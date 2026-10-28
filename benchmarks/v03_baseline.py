@@ -111,77 +111,52 @@ def step_diagram_entries(out):
 
 
 def hybrid_entries(out):
-    """The hybrid demos' loops: multi-rate filter and controller, sampled SMC, sampled PD."""
-    from minilink import SlidingMode
-    from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
-    from minilink.simulation import StepSchedule
+    """The hybrid demos' loops on the sampled loop: multi-rate filter and controller, sampled SMC, sampled PD."""
+    from minilink import SlidingMode, Step, closed_loop
+    from minilink.analysis import discretize
+
+    def plant_x(loop, traj):
+        start, end = loop.state_index["plant"]
+        return traj.x[start:end]
 
     # The multi-rate computer on an integrator (hybrid_multi_rate)
-    computer = StepDiagramSystem()
-    computer.add_subsystem(DiscreteLowPass(alpha=0.6), "filter")
-    computer.add_subsystem(P(10.0, ports="reference"), "controller")
-    computer.add_input_port("r")
-    computer.add_input_port("y_meas")
-    computer.connect("input", "r", "controller", "r")
-    computer.connect("input", "y_meas", "filter", "u")
-    computer.connect("filter", "y", "controller", "y")
-    computer.connect_new_output_port("filter", "y", "y_f")
-    computer.connect_new_output_port("controller", "u", "u_cmd")
-    schedule = StepSchedule.from_rates(
-        dt_base=0.01, rates_hz={"filter": 100.0, "controller": 10.0}
-    )
-    hybrid = hybrid_closed_loop(
-        computer,
-        Integrator(),
-        schedule=schedule,
-        computer_out="u_cmd",
-        computer_in="y_meas",
-    )
     for i in range(2):
-        result = hybrid.compute_forced(
-            lambda t: np.array([1.0 if t < 1.0 else 0.0]),
-            t_start=0,
-            tf=2.0,
-            input_port_id="r",
-            plant_dt_inner=0.002,
+        loop = closed_loop(
+            P(10.0, ports="reference") % 0.1,
+            discretize(Integrator(), 0.01, substeps=5),
+            reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
+            filter=DiscreteLowPass(alpha=0.6) % 0.01,
         )
-        out[f"hybrid.multi_rate.plant_x.{i}"] = result.plant.x
-        out[f"hybrid.multi_rate.computer.{i}"] = dict(result.computer.signals)
+        traj = loop.compute_trajectory(tf=2.0)
+        out[f"hybrid.multi_rate.plant_x.{i}"] = plant_x(loop, traj)
+        out[f"hybrid.multi_rate.loop_x.{i}"] = traj.x
 
     # The sampled sliding-mode controller on the pendulum (sampled_smc_pendulum)
     plant = Pendulum(length=1.0, mass=1.0)
     plant.x0 = np.array([np.pi + 0.25, 0.0])
     ctl = SlidingMode(plant, lam=2.0, gain=8.0, nab=0.15)
-    hybrid = hybrid_closed_loop(
-        ctl, plant, schedule=0.05, computer_in="y", plant_out="y"
-    )
-    result = hybrid.compute_forced(
-        np.array([0.0, 0.0]),
-        input_port_id="r",
-        t_start=0.0,
-        tf=1.0,
-        plant_dt_inner=0.001,
-    )
-    out["hybrid.smc.plant_x"] = result.plant.x
-    out["hybrid.smc.computer"] = dict(result.computer.signals)
+    ctl.inputs["r"].nominal_value = np.array([0.0, 0.0])
+    loop = (ctl % 0.05) @ discretize(plant, 0.05, substeps=50)
+    traj = loop.compute_trajectory(tf=1.0)
+    out["hybrid.smc.plant_x"] = plant_x(loop, traj)
+    out["hybrid.smc.loop_x"] = traj.x
 
-    # A sampled state feedback, trajectory and rollout verbs
+    # A sampled state feedback, the dense run
     plant = Pendulum()
     plant.x0 = X0.copy()
-    hybrid = hybrid_closed_loop(
-        pd_controller(), plant, schedule=0.05, computer_in="x", plant_out="x"
-    )
-    traj = hybrid.compute_trajectory(tf=1.0, plant_dt_inner=0.01)
-    out["hybrid.pd.trajectory_x"] = traj.plant.x
+    loop = (pd_controller() % 0.05) @ discretize(plant, 0.05, substeps=5)
+    traj = loop.compute_trajectory(tf=1.0)
+    out["hybrid.pd.trajectory_x"] = plant_x(loop, traj)
 
 
 def mpc_entries(out):
-    """The NumPy MPC on a single integrator (mpc_integrator_numpy), shortened."""
+    """The NumPy MPC on a single integrator (mpc_integrator_numpy), shortened: the delayed MPC on its clock."""
     from minilink import (
         DynamicSystem,
         SingletonSet,
         TrajectoryOptimizationPlanner,
     )
+    from minilink.analysis import discretize
     from minilink.control import ModelPredictiveController
 
     class SingleIntegrator(DynamicSystem):
@@ -220,12 +195,11 @@ def mpc_entries(out):
         optimizer_options={"maxiter": 80, "ftol": 1e-6},
         verbose=False,
     )
-    mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True, verbose=False)
-    hybrid = mpc @ plant
-    traj = hybrid.compute_trajectory(
-        tf=1.0, x0_plant=x0, plant_dt_inner=0.01, backend="numpy"
-    )
-    out["mpc.integrator.x"] = traj.plant.x
+    mpc = ModelPredictiveController(planner)
+    loop = (mpc % 0.2) @ discretize(plant, 0.2, substeps=20)
+    traj = loop.compute_trajectory(tf=1.0)
+    start, end = loop.state_index["plant"]
+    out["mpc.integrator.x"] = traj.x[start:end]
 
 
 # Entries: the problem evaluator and its program

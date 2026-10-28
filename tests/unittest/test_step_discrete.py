@@ -288,7 +288,6 @@ from minilink.core.compile.plan import (
     INTERNAL_SIGNAL,
     NOMINAL,
 )
-from minilink.core.discrete.step_rollout import StepRollout
 from minilink.core.trajectory import Trajectory
 
 try:
@@ -349,25 +348,7 @@ class TestGatherU(unittest.TestCase):
             gather_u(((99, 0, 1),), 1, np.zeros(1), np.zeros(1))
 
 
-class TestStepRollout(unittest.TestCase):
-    def test_shapes(self):
-        rollout = StepRollout(
-            k=np.arange(4, dtype=float), x=np.zeros((1, 4)), u=np.zeros((1, 4))
-        )
-        self.assertEqual(rollout.n_samples, 4)
-        self.assertEqual(rollout.n, 1)
-        self.assertEqual(rollout.m, 1)
-
-    def test_as_trajectory(self):
-        rollout = StepRollout(
-            k=np.array([0.0, 1.0, 2.0]),
-            x=np.array([[0.0, 1.0, 3.0]]),
-            u=np.array([[0.0, 1.0, 1.0]]),
-        )
-        traj = rollout.as_trajectory()
-        self.assertIsInstance(traj, Trajectory)
-        np.testing.assert_allclose(traj.t, [0.0, 1.0, 2.0])
-
+class TestComputeRollout(unittest.TestCase):
     def test_rollout_constant_u(self):
         plant = AffineStep()
         rollout = plant.compute_rollout(n_steps=3, u=np.array([1.0]))

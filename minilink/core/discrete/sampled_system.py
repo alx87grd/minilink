@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax
@@ -283,6 +285,123 @@ class SampledSystem(StepSystem):
         return self.source.get_dynamic_geometry(x, u, t, params)
 
 
+class NativeSampledSystem(SampledSystem):
+    """
+    A native sampled law: a system on a clock with no source, its equation written in seconds.
+
+    A subclass writes the seconds face, ``update(x, u, t)`` the state one
+    period after the sampling instant ``t``, and declares its output ports as
+    any system does (``add_output_port(id, function=…)``, each function in
+    seconds); the tick face is the base class's, ``step(x, u, k) =
+    update(x, u, k h)``. Its ``params``, ``x0`` and solver hints are its own.
+    ``sample_period`` is ``None`` until ``law % dt`` sets it, on a copy: the
+    equations never read the period, only the tick face does.
+    """
+
+    def __init__(self, n=0, sample_period=None):
+        # No source: the clock alone, unset until law % dt
+        self.source = None
+        self.solver = None
+        self.substeps = 1
+        self.sample_period = (
+            None if sample_period is None else positive_period(sample_period)
+        )
+
+        # The System shell: its own state, ports, parameters and hints
+        System.__init__(self, n)
+
+    @property
+    def params(self) -> dict:
+        """The law's own numbers."""
+        return self.params_override
+
+    @params.setter
+    def params(self, value: dict | None):
+        self.params_override = {} if value is None else value
+
+    @property
+    def x0(self):
+        """The law's own initial state."""
+        return self.__dict__["own_x0"]
+
+    @x0.setter
+    def x0(self, value):
+        self.__dict__["own_x0"] = np.array(value, dtype=float)
+
+    @property
+    def solver_info(self) -> dict:
+        """The law's own solver hints."""
+        return self.__dict__["own_solver_info"]
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.__dict__["own_solver_info"] = value
+
+    def refresh(self):
+        """Nothing derived to refresh: the law owns its structure."""
+        return
+
+    @property
+    def counts(self) -> bool:
+        """A native law reads seconds, never its tick count."""
+        return False
+
+    @property
+    def is_random(self):
+        """Whether the law draws: a ``seed`` in its ``params`` that is not ``None``."""
+        return self.params.get("seed") is not None
+
+    def realize(self, key):
+        """The law's ``params``: a native law holds no draw of its own to realize."""
+        return self.params
+
+    @property
+    def resolves(self) -> bool:
+        """A native law has no source integrated inside the period."""
+        return False
+
+    def update(self, x, u, t, params=None):
+        """The state one sample period after ``t``: the law's own equation."""
+        raise NotImplementedError(
+            f"{type(self).__name__} is a native sampled law: write update(x, u, t, params)"
+        )
+
+    def h(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        y_port = next(iter(self.outputs.values()))
+        dt = self.sample_period
+
+        # y_k = h(x_k, u_k, t_k), the first output port sampled at t_k = k Δt
+        t_k = k * dt
+        y = y_port.compute(x, u, t_k, params)
+
+        return y
+
+    def __mod__(self, dt: float):
+        """This law on a clock of period ``dt``: a copy with the period set and its own numbers and start (the equations unchanged)."""
+        require_no_clock(self)
+
+        sampled = copy.copy(self)
+        sampled.params = copy.deepcopy(self.params)
+        sampled.x0 = np.array(self.x0, dtype=float)
+        sampled.sample_period = positive_period(dt)
+        sampled.name = f"{self.name} % {float(dt):g}"
+
+        return sampled
+
+    # Display: the System shell's
+
+    def get_kinematic_geometry(self):
+        return System.get_kinematic_geometry(self)
+
+    def tf(self, x, u, t=0, params=None):
+        return System.tf(self, x, u, t, params)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        return System.get_dynamic_geometry(self, x, u, t, params)
+
+
 def sampled_substeps(plant, sample_period) -> int:
     """
     The integration steps per period of a plant on a clock: the automatic step rule.
@@ -407,3 +526,12 @@ def positive_period(sample_period: float) -> float:
     if sample_period <= 0.0:
         raise ValueError(f"sample_period must be positive, got {sample_period}")
     return sample_period
+
+
+def require_no_clock(law) -> None:
+    """Refuse to clock a native law that already has a period."""
+    if law.sample_period is not None:
+        raise TypeError(
+            f"{law.name} is already on a clock of {law.sample_period:g} s: clock the "
+            "law itself, once"
+        )

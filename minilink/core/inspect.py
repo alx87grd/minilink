@@ -68,12 +68,9 @@ def inspect_text(obj):
     if isinstance(obj, MathematicalProgram):
         return program_text(obj)
 
-    # Hybrid diagram and simulator: lazy imports from outer bands
-    from minilink.core.discrete.hybrid_diagram import HybridDiagram
+    # The simulator: a lazy import from an outer band
     from minilink.simulation.simulator import Simulator
 
-    if isinstance(obj, HybridDiagram):
-        return hybrid_diagram_text(obj)
     if isinstance(obj, Simulator):
         return simulator_text(obj)
 
@@ -408,18 +405,6 @@ def field_text(field):
         return format_inspect(cls, body)
 
     return cls
-
-
-def hybrid_diagram_text(hybrid):
-    computer = hybrid.computer
-    plant = hybrid.plant
-    diagram = getattr(computer, "diagram", None)
-    computer_name = getattr(diagram, "name", type(computer).__name__)
-    plant_name = getattr(plant, "name", type(plant).__name__)
-    headline = f"HybridDiagram, computer={computer_name}, plant={plant_name}"
-    body = [body_line("boundary connections", str(len(hybrid.connections)))]
-
-    return format_inspect(headline, body)
 
 
 def simulator_text(sim):

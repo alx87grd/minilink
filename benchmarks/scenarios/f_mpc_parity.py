@@ -1,4 +1,4 @@
-"""F MPC regression parity (hybrid ZOH, hand-loop, dual-rate).
+"""F MPC regression parity (the sampled loop, a hand loop on the face, dual rate).
 
 Compare against ``benchmarks/baselines/f_mpc_parity.json`` for the landed
 ``planning/trajectory_optimization/mpc`` product path.
@@ -17,6 +17,7 @@ from benchmarks.scenarios.common import (
 )
 from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
+from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -25,9 +26,9 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
 )
-from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
-from minilink.planning.trajectory_optimization.mpc.utilities import (
-    mpc_default_computer_x0,
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    PlanFollower,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -94,73 +95,75 @@ def _bicycle_planner():
     return planner, sys, x0
 
 
-def _nlp_solve_sum(planner) -> float:
-    total = 0.0
-    # Prefer last_solution record when available; hybrid accumulates
-    # via planner.last_solve_time_s only for the last tick — sum from history
-    # is not stored. Use wall time as primary; expose last_solve as secondary.
-    if planner.last_solve_time_s is not None:
-        total = float(planner.last_solve_time_s)
-    return total
+class TimedSolves:
+    """The MPC face's ``solve`` wrapped to time the last solve (past the first, compiled, one) and record each status."""
+
+    def __init__(self, pv):
+        self.solve = pv.solve
+        self.seconds = 0.0
+        self.success = True
+        pv.solve = self
+
+    def __call__(self, params=None, z0=None):
+        t0 = time.perf_counter()
+        z, status = self.solve(params, z0)
+        self.seconds = time.perf_counter() - t0
+        self.success = self.success and bool(status["success"])
+        return z, status
+
+
+def plant_run(loop, traj) -> Trajectory:
+    """The plant's samples of a loop's run."""
+    start, end = loop.state_index["plant"]
+    return Trajectory(t=traj.t, x=traj.x[start:end], u=traj.u)
 
 
 def run_hybrid_zoh() -> list[MetricRecord]:
-    """``mpc @ plant`` single-rate u_ff ZOH."""
+    """``(mpc % dt) @ plant``: the delayed MPC on its clock, its command held."""
     _require_jax()
     planner, sys, x0 = _bicycle_planner()
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
-    hybrid = mpc @ sys
+    mpc = ModelPredictiveController(planner)
+    solves = TimedSolves(mpc.pv)
+    loop = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 
     t0 = time.perf_counter()
-    result = hybrid.compute_trajectory(
-        tf=TF_HYBRID,
-        x0_plant=x0,
-        x0_computer=mpc_default_computer_x0(planner),
-        plant_dt_inner=SIM_DT,
-        backend="jax",
-    )
+    result = loop.compute_trajectory(tf=TF_HYBRID)
     wall = time.perf_counter() - t0
-    traj = result.plant
+    traj = plant_run(loop, result)
     assert_simulation_finite(traj)
-    success = True
-    if planner.last_solution is not None:
-        success = bool(planner.last_solution.success)
     return _metrics(
         prefix="f.hybrid_zoh",
         traj=traj,
-        success=success,
+        success=solves.success,
         wall_s=wall,
-        nlp_s=_nlp_solve_sum(planner),
-        notes="mpc @ plant warm-start ZOH, short tf",
+        nlp_s=solves.seconds,
+        notes="(mpc % dt) @ plant, the delayed MPC, short tf",
     )
 
 
 def run_hand_loop() -> list[MetricRecord]:
-    """Deploy-shaped ``compute_command`` closed loop (few ticks)."""
+    """A deploy-shaped host loop on the planner's face: solve, shift, command (few ticks)."""
     _require_jax()
     planner, sys, x0 = _bicycle_planner()
     plant = BicycleDynRate()
     plant.x0 = x0.copy()
     plant_eval = plant.compile(backend="jax")
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
+    pv = planner.compile()
+    solves = TimedSolves(pv)
 
     t_hist = [0.0]
     x_hist = [x0.copy()]
     x = x0.copy()
     t = 0.0
+    z = pv.initial()
     u_hold = np.zeros(plant.m)
     next_mpc_t = 0.0
-    nlp_sum = 0.0
-    success = True
 
     t0 = time.perf_counter()
     while t < TF_HAND - 1e-12:
         if t >= next_mpc_t - 1e-12:
-            cmd = mpc.compute_command(x, t=t)
-            u_hold = cmd.u_ff.copy()
-            success = success and bool(cmd.success)
-            if planner.last_solve_time_s is not None:
-                nlp_sum += float(planner.last_solve_time_s)
+            z, _ = pv.solve({"x_start": x, "t_start": t}, z0=pv.shift(z, t))
+            u_hold = np.asarray(pv.command(z, x, t), dtype=float)
             next_mpc_t += MPC_DT
         x = plant_eval.step(x, u_hold, t, dt=SIM_DT)
         t += SIM_DT
@@ -177,42 +180,36 @@ def run_hand_loop() -> list[MetricRecord]:
     return _metrics(
         prefix="f.hand_loop",
         traj=traj,
-        success=success,
+        success=solves.success,
         wall_s=wall,
-        nlp_s=nlp_sum,
-        notes="compute_command hand loop, short tf",
+        nlp_s=solves.seconds,
+        notes="host loop on pv.solve / shift / command, short tf",
     )
 
 
 def run_dual_rate() -> list[MetricRecord]:
-    """``dual_rate_computer @ plant`` with u_nom broadcast."""
+    """``(mpc % slow) >> (PlanFollower % fast) @ plant``: the plan applied at the fast rate."""
     _require_jax()
     planner, sys, x0 = _bicycle_planner()
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
-    computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
-    hybrid = computer @ sys
+    mpc = ModelPredictiveController(planner)
+    solves = TimedSolves(mpc.pv)
+    computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
+    loop = computer @ discretize(
+        sys, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT)
+    )
 
     t0 = time.perf_counter()
-    result = hybrid.compute_trajectory(
-        tf=TF_HYBRID,
-        x0_plant=x0,
-        x0_computer=mpc_default_computer_x0(planner),
-        plant_dt_inner=SIM_DT,
-        backend="jax",
-    )
+    result = loop.compute_trajectory(tf=TF_HYBRID)
     wall = time.perf_counter() - t0
-    traj = result.plant
+    traj = plant_run(loop, result)
     assert_simulation_finite(traj)
-    success = True
-    if planner.last_solution is not None:
-        success = bool(planner.last_solution.success)
     return _metrics(
         prefix="f.dual_rate",
         traj=traj,
-        success=success,
+        success=solves.success,
         wall_s=wall,
-        nlp_s=_nlp_solve_sum(planner),
-        notes="dual_rate_computer @ plant, short tf",
+        nlp_s=solves.seconds,
+        notes="(mpc % slow) >> (PlanFollower % fast) @ plant, short tf",
     )
 
 

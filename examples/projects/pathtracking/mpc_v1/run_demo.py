@@ -21,10 +21,10 @@ from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
 from minilink import BicycleDynRate
+from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
-from minilink.core.discrete.hybrid_composition import hybrid_closed_loop
 from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount
@@ -33,9 +33,6 @@ from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
     mpc_animation_overlays,
-)
-from minilink.planning.trajectory_optimization.mpc.utilities import (
-    mpc_default_computer_x0,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -108,9 +105,9 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 computer = dual_rate_computer_ahead(
-    mpc, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
+    mpc, planner, dt_mpc=MPC_DT, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
 )
 
 plant_to_mpc = PlantToMpcState()
@@ -161,29 +158,20 @@ vehicle.x0[5] = 0.0
 vehicle.x0[6] = U_TARGET / r_r
 vehicle.x0[7] = 0.0
 
-x0_plant = np.concatenate([vehicle.x0, servos.x0])
-hybrid = hybrid_closed_loop(
-    computer.diagram,
-    plant,
-    schedule=computer.schedule,
-    computer=computer,
-    computer_out="x_nom",
-    plant_in="x_nom",
-    plant_out="y_mpc",
-    computer_in="y",
+hybrid = computer @ discretize(
+    plant, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT)
 )
 
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0_plant,
-    x0_computer=mpc_default_computer_x0(planner),
-    plant_dt_inner=SIM_DT,
-    backend="numpy",
-    verbose=True,
-)
+result = hybrid.compute_trajectory(tf=TF_SIM, verbose=True)
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, track=track),
+    overlays=mpc_animation_overlays(
+        result,
+        mpc,
+        loop=hybrid,
+        block="controller/DelayedPredictiveController",
+        track=track,
+    ),
     renderer="matplotlib",
 )

@@ -187,7 +187,8 @@ Why: [core-architecture.md](core-architecture.md) §2.
   [the run's log](../reviews/2026-10-29-v03-run-log.md) §7): `Computer.tick`'s one-tick lag and
   `StepRollout`, the legacy hybrid computer's record, leave with `Computer` when the MPC is
   rebuilt on the sampled loop (§1.8, join 2; the run's log RD-8). Done when no `Computer` or
-  `StepRollout` remains.
+  `StepRollout` remains. Landed at join 2: `Computer`, `StepRollout` and the hybrid runtime
+  removed.
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
   steps). Done when the family path is within 2× of the plain batch. Also: gate the quoted
@@ -280,7 +281,10 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   - the dual-rate MPC projects rewritten as composition, with the MPC (join 2);
   - tutorial 06 on the sampled loop, with the notebook sweep (§1.10, R167).
 
-  Done when every hybrid notebook and project runs as a `SampledDiagramSystem`.
+  Done when every hybrid notebook and project runs as a `SampledDiagramSystem`. Landed at join
+  2: the legacy runtime removed (`Computer`, `StepSchedule`, `HybridDiagram`,
+  `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
+  projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
@@ -400,10 +404,10 @@ solvers and MPPI are v0.4 (§4).
   `CompiledTrajectoryPlanner` (`z` the knots with the origin appended), `planner.params`,
   `iterations=` forwarded to the `Optimizer`, single shooting's JAX program on the tree; both
   done-when checks pass (byte-identical on NumPy and JAX, a `vmap` of the native Adam planner
-  over starts). Rest: the `"method"` and `seed` leaves of `planner.params` (with NS-8, the
-  native method's numbers), `planner.solve` rebuilt on the face without mutation and
-  `last_solution` gone (with the MPC's rebuild, which reads it; the run log's RD-35), LQR and
-  value iteration.
+  over starts). At join 2: `planner.solve(params=None, *, guess=None, ...)`, no solve reading
+  `last_solution` (the run log's RD-53). Rest: the `"method"` and `seed` leaves of
+  `planner.params` (v0.4 with MPPI, RD-54), `last_solution` with the plotting shortcuts (D1.4),
+  the face of LQR and value iteration.
 - [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
@@ -419,10 +423,16 @@ solvers and MPPI are v0.4 (§4).
   numbers re-pinned once with R123's delay. Done when one tick jits on the native planner and
   matches the host SLSQP plan within a tolerance on the pendulum and the cart-pole, and the Ipopt
   MPC runs on the host runner.
+  Landed at join 2 (the run log's RD-49 to RD-52): `ModelPredictiveController` on the face,
+  delayed (a `NativeSampledSystem` whose state is the plan) or pure, `inputs=`, `lookahead=`
+  (delay compensation), `PlanFollower`, the legacy MPC and the hybrid runtime gone, every MPC
+  demo and project swept, the MPC baselines re-pinned once. Rest: the MPC demos' retuning for
+  the delay (RD-52, yours), `racecar_toward_mpc.ipynb` at step 7.
 - [ ] **Its closed loop in one scan, tuned by gradient** (NS-9): `problem.compile(mpc % Δ)`
   `.evaluate(p)` runs, `vmap`s over starts, and `jax.grad` with respect to `controller.cost.Q`
   tunes a demo by `Optimizer`. The gradient MPC comes first, as the direction places it; MPPI is
-  v0.4.
+  v0.4. Landed at join 2: acceptance script 5, the `native_mpc_tuning` demo (the plan's
+  weights tuned by L-BFGS through the closed loop).
 
 ### 1.9 Fields
 

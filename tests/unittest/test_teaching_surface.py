@@ -199,13 +199,8 @@ TEACHING_LANE_PREFIXES = (
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
-    "minilink.planning.trajectory_optimization.mpc.controller",
-    "minilink.planning.trajectory_optimization.mpc.utilities",
     "minilink.planning.trajectory_optimization.mpc.viz",
     "minilink.simulation.realtime",
-    "minilink.simulation.discrete.computer",
-    "minilink.simulation.discrete.hybrid_simulator",
-    "minilink.core.discrete.hybrid",
     "minilink.experimental",
 )
 
@@ -217,18 +212,10 @@ BAND_FACADES = (
 )
 
 # Research-lane names a band facade re-exports beside the teaching tool they
-# extend (the sibling hybrid algebra and the real-time loop next to
-# `Simulator`). They carry a docstring and an API page, never reach the root
-# prelude, and this list only shrinks.
+# extend (the real-time loop next to `Simulator`). They carry a docstring and an
+# API page, never reach the root prelude, and this list only shrinks.
 BAND_RESEARCH_NAMES = {
-    "minilink.simulation": (
-        "Computer",
-        "StepSchedule",
-        "HybridSimulator",
-        "HybridSimResult",
-        "RealtimeSimulator",
-        "hybrid_closed_loop",
-    ),
+    "minilink.simulation": ("RealtimeSimulator",),
 }
 
 # Facades whose every exported name must have an API page under docs/api.

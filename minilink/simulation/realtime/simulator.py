@@ -10,9 +10,8 @@ an optional :class:`~minilink.simulation.realtime.io.RealtimeOutput`, and
 return a :class:`~minilink.core.trajectory.Trajectory` when the session stops.
 
 Sibling orchestrators: :class:`~minilink.simulation.simulator.Simulator`
-(offline time grid) and
-:class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` (computer
-ticks). The stepping math lives in the evaluators; this module owns only the
+(offline time grid) and the sampled loop's run verbs (``compute_rollout``,
+``compute_trajectory``: its ticks). The stepping math lives in the evaluators; this module owns only the
 loop, the clock policy, and the recording.
 
 TODO: User Architectural Review — first realtime slice (game-mode parity);

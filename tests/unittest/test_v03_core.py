@@ -56,7 +56,7 @@ def digital_pid_problem():
     return problem, pid
 
 
-# Script 1, the objects lane
+# Script 1
 
 LQG_DT, LQG_TF = 0.01, 5.0
 PROCESS_PSD = 0.04  # W, the torque's white-noise intensity
@@ -159,7 +159,7 @@ def test_script_01_objects_an_lqg_loop_scores_its_covariance_prediction():
     assert abs(J_s.mean() - expected) < 3.0 * J_s.std(ddof=1) / np.sqrt(J_s.size)
 
 
-# Script 2, the loop lane
+# Script 2
 
 
 @pytest.mark.optional
@@ -187,7 +187,7 @@ def test_script_02_loop_a_digital_pid_has_a_gradient():
         problem.compile(pid % 0.01, dt=0.02)
 
 
-# Script 3, the loop lane
+# Script 3
 
 
 def test_script_03_loop_the_run_verbs_and_the_score_give_one_run():
@@ -207,7 +207,7 @@ def test_script_03_loop_the_run_verbs_and_the_score_give_one_run():
     np.testing.assert_allclose(host.x, dense.x, atol=1e-7)
 
 
-# Script 10, the loop lane
+# Script 10
 
 
 def multi_rate_loop():
@@ -251,7 +251,7 @@ def test_script_10_loop_a_multi_rate_computer_on_a_continuous_plant(backend):
     )
 
 
-# Script 11, the loop lane
+# Script 11
 
 
 def test_script_11_loop_a_bare_reference_reads_seconds():
@@ -528,7 +528,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     assert plan.solver.cost == pytest.approx(reference.solver.cost, rel=1e-6)
 
 
-# Script 6, join 1
+# Script 6
 
 
 def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
@@ -605,3 +605,97 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     # The planner's evidence is the same held loop on the face
     evidence = vi.nominal_trajectory()
     np.testing.assert_array_equal(evidence.x.T, face.run(policy)[0])
+
+
+# Script 5
+
+
+def native_mpc_problem():
+    """The pendulum regulated from 0.5 rad over 2 s, and a native fixed-iteration planner on it (single shooting, Adam)."""
+    from minilink.planning import TrajectoryOptimizationPlanner
+    from minilink.planning.trajectory_optimization.shooting import (
+        ShootingOptions,
+        ShootingTranscription,
+    )
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.array([0.5, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        backend="jax",
+        method="adam",
+        iterations=30,
+        optimizer_options={"learning_rate": 0.05},
+    )
+    return problem, planner
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradient():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    from minilink.control import ModelPredictiveController
+
+    problem, planner = native_mpc_problem()
+    mpc = ModelPredictiveController(planner)
+    pe = problem.compile(mpc % 0.1, backend="jax")
+    params = pe.params
+
+    def objective(p):
+        return pe.evaluate(p).objective
+
+    J = objective(params)
+    assert np.isfinite(J)
+
+    # vmap over starts: one closed loop per start, the same J as one by one
+    starts = jnp.asarray([[0.5, 0.0], [0.3, 0.2]])
+    batch = jax.vmap(lambda x: objective({**params, "x_start": x}))(starts)
+    np.testing.assert_allclose(batch[0], J, rtol=1e-10)
+    np.testing.assert_allclose(
+        batch[1], objective({**params, "x_start": np.asarray(starts[1])}), rtol=1e-10
+    )
+
+    # The gradient in the controller's effort weight R, against a central difference
+    def J_of_R(r):
+        cost = {**params["controller"]["cost"], "R": r}
+        return objective(
+            {**params, "controller": {**params["controller"], "cost": cost}}
+        )
+
+    R = params["controller"]["cost"]["R"]
+    g = jax.grad(J_of_R)(R)
+    eps = 1e-5
+    central = (J_of_R(R + eps) - J_of_R(R - eps)) / (2 * eps)
+    np.testing.assert_allclose(g.sum(), central, rtol=1e-4)
+
+    # One gradient step on R lowers the loop's J
+    assert J_of_R(R - 0.05 * g / jnp.abs(g).max()) < J
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late():
+    from minilink.control import ModelPredictiveController, PlanFollower
+
+    problem, planner = native_mpc_problem()
+    mpc = ModelPredictiveController(planner)
+    computer = (mpc % 0.05) >> (PlanFollower(planner) % 0.01)
+    pe = problem.compile(computer, backend="jax")
+    u = np.asarray(pe.trajectory().get_signal("plant:u"))[0]
+
+    # The first slow period applies the guess (zero); the plan solved at t = 0 from
+    # x(0) arrives at t = 0.05 and is read at the fast ticks
+    np.testing.assert_array_equal(u[:5], 0.0)
+    pv = mpc.pv
+    z0, _ = pv.solve({"x_start": problem.x_start, "t_start": 0.0}, z0=pv.initial())
+    expected = [float(pv.command(z0, None, 0.01 * k)[0]) for k in range(5, 10)]
+    np.testing.assert_allclose(u[5:10], expected, rtol=1e-10)

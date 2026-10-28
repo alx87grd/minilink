@@ -1,8 +1,8 @@
 """Dual-rate path-tracking MPC with a ROS2-style manual deploy loop.
 
 Big ``=====`` boxes mark the ROS2 copy-paste surface: one ``__init__`` block
-(path → planning problem → planner → ``mpc``) and two timer callbacks.
-Everything else is offline sim / plotting only.
+(path → planning problem → planner → its compiled face ``pv`` and the plan
+``z``) and two timer callbacks. Everything else is offline sim / plotting only.
 
 Flip ``BACKEND`` below: ``"jax"`` parametric compile, ``"numpy"`` rebuild each
 replan tick (see ``mpc_integrator_numpy.py``).
@@ -31,7 +31,6 @@ from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -47,7 +46,7 @@ SHOW_COST_FIELD = True
 CAMERA_SCALE = 14.0
 
 # =============================================================================
-# ROS2 NODE __init__ — copy this whole block once (keep ``mpc`` as a member)
+# ROS2 NODE __init__ — copy this whole block once (keep ``pv`` and ``z`` as members)
 # =============================================================================
 WAYPOINTS = [
     (0.0, 0.0),
@@ -121,7 +120,8 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+pv = planner.compile()  # the planner's pure face: solve, shift, command, prediction
+z = pv.initial()  # the plan, its origin t_start inside
 # =============================================================================
 # end ROS2 NODE __init__
 # =============================================================================
@@ -176,30 +176,29 @@ while t < TF_SIM - 1e-12:
     if t >= next_replan_t - 1e-12:
         # =============================================================================
         # ROS2 NODE slow timer (period = MPC_DT) — copy these 2 lines
-        #   inputs: measured state ``x``, wall time ``t``
+        #   inputs: measured state ``x``, wall time ``t``; a failed solve keeps the old plan
         # =============================================================================
-        cmd = mpc.compute_command(x, t=t)
-        mpc.generate_nominal_interpolator(derivatives=True)
+        z_new, status = pv.solve({"x_start": x, "t_start": t}, z0=pv.shift(z, t))
+        z = z_new if status["success"] else z
         # =============================================================================
         # end ROS2 NODE slow timer
         # =============================================================================
 
         # offline only: stash horizon for animation overlay
-        plan = cmd.solution.trajectory
-        mpc_plans.append(
-            (t, Trajectory(t=plan.t + t, x=plan.x.copy(), u=plan.u.copy()))
-        )
+        plan = pv.solution(z, {"t_start": float(z[-1])}).trajectory
+        mpc_plans.append((t, plan))
         next_replan_t += MPC_DT
 
     if t >= next_broadcast_t - 1e-12:
         # =============================================================================
         # ROS2 NODE fast timer (period = DT_BROADCAST) — copy these 4 lines
-        #   then publish / apply ``u_nom`` (and optionally x/du/dx) to the plant
+        #   then publish / apply ``u_nom`` (and optionally x/du/dx) to the plant;
+        #   the plan is linear between its knots: its rates over one broadcast period
         # =============================================================================
-        u_nom = mpc.get_nominal_u(t)
-        x_nom = mpc.get_nominal_x(t)
-        du_nom = mpc.get_nominal_u_dot(t)
-        dx_nom = mpc.get_nominal_x_dot(t)
+        x_nom, u_nom = pv.prediction(z, t)
+        x_ahead, u_ahead = pv.prediction(z, t + DT_BROADCAST)
+        du_nom = (u_ahead - u_nom) / DT_BROADCAST
+        dx_nom = (x_ahead - x_nom) / DT_BROADCAST
         # =============================================================================
         # end ROS2 NODE fast timer
         # =============================================================================

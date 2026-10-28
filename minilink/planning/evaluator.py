@@ -921,17 +921,17 @@ def require_continuous_or_clocked(controller):
 
 
 def require_no_stateless_mpc(controller):
-    """Refuse the stateless MPC: closed as a continuous law, it would re-solve at every integrator stage."""
+    """Refuse the pure MPC with no clock: closed as a continuous law, it would re-solve at every integrator stage."""
     # Lazy import: the MPC loads with the first one evaluated
-    from minilink.planning.trajectory_optimization.mpc.controller import (
-        MPCStatelessController,
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        PurePredictiveController,
     )
 
-    if isinstance(controller, MPCStatelessController):
+    if isinstance(controller, PurePredictiveController):
         raise TypeError(
-            "an MPC solves once per period on its clock: the stateless MPC closed as a "
-            "continuous law would re-solve at every integrator stage; run it in its "
-            "sampled loop (mpc % dt @ plant, compute_trajectory)"
+            "an MPC solves once per period on its clock: the pure MPC closed as a "
+            "continuous law would re-solve at every integrator stage; put it on its "
+            "clock (mpc % dt)"
         )
 
 

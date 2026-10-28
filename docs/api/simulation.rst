@@ -25,17 +25,5 @@ Simulation
 .. automodule:: minilink.simulation.solvers.rk4_fixed
    :members:
 
-.. automodule:: minilink.simulation.discrete.computer
-   :members:
-
-.. automodule:: minilink.simulation.discrete.hybrid_simulator
-   :members:
-
-.. automodule:: minilink.core.discrete.hybrid_diagram
-   :members:
-
-.. automodule:: minilink.core.discrete.hybrid_composition
-   :members:
-
 .. automodule:: minilink.simulation.realtime.simulator
    :members:

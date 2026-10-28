@@ -137,7 +137,7 @@ guess = Trajectory(
     u=np.gradient(xy, t_grid, axis=0).T,
 )
 
-traj = planner.solve(initial_guess=guess).trajectory
+traj = planner.solve(guess=guess).trajectory
 distances = [
     float(track.distance_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]

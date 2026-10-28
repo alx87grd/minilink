@@ -1,4 +1,4 @@
-"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick."""
+"""Minimal sampled MPC without JAX — the NumPy program rebuilt each tick."""
 
 import numpy as np
 
@@ -9,6 +9,7 @@ from minilink import (
     SingletonSet,
     TrajectoryOptimizationPlanner,
 )
+from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 
 
@@ -58,16 +59,14 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 80, "ftol": 1e-6},
 )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
-)
-hybrid = mpc @ sys
+mpc = ModelPredictiveController(planner)
+
+# The MPC on its clock, the plant sampled at it with SIM_DT steps inside each period
+hybrid = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 
 hybrid.plot_diagram()
-hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    backend="numpy",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM)
+if VERBOSE:
+    start, end = hybrid.state_index["plant"]
+    print(f"x(tf) = {result.x[start:end, -1]}, the goal {x_goal}")
 hybrid.plot_trajectory()

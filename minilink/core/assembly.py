@@ -477,8 +477,8 @@ def default_subsystem_id(sys, *, role=None) -> str:
 
 
 def base_system_id(sys) -> str:
-    """The block's class name as an id (``Pendulum``, ``Drone2D``, ``UdeSRacecar``); a block on a clock takes its source's."""
-    if isinstance(sys, SampledSystem):
+    """The block's class name as an id (``Pendulum``, ``Drone2D``, ``UdeSRacecar``); a block on a clock takes its source's (a native law its own)."""
+    if isinstance(sys, SampledSystem) and sys.source is not None:
         return base_system_id(sys.source)
 
     return type(sys).__name__

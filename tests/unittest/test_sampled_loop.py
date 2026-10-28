@@ -214,21 +214,23 @@ def test_a_tick_law_has_no_continuous_time():
 
 @pytest.mark.optional
 @pytest.mark.jax
-def test_the_problem_refuses_the_stateless_mpc_naming_its_clock():
+def test_the_problem_refuses_the_pure_mpc_naming_its_clock():
     pytest.importorskip("jax")
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
-    from minilink.planning.trajectory_optimization.mpc.controller import (
-        MPCStatelessController,
-    )
+    from minilink.control import ModelPredictiveController
 
     plant = Pendulum()
     problem = PlanningProblem(
         plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), tf=1.0
     )
     planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
-    mpc = MPCStatelessController(planner, dt_mpc=0.1)
+    mpc = ModelPredictiveController(planner, delay=False)
     with pytest.raises(TypeError, match="mpc % dt"):
         problem.compile(mpc, dt=0.1)
+
+    # The delayed form with no clock is a tick law with no clock: refused alike
+    with pytest.raises(TypeError, match="% dt"):
+        problem.compile(ModelPredictiveController(planner), dt=0.1)
 
 
 def test_a_tick_law_with_no_clock_is_refused_by_the_problem():

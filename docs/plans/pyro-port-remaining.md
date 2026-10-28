@@ -261,7 +261,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | --- | --- | --- |
 | Discrete-time / ZOH library | **Done** (2026-10-24) | The exact zero-order hold on `discretize(sys, dt, solver="exact")` (`analysis/discretization.py`), S75's step SM-2 (the contract in DESIGN §5); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
 | RNN / recurrent blocks | **Drop** | — |
-| Mixed-rate sim (a sampled controller on a continuous plant) | **Done** | `HybridSimulator`, `Computer` (`simulation/discrete/`, the `%` operator); R110, 2026-10-25 |
+| Mixed-rate sim (a sampled controller on a continuous plant) | **Done** | the sampled loop (`SampledDiagramSystem`, the `%` operator, `simulation/discrete/clock_runner.py`); R110, 2026-10-25; the v0.3 run |
 | Hybrid events (guards and resets, event-driven switching) | **Drop** | out of scope (ROADMAP §7); R110 |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
 | Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |

@@ -8,6 +8,7 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
+from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
@@ -68,15 +69,13 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 
 # --- closed loop ---
-diagram = mpc @ car
+diagram = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / 0.01))
 
 # diagram.plot_diagram()
-result = diagram.compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=0.01, backend="jax"
-)
+result = diagram.compute_trajectory(tf=TF)
 # diagram.plot_trajectory()
 
 # --- 3-D look: same lap ---
@@ -84,7 +83,9 @@ car.camera_follow_frame = "body"
 car.skin = racecar_skin_3d
 
 diagram.animate(
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+    overlays=mpc_animation_overlays(
+        result, mpc, loop=diagram, scene=scene, track=track
+    ),
     renderer="meshcat",
     native=False,
 )

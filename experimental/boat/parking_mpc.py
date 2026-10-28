@@ -3,6 +3,7 @@
 from parking import CURRENT, X_START, ParkingBoat, parking_cost
 
 from minilink import PlanningProblem, TrajectoryOptimizationPlanner
+from minilink.analysis import discretize
 from minilink.graphical.catalog.boat_skin import boat_skin_3d
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
@@ -37,22 +38,21 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 
-loop = mpc @ boat
-result = loop.compute_trajectory(
-    tf=TF_SIM, x0_plant=X_START, plant_dt_inner=SIM_DT, backend="jax"
-)
+boat.x0 = X_START
+loop = (mpc % MPC_DT) @ discretize(boat, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+result = loop.compute_trajectory(tf=TF_SIM)
 loop.plot_trajectory()
 loop.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner),
+    result.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, mpc, loop=loop),
 )
 
 boat.skin = boat_skin_3d  # the hull on the water, in the browser
 loop.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner),
+    result.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, mpc, loop=loop),
     renderer="meshcat",
     native=False,
 )

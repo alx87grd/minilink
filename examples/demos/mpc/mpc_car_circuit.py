@@ -8,6 +8,7 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
+from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.core.geometry import Sphere
 from minilink.core.shaping import (
@@ -194,7 +195,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner)
 
 sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
@@ -202,15 +203,10 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 18.0
 sys_sim.x0 = x0.copy()
 
-hybrid = mpc @ sys_sim
+hybrid = (mpc % MPC_DT) @ discretize(sys_sim, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM)
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track)
+    overlays=mpc_animation_overlays(result, mpc, loop=hybrid, scene=scene, track=track)
 )

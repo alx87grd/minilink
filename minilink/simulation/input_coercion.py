@@ -65,7 +65,7 @@ def validate_forced_u_traj(u_traj, m, n_pts):
 def require_x0(x0, n, *, label="x0"):
     """Refuse an initial state that is not a finite 1-D vector ``(n,)``; return it as floats.
 
-    ``label`` names the state in the refusal (``x0_plant``, ``x0_computer``).
+    ``label`` names the state in the refusal (``x0``).
     """
     x0_arr = np.asarray(x0, dtype=float)
     if x0_arr.ndim != 1:

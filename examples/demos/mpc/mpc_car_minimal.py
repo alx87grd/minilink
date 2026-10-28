@@ -1,4 +1,4 @@
-"""Minimal hybrid MPC: ``ModelPredictiveController`` then ``mpc @ plant``."""
+"""Minimal sampled MPC: ``ModelPredictiveController`` then ``(mpc % dt) @ plant``."""
 
 import numpy as np
 
@@ -8,6 +8,7 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
+from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
@@ -47,21 +48,20 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 10, "ftol": 1.0},
 )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
-)
+mpc = ModelPredictiveController(planner)
 
-hybrid = mpc @ sys
+# The MPC on its clock, the plant sampled at it with SIM_DT steps inside each period
+hybrid = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))
 
 hybrid.plot_diagram()
 
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM)
+if VERBOSE:
+    start, end = hybrid.state_index["plant"]
+    print(
+        f"{round(TF_SIM / MPC_DT)} ticks, one solve each; final state {result.x[start:end, -1]}"
+    )
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, reference_pad=REF_X_PAD)
+    overlays=mpc_animation_overlays(result, mpc, loop=hybrid, reference_pad=REF_X_PAD)
 )

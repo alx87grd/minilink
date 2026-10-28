@@ -380,7 +380,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         traj = planner.solve().trajectory
-        warm_started = planner.solve(warm_start=True).trajectory
+        warm_started = planner.solve(guess=planner.last_solution).trajectory
         self.assertTrue(planner.last_optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.iteration_history), 0)
@@ -509,7 +509,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertEqual(id(callback.fig), fig_id)
         self.assertEqual([id(line) for line in callback.lines], line_ids)
 
-    def test_trajopt_warm_start_passes_previous_trajectory(self):
+    def test_trajopt_a_solution_as_guess_passes_its_trajectory(self):
 
         class RecordingTranscription(DirectCollocationTranscription):
             def __init__(self, options):
@@ -526,12 +526,28 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                warm_start=True, optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
-        first = planner.solve().trajectory
+        first = planner.solve()
+        planner.solve(guess=first)
+        self.assertIs(transcription.guesses[1], first.trajectory)
+
+        # No solve reads the last one: a bare solve starts from the default again
         planner.solve()
-        self.assertIs(transcription.guesses[1], first)
+        self.assertIsNot(transcription.guesses[2], first.trajectory)
+
+    def test_trajopt_solve_on_params_is_a_solve_of_the_moved_problem(self):
+        problem = self.make_single_integrator_problem()
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=5,
+            transcription="direct_collocation",
+            optimizer_options={"maxiter": 100, "ftol": 1e-09},
+        )
+        moved = planner.solve({"x_start": np.array([0.4])})
+        np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
+        np.testing.assert_allclose(planner.problem.x_start, problem.x_start)
 
 
 import pytest
@@ -713,71 +729,6 @@ class TestRrtFlatConstructor(unittest.TestCase):
         self.assertEqual(flat.options.max_nodes, nested.options.max_nodes)
         self.assertEqual(flat.options.goal_bias, nested.options.goal_bias)
         self.assertEqual(flat.options.seed, nested.options.seed)
-
-
-@pytest.mark.optional
-@pytest.mark.jax
-class TestHybridDefaultComputerX0(unittest.TestCase):
-    def test_omit_x0_computer_matches_helper(self):
-        pytest.importorskip("jax")
-        import jax.numpy as jnp
-        from minilink.planning.trajectory_optimization.mpc import (
-            ModelPredictiveController,
-        )
-        from minilink.planning.trajectory_optimization.mpc.utilities import (
-            mpc_default_computer_x0,
-        )
-        from minilink.core.backends import configure_jax
-
-        class JaxSingleIntegrator(DynamicSystem):
-            def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-                self.state.lower_bound = np.array([-10.0])
-                self.state.upper_bound = np.array([10.0])
-                self.inputs["u"].lower_bound = np.array([-10.0])
-                self.inputs["u"].upper_bound = np.array([10.0])
-
-            def f(self, x, u, t=0, params=None):
-                return jnp.array([u[0]])
-
-            def h(self, x, u, t=0, params=None):
-                return x
-
-        configure_jax(enable_x64=True)
-        sys = JaxSingleIntegrator()
-        sys.x0 = np.array([0.0])
-        problem = PlanningProblem(
-            sys=sys,
-            tf=0.4,
-            x_start=np.array([0.0]),
-            cost=QuadraticCost.from_system(
-                sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
-            ),
-            U=sys.input_box,
-        )
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=4,
-            transcription="direct_collocation",
-            backend="jax",
-            optimizer_options={"maxiter": 30, "ftol": 0.001},
-        )
-        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-        hybrid = mpc @ sys
-        z0 = mpc_default_computer_x0(planner)
-        with_helper = hybrid.compute_trajectory(
-            tf=0.4,
-            x0_plant=np.array([0.0]),
-            x0_computer=z0,
-            backend="numpy",
-            verbose=False,
-        )
-        without = hybrid.compute_trajectory(
-            tf=0.4, x0_plant=np.array([0.0]), backend="numpy", verbose=False
-        )
-        np.testing.assert_allclose(
-            without.plant.x[:, -1], with_helper.plant.x[:, -1], atol=1e-08, rtol=1e-08
-        )
 
 
 from minilink.core.sets import BallSet, BoxSet
