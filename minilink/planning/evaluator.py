@@ -645,12 +645,13 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     """
     The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
 
-    ``u_k = π(x_k, t_k)`` held while one step of the plant takes ``x_k`` to
-    ``x_{k+1}``, nominal parameters, on NumPy: the sampled loop a feedback
-    planner designs for (its grid, its model), reported beside its policy;
-    :func:`evaluate` scores the continuous loop. A stochastic problem runs at
-    its mean start; ``tf`` is the run's length for an infinite horizon. ``u`` is
-    the plant's command port.
+    ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
+    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period, R141), nominal
+    parameters, on NumPy, from ``t_start``: the sampled loop a feedback planner
+    designs for (its grid, its model), reported beside its policy; the
+    planner's evaluation scores the same law held on the plant's own clock
+    (R159). A stochastic problem runs at its mean start; ``tf`` is the run's
+    length for an infinite horizon. ``u`` is the plant's command port.
     """
     # Lazy import: the loop roles load with the first rollout
     from minilink.core.roles import command_port
@@ -660,9 +661,10 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     plant = nominal.sys
     n_steps = steps_of(horizon_of(nominal, tf), float(dt))
 
-    # The plant's step, the law on the grid, the command's slice of the plant input
-    ev = plant.compile(backend=BACKEND_NUMPY, verbose=False)
-    t = float(dt) * np.arange(n_steps + 1)
+    # The face's step, the law on the grid, the command's slice of the plant input
+    face = nominal.compile(dt=float(dt))
+    plant_params = face.params["plant"]
+    t = nominal.t_start + float(dt) * np.arange(n_steps + 1)
     law = held_law(policy, t)
     command = plant.get_input_port_slice(command_port(plant))
     u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
@@ -677,7 +679,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
         if k == n_steps:
             break
         u_full[command] = us[:, k]
-        xs[:, k + 1] = ev.step(xs[:, k], u_full, t[k], dt=float(dt))
+        xs[:, k + 1] = face.step_at(xs[:, k], u_full, t[k], plant_params)
 
     return Trajectory(t=t, x=xs, u=us)
 

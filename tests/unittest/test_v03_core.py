@@ -526,3 +526,81 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     assert plan.success
     np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)
     assert plan.solver.cost == pytest.approx(reference.solver.cost, rel=1e-6)
+
+
+# Script 6, join 1
+
+
+def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
+    from minilink.planning import DynamicProgrammingPlanner
+    from tests.unittest.test_step_problems import grid_world
+
+    problem = grid_world()
+    face = problem.compile()
+    vi = DynamicProgrammingPlanner(
+        problem, x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
+    )
+    vi.solve()
+
+    # J(x) = the moves to the goal, the face's c summed: the Chebyshev distance
+    J = vi.result.J.reshape(7, 7)
+    cells = np.arange(7.0)
+    np.testing.assert_array_equal(
+        J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
+    )
+
+    # The greedy walk from the start, rolled out on the face, pays J(x_start)
+    law = vi.get_controller()
+    walk = face.run(
+        lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
+    )
+    assert walk[3] == J[0, 0] == 5.0
+
+
+def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_one_j():
+    from minilink.learning.reinforcement_learning.environment import (
+        RolloutEnvironment,
+    )
+    from minilink.planning import DynamicProgrammingPlanner
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        x_start=np.array([0.5, 0.0]),
+        tf=3.0,
+        U=plant.input_box,
+        discount_rate=0.5,
+    )
+    dt = 0.1
+    vi = DynamicProgrammingPlanner(
+        problem, x_grid=(41, 41), u_grid=(11,), dt=dt, solver="rk4"
+    )
+    solution = vi.solve(evaluate=True)
+    law = vi.get_controller()
+
+    def policy(x, t):
+        return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
+
+    # The step tool's sum on the face value iteration backs up: Σ γᵏ c_k + γᴺ h
+    face = problem.compile(dt=dt, solver="rk4")
+    J_face = face.run(policy)[3]
+
+    # The judge, the lookup law sampled at dt (R105) on the continuous plant
+    J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
+
+    # The RL environment's discounted return of the same law
+    env = RolloutEnvironment(problem, dt=dt, backend="numpy")
+    x, t, J_env = problem.x_start, 0.0, 0.0
+    for k in range(env.n_steps_per_episode):
+        x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
+        J_env += face.gamma**k * -float(reward)
+    assert bool(terminated)
+
+    # One J, the planner's own score among them (the law held over each period, R159)
+    J_planner = float(np.squeeze(solution.evaluation.J))
+    assert J_judge == J_face == J_env == J_planner
+
+    # The planner's evidence is the same held loop on the face
+    evidence = vi.nominal_trajectory()
+    np.testing.assert_array_equal(evidence.x.T, face.run(policy)[0])

@@ -176,7 +176,10 @@ class Planner(ABC):
         The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on this planner's problem (or ``problem``).
 
         One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
-        ``None`` when the problem declares no cost (a search without one).
+        ``None`` when the problem declares no cost (a search without one). A
+        feedback law with no clock of its own is held over each period of
+        ``dt`` (``policy % dt``, R159), the loop its planner designs for; an
+        open-loop source keeps the interpolation its planner states.
         """
         problem = self.problem if problem is None else problem
 
@@ -187,9 +190,12 @@ class Planner(ABC):
         # One run when nothing is random, n_trials draws otherwise
         trials = int(n_trials) if problem.is_stochastic else None
 
+        # The law the run holds: a feedback law on the clock of dt
+        law = held_feedback(policy, dt)
+
         return evaluate(
             problem,
-            policy,
+            law,
             dt=dt,
             n_trials=trials,
             key=0,
@@ -201,3 +207,18 @@ class Planner(ABC):
         """Keep ``solution`` as :attr:`last_solution`, and return it."""
         self.last_solution = solution
         return solution
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def held_feedback(policy, dt):
+    """A feedback law with no clock of its own on the clock of ``dt`` (``policy % dt``); any other policy as given."""
+    reads_input = int(getattr(policy, "m", 0)) > 0
+    clocked = getattr(policy, "sample_period", None) is not None
+    if reads_input and not clocked:
+        return policy % float(dt)
+
+    return policy
