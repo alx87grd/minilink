@@ -1,9 +1,10 @@
 # Compile once, in the form the call needs
 
-Status: proposed 2026-10-28 (the maintainer's ask after the v0.3 run: "frozen parameters, or
-parameters as arguments for a parametric computation, each as fast as if hard-coded, behind the
-one method entry; `jit` at the right place on every pipeline"). Two independent reviews, then
-implementation on `dev-v0.3-compile`.
+Status: revised 2026-10-28 after two independent reviews (A: JAX and performance; B: architecture
+and correctness; their findings and the resolution of each in §7); implementation on
+`dev-v0.3-compile`. The maintainer's ask: "frozen parameters, or parameters as arguments for a
+parametric computation, each as fast as if hard-coded, behind the one method entry; `jit` at
+the right place on every pipeline".
 Where it sits: a hardening row of the v0.3 core (TODO §1.10), beside the wiring-time refusals.
 
 ## 1. What the audit measured (CartPole / pendulum, CPU, float64, `dev-v0.3` at `1e9d2d6e`)
@@ -14,131 +15,180 @@ A second identical call, the XLA compilations it triggers:
 | --- | --- | --- | --- |
 | `plant.compute_trajectory(backend="jax")`, RK4, 5 001 points | 1 (0.35 s) | 465 ms | 36 ms (`ev.rollout`) |
 | the same, Euler / a closed loop `lqr @ plant` / a sampled loop | 1 each | 300–480 ms | — |
-| `compute_trajectory(solver="scipy", backend="jax")` | 2 | 315 ms | — |
+| `compute_trajectory(solver="scipy", backend="jax")` | 2 (`t` weak, then strong) | 315 ms | — |
 | `pe.evaluate(params)`, `pe.evaluate()`, `jax.grad` of it | 0 | 3.7 ms | 3.3 ms |
+| `pe.evaluate(p)` with a leaf as `9.0`, `np.float64(9.0)` or `10` | 1 each (4–5 s) | — | — |
+| `pe.trajectory()` | 1 (≈ 3 s, eager `scan`) | — | — |
 | `problem.compile(law, dt).evaluate()`, a fresh evaluator | 1 (0.58 s) | 800 ms | — |
 | `planner.solve()`, collocation + SLSQP | 6 (1.06 s) | 1.41 s | 0.11 s (`pv.solve`) |
 | `planner.solve()`, native single shooting + Adam | 7 (1.48 s) | 2.07 s | — |
-| `pv.solve(P)`, native Adam, called from Python | 1 (0.52 s) | 0.64 s | 25 ms under `jit` |
-| the native MPC's closed loop, `pe.evaluate` | 0 | — | — |
+| `pv.solve(P)`, native Adam, called from Python | 1 (0.52 s, eager `scan`) | 0.64 s | 25 ms under `jit` |
 | `(mpc % dt) @ plant).compute_trajectory` | 2 (1.51 s) | 1.97 s | — |
-| value iteration `planner.solve()` (JAX), RL training | 0 | — | — |
-| RL `solve_trajectory_from` | 1 | 374 ms | — |
+| RL `solve_trajectory_from` | 1 (eager `scan`) | 374 ms | — |
+| value iteration `planner.solve()` (JAX), RL training, the native MPC's `pe.evaluate` | 0 | — | — |
 
 Frozen against parameters as arguments, the compiled work alone: the rollout 72 against 76 ms,
 one evaluation 2.7 against 3.3 ms, the native MPC's loop 117 against 128 ms, a native solve 25
-against 25 ms; the program's evaluator call 1.51× (DESIGN §6, the bicycle MPC). On `main`
-(v0.2) `compute_trajectory` and `planner.solve()` recompile the same way (395 and 1 180 ms a
-repeat): not a regression, the cost of never reusing a compiled object.
+against 25 ms. A tree of 36 small NumPy leaves costs 166 µs a call to transfer, 34 µs already
+on the device, 7 µs frozen (review A). On `main` (v0.2) `compute_trajectory` and
+`planner.solve()` recompile the same way: not a regression, the cost of never reusing a
+compiled object.
 
 ## 2. The contract
 
-- **C1, two forms, one entry.** Every compiled computation has a frozen form (`params=None`:
-  the values compiled in are constants of the trace, so XLA folds them, the code a hand-written
-  `jit` with literals would give) and a parametric form (a tree: traced arguments, one trace
-  for every value of the same tree structure, shapes and dtypes). Each is traced once per
-  holder and cached; neither retraces on a repeat, and the parametric one never on a new value.
-- **C2, one dispatch per call.** `jit` sits at the outermost pure computation of a user call: the
-  rollout (one `scan`), the evaluation (a `vmap` of the scan), a fixed-count solve (one `scan`),
-  each callback of a host solver (`J`, `∇J`, `h`, `∂h/∂z`, … one jitted function each, the
-  solver's loop the only Python). No `jax.*` primitive runs eagerly on a fresh closure.
-- **C3, compiled objects are reused.** A facade (`compute_trajectory`, `compute_rollout`, the
-  simulator, `planner.solve`, the RL rollouts) looks its compiled object up instead of building
-  it: keyed by what compile reads, rebuilt when that changes. Correctness first: a changed
-  number or wiring always gives the new result.
-- **C4, what compile reads.** A system's structure (its class, its ports' sizes, nominal values
-  and dependencies; a diagram's blocks and wiring; a clocked block's period) and its `params`'
-  values. By the constitution's "every number is a parameter" and its build-versus-run law, any
-  other attribute a block's equations read is structure, set before the first compile;
-  `clear_compiled(system)` drops a system's compiled objects for the rare script that edits
-  one afterwards.
+- **C1, two forms, one entry, at the evaluator.** An evaluator method's `params=None` is the
+  frozen form: the compiled values are constants of the trace (XLA folds them, the code a
+  hand-written `jit` with literals gives), unless a leaf is large (over 1 000 elements: network
+  weights), where the frozen tree is instead an argument already on the device. A tree given is
+  the parametric form: traced arguments, one trace for every value.
+- **C2, one trace for every value.** Every parametric boundary canonicalizes what it is given:
+  each leaf of a tree to the default's dtype (a strong type) and shape, a Python scalar
+  argument (`t`, `dt`, `t_start`) to `np.float64`. A Python `9.0`, `np.float64(9.0)`, `9` or a
+  0-d array then hit the same trace.
+- **C3, one dispatch per call.** `jit` sits at the outermost pure computation of a call: the
+  rollout, the evaluation and its recorded trajectory, a fixed-count solve, each callback of a
+  host solver, one fused step of a first-order solver. No `jax` primitive (`scan`, `vmap`)
+  runs eagerly on a fresh closure; no `jit` is built per call.
+- **C4, compiled objects reused at the convenience calls, JAX only.** `compute_trajectory`,
+  `compute_rollout`, the simulator, the RL rollouts, a problem evaluator's loop and
+  `planner.solve()` look their compiled object up. `compile()` stays the build verb (a fresh
+  evaluator, as DESIGN states); NumPy evaluators are not cached (a NumPy compile costs 0.1 ms,
+  and a NumPy evaluator reads its blocks' attributes live).
+- **C5, what the key is.** Structure by Python identity, never parameter values: a changed value
+  takes the parametric form with the live tree (one compile for a whole sweep), an unchanged one
+  the frozen form. The structure: each block's identity and class, its ports (size, nominal
+  value, dependencies, the compute function's identity), instance overrides of its equations,
+  a digest of its plain numeric and string attributes outside `params` and `x0` (the values an
+  equation reads at trace time: `Sum.signs`, `MLP.activation`, `TrajectorySource.sample_times`,
+  the `PID` flags, `NoiseSource.law`), a diagram's edge ports and wiring, and the x64 flag.
 
 ## 3. The design, layer by layer
 
-### 3.1 The evaluator cache (`core/compile/cache.py`)
+### 3.1 The evaluator methods (`core/compile/evaluators/compiled.py`, `base.py`)
 
-- `CompiledCache`, an attribute of every `System` set in `System.__init__`: a small LRU (4
-  entries) of evaluators by key. It copies and pickles empty (`__deepcopy__`, `__copy__`,
-  `__getstate__`), so a copied block never carries another's evaluators, and it lives on the
-  system, so the cycle system → evaluator → system is collectable.
-- The key: `(backend, flatten, fingerprint(system))`. `fingerprint` is a tuple built
-  recursively: for a leaf its class, `n`, its ports (id, size, nominal value bytes, an output's
-  dependencies), its clock (a `SampledSystem`'s period, substeps and solver) and a digest of its
-  `params` (blake2b over each leaf's path, dtype, shape and bytes); for a diagram the same of
-  its edge ports, its connections and its blocks by id (the block's identity and fingerprint).
-  A hit costs the fingerprint (measured target: under 0.2 ms for CartPole, under 2 ms for the
-  UR5 loop).
-- `compile(system, backend, verbose, flatten)` (the one compile entry, `compiler.py`) consults
-  it; every caller of `sys.compile` and of `compile` then reuses: `compute_trajectory`,
-  `compute_rollout`, the simulator, the sampled loops, the RL rollouts, `problem.compile`'s loop
-  compile, `linearize`.
+- `CompiledMethod.__get__` returns a small wrapper over the two jitted forms: it canonicalizes
+  the scalar arguments (C2), and for `params` routes `None` to the frozen form (or, for a large
+  tree, to the parametric form with the frozen tree put on the device once) and a tree to the
+  parametric form after canonicalizing it against `evaluator.params`.
+- `Evaluator.live_params()` reads the tree from the system now (the same reader as the
+  constructor); `Evaluator.call_params()` is `None` when its digest equals the frozen one, else
+  the live tree: the one rule the facades use.
 
-### 3.2 The evaluator methods
+### 3.2 The reuse (`core/compile/cache.py`)
 
-`@compiled` already gives C1: `jax.jit(bound)` with `params` an argument; `None` is a tree with
-no leaves, so the body reads `self._frozen_params` and the trace takes them as constants; a
-tree is traced. Two cache entries, one per form. Kept; documented in DESIGN §5 and pinned by
-tests (a repeat: 0 compiles; a new value of the tree: 0; frozen and parametric equal to 1e-12).
+- `compiled_of(system, backend, *, flatten=False)`: a module-level LRU (16 entries) of JAX
+  evaluators keyed by the structural fingerprint (C5); NumPy calls `compile`. Block identities
+  in the key are safe because the cached evaluator keeps its blocks alive, so an `id()` cannot
+  be reused while its entry exists; a loop rebuilt over the same blocks (`problem.compile`, an
+  inline `ctl @ plant` held across calls) hits. `clear_compiled()` empties it, for a script that
+  edits a block's structure after a convenience call.
+- Callers: the simulator and its solvers (which pass `call_params()` through), the step
+  systems' `compute_rollout` / `compute_trajectory`, `compile_loop` of the problem evaluator, the
+  RL rollouts.
 
 ### 3.3 The problem evaluator (`planning/evaluator.py`)
 
-- `evaluate()` and `trajectory()` with `params=None` take a frozen form: the trial function
-  jitted with the run's default tree closed over (constants), the drawn leaves (the trial axis
-  of a stochastic problem) still arguments. Cached by the layout and a digest of the defaults
-  (`pe.params` is read fresh from the objects, so a changed block or cost recompiles).
-- A tree given keeps today's parametric form (one trace per layout).
+- No second executable (reviews A5, B3): `params=None` runs the parametric trial function with
+  the default tree put on the device once, cached by its digest (one entry; a changed default
+  replaces it); a tree given is canonicalized in `merged` (C2).
+- `trajectory()` runs under a cached jitted trial (record on, one trial), as `evaluate()` does,
+  and the recorded signals (`signals_along`, `signals_at_ticks`) inside it.
+- A frozen form at this layer is built only if the benchmark (§5) shows a steady gain above
+  15 % over the device-resident parametric form.
 
 ### 3.4 The program evaluator (`optimization/evaluators/jax_evaluator.py`)
 
-- The functions of `(z, params)` keep their parametric jitted forms; each gains a frozen form,
-  `jit(lambda z: f_raw(z, P))` over the program's own `params`, built on first use. `J(z)`,
-  `grad_J(z)`, `h(z)`, `jac_h(z)`, … with no params use it (the offline solve); the parametric
-  path (`Optimizer.solve(params=)`, the compiled face) passes the tree.
+- The parametric jitted functions of `(z, params)` stay the one form; `bind(params)`
+  canonicalizes the tree and puts it on the device once (keyed by its digest), so a host solver's
+  thousands of callbacks transfer only `z`. The frozen question is the same as §3.3, decided by
+  the benchmark (review B4: a frozen form must not survive a `bind`).
 
-### 3.5 The fixed-count solve (`optimization/optimizers/first_order.py`)
+### 3.5 The first-order solves (`optimization/optimizers/first_order.py`)
 
-`run(program_evaluator, z0, params, iterations)` jits the whole count (init, `scan`, the final
-`J`) once per `(program evaluator, K)`, with `z0` and `params` arguments, cached on the backend;
-the frozen form when `params` is the program's own. A Python caller of `pv.solve` then pays one
-dispatch, as under an outer `jit`.
+- `run` (the fixed count): one jitted function of `(z0, params)` per `(K, algorithm, options,
+  box)`, stored in the program evaluator's `compiled_forms` (review B11: not on the optimizer).
+- `solve` (to tolerance): one jitted fused step `z ← S(z, ∇J(z; p))`, cached the same way, so a
+  solve is one dispatch per iteration and no per-solve `jit`.
 
-### 3.6 `planner.solve()` on trajectory optimization
+### 3.6 `planner.solve()` on trajectory optimization (`planning/trajectory_optimization/planner.py`)
 
-The transcribed program and its optimizer are cached on the planner, keyed by the problem's
-fingerprint (its parts' identities and a digest of `problem.params`) and the transcription's
-options; a repeat runs the host solver only (`z0` from the guess is data). `params=` on solve
-gives a new problem copy, so a new key: a sweep of values belongs on `planner.compile()`, the
-parametric face (one trace for every value), as DESIGN already says.
+- The transcribed program and its optimizer are cached on the planner (one entry), keyed by
+  `fingerprint(problem.sys)`, the problem parts' identities, `tf` and the horizon kind, a digest
+  of the program's parameter tree (laws by identity), and a snapshot of the planner's and the
+  transcription's options. A repeat runs the host solver from the new `z0`.
+- `solve(params=...)` keeps today's path (a problem copy, no caching: review B5); a sweep of
+  values belongs on `planner.compile()`.
 
-### 3.7 Out of scope here
+### 3.7 The other eager sites
 
-- A persistent XLA cache across processes (`jax_compilation_cache_dir`): measured 370 against
-  850 ms for a script's first simulation; it writes to the user's disk, so it is an opt-in
-  knob for later (`configure_jax(cache_dir=)`), not part of this change.
-- `problem.compile(...)` building a new `ProblemEvaluator` each call: its loop's evaluator is
-  reused (3.1); its own trial function is per evaluator, as any held object (hold the `pe`).
+- RL `rollout_law`: one jitted rollout per `(n_steps, key given)` on the planner.
+- The Lyapunov helpers that re-jit per call (`analysis/lyapunov.py`): jitted once per
+  certificate.
+
+### 3.8 Out of scope
+
+- A persistent XLA cache across processes (`jax_compilation_cache_dir`): a complement (a repeat
+  206 → 85 ms in-process, a script's first simulation 850 → 370 ms) that writes to disk; an
+  opt-in knob for later.
+- A fresh `ProblemEvaluator` per `problem.compile` traces its own trial function again (its
+  loop evaluator is reused, §3.2): hold the `pe`.
+- A value sweep through `compute_trajectory` is one compile for the whole sweep (the
+  parametric form), not zero; `ev.rollout(params=)`, `rollout_batch` and `planner.compile()` are
+  the sweep tools.
 
 ## 4. Tests (`tests/unittest/test_compile_once.py`)
 
-A compile counter (the `/jax/core/compile/backend_compile_duration` monitoring event). Per
-pipeline of §1: a repeat costs 0 compiles; a parametric call with new values of the same
-shapes costs 0; a frozen call after a changed parameter recompiles and gives the new number;
-a rewired diagram gets a new evaluator; a deep copy's cache is empty; the frozen and parametric
-forms agree to 1e-12; the NumPy paths are byte-identical to today (the v03 baseline).
+A compile counter (the `/jax/core/compile/backend_compile_duration` event, the persistent cache
+off). For every row of §1: a repeat costs 0 compiles. Then: a parametric call with a leaf as
+`9.0`, `np.float64(9.0)`, `9` and a 0-d `jnp` array costs 0 after the first; a parameter edit
+followed by `compute_trajectory` or `pe.evaluate()` gives the new number at most one compile
+for any number of values; a structural attribute edit (`Sum.signs`) followed by
+`clear_compiled()` gives the new number; a rebuilt loop over the same blocks hits; a `%` copy
+and a deep copy do not share an evaluator with their source; `problem.tf` edited before
+`planner.solve()` gives the new grid; `bind(P)` then `J(z)` reads `P`; frozen and parametric
+agree to 1e-12 (not bit for bit: the fusion order differs); NumPy paths byte-identical (the v03
+baseline).
 
 ## 5. Benchmarks
 
-- `benchmarks/compile_once.py`: first call, repeat, frozen and parametric per pipeline, and the
-  compile counts, to JSON.
+- `benchmarks/compile_once.py`: for every row of §1, the first call, a repeat, the parametric
+  and frozen forms and the compile counts, to JSON; it decides §3.3 and §3.4's frozen forms.
 - The sanity check against `main`: the classical demos' core calls (a plant's and a closed
-  loop's simulation on NumPy and JAX, a trajectory optimization, value iteration, a sampled
-  PID), first call and repeat, in fresh processes on `main` and on the branch.
+  loop's simulation on NumPy and JAX, a sampled PID, a trajectory optimization, value
+  iteration), first call and repeat, in fresh processes, on `main`, on `dev-v0.3` and on the
+  branch, the machine otherwise idle.
 
 ## 6. Risks
 
-- An attribute outside `params` edited after a compile is not seen (C4): the same holds today
-  for any held evaluator; the cache widens it to the facades. Mitigation: `clear_compiled`, the
-  doc line, and the fingerprint's nominal values and clocks.
-- Memory: four evaluators per system at most.
-- The fingerprint's cost on a large diagram, and the digest of `pe.params` per frozen call:
-  measured in the benchmark, under the budgets above.
+- A structural attribute edited after a convenience call outside the digested kinds (an object
+  attribute such as a lookup object, a module global): not seen until `clear_compiled()`; a
+  KNOWN_ISSUES entry, the DESIGN line, the same as any held JAX evaluator today.
+- Memory: 16 evaluators, each keeping its blocks alive until evicted.
+- The fingerprint's cost per convenience call (target under 0.2 ms for CartPole, 2 ms for the
+  UR5 loop; JAX leaves digested by identity, NumPy ones by bytes).
+
+## 7. The reviews and their resolution
+
+| Finding | Resolution |
+| --- | --- |
+| A1 the parametric form retraces on weak types, int against float, a `(1,)` default given a scalar; SciPy's `t` | C2, §3.1, §3.3, §3.4 |
+| A2 `pe.trajectory()` eager, a compile per call | §3.3 |
+| A3, B8 a rebuilt loop is a new system: a per-system cache never hits | the module-level cache keyed by block identities, §3.2 |
+| A4 per-solve `jit` of the first-order update; RL's eager rollout | §3.5, §3.7 |
+| A5, B3 a frozen executable at the problem and program layers costs a second compile, and keyed by value a compile per value | device-resident defaults; frozen only if measured worth it, §3.3, §3.4 |
+| A6, B14 large frozen leaves bloat the executable | the 1 000-element threshold, C1 |
+| A7 values in the key turn a sweep into rebuilds | C5: structure only, the parametric form for a changed value |
+| A8, B7 a trace reads more than `params` | C5's attribute digest and function identities; KNOWN_ISSUES |
+| A9 the persistent cache | out of scope, §3.8; the test counter turns it off |
+| A10 the frozen evaluator form folds constants as claimed; frozen and parametric differ in the last bits | 1e-12, §4 |
+| B1 do not cache NumPy evaluators | C4 |
+| B2 `compile()` stays the build verb | C4, `compiled_of` |
+| B4 a frozen program form conflicts with `bind` | §3.4 |
+| B5 the transcription reads `tf`, the plant's structure, the options and the laws | §3.6's key; no caching of `params=` |
+| B6 a shallow `%` copy shares an attribute cache | the module-level cache by identity |
+| B9 identity, not `System.id` | C5, §3.2 |
+| B10 digest JAX leaves by identity | §6 |
+| B11 the first-order forms on the program evaluator, keyed by the options | §3.5 |
+| B12 every `System` reaches `System.__init__` | (no change needed with a module-level cache) |
+| B13 one rule in one place | `call_params()`, §3.1 |
+| B15 docs and tests | §4; DESIGN §4–§6, the `compile_diagram` docstring, the definition of done, KNOWN_ISSUES |
