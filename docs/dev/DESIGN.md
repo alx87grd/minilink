@@ -353,7 +353,7 @@ Applies to every method CONSTITUTION §2 names ('One signature'), and also to po
 computes, transcriptions and the `MathematicalProgram` `J`/`h`/`g`.
 Native in, native out; no `np.asarray` / `float()` inside equation paths. Convert at
 boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Where an object does not
-read `params` yet, the gap is tracked below.
+read `params` yet, the gap is tracked below (the distributions and the sets read theirs).
 
 ### Parameters
 
@@ -398,7 +398,8 @@ read `params` yet, the gap is tracked below.
   blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x_start",
   "discount_rate"}`, assembled on each access from the parts, which stay the one home of
   each number; assigning a dictionary routes each entry to its part (a singleton `X0`
-  moves with `x_start`; a set that holds no parameters refuses a write). Library costs
+  moves with `x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
+  a set that holds no parameters refuses a write). Library costs
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
   `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
   (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
@@ -640,20 +641,26 @@ provided.
   plant's run by static indexing.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
-  boolean under JAX); `sample(key, n=None)`
+  boolean under JAX); `sample(key, n=None, params=None)`, the key required,
   follows the distributions' draw convention below (`BoxSet.sample` traces);
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
-  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set that holds parameters
-  stores `self.params` and reads it when `params` is `None`; the tools pass nothing, so
-  each set reads its own. The library sets hold none yet (the gap in 'Parameters').
+  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set's numbers are its `params`
+  (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
+  singleton, the members' by position `{"0", "1", …}` on an intersection, `{}` for a set with
+  none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
+  a library set is a frozen value, and `with_params(params)` is the moved copy a problem
+  assignment (`problem.params = {"U": {...}}`) puts in the role.
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
-  `sample(key, n=None)` with `key` a NumPy generator, an integer seed or a JAX PRNG key
-  (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support` an
-  optional `Set`. `Uniform(lower, upper)` holds its `BoxSet`; the same `sample` convention
-  holds on sets. `Gaussian`, `Uniform`, `Particles`; sets are support,
-  distributions are probability.
+  `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
+  PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
+  an optional `Set`. A library law's numbers are its `params` and `cov` is the covariance of
+  one draw (RD-R1): `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
+  `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`
+  (its `BoxSet`'s bounds, `cov = diag((b − a)² / 12)`), `Particles(points)` (`{"points"}`, the
+  law's own covariance); so a family of noise levels vmaps like a family of masses. Sets are
+  support, distributions are probability.
 - Randomness (`blocks/sources.py`, `core/distributions.py`): a `Distribution` has no time; a
   noise signal is a block holding draws over a sample period. `WhiteNoise(p, *, psd,
   sample_period, seed, hold)` is white noise of two-sided intensity `psd`, each sample

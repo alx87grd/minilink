@@ -22,11 +22,13 @@ from minilink.core.sets import BoxSet, Set
 
 
 class Distribution(ABC):
-    """Vector-valued distribution: ``dim``, ``mean`` (an array), ``sample(key, n=None)``, optional ``support``.
+    """Vector-valued distribution: ``dim``, ``mean``, ``cov``, ``params`` and ``sample(key, n=None, params=None)``.
 
     A duck type, not a probability library: anything with ``dim``, ``sample(key)``
-    and ``mean`` works. ``key`` is a NumPy generator, an integer seed, or a JAX
+    and ``mean`` works; ``params`` and ``cov`` are the library laws'. ``key`` is a NumPy generator, an integer seed, or a JAX
     PRNG key (JAX arrays out, traceable under ``jit`` / ``vmap`` / ``scan``).
+    The law's numbers are its ``params``; ``sample(key, n, params)`` draws from
+    the law they name, so a noise level is a parameter like a mass (RD-R1).
     """
 
     support: Set | None = None
@@ -36,6 +38,14 @@ class Distribution(ABC):
     @abstractmethod
     def dim(self) -> int: ...
 
+    # The law's numbers, by name (``{}`` for a law that exposes none)
+    params = {}
+
+    @property
+    def cov(self) -> np.ndarray:
+        """The covariance of one draw, ``(dim, dim)``, for a law that states it."""
+        raise NotImplementedError(f"{type(self).__name__} states no covariance")
+
     def __str__(self):
         return inspect_text(self)
 
@@ -43,30 +53,57 @@ class Distribution(ABC):
         repr_pretty(self, p, cycle)
 
     @abstractmethod
-    def sample(self, key, n=None):
+    def sample(self, key, n=None, params=None):
         """
         Draw one sample (shape ``(dim,)``) or ``n`` samples (``(n, dim)``).
 
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
-        JAX PRNG key (JAX arrays out, traceable).
+        JAX PRNG key (JAX arrays out, traceable). ``params=None`` reads the
+        law's own :attr:`params`.
         """
         ...
 
 
 class Gaussian(Distribution):
-    """Diagonal Gaussian ``x ~ N(mean, diag(std**2))``."""
+    """Gaussian ``x ~ N(mean, Σ)``: diagonal from ``std`` (``Σ = diag(std²)``), or full from ``cov``."""
 
-    def __init__(self, mean, std):
+    def __init__(self, mean, std=None, cov=None):
+        require_one_spread(std, cov)
         self.mean = np.asarray(mean, dtype=float).reshape(-1)
-        self.std = np.broadcast_to(np.asarray(std, dtype=float), self.mean.shape).copy()
+        if cov is None:
+            self.std = np.broadcast_to(
+                np.asarray(std, dtype=float), self.mean.shape
+            ).copy()
+            self.full_cov = None
+        else:
+            self.std = None
+            self.full_cov = np.asarray(cov, dtype=float).reshape(self.dim, self.dim)
 
     @property
     def dim(self) -> int:
         return int(self.mean.size)
 
-    def sample(self, key, n=None):
-        mean = self.mean
-        std = self.std
+    @property
+    def params(self) -> dict:
+        """``{"mean", "std"}`` for a diagonal law, ``{"mean", "cov"}`` for a full one."""
+        if self.full_cov is None:
+            return {"mean": self.mean, "std": self.std}
+
+        return {"mean": self.mean, "cov": self.full_cov}
+
+    @property
+    def cov(self) -> np.ndarray:
+        if self.full_cov is None:
+            return np.diag(self.std**2)
+
+        return self.full_cov
+
+    def sample(self, key, n=None, params=None):
+        params = self.params if params is None else params
+
+        mean = params["mean"]
+        std = params.get("std")
+        cov = params.get("cov")
         dim = self.dim
 
         shape = (dim,) if n is None else (int(n), dim)
@@ -74,11 +111,19 @@ class Gaussian(Distribution):
         # ε ~ N(0, I), drawn on the key's backend
         if is_jax_key(key):
             jax = require_jax()
+            xp = jax.numpy
             eps = jax.random.normal(key, shape)
         else:
+            xp = np
             eps = numpy_generator(key).standard_normal(shape)
 
-        x = mean + std * eps
+        if cov is None:
+            # x = mean + std ε
+            x = mean + std * eps
+        else:
+            # x = mean + L ε, with Σ = L Lᵀ
+            L = xp.linalg.cholesky(cov)
+            x = mean + eps @ L.T
 
         return x
 
@@ -95,8 +140,23 @@ class Uniform(Distribution):
     def dim(self) -> int:
         return self.box.dim
 
-    def sample(self, key, n=None):
-        return self.box.sample(key, n)
+    @property
+    def params(self) -> dict:
+        """``{"lower", "upper"}``, the box's bounds."""
+        return self.box.params
+
+    @property
+    def cov(self) -> np.ndarray:
+        lower = self.box.lower
+        upper = self.box.upper
+
+        # Σ = diag((b − a)² / 12)
+        cov = np.diag((upper - lower) ** 2 / 12.0)
+
+        return cov
+
+    def sample(self, key, n=None, params=None):
+        return self.box.sample(key, n, params)
 
 
 class Particles(Distribution):
@@ -111,9 +171,24 @@ class Particles(Distribution):
     def dim(self) -> int:
         return int(self.points.shape[1])
 
-    def sample(self, key, n=None):
+    @property
+    def params(self) -> dict:
+        """``{"points"}``, the ``(N, dim)`` support points."""
+        return {"points": self.points}
+
+    @property
+    def cov(self) -> np.ndarray:
         points = self.points
 
+        # The law's own covariance: Σ = (1/N) Σᵢ (pᵢ − p̄)(pᵢ − p̄)ᵀ
+        cov = np.atleast_2d(np.cov(points, rowvar=False, bias=True))
+
+        return cov
+
+    def sample(self, key, n=None, params=None):
+        params = self.params if params is None else params
+
+        points = params["points"]
         count = points.shape[0]
 
         # A uniform index into the points: x = points[idx]
@@ -134,6 +209,12 @@ class Particles(Distribution):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_one_spread(std, cov):
+    """Refuse a Gaussian given both ``std`` and ``cov``, or neither."""
+    if (std is None) == (cov is None):
+        raise ValueError("Gaussian takes one spread: std= (diagonal) or cov= (full)")
 
 
 def check_points(points):

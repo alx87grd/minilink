@@ -378,8 +378,9 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
 
     with pytest.raises(ValueError, match="unknown problem role"):
         problem.params = {"gains": {}}
-    with pytest.raises(TypeError, match="holds no parameters"):
-        problem.params = {"U": {"lower": 0.0}}
+    # A set is a value: its numbers move it, a new set in the role
+    problem.params = {"U": {"lower": np.array([-2.0]), "upper": np.array([2.0])}}
+    assert problem.U.box.upper.tolist() == [2.0]
 
 
 @pytest.mark.jax

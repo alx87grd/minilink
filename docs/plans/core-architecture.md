@@ -101,7 +101,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   start (`x_start`, a leaf), and each stateful block's start is an `x0` leaf of the evaluator's
   tree; a realization is one tree (R144); a problem's tree gains `t_start` and a planner's tree is
   its problem's plus `"method"` and `seed` (R148).
-- **Today:** `Set.params = None` (OD-24); distributions keep `mean` / `std` as attributes;
+- **Today:** the sets and the distributions read their `params` (RN-2, the v0.3 run);
   `TrajectorySource` and `LookupPolicy` keep their tables as attributes; only the plant's slice of
   the start is a leaf, a diagram stores stacked copies of `x0`, `n` and `state` restacked by
   `refresh()`; `Computer` blocks read `op.bound_params`, frozen at compile; the MPC's

@@ -571,7 +571,8 @@ its deterministic twin (RD-D23). RN-3 comes with its first consumer.
   `core/distributions.py`), the block in `blocks/sources.py`, the solver hints,
   `System.realize(key)` and the stepped-tools warnings. DESIGN §4 ("Randomness") states the
   contract.
-- [ ] **RN-2 Distributions read `params`** (RD-R1, RD-D9, RD-D12): `Gaussian(cov=)`, `cov` on
+- [x] **RN-2 Distributions read `params`** (landed in the v0.3 run, the objects lane; the sets
+  with them, a set's numbers its `params` and `with_params` its moved copy) (RD-R1, RD-D9, RD-D12): `Gaussian(cov=)`, `cov` on
   every law, `sample(key, n=None, params=None)`, a `params` dict on `Gaussian`, `Uniform`,
   `Particles`; `Set.sample` and `InputSet.sample` take a required key. Files:
   `core/distributions.py`, `core/sets.py`, every `sample` call site. Baseline: every `sample`

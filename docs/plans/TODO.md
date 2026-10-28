@@ -180,7 +180,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
     moves to `core/`, and MPPI reads it next;
   - `UnionSet` via `|`, when reachability or multi-goal work needs it;
   - vector bounds on `Saturation`;
-  - the library sets, shapes and fields reading `params` (the same rule as A2, after it);
+  - the library shapes and fields reading `params` (the same rule as A2; the sets read theirs);
   - `PlanningProblem.hamiltonian()`, only if the course teaches Pontryagin;
   - the RL critic as a `Field` once training is over;
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
@@ -205,13 +205,10 @@ Why: [core-architecture.md](core-architecture.md) §1.
   Done when no diagram stores a stacked copy, `Simulator` calls no `refresh()` before a run,
   `jax.grad` of `objective` with respect to `observer.x0` matches a central difference, and the
   baselines are byte-identical.
-- [ ] **Distributions read `params`** (RN-2 of [randomness.md](randomness.md)):
-  `Gaussian(cov=)`, and every `sample` takes a key.
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
   - `shaping.py` (today `planning/spatial/shaping.py`) moves to `core/`;
   - `Set.as_cost(weight=, shaping=)`, the field `as_cost` applied to the set's margin (R133);
-  - the sets read `params`;
   - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and
     `"controller.values"` are decision leaves, with `Xf` lowered;
   - the robust-tuning and identification demos run on the export;

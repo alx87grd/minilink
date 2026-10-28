@@ -344,3 +344,71 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
     x0s, _ = problem.realize(0, 4)
     assert x0s.shape == (4, 2) and set(np.abs(x0s).ravel()) == {1.0}
     assert isinstance(problem.nominal(), PlanningProblem)
+
+
+def test_a_law_reads_its_numbers_from_params():
+    from minilink import Gaussian, Uniform
+    from minilink.core.distributions import Particles
+
+    law = Gaussian([0.0, 1.0], [1.0, 0.5])
+    assert set(law.params) == {"mean", "std"}
+    np.testing.assert_array_equal(law.cov, np.diag([1.0, 0.25]))
+    wider = {"mean": law.mean, "std": 2.0 * law.std}
+    np.testing.assert_allclose(
+        law.sample(3, 4, wider) - law.mean, 2.0 * (law.sample(3, 4) - law.mean)
+    )
+
+    np.testing.assert_allclose(Uniform([0.0], [1.0]).cov, [[1.0 / 12.0]])
+    points = np.array([[0.0, 0.0], [2.0, 4.0]])
+    np.testing.assert_allclose(Particles(points).cov, [[1.0, 2.0], [2.0, 4.0]])
+
+
+def test_a_full_covariance_is_drawn_through_its_cholesky_factor():
+    from minilink import Gaussian
+
+    cov = np.array([[1.0, 0.8], [0.8, 1.0]])
+    law = Gaussian(np.zeros(2), cov=cov)
+    assert set(law.params) == {"mean", "cov"}
+    draws = law.sample(0, 20000)
+    np.testing.assert_allclose(np.cov(draws, rowvar=False), cov, atol=0.03)
+    with pytest.raises(ValueError, match="one spread"):
+        Gaussian(np.zeros(2), std=1.0, cov=cov)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_family_of_noise_levels_vmaps_like_a_family_of_masses():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    from minilink import Gaussian
+
+    law = Gaussian(np.zeros(2), np.ones(2))
+    key = jax.random.PRNGKey(0)
+    stds = jnp.array([[0.1, 0.1], [1.0, 1.0], [3.0, 3.0]])
+
+    family = jax.vmap(
+        lambda std: law.sample(key, params={"mean": law.mean, "std": std})
+    )(stds)
+
+    one = law.sample(key)
+    np.testing.assert_allclose(family, np.asarray(stds) * np.asarray(one), rtol=1e-12)
+
+
+def test_a_set_reads_its_numbers_from_params_and_moves_by_them():
+    from minilink.core.sets import BallSet, BoxSet, SingletonSet
+
+    box = BoxSet([0.0, 0.0], [1.0, 2.0])
+    z = np.array([0.5, 0.5])
+    assert set(box.params) == {"lower", "upper"}
+    np.testing.assert_array_equal(
+        box.margin(z, params={"lower": np.zeros(2), "upper": np.ones(2)}),
+        box.with_params({"lower": np.zeros(2), "upper": np.ones(2)}).margin(z),
+    )
+    both = box & BallSet([0.0, 0.0], 1.0)
+    assert set(both.params) == {"0", "1"}
+    moved = both.with_params(
+        {**both.params, "1": {"center": np.ones(2), "radius": 0.1}}
+    )
+    assert moved.margin(z)[-1] < 0.0 <= both.margin(z)[-1]
+    assert SingletonSet([1.0]).params["point"].tolist() == [1.0]

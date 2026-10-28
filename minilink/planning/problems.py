@@ -203,7 +203,7 @@ class PlanningProblem:
         ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
         "Xf": …, "x_start": x_start, "discount_rate": ρ}``, assembled on each
         access from the parts, which stay the one home of each number (a set's
-        entry is its own ``params``, ``None`` for a set without parameters).
+        entry is its own ``params``, ``{}`` for a set without parameters).
         Assigning a dictionary routes each entry to its part, so
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
@@ -232,7 +232,7 @@ class PlanningProblem:
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
             else:
-                write_set_params(role, getattr(self, role), entry)
+                setattr(self, role, moved_set(role, getattr(self, role), entry))
 
     def move_start(self, x_start):
         """Set ``x_start``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
@@ -833,15 +833,15 @@ def require_roles(value, view):
         )
 
 
-def write_set_params(role, set_, entry):
-    """Set a set's parameters; refuse a set that holds none (a frozen library set)."""
+def moved_set(role, set_, entry):
+    """The set of ``role`` with its numbers ``entry``; refuse numbers a set does not hold."""
     # The view's own entry for a set without parameters writes back as nothing
-    if entry is None and set_.params is None:
-        return
-    try:
-        set_.params = entry
-    except AttributeError:
-        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters") from None
+    if not entry and not set_.params:
+        return set_
+    if not set_.params:
+        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters")
+
+    return set_.with_params(entry)
 
 
 def coerce_price(price):

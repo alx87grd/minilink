@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -31,11 +31,13 @@ class Set(ABC):
     :meth:`sample` follows the draw convention of
     :class:`~minilink.core.distributions.Distribution`.
 
-    ``params`` is the set's own parameters (``None`` for a set without any): a
-    set that reads them takes ``params=None`` in :meth:`margin` as its own.
+    ``params`` is the set's own numbers (``{}`` for a set without any), by
+    name: ``params=None`` in :meth:`margin` and :meth:`sample` reads them, and
+    a tree passed instead moves the set (``{"lower": ..., "upper": ...}`` on a
+    box), so a set's numbers are parameters like a plant's.
     """
 
-    params = None
+    params = {}
 
     @abstractmethod
     def margin(self, z, t=0.0, params=None):
@@ -58,12 +60,12 @@ class Set(ABC):
 
         return inside
 
-    def sample(self, key=None, n=None, params=None):
+    def sample(self, key, n=None, params=None):
         """
         Draw one point ``(dim,)`` or ``n`` points ``(n, dim)`` from the set when supported.
 
-        ``key`` is a NumPy generator, an integer seed, ``None`` (unseeded) or a JAX
-        PRNG key (JAX arrays out, traceable): the draw convention of
+        ``key`` is a NumPy generator, an integer seed or a JAX PRNG key (JAX
+        arrays out, traceable): the draw convention of
         :class:`~minilink.core.distributions.Distribution`. Search planners use
         this optional method on samplable sets such as boxes; other sets leave it
         unimplemented and are sampled by rejection from a box.
@@ -73,6 +75,11 @@ class Set(ABC):
     def bounding_box(self):
         """The tightest :class:`BoxSet` containing the set, or ``None`` when it has none."""
         return None
+
+    def with_params(self, params):
+        """The set with its numbers replaced by ``params``: a new set for a library set (a value), else this one holding them."""
+        self.params = params
+        return self
 
     def __and__(self, other: "Set") -> "IntersectionSet":
         """Return the intersection ``self & other`` of two sets."""
@@ -93,11 +100,11 @@ class InputSet(ABC):
 
     Input feasibility often depends on the current state, for example
     actuator envelopes or contact-dependent controls. The state argument
-    is optional so constant input boxes stay simple. :meth:`margin` and
-    :meth:`contains` follow the conventions of :class:`Set`.
+    is optional so constant input boxes stay simple. :meth:`margin`,
+    :meth:`contains` and ``params`` follow the conventions of :class:`Set`.
     """
 
-    params = None
+    params = {}
 
     @abstractmethod
     def margin(self, u, x=None, t=0.0, params=None):
@@ -124,13 +131,18 @@ class InputSet(ABC):
 
         return admissible
 
-    def sample(self, key=None, n=None, x=None, t=0.0, params=None):
+    def sample(self, key, n=None, x=None, t=0.0, params=None):
         """Draw one input ``(m,)`` or ``n`` inputs ``(n, m)`` when supported (same convention as :meth:`Set.sample`)."""
         raise NotImplementedError("Sampling is not available for this input set")
 
     def bounding_box(self):
         """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
         return None
+
+    def with_params(self, params):
+        """The input set with its numbers replaced by ``params`` (as :meth:`Set.with_params`)."""
+        self.params = params
+        return self
 
     # Display
 
@@ -169,6 +181,11 @@ class BoxSet(Set):
         """Dimension of the boxed vector."""
         return int(self.lower.size)
 
+    @property
+    def params(self) -> dict:
+        """``{"lower", "upper"}``, the box's bounds."""
+        return {"lower": self.lower, "upper": self.upper}
+
     @classmethod
     def from_system_state(cls, sys) -> "BoxSet":
         """The state box of ``sys``: its state bounds (``sys.state.box``)."""
@@ -176,20 +193,23 @@ class BoxSet(Set):
 
     def margin(self, z, t=0.0, params=None):
         """Return the margins to the lower and upper faces, shape ``(2n,)``."""
+        params = self.params if params is None else params
         xp = array_module(z)
 
-        lower = self.lower
-        upper = self.upper
+        lower = params["lower"]
+        upper = params["upper"]
 
         # lower ≤ z ≤ upper ⇔ [z − lower; upper − z] ≥ 0
         margin = xp.concatenate((z - lower, upper - z))
 
         return margin
 
-    def sample(self, key=None, n=None, params=None):
+    def sample(self, key, n=None, params=None):
         """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``."""
-        lower = self.lower
-        upper = self.upper
+        params = self.params if params is None else params
+
+        lower = params["lower"]
+        upper = params["upper"]
         dim = self.dim
 
         require_finite_box(self)
@@ -210,6 +230,9 @@ class BoxSet(Set):
         """A box is its own bounding box."""
         return self
 
+    def with_params(self, params):
+        return replace(self, **params)
+
 
 @dataclass(frozen=True)
 class BoxInputSet(InputSet):
@@ -218,6 +241,11 @@ class BoxInputSet(InputSet):
     """
 
     box: BoxSet
+
+    @property
+    def params(self) -> dict:
+        """``{"lower", "upper"}``, the input box's bounds."""
+        return self.box.params
 
     @classmethod
     def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> "BoxInputSet":
@@ -237,13 +265,16 @@ class BoxInputSet(InputSet):
         """Return the margins to the input box faces, shape ``(2m,)``."""
         return self.box.margin(u, t=t, params=params)
 
-    def sample(self, key=None, n=None, x=None, t=0.0, params=None):
+    def sample(self, key, n=None, x=None, t=0.0, params=None):
         """Draw uniformly from the input box: ``(m,)`` for one input, ``(n, m)`` with ``n``."""
         return self.box.sample(key, n, params)
 
     def bounding_box(self):
         """The input box itself."""
         return self.box
+
+    def with_params(self, params):
+        return replace(self, box=self.box.with_params(params))
 
 
 @dataclass(frozen=True)
@@ -263,6 +294,11 @@ class SingletonSet(Set):
         object.__setattr__(self, "point", point)
 
     @property
+    def params(self) -> dict:
+        """``{"point"}``."""
+        return {"point": self.point}
+
+    @property
     def dim(self) -> int:
         """Dimension of the singleton point."""
         return int(self.point.size)
@@ -271,16 +307,18 @@ class SingletonSet(Set):
         """Return zero only when ``z`` equals the singleton point."""
         xp = array_module(z)
 
-        residual = self.residual(z)
+        residual = self.residual(z, params)
 
         # −|z − p| ≥ 0 only at z = p: the equality as a degenerate inequality
         margin = -xp.abs(residual)
 
         return margin
 
-    def residual(self, z):
+    def residual(self, z, params=None):
         """Return the equality residual ``z - point``, shape ``(n,)``."""
-        point = self.point
+        params = self.params if params is None else params
+
+        point = params["point"]
 
         residual = z - point
 
@@ -289,6 +327,9 @@ class SingletonSet(Set):
     def bounding_box(self):
         """The degenerate box ``point <= z <= point``."""
         return BoxSet(self.point, self.point)
+
+    def with_params(self, params):
+        return replace(self, **params)
 
 
 @dataclass(frozen=True)
@@ -310,16 +351,22 @@ class BallSet(Set):
         object.__setattr__(self, "radius", radius)
 
     @property
+    def params(self) -> dict:
+        """``{"center", "radius"}``."""
+        return {"center": self.center, "radius": self.radius}
+
+    @property
     def dim(self) -> int:
         """Dimension of the ball center."""
         return int(self.center.size)
 
     def margin(self, z, t=0.0, params=None):
         """Return the signed distance to the ball boundary, shape ``(1,)``."""
+        params = self.params if params is None else params
         xp = array_module(z)
 
-        center = self.center
-        radius = self.radius
+        center = params["center"]
+        radius = params["radius"]
 
         # r − ‖z − c‖ ≥ 0 inside the ball, as a margin vector of one entry
         signed_distance = radius - xp.linalg.norm(z - center)
@@ -338,6 +385,9 @@ class BallSet(Set):
 
         return BoxSet(lower, upper)
 
+    def with_params(self, params):
+        return replace(self, **params)
+
 
 @dataclass(frozen=True)
 class CallableSet(Set):
@@ -350,16 +400,20 @@ class CallableSet(Set):
         Function ``margin_fn(z, t, params) -> array``.
     contains_fn : callable, optional
         Function ``contains_fn(z, t, params) -> bool``.
+    params : dict, optional
+        The numbers the functions read, handed to them when a call passes none.
     """
 
     margin_fn: Callable | None = None
     contains_fn: Callable | None = None
+    params: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         require_margin_or_contains(self.margin_fn, self.contains_fn)
 
     def margin(self, z, t=0.0, params=None):
         """Evaluate the user-supplied margin function."""
+        params = self.params if params is None else params
         margin_fn = self.margin_fn
         require_margin_fn(margin_fn)
 
@@ -374,11 +428,15 @@ class CallableSet(Set):
         params=None,
     ) -> bool:
         """Evaluate membership through the supplied callable when present, on a flat ``z``."""
+        params = self.params if params is None else params
         contains_fn = self.contains_fn
         if contains_fn is not None:
             return bool(contains_fn(np.asarray(z, dtype=float).reshape(-1), t, params))
 
         return super().contains(z, t=t, params=params)
+
+    def with_params(self, params):
+        return replace(self, params=params)
 
 
 @dataclass(frozen=True)
@@ -410,22 +468,34 @@ class IntersectionSet(Set):
 
         return cls(tuple(members))
 
+    @property
+    def params(self) -> dict:
+        """The members' ``params`` by position: ``{"0": ..., "1": ...}``."""
+        return {str(i): set_.params for i, set_ in enumerate(self.sets)}
+
     def margin(self, z, t=0.0, params=None):
         """Concatenate the margins of all member sets (a scalar margin counts as one)."""
+        params = self.params if params is None else params
         xp = array_module(z)
 
         sets = self.sets
 
         # Each member's margins as a vector, a scalar margin as one entry
         margins = [
-            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params)), (-1,))
-            for set_ in sets
+            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params[str(i)])), (-1,))
+            for i, set_ in enumerate(sets)
         ]
 
         # z ∈ Z₁ ∩ Z₂ ∩ … ⇔ every member's margins ≥ 0
         margin = xp.concatenate(margins)
 
         return margin
+
+    def with_params(self, params):
+        members = tuple(
+            set_.with_params(params[str(i)]) for i, set_ in enumerate(self.sets)
+        )
+        return replace(self, sets=members)
 
     def bounding_box(self):
         """The intersection of the members' boxes; ``None`` when no member has one.
