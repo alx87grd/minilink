@@ -358,10 +358,10 @@ class ProblemEvaluator:
         """
         problem = self.problem
         loop = self.loop
+        xp = array_module(params["x_start"])
 
         # Nothing random: the one start, the parameters as they are
         if not self.draws:
-            xp = array_module(params["x_start"])
             return xp.reshape(params["x_start"], (1, -1)), params
 
         # x0 ~ p(x0), each law and each source's seed, n_trials times: one tree,
@@ -374,8 +374,8 @@ class ProblemEvaluator:
             for path in problem.drawn_paths()[1:]:
                 set_leaf(overrides, path, lookup(tree, path))
         else:
-            x_starts = np.tile(
-                np.asarray(params["x_start"], dtype=float), (n_trials, 1)
+            x_starts = xp.tile(
+                xp.asarray(params["x_start"], dtype=float), (n_trials, 1)
             )
 
         # Each trial's seeds of the loop's random blocks override theirs

@@ -5,7 +5,7 @@ import numpy as np
 from minilink import Gaussian, NoisyPendulum, PlanningProblem, QuadraticCost, WhiteNoise
 from minilink.analysis import linearize
 from minilink.blocks import NoiseSource
-from minilink.control.design import lqg
+from minilink.control import lqg
 
 TF = 5.0
 DT = 0.01  # the noise blocks' sample period and the run's step, s
