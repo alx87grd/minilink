@@ -370,7 +370,7 @@ def carry_left_operand(diagram, left) -> None:
     """Carry a diagram left operand's name and camera settings into ``diagram``.
 
     The result shares the left operand's blocks, so their ``x0`` (which the
-    blocks own, R124) comes with them; a leaf left operand carries nothing.
+    blocks own) comes with them; a leaf left operand carries nothing.
     """
     if not is_box(left):
         return

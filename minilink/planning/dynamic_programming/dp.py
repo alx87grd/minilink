@@ -15,8 +15,10 @@ from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_face import price_at
+from minilink.planning.step_problems import StepPlanningProblem
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
@@ -200,7 +202,7 @@ class DynamicProgrammingPlanner(Planner):
             t = tf - k * dt
 
             # Bellman backup from the cost-to-go one step ahead:
-            # J(x) = min_u [ g(x, u, t) dt + alpha J_next(x + f(x, u, t) dt) ]
+            # J(x_k) = min_u [ c(x_k, u) + α J_next(x_{k+1}) ], the face's stage cost and step
             J_next = J
             J, pi = backward_step(J_next, t)
 
@@ -229,12 +231,10 @@ class DynamicProgrammingPlanner(Planner):
         up the arrival cost-to-go, and keep the cheapest action.
         """
         grid = self.grid
-        cost = self.problem.cost
+        face = grid.face
+        params = face.params
         X = self.problem.X
         U = self.problem.U
-        plant_params = nominal_plant_params(self.problem)
-        cost_params = cost.params
-        dt = grid.dt
         alpha = self.options.alpha
         INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
 
@@ -255,8 +255,8 @@ class DynamicProgrammingPlanner(Planner):
             for a in range(grid.actions_n):
                 u = grid.inputs[a]
 
-                # x_{k+1} = Φ(x_k, u, t), the grid's step model
-                x_next = grid.successor(x, u, t, plant_params)
+                # x_{k+1}, c = transition(x_k, u, t): the step face's tick
+                x_next, c = face.transition_at(x, u, t, params)
 
                 # If action is in allowable set
                 if U.contains(u, x, t):
@@ -266,8 +266,8 @@ class DynamicProgrammingPlanner(Planner):
                         # (the interpolator takes a batch of states: [0] is this one)
                         J_arrival = J_interpol(x_next)[0]
 
-                        # Cost-to-go of a given action
-                        Q[a] = cost.g(x, u, t, cost_params) * dt + alpha * J_arrival
+                        # Cost-to-go of a given action: Q = c + α J(x_{k+1})
+                        Q[a] = c + alpha * J_arrival
 
                     else:
                         # The next state leaves the admissible states: the penalty
@@ -305,7 +305,7 @@ class DynamicProgrammingPlanner(Planner):
         J_arrival = grid.interpolate(J_next, x_next.reshape(-1, n), method)
         J_arrival = J_arrival.reshape(N, A)
 
-        # Q(x, u) = g(x, u, t) dt + alpha J_next(x_next), for every pair at once
+        # Q(x, u) = c(x, u, t) + alpha J_next(x_next), for every pair at once
         Q = G + alpha * J_arrival
 
         # Best action at every node
@@ -317,8 +317,7 @@ class DynamicProgrammingPlanner(Planner):
     def terminal_cost(self, t) -> np.ndarray:
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
-        h = self.problem.cost.h
-        cost_params = self.problem.cost.params
+        face = grid.face
         N = grid.nodes_n
 
         J = np.empty(N, dtype=float)
@@ -331,13 +330,13 @@ class DynamicProgrammingPlanner(Planner):
             x = grid.states[s]
 
             # Final cost of the state
-            J[s] = float(h(x, t, cost_params))
+            J[s] = float(face.terminal(x, t))
 
         return J
 
     def running_cost_table(self, t, admissible=None, x_next=None) -> np.ndarray:
         """
-        Running cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``.
+        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step face's ``c`` (``g dt`` under Euler).
 
         Pairs that are not ``admissible`` (action outside the input set, or a
         successor outside the state set or the grid) cost ``out_of_bound_cost``:
@@ -356,9 +355,7 @@ class DynamicProgrammingPlanner(Planner):
             return self._G
 
         grid = self.grid
-        g = self.problem.cost.g
-        cost_params = self.problem.cost.params
-        dt = grid.dt
+        params = grid.face.params
         N = grid.nodes_n
         A = grid.actions_n
         INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
@@ -386,8 +383,8 @@ class DynamicProgrammingPlanner(Planner):
             for a in range(A):
                 u = grid.inputs[a]
 
-                # Running cost over one step
-                G[s, a] = float(g(x, u, t, cost_params)) * dt
+                # The stage cost over one step, c = ∫₀^dt e^{−ρτ} g dτ (g dt under Euler)
+                G[s, a] = float(grid.stage_cost(x, u, t, params))
 
         # Out of bound cost on the pairs that leave the admissible set: the scalar,
         # or the price of each pair's successor
@@ -686,7 +683,10 @@ class ValueIterationRecord:
 def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid:
     """The grid passed in, or one built from the shapes and ``dt`` (never both)."""
     if grid is None:
-        if x_grid is None or u_grid is None or dt is None:
+        # A step problem ticks on its own: its grid needs no dt, and takes none
+        require_no_period_on_ticks(problem, dt)
+        native = isinstance(problem, StepPlanningProblem) and dt is None
+        if x_grid is None or u_grid is None or (dt is None and not native):
             raise ValueError(
                 "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
             )
@@ -707,20 +707,22 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     given = {key: value for key, value in flat.items() if value is not _UNSET}
     opt = replace(base, **given) if given else base
 
-    # The problem's continuous discount rate becomes the per-step factor, unless
-    # alpha is set
-    if "alpha" not in given and problem.discount_rate > 0.0:
-        opt = replace(opt, alpha=problem.discount_factor(grid.dt))
+    face = grid.face
+
+    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless alpha is set
+    if "alpha" not in given and face.gamma < 1.0:
+        opt = replace(opt, alpha=face.gamma)
 
     # The price of leaving the grid, unless set: the problem's, else the bound of its cost
     if opt.out_of_bound_cost is None:
-        opt = replace(opt, out_of_bound_cost=grid_price(problem, opt.alpha, grid.dt))
+        opt = replace(opt, out_of_bound_cost=face.price(opt.alpha))
 
-    # The problem's horizon is the terminal time unless final_time is set
+    # The horizon's end (t_start + tf, or a step problem's last tick) is the
+    # terminal time unless final_time is set
     if "final_time" not in given and opt.final_time == 0.0:
-        tf = getattr(problem, "tf", None)
-        if tf is not None and np.isfinite(tf):
-            opt = replace(opt, final_time=float(tf))
+        end = face.horizon_end()
+        if end is not None:
+            opt = replace(opt, final_time=float(end))
 
     if opt.backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
         raise ValueError(f"Unknown backend {opt.backend!r}")
@@ -729,21 +731,8 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
 
 
 def grid_price(problem, alpha, dt):
-    """
-    The price of an inadmissible pair: ``infeasible_cost`` when a number, else the cost bound.
-
-    The bound is the problem's :meth:`~minilink.planning.problems.PlanningProblem.cost_bound`
-    on value iteration's own sum: with ``α < 1`` the sweeps run to convergence,
-    ``Σ_{k≥0} αᵏ dt = dt / (1 − α)``, the rate ``ρ = −ln(α) / dt`` making
-    ``e^{−ρ dt} = α``; with ``α = 1``, the problem's horizon undiscounted.
-    """
-    if alpha >= 1.0:
-        return problem.infeasibility_price(discount_rate=0.0, dt=dt)
-
-    # α = e^{−ρ dt} (α = 0: one step counts, ρ = ∞)
-    rho = -np.log(alpha) / dt if alpha > 0.0 else np.inf
-
-    return problem.infeasibility_price(np.inf, discount_rate=rho, dt=dt)
+    """The price of an inadmissible pair at the discount ``alpha`` per step: the step face's rule, :func:`~minilink.planning.step_face.price_at`."""
+    return price_at(problem, alpha, dt)
 
 
 def cached_options_of(options) -> tuple:
@@ -766,3 +755,12 @@ def require_tables(result):
     """Refuse a cleanup before any solve has produced the tables."""
     if result is None:
         raise ValueError("No solution has been computed yet")
+
+
+def require_no_period_on_ticks(problem, dt):
+    """Refuse a ``dt`` for a step problem's grid: it ticks on its own clock."""
+    if isinstance(problem, StepPlanningProblem) and dt is not None:
+        raise ValueError(
+            "a step problem ticks on its own clock: omit dt (its period, if it has "
+            "one, is the problem's dt)"
+        )

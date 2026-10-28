@@ -5,7 +5,11 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax
-from minilink.core.compile.evaluators.stepping import step_body, step_path
+from minilink.core.compile.evaluators.stepping import (
+    step_body,
+    step_path,
+    step_with_cost,
+)
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import (
     AUTO_DT_SCALE,
@@ -73,7 +77,7 @@ class SampledSystem(StepSystem):
         self.id = source.id
         self.params = None
 
-        # State: the source's (its x0 a view, R124), labels, units, bounds and nominal value
+        # State: the source's (its x0 a view), labels, units, bounds and nominal value
         self.state = source.state
 
         # Ports: the source's own, their functions included
@@ -101,7 +105,7 @@ class SampledSystem(StepSystem):
 
     @property
     def x0(self):
-        """The source's ``x0``, read live; setting it writes through to the source, which owns it (R124)."""
+        """The source's ``x0``, read live; setting it writes through to the source, which owns it."""
         return np.asarray(self.source.x0, dtype=float)
 
     @x0.setter
@@ -176,6 +180,31 @@ class SampledSystem(StepSystem):
         x_next = step_body(f, x, u, u, t, h, solver, substeps)
 
         return x_next
+
+    def update_with_cost(self, x, u, t, params, rate):
+        """
+        ``(x(t + h), c)``: :meth:`update` with a stage cost integrated beside the state.
+
+        ``rate(x, u, τ)`` is the cost's integrand along the period, the input
+        held; the state is :meth:`update`'s to the bit, ``c = ∫ rate dτ`` by the
+        same solver and substeps.
+        """
+        params = self.params if params is None else params
+
+        source = self.source
+        h = self.sample_period
+        solver = self.solver
+        substeps = self.substeps
+
+        require_resolved(self)
+
+        def f(x, u, t):
+            return source.f(x, u, t, params)
+
+        # [x(t + h); c] = Φ([x(t); 0], u(t), t), the cost a state of its own
+        x_next, c = step_with_cost(f, rate, x, u, t, h, solver, substeps)
+
+        return x_next, c
 
     @property
     def resolves(self) -> bool:

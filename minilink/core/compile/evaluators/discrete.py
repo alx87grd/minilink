@@ -486,6 +486,49 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return x_samples
 
+    def rollout_with_cost(self, x0, u_seq, params, rate, *, n_steps=None, t_start=0.0):
+        """
+        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the loop's plant carrying its stage cost.
+
+        The plant's period is :meth:`SampledSystem.update_with_cost`, the
+        cost's integrand ``rate(x_plant, u_plant, τ)`` integrated beside the
+        plant's state by its solver and substeps, the input held; ``C_k`` is
+        the running sum of the periods' costs, ``C_0 = 0``. The states are
+        :meth:`rollout`'s.
+        """
+        xp = self.xp
+        n = self.n
+        plant = self.plan.plant_op
+
+        x0 = xp.asarray(x0, dtype=float).reshape(n)
+        u_seq = self.input_sequence_of(u_seq, n_steps)
+        ks = self.indices(u_seq.shape[0])
+
+        # z_{k+1} = [x_{k+1}; C_k + c_k]: the loop's tick, its plant advanced with its cost
+        def transition(z, k, u_k):
+            x, u_f = self.float_arrays(z[:n], u_k)
+            signals = self.port_signals(x, u_f, k, params, t_start=t_start)
+            costs = []
+
+            def advance(system, local_x, local_u, time, p_op):
+                x_i, c = system.update_with_cost(local_x, local_u, time, p_op, rate)
+                costs.append(c)
+                return x_i
+
+            x_next = self.next_from_signals(
+                x, u_f, k, params, signals, t_start=t_start, advance=advance
+            )
+            require_one_plant_period(costs, plant)
+            z_next = xp.concatenate(
+                [xp.reshape(x_next, (n,)), xp.reshape(z[n] + costs[0], (1,))]
+            )
+            return z_next
+
+        z0 = xp.concatenate([x0, xp.zeros(1)])
+        z_samples = iterate(self, transition, z0, (ks, u_seq))
+
+        return z_samples[:, :n], z_samples[:, n]
+
     def signals(self, x, u, k=0, params=None, *, t_start=0.0):
         """The signal buffer at tick ``k``: every block output, flat (``plan.output_slices``)."""
         x, u = self.float_arrays(x, u)
@@ -638,3 +681,12 @@ def check_sampled_plan_traces(evaluator, plan, verbose):
         )
     if verbose:
         print("[compile] The sampled plan traces on JAX.")
+
+
+def require_one_plant_period(costs, plant):
+    """Refuse a sampled loop whose plant did not take its one period: its stage cost has no owner."""
+    if len(costs) != 1:
+        raise ValueError(
+            f"the loop's plant {getattr(plant, 'sys_id', plant)!r} took {len(costs)} periods "
+            "in one tick; the stage cost needs exactly one"
+        )

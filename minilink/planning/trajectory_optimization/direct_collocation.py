@@ -260,8 +260,7 @@ class DirectCollocationTranscription(Transcription):
         """Build the JAX program on the problem's tree, ``J(z, params)``, ``h(z, params)``, ``g(z, params)``.
 
         The tree is :meth:`program_params`: the start, its time, the plant's,
-        the cost's and the discount, and each set read as a constraint (R148,
-        PP-2, PP-3). One program is compiled once and solved for any value of
+        the cost's and the discount, and each set read as a constraint. One program is compiled once and solved for any value of
         them, a moved target or a new friction, without a rebuild. Direct
         collocation is performance-sensitive because SLSQP repeatedly calls the
         objective, gradient, constraints, and constraint Jacobians; the whole
@@ -296,7 +295,7 @@ class DirectCollocationTranscription(Transcription):
 
     def program_params(self, problem: PlanningProblem) -> dict:
         """
-        The JAX program's tree: the problem's leaves it reads (R148).
+        The JAX program's tree: the problem's leaves it reads.
 
         ``x_start``, ``t_start``, the plant's (a random plant's at its mean),
         the cost's and the discount rate; each set it reads as a constraint by
@@ -368,7 +367,7 @@ class DirectCollocationTranscription(Transcription):
         The boundary and path constraints as functions of ``(z, params)``: ``(equalities, inequalities)``.
 
         The start: ``x_0 − x_start = 0`` for the start's singleton ``X0`` (the
-        start pinned from ``x_start``, R148), else its margins; the terminal
+        start pinned from ``x_start``), else its margins; the terminal
         set: ``x_N − point = 0`` for a singleton, else its margins; then the
         margins of ``X`` and ``U`` at every knot when they are not lowered to the
         decision bounds. Each set reads its numbers from ``params`` by role.

@@ -117,10 +117,10 @@ class Optimizer:
         Solver options merged into the preset's ``options`` dict (user keys win).
     iterations : int, optional
         For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
-        no tolerance (R149). On a JAX program the solve is one ``lax.scan``,
+        no tolerance. On a JAX program the solve is one ``lax.scan``,
         pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
         ``grad``. ``None`` (default) runs to the method's tolerance, its
-        ``maxiter`` the cap. A size, structural: never a parameter (R131).
+        ``maxiter`` the cap. A size, structural: never a parameter.
     **method_kwargs
         Extra keyword arguments override the preset's top-level kwargs and are
         forwarded to the backend constructor.
@@ -179,7 +179,7 @@ class Optimizer:
         ----------
         params : dict, optional
             The values of the program's parameters for this solve, a partial
-            tree merged once onto the program's defaults (R130; a path the
+            tree merged once onto the program's defaults (a path the
             program does not declare raises). ``None`` solves at the defaults.
             The compiled program is reused: a new value never recompiles.
         z0 : array_like, optional
@@ -246,7 +246,7 @@ class Optimizer:
 
     def as_step_system(self, params=None):
         """
-        The solve as a step system (R132): the state the law's, one tick one iteration.
+        The solve as a step system: the state the law's, one tick one iteration.
 
         ``x`` is the law's state flattened (``z``; with Adam its moments and step
         count after it), ``x0`` the law's start from :attr:`z0`, the update
@@ -333,7 +333,7 @@ def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs
     ``kwargs`` over its constructor keywords. The adapter solves any program
     evaluator from a start, ``adapter.solve(evaluator, z0)``, whether the
     evaluator came from one transcription or a compiled program with
-    parameters (OPW-1).
+    parameters.
     """
     require_method(method)
     require_named_method(method)

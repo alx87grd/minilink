@@ -32,7 +32,7 @@ class Distribution(ABC):
     :class:`CounterKey` ``(seed, k)``: one draw by the library's cipher, the same
     on both backends (what a noise source holds over its sample ``k``).
     The law's numbers are its ``params``; ``sample(key, n, params)`` draws from
-    the law they name, so a noise level is a parameter like a mass (RD-R1).
+    the law they name, so a noise level is a parameter like a mass.
     """
 
     support: Set | None = None
@@ -62,10 +62,24 @@ class Distribution(ABC):
         Draw one sample (shape ``(dim,)``) or ``n`` samples (``(n, dim)``).
 
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
-        JAX PRNG key (JAX arrays out, traceable). ``params=None`` reads the
-        law's own :attr:`params`.
+        JAX PRNG key (JAX arrays out, traceable); ``key=None`` draws nothing
+        and returns the mean (:meth:`mean_draw`), as a noise block's
+        ``seed=None`` gives its mean signal.
+        ``params=None`` reads the law's own :attr:`params`.
         """
         ...
+
+    def mean_at(self, params=None):
+        """The law's mean at its numbers ``params`` (``None``: its own)."""
+        return self.mean
+
+    def mean_draw(self, n=None, params=None):
+        """The draw of no key: the mean at ``params``, ``(dim,)``, or ``(n, dim)`` tiled."""
+        params = self.params if params is None else params
+        mean = self.mean_at(params)
+        xp = array_module(mean)
+
+        return mean if n is None else xp.tile(mean, (int(n), 1))
 
 
 class Gaussian(Distribution):
@@ -102,7 +116,13 @@ class Gaussian(Distribution):
 
         return self.full_cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+        return params["mean"]
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         params = self.params if params is None else params
 
         mean = params["mean"]
@@ -163,7 +183,17 @@ class Uniform(Distribution):
 
         return cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+
+        # The box's center, (a + b) / 2
+        mean = 0.5 * (params["lower"] + params["upper"])
+
+        return mean
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         return self.box.sample(key, n, params)
 
 
@@ -193,7 +223,19 @@ class Particles(Distribution):
 
         return cov
 
+    def mean_at(self, params=None):
+        params = self.params if params is None else params
+        points = params["points"]
+        xp = array_module(points)
+
+        # p̄ = (1/N) Σᵢ pᵢ
+        mean = xp.mean(points, axis=0)
+
+        return mean
+
     def sample(self, key, n=None, params=None):
+        if key is None:
+            return self.mean_draw(n, params)
         params = self.params if params is None else params
 
         points = params["points"]
@@ -262,9 +304,11 @@ def check_points(points):
 
 
 def split_keys(key, n):
-    """``n`` independent keys from a JAX key, or the same NumPy generator ``n`` times."""
+    """``n`` independent keys from a JAX key, the same NumPy generator ``n`` times, or ``n`` times ``None`` (no key: every draw at its mean)."""
     if n == 0:
         return []
+    if key is None:
+        return [None] * n
 
     if is_jax_key(key):
         jax = require_jax()

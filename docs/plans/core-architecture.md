@@ -256,14 +256,13 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   - the continuous description stays primary for collocation, the continuous LQR, the linear
     analysis and `solver="scipy"`.
 - **Ruled:** R141, R142, R150.
-- **Today:** one policy gets three or four close `J`s (a left Riemann sum `g dt` in `dp.py` and
-  the RL reward; a trapezoid in `score_run`; shooting's trapezoid with a first-order hold); the
-  failure rules differ (`score_run` integrates to `tf` and checks `X` and `U` at every sample; the
-  RL environment stops at the first exit from `X` and checks no `U`; value iteration prices the
-  cells that leave its grid), written twice (the environment's step and `score_run`; R108 gives
-  them one owner); the hold differs too: the planners' `nominal_trajectory` holds `u_k` over the
-  period while `evaluate` closes the law as a continuous diagram and reads it at the RK4 stages,
-  so a lookup policy is scored on two loops today.
+- **Today:** landed in the v0.3 run (join 1): `StepPlanningProblem`, `StepCost`, `SampledCost`,
+  the compiled face (`StepFace`, `problem.compile(dt=)`, `problem.discretize(dt)`); the judge's
+  running cost integrated with the state; value iteration's backup, the RL environment's step
+  (reward `−c_k`, the failure the judge's rule at the sample) and the planners' evidence on the
+  face; a planner's score holding its feedback law over each period (`policy % dt`); the RL
+  heads on the seeded policy; acceptance script 6 gets one `J` to the bit from the face, the
+  judge, the RL environment and the planner. Rest: `Sys2Gym` keeps its own step in v0.3.
 - **Open:** nothing. The three points are ruled (R159): the bounds are checked at the samples (the
   dense run shows what happens between them); a run is priced to the horizon with the input held;
   a solver may optimize its own objective but a solution's score is always the problem's cost

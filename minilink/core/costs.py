@@ -99,7 +99,7 @@ class CostFunction(ABC):
         The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
 
         ``cost_rate`` is the integrand ``e^{−ρ (t_k − t_start)} g(x_k, u_k, t_k)``
-        at each sample, the discount counted from the horizon's start (R148),
+        at each sample, the discount counted from the horizon's start,
         and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
         ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
         trajectory's array module, so it traces under JAX.
@@ -490,6 +490,168 @@ class ScaledCost(CostFunction):
         params = params or {}
 
         return params.get("weight", self.weight), params.get("cost")
+
+
+class StepCost(ABC):
+    """
+    The cost of a step problem: a stage cost ``c(x, u, k)`` and a terminal cost ``h(x, k)``.
+
+    ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``: the stage cost is
+    paid per tick, already integrated over its period, and the discount is the
+    problem's ``γ`` per tick. ``params`` holds the cost's numbers (``{}`` for
+    none), the System pattern: ``params=None`` reads them.
+    """
+
+    id = None
+
+    @property
+    def params(self) -> dict:
+        """The cost's numbers: this instance's own (``{}`` until it sets some)."""
+        return self.__dict__.setdefault("own_params", {})
+
+    @params.setter
+    def params(self, value):
+        self.__dict__["own_params"] = value
+
+    @abstractmethod
+    def c(self, x, u, k=0, params=None):
+        """Return the native scalar stage cost ``c(x, u, k)`` of one tick."""
+        ...
+
+    @abstractmethod
+    def h(self, x, k=0, params=None):
+        """Return the native scalar terminal cost ``h(x, k)``."""
+        ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
+
+class SampledCost(StepCost):
+    """
+    The stage cost of a continuous cost on a plant sampled at ``dt``: ``c_k = ∫₀^dt e^{−ρτ} g dτ``.
+
+    ``c(x, u, k)`` integrates ``e^{−ρ(τ − t_k)} g(x(τ), u, τ)`` over one period
+    from ``x`` at ``t_k = t_start + k dt``, the input held, with the plant's
+    solver and substeps (the plant evaluated beside the cost: a direct call is
+    the second plant evaluation a compiled face fuses away); ``h(x, k)`` is
+    the terminal cost at ``t_k``. The stationary form: ``c_k`` does not
+    depend on ``k`` except through the time the cost reads, and under one
+    Euler step it is ``g(x_k, u_k, t_k) dt`` to the last bit. ``params`` are
+    the cost's; the plant's numbers are the plant's own.
+    """
+
+    def __init__(
+        self,
+        cost,
+        plant,
+        dt,
+        *,
+        solver="rk4",
+        substeps=1,
+        discount_rate=0.0,
+        t_start=0.0,
+    ):
+        self.cost = cost
+        self.plant = plant
+        self.dt = float(dt)
+        self.solver = solver
+        self.substeps = int(substeps)
+        self.discount_rate = float(discount_rate)
+        self.t_start = float(t_start)
+        self.id = cost.id
+
+    @property
+    def params(self):
+        """The cost's numbers."""
+        return self.cost.params
+
+    @params.setter
+    def params(self, value):
+        self.cost.params = value
+
+    def c(self, x, u, k=0, params=None):
+        t_start = self.t_start
+        dt = self.dt
+
+        # t_k = t_start + k dt, the period's start
+        t_k = t_start + k * dt
+        c = self.stage_cost_at(x, u, t_k, params)
+
+        return c
+
+    def h(self, x, k=0, params=None):
+        params = self.params if params is None else params
+        t_start = self.t_start
+        dt = self.dt
+        h = self.cost.h
+
+        # h(x_k, t_k), t_k = t_start + k dt
+        t_k = t_start + k * dt
+        h_k = h(x, t_k, params)
+
+        return h_k
+
+    def terminal_at(self, x, t, params=None):
+        """The terminal cost at the absolute time ``t`` (seconds): the continuous cost's ``h(x, t)``."""
+        params = self.params if params is None else params
+        h = self.cost.h
+
+        h_t = h(x, t, params)
+
+        return h_t
+
+    def stage_cost_at(
+        self, x, u, t_k, params=None, plant_params=None, discount_rate=None
+    ):
+        """``c_k`` alone of the period starting at ``t_k``: :meth:`stage_at`'s cost, the plant not stepped where the scheme allows (one Euler step)."""
+        # Lazy import: the step model loads with the first stage
+        from minilink.core.compile.evaluators.stepping import stage_cost
+
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+
+        return stage_cost(
+            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
+        )
+
+    def stage_at(self, x, u, t_k, params=None, plant_params=None, discount_rate=None):
+        """
+        ``(x_{k+1}, c_k)`` of the period starting at ``t_k``: the plant and its stage cost in one step.
+
+        ``params`` are the cost's, ``plant_params`` the plant's (``None``: their
+        own), ``discount_rate`` the rate ``ρ`` (``None``: this cost's).
+        """
+        # Lazy import: the step model loads with the first stage
+        from minilink.core.compile.evaluators.stepping import step_with_cost
+
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+        x_next, c = step_with_cost(
+            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
+        )
+
+        return x_next, c
+
+    def laws_at(self, t_k, params, plant_params, discount_rate):
+        """``(ẋ, ċ)`` of the period starting at ``t_k``: the plant on its numbers, the discounted cost rate."""
+        params = self.params if params is None else params
+        rho = self.discount_rate if discount_rate is None else discount_rate
+        g = self.cost.g
+        f = self.plant.f
+
+        # ẋ = f(x, u, τ) on the plant's numbers
+        def dynamics(x, u, tau):
+            return f(x, u, tau, plant_params)
+
+        # ċ = e^{−ρ(τ − t_k)} g(x, u, τ): the discount counted from the period's start
+        def rate(x, u, tau):
+            xp = array_module(x, u, tau)
+            c_dot = xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
+            return c_dot
+
+        return dynamics, rate
 
 
 ###############################################################################

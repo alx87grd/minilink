@@ -13,6 +13,7 @@ from minilink.core.compile.evaluators.base import (
     gather_u,
 )
 from minilink.core.compile.evaluators.compiled import compiled
+from minilink.core.compile.evaluators.stepping import held_inputs, iterate, step_body
 from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.system import DynamicSystem
@@ -67,6 +68,73 @@ class DiagramEvaluator(ContinuousEvaluator):
         self.require_params(params)
         dtype = self.dtype_of(x, u)
         return self.port_signals(x, u, t, dtype, params)
+
+    def f_and_block(self, x, u, t, params, sys_id):
+        """``(dx, x_b, u_b)``: the loop's ``dx`` and one block's own state and input, from one signal pass."""
+        self.require_params(params)
+        xp = self.xp
+        dtype = self.dtype_of(x, u)
+        signals = self.port_signals(x, u, t, dtype, params)
+        dx = self.dx_from_signals(x, u, t, dtype, params, signals)
+
+        # The block's state slice and its gathered input, read off the same buffer
+        op = next(op for op in self.plan.state_ops if op.sys_id == sys_id)
+        x_b = x[op.local_x_slice]
+        u_b = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+
+        return dx, x_b, u_b
+
+    def rhs_with_cost(self, params, sys_id, rate):
+        """``ż = [dx; rate(x_b, u_b, t)]`` of the loop augmented with one block's stage cost."""
+        xp = self.xp
+
+        def f_aug(z, u, t):
+            dx, x_b, u_b = self.f_and_block(z[:-1], u, t, params, sys_id)
+            c_dot = xp.reshape(rate(x_b, u_b, t), (1,))
+            z_dot = xp.concatenate([dx, c_dot])
+            return z_dot
+
+        return f_aug
+
+    def rollout_with_cost(
+        self,
+        x0,
+        u_seq,
+        t_start,
+        dt,
+        params,
+        rate,
+        *,
+        sys_id="plant",
+        solver="rk4",
+        substeps=1,
+        n_steps=None,
+    ):
+        """
+        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the running stage cost of one block integrated beside the state.
+
+        ``C(t) = ∫_{t_start}^t rate(x_b, u_b, τ) dτ``, ``x_b`` and ``u_b`` the
+        block's own state and input at every stage of the same scheme and
+        substeps (one signal pass per stage), the input held; the states are
+        :meth:`rollout`'s.
+        """
+        xp = self.xp
+        n = self.n
+        f_aug = self.rhs_with_cost(params, sys_id, rate)
+
+        x0 = xp.asarray(x0, dtype=float).reshape(n)
+        u_seq = self.input_sequence_of(u_seq, n_steps, "zoh")
+        u_start, u_end = held_inputs(u_seq, "zoh")
+        ks = self.indices(u_start.shape[0])
+
+        # z_{k+1} = Φ(z_k, u_k, t_k) for z = [x; C], t_k = t_start + k dt
+        def period(z, k, ua, ub):
+            return step_body(f_aug, z, ua, ub, t_start + k * dt, dt, solver, substeps)
+
+        z0 = xp.concatenate([x0, xp.zeros(1)])
+        z_samples = iterate(self, period, z0, (ks, u_start, u_end))
+
+        return z_samples[:, :n], z_samples[:, n]
 
     def compute_internal_signals_dict(self, x, u, t=0.0, params=None):
         """Every block output at ``(x, u, t)``, keyed ``"block:port"``."""

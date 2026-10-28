@@ -57,8 +57,10 @@ class ReinforcementLearningPlanner(Planner):
     Policy-family planner that learns ``u = pi(x)`` by reinforcement learning.
 
     The training objective is the expected discounted return on the control
-    grid, ``E[-sum_k gamma^k g(x_k, u_k) dt]``: a failure (leaving ``X``) pays the
-    problem's price of infeasibility, leaving the training zone truncates the episode.
+    grid, ``E[-Σ_k γᵏ c_k]``, ``c_k`` the stage cost of the problem's step face: a failure (leaving ``X`` or ``U``) pays the problem's price
+    of infeasibility, leaving the training zone truncates the episode. The
+    discount ``γ`` is the problem's own per period unless ``gamma=`` overrides
+    it, a training hyperparameter the record states beside the scored one.
     ``solve`` returns the learned law as a
     :class:`~minilink.planning.results.PlanningSolution`; asked to evaluate, it
     also rolls the law out and scores it by Monte Carlo on the problem's own
@@ -622,6 +624,8 @@ class ReinforcementLearningPlanner(Planner):
             cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,
+            gamma=float(self.gamma),
+            scored_gamma=float(self.env.face.gamma),
         )
 
     def critic_cost_to_go(self):
@@ -667,14 +671,15 @@ class ReinforcementLearningPlanner(Planner):
             x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
             return (x_next, t_next), (x, u)
 
-        # The N periods from x0 at t = 0
+        # The N periods from x0 at t_start
         x0 = jnp.asarray(x0, dtype=float)
-        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, 0.0), None, length=n_steps)
+        t_start = env.t_start
+        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, t_start), None, length=n_steps)
 
         # N + 1 samples: the final state appended, the last input held at it
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
         us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
-        t = env.dt * np.arange(n_steps + 1)
+        t = t_start + env.dt * np.arange(n_steps + 1)
 
         return Trajectory(t=t, x=xs.T, u=us.T)
 
@@ -687,7 +692,8 @@ class ReinforcementLearningRecord:
     ``cost`` is the mean episode cost ``J`` of the last collection, positive
     and falling. ``history`` holds one dict per learning iteration
     (``timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
-    stay internal to the algorithms.
+    stay internal to the algorithms. ``gamma`` is the discount per period the
+    training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
     """
 
     algorithm: str
@@ -696,6 +702,8 @@ class ReinforcementLearningRecord:
     cost: float
     weights_finite: bool
     history: list
+    gamma: float | None = None
+    scored_gamma: float | None = None
 
     @property
     def success(self) -> bool:
@@ -704,8 +712,23 @@ class ReinforcementLearningRecord:
 
     # Display
 
+    @property
+    def discount_differs(self) -> bool:
+        """The training discount is not the scored one: an override."""
+        if self.gamma is None or self.scored_gamma is None:
+            return False
+
+        return self.gamma != self.scored_gamma
+
     def __str__(self) -> str:
-        return (
+        line = (
             f"{self.algorithm}: {self.timesteps} plant steps in "
             f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}"
         )
+        if self.discount_differs:
+            line += (
+                f"; trained at gamma={self.gamma:g} per period, scored at "
+                f"gamma={self.scored_gamma:g} (the problem's)"
+            )
+
+        return line

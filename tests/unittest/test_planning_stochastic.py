@@ -684,10 +684,26 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     source = TrajectorySource(t, u)
     assert int(source.m) == 0  # no input port: an open-loop policy
 
-    # The source interpolates linearly: the plant's first-order-hold rollout
+    # The source interpolates linearly: the plant's first-order-hold rollout, its
+    # running cost integrated with the state by the same RK4 step (R142),
+    # ż = [f(x, u(τ)); g(x, u(τ))], plus h(x_N)
+    from minilink.core.compile.evaluators.stepping import step_body
+
+    cost = problem.cost
+
+    def f_aug(z, u, tau):
+        dx = plant.f(z[:2], u, tau)
+        return np.concatenate([dx, [cost.g(z[:2], u, tau)]])
+
+    z = np.concatenate([problem.x_start, [0.0]])
+    for k in range(n_steps):
+        z = step_body(f_aug, z, u[:, k], u[:, k + 1], t[k], dt, "rk4", 1)
+    J_hand = z[2] + cost.h(z[:2], t[-1])
     evaluator = plant.compile(backend="numpy", verbose=False)
     xs = evaluator.rollout(problem.x_start, u.T, 0.0, dt, hold="foh")
-    J_hand = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
+    np.testing.assert_allclose(xs[-1], z[:2], rtol=1e-12)
+    trapezoid = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
+    np.testing.assert_allclose(trapezoid, J_hand, rtol=2e-2)
 
     runs = [("numpy", "rk4"), ("numpy", "scipy")]
     runs += [("jax", "rk4")] if jax_available() else []

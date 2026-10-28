@@ -114,7 +114,7 @@ def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t_start=0.0
 
     ``x`` and ``u`` are knot matrices with shape ``(dim, N)``; the running
     cost is integrated with the trapezoid rule. The discount is the
-    problem's, ``e^{−ρ(t − t_start)}`` (R148); ``ρ = 0`` is the plain sum.
+    problem's, ``e^{−ρ(t − t_start)}``; ``ρ = 0`` is the plain sum.
     """
     xp = array_module(x, t)
     rho = discount_rate

@@ -1,4 +1,4 @@
-"""The compiled trajectory-optimization planner: the planner's pure face, ``pv = planner.compile()`` (R148)."""
+"""The compiled trajectory-optimization planner: the planner's pure face, ``pv = planner.compile()``."""
 
 import numpy as np
 
@@ -18,7 +18,7 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 
 class CompiledTrajectoryPlanner:
     """
-    The pure face of a trajectory-optimization planner (R148): its solve as functions of ``(params, z)``.
+    The pure face of a trajectory-optimization planner: its solve as functions of ``(params, z)``.
 
     ``z`` is the planner's solution vector: the transcription's decision vector
     (the knots, ``(rows, N)`` row after row: collocation's states then inputs,
@@ -100,7 +100,7 @@ class CompiledTrajectoryPlanner:
         return z, status
 
     def shift(self, z, t):
-        """The plan rebased to the absolute time ``t`` (R155): each knot row re-read at ``t + offset``, the tail held."""
+        """The plan rebased to the absolute time ``t``: each knot row re-read at ``t + offset``, the tail held."""
         xp = array_module(z, t)
 
         rows = self.rows(z)

@@ -681,7 +681,9 @@ provided.
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
-  an optional `Set`. A library law's numbers are its `params` and `cov` is the covariance of
+  an optional `Set`. **No key, no draw:** `sample(None)` is the mean at the law's numbers
+  (`mean_at(params)`; `(n, dim)` tiled with `n`), as a noise block's `seed=None` is its mean
+  signal: the design point (the maintainer, 2026-10-28). A library law's numbers are its `params` and `cov` is the covariance of
   one draw (RD-R1): `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
   `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`
   (its `BoxSet`'s bounds, `cov = diag((b − a)² / 12)`), `Particles(points)` (`{"points"}`, the
@@ -1065,12 +1067,19 @@ finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
-cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)  (trapezoid; +inf when not finite; no h on an infinite horizon)
+cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t_start)} g dt  (+inf when not finite; no h on an infinite horizon)
 J                   = cost, or with the price on cost + price · (failed or not reached),
                       and cost_bound + price for a run not finite
 ```
 
-A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
+**The stage cost is integrated with the state** (R142): the evaluator's run carries the running
+cost `C(t) = ∫ e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
+scheme and substeps, read at the plant block's own state and input in the pass that computes
+`dx` (a sampled loop: inside the plant's period, `SampledSystem.update_with_cost`), recorded as
+the signal `"plant:running_cost"`; its last value is the run's running cost, the stage costs
+`c_k` of the step face summed with their discount. `evaluate_trajectory` reads that signal when
+the run carries it (one score) and scores a logged run, which has none, by the trapezoid on its
+samples. A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
 term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach (its `1e6`
 fallback, unannounced, when the boxes bound no cost and the price is a number): its `J` stays
 finite and above that of any finite run, failed or not. Its gradient is not defined (the rollout
@@ -1100,8 +1109,9 @@ parts; `problem.params` shows each law at its leaf and the start's law under `"x
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
 path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
 law or a source leaves every other draw unchanged, and an integer key draws on the host: the
-same trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
-sources. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
+same trials on NumPy and JAX. `realize(None)` draws nothing: every law at its mean, every seed
+`None`; `nominal()` is that tree written into a copy of the problem's parts (the caller's
+untouched), the random sources kept with seed `None`, their mean signal. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
 two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
 `Sum` on the command or the measurement when the plant has no such port), any other port's
 under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
@@ -1152,7 +1162,24 @@ call, and each trial realizes the loop's random blocks under that key (trial `i`
 key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the price on, the price is a step
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
-grid (`nominal_trajectory`), the planner's evidence; `evaluate` scores the continuous loop.
+grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
+a planner's score (`Planner.evaluate`) holds a feedback law with no clock of its own over
+each period, `policy % dt` on the plant's own clock (R159), so value iteration's or a
+learner's policy gets the face's `J`; an open-loop source keeps the interpolation its planner
+states. `problem.compile(law)` called directly closes a continuous law as a continuous loop.
+
+**The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
+substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
+-> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
+beside the state by the same scheme (`g·dt` to the last bit under one Euler step, R142),
+`N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `price(gamma)` and `run(policy)`
+(`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
+cost, `x_start`, `t_start`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
+...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
+(`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
+face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit step problem
+of a continuous one, its cost a `SampledCost` (R154), compiling to the same face to the bit.
+Value iteration, the RL environment and a planner's evidence read only this face.
 
 The pipeline in two pictures. Every object carries its own parameters `p` (the amber tab on
 its edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
@@ -1213,9 +1240,15 @@ attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JA
 Flax/Optax dependency. Training prints one line per update; `verbose=False` silences it.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
-step functions on either backend — the reward `r = -g dt`, the exit rule and
-the horizon — shared by the JAX collectors and the tabular learners, so one object owns
-what a training episode means (an evaluation scores the learned law by `evaluate`).
+step functions on either backend — the step face's `transition` with the reward `r = −c_k`,
+the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
+the first failure, a training device, R159) and the horizon — shared by the JAX collectors
+and the tabular learners, so one object owns what a training episode means (an evaluation
+scores the learned law by `evaluate`, the law held over each period). The heads draw at a JAX
+key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
+tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes (R160). The discount is
+the problem's `e^{−ρ dt}` unless `gamma=` overrides it, and the record (`gamma`,
+`scored_gamma`) says when the two differ (R150).
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the
@@ -1306,9 +1339,13 @@ count and the last cost-to-go change.
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
-works on both); `grid.X` and `grid.U` are the boxes it spans, and successors from one
-period of the step model, forward Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's
-`solver="rk4"` otherwise; the time step `dt` lives on the grid, not on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
+works on both); `grid.X` and `grid.U` are the boxes it spans. The grid reads the problem's
+step face (`grid.face`, R141): the successors are one period of the step model, forward
+Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
+step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
+`c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
+the discount `α` the face's `γ` and the price its rule; a `StepPlanningProblem` (a grid world)
+solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on

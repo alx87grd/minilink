@@ -64,7 +64,7 @@ class SampledDiagramSystem(StepDiagramSystem):
 
     @property
     def x0(self):
-        """The loop's initial state: its blocks' ``x0`` (a view, R124), then the held outputs' own start."""
+        """The loop's initial state: its blocks' ``x0`` (a view), then the held outputs' own start."""
         x0 = np.concatenate([stacked_x0(self.subsystems), self.hold_x0])
         x0.flags.writeable = False
 

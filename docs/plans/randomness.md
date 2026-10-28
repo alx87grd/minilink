@@ -558,6 +558,11 @@ where they conflict, the later rulings hold:
   - RD-D10 and RD-D21: a realization is one tree, `x_start` a leaf; laws drawn to values by
     path, sources given seed leaves (§5); "`(x0, params)`" in older text means that tree;
   - the control period's owner is a `SampledSystem`, not a `Computer` (§4).
+- **No key, no draw: the design point (the maintainer, 2026-10-28;
+  [record](../reviews/2026-10-28-no-key-ruling.md)):** a law's `sample(None)` is its mean at its
+  numbers (`mean_draw`, `mean_at(params)`), as a noise block's `seed=None` is its mean signal;
+  `problem.realize(None)` is every law at its mean and every seed `None`, and `nominal()` is that
+  tree written into a copy of the parts (the random sources kept, seed `None`).
 
 ## 9. Steps: the implementation plan
 
