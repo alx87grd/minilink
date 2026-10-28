@@ -228,7 +228,6 @@ class NoiseSource(Source):
     """
 
     HOLDS = ("zoh", "linear")
-    is_random = True
 
     def __init__(self, law, *, sample_period=0.01, seed=0, hold="zoh", port="y"):
         require_one_of("hold", hold, self.HOLDS)
@@ -258,9 +257,9 @@ class NoiseSource(Source):
         # The backend of the time and of the period
         xp = array_module(t, period)
 
-        # Without a seed, the mean: no draw
+        # Without a seed, the mean (the law's own number when it names one): no draw
         if seed is None:
-            w_mean = xp.asarray(law.mean, dtype=float)
+            w_mean = xp.asarray(law_params.get("mean", law.mean), dtype=float)
             return w_mean
 
         # The sample index of the held train: w(t) = w_k on [kΔ, (k+1)Δ)
@@ -279,6 +278,11 @@ class NoiseSource(Source):
         """The params of one realization: a fresh seed under ``key``, or the mean for ``None``."""
         seed = None if key is None else child_seed(key, "seed")
         return dict(self.params, seed=seed)
+
+    @property
+    def is_random(self):
+        """A seed draws; ``seed=None`` is the mean, a deterministic signal no realization reseeds."""
+        return self.params["seed"] is not None
 
     @property
     def solver_info(self) -> dict:

@@ -22,6 +22,7 @@ from minilink.core.sets import (
     is_finite_box,
 )
 from minilink.core.system import System
+from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################
 # Public API
@@ -46,8 +47,9 @@ class PlanningProblem:
     A problem is stochastic by its parts (R143): where a number goes, a law may
     go (``x_start=`` a law or a set; ``params=`` laws in the tree's own shape),
     and a disturbance is a source block on a plant port (R128). :meth:`realize`
-    draws them into one tree (R144), :meth:`nominal` replaces each law by its
-    mean, and :attr:`is_stochastic` is read off the parts.
+    draws them into one tree (R144), :meth:`nominal` is the problem without its
+    laws (the start at its law's mean, the parts at their own numbers), and
+    :attr:`is_stochastic` is read off the parts.
 
     Parameters
     ----------
@@ -268,6 +270,14 @@ class PlanningProblem:
     @params.setter
     def params(self, value):
         require_roles(value, self.params)
+
+        # A law in the tree moves the problem's laws; the numbers move the parts
+        value, laws = split_laws(value, self.parts_view())
+        if "x_start" in laws:
+            self.start_law = laws.pop("x_start")
+            value.pop("x_start", None)
+        self.laws = merge_tree(self.laws, laws) if laws else self.laws
+
         for role, entry in value.items():
             if role == "plant":
                 self.sys.params = entry
@@ -330,11 +340,11 @@ class PlanningProblem:
             values = law.sample(stream_of(key, ".".join(path)), n)
             tree = with_leaf(tree, path, values.reshape((n, *nominal)))
 
-        # Each random source's seed, n times, named by its block id and the trial
+        # Each random source's seeds, n times, named by its block id and the trial
         for sys_id, block in self.sources_by_id().items():
             if block.is_random:
                 seeds = source_seeds(block, key, sys_id, n)
-                tree = with_leaf(tree, (sys_id, "seed"), seeds)
+                tree = with_leaf(tree, (sys_id,), merge_tree(tree[sys_id], seeds))
 
         return tree
 
@@ -342,11 +352,10 @@ class PlanningProblem:
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
         paths = [("x_start",)]
         paths.extend(path for path, _ in flatten(self.laws))
-        paths.extend(
-            (sys_id, "seed")
-            for sys_id, block in self.sources_by_id().items()
-            if block.is_random
-        )
+        for sys_id, block in self.sources_by_id().items():
+            if block.is_random:
+                seeds = seeds_of(block, block.realize(0))
+                paths.extend((sys_id, *path) for path, _ in flatten(seeds))
 
         return paths
 
@@ -374,10 +383,11 @@ class PlanningProblem:
 
     def nominal(self) -> PlanningProblem:
         """
-        The certainty-equivalent problem: each law replaced by its mean, no random source.
+        The certainty-equivalent problem: the start at its law's mean, no law, no random source.
 
-        The start's mean is the one start (a singleton ``X0``); a deterministic
-        source (a load ``Step``) stays.
+        The start's mean is the one start (a singleton ``X0``); a parameter
+        with a law keeps its part's own number (the parts are shared, never
+        written); a deterministic source (a load ``Step``) stays.
         """
         sources = {
             port: block
@@ -703,7 +713,12 @@ def start_law_of(x_start):
 
 
 def require_samplable_start(set_, box):
-    """Refuse a start set with no finite bounding box to draw from."""
+    """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
+    if type(set_).sample is Set.sample:
+        raise ValueError(
+            f"x_start {type(set_).__name__} cannot draw a start (only a box samples): "
+            "give a law (a Distribution), or a box"
+        )
     if not is_finite_box(box):
         raise ValueError(
             f"x_start {type(set_).__name__} has no finite bounding box: give a law "
@@ -806,13 +821,46 @@ def stream_of(key, name):
     return child_seed(int(key), name)
 
 
-def source_seeds(block, key, port, n):
-    """The seeds of a random source over ``n`` trials: trial ``i`` its realization under ``child_seed(key, "trial i")``."""
+def source_seeds(block, key, sys_id, n):
+    """The seeds of a random source over ``n`` trials, nested like the block: trial ``i`` its realization under ``child_seed(key, "trial i")``."""
     require_integer_key(key)
     trial_keys = [child_seed(int(key), f"trial {i}") for i in range(n)]
-    seeds = [block.realize(child_seed(k, port))["seed"] for k in trial_keys]
+    seeds = [seeds_of(block, block.realize(child_seed(k, sys_id))) for k in trial_keys]
 
-    return np.asarray(seeds)
+    return stack_leaves(seeds)
+
+
+def split_laws(value, view):
+    """``(numbers, laws)``: the tree with each law replaced by the part's current number, and the laws alone."""
+    numbers = dict(value)
+    laws = {}
+    for path, leaf in flatten(value):
+        if isinstance(leaf, Distribution):
+            set_leaf(laws, path, leaf)
+            if path != ("x_start",):
+                numbers = with_leaf(numbers, path, lookup(view, path))
+
+    return numbers, laws
+
+
+def seeds_of(system, realized):
+    """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
+    if not isinstance(system, WiredDiagramMixin):
+        return {"seed": realized["seed"]}
+
+    return {
+        sys_id: seeds_of(subsystem, realized[sys_id])
+        for sys_id, subsystem in system.subsystems.items()
+        if subsystem.is_random
+    }
+
+
+def stack_leaves(trees):
+    """One tree of the shape of each of ``trees``, each leaf their values stacked on a leading axis."""
+    if isinstance(trees[0], dict):
+        return {key: stack_leaves([tree[key] for tree in trees]) for key in trees[0]}
+
+    return np.stack([np.asarray(leaf) for leaf in trees])
 
 
 def require_integer_key(key):

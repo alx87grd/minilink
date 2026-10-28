@@ -2412,3 +2412,12 @@ def test_a_set_as_a_cost_is_its_margin_through_a_hinge():
     assert box.as_cost(shaping=quadratic_hinge(0.5)).g(
         np.array([0.75]), np.zeros(0)
     ) == pytest.approx(0.25**2)
+
+
+def test_a_field_set_in_an_intersection_survives_a_params_write():
+    plant = Integrator()
+    X = BoxSet([-5.0], [5.0]) & _ConstField(0.5).as_set(lower=0.0)
+    problem = PlanningProblem(plant, X=X, tf=1.0)
+
+    problem.params = problem.params  # a frozen field set has no numbers to write
+    assert problem.X.contains(np.zeros(1))

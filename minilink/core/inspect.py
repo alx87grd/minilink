@@ -203,9 +203,10 @@ def distribution_text(obj):
     from minilink.core.distributions import Distribution, Gaussian, Particles, Uniform
 
     if isinstance(obj, Gaussian):
-        return (
-            f"Gaussian, dim={obj.dim}, mean={array_text(obj.mean)}, "
+        return f"Gaussian, dim={obj.dim}, mean={array_text(obj.mean)}, " + (
             f"std={array_text(obj.std)}"
+            if obj.full_cov is None
+            else f"cov={array_text(obj.full_cov)}"
         )
     if isinstance(obj, Uniform):
         box = obj.box

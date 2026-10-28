@@ -458,3 +458,55 @@ def test_a_noise_source_is_the_same_signal_on_both_backends():
     on_jax = jax.vmap(lambda tk: noise.h(jax.numpy.zeros(0), jax.numpy.zeros(0), tk))(t)
     np.testing.assert_array_equal(np.asarray(on_jax), on_numpy)
     assert np.all(np.abs(on_numpy) <= 0.005)
+
+
+def test_a_source_without_a_seed_is_its_mean_and_not_random():
+    from minilink import Gain
+    from minilink.blocks.sources import NoiseSource
+    from minilink.control.stochastic import GaussianPolicy
+    from minilink.core.distributions import Gaussian
+
+    law = Gaussian([1.0], [0.5])
+    source = NoiseSource(law, sample_period=0.1, seed=None)
+    assert not source.is_random and NoiseSource(law, sample_period=0.1).is_random
+
+    # The mean is the one the params give
+    moved = dict(source.params, law={"mean": np.array([2.0]), "std": law.std})
+    np.testing.assert_array_equal(source.h(None, None, 0.3, moved), [2.0])
+
+    policy = GaussianPolicy(Gain(np.array([[1.0]])), -1.0, sample_period=0.1)
+    assert not policy.is_random
+    policy.params["seed"] = 3
+    assert policy.is_random
+
+
+def test_a_full_covariance_law_prints_its_covariance():
+    from minilink.core.distributions import Gaussian
+
+    text = str(Gaussian([0.0, 0.0], cov=[[1.0, 0.2], [0.2, 2.0]]))
+    assert "cov=" in text and "None" not in text
+
+
+def test_the_rollout_refuses_a_source_it_cannot_feed():
+    from minilink import Pendulum
+    from minilink.blocks.sources import WhiteNoise
+    from minilink.core.costs import QuadraticCost
+    from minilink.learning.reinforcement_learning.environment import (
+        RolloutEnvironment,
+        episode_seed,
+    )
+    from minilink.planning.problems import PlanningProblem
+
+    sys = Pendulum()
+    problem = PlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        tf=1.0,
+        disturbances={"n": WhiteNoise(2, psd=0.1)},
+    )
+    with pytest.raises(ValueError, match="no port on"):
+        RolloutEnvironment(problem, dt=0.1, backend="numpy")
+
+    # An integer key gives each port its own seed
+    assert episode_seed(5, "d") != episode_seed(5, "n")
+    assert episode_seed(5, "d") == episode_seed(5, "d")

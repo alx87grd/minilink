@@ -35,7 +35,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.problems import source_id
+from minilink.planning.problems import seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -368,15 +368,13 @@ class ProblemEvaluator:
         # drawn on the host from an integer key whatever the backend; a point
         # start, the same for every trial
         overrides = {}
+        x_starts = xp.tile(xp.asarray(params["x_start"], dtype=float), (n_trials, 1))
         if problem.is_stochastic:
             tree = problem.realize(key, n_trials)
-            x_starts = tree["x_start"]
+            if problem.start_law is not None:
+                x_starts = tree["x_start"]
             for path in problem.drawn_paths()[1:]:
                 set_leaf(overrides, path, lookup(tree, path))
-        else:
-            x_starts = xp.tile(
-                xp.asarray(params["x_start"], dtype=float), (n_trials, 1)
-            )
 
         # Each trial's seeds of the loop's random blocks override theirs
         if loop.is_random:
@@ -1197,29 +1195,6 @@ def require_integer_key(key):
             "the loop holds random blocks, whose seeds are realized from an integer "
             f"key: pass key as an int, got {type(key).__name__}"
         )
-
-
-def seeds_of(system, realized):
-    """The ``"seed"`` entries of the random blocks in a realization of ``system``, nested like it."""
-    # Lazy import: the diagram tools load with the first loop
-    from minilink.core.wiring import WiredDiagramMixin
-
-    if not isinstance(system, WiredDiagramMixin):
-        return {"seed": realized["seed"]}
-
-    return {
-        sys_id: seeds_of(subsystem, realized[sys_id])
-        for sys_id, subsystem in system.subsystems.items()
-        if subsystem.is_random
-    }
-
-
-def stack_leaves(trees):
-    """One tree of the shape of each of ``trees``, each leaf their values stacked on a leading axis."""
-    if isinstance(trees[0], dict):
-        return {key: stack_leaves([tree[key] for tree in trees]) for key in trees[0]}
-
-    return np.stack([np.asarray(leaf) for leaf in trees])
 
 
 def integer_seeds(system, params):

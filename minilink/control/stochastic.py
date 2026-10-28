@@ -31,8 +31,6 @@ class GaussianPolicy(System):
     :meth:`entropy` are the law's, beside ``h``.
     """
 
-    is_random = True
-
     def __init__(self, mean, log_std, *, sample_period, seed=None):
         require_static(mean, "mean")
         require_positive_period(sample_period)
@@ -130,6 +128,11 @@ class GaussianPolicy(System):
         """The params of one realization: a fresh seed under ``key``, or the mean for ``None``."""
         seed = None if key is None else child_seed(key, "seed")
         return dict(self.params, seed=seed)
+
+    @property
+    def is_random(self):
+        """A seed draws; ``seed=None`` is the deterministic face ``u = μ(x)``, which no evaluation reseeds."""
+        return self.params["seed"] is not None
 
     @property
     def solver_info(self) -> dict:

@@ -774,3 +774,77 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
     # The goal reached to the solver's tolerance: the optimum sits on its boundary
     planned = pe.evaluate(pe.unpack(result.z, wrt, pe.params))
     assert result.success and float(planned.reachability_margin[0]) >= -1e-8
+
+
+# --- the problem's laws, sources and starts: the seam review's cases ---
+
+
+def test_a_law_written_into_the_params_moves_the_laws_and_leaves_the_parts():
+    problem = stochastic_problem()
+    m_before = problem.sys.params["m"]
+    law = Uniform(np.array([1.5]), np.array([1.6]))
+    start = Gaussian(mean=np.array([0.2, 0.0]), std=np.array([0.01, 0.01]))
+
+    params = problem.params
+    params["plant"]["m"] = law
+    params["x_start"] = start
+    problem.params = params
+
+    # The laws hold the new law, the plant keeps its own number
+    assert problem.laws["plant"]["m"] is law
+    assert problem.start_law is start
+    assert problem.sys.params["m"] is m_before
+    tree = problem.realize(0, 4)
+    assert np.all(tree["plant"]["m"] >= 1.5)
+    np.testing.assert_allclose(tree["x_start"].mean(axis=0), [0.2, 0.0], atol=0.05)
+
+
+def two_noise_source():
+    from minilink.blocks.routing import Sum
+    from minilink.core.diagram import DiagramSystem
+
+    source = DiagramSystem()
+    source.add_subsystem(WhiteNoise(1, psd=1.0, sample_period=0.05, seed=1), "w1")
+    source.add_subsystem(WhiteNoise(1, psd=0.5, sample_period=0.05, seed=2), "w2")
+    source.add_subsystem(Sum(signs=(1.0, 1.0)), "sum")
+    source.connect("w1", "y", "sum", "in0")
+    source.connect("w2", "y", "sum", "in1")
+    source.connect_new_output_port("sum", "y", "y")
+    return source
+
+
+def test_a_diagram_source_draws_a_seed_per_noise_block_per_trial():
+    from minilink import NoisyPendulum
+
+    sys = NoisyPendulum()
+    problem = PlanningProblem(
+        sys,
+        cost=QuadraticCost.from_system(sys),
+        x_start=[0.1, 0.0],
+        tf=1.0,
+        disturbances={"d": two_noise_source()},
+    )
+    assert problem.drawn_paths() == [
+        ("x_start",),
+        ("disturbance", "w1", "seed"),
+        ("disturbance", "w2", "seed"),
+    ]
+    tree = problem.realize(1, 3)
+    w1, w2 = tree["disturbance"]["w1"]["seed"], tree["disturbance"]["w2"]["seed"]
+    assert w1.shape == w2.shape == (3,) and not np.array_equal(w1, w2)
+
+    report = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05).evaluate(n_trials=3, key=1)
+    assert len(np.unique(report.J)) == 3
+
+
+def test_a_point_start_reads_the_start_the_params_give():
+    problem = stochastic_problem().replace(x_start=np.array([0.5, 0.0]))
+    pe = problem.compile(pid(), dt=0.01, backend="numpy")
+    moved = pe.merged({"x_start": np.array([0.3, 0.0])})
+    report = pe.evaluate(moved, n_trials=2, key=0)
+    np.testing.assert_array_equal(report.x0, np.tile([0.3, 0.0], (2, 1)))
+
+
+def test_a_start_set_that_cannot_draw_is_refused():
+    with pytest.raises(ValueError, match="cannot draw a start"):
+        PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), tf=1.0)

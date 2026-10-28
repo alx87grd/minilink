@@ -14,8 +14,10 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.distributions import child_seed
 from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
+from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################
 # Public API
@@ -101,6 +103,7 @@ class RolloutEnvironment:
         # The episode's realization: the plant's laws drawn, a seed per random source
         self.laws = problem.laws.get("plant", {})
         self.sources = dict(problem.disturbances)
+        require_stepped_sources(self.sys, self.sources)
         random_sources = any(block.is_random for block in self.sources.values())
         self.randomizes_params = bool(self.laws) or random_sources
 
@@ -306,13 +309,30 @@ def require_episode_steps(n_steps, tf, dt):
 
 
 def episode_seed(key, port):
-    """The episode's integer seed of the source on ``port``, from the episode's key."""
+    """The episode's integer seed of the source on ``port``, from the episode's key: one stream per port."""
     if is_jax_key(key):
         jax = require_jax()
         k = jax.random.fold_in(key, zlib.crc32(port.encode()))
         return jax.random.randint(k, (), 0, MAX_SEED)
+    if isinstance(key, (int, np.integer)):
+        return child_seed(int(key), port)
 
     return int(numpy_generator(key).integers(0, MAX_SEED))
+
+
+def require_stepped_sources(sys, sources):
+    """Refuse a source the stepped episode cannot feed: a port the plant lacks, a state, a diagram."""
+    for port, block in sources.items():
+        if port not in sys.inputs:
+            raise ValueError(
+                f"the disturbance on {port!r} has no port on {sys.name} "
+                f"(inputs {list(sys.inputs)}): the RL episode feeds plant ports only"
+            )
+        if isinstance(block, WiredDiagramMixin) or block.n > 0:
+            raise TypeError(
+                f"the source on {port!r} ({block.name}) has a state or blocks of its own: "
+                "the RL episode evaluates a source's h at t; give a memoryless source"
+            )
 
 
 def source_signal(block, t, realization, xp):

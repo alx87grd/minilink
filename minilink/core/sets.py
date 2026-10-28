@@ -78,6 +78,8 @@ class Set(ABC):
 
     def with_params(self, params):
         """The set with its numbers replaced by ``params``: a new set for a library set (a value), else this one holding them."""
+        if not params and not self.params:
+            return self
         self.params = params
         return self
 
@@ -158,6 +160,8 @@ class InputSet(ABC):
 
     def with_params(self, params):
         """The input set with its numbers replaced by ``params`` (as :meth:`Set.with_params`)."""
+        if not params and not self.params:
+            return self
         self.params = params
         return self
 

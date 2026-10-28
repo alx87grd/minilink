@@ -694,7 +694,8 @@ provided.
   does not change with the period; `seed`, `sample_period` and `psd` are params, and `h`
   computes `w(t)` from `(t, params)` with a counter-based cipher (Threefry-2x32, the same bits
   on NumPy and JAX), so the block is pure, traces, and edits without a refresh. `seed=None` is
-  the mean. `System.realize(key)` returns the params of one realization: every random block
+  the mean, and such a block is not random (`is_random` reads the seed): no realization or
+  evaluation reseeds it. `System.realize(key)` returns the params of one realization: every random block
   reseeded under its own stream, named by its id (a diagram nests it like `params`), or every
   seed `None` for `key=None`; the analysis verbs (`operating_point`, `find_equilibrium`) and a
   `PlanningProblem` on a random system resolve `params=None` through `realize(None)`, so a
