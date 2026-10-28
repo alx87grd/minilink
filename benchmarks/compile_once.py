@@ -51,8 +51,11 @@ jax.monitoring.register_event_duration_secs_listener(
 
 
 def done(out):
-    """``out`` computed: every JAX leaf of it ready."""
-    return jax.block_until_ready(jax.tree_util.tree_leaves(out))
+    """``out`` computed: every JAX array of it ready."""
+    leaves = jax.tree_util.tree_leaves(out)
+    return jax.block_until_ready(
+        [leaf for leaf in leaves if isinstance(leaf, jax.Array)]
+    )
 
 
 def timed(call):
@@ -152,9 +155,7 @@ def pipelines():
         "mpc  (mpc % dt) @ plant compute_trajectory": lambda: (
             mpc_loop.compute_trajectory(tf=1.0, backend="jax").x
         ),
-        "dp   value iteration planner.solve()": lambda: (
-            dp.solve(evaluate=False).trajectory.x
-        ),
+        "dp   value iteration planner.solve()": lambda: dp.solve(evaluate=False),
     }
 
 

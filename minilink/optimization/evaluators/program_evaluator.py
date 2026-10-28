@@ -45,8 +45,10 @@ class MathematicalProgramEvaluator(ABC):
         self.n_h = 0
         self.n_g = 0
 
-        # The bound parameters: the program's defaults, the empty tree for none
-        self.params = self.native_tree(program.params or {})
+        # The bound parameters: the program's defaults in strong types (the warm-up and
+        # every bind then share one trace), the empty tree for none
+        defaults = program.params or {}
+        self.params = self.native_tree(canonical_tree(defaults, defaults))
 
         # The forms a solver compiles on this program once, by the solver's numbers
         self.compiled_forms = {}
