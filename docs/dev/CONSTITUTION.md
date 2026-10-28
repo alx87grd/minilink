@@ -70,8 +70,9 @@ one of these quantities takes or returns the object, never its arrays:
   a clearance `d(x)`. Its sublevel and superlevel sets are `Set`s over `x`, or `InputSet`s
   over `u` at a given `x`; its shaping is a `CostFunction`.
 - `CostFunction` — the running cost `g(x, u, t)` and the terminal cost `h(x, t)` of `J`.
-- `PlanningProblem` — a system, its sets, a cost and a horizon; the stochastic sibling adds
-  distributions over starts, parameters and disturbances.
+- `PlanningProblem` — a system, its sets, a cost and a horizon, stochastic by its parts: a law
+  where a number goes (the start, a parameter), and a disturbance a noise source block wired
+  onto a port.
 - `PlanningSolution` — a policy, itself a `System`, and the evidence for it.
 - `MathematicalProgram` — the one NLP shape every transcription lowers to; its parametric
   form, with the problem's parameters as an input, is the same shape.
@@ -80,7 +81,9 @@ one of these quantities takes or returns the object, never its arrays:
 there, once.
 
 **One signature.** An object's mathematics is a method on the model's arguments
-`(x, u, t; p)`, or the subset it reads: `f`, `h`, `tf` on a system; `g`, `h` on a cost;
+`(x, u, t; p)`, or the subset it reads; `t` is the time of the diagram the object sits in,
+seconds under a clock and the count without one, and a tick law's `k` is its own count. The
+methods: `f`, `h`, `tf` on a system; `g`, `h` on a cost;
 `margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution. It
 is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
 traces under JAX in every argument, `params` included — so `jit`, `grad`, `vmap` and a
@@ -91,9 +94,9 @@ parameter family reach any object the way they reach `f`. An object that does no
 1. **Everything that can be viewed as a system is a System.** Plants, controllers, observers,
    filters, neural policies, and flow diagrams share the identical object model;
    discrete-time systems (`StepSystem`, `StepDiagramSystem`) form a closed sibling algebra
-   on an integer tick. The sampled loop (`Computer`, `HybridDiagram`) that couples a
-   discrete clock to a continuous plant is a simulation tool, not a `System`, keeping
-   discrete scheduling out of continuous dynamics `f`.
+   on an integer tick. A sampled loop, a computer closed on a plant (`SampledDiagramSystem`),
+   is a step diagram of that sibling algebra: a clock is applied to a block from outside
+   (`%`, `discretize`), never built into continuous dynamics `f`.
 2. **Functional purity in equation paths.** Arrays in, arrays out. Equation paths — $f$, $h$,
    and the equation methods of sets, costs, fields, shapes and distributions (`margin`, `g`,
    `h`, `value`, `sdf`, `sample`) — have no internal mutable state, no cached side effects,
@@ -103,9 +106,9 @@ parameter family reach any object the way they reach `f`. An object that does no
    yields a continuous `System`. The set of continuous Systems is algebraically closed under
    series, parallel, and feedback connections: a flow diagram compiles down to an identical
    pure continuous dynamical system ($\dot{X} = F(X, U, t; P)$). Any property or tool valid
-   for a leaf is valid for a composite flow diagram. Hybrid and step composition
-   (`Computer @ plant`, `HybridDiagram`) is a sibling algebra; it sits beside this set, not
-   inside it.
+   for a leaf is valid for a composite flow diagram. Step and sampled composition (`%`, then
+   `@`, `>>` and `+` between step systems; `sampled @ continuous` the one place the two worlds
+   meet) is a sibling algebra; it sits beside this set, not inside it.
 4. **The continuous contract is primary.** `f` is an instantaneous rate, not a next-step map.
    Discrete and hybrid loops are sibling utilities that sit beside this core, never compromising it.
 5. **JAX is an accelerator, not a prerequisite.** Every catalog plant and teaching tool runs on
@@ -161,8 +164,9 @@ When trade-offs or design tensions arise, higher-ranked principles strictly over
 - **Composition grammar is frozen early:** Series, parallel, and feedback (`>>`, `+`, `@`)
   are the composition language of the continuous algebra; `DiagramSystem.connect()` and
   `feedback()` are the explicit-wiring entry points for topologies the operators do not
-  reach. The sibling hybrid algebra adds exactly one operator, `%`, which schedules a block
-  into a `Computer`. Do not grow a second wiring dialect in either algebra.
+  reach. The sibling step algebra adds exactly one operator, `%`, which puts a block on a
+  clock (`sys % Δ` is `discretize(sys, Δ, solver="euler")`); its `>>`, `+` and `@` are the same
+  grammar on step systems. Do not grow a second wiring dialect in either algebra.
 - **Build vs run:** Wiring, structural switches (which terms or ports a block carries),
   validation, and `compile()` freeze structure and snapshot each block's default
   `params`. `params` holds numbers and numeric arrays only (never `bool` or `str` mode
