@@ -18,6 +18,7 @@ from minilink.core.assembly import (
     propagate_animation_camera,
 )
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import base_period_of
 from minilink.core.discrete.sampled_system import SampledSystem, sampled_substeps
 from minilink.core.roles import (
     block_roles,
@@ -168,7 +169,8 @@ def closed_loop(
     # its own x; under a sampled controller, the plant on its base clock
     reads_plant_state = "x" in roles.measurements and observer is None
     plant_box = plant_box_with_state(plant) if reads_plant_state else plant
-    plant_box = on_the_controller_clock(controller, plant_box)
+    loop_blocks = (controller, observer, filter, reference, disturbance, noise)
+    plant_box = on_the_loop_clock(loop_blocks, plant_box)
 
     # The controller and the plant, each under its role name, in their algebra
     diagram = algebra_of(controller, plant_box)()
@@ -492,17 +494,19 @@ def insert_filter(diagram, filter, signal):
     return (filter_id, filter_out), (filter_id, filter_in)
 
 
-def on_the_controller_clock(controller, plant):
-    """A continuous plant under a sampled controller: the plant on the loop's base clock, else as is.
+def on_the_loop_clock(blocks, plant):
+    """A continuous plant in a loop with clocked blocks: the plant on the loop's base clock, else as is.
 
     ``sampled @ continuous`` is where the two algebras meet: the plant becomes
-    ``discretize(plant, Δ, substeps=n)``, ``Δ`` the controller's base period and
+    ``discretize(plant, Δ, substeps=n)``, ``Δ`` the greatest common divisor of
+    the clocked blocks' periods (the controller's, a filter's, a source's) and
     ``n`` from the automatic step rule.
     """
-    if kind_of(controller) != "clocked" or kind_of(plant) != "continuous":
+    clocked = [b for b in blocks if isinstance(b, System) and kind_of(b) == "clocked"]
+    if not clocked or kind_of(plant) != "continuous":
         return plant
 
-    base = controller.sample_period
+    base = base_period_of([b.sample_period for b in clocked])
     sampled = SampledSystem(plant, base, substeps=sampled_substeps(plant, base))
     sampled.name = plant.name
 

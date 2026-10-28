@@ -79,6 +79,13 @@ class SampledSystem(StepSystem):
         self.inputs = source.inputs
         self.outputs = source.outputs
 
+        # Graphics: the source's camera hints (its geometry and poses are read through it)
+        self.camera_target = source.camera_target
+        self.camera_plot_axes = source.camera_plot_axes
+        self.camera_scale = source.camera_scale
+        self.camera_follow_frame = source.camera_follow_frame
+        self.camera_priority = source.camera_priority
+
     @property
     def params(self) -> dict:
         """The source's live ``params`` while no override is assigned, else the override."""
@@ -198,6 +205,20 @@ class SampledSystem(StepSystem):
         y = h(x, u, t_k, params)
 
         return y
+
+
+    # Display: the source's drawing, its poses at the time it is read
+
+    def get_kinematic_geometry(self):
+        return self.source.get_kinematic_geometry()
+
+    def tf(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        return self.source.tf(x, u, t, params)
+
+    def get_dynamic_geometry(self, x, u, t=0, params=None):
+        params = self.params if params is None else params
+        return self.source.get_dynamic_geometry(x, u, t, params)
 
 
 def sampled_substeps(plant, sample_period) -> int:
