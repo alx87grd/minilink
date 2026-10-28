@@ -470,6 +470,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         plant integrated by its substeps) shows its substep ends, every other
         block its state at the tick, the input held.
         """
+        self.require_params(params)
         xp = self.xp
         n = self.n
 
@@ -477,9 +478,15 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         u_seq = self.input_sequence_of(u_seq, n_steps)
         ks = self.indices(u_seq.shape[0])
 
+        # One signal pass per period: the step and the substep points share it
         def period(x, k, u_k):
-            x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
-            points = self.substep_points(x, u_k, k, params, x_next, t_start)
+            x_f, u_f = self.float_arrays(x, u_k)
+            signals = self.port_signals(x_f, u_f, k, params, t_start=t_start)
+            x_next = self.next_from_signals(
+                x_f, u_f, k, params, signals, t_start=t_start
+            )
+            x_next = xp.reshape(x_next, (n,))
+            points = self.substep_points(x, u_k, k, params, x_next, t_start, signals)
             return x_next, points
 
         x_samples = iterate_dense(self, period, x0, (ks, u_seq))
@@ -614,8 +621,8 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
         return x_new
 
-    def substep_points(self, x, u, k, params, x_next, t_start):
-        """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``."""
+    def substep_points(self, x, u, k, params, x_next, t_start, signals):
+        """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``; ``signals`` the tick's signal buffer."""
         xp = self.xp
         dtype = self.dtype
         S = self.plan.dense_points
@@ -625,7 +632,6 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             return xp.reshape(x_next, (1, -1))
 
         params = self._frozen_params if params is None else params
-        signals = self.port_signals(x_old, u, k, params, t_start=t_start)
         t_k = t_start + k * self.sample_period
         op = self.plan.plant_op
         local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)

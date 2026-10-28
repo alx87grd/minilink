@@ -277,15 +277,16 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `params`, so `controller.cost.Q` tunes the plan) with each leaf named in `inputs` read from
   its port (default `{"x_start": "y"}`) and `t_start` the tick's time; `lookahead=Δ` starts the
   plan at `t_k + Δ` from the measured start predicted that far under the stored plan (the
-  planner's model, its commands linear between knots). The zero-delay form (`delay=False`) is a
-  native sampled law whose state is the last plan: at tick `k` it solves from the measurement,
-  `z*_k = pv.solve(P_k, z0=warm)` with `warm` the last plan shifted one period and its first
-  state knot at the measurement, applies it at once, `u_k = pv.command(z*_k, x̂_k, t_k)`, and
-  keeps it, `z_{k+1} = z*_k`; its outputs feed through from the bound ports, and its command and
-  update read one stored solve per `(t_k, z_k, P_k)` on the host, so a tick solves once (the
+  planner's model, its commands linear between knots). The zero-delay form (`delay=False`) is a small
+  sampled diagram of pure blocks, the textbook MPC's optimizer and memory: `PlanSolver`
+  (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0=warm)`, `warm` the last plan shifted one
+  period with its first state knot at the measurement, the default guess while there is no
+  plan yet), `PlanCommand` (`z*_k → u_k = pv.command(z*_k, t_k)`) and `PlanMemory` (a
+  `UnitDelay` holding the last plan); the command applies the plan solved at its own tick,
+  and the loop computes each signal once per tick, so a tick solves once with no cache (the
   old MPC's numbers, the demos' form). With `warm_start=False` it is the pure form, a static
-  law, a cold solve per tick, refused without a clock. Ports out: `u`, `z`, and
-  `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
+  law, a cold solve per tick, refused without a clock. Ports out: `u`, `z`, and on the
+  delayed form `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
   plan, `u = pv.command(z, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
   fast)`, the plan one slow period late (at the slow tick itself with `delay=False`). A native fixed-iteration planner (single shooting,
   `method="adam"`, `iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is

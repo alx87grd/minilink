@@ -29,7 +29,6 @@ from minilink.planning.trajectory_optimization.mpc.predictive import (
     DelayedPredictiveController,
     PurePredictiveController,
     WarmStartedPredictiveController,
-    solve_key,
     warm_guess,
 )
 from minilink.planning.trajectory_optimization.compiled import (
@@ -497,13 +496,16 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         self.mpc = ModelPredictiveController(self.planner, delay=False)
         self.pv = self.mpc.pv
 
-    def test_its_state_is_the_plan_and_its_command_feeds_through(self):
+    def test_it_is_a_solve_a_command_and_a_delay_holding_the_plan(self):
         mpc, pv = self.mpc, self.pv
         assert isinstance(mpc, WarmStartedPredictiveController)
-        assert mpc.n == pv.n_z and list(mpc.inputs) == ["y"]
-        assert list(mpc.outputs) == ["u", "z", "x_ref", "u_ref"]
-        assert mpc.outputs["u"].dependencies == ("y",)
+        assert list(mpc.subsystems) == ["solve", "command", "memory"]
+        assert list(mpc.inputs) == ["y"] and list(mpc.outputs) == ["u", "z"]
+        assert mpc.n == pv.n_z and mpc.sample_period is None
         np.testing.assert_array_equal(mpc.x0, pv.initial())
+        clocked = mpc % DT
+        assert clocked.sample_period == DT and mpc.sample_period is None
+        np.testing.assert_array_equal(clocked.x0, pv.initial())
         with pytest.raises(TypeError, match="clock"):
             self.planner.problem.compile(mpc, dt=DT)
 
@@ -526,33 +528,25 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         np.testing.assert_array_equal(guess, pv.initial(P))
         assert guess[0] == 1.7
 
-    def test_one_tick_solves_once_and_applies_the_plan_at_once(self):
-        mpc, pv = self.mpc, self.pv
-        z = pv.initial()
+    def test_the_solve_block_solves_from_the_measurement_warm_started(self):
+        pv = self.pv
+        solve = self.mpc.subsystems["solve"]
+        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.2})
         y = np.array([0.8])
+        z_star = solve.compute_z(np.zeros(0), np.concatenate([y, z]), 0.4)
         expected, _ = pv.solve(
             {"x_start": y, "t_start": 0.4},
             z0=warm_guess(pv, z, y, tree_at(pv, y, 0.4), pv.initial()),
         )
-        with mock.patch.object(
-            CompiledTrajectoryPlanner,
-            "solve",
-            autospec=True,
-            side_effect=pv.solve.__func__,
-        ) as solve:
-            u_k = mpc.compute_u(z, y, 0.4)
-            z_next = mpc.update(z, y, 0.4)
-            plan = mpc.compute_z(z, y, 0.4)
-        assert solve.call_count == 1
-        np.testing.assert_allclose(z_next, expected, atol=1e-12)
-        np.testing.assert_array_equal(plan, z_next)
-        np.testing.assert_array_equal(u_k, pv.command(z_next, y, 0.4))
+        np.testing.assert_allclose(z_star, expected, atol=1e-12)
+        assert z_star[-1] == 0.4
 
     def test_the_loop_is_the_hand_loop_with_one_solve_per_tick(self):
-        mpc, pv = self.mpc, self.pv
+        pv = self.pv
         plant = self.planner.problem.sys
-        loop = (mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop = (self.mpc % DT) @ discretize(plant, DT, substeps=4)
         loop.subsystems["plant"].x0 = np.array([0.5])
+        ev = loop.compile()  # the compile's own checks solve; the run is counted
         with mock.patch.object(
             CompiledTrajectoryPlanner,
             "solve",
@@ -560,8 +554,8 @@ class TestTheWarmStartedMPC(unittest.TestCase):
             side_effect=pv.solve.__func__,
         ) as solve:
             run = loop.compute_trajectory(tf=1.0)
-            plant_run(run, loop)
             solves = solve.call_count
+        del ev
 
         # The hand loop: solve from x_k warm-started, apply u_k = u*_0 over the period
         x = np.array([0.5])
@@ -577,31 +571,34 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         p0, p1 = loop.state_index["plant"]
         np.testing.assert_allclose(run.x[p0:p1, -1], x, atol=1e-9)
 
-        # Five ticks, five solves (the run and its read-back share them), plus
-        # the compile's one shape check
-        assert solves == 5 + 1
+        # Five ticks, five solves: each signal once per tick, no second solve
+        assert solves == 5
 
-    def test_a_failed_solve_keeps_the_old_plan(self):
-        mpc, pv = self.mpc, self.pv
-        z = pv.initial()
+        # The plan readers find the boxed MPC; the plant's input is the command
+        plans = mpc_plans_from_rollout(run, self.mpc, loop=loop)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8]
+        assert plant_run(run, loop).u.shape == (1, run.t.size)
+
+    def test_a_failed_solve_keeps_the_last_plan(self):
+        pv = self.pv
+        solve = self.mpc.subsystems["solve"]
+        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
 
         def failing(params=None, z0=None):
             return z0 + 1.0, {"success": False, "iterations": 0, "cost": np.nan}
 
         pv.solve = failing
-        np.testing.assert_array_equal(mpc.update(z, np.array([0.8]), 0.2), z)
+        z_star = solve.compute_z(np.zeros(0), np.concatenate([[0.8], z]), 0.2)
+        np.testing.assert_array_equal(z_star, z)
 
-    def test_a_traced_solve_is_never_stored(self):
-        jax = pytest.importorskip("jax")
-        keys = []
-
-        def traced(z):
-            keys.append(solve_key(z, {"x_start": z}))
-            return z
-
-        jax.jit(traced)(np.zeros(3))
-        assert keys == [None]
-        assert solve_key(np.zeros(3), {"x_start": np.ones(1)}) is not None
+    def test_the_dual_rate_follower_gets_the_plan_at_the_slow_tick(self):
+        follower = PlanFollower(self.planner)
+        computer = (self.mpc % DT) >> (follower % 0.05)
+        loop = computer @ discretize(self.planner.problem.sys, 0.05)
+        run = loop.compute_trajectory(tf=0.6)
+        plans = mpc_plans_from_rollout(run, self.mpc, loop=loop)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]
+        assert plant_run(run, loop).u.shape == (1, run.t.size)
 
 
 @pytest.mark.optional

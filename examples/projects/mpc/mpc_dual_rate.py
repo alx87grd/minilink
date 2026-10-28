@@ -86,7 +86,6 @@ hybrid.animate(
         result,
         mpc,
         loop=hybrid,
-        block="controller/WarmStartedPredictiveController",
         reference_pad=REF_X_PAD,
     )
 )

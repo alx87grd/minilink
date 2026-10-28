@@ -151,7 +151,7 @@ plant.camera_scale = 15.0
 
 vehicle.x0[0] = 0.0
 vehicle.x0[1] = -20.0
-vehicle.x0[2] = 0.0
+vehicle.x0[2] = 1e-4  # off the exact axis: the solve is singular at a heading of 0
 vehicle.x0[3] = U_TARGET
 vehicle.x0[4] = 0.0
 vehicle.x0[5] = 0.0
@@ -170,7 +170,6 @@ hybrid.animate(
         result,
         mpc,
         loop=hybrid,
-        block="controller/WarmStartedPredictiveController",
         track=track,
     ),
     renderer="matplotlib",

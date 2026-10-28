@@ -171,22 +171,28 @@ class ModelPredictiveController(SampledSystem):          # no source: a native s
 
 ### 6.3 The zero-delay forms (`delay=False`)
 
-**Warm-started (the default of `delay=False`).** A native sampled law whose state is the last
-plan: `z*_k = pv.solve(P_k, z0=pv.shift(z_k, t_k)` with its first state knot at `x̂_k`), `u_k =
-pv.command(z*_k, x̂_k, t_k)`, `z_{k+1} = z*_k`: the solve takes no time, the classic MPC and
-the legacy block's numbers (the demos' form, the maintainer's ask of 2026-10-28). Its outputs
-feed through from the bound ports. The command and the update both need `z*_k`, and the run's
-read-backs (the plant's input, the overlays) need it again, so the block keeps its solves by
-their arguments `(t_k, z_k, P_k)` on the host: one solve per tick. That store is the hidden
-cache R123 removed; it stays until a combined `update → (x_next, y)` face and runs that record
-their signals in the scan (R123's option B) make it unnecessary. A traced call is never
-stored.
+**Warm-started (the default of `delay=False`).** The classic MPC and the legacy block's
+behaviour (the demos' form, the maintainer's ask of 2026-10-28), built as the textbook draws
+it, an optimizer and a memory:
+
+```
+y ──► [ PlanSolver: (y, z_prev) → z*_k ] ──► [ PlanCommand: z*_k → u_k ] ──► u
+                 ▲                       │
+                 └──── [ PlanMemory z⁻¹ ] ◄┘
+```
+
+`z*_k = pv.solve(P_k, z0=pv.shift(z_prev, t_k)` with its first state knot at `x̂_k`), the
+default guess at `P_k` while `z_prev` is no plan yet; `u_k = pv.command(z*_k, t_k)`. Every
+block is pure and the step evaluators compute each signal once per tick (the dense run's
+substep points share the tick's signal pass), so a tick solves once with no cache: R123 holds
+(the maintainer's choice, 2026-10-28, over a stored solve in one block). A read-back after the
+run (the plant's input, the overlays) recomputes the signals, so it solves again.
 
 **Cold (`warm_start=False`).** One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
 solve from the default guess. It is the ideal law, a reference for studies; a cold start each tick
 is slow on Ipopt and weak for a fixed-iteration solver. It needs **one signal pass per tick** in
-the step evaluators (today they compute the signals in `step` and again in `outputs`,
-`core/compile/evaluators/discrete.py`), else it solves twice per tick, with the same result.
+the step evaluators: the sampled dense run computes the signals once per period (2026-10-28,
+`core/compile/evaluators/discrete.py`); a read-back after the run computes them again.
 
 ### 6.4 Ports, the tree, dual rate, compensation
 

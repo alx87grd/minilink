@@ -35,7 +35,7 @@ MPC_DT = 0.1  # [s] between two solves
 MPC_HORIZON = 1.2  # [s] ~4.5 m ahead at V_TARGET: one corner's worth
 MPC_STEPS = 12  # knots, 0.1 s apart: a cone must not fall between two of them
 SLSQP_MAXITER = 60
-SLSQP_FTOL = 1.0
+SLSQP_FTOL = 0.3
 # 110 warm-started solves at ~0.15 s each; the whole script takes about half a minute.
 
 BODY_LENGTH, BODY_WIDTH, BODY_MARGIN = 0.34, 0.20, 0.02  # [m] footprint the plan keeps

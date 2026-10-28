@@ -205,7 +205,7 @@ def plant_inputs_of(rollout, loop):
         u_k = [
             rollout.u[edge_rows[port], first]
             if sys_id == "input"
-            else signals[f"{sys_id}:{port}"]
+            else signals[leaf_signal_of(loop, sys_id, port)]
             for sys_id, port in sources
         ]
         u[:, samples] = np.concatenate(u_k).reshape(-1, 1)
@@ -246,9 +246,7 @@ def block_path_of(rollout, mpc, loop, block):
     if block is not None:
         return tuple(block.split("/"))
     if loop is not None:
-        paths = [
-            path for path, sys in blocks_of(loop) if getattr(sys, "pv", None) is mpc.pv
-        ]
+        paths = [path for path, sys in blocks_of(loop) if holds_plan_of(sys, mpc.pv)]
         require_one_block(paths)
         return paths[0]
 
@@ -268,6 +266,25 @@ def blocks_of(diagram, prefix=()):
             yield from blocks_of(sys, path)
         else:
             yield path, sys
+
+
+def holds_plan_of(block, pv) -> bool:
+    """Whether ``block`` (or the block a clocked view wraps) is the one whose state is the plan of ``pv``: the delayed MPC, or the zero-delay MPC's memory."""
+    own = getattr(block, "source", None) or block
+
+    return getattr(own, "pv", None) is pv and int(block.n) == pv.n_z
+
+
+def leaf_signal_of(diagram, sys_id, port_id):
+    """The signal key ``"path/block:port"`` of a block's output port, a nested box's output followed to the leaf that computes it."""
+    path = [sys_id]
+    box = diagram.subsystems[sys_id]
+    while hasattr(box, "subsystems"):
+        sys_id, port_id = box.connections["output"][port_id]
+        path.append(sys_id)
+        box = box.subsystems[sys_id]
+
+    return f"{'/'.join(path)}:{port_id}"
 
 
 def require_state_knots(pv):
