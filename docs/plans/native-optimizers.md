@@ -230,7 +230,7 @@ settled with NS-2.
 **The shape (R148).** The fixed-iteration MPC is no special block: it is a trajectory-optimization
 planner whose method is native and whose `iterations=K` is forwarded to its `Optimizer` (R149),
 wrapped by `ModelPredictiveController` like any planner. Its compiled face's `pv.solve(params,
-z0)` is `K` iterations of the method from the shifted plan; the tick (shift, solve, policy), the
+z0)` is `K` iterations of the method from the shifted plan; the tick (shift, solve, command), the
 delay, tick 0 and the bindings are [planner-and-mpc.md](planner-and-mpc.md) §6. In the solver's
 terms one tick is
 
