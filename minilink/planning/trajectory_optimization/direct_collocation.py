@@ -197,6 +197,7 @@ class DirectCollocationTranscription(Transcription):
                 problem.cost,
                 discount_rate=problem.discount_rate,
                 params=problem.cost.params,
+                t_start=problem.t_start,
             )
 
         return traj

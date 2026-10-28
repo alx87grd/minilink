@@ -354,7 +354,12 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   every planner pins the start from the `x_start` leaf and `X0` is derived from it
   (today shooting and collocation read `X0` first). Done when a time-varying reference is tracked
   from `t_start = 100` with the same cost as from 0, and every baseline is byte-identical at
-  `t_start = 0`.
+  `t_start = 0`. Landed in the v0.3 run: the field and leaf on `PlanningProblem`, the evaluator's
+  run and score (acceptance script 12, both backends, continuous and sampled, with `jax.grad` in
+  `t_start`), the fixed grids of the transcriptions, the discount of `CostFunction.integrate`
+  counted from it, shooting pinned from `x_start`; every baseline byte-identical at `t_start = 0`
+  but two JAX Monte Carlo entries, one ulp (the run log). Rest: collocation's compiled program
+  reads `p["t_start"]` (PP-2), and the step problem's tick offset (§1.6).
 - [ ] **The stochastic program as the parametric program's seed case**
   (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
   one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes

@@ -363,7 +363,16 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
     sys, cost = problem.sys, problem.cost
     view = problem.params
     assert view["plant"] is sys.params and view["cost"] is cost.params
-    assert set(view) == {"plant", "cost", "X", "U", "X0", "x_start", "discount_rate"}
+    assert set(view) == {
+        "plant",
+        "cost",
+        "X",
+        "U",
+        "X0",
+        "x_start",
+        "t_start",
+        "discount_rate",
+    }
 
     # In place, and by assignment: the parts change
     problem.params["cost"]["R"][0, 0] = 2.0

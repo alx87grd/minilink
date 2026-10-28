@@ -120,6 +120,7 @@ class ShootingTranscription(Transcription):
                 problem.cost,
                 discount_rate=problem.discount_rate,
                 params=problem.cost.params,
+                t_start=problem.t_start,
             )
 
         return traj
@@ -285,9 +286,7 @@ class ShootingTranscription(Transcription):
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:
-        """The rollout's start: the singleton ``X0`` point, else ``x_start``."""
-        if isinstance(problem.X0, SingletonSet):
-            return problem.X0.point
+        """The rollout's start: the problem's ``x_start``, which a singleton ``X0`` is derived from (R148)."""
         return problem.x_start
 
     def rollout_loop(self, f, u, x0, problem: PlanningProblem) -> np.ndarray:

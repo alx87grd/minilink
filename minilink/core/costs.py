@@ -92,12 +92,15 @@ class CostFunction(ABC):
 
         return h_max
 
-    def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None):
+    def integrate(
+        self, traj: Trajectory, *, discount_rate=0.0, params=None, t_start=0.0
+    ):
         """
         The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
 
-        ``cost_rate`` is the integrand ``e^{−ρ t_k} g(x_k, u_k, t_k)`` at each
-        sample and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
+        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t_start)} g(x_k, u_k, t_k)``
+        at each sample, the discount counted from the horizon's start (R148),
+        and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
         ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
         trajectory's array module, so it traces under JAX.
         """
@@ -112,8 +115,8 @@ class CostFunction(ABC):
         # g_k = g(x_k, u_k, t_k), every sample (a vmap on JAX, a loop on NumPy)
         g_k = per_sample(g, x.T, u.T, t, params)
 
-        # dJ_k = e^{−ρ t_k} g_k
-        cost_rate = xp.exp(-rho * t) * g_k
+        # dJ_k = e^{−ρ (t_k − t_start)} g_k
+        cost_rate = xp.exp(-rho * (t - t_start)) * g_k
 
         # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
         increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])

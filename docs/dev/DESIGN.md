@@ -965,8 +965,12 @@ among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous horizon `tf`, the discount rate and the price
-switch (below). `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
+`U=plant.input_box`), cost, the continuous horizon `tf` and its start `t_start` (R148: the
+horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
+references read absolute time, the discount counts from it, the fixed grids of the
+transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
+evaluator's tree, so `jax.grad` differentiates it), the discount rate and the price
+switch (below). The planners pin the start from `x_start`; a singleton `X0` is derived from it. `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
 and `x_goal` never creates `Xf` (an exact terminal state is `Xf=SingletonSet(x_goal)`).
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
@@ -1034,14 +1038,14 @@ terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
 **One scoring formula** (`planning.evaluation.score_run`, every evaluation's): a run is
-integrated to `tf` (no event, no cut), then
+integrated from `t_start` to `t_end = t_start + tf` (no event, no cut), then
 
 ```
 finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
-reachability_margin = Xf.margin(x(tf), tf)        reached = margin ≥ 0   (Xf = None: reached)
-cost                = ∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))  (trapezoid; +inf when not finite; no h on an infinite horizon)
+reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
+cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)  (trapezoid; +inf when not finite; no h on an infinite horizon)
 J                   = cost, or with the price on cost + price · (failed or not reached),
                       and cost_bound + price for a run not finite
 ```

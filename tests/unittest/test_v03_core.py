@@ -5,6 +5,7 @@ import pytest
 
 from minilink import (
     PID,
+    CostFunction,
     DiagramSystem,
     Integrator,
     P,
@@ -283,3 +284,119 @@ def test_script_11_loop_a_bare_reference_reads_seconds():
         tf=0.4, dt=dt, solver="euler_fixedsteps", verbose=False
     )
     np.testing.assert_allclose(ticks.x[0], traj.x[0], rtol=1e-12, atol=1e-15)
+
+
+class SineTracking(CostFunction):
+    """``g = (θ − a sin(ω t + φ))² + r u²``, ``h = (θ − a sin(ω t + φ))²``: a reference in absolute time."""
+
+    def __init__(self, phase=0.0):
+        self.params = {"phase": float(phase), "r": 0.01}
+
+    def error(self, x, t, params):
+        xp = array_module(x, t)
+        phase = params["phase"]
+
+        # e = θ − a sin(ω t + φ)
+        e = x[0] - 0.3 * xp.sin(2.0 * t + phase)
+
+        return e
+
+    def g(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+        r = params["r"]
+
+        e = self.error(x, t, params)
+
+        # g = e² + r u²
+        g = e**2 + r * u[0] ** 2
+
+        return g
+
+    def h(self, x, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        e = self.error(x, t, params)
+
+        return e**2
+
+
+def tracking_problem(t_start, phase):
+    plant = Pendulum()
+    return PlanningProblem(
+        plant,
+        x_start=[0.2, 0.0],
+        cost=SineTracking(phase),
+        tf=2.0,
+        t_start=t_start,
+        discount_rate=0.3,
+    )
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+@pytest.mark.parametrize("sampled", [False, True], ids=["continuous", "sampled"])
+def test_script_12_program_a_loop_started_at_100_scores_as_from_0_shifted(
+    backend, sampled
+):
+    def controller():
+        pd = PID(Kp=8.0, Kd=2.0)
+        return pd % 0.01 if sampled else pd
+
+    # From t = 100 with sin(2t), and from 0 with the reference shifted by 2·100
+    late = tracking_problem(100.0, 0.0).compile(controller(), dt=0.01, backend=backend)
+    early = tracking_problem(0.0, 200.0).compile(controller(), dt=0.01, backend=backend)
+    J_late = float(late.evaluate().J[0])
+    J_early = float(early.evaluate().J[0])
+    assert J_late == pytest.approx(J_early, rel=1e-9)
+
+    # The run is stamped in absolute time, and the discount counts from t_start
+    traj = late.trajectory()
+    assert traj.t[0] == 100.0 and traj.t[-1] == pytest.approx(102.0)
+    undiscounted = tracking_problem(100.0, 0.0).replace(discount_rate=0.0)
+    J_flat = float(
+        undiscounted.compile(controller(), dt=0.01, backend=backend).evaluate().J[0]
+    )
+    assert J_flat > J_late > 0.5 * J_flat  # e^{-0.3 (t - 100)} ≥ e^{-0.6}, not e^{-30}
+
+
+@pytest.mark.jax
+def test_script_12_program_the_gradient_in_t_start_matches_a_central_difference():
+    import jax
+
+    pe = tracking_problem(100.0, 0.0).compile(
+        PID(Kp=8.0, Kd=2.0), dt=0.01, backend="jax"
+    )
+    params = pe.merged({})
+    grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
+
+    h = 1e-5
+    J_plus = float(pe.evaluate(pe.merged({"t_start": 100.0 + h})).objective)
+    J_minus = float(pe.evaluate(pe.merged({"t_start": 100.0 - h})).objective)
+    central = (J_plus - J_minus) / (2 * h)
+    assert float(grad["t_start"]) == pytest.approx(central, rel=1e-5)
+    assert abs(central) > 1e-3  # the reference moves under the run
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+@pytest.mark.parametrize("transcription", ["direct_collocation", "multiple_shooting"])
+def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcription):
+    from minilink.planning import TrajectoryOptimizationPlanner
+
+    def plan(t_start, phase):
+        problem = tracking_problem(t_start, phase).replace(discount_rate=0.0)
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=11,
+            transcription=transcription,
+            backend=backend,
+            optimizer_options={"maxiter": 100},
+        )
+        return planner.solve()
+
+    late, early = plan(100.0, 0.0), plan(0.0, 200.0)
+    np.testing.assert_allclose(late.trajectory.t, 100.0 + early.trajectory.t)
+    np.testing.assert_allclose(late.trajectory.u, early.trajectory.u, atol=1e-6)
+    assert late.solver.cost == pytest.approx(early.solver.cost, rel=1e-6)

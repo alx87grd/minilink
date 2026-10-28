@@ -415,20 +415,21 @@ class ProblemEvaluator:
         u = self.held_inputs(params, xp)
         u_seq = xp.broadcast_to(u, (N, u.size))
 
-        # x_{k+1} = Φ(x_k, u, t_k), t_k = k dt, k = 0 … N − 1; or the adaptive
-        # integral reported on that grid
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1; or the
+        # adaptive integral reported on that grid
         loop_params = {
             sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
         }
         loop_params = integer_seeds(loop, loop_params)
-        ts = xp.arange(N + 1) * dt
+        t_start = params["t_start"]
+        ts = t_start + xp.arange(N + 1) * dt
         if self.sampled:
-            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N)
+            xs = ev.rollout(x0, u_seq, loop_params, n_steps=N, t_start=t_start)
         elif self.adaptive is None:
             xs = ev.rollout(
                 x0,
                 u_seq,
-                0.0,
+                t_start,
                 dt,
                 loop_params,
                 solver=self.solver,
@@ -441,7 +442,7 @@ class ProblemEvaluator:
 
         # Every block output at every sample, and the plant's input among them
         if self.sampled:
-            signals = signals_at_ticks(ev, xs, us, loop_params)
+            signals = signals_at_ticks(ev, xs, us, loop_params, t_start)
         else:
             signals = signals_along(ev, xs, us, ts, loop_params)
         u_plant = gather_samples(self.plant_input, signals, us, xp)
@@ -977,17 +978,22 @@ def signal_name_of(ev, sys_id, sampled):
     return "/".join(ev.plan.paths[sys_id])
 
 
-def signals_at_ticks(ev, xs, us, params):
-    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``: ``vmap`` on JAX."""
+def signals_at_ticks(ev, xs, us, params, t_start=0.0):
+    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``, the clock started at ``t_start``: ``vmap`` on JAX."""
     xp = array_module(xs)
     if xp is np:
         return xp.stack(
-            [ev.signals(x, u, k, params) for k, (x, u) in enumerate(zip(xs, us))]
+            [
+                ev.signals(x, u, k, params, t_start=t_start)
+                for k, (x, u) in enumerate(zip(xs, us))
+            ]
         )
 
     jax = ensure_jax_x64()
     ks = jax.numpy.arange(xs.shape[0])
-    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params))(xs, us, ks)
+    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params, t_start=t_start))(
+        xs, us, ks
+    )
 
 
 def signals_along(ev, xs, us, ts, params):
@@ -1096,7 +1102,7 @@ def block_params_of(loop, params, sys_id):
 
 def require_free_names(free_inputs, block_ids):
     """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
-    reserved = {"cost", "X", "U", "Xf", "x_start", "discount_rate"}
+    reserved = {"cost", "X", "U", "Xf", "x_start", "t_start", "discount_rate"}
     clash = sorted(
         (set(free_inputs) & set(block_ids))
         | ((set(free_inputs) | set(block_ids)) & reserved)

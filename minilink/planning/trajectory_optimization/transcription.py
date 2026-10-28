@@ -90,8 +90,10 @@ class FixedGridOptions:
         self.n_steps = int(self.n_steps)
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
-        """Time grid from finite ``problem.tf`` and ``n_steps``."""
-        return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+        """The time grid on the horizon ``[t_start, t_start + tf]``: ``t_start`` plus ``linspace(0, tf, n_steps)``."""
+        t = problem.t_start + fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+
+        return t
 
     def dt(self, problem: PlanningProblem) -> float:
         """Step size from finite ``problem.tf`` and ``n_steps``."""

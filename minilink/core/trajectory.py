@@ -108,10 +108,12 @@ class Trajectory(SampledSignals):
         object.__setattr__(self, "signals", MappingProxyType(signals))
         object.__setattr__(self, "roles", MappingProxyType(dict(self.roles)))
 
-    def with_cost(self, cost, *, discount_rate=0.0, params=None) -> Trajectory:
-        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``)."""
+    def with_cost(
+        self, cost, *, discount_rate=0.0, params=None, t_start=0.0
+    ) -> Trajectory:
+        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t_start``."""
         cost_rate, running = cost.integrate(
-            self, discount_rate=discount_rate, params=params
+            self, discount_rate=discount_rate, params=params, t_start=t_start
         )
 
         return self.with_signals(
