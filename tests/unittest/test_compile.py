@@ -1369,9 +1369,9 @@ def test_a_step_returning_a_bare_number_rolls_out():
             x_next = 0.5 * x[0] + u[0]
             return x_next
 
-    rollout = compile(HalfStep()).rollout(np.zeros(1), n_steps=3, u=np.ones(1))
+    xs = compile(HalfStep()).rollout(np.zeros(1), np.ones((3, 1)))
 
-    np.testing.assert_allclose(rollout.x, [[0.0, 1.0, 1.5, 1.75]])
+    np.testing.assert_allclose(xs, [[0.0], [1.0], [1.5], [1.75]])
 
 
 def test_a_diagram_hands_its_blocks_float_inputs():

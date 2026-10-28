@@ -35,9 +35,6 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         # requires n ≥ 1), and its ports are the ones it exposes
         System.__init__(self, 0)
 
-        # Memory: the last rollout ``compute_rollout`` produced
-        self.rollout = None
-
         # Wiring tables and the stacked-state layout
         self.init_wiring()
 

@@ -805,10 +805,13 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compile().rollout(...)` or `compute_rollout(n_steps=...)`
-  (state-only :class:`~minilink.core.discrete.step_rollout.StepRollout` ``(k, x, u)``; evaluators
-  and the façade do not record boundary signals — logging is owned by
-  :class:`~minilink.simulation.discrete.computer.Computer` / :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator`; not `Simulator`)
+- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t_start=0.0)`, a
+  :class:`~minilink.core.trajectory.Trajectory` of the ticks (`t = k` on a tick law,
+  `t = t_start + k·Δ` on a system on a clock); its compiled evaluator's
+  `rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)` returns the states
+  `(N + 1, n)` as native arrays (one `lax.scan` on JAX, traced and differentiable end to end),
+  `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
+  diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass
 - :class:`~minilink.core.discrete.hybrid_diagram.HybridDiagram` →
   :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` or façade
   `compute_trajectory` / `compute_forced` (hybrid :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimResult`)

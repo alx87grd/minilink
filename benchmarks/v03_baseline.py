@@ -106,8 +106,8 @@ def step_diagram_entries(out):
         out[f"step_diagram.unity.x.{i}"] = rollout.x
     for backend in ("numpy", "jax"):
         ev = diagram.compile(backend=backend)
-        rollout = ev.rollout(diagram.x0, n_steps=40, u=np.array([1.0]))
-        out[f"step_diagram.unity.ev.{backend}"] = np.asarray(rollout.x)
+        xs = ev.rollout(diagram.x0, np.ones((40, 1)), n_steps=40)
+        out[f"step_diagram.unity.ev.{backend}"] = np.asarray(xs).T
 
 
 def hybrid_entries(out):

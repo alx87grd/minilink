@@ -1,5 +1,6 @@
 """Simulation shortcuts: compile a system, simulate it, score the run."""
 
+import numpy as np
 
 ###############################################################################
 # Public API
@@ -371,25 +372,28 @@ class StepSimulation:
         u=None,
         *,
         x0=None,
+        t_start=0.0,
         backend="numpy",
         show=False,
         verbose=False,
     ):
         """
-        Convenience shortcut to roll out a discrete-time step system.
+        Convenience shortcut to roll out a discrete-time step system: its ticks, a :class:`~minilink.core.trajectory.Trajectory`.
 
-        Returns a state-only :class:`~minilink.core.discrete.step_rollout.StepRollout`.
-        Boundary output logging belongs in :class:`~minilink.simulation.discrete.computer.Computer`
-        or :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` — not here.
+        The samples sit at ``t = k`` on a tick law, at ``t = t_start + k·Δ``
+        seconds on a system on a clock of period ``Δ``.
 
         Parameters
         ----------
         n_steps : int
             Number of step transitions to apply.
         u : array, sequence, callable, or None, optional
-            Input schedule passed to the compiled evaluator rollout.
+            The input of each step: ``None`` (the nominal input), a constant
+            vector, an ``(n_steps, m)`` sequence, or ``u(k)``.
         x0 : array, optional
             Initial state; defaults to :attr:`x0`.
+        t_start : float
+            The clock's origin, the time of the first tick (a system on a clock).
         backend : str
             Backend passed to :meth:`compile`.
         show : bool
@@ -397,19 +401,28 @@ class StepSimulation:
 
         Returns
         -------
-        StepRollout
-            The rollout, also stored in :attr:`rollout`.
+        Trajectory
+            The ticks ``(t, x, u)``, also stored in :attr:`traj`.
         """
+        # A real cycle through minilink.core.system
+        from minilink.core.trajectory import Trajectory
+
         ev = self.compile(backend=backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
-        rollout = ev.rollout(x0, n_steps=n_steps, u=u)
+        u_samples = ev.rollout_inputs_of(n_steps, u)
 
-        self.rollout = rollout
+        # x_{k+1} = step(x_k, u_k, k) for k = 0 … N − 1, at the ticks' times
+        xs = ev.rollout(x0, u_samples[:, :n_steps].T, n_steps=n_steps, t_start=t_start)
+        k = np.arange(n_steps + 1, dtype=float)
+        t = k if self.sample_period is None else t_start + k * self.sample_period
+
+        traj = Trajectory(t=t, x=np.asarray(xs, dtype=float).T, u=u_samples)
+        self.traj = traj
 
         if show:
-            self.plot_rollout(rollout)
+            self.plot_rollout(traj)
 
-        return rollout
+        return traj
 
 
 ###############################################################################
