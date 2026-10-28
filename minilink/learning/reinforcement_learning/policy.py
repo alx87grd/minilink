@@ -5,6 +5,7 @@ import math
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module, require_jax, require_jax_numpy
+from minilink.core.distributions import is_counter_key, standard_normal
 
 
 # The batching decorator the classes below apply as they are defined, so it comes
@@ -48,7 +49,11 @@ class ExplorationPolicy:
     block carries once training is over.
 
     Every method takes one state ``x`` or a batch of states (leading axes),
-    with one key or one action per state.
+    with one key or one action per state. A key is a JAX key or a
+    :class:`~minilink.core.distributions.CounterKey` ``(seed, k)``: the
+    collectors draw with the episode's seed at the tick, so the head's draw is
+    the one :class:`~minilink.control.GaussianPolicy` makes with that seed at
+    that sample (R160); the off-policy losses keep JAX keys.
     """
 
     def __init__(self, controller, head):
@@ -140,13 +145,13 @@ class GaussianHead:
 
     def sample(self, params, mu, z, key):
         """A normalized action drawn around the mean."""
-        jax, jnp = require_jax(), require_jax_numpy()
+        jnp = require_jax_numpy()
 
         log_std = params["log_std"]
 
         # a = μ + σ ε, ε ~ N(0, I)
         sigma = jnp.exp(log_std)
-        eps = jax.random.normal(key, mu.shape)
+        eps = unit_normal(key, mu.shape)
         a = mu + sigma * eps
 
         return a
@@ -231,12 +236,12 @@ class SquashedGaussianHead:
 
     def sample_and_log_prob(self, params, mu, z, key):
         """Reparameterized squashed sample and its log-density."""
-        jax, jnp = require_jax(), require_jax_numpy()
+        jnp = require_jax_numpy()
 
         log_std = self.log_std(params, z)
 
         # Reparameterized draw: a = tanh(μ + σ ε), ε ~ N(0, I)
-        eps = jax.random.normal(key, mu.shape)
+        eps = unit_normal(key, mu.shape)
         sigma = jnp.exp(log_std)
         a_gauss = mu + sigma * eps
         a = jnp.tanh(a_gauss)
@@ -273,3 +278,24 @@ class SquashedGaussianHead:
         raise NotImplementedError(
             "a squashed Gaussian has no closed-form entropy; estimate it as -ln pi of samples"
         )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def unit_normal(key, shape):
+    """``ε ~ N(0, I)`` of ``shape``: the library's cipher at ``(seed, k)`` for a counter key, else ``jax.random.normal``."""
+    # A counter key: ε = F(seed, k), the seeded policy block's draw
+    if is_counter_key(key):
+        jnp = require_jax_numpy()
+        p = math.prod(shape)
+        eps = jnp.reshape(standard_normal(key.seed, key.k, p), shape)
+        return eps
+
+    # A JAX key: ε from its stream
+    jax = require_jax()
+    eps = jax.random.normal(key, shape)
+
+    return eps

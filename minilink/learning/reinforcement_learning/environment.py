@@ -32,12 +32,15 @@ class RolloutEnvironment:
     """
     A planning problem seen by a learner: ``reset`` draws a start, ``step`` runs one control period.
 
-    The plant is compiled once. ``step`` integrates it over ``dt`` with the input
-    held, scores the period with the problem's own cost and tells how the episode
-    ends: at the horizon, at a failure (the state left the constraint set ``X``, a
-    priced terminal event), or at the edge of the training zone (a truncation: the
-    model is not studied there, the value of the state stands in for the rest). On the JAX backend every
-    method traces, so collectors ``vmap`` over plants and ``scan`` over time with
+    The problem is compiled once to its step face (R141). ``step`` is the face's
+    ``transition``: the plant over ``dt`` with the input held and the period's
+    stage cost ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside it by the same
+    scheme (R142), the reward ``−c_k``; it tells how the episode ends: at the
+    horizon, at a failure (the state left ``X`` or the input left ``U``, checked
+    at the sample as the judge does: a priced terminal event, a training device
+    that ends the episode early, R159), or at the edge of the training zone (a
+    truncation: the model is not studied there, the value of the state stands in
+    for the rest). On the JAX backend every method traces, so collectors ``vmap`` over plants and ``scan`` over time with
     no Python per step; on NumPy the same methods drive plain loops (tabular
     learning, Monte Carlo trials).
 
@@ -93,12 +96,14 @@ class RolloutEnvironment:
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
         self.discount_rate = problem.discount_rate
 
-        # Plant: the step model of one control period, on nominal or drawn parameters
+        # Plant and stage cost: the problem's step face at dt, one transition per
+        # control period, on nominal or drawn parameters
         require_rollout_backend(backend)
         require_step_knobs(solver, substeps)
-        self.evaluator = self.sys.compile(backend=backend, verbose=False)
         self.solver = solver
         self.substeps = int(substeps)
+        self.face = problem.compile(dt=self.dt, solver=solver, substeps=self.substeps)
+        self.face_params = self.face.params
 
         # The episode's realization: the plant's laws drawn, a seed per random source
         self.laws = problem.laws.get("plant", {})
@@ -107,9 +112,10 @@ class RolloutEnvironment:
         random_sources = any(block.is_random for block in self.sources.values())
         self.randomizes_params = bool(self.laws) or random_sources
 
-        # The constraint X, whose exit is a failure, and the training zone, whose
-        # exit is a truncation
+        # The constraints X and U, whose violation is a failure (the judge's rule,
+        # checked at the sample), and the training zone, whose exit is a truncation
         self.X = problem.X
+        self.U = problem.U
         self.set_params = None
         self.training_zone = (
             self.sys.state.box if training_zone is None else training_zone
@@ -176,31 +182,34 @@ class RolloutEnvironment:
         dt = self.dt
         tf = self.tf
         finite_horizon = self.finite_horizon
-        g = self.cost.g
-        h = self.cost.h
+        face = self.face
         X = self.X
+        U = self.U
         zone = self.training_zone
         set_params = self.set_params
+        tree = self.episode_tree(params)
 
         # Plant input: the action on its port, each source's signal at t on theirs
         u_full = self.input_vector(u, t, params)
 
-        # Dynamics: x_{k+1} = f(x_k, u_k, w_k) over one control period, input held
-        x_next = self.plant_step(x, u_full, t, params)
+        # Transition: x_{k+1}, c_k over one control period, input held (R141, R142)
+        x_next, c = face.transition_at(x, u_full, t, tree)
         t_next = t + dt
 
-        # Reward: r_k = −g(x_k, u_k) dt, the stage cost on the plant's whole input
-        # with its sign flipped; the discount enters the return once, through the
+        # Reward: r_k = −c_k, the stage cost on the plant's whole input with its
+        # sign flipped; the discount enters the return once, through the
         # algorithm, never the reward
-        reward = -g(x, u_full, t) * dt
+        reward = -c
 
         # A step that blew up ends the episode; the last finite state stands in
         # for the next one so rewards, values and the reset stay finite
         finite = xp.all(xp.isfinite(x_next))
         x_next = xp.where(finite, x_next, x)
 
-        # Leaving X is a failure; leaving the training zone is not; the horizon ends
-        failed = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0) | ~finite
+        # Leaving X or U is a failure; leaving the training zone is not; the horizon ends
+        out_of_U = ~xp.all(U.margin(u_full, x, t, set_params) >= 0.0)
+        out_of_X = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0)
+        failed = out_of_X | out_of_U | ~finite
         left_zone = ~xp.all(zone.margin(x_next, t_next, set_params) >= 0.0)
         horizon_reached = xp.asarray(t_next >= tf - 0.5 * dt)
 
@@ -208,7 +217,7 @@ class RolloutEnvironment:
         penalty = self.infeasible_penalty(x_next, t_next)
         reward = reward - xp.where(failed, penalty, 0.0)
         if finite_horizon:
-            reward = reward - horizon_reached * h(x_next, t_next)
+            reward = reward - horizon_reached * face.terminal(x_next, t_next, tree)
 
         # What is paid is terminal; what is left unpaid is truncated
         terminated = failed | (horizon_reached & finite_horizon)
@@ -217,12 +226,19 @@ class RolloutEnvironment:
         return x_next, t_next, reward, terminated, truncated
 
     def plant_step(self, x, u_full, t, params=None):
-        """One control period of the plant, on the nominal or the episode's parameters."""
-        plant = (params or {}).get("plant")
-        p = self.full_params(plant) if plant else None
+        """``x_next`` alone of one control period, on the nominal or the episode's parameters (no cost evaluated)."""
+        tree = self.episode_tree(params)
 
-        return self.evaluator.step(
-            x, u_full, t, p, dt=self.dt, solver=self.solver, substeps=self.substeps
+        return self.face.step_at(x, u_full, t, tree["plant"])
+
+    def episode_tree(self, params=None):
+        """The face's tree with the episode's plant draws merged in (none: the face's own)."""
+        plant = (params or {}).get("plant")
+        if not plant:
+            return self.face_params
+
+        return dict(
+            self.face_params, plant=merge_tree(self.face_params["plant"], plant)
         )
 
     def input_vector(self, u, t, params=None):
@@ -267,7 +283,7 @@ class RolloutEnvironment:
         randomized = f", randomized params {sorted(names)}" if self.laws else ""
 
         return (
-            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X, "
+            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X or U, "
             f"or a non-finite state) terminates and is charged {charged}; leaving the "
             f"training zone truncates (value bootstrapped){randomized}"
         )

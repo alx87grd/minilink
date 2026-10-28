@@ -85,7 +85,9 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
         jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
     )
     assert bool(truncated) and not bool(terminated)
-    expected = -float(env.cost.g(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0)) * env.dt
+    expected = -float(
+        env.face.stage_cost_at(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0)
+    )
     np.testing.assert_allclose(
         float(r_exit), expected
     )  # the running cost only, no price
@@ -207,13 +209,14 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
     )
     np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
-    # the step reward is −g dt; gamma carries the discount (not exp(−ρ t) in r)
+    # the step reward is −c_k, the face's stage cost in its stationary form (R142):
+    # gamma carries the discount between ticks, never exp(−ρ t) in r
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
-    g0 = float(HangCost().g(np.array([1.0, 0.0]), np.array([0.0])))
+    c0 = float(planner.env.face.stage_cost_at(x, u, 0.0))
     _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
     _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
-    np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
+    np.testing.assert_allclose(float(r0), -c0, atol=1e-6)
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
         ReinforcementLearningPlanner(prob, dt=0.1, algorithm="sac?", verbose=0)
@@ -764,7 +767,7 @@ def test_the_planner_trains_on_a_substepped_step_model():
     solution = planner.solve(timesteps=32)
     env = planner.env
     x, u = np.array([0.3, 0.0]), np.array([0.5])
-    expected = env.evaluator.step(x, u, 0.0, dt=0.1, substeps=2)
+    expected = env.sys.compile(verbose=False).step(x, u, 0.0, dt=0.1, substeps=2)
     np.testing.assert_allclose(
         np.asarray(env.plant_step(x, u, 0.0)), np.asarray(expected)
     )
@@ -782,3 +785,58 @@ def test_angle_features_map_each_angle_to_its_cosine_and_sine():
     np.testing.assert_allclose(z, [0.5, np.sqrt(3) / 2, 0.4])
     np.testing.assert_allclose(features(x + [2 * np.pi, 0.0]), z, atol=1e-12)
     np.testing.assert_allclose(jax.jit(features)(jnp.asarray(x)), z, atol=1e-12)
+
+
+def test_the_heads_draw_at_a_counter_key_as_the_seeded_policy_block_does():
+    """R160: a head drawing at ``CounterKey(seed, k)`` makes the block's draw at that seed and sample."""
+    from minilink import Gain
+    from minilink.control import GaussianPolicy
+    from minilink.core.backends import require_jax
+    from minilink.core.distributions import CounterKey
+    from minilink.learning.reinforcement_learning.policy import GaussianHead
+
+    require_jax()  # the library's 64-bit policy, before the first JAX array
+    law = Gain(np.array([[2.0, 1.0]]))
+    block = GaussianPolicy(law, np.log([0.5]), sample_period=0.05, seed=7)
+    head = GaussianHead(1)
+    x = np.array([0.3, -0.2])
+    mu = jnp.asarray(law.outputs["y"].compute(None, x, 0.0))
+    for k in (0, 1, 13):
+        a = head.sample(
+            {"log_std": jnp.log(jnp.array([0.5]))}, mu, None, CounterKey(7, k)
+        )
+        np.testing.assert_allclose(
+            np.asarray(a), block.h(None, x, k * 0.05 + 0.01), rtol=1e-12
+        )
+
+
+def test_the_collector_draws_each_episode_at_its_own_policy_seed():
+    """The carry holds one policy seed per plant; a finished episode draws a fresh one."""
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        episode_length=0.3,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=8,
+        batch_size=32,
+        verbose=False,
+    )
+    seeds = np.asarray(planner.carry[4])
+    assert seeds.shape == (4,) and len(set(seeds.tolist())) == 4
+    planner.solve(timesteps=32)
+    assert not np.array_equal(np.asarray(planner.carry[4]), seeds)
+
+
+def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
+    """R150: the problem's discount by default; an override is a training choice the record names."""
+    kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16, verbose=0)
+    prob = problem(tf=np.inf, discount_rate=0.5)
+    derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).solver
+    assert derived.gamma == derived.scored_gamma == np.exp(-prob.discount_rate * 0.1)
+    assert not derived.discount_differs and "scored at" not in str(derived)
+
+    override = ReinforcementLearningPlanner(prob, gamma=0.9, **kwargs)
+    record = override.solve(timesteps=16).solver
+    assert record.gamma == 0.9 and record.discount_differs
+    assert "trained at gamma=0.9" in str(record)
