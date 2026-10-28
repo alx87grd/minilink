@@ -275,24 +275,28 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
     import warnings
 
     from minilink import NoisyPendulum
+    from minilink.blocks.sources import WhiteNoise
     from minilink.core.costs import QuadraticCost
-    from minilink.core.distributions import Gaussian, Uniform
+    from minilink.core.distributions import Uniform
     from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
-    from minilink.planning.problems import StochasticPlanningProblem
+    from minilink.planning.problems import PlanningProblem
 
     def problem(sys, **disturbances):
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             sys,
             cost=QuadraticCost.from_system(sys),
             tf=1.0,
-            x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+            x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
             disturbances=disturbances or None,
             U=sys.input_box,
         )
 
     cases = [
-        (problem(NoisyPendulum(), d=Gaussian(0.0, 0.1)), None),
-        (problem(NoisyPendulum(), n=Gaussian(0.0, 0.1)), "never calls h"),
+        (problem(NoisyPendulum(), d=WhiteNoise(1, psd=0.01, sample_period=0.1)), None),
+        (
+            problem(NoisyPendulum(), n=WhiteNoise(1, psd=0.01, sample_period=0.1)),
+            "never calls h",
+        ),
         (problem(noisy_plant()), "fixed seed"),
     ]
     for prob, expected in cases:
@@ -319,7 +323,6 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
     from minilink import Gaussian, PlanningProblem, QuadraticCost, Uniform
     from minilink.core import Distribution
     from minilink.dynamics.catalog.equations import DoubleIntegrator
-    from minilink.planning.problems import StochasticPlanningProblem
 
     # The library laws are Distributions: their draws have the shape (n, dim)
     for law in (Gaussian([0.0, 1.0], 0.1), Uniform([-1.0, -1.0], [1.0, 1.0])):
@@ -338,10 +341,10 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
             return draws[0] if n is None else draws
 
     plant = DoubleIntegrator()
-    problem = StochasticPlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x0_distribution=Corners()
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), x_start=Corners()
     )
-    x0s, _ = problem.realize(0, 4)
+    x0s = problem.realize(0, 4)["x_start"]
     assert x0s.shape == (4, 2) and set(np.abs(x0s).ravel()) == {1.0}
     assert isinstance(problem.nominal(), PlanningProblem)
 

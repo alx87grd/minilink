@@ -346,7 +346,7 @@ def stochastic():
                 "distributions",
             ),
         ],
-        "StochasticPlanningProblem",
+        "PlanningProblem",
     )
 
     # The problem evaluator: n draws, n simulations, n trajectories, n scores, one criterion
@@ -665,7 +665,7 @@ def reinforcement_learning():
             ("Sets", ["leave X: a failure"], "obj"),
             ("Distributions", ["x₀ ~ D₀,  p ~ Dₚ"], "rnd"),
         ],
-        "StochasticPlanningProblem",
+        "PlanningProblem",
     )
 
     y, h = bottom + 58, 96

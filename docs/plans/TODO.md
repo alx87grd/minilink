@@ -244,13 +244,11 @@ when": [randomness.md](randomness.md) §9.
   - two trials from one key draw distinct noise;
   - adding a random block leaves every other stream unchanged;
   - RN-5's LQG loop scores within the covariance prediction's sampling error.
-- [ ] **A problem stochastic by its parts** **[ask — student-facing, given]** (R143): no
-  `StochasticPlanningProblem`; `x_start=` takes a point, a `Set` or a `Distribution`, `params=`
-  takes laws in the tree's own shape, `criterion=` and `nominal()` move onto `PlanningProblem`,
-  `problem.is_stochastic` is read off its parts; `x0_distribution=` and `params_distribution=` go.
-  The four RL demos and ten notebooks that build one are swept in the same commit (with R151's
-  rename and R150's discount). Done when no public name `StochasticPlanningProblem` remains and the
-  RL baselines are byte-identical.
+- [ ] **A problem stochastic by its parts** (R143): landed in the v0.3 run (no
+  `StochasticPlanningProblem`; `x_start=` a law or a set, `params=` laws, `disturbances=` source
+  blocks, `criterion=` and `nominal()` on `PlanningProblem`), every Python caller swept; the
+  ten notebooks move at step 7 (the run log's §4). Rest: the RL baselines re-pin with the
+  seeded policy (§1.4).
 - [ ] **`NoiseSource` with its first consumer** (RN-3).
 - [ ] **`Sys2Gym` takes a `Distribution` for the start state** (randomness.md RD-R5, with RN-5;
   scan: graphics#1). The same row brings `Sys2Gym.from_problem` in line with DESIGN §6's claim

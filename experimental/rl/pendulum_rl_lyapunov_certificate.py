@@ -9,7 +9,7 @@ from scipy.linalg import solve_continuous_lyapunov
 from minilink import CostFunction, Pendulum
 from minilink.control import angle_features
 from minilink.learning import ReinforcementLearningPlanner
-from minilink.planning import StochasticPlanningProblem, Uniform
+from minilink.planning import PlanningProblem, Uniform
 
 TORQUE = 4.0  # Nm, below m g l = 9.81 Nm: the pendulum must pump to get up
 DT = 0.05
@@ -32,11 +32,11 @@ class SwingUpCost(CostFunction):
         return 0.0
 
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
     tf=np.inf,
-    x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+    x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
     U=plant.input_box,
 )
 planner = ReinforcementLearningPlanner(

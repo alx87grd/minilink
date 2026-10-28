@@ -201,7 +201,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         self.assertIs(problem.params["plant"], sys.params)  # a view of the parts
         with self.assertRaises(TypeError):
-            PlanningProblem(sys=sys, params={"plant": {}}, U=sys.input_box)
+            PlanningProblem(sys=sys, params={"plant": {"m": 1.0}}, U=sys.input_box)
         with self.assertRaises(TypeError):  # A problem keeps no free-form notes
             PlanningProblem(sys=sys, metadata={"tag": "demo"}, U=sys.input_box)
 

@@ -58,8 +58,8 @@ class Planner(ABC):
         if problem.is_stochastic and not self.accepts_stochastic:
             warnings.warn(
                 f"{type(self).__name__} is a deterministic planner: it reads the "
-                "start set X0 of this StochasticPlanningProblem (the support of "
-                "its start law) and its x_start, and ignores its distributions. "
+                "start set X0 of this stochastic problem (the support of its start "
+                "law) and its x_start, and ignores its laws and random sources. "
                 "Pass problem.nominal() to plan from the mean start alone.",
                 stacklevel=2,
             )

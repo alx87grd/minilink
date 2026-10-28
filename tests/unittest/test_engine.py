@@ -12,7 +12,7 @@ from minilink.core.sets import BallSet, BoxInputSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
 from minilink.planning.evaluator import closed_loop_of, evaluate
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+from minilink.planning.problems import PlanningProblem
 
 UPRIGHT = {"r": np.array([np.pi])}
 
@@ -181,13 +181,13 @@ def test_the_criteria_reduce_the_runs():
 def stochastic_problem(**fields):
     sys = plant()
     cost = QuadraticCost.from_system(sys)
-    return StochasticPlanningProblem(
+    return PlanningProblem(
         sys=sys,
         cost=cost,
         tf=1.0,
         U=BoxInputSet.from_bounds([-50.0], [50.0]),
-        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
-        params_distribution={"m": Uniform(np.array([0.9]), np.array([1.1]))},
+        x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
+        params={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,
     )
 
@@ -462,15 +462,17 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
 
 def test_a_problem_realizes_its_draws_from_one_key():
     problem = stochastic_problem()
-    x0s, draws = problem.realize(0, 5)
-    assert x0s.shape == (5, 2) and draws["params"]["m"].shape == (5,)
-    again, _ = problem.realize(0, 5)
-    np.testing.assert_array_equal(x0s, again)  # one key, the same draws
-    assert np.all((draws["params"]["m"] >= 0.9) & (draws["params"]["m"] <= 1.1))
+    tree = problem.realize(0, 5)
+    assert tree["x_start"].shape == (5, 2) and tree["plant"]["m"].shape == (5,)
+    again = problem.realize(0, 5)
+    np.testing.assert_array_equal(tree["x_start"], again["x_start"])  # one key
+    assert np.all((tree["plant"]["m"] >= 0.9) & (tree["plant"]["m"] <= 1.1))
+    assert problem.drawn_paths() == [("x_start",), ("plant", "m")]
 
-    # A deterministic problem has one realization: its start, no draws
-    one, none = upright_problem().realize()
-    assert one.shape == (1, 2) and none == {"params": {}, "disturbances": {}}
+    # A deterministic problem has one realization: its start, the shared numbers
+    deterministic = upright_problem()
+    one = deterministic.realize()
+    assert one["x_start"].shape == (1, 2) and one["plant"] is deterministic.sys.params
     with pytest.raises(ValueError, match="one realization"):
         upright_problem().realize(0, 3)
 
@@ -482,11 +484,11 @@ def noisy_loop(seed=3):
 
 def point_start_problem():
     sys = plant()
-    return StochasticPlanningProblem(
+    return PlanningProblem(
         sys=sys,
         cost=QuadraticCost.from_system(sys),
         tf=1.0,
-        x0_distribution=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
+        x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
     )
 
 
@@ -620,12 +622,12 @@ def test_the_problems_params_write_back_to_themselves():
 
 def test_a_new_start_law_brings_its_own_mean_and_support():
     sys = plant()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         sys,
         cost=QuadraticCost.from_system(sys),
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
     )
-    moved = problem.replace(x0_distribution=Uniform([2.0, 0.0], [2.2, 0.1]))
+    moved = problem.replace(x_start=Uniform([2.0, 0.0], [2.2, 0.1]))
     np.testing.assert_allclose(moved.x_start, [2.1, 0.05])
     assert moved.X0.contains(np.array([2.1, 0.05]))
 
@@ -639,14 +641,18 @@ def test_a_disturbance_the_loop_does_not_draw_is_announced():
     from minilink import NoisyPendulum
 
     sys = NoisyPendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         sys,
         cost=QuadraticCost.from_system(sys),
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
-        disturbances={"d": Gaussian([0.0], [1.0])},
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        disturbances={"d": WhiteNoise(1, psd=1.0, sample_period=0.05)},
     )
     with pytest.warns(UserWarning, match="does not draw the disturbances on \\['d'\\]"):
         problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+
+    # A disturbance is a source block: a bare law is refused, naming the fix
+    with pytest.raises(TypeError, match="WhiteNoise"):
+        PlanningProblem(sys, disturbances={"d": Gaussian([0.0], [1.0])})
 
 
 @pytest.mark.parametrize("substeps", [2.0, np.float32(2.0), True, 0])

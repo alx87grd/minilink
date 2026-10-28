@@ -12,8 +12,8 @@ from parking import (
 )
 
 from minilink import (
+    PlanningProblem,
     ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
     Uniform,
     evaluate,
 )
@@ -29,11 +29,11 @@ GAMMA = 0.99  # a 10 s discount horizon at DT
 
 boat = ParkingBoat(CURRENT)
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     boat,
     cost=parking_cost(boat, terminal=TERMINAL, well=DOCK_WELL),
     tf=TF,
-    x0_distribution=Uniform(
+    x_start=Uniform(
         [-START_RADIUS, -START_RADIUS, -np.pi, -0.5, -0.5, -0.2],
         [START_RADIUS, START_RADIUS, np.pi, 0.5, 0.5, 0.2],
     ),

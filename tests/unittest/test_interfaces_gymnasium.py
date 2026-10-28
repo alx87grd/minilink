@@ -190,7 +190,6 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
         from minilink.planning.problems import (
             PlanningProblem,
-            StochasticPlanningProblem,
         )
 
         # A deterministic problem on a plant without state bounds starts at x_start
@@ -210,8 +209,8 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(y, [0.2, 0.0])
         # The start is the problem's first draw on the seeded generator
         start = Uniform([-1.0, -0.5], [1.0, 0.5])
-        problem = StochasticPlanningProblem(
-            make_bounded_pendulum(), cost=cost, tf=1.0, x0_distribution=start
+        problem = PlanningProblem(
+            make_bounded_pendulum(), cost=cost, tf=1.0, x_start=start
         )
         env = Sys2Gym.from_problem(problem, backend="numpy")
         for seed in (0, 7):

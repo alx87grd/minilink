@@ -16,7 +16,6 @@ from minilink import (
     QuadraticCost,
     Simulator,
     Step,
-    StochasticPlanningProblem,
     linearize,
 )
 
@@ -48,10 +47,10 @@ print(cost + QuadraticCost.from_system(DoubleIntegrator()))
 print(PlanningProblem(plant, tf=2.0, cost=cost))
 
 print(
-    StochasticPlanningProblem(
+    PlanningProblem(
         plant,
         tf=1.0,
-        x0_distribution=Gaussian([0.0], [0.1]),
+        x_start=Gaussian([0.0], [0.1]),
         cost=cost,
         criterion="expectation",
     )

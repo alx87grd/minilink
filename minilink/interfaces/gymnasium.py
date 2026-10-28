@@ -152,7 +152,7 @@ class Sys2Gym(gym.Env):
     @classmethod
     def from_problem(cls, problem, dt=0.05, episode_length=None, **kwargs):
         """
-        The Gymnasium view of a :class:`~minilink.planning.problems.StochasticPlanningProblem`.
+        The Gymnasium view of a :class:`~minilink.planning.problems.PlanningProblem`.
 
         ``reset`` draws the initial state from the problem, the reward is the
         problem's running cost, a finite horizon ends the episode at ``tf``
@@ -160,13 +160,9 @@ class Sys2Gym(gym.Env):
         the problem's set parameters) is a failure (*terminated*, charged the
         price of infeasibility) and leaving the plant's state box, the training
         zone, is a *truncation*.
-        Parameter and disturbance draws are not applied by this view. A
-        deterministic :class:`~minilink.planning.problems.PlanningProblem`
-        starts every episode at its ``x_start``.
+        Parameter laws and disturbance sources are not applied by this view.
+        A problem with a point start starts every episode at its ``x_start``.
         """
-        from minilink.planning.problems import as_stochastic
-
-        problem = as_stochastic(problem)
         finite = problem.horizon_kind() == "finite"
         tf = float(problem.tf) if finite else float(episode_length or 10.0)
 

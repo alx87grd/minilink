@@ -1044,20 +1044,23 @@ left-Riemann discretization of the same running cost (`r_k = -g dt`) with per-st
 `gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that would discount
 twice); its plans report `evaluate`.
 
-**Stochastic problem:** `StochasticPlanningProblem(PlanningProblem)` adds
-`x0_distribution` (its mean is `x_start`, its support `X0`),
-`params_distribution` (`{name: Distribution}` over `sys.params`, dotted names
-reaching a diagram's subsystem params such as `"sys.mass"`, one draw per
-episode carried through the step model's `params`),
-`disturbances` (`{port_id: Distribution}`, a fresh draw per step held on the
-port in the stepped environment and `Sys2Gym`; `evaluate` holds those ports at their
-nominal value and warns) and `criterion` (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the
-mean of the worst `alpha` fraction; an evaluation's `objective` is this reduction of the
-runs' `J`, and the RL planner, which optimizes the expectation, refuses the others). A deterministic planner given a stochastic problem plans from
-the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the
-Gymnasium view (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type. `nominal()` is the certainty-equivalent
-`PlanningProblem`. Every planner that takes a `PlanningProblem` takes the
-stochastic one.
+**A problem stochastic by its parts (R143):** there is no stochastic class; where a number
+goes, a law may go. `x_start=` takes a point, a `Set` (the uniform law on it, the set its
+`X0`) or a `Distribution` (its mean the representative `x_start`, its support the default
+`X0`); `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
+a block inside a diagram plant by its id); `disturbances=` takes source blocks on the plant's
+ports (`{"d": WhiteNoise(...)}`, R128; a bare law is refused, naming the fix); `criterion`
+(`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the mean of the worst `alpha`
+fraction; an evaluation's `objective` is this reduction of the runs' `J`, and the RL planner,
+which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
+parts; `problem.params` shows each law at its leaf and the start's law under `"x_start"`;
+`problem.realize(key, n)` is one tree (R144): the problem's numbers with `"x_start"` of shape
+`(n, nx)` and each law's leaf drawn `n` times (`drawn_paths()` names them); `nominal()`
+replaces each law by its mean and drops the random sources. `evaluate` holds the disturbance
+ports at their nominal value and warns; the stepped environment reads each source at `t_k`
+with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
+from the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
+(draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
 `pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=1, backend="auto")` closes
@@ -1321,8 +1324,8 @@ line 1 is `{TypeName}, …` identity tokens; further lines are two-space
 indented `label: value`. `print(obj)` and IPython `_repr_pretty_` call
 `inspect_text`; unknown types fall back to `repr`. Covered types include
 `System`, `Trajectory`, sets, distributions, costs (including sums and
-quadratic weights), state fields, `PlanningProblem` and
-`StochasticPlanningProblem`, `PlanningSolution`, `MathematicalProgram`,
+quadratic weights), fields, `PlanningProblem` (a stochastic one with its
+laws and criterion), `PlanningSolution`, `MathematicalProgram`,
 `Optimizer`, `OptimizationResult`, `HybridDiagram`, and `Simulator`.
 Subclasses may append a deep block after the hub summary (`LTISystem`
 matrices, `TransferFunction` `G(s)`, `Observer` gain and poles).

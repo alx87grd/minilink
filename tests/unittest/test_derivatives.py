@@ -338,7 +338,14 @@ class TestMethod(unittest.TestCase):
     def test_auto_uses_finite_differences_when_params_do_not_trace(self):
         from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
 
-        plant = TwoMass()  # A(t, params) is a NumPy matrix built from params
+        class NumpyTwoMass(TwoMass):
+            def A(self, t=0.0, params=None):
+                # A NumPy matrix built from the params as floats: they do not trace
+                params = self.params if params is None else params
+                numbers = {key: float(value) for key, value in params.items()}
+                return np.asarray(super().A(0.0, numbers))
+
+        plant = NumpyTwoMass()
         self.assertEqual(compile_auto(plant)[0], "jax")
         S = plant.jacobian("f", "params")
         S_fd = plant.jacobian("f", "params", method="fd")

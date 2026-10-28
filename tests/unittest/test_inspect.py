@@ -16,7 +16,7 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
 )
 from minilink.optimization.optimizer import Optimizer
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+from minilink.planning.problems import PlanningProblem
 
 
 class TestInspectPrint(unittest.TestCase):
@@ -85,14 +85,14 @@ class TestInspectPrint(unittest.TestCase):
     def test_stochastic_planning_problem(self):
         plant = Integrator()
         law = Gaussian([0.0], [0.1])
-        problem = StochasticPlanningProblem(
+        problem = PlanningProblem(
             plant,
             tf=1.0,
-            x0_distribution=law,
+            x_start=law,
             cost=QuadraticCost.from_system(plant),
         )
         text = str(problem)
-        self.assertIn("StochasticPlanningProblem", text)
+        self.assertIn("PlanningProblem", text)
         self.assertIn("criterion=expectation", text)
         self.assertIn("x0:", text)
         self.assertIn("Gaussian", text)

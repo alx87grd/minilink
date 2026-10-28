@@ -5,11 +5,11 @@ import warnings
 import numpy as np
 import pytest
 
-from minilink import Pendulum
+from minilink import Pendulum, WhiteNoise
 from minilink.core.costs import CostFunction
-from minilink.core.distributions import Gaussian, Uniform
+from minilink.core.distributions import Uniform
 from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
-from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
 pytest.importorskip("jax")
@@ -48,11 +48,11 @@ def bounded_pendulum(plant=None):
 
 def problem(**kwargs):
     plant = bounded_pendulum()
-    return StochasticPlanningProblem(
+    return PlanningProblem(
         plant,
         cost=HangCost(),
         X=plant.state.box,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         **kwargs,
     )
 
@@ -62,11 +62,11 @@ def problem(**kwargs):
 
 def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default():
     # no X declared: the plant's state box is the training zone, not a constraint
-    free = StochasticPlanningProblem(
+    free = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
         tf=np.inf,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
     )
     env = RolloutEnvironment(free, dt=0.1, episode_length=0.3)
     assert not env.finite_horizon and np.isfinite(
@@ -196,10 +196,10 @@ def test_learn_and_solve_verbose_override_the_constructor(capsys):
 
 def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     plant = bounded_pendulum()
-    prob = StochasticPlanningProblem(
+    prob = PlanningProblem(
         plant,
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
         U=plant.input_box,
     )
@@ -221,10 +221,10 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
 
 def test_the_discount_has_one_owner_and_an_announced_default():
     undiscounted = problem(tf=np.inf)
-    discounted = StochasticPlanningProblem(
+    discounted = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
@@ -267,12 +267,12 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     np.testing.assert_array_equal(nominal.x, solved.x)
     np.testing.assert_array_equal(nominal.u, solved.u)
 
-    # a disturbance port: the nominal rollout holds it at its nominal value
-    noisy = StochasticPlanningProblem(
+    # a disturbance source: the nominal rollout reads it at its mean
+    noisy = PlanningProblem(
         bounded_pendulum(NoisyPendulum()),
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        disturbances={"d": Gaussian([0.0], [1.0])},
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.1)},
     )
     planner = ReinforcementLearningPlanner(noisy, **small)
     first, second = (
@@ -408,11 +408,11 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
             return 1.0 * u
 
     point = ThreeAxisPoint()
-    three_inputs = StochasticPlanningProblem(
+    three_inputs = PlanningProblem(
         point,
         cost=QuadraticCost.from_system(point),
         X=point.state.box,
-        x0_distribution=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
+        x_start=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
         U=point.input_box,
     )
 
@@ -494,10 +494,10 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     assert "truncates" in planner.env.describe()
 
-    worst = StochasticPlanningProblem(
+    worst = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         criterion="worst_case",
     )
     with pytest.raises(NotImplementedError):
@@ -508,11 +508,11 @@ def test_planner_trains_with_randomized_parameters():
     from minilink.core.distributions import Particles
 
     plant = bounded_pendulum()
-    prob = StochasticPlanningProblem(
+    prob = PlanningProblem(
         plant,
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params_distribution={"m": Particles([[0.5], [2.0]])},
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        params={"plant": {"m": Particles([[0.5], [2.0]])}},
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -522,8 +522,8 @@ def test_planner_trains_with_randomized_parameters():
         planner.env.randomizes_params
         and "randomized params ['m']" in planner.env.describe()
     )
-    theta = planner.carry[3]
-    assert set(np.unique(np.asarray(theta["m"]))) <= {0.5, 2.0}
+    episode = planner.carry[3]
+    assert set(np.unique(np.asarray(episode["plant"]["m"]))) <= {0.5, 2.0}
     planner.learn(64)
     assert np.all(np.isfinite(np.asarray(planner.carry[0])))
 
@@ -544,15 +544,17 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     inner.state.upper_bound = plant.state.upper_bound
     assert "u" not in inner.inputs and list(inner.inputs) == ["r"]
 
-    prob = StochasticPlanningProblem(
+    prob = PlanningProblem(
         inner,
         cost=HangCost(),
-        x0_distribution=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
+        x_start=Uniform([-0.3, -0.3], [0.3, 0.3]),
+        params={
+            "plant": {"plant": {"m": Particles([[0.5], [2.0]])}}
+        },  # the plant inside
         U=inner.input_box,
     )
     assert lookup(inner.params, "plant.m") == 1.0
-    draw = prob.sample_params(0)
+    draw = prob.sample_params(0)["plant"]
     assert set(draw) == {"plant"} and float(draw["plant"]["m"]) in (0.5, 2.0)
     merged = merge_tree(inner.params, draw)
     assert merged["controller"] is not None and merged["plant"]["m"] == float(
@@ -596,8 +598,8 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    prob = StochasticPlanningProblem(
-        Explosive(), cost=Zero(), tf=np.inf, x0_distribution=Uniform([1.0], [2.0])
+    prob = PlanningProblem(
+        Explosive(), cost=Zero(), tf=np.inf, x_start=Uniform([1.0], [2.0])
     )
     env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
     x_next, t, r, terminated, truncated = env.step(
@@ -718,10 +720,10 @@ def test_numpy_and_jax_environments_take_the_same_step():
 
 
 def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
-    prob = StochasticPlanningProblem(
+    prob = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
     planner = ReinforcementLearningPlanner(

@@ -2,6 +2,8 @@
 
 import numpy as np
 
+from minilink.core.params import flatten
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -33,7 +35,7 @@ def inspect_text(obj):
         OptimizationResult,
     )
     from minilink.optimization.optimizer import Optimizer
-    from minilink.planning.problems import PlanningProblem, StochasticPlanningProblem
+    from minilink.planning.problems import PlanningProblem
     from minilink.planning.results import PlanningSolution
 
     if isinstance(obj, System):
@@ -53,7 +55,7 @@ def inspect_text(obj):
         return cost_text(obj)
     if isinstance(obj, Field):
         return field_text(obj)
-    if isinstance(obj, StochasticPlanningProblem):
+    if isinstance(obj, PlanningProblem) and obj.is_stochastic:
         return stochastic_problem_text(obj)
     if isinstance(obj, PlanningProblem):
         return problem_text(obj)
@@ -251,11 +253,13 @@ def stochastic_problem_text(problem):
         criterion_s = str(criterion)
     headline = f"{headline}, criterion={criterion_s}"
 
-    body.append(body_line("x0", inspect_inline(problem.x0_distribution)))
-    if problem.params_distribution:
-        names = ", ".join(sorted(problem.params_distribution))
-        n = len(problem.params_distribution)
-        body.append(body_line("params", f"{n} laws ({names})"))
+    if problem.start_law is not None:
+        body.append(body_line("x0", inspect_inline(problem.start_law)))
+    if problem.laws:
+        paths = [".".join(path) for path, _ in flatten(problem.laws)]
+        body.append(
+            body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
+        )
     if problem.disturbances:
         body.append(body_line("disturbances", ", ".join(sorted(problem.disturbances))))
 

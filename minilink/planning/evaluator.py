@@ -22,6 +22,7 @@ from minilink.core.params import (
     float_leaves,
     lookup,
     merge_tree,
+    set_leaf,
     with_leaf,
 )
 from minilink.core.trajectory import Trajectory
@@ -360,11 +361,14 @@ class ProblemEvaluator:
             xp = array_module(params["x_start"])
             return xp.reshape(params["x_start"], (1, -1)), params
 
-        # x0 ~ p(x0) and each law, n_trials times, from one key on the backend
-        x_starts, draws = problem.realize(trial_key(key, self.backend), n_trials)
+        # x0 ~ p(x0) and each law, n_trials times, from one key on the backend: one tree
+        tree = problem.realize(trial_key(key, self.backend), n_trials)
+        x_starts = tree["x_start"]
 
-        # The plant's draws override its entries
-        overrides = {"plant": draws["params"]} if draws["params"] else {}
+        # The drawn leaves override theirs (the problem's paths are the run's)
+        overrides = {}
+        for path in problem.drawn_paths()[1:]:
+            set_leaf(overrides, path, lookup(tree, path))
 
         # Each trial's seeds of the loop's random blocks override theirs
         if loop.is_random:
@@ -810,8 +814,8 @@ def open_loop_of(source, plant):
 
 
 def warn_if_disturbed(problem):
-    """Warn when the problem draws disturbances: the evaluated loop holds those ports at nominal."""
-    if not problem.is_stochastic or not problem.disturbances:
+    """Warn when the problem has disturbance sources: the evaluated loop holds those ports at nominal."""
+    if not problem.disturbances:
         return
     ports = sorted(problem.disturbances)
 

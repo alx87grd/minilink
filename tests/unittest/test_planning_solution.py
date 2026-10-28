@@ -11,7 +11,6 @@ from minilink.dynamics.catalog.equations import DoubleIntegrator
 from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
     PlanningSolution,
-    StochasticPlanningProblem,
     Uniform,
     evaluate,
 )
@@ -41,11 +40,11 @@ def pendulum_problem(stochastic=False):
         plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), xbar=np.array([np.pi, 0.0])
     )
     if stochastic:
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             plant,
             cost=cost,
             tf=2.0,
-            x0_distribution=Uniform([-0.2, -0.2], [0.2, 0.2]),
+            x_start=Uniform([-0.2, -0.2], [0.2, 0.2]),
             U=plant.input_box,
         )
     return PlanningProblem(
@@ -65,12 +64,12 @@ def move_problem(stochastic=False):
     plant.inputs["u"].upper_bound = np.array([2.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     if stochastic:
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             plant,
             cost=cost,
             tf=2.0,
             Xf=SingletonSet([0.0, 0.0]),
-            x0_distribution=Uniform([0.8, -0.2], [1.2, 0.2]),
+            x_start=Uniform([0.8, -0.2], [1.2, 0.2]),
             U=plant.input_box,
         )
     return PlanningProblem(
@@ -268,11 +267,11 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     plant.state.lower_bound = np.array([-np.pi, -8.0])
     plant.state.upper_bound = np.array([np.pi, 8.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1))
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=cost,
         tf=np.inf,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -432,13 +431,13 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     from minilink.planning import compare
 
     problem, vi, lqr = solved_pendulum()
-    spread = StochasticPlanningProblem(
+    spread = PlanningProblem(
         problem.sys,
         cost=problem.cost,
         tf=np.inf,
         X=problem.X,
         infeasible_cost=500.0,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=problem.sys.input_box,
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
