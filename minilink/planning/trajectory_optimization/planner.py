@@ -5,11 +5,13 @@ from __future__ import annotations
 import time
 import warnings
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field, replace
 
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.params import merge_known
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -30,7 +32,7 @@ from minilink.optimization.reporting import (
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import Planner
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
@@ -325,13 +327,8 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         self.program_evaluator.bind({"x_start": self.problem.x_start})
 
-        # The compiled dynamics that read each tick's plan back
-        params = nominal_plant_params(self.problem)
-        evaluator = self.problem.sys.compile(backend=backend, verbose=False)
-        if params is None:
-            self._dynamics = evaluator.f
-        else:
-            self._dynamics = lambda x, u, t: evaluator.f(x, u, t, params)
+        # The compiled plant that reads each tick's plan back, on the tick's numbers
+        self._dynamics = self.problem.sys.compile(backend=backend, verbose=False).f
 
         # The optimizer every online tick reuses
         self.optimizer_backend = self.build_parametric_optimizer_backend()
@@ -354,8 +351,12 @@ class TrajectoryOptimizationPlanner(Planner):
         x0 : array_like
             Measured initial state.
         params : mapping, optional
-            Scene / bind façade. ``None`` or ``{}`` binds ``x0`` only.
-            Non-empty keys are refused (``scene`` is reserved for the scene bind).
+            The values of this tick, a partial tree of the problem's leaves
+            (``{"plant": {"mu": 0.6}, "cost": {"xbar": …}, "t_start": t}``),
+            merged once onto the program's defaults with ``x0`` as its
+            ``x_start`` (R148): an unknown path raises naming the known ones.
+            ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
+            scene bind (A3) and raises.
         initial_guess : ndarray or Trajectory, optional
             NLP seed (schedule and/or packed ``z``). Warm-start *policy*
             (reuse last latch) is owned by ``ModelPredictiveController``, not
@@ -364,19 +365,27 @@ class TrajectoryOptimizationPlanner(Planner):
         Notes
         -----
         Fast bind path when :attr:`has_parametric_program`; otherwise rebuilds
-        the NLP with ``x_start`` replaced (one-time warning suggesting
-        :meth:`compile_parametric_program`).
+        the NLP on a copy of the problem holding the values (one-time warning
+        suggesting :meth:`compile_parametric_program`): one API at two speeds.
         """
-        require_online_params(params)
+        require_no_scene(params)
 
         # The fast bind path on a compiled program, else a rebuild from x0
         if self.has_parametric_program:
             return self.solve_trajectory_from_parametric(
-                x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+                x0,
+                params=params,
+                initial_guess=initial_guess,
+                evaluate=evaluate,
+                n_trials=n_trials,
             )
 
         return self.solve_trajectory_from_rebuild(
-            x0, initial_guess=initial_guess, evaluate=evaluate, n_trials=n_trials
+            x0,
+            params=params,
+            initial_guess=initial_guess,
+            evaluate=evaluate,
+            n_trials=n_trials,
         )
 
     def step(
@@ -626,19 +635,26 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         x0,
         *,
+        params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
-        """One online tick on the compiled program: bind ``x0``, seed, solve, read the plan back."""
+        """One online tick on the compiled program: bind ``x0`` and the tick's values, seed, solve, read the plan back."""
         require_compiled_program(self.program_evaluator, self.optimizer_backend)
 
-        # The problem restarted at the measured state, which the program binds
+        # The tick's tree: the given values, the measured state as x_start, bound once
         step_t0 = time.perf_counter()
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
-        problem_k = self.problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
-        self.program_evaluator.bind({"x_start": x_arr})
+        self.program_evaluator.bind({**(params or {}), "x_start": x_arr})
+        bound = self.program_evaluator.params
+
+        # The problem restarted at the measured state and the tick's start time
+        t_start = float(bound["t_start"])
+        problem_k = self.problem.replace(
+            x_start=x_arr, X0=SingletonSet(x_arr), t_start=t_start
+        )
 
         # The seed: the given guess, else the default schedule from the measured state
         if initial_guess is None:
@@ -671,11 +687,13 @@ class TrajectoryOptimizationPlanner(Planner):
         else:
             self.last_solve_time_s = None
 
-        # The plan read back from z* with the compiled dynamics
+        # The plan read back from z* with the compiled dynamics on the tick's plant
+        plant = bound["plant"]
         trajectory = self.transcription.reconstruct_result(
             result,
             problem=problem_k,
-            dynamics=self._dynamics,
+            dynamics=lambda x, u, t: self._dynamics(x, u, t, plant),
+            params=bound,
         )
         self.last_step_time_s = time.perf_counter() - step_t0
         self.last_optimization_result = result
@@ -717,11 +735,12 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         x0,
         *,
+        params=None,
         initial_guess: np.ndarray | Trajectory | None = None,
         evaluate: bool = False,
         n_trials: int = 50,
     ) -> PlanningSolution:
-        """One online tick by an offline solve from ``x0`` (warns once, on JAX, to compile instead)."""
+        """One online tick by an offline solve from ``x0`` and the tick's values (warns once, on JAX, to compile instead)."""
         # Once: on JAX, a compiled parametric program would skip the rebuild
         if not self._warned_uncompiled_from:
             backend = normalize_backend(self.options.backend, allow_direct=True)
@@ -740,7 +759,9 @@ class TrajectoryOptimizationPlanner(Planner):
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
         saved_problem = self.problem
-        self.problem = saved_problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
+        self.problem = problem_with(saved_problem, params).replace(
+            x_start=x_arr, X0=SingletonSet(x_arr)
+        )
         try:
             return self.solve_trajectory(
                 initial_guess=initial_guess,
@@ -856,16 +877,13 @@ class TrajectoryOptimizationIteration:
     min_ineq: float | None
 
 
-# Online keys reserved for the scene bind (ObstacleBank / J(z, p)), refused here
-_DEFERRED_ONLINE_PARAM_KEYS = frozenset({"scene"})
-
-
-def require_online_params(params) -> None:
+def require_no_scene(params) -> None:
     """
-    Refuse online ``params`` that ``solve_trajectory_from`` / MPC cannot bind.
+    Refuse online ``params`` that are not a tree, or that hold the reserved ``scene``.
 
-    ``None`` or ``{}`` → bind ``x0`` only. The reserved key ``scene`` raises
-    :class:`NotImplementedError`. Any other key raises :class:`ValueError`.
+    The tree's own check is the program's (an unknown path raises naming the
+    known ones); ``scene`` waits for the scene bind (A3) and raises
+    :class:`NotImplementedError`.
     """
     if params is None:
         return
@@ -874,23 +892,23 @@ def require_online_params(params) -> None:
         raise TypeError(
             f"params must be a mapping or None; got {type(params).__name__}."
         )
-
-    keys = list(params.keys())
-    if not keys:
-        return
-
-    unknown = sorted(k for k in keys if k not in _DEFERRED_ONLINE_PARAM_KEYS)
-    deferred = sorted(k for k in keys if k in _DEFERRED_ONLINE_PARAM_KEYS)
-    if unknown:
-        raise ValueError(
-            "solve_trajectory_from got unknown params keys "
-            f"{unknown!r}; pass params=None or {{}} (x0-only bind)."
-        )
-    if deferred:
+    if "scene" in params:
         raise NotImplementedError(
-            f"Online params key(s) {deferred} are not supported; "
-            "pass params=None or {} (x0-only bind)."
+            "the online params key 'scene' waits for the scene bind (A3); "
+            "bind the problem's own leaves (plant, cost, t_start, …)"
         )
+
+
+def problem_with(problem, params):
+    """The problem itself for no values, else a copy holding them: its parts copied, so the caller's stay as they are."""
+    if not params:
+        return problem
+
+    merged = merge_known(problem.parts_view(), params)
+    copy = deepcopy(problem)
+    copy.params = merged
+
+    return copy
 
 
 ###############################################################################

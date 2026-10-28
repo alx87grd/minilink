@@ -20,6 +20,7 @@ from minilink.planning.trajectory_optimization.transcription import (
     FixedGridOptions,
     Transcription,
     dynamics_function,
+    fixed_grid_t,
     native_concatenate,
     program_backend_for_compile,
     require_jax_compile_backend,
@@ -103,64 +104,17 @@ class DirectCollocationTranscription(Transcription):
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_JAX,
-    ):
-        """Build the JAX collocation program with the start as its parameter, ``params = {"x_start": x0}``.
+    ) -> MathematicalProgram:
+        """The JAX program an MPC compiles once: :meth:`transcribe`'s, its start pinned from ``params["x_start"]``.
 
-        The equalities are ``h(z, params)``: the dynamics and the terminal
-        boundary, then the initial residual ``x[:, 0] − params["x_start"]``.
-        Requires a singleton ``X0``.
+        Requires a singleton ``X0``, so the measured start binds the initial
+        residual ``x[:, 0] − params["x_start"]``.
         """
         require_jax_compile_backend(backend)
         require_singleton_x0(problem)
 
-        jax = ensure_jax_x64()
-        jnp = jax.numpy
-
-        unpack_jax, J, dynamics_residual = self.jax_objective_and_defects(problem, jax)
-        n = int(problem.sys.n)
-
-        # x_0 − x_start = 0: the measured initial state is the program's parameter
-        def initial_residual(z, params):
-            x, _ = unpack_jax(z)
-            residual = x[:, 0] - params["x_start"]
-            return residual.reshape(-1)
-
-        # Dynamics and the terminal boundary, fixed at compile time
-        fixed_equalities: list[ConstraintFunction] = [dynamics_residual]
-        inequalities: list[ConstraintFunction] = []
-
-        # The terminal and path constraints, and the box bounds on the knots
-        self.add_terminal_constraints(
-            problem,
-            equalities=fixed_equalities,
-            inequalities=inequalities,
-        )
-        self.add_path_constraints(problem, inequalities=inequalities)
-        lower, upper = self.decision_bounds(problem)
-
-        # h(z, params) = [h_fixed(z); x_0 − x_start]
-        fixed_h = stack_constraints(fixed_equalities)
-        fixed_g = stack_constraints(inequalities)
-
-        def h(z, params):
-            parts = [fixed_h(z), initial_residual(z, params)]
-            return jnp.concatenate(parts)
-
-        g = None if fixed_g is None else (lambda z, params: fixed_g(z))
-
-        return MathematicalProgram(
-            n_z=self.decision_dimension(problem),
-            J=lambda z, params: J(z),
-            h=h,
-            g=g,
-            lower=lower,
-            upper=upper,
-            backend=BACKEND_JAX,
-            metadata={
-                "transcription": "direct_collocation_parametric",
-                "backend": backend,
-            },
-            params={"x_start": np.zeros(n)},
+        return self.transcribe_jax(
+            problem, backend=backend, name="direct_collocation_parametric"
         )
 
     def reconstruct_result(
@@ -170,11 +124,14 @@ class DirectCollocationTranscription(Transcription):
         problem: PlanningProblem,
         backend: str = BACKEND_NUMPY,
         dynamics=None,
+        params=None,
     ) -> Trajectory:
         """Read ``(x, u)`` from the optimizer result.
 
         Prefer a cached ``dynamics`` callable (parametric compile path);
-        otherwise build one via ``backend``.
+        otherwise build one via ``backend``. ``params``, the tree a compiled
+        program was solved with, gives the cost's numbers and the discount of
+        the cost signals; ``None`` reads the problem's.
         """
         x, u = self.unpack(result.z, problem)
 
@@ -193,10 +150,12 @@ class DirectCollocationTranscription(Transcription):
         # The trajectory, with the cost signals when the problem has a cost
         traj = Trajectory(t=t, x=x, u=u, signals={"dx": dx})
         if problem.cost is not None:
+            cost_params = problem.cost.params if params is None else params["cost"]
+            rho = problem.discount_rate if params is None else params["discount_rate"]
             traj = traj.with_cost(
                 problem.cost,
-                discount_rate=problem.discount_rate,
-                params=problem.cost.params,
+                discount_rate=rho,
+                params=cost_params,
                 t_start=problem.t_start,
             )
 
@@ -291,91 +250,183 @@ class DirectCollocationTranscription(Transcription):
         problem: PlanningProblem,
         *,
         backend: str,
+        name: str | None = None,
     ) -> MathematicalProgram:
-        """Build the JAX-vectorized program of :meth:`jax_objective_and_defects`.
+        """Build the JAX program on the problem's tree, ``J(z, params)``, ``h(z, params)``, ``g(z, params)``.
 
-        Direct collocation is performance-sensitive because SLSQP repeatedly
-        calls the objective, gradient, constraints, and constraint Jacobians.
-        The whole mathematical program is already JIT/autodiff compiled by the
-        JAX program evaluator, so this path uses raw traceable equations and
-        vectorized knot evaluation instead of nesting precompiled dynamics
-        evaluators inside the program.
+        The tree is :meth:`program_params`: the start, its time, the plant's,
+        the cost's and the discount, and each set read as a constraint (R148,
+        PP-2, PP-3). One program is compiled once and solved for any value of
+        them, a moved target or a new friction, without a rebuild. Direct
+        collocation is performance-sensitive because SLSQP repeatedly calls the
+        objective, gradient, constraints, and constraint Jacobians; the whole
+        program is JIT/autodiff compiled by the JAX program evaluator, so this
+        path uses raw traceable equations and knot evaluation vectorized with
+        ``vmap``.
         """
         jax = ensure_jax_x64()
 
-        _, J, dynamics_residual = self.jax_objective_and_defects(problem, jax)
+        unpack_jax, J, dynamics_residual = self.jax_objective_and_defects(problem, jax)
 
         # Dynamics: the defect of every interval vanishes, by the transcription's
-        # defect law
-        equalities: list[ConstraintFunction] = [dynamics_residual]
-        inequalities: list[ConstraintFunction] = []
-
-        # The boundary and path constraints, and the box bounds on the knots
-        self.add_boundary_constraints(
-            problem,
-            equalities=equalities,
-            inequalities=inequalities,
-        )
-        self.add_path_constraints(problem, inequalities=inequalities)
+        # defect law; then the boundary and path constraints
+        equalities, inequalities = self.jax_constraints(problem, unpack_jax, jax)
+        equalities = [dynamics_residual, *equalities]
         lower, upper = self.decision_bounds(problem)
 
         return MathematicalProgram(
             n_z=self.decision_dimension(problem),
             J=J,
-            h=stack_constraints(equalities),
-            g=stack_constraints(inequalities),
+            h=stack_parametric(equalities),
+            g=stack_parametric(inequalities),
             lower=lower,
             upper=upper,
             backend=BACKEND_JAX,
             metadata={
-                "transcription": self.name,
+                "transcription": self.name if name is None else name,
                 "backend": backend,
             },
+            params=self.program_params(problem),
         )
 
+    def program_params(self, problem: PlanningProblem) -> dict:
+        """
+        The JAX program's tree: the problem's leaves it reads (R148).
+
+        ``x_start``, ``t_start``, the plant's (a random plant's at its mean),
+        the cost's and the discount rate; each set it reads as a constraint by
+        role (``X`` and ``U`` when not lowered to the decision bounds, ``X0``
+        when not the start's singleton, ``Xf``), with its numbers. A box lowered
+        to the bounds is the program's structure, not a leaf.
+        """
+        plant = nominal_plant_params(problem)
+        tree = {
+            "x_start": np.asarray(problem.x_start, dtype=float),
+            "t_start": float(problem.t_start),
+            "plant": problem.sys.params if plant is None else plant,
+            "cost": problem.require_cost().params,
+            "discount_rate": float(problem.discount_rate),
+        }
+        for role in constrained_roles(problem):
+            tree[role] = getattr(problem, role).params
+
+        return tree
+
     def jax_objective_and_defects(self, problem: PlanningProblem, jax):
-        """The objective and the defects as traceable JAX closures.
+        """The objective and the defects as traceable JAX closures of ``(z, params)``.
 
         Returns ``(unpack_jax, J, dynamics_residual)``: the knot unpacking
-        ``unpack_jax(z) -> (x, u)``, the objective ``J(z)`` and the flattened
-        trapezoidal defects ``dynamics_residual(z)``, the dynamics vectorized
-        over the knots.
+        ``unpack_jax(z) -> (x, u)``, the objective ``J(z, params)`` and the
+        flattened trapezoidal defects ``dynamics_residual(z, params)``, the
+        dynamics vectorized over the knots, every number read from ``params``.
         """
         jnp = jax.numpy
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t(problem))
+        grid = self.knot_offsets(problem, jnp)
         dt = jnp.asarray(self.options.dt(problem))
+        unpack_jax = self.jax_unpacker(problem)
+
+        # The dynamics at one knot, vectorized over the knots below
+        def f(x_k, u_k, t_k, plant):
+            return problem.sys.f(x_k, u_k, t_k, plant)
+
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t_start + k dt
+        def J(z, params):
+            x, u = unpack_jax(z)
+            t = params["t_start"] + grid
+            return trajectory_cost(
+                cost,
+                x,
+                u,
+                t,
+                dt,
+                params["cost"],
+                discount_rate=params["discount_rate"],
+                t_start=params["t_start"],
+            )
+
+        # d_k = x_{k+1} − x_k − dt/2 (f_k + f_{k+1}), every interval at once
+        def dynamics_residual(z, params):
+            x, u = unpack_jax(z)
+            t = params["t_start"] + grid
+            dx = jax.vmap(f, in_axes=(1, 1, 0, None), out_axes=1)(
+                x, u, t, params["plant"]
+            )
+            defect = trapezoidal_defect(x, dx, dt)
+            return defect.reshape(-1)
+
+        return unpack_jax, J, dynamics_residual
+
+    def jax_constraints(self, problem: PlanningProblem, unpack_jax, jax):
+        """
+        The boundary and path constraints as functions of ``(z, params)``: ``(equalities, inequalities)``.
+
+        The start: ``x_0 − x_start = 0`` for the start's singleton ``X0`` (the
+        start pinned from ``x_start``, R148), else its margins; the terminal
+        set: ``x_N − point = 0`` for a singleton, else its margins; then the
+        margins of ``X`` and ``U`` at every knot when they are not lowered to the
+        decision bounds. Each set reads its numbers from ``params`` by role.
+        """
+        jnp = jax.numpy
+        grid = self.knot_offsets(problem, jnp)
+        equalities = []
+        inequalities = []
+
+        # x_0 − x_start = 0: the start is the program's parameter
+        if isinstance(problem.X0, SingletonSet):
+
+            def initial_residual(z, params):
+                x, _ = unpack_jax(z)
+                residual = x[:, 0] - params["x_start"]
+                return residual.reshape(-1)
+
+            equalities.append(initial_residual)
+        else:
+            inequalities.append(knot_margin(problem.X0, "X0", 0, unpack_jax, grid))
+
+        # The terminal set: x_N on its point, or inside it
+        Xf = problem.Xf
+        if isinstance(Xf, SingletonSet):
+
+            def terminal_residual(z, params):
+                x, _ = unpack_jax(z)
+                return Xf.residual(x[:, -1], params["Xf"])
+
+            equalities.append(terminal_residual)
+        elif Xf is not None:
+            inequalities.append(knot_margin(Xf, "Xf", -1, unpack_jax, grid))
+
+        # The path: a set not lowered to the bounds contributes its margins
+        roles = constrained_roles(problem)
+        if "X" in roles:
+            inequalities.append(state_margins(problem.X, unpack_jax, grid))
+        if "U" in roles:
+            inequalities.append(input_margins(problem.U, unpack_jax, grid))
+
+        return equalities, inequalities
+
+    def knot_offsets(self, problem: PlanningProblem, xp):
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t_start + offset_k``."""
+        offsets = xp.asarray(
+            fixed_grid_t(problem.require_finite_tf(), self.options.n_steps)
+        )
+
+        return offsets
+
+    def jax_unpacker(self, problem: PlanningProblem):
+        """``unpack_jax(z) -> (x, u)``: the knots packed in ``z``, the states row by row, then the inputs."""
         n = int(problem.sys.n)
         m = int(problem.sys.m)
         n_steps = int(self.options.n_steps)
-        system_params = nominal_plant_params(problem)
-        cost_params = problem.cost.params
 
-        # The knots packed in z: the states row by row, then the inputs
         def unpack_jax(z):
             split = n * n_steps
             x = z[:split].reshape(n, n_steps)
             u = z[split:].reshape(m, n_steps)
             return x, u
 
-        # The dynamics at one knot, vectorized over the knots below
-        def f(x_k, u_k, t_k):
-            return problem.sys.f(x_k, u_k, t_k, system_params)
-
-        # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-        def J(z):
-            x, u = unpack_jax(z)
-            return trajectory_cost(cost, x, u, t, dt, cost_params)
-
-        # d_k = x_{k+1} − x_k − dt/2 (f_k + f_{k+1}), every interval at once
-        def dynamics_residual(z):
-            x, u = unpack_jax(z)
-            dx = jax.vmap(f, in_axes=(1, 1, 0), out_axes=1)(x, u, t)
-            defect = trapezoidal_defect(x, dx, dt)
-            return defect.reshape(-1)
-
-        return unpack_jax, J, dynamics_residual
+        return unpack_jax
 
     def dynamics_residual(
         self,
@@ -519,8 +570,17 @@ class DirectCollocationTranscription(Transcription):
         dt = self.options.dt(problem)
         cost_params = problem.cost.params
 
-        # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-        J = trajectory_cost(cost, x, u, t, dt, cost_params)
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t_start)}
+        J = trajectory_cost(
+            cost,
+            x,
+            u,
+            t,
+            dt,
+            cost_params,
+            discount_rate=problem.discount_rate,
+            t_start=problem.t_start,
+        )
 
         return J
 
@@ -528,6 +588,75 @@ class DirectCollocationTranscription(Transcription):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def constrained_roles(problem) -> tuple[str, ...]:
+    """The sets the JAX program reads as constraints, by role: ``X`` and ``U`` not lowered to the bounds, ``X0`` not the start's singleton, ``Xf``."""
+    roles = []
+    if not isinstance(problem.X, BoxSet):
+        roles.append("X")
+    if not isinstance(problem.U, BoxInputSet):
+        roles.append("U")
+    if not isinstance(problem.X0, SingletonSet):
+        roles.append("X0")
+    if problem.Xf is not None:
+        roles.append("Xf")
+
+    return tuple(roles)
+
+
+def knot_margin(set_, role, index, unpack_jax, grid):
+    """``margin(x_i, t_i) ≥ 0`` at one knot, the set's numbers from ``params[role]``."""
+
+    def margin(z, params):
+        x, _ = unpack_jax(z)
+        t_i = params["t_start"] + grid[index]
+        return set_.margin(x[:, index], t=t_i, params=params[role])
+
+    return margin
+
+
+def state_margins(X, unpack_jax, grid):
+    """``X.margin(x_k, t_k) ≥ 0`` at every knot, ``X``'s numbers from ``params["X"]``."""
+
+    def margins(z, params):
+        x, _ = unpack_jax(z)
+        t = params["t_start"] + grid
+        values = [
+            X.margin(x[:, k], t=t[k], params=params["X"]) for k in range(x.shape[1])
+        ]
+        return native_concatenate(values, z)
+
+    return margins
+
+
+def input_margins(U, unpack_jax, grid):
+    """``U.margin(u_k, x_k, t_k) ≥ 0`` at every knot, ``U``'s numbers from ``params["U"]``."""
+
+    def margins(z, params):
+        x, u = unpack_jax(z)
+        t = params["t_start"] + grid
+        values = [
+            U.margin(u[:, k], x=x[:, k], t=t[k], params=params["U"])
+            for k in range(x.shape[1])
+        ]
+        return native_concatenate(values, z)
+
+    return margins
+
+
+def stack_parametric(constraints):
+    """One native constraint vector of ``(z, params)`` from a list of vector functions, ``None`` for none."""
+    if not constraints:
+        return None
+
+    def stacked(z, params):
+        values = native_concatenate(
+            (constraint(z, params) for constraint in constraints), z
+        )
+        return values
+
+    return stacked
 
 
 def require_singleton_x0(problem):

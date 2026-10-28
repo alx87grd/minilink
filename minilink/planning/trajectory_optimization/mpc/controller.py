@@ -21,7 +21,7 @@ from minilink.planning.trajectory_optimization.mpc.utilities import (
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
-    require_online_params,
+    require_no_scene,
 )
 
 if TYPE_CHECKING:
@@ -183,7 +183,7 @@ class ModelPredictiveControllerMixin:
             t_solve = float(t)
 
         # Gate early for clear deploy errors; the latch also forwards to the planner
-        require_online_params(params)
+        require_no_scene(params)
         y_arr = np.asarray(y, dtype=float).reshape(-1)
         z_warm = self.z_warm_for_command()
 

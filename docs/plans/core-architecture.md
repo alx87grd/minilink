@@ -290,11 +290,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 - **Ruled:** R26 (the key `plant`), R130, R131, R148.
 - **Today:** the one noun is in (PP-1, the v0.3 run): `MathematicalProgram(..., params=)`,
   `Optimizer.solve(params=, z0=)`, one evaluator body (the parametric program and its evaluator
-  folded in); collocation's compiled program declares `x_start` only and closes over the plant,
-  cost and set parameters, and `require_online_params` refuses every other key; the MPC port
-  functions drop `params`; the compiled path takes every method of the one table (OPW, landed in the v0.3 run); the problem's start time `t_start` is in (the v0.3 run: the problem, the evaluator, the
-  transcriptions' grids; shooting pins the start from `x_start`), collocation's compiled program
-  does not read it yet; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
+  folded in); collocation's JAX program reads the problem's tree (the plant, the cost, the
+  margin sets, `x_start`, `t_start`, the discount) and the online call binds any of its leaves
+  (PP-2, PP-3, acceptance script 4); the MPC port functions drop `params`; the compiled path takes every method of the one table (OPW, landed in the v0.3 run); the problem's start time `t_start` is in (the v0.3 run: the problem, the evaluator, the
+  transcriptions' grids, collocation's program; shooting pins the start from `x_start`); `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
 - **Open:** nothing; the export's full tuned tree is `program.unpack(z)` (R164). The performance
   gate has its budget: §11's ninth script (R156).

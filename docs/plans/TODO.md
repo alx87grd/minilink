@@ -343,6 +343,13 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   - **Landed in the v0.3 run:** PP-1, the noun with its optional `params`, `Optimizer.solve(params=,
     z0=)` with the one checked merge (`core.params.merge_known`), one evaluator body;
     `ParametricMathematicalProgram` and `JaxParametricProgramEvaluator` folded in.
+    PP-2 and PP-3: collocation's JAX program reads the tree (plant, cost, margin sets,
+    `x_start`, `t_start`, the discount; a box in the bounds is structure), the online call binds
+    any leaf, the NumPy rebuild path answers the same values on a copy (acceptance script 4:
+    two friction values and a moved target match the rebuilds; Ipopt on the compiled program).
+    The performance gate: 1.34× compile, 1.14× solve, 1.51× a call, under the 2× bar (no
+    frozen-export option). Rest: the failure price under cost overrides (R165), and the MPC's
+    `inputs=` bindings and the friction-aware example from a port (with §1.8's MPC rebuild).
 
   Done when one compiled MPC program, bound with two values of a plant parameter and of a cost
   target, gives what a rebuild gives; the MPC baselines are byte-identical with only `x_start`
@@ -357,9 +364,9 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   `t_start = 0`. Landed in the v0.3 run: the field and leaf on `PlanningProblem`, the evaluator's
   run and score (acceptance script 12, both backends, continuous and sampled, with `jax.grad` in
   `t_start`), the fixed grids of the transcriptions, the discount of `CostFunction.integrate`
-  counted from it, shooting pinned from `x_start`; every baseline byte-identical at `t_start = 0`
-  but two JAX Monte Carlo entries, one ulp (the run log). Rest: collocation's compiled program
-  reads `p["t_start"]` (PP-2), and the step problem's tick offset (§1.6).
+  counted from it, shooting pinned from `x_start`, collocation's program reading `t_start`;
+  every baseline byte-identical at `t_start = 0` but two JAX Monte Carlo entries, one ulp (the
+  run log). Rest: the step problem's tick offset (§1.6).
 - [ ] **The stochastic program as the parametric program's seed case**
   (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
   one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes

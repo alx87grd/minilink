@@ -18,7 +18,9 @@ Status: **draft plan**, its shape decided (2026-10-27; the architecture of recor
   - the name of `program.unpack(z)`, the full tuned tree from an exported program (the
     naming question).
 - **Landed in the v0.3 run:** PP-1 (the noun, `Optimizer.solve(params=, z0=)`, one evaluator
-  body; §3.2) and OPW-1–OPW-5 (§6). **Not started:** PP-2–PP-5. They build on the optimizer method table and the
+  body; §3.2), PP-2 and PP-3 (collocation's JAX program on the tree, §3.3; the online call on
+  the tree, §3.4) and OPW-1–OPW-5 (§6); the performance gate measured (DESIGN §6: under 2×).
+  **Not started:** PP-4's MPC bindings (with the MPC's rebuild, TODO §1.8) and PP-5's rest. They build on the optimizer method table and the
   first-order backend that S74 landed (R74, 2026-10-24), on the compiled problem's program
   export, and on A2's cost leaves.
 - **Scope:** direct collocation and the MPC first; the other transcriptions later (§5).

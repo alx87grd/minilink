@@ -105,16 +105,23 @@ class FixedGridOptions:
 # collocation defect, one RK4 step between input knots)
 
 
-def trajectory_cost(cost, x, u, t, dt, params):
-    """Sampled Bolza objective on a uniform grid.
+def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t_start=0.0):
+    """Sampled Bolza objective on a uniform grid, discounted from the horizon's start.
 
     ``x`` and ``u`` are knot matrices with shape ``(dim, N)``; the running
-    cost is integrated with the trapezoid rule.
+    cost is integrated with the trapezoid rule. The discount is the
+    problem's, ``e^{−ρ(t − t_start)}`` (R148); ``ρ = 0`` is the plain sum.
     """
-    # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-    g = running_cost_samples(cost, x, u, t, params)
+    xp = array_module(x, t)
+    rho = discount_rate
+
+    # w_k = e^{−ρ(t_k − t_start)}, the discount at each knot
+    w = xp.exp(-rho * (t - t_start))
+
+    # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N)
+    g = w * running_cost_samples(cost, x, u, t, params)
     running = trapezoid_integral(g, dt)
-    terminal = cost.h(x[:, -1], t[-1], params=params)
+    terminal = w[-1] * cost.h(x[:, -1], t[-1], params=params)
     J = running + terminal
 
     return J

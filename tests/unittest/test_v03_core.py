@@ -400,3 +400,129 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
     np.testing.assert_allclose(late.trajectory.t, 100.0 + early.trajectory.t)
     np.testing.assert_allclose(late.trajectory.u, early.trajectory.u, atol=1e-6)
     assert late.solver.cost == pytest.approx(early.solver.cost, rel=1e-6)
+
+
+def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"):
+    """The rate bicycle's lane-keeping MPC (the e4 parity scenario), its friction and its lane given."""
+    from minilink import BicycleDynRate
+    from minilink.planning import TrajectoryOptimizationPlanner
+
+    sys = BicycleDynRate(named_ports=True)
+    sys.params["mu"] = mu
+    sys.state.lower_bound[6], sys.state.upper_bound[6] = 0.0, 40.0
+    sys.state.lower_bound[7], sys.state.upper_bound[7] = -0.5, 0.5
+    sys.inputs["w_rear_dot"].lower_bound[0] = -60.0
+    sys.inputs["w_rear_dot"].upper_bound[0] = 60.0
+    sys.inputs["delta_dot"].lower_bound[0] = -1.5
+    sys.inputs["delta_dot"].upper_bound[0] = 1.5
+    r_r = float(sys.params["r_r"])
+    speed = 6.0
+    target = np.array([0.0, target_y, 0.0, speed, 0.0, 0.0, speed / r_r, 0.0])
+    cost = QuadraticCost.from_system(
+        sys,
+        Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
+        R=np.diag([1.0, 25.0]),
+        S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
+        xbar=target,
+        ubar=np.zeros(2),
+    )
+    x_start = np.array([0.0, 1.0, 0.0, 0.9 * speed, 0.0, 0.0, 0.9 * speed / r_r, 0.0])
+    problem = PlanningProblem(
+        sys, x_start=x_start, cost=cost, tf=1.0, X=sys.state.box, U=sys.input_box
+    )
+    options = (
+        {"max_iter": 300, "tol": 1e-10}
+        if method == "ipopt"
+        else {"maxiter": 300, "ftol": 1e-12}
+    )
+    return TrajectoryOptimizationPlanner(
+        problem,
+        n_steps=12,
+        transcription="direct_collocation",
+        backend=backend,
+        method=method,
+        optimizer_options=options,
+    )
+
+
+@pytest.mark.jax
+def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
+    compiled = bicycle_planner()
+    compiled.compile_parametric_program()
+    x_start = compiled.problem.x_start
+
+    plans = {}
+    for mu, target_y in ((1.0, 0.0), (0.4, 0.0), (0.4, 0.6)):
+        values = {
+            "plant": {"mu": np.asarray(mu)},
+            "cost": {"xbar": bicycle_planner(target_y=target_y).problem.cost.xbar},
+        }
+        plan = compiled.solve_trajectory_from(x_start, params=values)
+        rebuilt = bicycle_planner(mu, target_y).solve()
+        np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
+        np.testing.assert_allclose(plan.trajectory.u, rebuilt.trajectory.u, atol=1e-5)
+        plans[mu, target_y] = plan.trajectory
+
+        # The NumPy rebuild path answers the same values on the same API
+        numpy_plan = bicycle_planner(backend="numpy").solve_trajectory_from(
+            x_start, params=values
+        )
+        # (SLSQP on finite differences: the same optimum on a flat valley)
+        assert numpy_plan.solver.cost == pytest.approx(plan.solver.cost, rel=1e-6)
+        np.testing.assert_allclose(
+            numpy_plan.trajectory.x, plan.trajectory.x, atol=1e-3
+        )
+
+    # The friction and the target change the plan, and the user's plant keeps its mu
+    assert not np.allclose(plans[1.0, 0.0].x, plans[0.4, 0.0].x, atol=1e-3)
+    assert not np.allclose(plans[0.4, 0.0].x, plans[0.4, 0.6].x, atol=1e-3)
+    assert compiled.problem.sys.params["mu"] == 1.0
+
+    # An unknown path raises, naming the known ones
+    with pytest.raises(ValueError, match="known entries"):
+        compiled.solve_trajectory_from(x_start, params={"plant": {"nu": 1.0}})
+
+
+def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
+    """The pendulum brought back from 0.5 rad on 11 collocation knots, its mass given."""
+    from minilink.planning import TrajectoryOptimizationPlanner
+
+    plant = Pendulum()
+    plant.params["m"] = m
+    problem = PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.array([0.5, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+    options = (
+        {"max_iter": 500, "tol": 1e-10}
+        if method == "ipopt"
+        else {"maxiter": 300, "ftol": 1e-14}
+    )
+    return TrajectoryOptimizationPlanner(
+        problem,
+        n_steps=11,
+        transcription="direct_collocation",
+        backend="jax",
+        method=method,
+        optimizer_options=options,
+    )
+
+
+@pytest.mark.jax
+def test_script_04_program_ipopt_solves_the_compiled_program():
+    # The adapter's quasi-Newton (no Lagrangian Hessian, the plan's §6) needs
+    # thousands of iterations on the stiff bicycle: the clause runs on the
+    # pendulum's compiled program, rebound with a new mass (the run log, §4)
+    pytest.importorskip("cyipopt")
+    compiled = pendulum_planner(method="ipopt")
+    compiled.compile_parametric_program()
+    plan = compiled.solve_trajectory_from(
+        compiled.problem.x_start, params={"plant": {"m": np.asarray(1.3)}}
+    )
+    reference = pendulum_planner(1.3).solve()
+    assert plan.success
+    np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)
+    assert plan.solver.cost == pytest.approx(reference.solver.cost, rel=1e-6)

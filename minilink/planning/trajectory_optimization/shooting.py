@@ -222,11 +222,21 @@ class ShootingTranscription(Transcription):
 
             return x
 
-        # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N), on the rolled-out states
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), on the rolled-out
+        # states, w_k = e^{−ρ(t_k − t_start)}
         def J(z):
             u = unpack_jax(z)
             x = rollout(u)
-            return trajectory_cost(cost, x, u, t, dt, cost_params)
+            return trajectory_cost(
+                cost,
+                x,
+                u,
+                t,
+                dt,
+                cost_params,
+                discount_rate=problem.discount_rate,
+                t_start=problem.t_start,
+            )
 
         equalities: list[ConstraintFunction] = []
         inequalities: list[ConstraintFunction] = []
@@ -404,8 +414,17 @@ class ShootingTranscription(Transcription):
         dt = self.options.dt(problem)
         cost_params = problem.cost.params
 
-        # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-        J = trajectory_cost(cost, x, u, t, dt, cost_params)
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t_start)}
+        J = trajectory_cost(
+            cost,
+            x,
+            u,
+            t,
+            dt,
+            cost_params,
+            discount_rate=problem.discount_rate,
+            t_start=problem.t_start,
+        )
 
         return J
 

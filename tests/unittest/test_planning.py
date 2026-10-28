@@ -683,7 +683,8 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
             import jax.numpy as jnp
 
             z = jnp.asarray(z)
-        return np.asarray(program.g(z))
+        args = (z,) if program.params is None else (z, program.params)
+        return np.asarray(program.g(*args))
 
     def scalar(z):
         if backend == "jax":

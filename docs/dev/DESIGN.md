@@ -1230,17 +1230,25 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `solve_trajectory` always rebuilds a fresh
-`MathematicalProgram`. Optional `compile_parametric_program()` builds the
-collocation program with the start as its parameter (`params={"x_start": …}`) once so
-`solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
-parametric path; with ``backend='numpy'`` or ``'direct'``, each
-from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
-is emitted only when a JAX planner omits parametric compile.
-Online ``params`` binds `x0` only; the reserved key ``scene`` raises
-``NotImplementedError`` (§4, 'Parameters'). Knot count
+`MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
+(PP-2, PP-3, R148): `x_start` (the start's residual when `X0` is the start's singleton),
+`t_start`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
+(`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
+bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
+once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
+only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"xbar": …}, "t_start": t}`)
+merged once onto the defaults with `x0` as `x_start`, an unknown path raising and naming the
+known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
+of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
+one-time speed warning is emitted only when a JAX planner omits parametric compile. The
+reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
+tree costs 1.34× the compile, 1.14× the solve and 1.51× an evaluator call of the same program
+with it frozen on the bicycle MPC (R156's bar is 2×). Every transcription's objective is the
+problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
+`w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
+`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
