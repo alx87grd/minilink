@@ -534,7 +534,7 @@ def test_planner_trains_with_randomized_parameters():
 def test_outer_loop_on_an_inner_loop_with_nested_params():
     from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning.problems import lookup_param, merge_params
+    from minilink.core.params import lookup, merge_tree
 
     plant = bounded_pendulum()
     inner = StateFeedback(K=[[20.0, 4.0]], xbar=[0.0, 0.0]) @ plant
@@ -551,10 +551,10 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         params_distribution={"plant.m": Particles([[0.5], [2.0]])},  # the plant inside
         U=inner.input_box,
     )
-    assert lookup_param(inner.params, "plant.m") == 1.0
+    assert lookup(inner.params, "plant.m") == 1.0
     draw = prob.sample_params(0)
     assert set(draw) == {"plant"} and float(draw["plant"]["m"]) in (0.5, 2.0)
-    merged = merge_params(inner.params, draw)
+    merged = merge_tree(inner.params, draw)
     assert merged["controller"] is not None and merged["plant"]["m"] == float(
         draw["plant"]["m"]
     )

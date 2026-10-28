@@ -11,6 +11,7 @@ from minilink.core.backends import is_jax_key, numpy_generator, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, Particles, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.params import lookup
 from minilink.core.sets import (
     BoxInputSet,
     BoxSet,
@@ -617,7 +618,7 @@ class StochasticPlanningProblem(PlanningProblem):
         for name, k in zip(names, keys):
             # One draw, in the nominal entry's shape
             value = self.params_distribution[name].sample(k)
-            value = value.reshape(np.shape(lookup_param(self.sys.params, name)))
+            value = value.reshape(np.shape(lookup(self.sys.params, name)))
 
             # Placed at its dotted path in the nested override
             node = draws
@@ -664,7 +665,7 @@ class StochasticPlanningProblem(PlanningProblem):
         keys = split_keys(law_key, len(names) + len(ports))
         params = {}
         for name, k in zip(names, keys[: len(names)]):
-            nominal = np.shape(lookup_param(self.sys.params, name))
+            nominal = np.shape(lookup(self.sys.params, name))
             values = self.params_distribution[name].sample(k, n)
             node = params
             *path, last = name.split(".")
@@ -740,7 +741,7 @@ class StochasticPlanningProblem(PlanningProblem):
         """Refuse a drawn name missing from ``sys.params``, or one naming a whole subsystem dict."""
         for name in params_distribution or {}:
             try:
-                leaf = lookup_param(sys.params, name)
+                leaf = lookup(sys.params, name)
             except KeyError:
                 raise ValueError(
                     f"params_distribution key {name!r} is not in sys.params"
@@ -891,24 +892,3 @@ def unconstrained(n):
 def unconstrained_inputs(m):
     """The whole input space as an input set: no constraint on ``u``."""
     return BoxInputSet(unconstrained(m))
-
-
-def lookup_param(params, name):
-    """Entry of a (nested) params dict by dotted name; raises ``KeyError``."""
-    node = params
-    for part in name.split("."):
-        node = node[part]
-
-    return node
-
-
-def merge_params(params, draws):
-    """``params`` with the (nested) ``draws`` overriding matching entries, untouched elsewhere."""
-    merged = dict(params)
-    for name, value in draws.items():
-        if isinstance(value, dict) and isinstance(merged.get(name), dict):
-            merged[name] = merge_params(merged[name], value)
-        else:
-            merged[name] = value
-
-    return merged

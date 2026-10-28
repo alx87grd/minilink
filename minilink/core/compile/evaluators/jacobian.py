@@ -20,6 +20,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.params import flatten, set_leaf, with_leaf
+
 # =============================================================================
 # Public API — JacobianMixin
 # =============================================================================
@@ -220,7 +222,7 @@ def finite_difference_jacobian(evaluator, target, variable, eps):
 
             def perturbed(z, path=path, leaf=leaf):
                 value = z.reshape(leaf.shape) if leaf.shape else float(z[0])
-                return probe(x, u, t, replace_leaf(params, path, value), zero)
+                return probe(x, u, t, with_leaf(params, path, value), zero)
 
             columns = central_difference(perturbed, leaf.reshape(-1), eps)
             set_leaf(result, path, columns.reshape(columns.shape[0], *leaf.shape))
@@ -275,7 +277,7 @@ def forward_mode_jacobian(evaluator, target, variable, eps):
         def with_leaves(new_values):
             tree = params
             for path, value in zip(paths, new_values):
-                tree = replace_leaf(tree, path, value)
+                tree = with_leaf(tree, path, value)
             return probe(x, u, t, tree, zero)
 
         blocks = jax.jacfwd(with_leaves)(values)
@@ -314,41 +316,9 @@ def central_difference(g, z, eps):
     return np.column_stack(columns)
 
 
-def flatten_params(params, prefix=()):
-    """Yield ``(path, leaf)`` pairs of a nested parameter dict (depth-first)."""
-    if params is None:
-        return
-    if not isinstance(params, dict):
-        raise TypeError(
-            f"params must be a dict (nested for diagrams), got {type(params).__name__}"
-        )
-    for key, value in params.items():
-        if isinstance(value, dict):
-            yield from flatten_params(value, prefix + (key,))
-        else:
-            yield prefix + (key,), value
-
-
-def replace_leaf(params, path, value):
-    """Copy of ``params`` with the leaf at ``path`` replaced (containers copied on the path)."""
-    key, *rest = path
-    tree = dict(params)
-    tree[key] = value if not rest else replace_leaf(params[key], rest, value)
-    return tree
-
-
-def set_leaf(tree, path, value):
-    """Insert ``value`` at ``path`` in ``tree``, creating nested dicts."""
-    for key in path[:-1]:
-        tree = tree.setdefault(key, {})
-    tree[path[-1]] = value
-
-
 def _float_leaves(params):
     """``(path, leaf)`` pairs of the float leaves; raise when there is nothing to differentiate."""
-    leaves = [
-        (path, leaf) for path, leaf in flatten_params(params) if _is_float_leaf(leaf)
-    ]
+    leaves = [(path, leaf) for path, leaf in flatten(params) if _is_float_leaf(leaf)]
     if not leaves:
         raise ValueError(
             f"wrt='params' needs a params dict with float leaves; got {params!r}"

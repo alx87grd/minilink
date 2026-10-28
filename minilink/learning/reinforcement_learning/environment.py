@@ -6,8 +6,9 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, array_module
 from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.params import merge_tree
 from minilink.core.roles import command_port
-from minilink.planning.problems import as_stochastic, merge_params
+from minilink.planning.problems import as_stochastic
 
 ###############################################################################
 # Public API
@@ -221,7 +222,7 @@ class RolloutEnvironment:
 
     def full_params(self, params):
         """The plant's params with the episode's draws merged in (other entries untouched)."""
-        return merge_params(self.sys.params, params)
+        return merge_tree(self.sys.params, params)
 
     def describe(self) -> str:
         """One line naming the horizon, the constraint's price, the training zone and the randomization."""

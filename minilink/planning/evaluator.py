@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -16,6 +15,14 @@ from minilink.core.backends import (
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
+from minilink.core.params import (
+    Batched,
+    flat_leaves,
+    float_leaves,
+    lookup,
+    merge_tree,
+    with_leaf,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
     Evaluation,
@@ -618,14 +625,6 @@ def closed_loop_of(problem, controller):
 ###############################################################################
 
 
-@dataclass(frozen=True)
-class Batched:
-    """A parameter tree whose drawn leaves carry a leading trial axis, and its axes tree (``0`` drawn, ``None`` shared)."""
-
-    tree: dict
-    axes: dict
-
-
 def adaptive_options(solver):
     """The SciPy method and tolerances of an adaptive solver label (``"scipy"`` …), or ``None`` for a step."""
     # Lazy import: the simulator's labels load with the first adaptive run
@@ -981,66 +980,6 @@ def paths_of(wrt):
 def tunes(wrt, name):
     """Whether ``wrt`` names ``name`` or a leaf under it (``"cost"``, ``"cost.Q"``)."""
     return any(path == name or path.startswith(name + ".") for path in wrt)
-
-
-def split_path(path):
-    """A dotted path (``"controller.Kp"``; a nested box ``"plant/motor.R"``) as its keys."""
-    return path.replace("/", ".").split(".")
-
-
-def lookup(tree, path):
-    """The leaf of ``tree`` at ``path``; refuse a path that names none."""
-    node = tree
-    for part in split_path(path):
-        if not isinstance(node, dict) or part not in node:
-            raise KeyError(f"{path!r} names no leaf of the parameters")
-        node = node[part]
-
-    return node
-
-
-def with_leaf(tree, path, value):
-    """A copy of ``tree`` (copied along ``path`` only) with the leaf at ``path`` replaced."""
-    head, *rest = split_path(path)
-    copy = dict(tree)
-    copy[head] = value if not rest else with_leaf(tree[head], ".".join(rest), value)
-
-    return copy
-
-
-def merge_tree(tree, override):
-    """``tree`` with the entries of ``override`` replacing its own, recursively."""
-    if isinstance(override, Batched):
-        override = override.tree
-
-    merged = dict(tree)
-    for key, value in override.items():
-        if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = merge_tree(merged[key], value)
-        else:
-            merged[key] = value
-
-    return merged
-
-
-def float_leaves(tree):
-    """``tree`` with every leaf a float NumPy array (``None``, an empty entry, kept)."""
-    if isinstance(tree, dict):
-        return {key: float_leaves(value) for key, value in tree.items()}
-    if tree is None:
-        return None
-
-    return np.asarray(tree, dtype=float)
-
-
-def flat_leaves(tree):
-    """The leaves of a nested dict, in order."""
-    if isinstance(tree, Batched):
-        tree = tree.tree
-    if isinstance(tree, dict):
-        return [leaf for value in tree.values() for leaf in flat_leaves(value)]
-
-    return [tree]
 
 
 def trial_seeds(loop, key, n_trials):
