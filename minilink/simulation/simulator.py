@@ -9,6 +9,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
+from minilink.core.compile.cache import compiled_of
 from minilink.core.inspect import inspect_text
 from minilink.core.system import (
     AUTO_DT_SCALE,
@@ -174,8 +175,10 @@ class Simulator:
         # The initial state, checked
         self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
-        # Compile the system
+        # Compile the system, or reuse its compiled form; the parameters it runs on
+        # (None while they are the compiled ones)
         self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
+        self.params = self.evaluator.call_params()
 
         # Solver and time grid. With an automatic grid the solver is chosen
         # first and the grid is sized to it; with an explicit grid the solver
@@ -236,7 +239,11 @@ class Simulator:
             t_start = time.perf_counter()
 
         x_traj = self.solver_backend.integrate(
-            self.evaluator, self.t, self.x0, args=self.solver_backend_options
+            self.evaluator,
+            self.t,
+            self.x0,
+            args=self.solver_backend_options,
+            params=self.params,
         )
 
         if time_solve:
@@ -284,7 +291,7 @@ class Simulator:
                 return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
 
             x_traj = self.solver_backend.integrate_input(
-                self.evaluator, self.t, u_of_t, self.x0
+                self.evaluator, self.t, u_of_t, self.x0, params=self.params
             )
         else:
             x_traj = self.solver_backend.integrate_forced(
@@ -293,6 +300,7 @@ class Simulator:
                 u_traj,
                 self.x0,
                 args=self.solver_backend_options,
+                params=self.params,
             )
 
         if time_solve:
@@ -382,8 +390,8 @@ class Simulator:
         )
 
     def build_evaluator(self, sys, backend):
-        """Compile ``sys`` with ``backend``; subclasses wrap it (timings, caches)."""
-        return sys.compile(backend=backend)
+        """``sys`` compiled with ``backend``: a JAX form reused while its structure is unchanged."""
+        return compiled_of(sys, backend)
 
     def parse_solver(self, solver):
         """``(backend key, options)`` of a solver label."""

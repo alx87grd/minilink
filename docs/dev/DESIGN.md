@@ -395,9 +395,10 @@ read `params` yet, the gap is tracked below (the distributions and the sets read
   live key (`diagram.params["plant"]["m"] = 4`). Nested diagrams nest the dict
   recursively.
 - Compile: a diagram's compile copies every block's params into the plan, as a leaf's does.
-  The evaluator's `params` is that snapshot; `params=None` reads it. An edit after
-  compile needs a recompile or an explicit complete tree (copy `evaluator.params` and
-  replace the block you change). On JAX the dict is a pytree argument
+  The evaluator's `params` is that snapshot; `params=None` reads it. A held evaluator
+  reads an edit made after compile only through an explicit complete tree (copy
+  `evaluator.params` and replace the block you change); the convenience calls
+  (`compute_trajectory`, `Simulator`, `problem.compile`) read the live values on every call. On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
@@ -841,6 +842,24 @@ a `bool` or `str` mode switch, which belongs on the constructor, R118), so the w
 `params` tree traces directly. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
 `vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
 no parametric twin, no trace tier, no `jit` namespace.
+
+**Compile once, in the form the call needs** (`core/compile/cache.py`, the plan
+[compile-once](../plans/compile-once.md)). A compiled method has two forms behind its one
+name: `params=None` is the frozen form (the compiled values are constants of the trace, the
+fastest run of one fixed model), a tree is the parametric form (its leaves traced, so new
+values never retrace). Before the jitted call, every scalar argument and every leaf of the
+tree is made the dtype and shape of the compiled default (`9`, `9.0`, `np.float64(9.0)` and a
+0-d array share one trace) and the tree is put on the device once per distinct value; a tree
+holding a leaf of more than 1000 numbers (a network's weights) always goes as an argument,
+never as constants. The convenience calls reuse a JAX evaluator through
+`compiled_of(system, backend)`, keyed by the structure a compile reads (blocks by identity,
+ports, wiring, clocks, plain attributes), never by parameter values, and pass
+`evaluator.call_params()`: `None` while the live values are the compiled ones, else the live
+tree, so a sweep of values through `compute_trajectory` compiles once. A structural attribute
+edited after a run is seen after `clear_compiled()`. The `jit` sits at the outermost pure
+computation of each pipeline: the rollout (not `f`), the problem's trial function, the
+fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
+host SLSQP) calls jitted `f`, Jacobian, objective and gradient.
 
 **The step model.** Every sampled consumer steps a continuous plant through `step` and
 `rollout`, written once (`core/compile/evaluators/stepping.py`) for both backends.

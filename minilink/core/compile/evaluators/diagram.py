@@ -4,19 +4,26 @@ from __future__ import annotations
 
 import time
 
+import numpy as np
+
 from minilink.core.backends import BACKEND_JAX
 from minilink.core.compile.evaluators.base import (
     ContinuousEvaluator,
     added,
     assigned,
+    blocks_params,
     check_jax_compatible,
     gather_u,
+    gathered_on_host,
 )
 from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.evaluators.stepping import held_inputs, iterate, step_body
 from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import check_diagram_params
 from minilink.core.system import DynamicSystem
+
+# The common buffer dtype, returned without a promotion
+FLOAT64 = np.dtype(np.float64)
 
 ###############################################################################
 # Public API
@@ -37,6 +44,7 @@ class DiagramEvaluator(ContinuousEvaluator):
             for op in (*plan.port_ops, *plan.state_ops)
             if op.sys_id
         }
+        self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
@@ -160,6 +168,8 @@ class DiagramEvaluator(ContinuousEvaluator):
         dtype = getattr(sample, "dtype", None)
         if dtype is None:
             return xp.float32 if self.backend == BACKEND_JAX else float
+        if dtype == FLOAT64:
+            return FLOAT64
         # An integer x0 still gets float dx; float inputs keep their width.
         return xp.result_type(dtype, float)
 
@@ -168,6 +178,18 @@ class DiagramEvaluator(ContinuousEvaluator):
         xp = self.xp
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
         params = self._frozen_params if params is None else params
+
+        # NumPy: the buffer written in place, the hot path of a host integration
+        if xp is np and inject is None:
+            for op in self.plan.port_ops:
+                local_u = gathered_on_host(
+                    op.gather_sources, op.u_dim, signals, u, dtype
+                )
+                signals[op.out_slice] = op.compute_func(
+                    x[op.local_x_slice], local_u, t, params[op.sys_id]
+                )
+            return signals
+
         for op in self.plan.port_ops:
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
@@ -182,6 +204,18 @@ class DiagramEvaluator(ContinuousEvaluator):
         xp = self.xp
         dx = xp.zeros(self.plan.state_dim, dtype=dtype)
         params = self._frozen_params if params is None else params
+
+        # NumPy: every block's dx written in place
+        if xp is np:
+            for op in self.plan.state_ops:
+                local_u = gathered_on_host(
+                    op.gather_sources, op.u_dim, signals, u, dtype
+                )
+                dx[op.local_x_slice] = op.f_func(
+                    x[op.local_x_slice], local_u, t, params[op.sys_id]
+                )
+            return dx
+
         for op in self.plan.state_ops:
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)

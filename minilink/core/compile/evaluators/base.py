@@ -30,6 +30,11 @@ from minilink.core.compile.plan import (
     INTERNAL_SIGNAL,
     NOMINAL,
 )
+from minilink.core.params import canonical_tree, flat_leaves, tree_digest
+
+# Above this many numbers a frozen leaf is passed as an argument, not baked into the executable
+LARGE_LEAF = 1_000
+
 
 ###############################################################################
 # Public API
@@ -65,11 +70,47 @@ class Evaluator(JacobianMixin):
             self.xp = np
         self._u_nominal = self.xp.array(np.asarray(u_nominal, dtype=float))
         self._frozen_params = None
+        self.params_reader = None
+        self.on_device = None
 
     @property
     def params(self):
         """The parameters taken at compile: ``params=None`` reads these."""
         return self._frozen_params
+
+    def live_params(self):
+        """The parameters read from the system now: the tree a new compile would freeze."""
+        return self.params_reader()
+
+    def call_params(self):
+        """``None`` when the system's parameters still equal the compiled ones (the frozen form), else the live tree."""
+        live = self.live_params()
+        if tree_digest(live) == tree_digest(self._frozen_params):
+            return None
+
+        return live
+
+    def call_tree(self, params):
+        """What a compiled method receives for ``params``: the frozen form, or a tree in its compiled types.
+
+        ``None`` stays ``None`` (the compiled values constants of the trace), unless
+        a leaf is large (network weights), where the frozen tree is passed as an
+        argument instead, so the executable carries no copy. A tree is put on the
+        device in its compiled dtypes and shapes, kept there while its values
+        repeat: every value of every number type is then one trace.
+        """
+        if params is None and not has_large_leaf(self._frozen_params):
+            return None
+        tree = self._frozen_params if params is None else params
+
+        # The tree in its compiled types, on the device: put there once and kept
+        # while its values repeat (a host loop's calls transfer nothing)
+        digest = tree_digest(tree)
+        if self.on_device is None or self.on_device[0] != digest:
+            canonical = canonical_tree(tree, self._frozen_params)
+            self.on_device = (digest, self.jax.device_put(canonical))
+
+        return self.on_device[1]
 
     @property
     def nominal_input(self):
@@ -293,6 +334,18 @@ class ContinuousEvaluator(Evaluator):
         return u_seq
 
 
+def blocks_params(diagram, frozen):
+    """A diagram's parameters now, by the block ids its compiled tree holds."""
+    return {sys_id: diagram.subsystems[sys_id].params for sys_id in frozen}
+
+
+def has_large_leaf(tree) -> bool:
+    """Whether a leaf of ``tree`` holds more than :data:`LARGE_LEAF` numbers (network weights)."""
+    return any(
+        np.size(leaf) > LARGE_LEAF for leaf in flat_leaves(tree) if leaf is not None
+    )
+
+
 def outputs_from_ports(system, x, u, t, params) -> dict:
     """Evaluate every output port on ``system``."""
     return {
@@ -312,6 +365,10 @@ def gather_u(gather_sources, u_dim, signals, u, xp=np, dtype=float):
     if u_dim == 0:
         return xp.zeros(0, dtype=dtype)
 
+    # NumPy: the pieces written into one buffer (the per-step hot path of a host loop)
+    if xp is np:
+        return gathered_on_host(gather_sources, u_dim, signals, u, dtype)
+
     pieces = []
     for kind, where, dim in gather_sources:
         if kind == INTERNAL_SIGNAL:
@@ -324,6 +381,25 @@ def gather_u(gather_sources, u_dim, signals, u, xp=np, dtype=float):
             raise RuntimeError(f"Unknown source_type={kind}")
 
     return xp.concatenate(pieces, axis=0)
+
+
+def gathered_on_host(gather_sources, u_dim, signals, u, dtype):
+    """:func:`gather_u` on NumPy: each source written into its rows of one buffer."""
+    local_u = np.empty(u_dim, dtype=dtype)
+    start = 0
+    for kind, where, dim in gather_sources:
+        stop = start + dim
+        if kind == INTERNAL_SIGNAL:
+            local_u[start:stop] = signals[where]
+        elif kind == NOMINAL:
+            local_u[start:stop] = where
+        elif kind == EXTERNAL_INPUT:
+            local_u[start:stop] = u[where]
+        else:
+            raise RuntimeError(f"Unknown source_type={kind}")
+        start = stop
+
+    return local_u
 
 
 def assigned(xp, buffer, where, value):

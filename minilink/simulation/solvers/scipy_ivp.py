@@ -24,6 +24,7 @@ class SciPySolverBackend(SolverBackend):
         times: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         t0 = times[0]
         tf = times[-1]
@@ -31,14 +32,14 @@ class SciPySolverBackend(SolverBackend):
         u_nominal = evaluator.nominal_input
 
         def rhs(t, x):
-            return np.asarray(f(x, u_nominal, t))
+            return np.asarray(f(x, u_nominal, t, params))
 
         # Solver options: the analytic Jacobian only from a JAX evaluator
         kw = dict(args or {})
         use_jac = kw.pop("use_jac", False)
         method = kw.get("method", "RK45")
         if use_jac and evaluator.backend == "jax":
-            kw["jac"] = nominal_jacobian_of(evaluator)
+            kw["jac"] = nominal_jacobian_of(evaluator, params)
             jac_applied = True
         else:
             jac_applied = False
@@ -61,6 +62,7 @@ class SciPySolverBackend(SolverBackend):
         u: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         # Solver options: the input scheme is ours, not solve_ivp's, and a forced
         # run takes no analytic Jacobian
@@ -77,7 +79,7 @@ class SciPySolverBackend(SolverBackend):
         f = evaluator.f
 
         def rhs(t, x):
-            return np.asarray(f(x, u_at_t(t), t))
+            return np.asarray(f(x, u_at_t(t), t, params))
 
         # x(t) = x₀ + ∫ f(x(s), u(s), s) ds, solved adaptively and reported on the grid
         sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
@@ -133,16 +135,19 @@ def require_success(sol, mode, method):
         )
 
 
-def nominal_jacobian_of(evaluator):
-    """``(t, x) -> ∂f/∂x`` at the nominal input, compiled once per JAX evaluator."""
+def nominal_jacobian_of(evaluator, params=None):
+    """``(t, x) -> ∂f/∂x`` at the nominal input, compiled once per JAX evaluator (``params=None``: the compiled ones)."""
     forms = evaluator.compiled_forms
     if "scipy_jacobian" not in forms:
         jax = evaluator.jax
         f = evaluator.f
         u_nominal = evaluator.nominal_input
         forms["scipy_jacobian"] = jax.jit(
-            jax.jacfwd(lambda x, t: f(x, u_nominal, t), argnums=0)
+            jax.jacfwd(lambda x, t, p: f(x, u_nominal, t, p), argnums=0)
         )
     jacobian = forms["scipy_jacobian"]
+    tree = evaluator.call_tree(params)
 
-    return lambda t, x: np.asarray(jacobian(evaluator.jnp.asarray(x), t))
+    return lambda t, x: np.asarray(
+        jacobian(evaluator.jnp.asarray(x), np.float64(t), tree)
+    )

@@ -30,6 +30,7 @@ class DynamicEvaluator(ContinuousEvaluator):
         )
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
+        self.params_reader = lambda: system.params
 
         if backend == BACKEND_JAX:
             check_leaf_traces(self, system, system.f, 0.0, verbose)

@@ -27,6 +27,7 @@ class SolverBackend(ABC):
         times: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         """
         Nominal input: ``x(t) = x₀ + ∫ f(x(s), u_nom, s) ds``.
@@ -57,6 +58,7 @@ class SolverBackend(ABC):
         u: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         """
         Forced input: ``x(t) = x₀ + ∫ f(x(s), u(s), s) ds``.

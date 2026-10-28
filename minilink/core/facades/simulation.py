@@ -394,7 +394,7 @@ class StepSimulation:
         require_run_solver(solver)
         h = self.sample_period
         n_steps = int(round((float(tf) - float(t_start)) / h))
-        ev = self.compile(backend="numpy" if solver else backend, verbose=verbose)
+        ev = compiled_run_of(self, "numpy" if solver else backend, verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
         u_steps = u_samples[:, :n_steps].T
@@ -402,7 +402,9 @@ class StepSimulation:
 
         # The scan with its substeps, or the host runner on the same blocks
         if solver is None:
-            xs = ev.rollout_dense(x0, u_steps, n_steps=n_steps, t_start=t_start)
+            xs = ev.rollout_dense(
+                x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
+            )
         else:
             # Tools import core (DESIGN §3): the host runner loads on first use
             from minilink.simulation.discrete.clock_runner import run_on_the_clock
@@ -472,12 +474,18 @@ class StepSimulation:
         # A real cycle through minilink.core.system
         from minilink.core.trajectory import Trajectory
 
-        ev = self.compile(backend=backend, verbose=verbose)
+        ev = compiled_run_of(self, backend, verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
 
         # x_{k+1} = step(x_k, u_k, k) for k = 0 … N − 1, at the ticks' times
-        xs = ev.rollout(x0, u_samples[:, :n_steps].T, n_steps=n_steps, t_start=t_start)
+        xs = ev.rollout(
+            x0,
+            u_samples[:, :n_steps].T,
+            ev.call_params(),
+            n_steps=n_steps,
+            t_start=t_start,
+        )
         k = np.arange(n_steps + 1, dtype=float)
         t = k if self.sample_period is None else t_start + k * self.sample_period
 
@@ -493,6 +501,17 @@ class StepSimulation:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def compiled_run_of(system, backend, verbose):
+    """The evaluator a run verb steps: a fresh compile when verbose (it prints its stages), else the reused one."""
+    # Lazy import: the compiler imports the systems
+    from minilink.core.compile.cache import compiled_of
+
+    if verbose:
+        return system.compile(backend=backend, verbose=True)
+
+    return compiled_of(system, backend)
 
 
 def require_continuous_underneath(system):

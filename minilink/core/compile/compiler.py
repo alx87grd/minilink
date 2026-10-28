@@ -97,17 +97,21 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
     return evaluator
 
 
-def compile_auto(system, verbose=False):
+def compile_auto(system, verbose=False, *, reuse=False):
     """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
 
     Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
     JAX cannot be imported, or the system is "not JAX-traceable"; any other
-    error from the JAX compile surfaces.
+    error from the JAX compile surfaces. ``reuse=True`` takes the JAX form the
+    convenience calls keep (:func:`~minilink.core.compile.cache.compiled_of`).
     """
     from minilink.core.backends import BACKEND_JAX, jax_installed
+    from minilink.core.compile.cache import compiled_of
 
     if jax_installed():
         try:
+            if reuse:
+                return BACKEND_JAX, compiled_of(system, BACKEND_JAX)
             return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
         except ImportError:
             pass  # present on disk but not importable (e.g. blocked, broken install)

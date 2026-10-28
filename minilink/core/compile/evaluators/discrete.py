@@ -12,6 +12,7 @@ from minilink.core.compile.evaluators.base import (
     Evaluator,
     added,
     assigned,
+    blocks_params,
     check_jax_compatible,
     gather_u,
     outputs_from_ports,
@@ -158,6 +159,7 @@ class StepEvaluator(DiscreteEvaluator):
         )
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
+        self.params_reader = lambda: system.params
 
         # A system on a clock steps its seconds face at t_start + k Δ
         self.seconds = isinstance(system, SampledSystem) and not system.counts
@@ -236,6 +238,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
             for op in (*plan.port_ops, *plan.step_ops)
             if op.sys_id
         }
+        self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
@@ -420,6 +423,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         self.plan = plan
         self.dtype = self.xp.float64
         self._frozen_params = copy.deepcopy(diagram.params)
+        self.params_reader = lambda: diagram.params
         self._subsystem_ids = tuple(diagram.subsystems)
         self.sample_period = plan.base_period
 

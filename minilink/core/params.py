@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -130,9 +131,93 @@ def float_leaves(tree):
     return np.asarray(tree, dtype=float)
 
 
+def canonical_tree(tree, reference):
+    """
+    ``tree`` with each leaf in the dtype and shape of the leaf at its path in ``reference``: one trace for every value.
+
+    A Python ``9.0``, ``np.float64(9.0)``, a ``9`` or a 0-d array given for a
+    leaf compiled as a ``(1,)`` float array all become that array, so a jitted
+    function of the tree traces once. A leaf with no reference (or a ``None``
+    reference) becomes a NumPy array of its own type; a leaf whose size differs
+    from its reference (a batch axis in front) keeps its shape.
+    """
+    if isinstance(tree, dict):
+        own = reference if isinstance(reference, dict) else {}
+        return {key: canonical_tree(value, own.get(key)) for key, value in tree.items()}
+
+    return canonical_leaf(tree, reference)
+
+
+def tree_digest(tree) -> bytes:
+    """A digest of a tree's structure and values: JAX arrays by identity, host values by their bytes."""
+    digest = hashlib.blake2b(digest_size=16)
+    for path, leaf in flatten_any(tree):
+        digest.update(repr(path).encode())
+        digest.update(leaf_bytes(leaf))
+
+    return digest.digest()
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def canonical_leaf(leaf, reference):
+    """One leaf in its reference's dtype and, when the sizes agree, its shape."""
+    numeric = isinstance(
+        leaf, (int, float, complex, list, tuple, np.ndarray, np.generic)
+    )
+    if leaf is None or isinstance(leaf, bool) or not (numeric or is_jax_value(leaf)):
+        return leaf
+    if reference is None or isinstance(reference, bool):
+        return leaf if is_jax_value(leaf) else np.asarray(leaf)
+    dtype = np.result_type(reference)
+    shape = np.shape(reference)
+
+    # A JAX value (a tracer under an outer transform) keeps its module
+    value = (
+        strong_jax(leaf, dtype) if is_jax_value(leaf) else np.asarray(leaf, dtype=dtype)
+    )
+    if value.shape != shape and value.size == int(np.prod(shape)):
+        value = value.reshape(shape)
+
+    return value
+
+
+def strong_jax(value, dtype):
+    """A JAX value in ``dtype`` with a strong type (a weak scalar would trace apart)."""
+    # Lazy import: only a JAX leaf reaches here
+    from jax import lax
+
+    return lax.convert_element_type(value, dtype)
+
+
+def is_jax_value(value) -> bool:
+    """Whether ``value`` is a JAX array or tracer (told by its type's module)."""
+    return type(value).__module__.startswith("jax")
+
+
+def flatten_any(tree, prefix=()):
+    """Yield ``(keys, leaf)`` pairs of any nested dict, a non-dict tree its one leaf."""
+    if isinstance(tree, dict):
+        for key, value in tree.items():
+            yield from flatten_any(value, prefix + (key,))
+        return
+    yield prefix, tree
+
+
+def leaf_bytes(leaf) -> bytes:
+    """What a digest reads of one leaf: a JAX array's identity (it is immutable), else its type, shape and bytes."""
+    if is_jax_value(leaf):
+        return b"jax" + id(leaf).to_bytes(8, "little")
+    if leaf is None or isinstance(leaf, (bool, str)):
+        return repr(leaf).encode()
+    if isinstance(leaf, (int, float, complex, np.ndarray, np.generic)):
+        array = np.asarray(leaf)
+        return f"{array.dtype}{array.shape}".encode() + array.tobytes()
+
+    return b"obj" + id(leaf).to_bytes(8, "little")
 
 
 def require_known_key(key, tree):
