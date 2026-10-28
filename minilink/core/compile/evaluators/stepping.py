@@ -65,6 +65,13 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
     xp = array_module(x, u)
     n = x.shape[0]
 
+    # One Euler step in its closed form: x + dt f(x, u, t) and c = dt rate(x, u, t),
+    # the augmented step's own two rows (the state's is euler's, to the bit)
+    if solver == "euler" and substeps == 1:
+        x_next = euler(f, x, u, u, t, dt)
+        c = dt * rate(x, u, t)
+        return x_next, c
+
     # ż = [f(x, u, τ); rate(x, u, τ)], the cost a state of its own
     def f_aug(z, u, tau):
         x_s = z[:n]
@@ -76,6 +83,17 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
     z = step_body(f_aug, z0, u, u, t, dt, solver, substeps)
 
     return z[:n], z[n]
+
+
+def stage_cost(f, rate, x, u, t, dt, solver, substeps):
+    """The stage cost alone of :func:`step_with_cost`: under one Euler step ``dt · rate(x, u, t)``, the plant not evaluated."""
+    if solver == "euler" and substeps == 1:
+        c = dt * rate(x, u, t)
+        return c
+
+    _, c = step_with_cost(f, rate, x, u, t, dt, solver, substeps)
+
+    return c
 
 
 def step_path(f, x, u0, u1, t, dt, solver, substeps):

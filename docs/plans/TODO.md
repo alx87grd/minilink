@@ -294,14 +294,16 @@ the input held, a solver's own objective allowed but the score always the proble
   `SampledCost(g, h, plant, dt, *, solver=, substeps=)` the `StepCost` of a discretized problem,
   its `c` integrating one period when called directly with the plant's solver and substeps
   (R154); sharing the sets, the start, the tree and `realize` with `PlanningProblem` by composition. Done
-  when a grid world solves by value iteration as a `StepPlanningProblem`.
+  when a grid world solves by value iteration as a `StepPlanningProblem`. Landed in the v0.3 run: `StepCost`, `SampledCost`, `StepPlanningProblem`
+  (`planning/step_problems.py`), the grid world solved by value iteration (`test_step_problems`).
+  Rest: `realize` on the step problem's own tree (today the start and the laws through its parts).
 - [ ] **The compiled step face** (R141, R142): `problem.compile(dt=, solver=,
   substeps=)` with no controller gives `transition(x, u, k, params) -> (x_next, c_k)`, `N`,
   `gamma = e^{−ρ dt}`, the sets at `t_k` and the price; `c_k` integrated with the state in the
   stationary form; `discretize(problem, dt)` (facade `problem.discretize`) returns the explicit
   `StepPlanningProblem` compiling to the same face. Done when the augmented step's state rows are
   byte-identical to `step_body`, its `c_k` equals `g·dt` under Euler to the last bit, and the
-  discretized problem's face equals `problem.compile(dt=)`'s.
+  discretized problem's face equals `problem.compile(dt=)`'s. Landed in the v0.3 run (`StepFace`, `planning/step_face.py`); all three checks pass.
 - [ ] **The judge, value iteration and the RL environment on `transition`**
   (after the open points): `problem.compile(controller)` scans `transition`; value iteration's
   backup and the RL environment's step read it; the environment's step and `score_run` share one

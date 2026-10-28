@@ -6,14 +6,14 @@ import numpy as np
 from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
-from minilink.core.compile.evaluators.stepping import require_step_knobs, step_body
+from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
 from minilink.planning.dynamic_programming.progress import (
     maybe_print_build_progress,
     print_build_complete,
     progress,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import PlanningProblem
 
 #: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
@@ -82,13 +82,15 @@ class StateSpaceGrid:
         precompute_backend: str = BACKEND_NUMPY,
         verbose: bool = False,
     ) -> None:
-        # The problem, its system's dimensions and the step model of one period
+        # The problem, its system's dimensions and its step face (R141): one period
+        # of the plant and its stage cost, the one face value iteration reads
         require_step_knobs(solver, 1)
         self.problem = problem
         self.sys = problem.sys
         self.n = int(self.sys.n)
         self.m = int(self.sys.m)
-        self.dt = float(dt)
+        self.face = face_of(problem, dt, solver)
+        self.dt = 1.0 if self.face.dt is None else float(self.face.dt)
         self.solver = solver
 
         # Levels per axis, and the box they span
@@ -205,23 +207,20 @@ class StateSpaceGrid:
     # The successor map
 
     def successor(self, x, u, t, params=None):
-        """``x_{k+1}``: the plant one period ``dt`` after ``x``, ``u`` held (the step model)."""
-        sys_f = self.sys.f
+        """``x_{k+1}``: the plant one period after ``x``, ``u`` held: the step face's step (``params``: the plant's numbers)."""
+        return self.face.step_at(x, u, t, params)
 
-        def f(x, u, t):
-            return sys_f(x, u, t, params)
-
-        x_next = step_body(f, x, u, u, t, self.dt, self.solver, 1)
-
-        return x_next
+    def stage_cost(self, x, u, t, params=None):
+        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (R142; ``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
+        return self.face.stage_cost_at(x, u, t, params)
 
     # The successor tables
 
     def compute_transition_numpy(self, t):
-        """Build the forward-Euler successors and the input/state validity masks."""
+        """Build the successors of the step face and the input/state validity masks."""
         X = self.problem.X
         U = self.problem.U
-        sys_params = nominal_plant_params(self.problem)
+        sys_params = self.face.params["plant"]
         set_params = None
         states = self.states
         inputs = self.inputs
@@ -267,7 +266,7 @@ class StateSpaceGrid:
         N = self.nodes_n
         A = self.actions_n
         n = self.n
-        sys_params = nominal_plant_params(self.problem)
+        sys_params = self.face.params["plant"]
         X = self.problem.X
         U = self.problem.U
         set_params = None
@@ -617,3 +616,14 @@ if __name__ == "__main__":
     grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)
+
+
+def face_of(problem, dt, solver):
+    """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
+    # Lazy import: the step problem loads with the first grid on one
+    from minilink.planning.step_problems import StepPlanningProblem
+
+    if isinstance(problem, StepPlanningProblem):
+        return problem.compile()
+
+    return problem.compile(dt=dt, solver=solver)

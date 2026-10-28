@@ -40,7 +40,6 @@ class StepFace:
     """
 
     def __init__(self, problem, *, dt=None, solver="rk4", substeps=1):
-        problem.require_cost()
         self.problem = problem
         self.sys = problem.sys
         self.n = int(problem.sys.n)
@@ -51,6 +50,8 @@ class StepFace:
             self.dt = problem.dt
             self.N = problem.N
             self.gamma = problem.gamma
+            self.solver = None
+            self.substeps = None
             cost = problem.cost
             self.stage = cost if isinstance(cost, SampledCost) else None
 
@@ -61,19 +62,23 @@ class StepFace:
             from minilink.planning.evaluator import steps_of
 
             self.dt = float(dt)
+            self.solver = solver
+            self.substeps = int(substeps)
             rho = problem.discount_rate
             finite = problem.horizon_kind() == "finite"
             self.N = steps_of(problem.tf, self.dt) if finite else None
             self.gamma = float(np.exp(-rho * self.dt))
-            self.stage = SampledCost(
-                problem.cost,
-                problem.sys,
-                self.dt,
-                solver=solver,
-                substeps=substeps,
-                discount_rate=rho,
-                t_start=problem.t_start,
-            )
+            self.stage = None
+            if problem.cost is not None:
+                self.stage = SampledCost(
+                    problem.cost,
+                    problem.sys,
+                    self.dt,
+                    solver=solver,
+                    substeps=substeps,
+                    discount_rate=rho,
+                    t_start=problem.t_start,
+                )
 
     @property
     def params(self) -> dict:
@@ -82,7 +87,7 @@ class StepFace:
         plant = nominal_plant_params(problem) if is_continuous(problem) else None
         tree = {
             "plant": problem.sys.params if plant is None else plant,
-            "cost": problem.cost.params,
+            "cost": None if problem.cost is None else problem.cost.params,
             "x_start": np.asarray(problem.x_start, dtype=float),
             "t_start": problem.t_start,
         }
@@ -124,6 +129,7 @@ class StepFace:
     def transition_at(self, x, u, t, params=None):
         """``(x_next, c)`` of the tick that starts at time ``t`` (a native problem's tick index)."""
         params = self.params if params is None else params
+        self.problem.require_cost()
 
         # A continuous plant: the plant and its stage cost in one step
         if self.stage is not None:
@@ -138,6 +144,52 @@ class StepFace:
 
         return x_next, c
 
+    def step_at(self, x, u, t, plant_params=None):
+        """``x_next`` alone of the tick that starts at ``t``: the plant's step model (no cost evaluated), on ``plant_params`` (``None``: the face's)."""
+        plant = self.params["plant"] if plant_params is None else plant_params
+
+        # A native step system: its own step at the tick
+        if self.stage is None and not is_continuous(self.problem):
+            return self.sys.step(x, u, t, plant)
+
+        # A continuous plant (a discretized problem's too): the step model over one
+        # period from the absolute time t, the input held
+        # Lazy import: the step model loads with the first step
+        from minilink.core.compile.evaluators.stepping import step_body
+
+        if self.stage is not None:
+            f, dt = self.stage.plant.f, self.stage.dt
+            solver, substeps = self.stage.solver, self.stage.substeps
+        else:
+            f, dt, solver, substeps = self.sys.f, self.dt, self.solver, self.substeps
+
+        def dynamics(x, u, tau):
+            return f(x, u, tau, plant)
+
+        return step_body(dynamics, x, u, u, t, dt, solver, substeps)
+
+    def horizon_end(self):
+        """The time of the horizon's end, ``t_start + tf`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
+        if self.N is None:
+            return None
+        if is_continuous(self.problem):
+            return self.t_start + self.problem.tf
+
+        return self.time_of(self.N)
+
+    def stage_cost_at(self, x, u, t, params=None):
+        """``c`` alone of the tick that starts at ``t``: :meth:`transition_at`'s cost, the plant not stepped where the scheme allows."""
+        params = self.params if params is None else params
+        self.problem.require_cost()
+
+        if self.stage is not None:
+            rho = params.get("discount_rate")
+            return self.stage.stage_cost_at(
+                x, u, t, params["cost"], params["plant"], discount_rate=rho
+            )
+
+        return self.problem.cost.c(x, u, t, params["cost"])
+
     def terminal(self, x, t=None, params=None):
         """The terminal cost ``h(x)`` at the horizon's end (or at ``t``); ``0`` on an infinite horizon."""
         params = self.params if params is None else params
@@ -150,19 +202,10 @@ class StepFace:
         return self.problem.cost.h(x, t, params["cost"])
 
     def price(self, gamma=None):
-        """The price of a failure, over the horizon, at the discount ``gamma`` per tick (default the face's)."""
-        problem = self.problem
+        """The price of a failure, over the horizon, at the discount ``gamma`` per tick (default the face's): :func:`price_at`."""
         gamma = self.gamma if gamma is None else float(gamma)
-        if not is_continuous(problem):
-            return problem.infeasibility_price(gamma=gamma)
 
-        # The continuous problem's price at the rate ρ that makes e^{−ρ dt} = γ
-        dt = self.dt
-        if gamma >= 1.0:
-            return problem.infeasibility_price(discount_rate=0.0, dt=dt)
-        rho = -np.log(gamma) / dt if gamma > 0.0 else np.inf
-
-        return problem.infeasibility_price(np.inf, discount_rate=rho, dt=dt)
+        return price_at(self.problem, gamma, self.dt)
 
     def run(self, policy, x_start=None, params=None, n_steps=None):
         """
@@ -200,6 +243,26 @@ class StepFace:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def price_at(problem, gamma, dt):
+    """
+    The price of a failure at the discount ``gamma`` per step: ``infeasible_cost`` when a number, else the cost bound.
+
+    A step problem's bound at ``γ``; a continuous problem's on the step tool's
+    own sum: with ``γ < 1`` the sweeps run to convergence,
+    ``Σ_{k≥0} γᵏ dt = dt / (1 − γ)``, the rate ``ρ = −ln(γ) / dt`` making
+    ``e^{−ρ dt} = γ``; with ``γ = 1``, the problem's horizon undiscounted.
+    """
+    if not is_continuous(problem):
+        return problem.infeasibility_price(gamma=gamma)
+    if gamma >= 1.0:
+        return problem.infeasibility_price(discount_rate=0.0, dt=dt)
+
+    # γ = e^{−ρ dt} (γ = 0: one step counts, ρ = ∞)
+    rho = -np.log(gamma) / dt if gamma > 0.0 else np.inf
+
+    return problem.infeasibility_price(np.inf, discount_rate=rho, dt=dt)
 
 
 def is_continuous(problem) -> bool:

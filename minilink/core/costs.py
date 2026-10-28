@@ -567,7 +567,7 @@ class SampledCost(StepCost):
 
     def c(self, x, u, k=0, params=None):
         t_k = self.t_start + k * self.dt
-        _, c = self.stage_at(x, u, t_k, params)
+        c = self.stage_cost_at(x, u, t_k, params)
 
         return c
 
@@ -576,6 +576,19 @@ class SampledCost(StepCost):
         t_k = self.t_start + k * self.dt
 
         return self.cost.h(x, t_k, params)
+
+    def stage_cost_at(
+        self, x, u, t_k, params=None, plant_params=None, discount_rate=None
+    ):
+        """``c_k`` alone of the period starting at ``t_k``: :meth:`stage_at`'s cost, the plant not stepped where the scheme allows (one Euler step)."""
+        # Lazy import: the step model loads with the first stage
+        from minilink.core.compile.evaluators.stepping import stage_cost
+
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+
+        return stage_cost(
+            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
+        )
 
     def stage_at(self, x, u, t_k, params=None, plant_params=None, discount_rate=None):
         """
@@ -587,6 +600,15 @@ class SampledCost(StepCost):
         # Lazy import: the step model loads with the first stage
         from minilink.core.compile.evaluators.stepping import step_with_cost
 
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+        x_next, c = step_with_cost(
+            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
+        )
+
+        return x_next, c
+
+    def laws_at(self, t_k, params, plant_params, discount_rate):
+        """``(ẋ, ċ)`` of the period starting at ``t_k``: the plant on its numbers, the discounted cost rate."""
         params = self.params if params is None else params
         rho = self.discount_rate if discount_rate is None else discount_rate
         g = self.cost.g
@@ -601,11 +623,7 @@ class SampledCost(StepCost):
             xp = array_module(x, u, tau)
             return xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
 
-        x_next, c = step_with_cost(
-            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
-        )
-
-        return x_next, c
+        return dynamics, rate
 
 
 ###############################################################################

@@ -1309,9 +1309,13 @@ count and the last cost-to-go change.
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
-works on both); `grid.X` and `grid.U` are the boxes it spans, and successors from one
-period of the step model, forward Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's
-`solver="rk4"` otherwise; the time step `dt` lives on the grid, not on `System`). `DynamicProgrammingPlanner` runs value iteration backward — `solve`
+works on both); `grid.X` and `grid.U` are the boxes it spans. The grid reads the problem's
+step face (`grid.face`, R141): the successors are one period of the step model, forward
+Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
+step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
+`c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
+the discount `α` the face's `γ` and the price its rule; a `StepPlanningProblem` (a grid world)
+solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on

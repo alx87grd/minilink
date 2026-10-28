@@ -127,3 +127,61 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
         StepPlanningProblem(Walk(), N=3, cost=QuadraticCost.from_system(Pendulum()))
     with pytest.raises(ValueError, match="tick offset"):
         StepPlanningProblem(Walk(), N=3, cost=Moves([4.0]), t_start=0.5)
+
+
+def test_the_state_only_step_is_the_transitions_state_on_both_faces():
+    problem = swing_problem(t_start=2.0)
+    face = problem.compile(dt=0.05, solver="rk4")
+    sampled = problem.discretize(0.05, solver="rk4").compile()
+    x, u = np.array([0.4, -0.3]), np.array([1.0])
+    for t in (2.0, 2.35):
+        np.testing.assert_array_equal(
+            face.step_at(x, u, t), face.transition_at(x, u, t)[0]
+        )
+        np.testing.assert_array_equal(sampled.step_at(x, u, t), face.step_at(x, u, t))
+
+    # A problem without a cost still steps: a grid needs only its successors
+    free = PlanningProblem(problem.sys, x_start=[0.0, 0.0])
+    assert free.compile(dt=0.1).step_at(x, u, 0.0).shape == (2,)
+
+
+def grid_world():
+    """A walker on a 7 × 7 grid of cells, a step to any of its 8 neighbours or none, one unit a move off the goal."""
+    from minilink.core.discrete.step_system import StepSystem
+
+    class Walker(StepSystem):
+        def __init__(self):
+            super().__init__(n=2, input_dim=2, output_dim=2)
+            self.state.lower_bound[:] = [0.0, 0.0]
+            self.state.upper_bound[:] = [6.0, 6.0]
+            self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
+            self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+
+        def step(self, x, u, k=0, params=None):
+            return np.clip(x + u, 0.0, 6.0)
+
+    walker = Walker()
+    return StepPlanningProblem(
+        walker,
+        cost=Moves([5.0, 3.0]),
+        x_start=[0.0, 0.0],
+        X=walker.state.box,
+        U=walker.input_box,
+        infeasible_cost=100.0,
+    )
+
+
+def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
+    from minilink.planning import DynamicProgrammingPlanner
+
+    vi = DynamicProgrammingPlanner(
+        grid_world(), x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
+    )
+    vi.solve()
+
+    # J(x) = the moves to the goal, diagonal moves allowed: the Chebyshev distance
+    J = vi.result.J.reshape(7, 7)
+    cells = np.arange(7.0)
+    distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
+    np.testing.assert_array_equal(J, distance)
+    assert vi.grid.dt == 1.0 and vi.options.alpha == 1.0
