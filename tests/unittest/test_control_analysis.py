@@ -1197,7 +1197,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
 
 
-from minilink.analysis.discretization import Discretization, discretize
+from minilink.analysis.discretization import SampledSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -1233,7 +1233,7 @@ class TestDiscretize(unittest.TestCase):
         x1_ref = _rk4_step(plant.f, x0, u, 0.0, dt, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.dt, dt)
+        self.assertEqual(step_leaf.sample_period, dt)
 
     def test_discretize_h_delegates_to_source(self):
         plant = DoubleIntegrator()
@@ -1362,9 +1362,9 @@ class TestDiscretize(unittest.TestCase):
     def test_discretized_system_checks_dt(self):
         plant = _GainIntegrator()
         with self.assertRaises(TypeError):
-            Discretization(plant, {"gain": 1.0, "dt": 0.1})
+            SampledSystem(plant, {"gain": 1.0, "dt": 0.1})
         with self.assertRaises(ValueError):
-            Discretization(plant, -0.1)
+            SampledSystem(plant, -0.1)
 
     def test_discretize_keeps_the_y_metadata(self):
         plant = Pendulum()

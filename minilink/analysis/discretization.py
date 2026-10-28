@@ -42,14 +42,14 @@ def discretize(
 
     # The exact hold of a linear model: the matrix exponential, once
     if solver == "exact":
-        return ExactDiscretization(system, dt)
+        return ExactSampledSystem(system, dt)
 
-    return Discretization(system, dt, solver=solver, substeps=substeps)
+    return SampledSystem(system, dt, solver=solver, substeps=substeps)
 
 
-class Discretization(StepSystem):
+class SampledSystem(StepSystem):
     """
-    A continuous :class:`DynamicSystem` sampled every :attr:`dt`, its input held.
+    A continuous :class:`DynamicSystem` sampled every :attr:`sample_period`, its input held.
 
     ``step`` is the step model's one step body (``rk4`` or ``euler``,
     ``substeps`` per period), the one the compiled evaluator steps, on the source's ``f``; the
@@ -61,7 +61,7 @@ class Discretization(StepSystem):
     def __init__(
         self,
         source: DynamicSystem,
-        dt: float,
+        sample_period: float,
         *,
         solver: str = "rk4",
         substeps: int = 1,
@@ -81,9 +81,9 @@ class Discretization(StepSystem):
         )
         self.name = f"Discretized({source.name})"
 
-        # The sample time and the step model's knobs; the source's params, live
+        # The sample period and the step model's knobs; the source's params, live
         self.params = None
-        self.dt = positive_dt(dt)
+        self.sample_period = positive_period(sample_period)
         self.solver = solver
         self.substeps = int(substeps)
 
@@ -131,7 +131,7 @@ class Discretization(StepSystem):
         params = self.params if params is None else params
 
         source_f = self.source.f
-        dt = self.dt
+        dt = self.sample_period
         solver = self.solver
         substeps = self.substeps
 
@@ -149,7 +149,7 @@ class Discretization(StepSystem):
         params = self.params if params is None else params
 
         h = self.source.h
-        dt = self.dt
+        dt = self.sample_period
 
         t_k = k * dt
 
@@ -159,11 +159,11 @@ class Discretization(StepSystem):
         return y
 
 
-class ExactDiscretization(Discretization):
+class ExactSampledSystem(SampledSystem):
     """The exact sampled linear model: ``x_{k+1} = A_d x_k + B_d u_k``, ``y_k = C x_k + D u_k``."""
 
-    def __init__(self, source: DynamicSystem, dt: float):
-        super().__init__(source, dt, solver="exact")
+    def __init__(self, source: DynamicSystem, sample_period: float):
+        super().__init__(source, sample_period, solver="exact")
         require_linear_model(source)
 
     def step(self, x, u, k=0, params=None):
@@ -171,7 +171,7 @@ class ExactDiscretization(Discretization):
         xp = array_module(x, u)
 
         source = self.source
-        dt = self.dt
+        dt = self.sample_period
         n = source.n
         m = source.m
 
@@ -264,9 +264,9 @@ def y_dependencies_of(source) -> tuple | str:
     return y_deps
 
 
-def positive_dt(dt: float) -> float:
-    """``dt`` as a float, refused unless positive."""
-    dt = float(dt)
-    if dt <= 0.0:
-        raise ValueError(f"dt must be positive, got {dt}")
-    return dt
+def positive_period(sample_period: float) -> float:
+    """``sample_period`` as a float, refused unless positive."""
+    sample_period = float(sample_period)
+    if sample_period <= 0.0:
+        raise ValueError(f"sample_period must be positive, got {sample_period}")
+    return sample_period
