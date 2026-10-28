@@ -16,7 +16,9 @@ N_TRIALS = 400
 # The plant: a pendulum with a torque disturbance port d and a rate-noise port n
 plant = NoisyPendulum()
 Q, r = np.diag([10.0, 1.0]), 0.1
-V = SENSOR_STD**2 * DT  # the sensor's intensity: its per-sample variance over its period
+V = (
+    SENSOR_STD**2 * DT
+)  # the sensor's intensity: its per-sample variance over its period
 
 # The LQG compensator: an LQR gain on a stationary Kalman estimate, one box
 box = lqg(plant, Q, np.array([[r]]), Q_n=np.diag([0.0, W]), R_n=np.diag([1e-4, V]))
@@ -60,7 +62,9 @@ for _ in range(round(TF / h)):
 
 print(f"Monte Carlo: E[J] = {J.mean():.4f} ± {sem:.4f} over {N_TRIALS} trials")
 print(f"prediction:  E[J] = {expected:.4f} (the loop's covariance from a zero start)")
-print(f"ratio {J.mean() / expected:.3f}, {abs(J.mean() - expected) / sem:.1f} standard errors")
+print(
+    f"ratio {J.mean() / expected:.3f}, {abs(J.mean() - expected) / sem:.1f} standard errors"
+)
 
 # The same loop with its computer sampled: the noise blocks realized per trial alike
 sampled = problem.compile(box % DT, backend="jax").evaluate(n_trials=N_TRIALS, key=1)
