@@ -614,6 +614,15 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
         return x_new
 
+    def plant_input(self, x, u, k=0, params=None, *, t_start=0.0):
+        """The input the loop feeds its plant at tick ``k``: the plant's gathered ``u``, held over the period."""
+        x, u = self.float_arrays(x, u)
+        params = self._frozen_params if params is None else params
+        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        op = self.plan.plant_op
+
+        return gather_u(op.gather_sources, op.u_dim, signals, u, self.xp, self.dtype)
+
     def substep_points(self, x, u, k, params, x_next, t_start):
         """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``."""
         xp = self.xp
@@ -625,10 +634,9 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             return xp.reshape(x_next, (1, -1))
 
         params = self._frozen_params if params is None else params
-        signals = self.port_signals(x_old, u, k, params, t_start=t_start)
         t_k = t_start + k * self.sample_period
         op = self.plan.plant_op
-        local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+        local_u = self.plant_input(x_old, u, k, params, t_start=t_start)
         path = op.system.update_path(
             x_old[op.local_x_slice], local_u, t_k, lookup(params, op.params_path)
         )

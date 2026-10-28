@@ -151,6 +151,7 @@ class WiredDiagramMixin:
 
     def disconnect(self, target_sys_id, target_port_id):
         """Open a subsystem input and return the ``(sys_id, port_id)`` it read, ``None`` if it was open."""
+        require_subsystem_target(target_sys_id)
         self.target_port_of(target_sys_id, target_port_id)
 
         source = self.connections[target_sys_id][target_port_id]
@@ -856,4 +857,13 @@ def require_output_port(outputs, sys_id, port_id):
         raise ValueError(
             f"Unknown output port {port_id!r} on subsystem {sys_id!r}; "
             f"available: {', '.join(outputs) or '(none)'}"
+        )
+
+
+def require_subsystem_target(target_sys_id):
+    """Refuse to disconnect a diagram output: its source is set where it is exposed."""
+    if target_sys_id == "output":
+        raise ValueError(
+            "disconnect opens a subsystem input; a diagram output is set where it is "
+            "exposed (connect_new_output_port or expose)"
         )

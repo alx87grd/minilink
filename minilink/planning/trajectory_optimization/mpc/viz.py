@@ -73,7 +73,7 @@ def mpc_animation_overlays(
     list
         Overlay drawables for ``animate(overlays=...)``.
     """
-    traj = plant_run(rollout, loop) if traj is None else traj
+    traj = plant_trail_of(rollout, loop) if traj is None else traj
 
     # The receding horizons: one plan per tick, in absolute time
     mpc_plans = mpc_plans_from_rollout(rollout, mpc, loop=loop, block=block)
@@ -160,22 +160,25 @@ def mpc_plans_from_rollout(
     return plans
 
 
-def plant_run(rollout: Trajectory, loop=None) -> Trajectory:
+def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
     """
     The plant's run inside a loop's run: its role, else its slice of ``loop`` (a sampled loop's ``compute_trajectory``).
 
     With ``loop``, ``x`` is the plant's state slice and ``u`` the input the
-    loop fed it, read once per tick from the loop's signals and held over the
-    period, so the run can be handed on as the plant's own (for instance to a
-    diagram's ``trajectory_of`` when the plant is itself a diagram).
+    loop fed it, as its compiled plan gathers it at each tick (an open port at
+    its nominal value) and held over the period, so the run can be handed on as
+    the plant's own (to a diagram's ``trajectory_of`` when the plant is itself
+    a diagram). ``params`` is the tree the run was made with (``None``: the
+    loop's own). Reading ``u`` evaluates every block once per tick: a pure MPC
+    solves again.
     """
     if loop is None:
         return rollout.of("plant")
 
-    start, end = loop.state_index["plant"]
-    u = plant_inputs_of(rollout, loop)
+    x = plant_states_of(rollout, loop)
+    u = plant_inputs_of(rollout, loop, params)
 
-    return Trajectory(t=rollout.t, x=rollout.x[start:end], u=u)
+    return Trajectory(t=rollout.t, x=x, u=u)
 
 
 ###############################################################################
@@ -183,45 +186,40 @@ def plant_run(rollout: Trajectory, loop=None) -> Trajectory:
 ###############################################################################
 
 
-def plant_inputs_of(rollout, loop):
-    """The plant's stacked input at each sample of a sampled loop's run: its sources at the sample's tick."""
-    ev = loop.compile()
-    h = loop.sample_period
-    t = np.asarray(rollout.t, dtype=float)
-    t_start = float(t[0])
-    plant = loop.subsystems["plant"]
-    sources = [loop.connections["plant"][port_id] for port_id in plant.inputs]
-    edge_rows = input_rows_of(loop)
+def plant_trail_of(rollout, loop):
+    """The plant's states for the executed trail, with no block evaluated again (its role with no ``loop``)."""
+    if loop is None:
+        return rollout.of("plant")
 
-    # The tick each sample holds: k = ⌊(t − t_start)/Δ⌋, the tick's own sample its first
-    ticks = np.floor((t - t_start) / h + 1e-9).astype(int)
-    u = np.zeros((int(plant.m), t.size))
+    return Trajectory(t=rollout.t, x=plant_states_of(rollout, loop), u=rollout.u)
+
+
+def plant_states_of(rollout, loop):
+    """The plant's state slice of a sampled loop's run."""
+    start, end = loop.state_index["plant"]
+
+    return rollout.x[start:end]
+
+
+def plant_inputs_of(rollout, loop, params=None):
+    """The plant's input at each sample of a sampled loop's dense run: ``S`` samples per tick, the last the end."""
+    ev = loop.compile()
+    t_start = float(rollout.t[0])
+    S = ev.plan.dense_points
+    n_samples = rollout.t.size
+
+    # Sample i lies in the period of tick ⌊i / S⌋; the last sample is the end's tick
+    ticks = np.arange(n_samples) // S
+    u = np.zeros((int(ev.plan.plant_op.u_dim), n_samples))
     for k in np.unique(ticks):
         samples = np.flatnonzero(ticks == k)
         first = samples[0]
-        signals = ev.compute_internal_signals_dict(
-            rollout.x[:, first], rollout.u[:, first], int(k), t_start=t_start
+        u_k = ev.plant_input(
+            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
         )
-        u_k = [
-            rollout.u[edge_rows[port], first]
-            if sys_id == "input"
-            else signals[f"{sys_id}:{port}"]
-            for sys_id, port in sources
-        ]
-        u[:, samples] = np.concatenate(u_k).reshape(-1, 1)
+        u[:, samples] = np.asarray(u_k).reshape(-1, 1)
 
     return u
-
-
-def input_rows_of(system):
-    """Each input port's rows in the stacked input ``u``, in port order."""
-    rows = {}
-    start = 0
-    for port_id, port in system.inputs.items():
-        rows[port_id] = slice(start, start + int(port.dim))
-        start += int(port.dim)
-
-    return rows
 
 
 def plan_history_of(rollout, mpc, loop, block):

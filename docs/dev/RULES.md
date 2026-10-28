@@ -173,7 +173,8 @@ concrete formatting, ordered by the cost of being wrong:
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit
   error messages naming the mismatched ports and blocks; a connected input is rewired only
-  through `disconnect`, and an output's undeclared feedthrough is refused at compile. This rule
+  through `disconnect`, and an output seen at the compile probe to move with an undeclared
+  input is refused. This rule
   covers wiring, not `f`/`h` return-shape checks at ODE time.
 - **4.11 Build vs run.** Does runtime stepping mutate what wiring and `compile()` froze? Law:
   CONSTITUTION §6, 'Build vs run'.

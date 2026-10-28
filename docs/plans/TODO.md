@@ -473,7 +473,7 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
   Landed in the v0.3 run (step 7; the log's RD-60): `connect` refuses a rewire and
   `disconnect(sys_id, port_id)` opens an input; `sum_into`, `filter_into` and the flattener's
-  inlining disconnect first; the compile probe refuses an undeclared feedthrough (no library
+  inlining disconnect first; the compile probe refuses an undeclared feedthrough it sees at the nominal point (no library
   block was under-declared: the catalog, the flagship demos and the suite pass).
 - [ ] **Material and contracts** (was V1 step 9;
   [differentiable-problem.md](differentiable-problem.md) §8):
@@ -483,8 +483,13 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
   - the showcase cells are rewritten on the engine;
   - K4 merges the compile demos, one per feature;
   - the three hand-gradient-loop demos are the maintainer's call (OD-32; §2, "S74, the rest").
+
+  In the v0.3 run (step 7): DESIGN and ROADMAP §3 were brought up at each step, the
+  gradient one-liner reads `allow_int=True`, the showcases run on the new API (RD-63) and the
+  budget is `benchmarks/v03_budget.py` (RD-62); K4 and OD-32 stay the maintainer's.
 - [ ] **The merge**:
-  - every notebook moved to the new interface (R47);
+  - every notebook moved to the new interface (R47) — done in the v0.3 run (step 7, RD-63; the
+    MPC notebooks' prose and the SB3 runs are for the maintainer's review);
   - the student-facing numbers re-pinned (the regression baselines move with each change, §1's
     gates);
   - DESIGN brought up to each landed step;

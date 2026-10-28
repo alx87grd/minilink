@@ -1525,6 +1525,9 @@ def test_connect_refuses_to_rewire_a_connected_input_and_disconnect_opens_it():
     assert diagram.disconnect("plant", "u") is None
     diagram.connect("plant", "y", "plant", "u")
     assert diagram.connections["plant"]["u"] == ("plant", "y")
+    diagram.connect_new_output_port("plant", "y", "y")
+    with pytest.raises(ValueError, match="diagram output"):
+        diagram.disconnect("output", "y")
 
 
 def test_compile_refuses_an_output_that_reads_an_undeclared_input():

@@ -613,3 +613,26 @@ def test_plant_run_carries_the_input_the_loop_fed_the_plant():
     ticks = np.floor(run.t / 0.1 + 1e-9).astype(int)
     tick_y = {k: run.x[p0, np.flatnonzero(ticks == k)[0]] for k in set(ticks)}
     np.testing.assert_allclose(plant.u[0], [2.0 * (1.0 - tick_y[k]) for k in ticks])
+
+
+def test_plant_run_reads_open_ports_boxes_and_a_late_clock():
+    from minilink import PD, Gain, NoisyPendulum, P, closed_loop
+    from minilink import Integrator
+    from minilink.planning.trajectory_optimization.mpc import plant_run
+
+    # An open disturbance port reads its nominal value
+    noisy = closed_loop(PD(2.0, 0.1) % 0.1, NoisyPendulum(), noise=True)
+    run = noisy.compute_trajectory(tf=0.5)
+    assert plant_run(run, noisy).u.shape == (3, run.t.size)
+
+    # A command from a box: u = 3 · 2 (r − y) at each tick
+    boxed = closed_loop((P(2.0) % 0.1) >> (Gain([3.0]) % 0.1), Integrator())
+    run = boxed.compute_trajectory(tf=0.5, u=np.array([1.0]))
+    plant = plant_run(run, boxed)
+    np.testing.assert_allclose(plant.u[0], 6.0 * (1.0 - plant.x[0]), atol=1e-12)
+
+    # A clock started late: the tick of a sample is its index
+    late = (P(2.0) % 1e-3) @ Integrator()
+    run = late.compute_trajectory(tf=1e5 + 0.01, u=np.array([1.0]), t_start=1e5)
+    plant = plant_run(run, late)
+    np.testing.assert_allclose(plant.u[0], 2.0 * (1.0 - plant.x[0]), atol=1e-12)
