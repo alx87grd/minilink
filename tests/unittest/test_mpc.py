@@ -455,10 +455,8 @@ class TestTheDelayedMPC(unittest.TestCase):
         z_next = mpc.update(z, np.array([0.5]), 0.0)
         assert z_next[-1] == DT
 
-        # x̂(Δ) = x + ∫ u dt under the stored plan (the integrator: exact on a linear plan)
-        x_hat = 0.5 + 0.5 * DT * (
-            pv.command(z, None, 0.0)[0] + pv.command(z, None, DT)[0]
-        )
+        # x̂(Δ) = x + Δ u_k, the applied command held (the integrator: exact)
+        x_hat = 0.5 + DT * pv.command(z, None, 0.0)[0]
         expected, _ = pv.solve(
             {"x_start": np.array([x_hat]), "t_start": DT}, z0=pv.shift(z, DT)
         )
@@ -470,7 +468,8 @@ class TestTheDelayedMPC(unittest.TestCase):
         loop = (mpc % DT) @ discretize(plant, DT, substeps=4)
         run = loop.compute_trajectory(tf=1.0)
         plans = mpc_plans_from_rollout(run, mpc, loop=loop)
-        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+        # One plan per solve, labelled by its origin (the tick-0 guess is no solve)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8]
         t_k, plan = plans[1]
         np.testing.assert_allclose(plan.t, plan.t[0] + mpc.pv.offsets)
         with pytest.raises(ValueError, match="loop="):
@@ -530,3 +529,70 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         run = loop.compute_rollout(5)
         p0, p1 = loop.state_index["plant"]
         assert abs(run.x[p0:p1, -1][0] - 2.0) < 0.6
+
+
+@pytest.mark.jax
+class TestTheMPCsSeamFixes(unittest.TestCase):
+    def test_an_iteration_limit_stop_is_used_and_a_non_finite_solve_is_not(self):
+        planner = integrator_planner()
+        mpc = ModelPredictiveController(planner)
+        pv = mpc.pv
+        z = pv.initial()
+        solve = pv.solve
+
+        def capped(params=None, z0=None):
+            z_new, status = solve(params, z0)
+            return z_new, {**status, "success": False}
+
+        pv.solve = capped
+        assert not np.array_equal(mpc.update(z, np.array([0.8]), 0.2), z)
+
+        def diverged(params=None, z0=None):
+            return z0 * np.nan, {"success": False, "iterations": 1, "cost": np.nan}
+
+        pv.solve = diverged
+        np.testing.assert_array_equal(mpc.update(z, np.array([0.8]), 0.2), z)
+
+    def test_an_unwired_bound_port_reads_the_trees_value(self):
+        planner = integrator_planner()
+        mpc = ModelPredictiveController(
+            planner, inputs={"x_start": "y", "cost.xbar": "r"}
+        )
+        np.testing.assert_array_equal(mpc.inputs["r"].nominal_value, [2.0])
+        with pytest.raises(ValueError, match="subtree"):
+            ModelPredictiveController(planner, inputs={"x_start": "y", "cost": "c"})
+
+    def test_the_controllers_tree_is_its_own(self):
+        planner = integrator_planner()
+        mpc = ModelPredictiveController(planner)
+        mpc.params["cost"]["Q"][0, 0] = 9.0
+        assert planner.problem.cost.params["Q"][0, 0] == 1.0
+        clocked = mpc % DT
+        clocked.params["cost"]["Q"][0, 0] = 7.0
+        assert mpc.params["cost"]["Q"][0, 0] == 9.0
+        with pytest.raises(TypeError, match="already on a clock"):
+            clocked % 0.1
+
+    def test_an_unclocked_mpc_in_a_loop_is_refused_naming_the_clock(self):
+        planner = integrator_planner()
+        mpc = ModelPredictiveController(planner)
+        with pytest.raises(TypeError, match="% dt"):
+            mpc @ planner.problem.sys
+
+    def test_a_faces_z_seeds_the_offline_solve(self):
+        planner = integrator_planner()
+        pv = planner.compile()
+        z, _ = pv.solve()
+        warm = planner.solve(guess=z)
+        np.testing.assert_allclose(
+            warm.trajectory.x, pv.solution(z).trajectory.x, atol=1e-6
+        )
+
+    def test_the_plan_readers_find_the_mpc_in_a_dual_rate_loop(self):
+        planner = integrator_planner()
+        mpc = ModelPredictiveController(planner)
+        computer = (mpc % DT) >> (PlanFollower(planner) % 0.05)
+        loop = computer @ discretize(planner.problem.sys, 0.05)
+        run = loop.compute_trajectory(tf=0.6)
+        plans = mpc_plans_from_rollout(run, mpc, loop=loop)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]

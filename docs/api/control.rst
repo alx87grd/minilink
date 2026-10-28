@@ -31,11 +31,5 @@ Control
 .. automodule:: minilink.planning.trajectory_optimization.mpc.predictive
    :members:
 
-.. automodule:: minilink.planning.trajectory_optimization.mpc.controller
-   :members:
-
-.. automodule:: minilink.planning.trajectory_optimization.mpc.utilities
-   :members:
-
 .. automodule:: minilink.planning.trajectory_optimization.mpc.viz
    :members:

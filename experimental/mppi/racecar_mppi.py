@@ -15,6 +15,7 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
+from minilink.analysis import discretize
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
@@ -31,7 +32,10 @@ from minilink.planning import (
     point_probe,
     quadratic_hinge,
 )
-from minilink.planning.trajectory_optimization.mpc import ModelPredictiveController
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    plant_run,
+)
 
 V_REF = 3.5  # [m/s]
 TF = 10.0  # closed-loop run, s
@@ -167,13 +171,12 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=DT, warm_start=True)
+mpc = ModelPredictiveController(planner)
+loop = (mpc % DT) @ discretize(car, DT, substeps=round(DT / SIM_DT))
 t0 = time.perf_counter()
-result = (mpc @ car).compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=SIM_DT, backend="jax"
-)
+result = loop.compute_trajectory(tf=TF)
 mpc_wall = time.perf_counter() - t0
-traj_mpc = result.plant
+traj_mpc = plant_run(result, loop)
 
 
 # --- the benchmark: closed-loop cost, clearance to the cone, corridor margin, tick time ---

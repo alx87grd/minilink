@@ -206,7 +206,8 @@ class TrajectoryOptimizationPlanner(Planner):
         ``x_start``, ``t_start``, the plant's, the cost's, ...), solved on a copy
         of the problem holding them; ``None`` solves the problem as it is.
         ``guess`` seeds the solve: a :class:`~minilink.core.trajectory.Trajectory`,
-        a packed ``z``, or a :class:`~minilink.planning.results.PlanningSolution`
+        a packed ``z`` (a compiled face's, its origin dropped), or a
+        :class:`~minilink.planning.results.PlanningSolution`
         (a warm start: ``planner.solve(guess=previous)``); ``None`` takes the
         options' guess, else the default. The solution's policy is the optimized
         input as a source block, ``policy >> plant``; ``evaluate=True`` also
@@ -242,6 +243,7 @@ class TrajectoryOptimizationPlanner(Planner):
             backend=backend,
         )
         transcribe_s = time.perf_counter() - transcribe_t0
+        seed = decision_vector_of(seed, program)
         z0 = self.transcription.pack_initial_guess(problem, seed)
 
         # The program compiled into an optimizer
@@ -920,6 +922,8 @@ def host_tree(tree):
     """A tree with every leaf a NumPy value (``None`` kept, an empty subtree kept empty), or ``None`` for none."""
     if not tree:
         return None
+    if not isinstance(tree, dict):
+        return tree
 
     return host_subtree(tree)
 
@@ -1061,3 +1065,12 @@ def require_x0_shape(x_arr, sys):
     n = int(sys.n)
     if x_arr.shape != (n,):
         raise ValueError(f"x0 must have shape ({n},)")
+
+
+def decision_vector_of(guess, program):
+    """A guess as the transcription reads it: a compiled face's ``z`` (its origin appended) without its origin."""
+    if isinstance(guess, np.ndarray) and guess.ndim == 1:
+        if guess.size == int(program.n_z) + 1:
+            return guess[:-1]
+
+    return guess

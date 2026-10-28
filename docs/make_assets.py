@@ -268,6 +268,7 @@ def ur5_impedance() -> None:
 
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
+    from minilink.analysis import discretize
     from minilink.catalog import UdeSRacecarDyn
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
@@ -285,6 +286,7 @@ def racecar_mpc() -> None:
     from minilink.planning.trajectory_optimization.mpc import (
         ModelPredictiveController,
         mpc_animation_overlays,
+        plant_run,
     )
 
     # examples/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,
@@ -379,7 +381,7 @@ def racecar_mpc() -> None:
         method="scipy_slsqp",
         optimizer_options={"maxiter": 60, "ftol": 1.0},
     )
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
+    mpc = ModelPredictiveController(planner)
 
     car = UdeSRacecarDyn(named_ports=False)
     car.params["mu"] = PLANT_MU
@@ -387,18 +389,17 @@ def racecar_mpc() -> None:
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d
 
-    lap = mpc @ car
-    result = lap.compute_trajectory(
-        tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, backend="jax"
-    )
+    lap = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+    result = lap.compute_trajectory(tf=TF_SIM)
     # one sample per video frame: the trail's pages stay small
-    traj = result.plant.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
+    frames = result.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
+    traj = plant_run(frames, lap)
     overlays = mpc_animation_overlays(
-        result, planner, scene=scene, track=track, traj=traj
+        result, mpc, loop=lap, scene=scene, track=track, traj=traj
     )
     save_meshcat(
         lap,
-        traj,
+        frames,
         "racecar_mpc.html",
         "racecar_mpc.gif",
         time_factor_video=PLAYBACK,

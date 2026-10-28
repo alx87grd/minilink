@@ -176,6 +176,7 @@ def base_period_of(periods):
     """The greatest common divisor of ``periods`` on a nanosecond grid, refused off the grid."""
     if not periods:
         return None
+    require_clocks(periods)
 
     # Δ = gcd of the periods counted in nanoseconds
     ticks = [round(float(p) * NANOSECONDS_PER_SECOND) for p in periods]
@@ -251,4 +252,13 @@ def require_sampled_subsystem(sys, sys_id):
             f"{type(sys).__name__} {sys_id!r} has continuous states and cannot "
             "join a SampledDiagramSystem: put it on a clock (block % dt, or "
             "discretize(plant, dt)), or close the loop with (block % dt) @ plant"
+        )
+
+
+def require_clocks(periods):
+    """Refuse a block on a clock with no period: a native sampled law takes its period from ``%``."""
+    if any(p is None for p in periods):
+        raise TypeError(
+            "a sampled law in the loop has no period: put it on its clock "
+            "(law % dt), e.g. (mpc % 0.05) @ plant"
         )

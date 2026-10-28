@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -32,8 +34,10 @@ def ModelPredictiveController(
       state is the plan ``z``. At tick ``k`` it applies the plan solved at the
       previous tick, ``u_k = command(z_k, x̂_k, t_k)``, and solves the next one,
       ``z_{k+1} = solve(P_k, z0=shift(z_k, t_k))``: one period of computation
-      delay, as on a real computer, and no algebraic loop. A failed solve keeps
-      ``z_k``, the next tick reading the old plan further in.
+      delay, as on a real computer, and no algebraic loop. A solve that returns
+      no usable plan (a non-finite cost or plan) keeps ``z_k``, the next tick
+      reading the old plan further in; a solver stopped at its iteration limit
+      still returns its last iterate, which is used.
     - **pure** (``delay=False``): a static law, ``u_k = command(solve(P_k), x̂_k,
       t_k)``, the first action of a solve from the default guess at every tick:
       the ideal law, a reference for studies.
@@ -55,8 +59,8 @@ def ModelPredictiveController(
         The delayed form (default) or the pure one.
     lookahead : float
         Delay compensation, in seconds: the plan starts at ``t_k + lookahead``
-        from the measured start predicted that far ahead under the stored plan
-        (the planner's model, the plan's commands applied), so the plan the
+        from the measured start predicted that far ahead under the planner's
+        model with the command the block applies now held, so the plan the
         next tick applies starts where the plant will be; ``0`` solves from
         the measurement at its own time.
     backend : str, optional
@@ -80,9 +84,10 @@ class DelayedPredictiveController(NativeSampledSystem):
     """
     The delayed MPC: a native sampled law whose state is the plan ``z``, ``n = pv.n_z``.
 
-    ``update(z, y, t) = solve(P(y, t), z0=shift(z, t + lookahead))``, the old
-    plan kept on a failed solve; ``u = command(z, x̂, t)``. Built by
-    :func:`ModelPredictiveController`.
+    Its state update solves the next plan from the bound leaves, warm-started
+    from the stored plan rebased to the plan's origin, and keeps the stored
+    plan when the solve returns none usable; its command reads the stored plan
+    at the tick's time. Built by :func:`ModelPredictiveController`.
     """
 
     def __init__(self, pv, bindings, lookahead=0.0):
@@ -93,7 +98,7 @@ class DelayedPredictiveController(NativeSampledSystem):
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
-        self.params = dict(pv.params)
+        self.params = copy.deepcopy(pv.params)
         self.x0 = np.asarray(pv.initial(), dtype=float)
         self.state.labels = [f"z[{i}]" for i in range(pv.n_z)]
 
@@ -117,41 +122,59 @@ class DelayedPredictiveController(NativeSampledSystem):
 
         pv = self.pv
         lookahead = self.lookahead
+        bindings = self.bindings
         z = x
+        t_plan = t + lookahead
 
         # P_k: the planner's tree with the bound leaves read from their ports, the
         # plan's origin t_start = t_k + lookahead, its start predicted to that time
-        P = bound_tree(self, params, u, t + lookahead)
-        if lookahead > 0.0 and "x_start" in self.bindings:
-            x_ahead = predicted_start(pv, z, P["x_start"], t, lookahead, P)
+        P = bound_tree(self, params, u, t_plan)
+        if lookahead > 0.0 and "x_start" in bindings:
+            u_k = pv.command(z, P["x_start"], t)
+            x_ahead = predicted_start(pv, P["x_start"], u_k, t, lookahead, P)
             P = with_leaf(P, "x_start", x_ahead)
 
-        # z_{k+1} = solve(P_k, z0 = shift(z_k, t_k + lookahead)), z_k kept on a failure
-        z_guess = pv.shift(z, t + lookahead)
+        # z_{k+1} = solve(P_k, z0 = shift(z_k, t_k + lookahead)), z_k kept when the
+        # solve returns no usable plan
+        z_guess = pv.shift(z, t_plan)
         z_new, status = pv.solve(P, z0=z_guess)
-        z_next = xp.where(status["success"], z_new, z)
+        cost = status["cost"]
+        finite_cost = True if cost is None else xp.isfinite(cost)
+        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        z_next = xp.where(usable, z_new, z)
 
         return z_next
 
     def compute_u(self, x, u, t=0, params=None):
-        """``u_k = command(z_k, x̂_k, t_k)``: the stored plan read at the tick's time."""
-        u_k = self.pv.command(x, measured_start(self, u), t)
+        """The command: the stored plan read at the tick's time."""
+        pv = self.pv
+        x_hat = measured_start(self, u)
+
+        # u_k = command(z_k, x̂_k, t_k)
+        u_k = pv.command(x, x_hat, t)
+
         return u_k
 
     def compute_x_ref(self, x, u, t=0, params=None):
         """The planned state at ``t``."""
-        x_ref, _ = self.pv.prediction(x, t)
+        pv = self.pv
+
+        x_ref, _ = pv.prediction(x, t)
+
         return x_ref
 
     def compute_u_ref(self, x, u, t=0, params=None):
         """The planned input at ``t``."""
-        _, u_ref = self.pv.prediction(x, t)
+        pv = self.pv
+
+        _, u_ref = pv.prediction(x, t)
+
         return u_ref
 
 
 class PurePredictiveController(System):
     """
-    The pure MPC: a static law, ``u_k = command(solve(P_k), x̂_k, t_k)`` from the default guess every tick.
+    The pure MPC: a static law, the first action of a solve from the default guess at every tick.
 
     Built by :func:`ModelPredictiveController` with ``delay=False``; closed on
     a clock (``mpc % dt``), one solve per tick.
@@ -164,13 +187,13 @@ class PurePredictiveController(System):
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
-        self.params = dict(pv.params)
+        self.params = copy.deepcopy(pv.params)
 
         declare_bound_inputs(self, pv, bindings)
         self.add_output_port("u", dim=pv.m, function=self.compute_u, dependencies="all")
 
     def compute_u(self, x, u, t=0, params=None):
-        """``u_k = command(solve(P_k), x̂_k, t_k)``, the first action of a cold solve."""
+        """The first action of a cold solve from the tick's bound leaves."""
         params = self.params if params is None else params
 
         pv = self.pv
@@ -179,14 +202,17 @@ class PurePredictiveController(System):
         # z* = solve(P_k) from the default guess, read at the tick's time
         P = bound_tree(self, params, u, t + lookahead)
         z, _ = pv.solve(P)
-        u_k = pv.command(z, measured_start(self, u), t)
+        x_hat = measured_start(self, u)
+
+        # u_k = command(z*, x̂_k, t_k)
+        u_k = pv.command(z, x_hat, t)
 
         return u_k
 
 
 class PlanFollower(System):
     """
-    The plan applied at its own rate: ``u = command(z, t)`` of the plan ``z`` received on its input.
+    The plan applied at its own rate: the command of the plan received on its input, read at its own ticks.
 
     The fast half of a dual-rate loop, ``(mpc % 0.05) >> (PlanFollower(planner) % 0.01)``:
     the plan solved from ``y_j`` reaches the follower at the next slow tick, one
@@ -205,8 +231,12 @@ class PlanFollower(System):
         )
 
     def compute_u(self, x, u, t=0, params=None):
-        """``u(t) = command(z, t)``: the received plan read at ``t``."""
-        u_t = self.pv.command(u, None, t)
+        """The received plan read at ``t``."""
+        pv = self.pv
+
+        # u(t) = command(z, t), an open-loop plan reading no state
+        u_t = pv.command(u, None, t)
+
         return u_t
 
 
@@ -227,8 +257,10 @@ def declare_bound_inputs(block, pv, bindings):
     """One input port per bound leaf, sized as the leaf."""
     defaults = pv.params
     for path, port in bindings.items():
-        leaf = np.asarray(lookup(defaults, path), dtype=float)
-        block.add_input_port(port, dim=int(leaf.size))
+        leaf = lookup(defaults, path)
+        require_bindable_leaf(path, leaf)
+        value = np.asarray(leaf, dtype=float).reshape(-1)
+        block.add_input_port(port, dim=int(value.size), nominal_value=value)
 
 
 def bound_tree(block, params, u, t_start):
@@ -245,8 +277,8 @@ def bound_tree(block, params, u, t_start):
     return P
 
 
-def predicted_start(pv, z, x, t, lookahead, params):
-    """``x̂(t + lookahead)``: the planner's model from ``x`` at ``t`` under the stored plan's commands, RK4 steps a quarter of a knot apart, the command linear over each."""
+def predicted_start(pv, x, u_k, t, lookahead, params):
+    """``x̂(t + lookahead)``: the planner's model from ``x`` at ``t`` with the applied command ``u_k`` held, RK4 steps a quarter of a knot apart."""
     # Lazy import: the step model loads with the first prediction
     from minilink.core.compile.evaluators.stepping import step_body
 
@@ -254,19 +286,14 @@ def predicted_start(pv, z, x, t, lookahead, params):
     plant = params["plant"] or None
     spacing = float(pv.offsets[1] - pv.offsets[0])
     n_sub = max(1, int(np.ceil(4.0 * lookahead / spacing)))
-    h = lookahead / n_sub
 
     def dynamics(x, u, tau):
         return f(x, u, tau, plant)
 
-    # x_{j+1} = Φ(x_j, u(τ), τ_j), the plan's command linear from u(τ_j) to u(τ_j + h)
-    for j in range(n_sub):
-        tau = t + j * h
-        u_j = pv.command(z, x, tau)
-        u_next = pv.command(z, x, tau + h)
-        x = step_body(dynamics, x, u_j, u_next, tau, h, "rk4", 1)
+    # x̂(t + Δ) = Φ(x, u_k, t), the command held over the lookahead as the plant sees it
+    x_ahead = step_body(dynamics, x, u_k, u_k, t, lookahead, "rk4", n_sub)
 
-    return x
+    return x_ahead
 
 
 def measured_start(block, u):
@@ -297,3 +324,12 @@ def require_unique_ports(bindings):
     ports = list(bindings.values())
     if len(set(ports)) != len(ports):
         raise ValueError(f"each bound leaf needs its own port, got {bindings}")
+
+
+def require_bindable_leaf(path, leaf):
+    """Refuse a binding that names a subtree: a port carries one leaf."""
+    if isinstance(leaf, dict):
+        raise ValueError(
+            f"{path!r} names a subtree of the planner's tree ({sorted(leaf)}): bind "
+            "each leaf to its own port"
+        )

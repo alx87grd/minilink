@@ -9,6 +9,7 @@ from minilink.planning.trajectory_optimization.mpc.predictive import (
 from minilink.planning.trajectory_optimization.mpc.viz import (
     mpc_animation_overlays,
     mpc_plans_from_rollout,
+    plant_run,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "PlanFollower",
     "mpc_animation_overlays",
     "mpc_plans_from_rollout",
+    "plant_run",
 ]

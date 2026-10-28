@@ -352,7 +352,7 @@ class NativeSampledSystem(SampledSystem):
         return self.params.get("seed") is not None
 
     def realize(self, key):
-        """The law's ``params``: a native law draws from its own ``seed`` leaf when it has one."""
+        """The law's ``params``: a native law holds no draw of its own to realize."""
         return self.params
 
     @property
@@ -379,8 +379,12 @@ class NativeSampledSystem(SampledSystem):
         return y
 
     def __mod__(self, dt: float):
-        """This law on a clock of period ``dt``: a copy with the period set (the equations unchanged)."""
+        """This law on a clock of period ``dt``: a copy with the period set and its own numbers and start (the equations unchanged)."""
+        require_no_clock(self)
+
         sampled = copy.copy(self)
+        sampled.params = copy.deepcopy(self.params)
+        sampled.x0 = np.array(self.x0, dtype=float)
         sampled.sample_period = positive_period(dt)
         sampled.name = f"{self.name} % {float(dt):g}"
 
@@ -522,3 +526,12 @@ def positive_period(sample_period: float) -> float:
     if sample_period <= 0.0:
         raise ValueError(f"sample_period must be positive, got {sample_period}")
     return sample_period
+
+
+def require_no_clock(law) -> None:
+    """Refuse to clock a native law that already has a period."""
+    if law.sample_period is not None:
+        raise TypeError(
+            f"{law.name} is already on a clock of {law.sample_period:g} s: clock the "
+            "law itself, once"
+        )

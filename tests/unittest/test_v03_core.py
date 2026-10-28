@@ -56,7 +56,7 @@ def digital_pid_problem():
     return problem, pid
 
 
-# Script 1, the objects lane
+# Script 1
 
 LQG_DT, LQG_TF = 0.01, 5.0
 PROCESS_PSD = 0.04  # W, the torque's white-noise intensity
@@ -159,7 +159,7 @@ def test_script_01_objects_an_lqg_loop_scores_its_covariance_prediction():
     assert abs(J_s.mean() - expected) < 3.0 * J_s.std(ddof=1) / np.sqrt(J_s.size)
 
 
-# Script 2, the loop lane
+# Script 2
 
 
 @pytest.mark.optional
@@ -187,7 +187,7 @@ def test_script_02_loop_a_digital_pid_has_a_gradient():
         problem.compile(pid % 0.01, dt=0.02)
 
 
-# Script 3, the loop lane
+# Script 3
 
 
 def test_script_03_loop_the_run_verbs_and_the_score_give_one_run():
@@ -207,7 +207,7 @@ def test_script_03_loop_the_run_verbs_and_the_score_give_one_run():
     np.testing.assert_allclose(host.x, dense.x, atol=1e-7)
 
 
-# Script 10, the loop lane
+# Script 10
 
 
 def multi_rate_loop():
@@ -251,7 +251,7 @@ def test_script_10_loop_a_multi_rate_computer_on_a_continuous_plant(backend):
     )
 
 
-# Script 11, the loop lane
+# Script 11
 
 
 def test_script_11_loop_a_bare_reference_reads_seconds():
@@ -528,7 +528,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     assert plan.solver.cost == pytest.approx(reference.solver.cost, rel=1e-6)
 
 
-# Script 6, join 1
+# Script 6
 
 
 def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
@@ -607,7 +607,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     np.testing.assert_array_equal(evidence.x.T, face.run(policy)[0])
 
 
-# Script 5, join 2
+# Script 5
 
 
 def native_mpc_problem():

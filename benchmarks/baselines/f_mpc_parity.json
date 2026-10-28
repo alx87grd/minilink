@@ -21,7 +21,7 @@
       "direction": "lower_better",
       "value": 0.24549795901111793,
       "unit": "s",
-      "notes": "mpc @ plant warm-start ZOH, short tf"
+      "notes": "(mpc % dt) @ plant, the delayed MPC, short tf"
     },
     {
       "id": "f.hybrid_zoh.nlp_s",
@@ -118,7 +118,7 @@
       "direction": "lower_better",
       "value": 0.16140987499966286,
       "unit": "s",
-      "notes": "compute_command hand loop, short tf"
+      "notes": "host loop on pv.solve / shift / command, short tf"
     },
     {
       "id": "f.hand_loop.nlp_s",
@@ -215,7 +215,7 @@
       "direction": "lower_better",
       "value": 0.23925920799956657,
       "unit": "s",
-      "notes": "dual_rate_computer @ plant, short tf"
+      "notes": "(mpc % slow) >> (PlanFollower % fast) @ plant, short tf"
     },
     {
       "id": "f.dual_rate.nlp_s",
