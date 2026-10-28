@@ -25,7 +25,7 @@ Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
-Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only; `R1`–`R153`
+Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only; `R1`–`R166`
 are rulings, numbered in their dated records under [../reviews/](../reviews/). A plan doc numbers
 its own steps locally (fields.md's 4.1–4.8, cited as "steps 4.1–4.8 of fields.md") or with a
 prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare workboard-style id. The prefix
@@ -52,7 +52,7 @@ sentence: the plain title comes first.
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
 | [core-architecture.md](core-architecture.md) | **Read first for the core.** The v0.3 workstreams (two invariants, seven pillars), each with its goal, status, code today, open decisions and rows; the order (three lanes); the proposed definition of done; the core against the features | v0.3 |
-| [sampled-path.md](sampled-path.md) | The sampled loop (S31, R145–R147): `SampledSystem`, periods on blocks, `SampledDiagramSystem`, the two run verbs, the two runners; D13–D15; kept for S53 | core §5 |
+| [sampled-path.md](sampled-path.md) | Time in the core and the sampled loop (S31, R145–R147, R158): what `t` is for every kind and every diagram, `SampledSystem` the sampled-data kind, periods on blocks, `SampledDiagramSystem` and its plan, the two run verbs, the two runners; D13–D15; kept for S53 | core §2, §5 |
 | [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, noise is a held law, one key per experiment; RD-D1–RD-D24; RN-2–RN-6 | core §1, §3 |
 | [differentiable-problem.md](differentiable-problem.md) | What remains of the path from any parameter to any metric: the `StepRollout` fold, steps 7, 7b, 8, 9; §9's one score (decided in part, R141, R142); traceable linear analysis (S73, §4.6) | core §1, §2, §3, §5, §6; S73 v0.4 |
 | [parametric-program.md](parametric-program.md) | One program family with every problem parameter bound at solve time (PP-0–PP-5, D25 in §2.1); one optimizer backend table (OPW-1–OPW-5) | core §7 |

@@ -4,10 +4,12 @@
 goal, a status, what the code does today, what is still open and its rows. Where the pieces live:
 - **The rows** (files, "done when") are [TODO.md](TODO.md) §1.N, with the same N as the section
   here.
-- **The rulings** are preliminary choices, open to readjustment with the final architecture:
-  [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
+- **The rulings** are the architecture of record (R166, 2026-10-28):
+  [R124–R140](../reviews/2026-10-27-design-questions-rulings.md),
   [R141–R153](../reviews/2026-10-27-core-vision-decisions.md) (the latter opens with a one-screen
-  index and what it revises among the former). How they were reached:
+  index and what it revises among the former) and
+  [R154–R166](../reviews/2026-10-28-session-rulings.md) (time in the core, the MPC's kind, the
+  one-score points, the names, the go). How they were reached:
   [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md), whose fourteen
   decisions they take.
 - **The open design questions** are [QUESTIONS.md](../dev/QUESTIONS.md).
@@ -39,7 +41,7 @@ PlanningProblem / StepPlanningProblem (stochastic by their parts)              �
   └─ problem.compile(dt=) → transition(x, u, k) → (x_next, c_k)                §6 one score
   └─ problem.compile(controller) → evaluate → Evaluation; program(wrt)         §6, §7
 MathematicalProgram  J(z, params) → Optimizer(method, iterations=K)             §7, §8
-Planner → planner.compile() → pv: solve, shift, policy → the MPC                §8
+Planner → planner.compile() → pv: solve, shift, command → the MPC                §8
 Field  value(x, u, t; p): as_set, as_cost, as_terminal_cost                    §9
 ```
 
@@ -175,7 +177,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   `NeuralPolicy` (renamed from `NeuralPolicyController` in the v0.3 sweep, R151).
 - **Ruled:** R129, R151.
 - **Today:** the RL Gaussian heads draw from their own keys.
-- **Open:** whether the RL heads are rebuilt on the block in v0.3 or in v0.4 (a placement detail).
+- **Open:** nothing; the heads are rebuilt in v0.3 with the block, training performance unchanged
+  as the gate (R160).
 - **Rows:** [TODO §1.4](TODO.md#14-the-seeded-stochastic-policy).
 
 ## 5. The sampled loop: a step diagram, two runners (pillar)
@@ -222,10 +225,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   `params`, no roles and no problem; `StepRollout` is the computer's record; `problem.compile`
   refuses a `StepSystem` controller but accepts the stateless MPC, whose latch then runs at the
   RK4 stages (KNOWN_ISSUES); `%` refuses a law with continuous states.
-- **Open:** whether the realtime simulator is re-based on the pure blocks in v0.3 or with the
-  realtime review (v1.0); AC-8a's port names and the role name of the computer side
-  (automation-by-convention.md); whether the host clock runner keeps the lazy
-  `core` → `simulation` import once the hybrid modules go (R100).
+- **Open:** whether the host clock runner keeps the lazy `core` → `simulation` import once the
+  hybrid modules go (R100). Settled 2026-10-28: the realtime runner's re-base is a v0.4 feature
+  (R161); the left operand of `@` is `controller`, box or block (R162); the conventions' first
+  sampled-loop step is folded into this workstream (R163).
 - **Rows:** [TODO §1.5](TODO.md#15-the-sampled-loop-a-step-diagram-two-runners).
 
 ## 6. One score (pillar)
@@ -260,8 +263,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   them one owner); the hold differs too: the planners' `nominal_trajectory` holds `u_k` over the
   period while `evaluate` closes the law as a continuous diagram and reads it at the RK4 stages,
   so a lookup policy is scored on two loops today.
-- **Open** (QUESTIONS, the one-score entry): time-varying sets and the margins between samples;
-  one failure rule (absorbing or not) and the input hold; shooting's reported score.
+- **Open:** nothing. The three points are ruled (R159): the bounds are checked at the samples (the
+  dense run shows what happens between them); a run is priced to the horizon with the input held;
+  a solver may optimize its own objective but a solution's score is always the problem's cost
+  through the common step function, said in the planner's record when they differ.
 - **Rows:** [TODO §1.6](TODO.md#16-one-score).
 
 ## 7. The parametric program; the stochastic program its seed case (pillar)
@@ -288,8 +293,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   evaluator; the compiled path takes SciPy only; problems have no start time; shooting and
   collocation pin the start through `X0`; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
-- **Open:** the name of `program.params_at(z)` (the names sweep). The performance gate has its
-  budget: §11's ninth script (R156).
+- **Open:** nothing; the export's full tuned tree is `program.unpack(z)` (R164). The performance
+  gate has its budget: §11's ninth script (R156).
 - **Rows:** [TODO §1.7](TODO.md#17-the-parametric-program-the-stochastic-program-its-seed-case).
 
 ## 8. The native proof of concept: the planner's pure face and an MPC on it (pillar)
@@ -300,7 +305,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     `Optimizer(program, method="adam", iterations=K)` is exactly `K` steps, one `lax.scan`, pure
     and differentiable; `iterations=None` runs to a tolerance (R149).
   - **A planner is a description; `planner.compile()` is its pure face** (R148): `n_z`,
-    `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `policy(z, x, t)`,
+    `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `command(z, x, t)`,
     `prediction`, `solution`, `pack`, `program`; `planner.solve()` stays the convenience verb.
     Every planner fits: what differs is what its solution vector `z` holds.
   - **The MPC** is one block in two forms on that face (R148, R123): the delayed form, a
@@ -316,7 +321,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   update jitted; nothing differentiates through a solve; the RL learners already run their steps
   in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
   MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
-- **Open:** the names in planner-and-mpc.md §11.
+- **Open:** nothing; the names are ruled (R164).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 
 ## 9. Fields (pillar)
@@ -341,8 +346,7 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
 
 The lanes follow the dependencies (they replaced the phases 0–8 of 2026-10-26, whose two
 backward edges reviewer C found; [the simplification record](../reviews/2026-10-26-plan-simplification.md)).
-Every lane is ready to start once step 0 lands; only join 1 waits on the one-score question's
-three open points.
+Every lane is ready to start once step 0 lands; nothing waits on a decision (R166).
 
 | Lane | Workstreams, in order | Waits on |
 | --- | --- | --- |
@@ -426,5 +430,6 @@ v0.4 reads the core and never changes it.
 | Native solvers beyond the proof of concept (NS-2's tolerance form, NS-3–NS-7) | §7, §8 | [native-optimizers.md](native-optimizers.md) |
 | Traceable linear analysis (S73) | the Jacobian | [differentiable-problem.md](differentiable-problem.md) §4.6 |
 | The serial chain (C6), pyro parity (C1), C2, C3, S63, S64 | — | [pyro-port-remaining.md](pyro-port-remaining.md) |
+| The realtime runner on the pure blocks (R161) | §5 | [sampled-path.md](sampled-path.md) §8.6 |
 | The estimation follow-ups (v0.9, TODO §5): the sampled filters | §5 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §6 |
 | After v1.0: behavior cloning (a `fit` verb and a dataset noun, open), diffusion policy | §4, §5 | [future-policies.md](future-policies.md) §3–§5 |

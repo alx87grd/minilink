@@ -336,7 +336,7 @@ behaviour-preserving, one module per step.
 - **D3** Hardening rows carried over (research lane).
 - **S65** One owner per rule (the automatic `dt`, the backend fallback, the input-hold
   model, the Monte Carlo defaults), the core; **S66** wiring mistakes fail at wiring time
-  **[ask — core]**, the core's hardening; **S67** one plot vocabulary; **S68** contracts as tests.
+  (the go given, R166), the core's hardening; **S67** one plot vocabulary; **S68** contracts as tests.
 
 ### 5.3 v0.3 — the complete core
 
@@ -346,7 +346,8 @@ supporting stochastic problems and the hybrid sampled loop, built in the natural
 code, with no date. It supersedes R86's "v0.3 stays continuous". Where the pieces live:
 - **The design home:** [core-architecture.md](../plans/core-architecture.md).
 - **The rows:** TODO §1.
-- **The design questions:** QUESTIONS.md; the preliminary choices of 2026-10-27,
+- **The design questions:** QUESTIONS.md; the choices of 2026-10-27 and 2026-10-28, the
+  architecture of record (R166, [record](../reviews/2026-10-28-session-rulings.md)),
   [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
   [R141–R153](../reviews/2026-10-27-core-vision-decisions.md), the latter taking the fourteen
   decisions of [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md).
@@ -360,7 +361,7 @@ code, with no date. It supersedes R86's "v0.3 stays continuous". Where the piece
 - the optimizer's method table (S74);
 - the closing PID example (S77).
 
-**The workstreams** (each **[ask — core]**). One number per workstream, the same in
+**The workstreams** (each with the go, R166). One number per workstream, the same in
 core-architecture §N and TODO §1.N:
 
 | § | Workstream | The main rows |
@@ -425,6 +426,8 @@ audit was done 2026-10-23 (G1).
 **The maintainer's direction (2026-10-26):** v0.4 adds features built on the finished core, not
 intertwined with it; any order, each independent. The rows are TODO §4; the map of which pillar
 each reads is [core-architecture.md](../plans/core-architecture.md) §12.
+- The realtime runner on the pure blocks (R161): game mode and hardware in the loop on the
+  sampled loop's blocks (TODO §4).
 - **S72** The path-integral planner (MPPI) on the core's sampled loop and draws
   ([mppi.md](../plans/mppi.md)), a planner under the compiled-face contract
   ([planner-and-mpc.md](../plans/planner-and-mpc.md), R148).

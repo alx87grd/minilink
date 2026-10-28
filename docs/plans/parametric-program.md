@@ -1,7 +1,7 @@
 # The parametric program: every problem parameter bound at solve time
 
-Status: **draft plan**, its shape decided (2026-10-27, preliminary, open to readjustment with
-the final architecture).
+Status: **draft plan**, its shape decided (2026-10-27; the architecture of record since
+2026-10-28, R166).
 - **Decided:**
   - one noun, `MathematicalProgram(..., params=None)`, mirroring `f(x, u, t; params)`; no
     `ParametricProgram` and no `bind` on programs (R130,
@@ -15,7 +15,7 @@ the final architecture).
   - the plant's key in every tree is `plant` (R26, 2026-10-23).
 - **Still open:**
   - R130's performance gate (§2);
-  - the name of `program.params_at(z)`, the full tuned tree from an exported program (the
+  - the name of `program.unpack(z)`, the full tuned tree from an exported program (the
     naming question).
 - **Not started:** PP-1–PP-5 and OPW-1–OPW-5. They build on the optimizer method table and the
   first-order backend that S74 landed (R74, 2026-10-24), on the compiled problem's program
@@ -90,7 +90,7 @@ MathematicalProgram(n_z=3, J=J, grad_J=grad)         # J(z): no parameters decla
 
 ### 2.1 D25, the two asks (moved from end-state-api.md, 2026-10-26)
 
-Both are answered (2026-10-27, preliminary):
+Both are answered (2026-10-27):
 - **A hand-written program may declare its own parameters:** `MathematicalProgram(n_z, J,
   params=…)` with `J(z, params=None)` (R130), so tutorial 08 can solve one NLP for several
   parameter values.
@@ -162,7 +162,7 @@ R148's `inputs=` bindings (§2.1); the design is [planner-and-mpc.md](planner-an
 ## 4. The steps (one commit each; the AGENTS recipe where behaviour must hold)
 
 - **PP-0 The names:** the key `plant` (R26); the noun (R130); the MPC's `inputs=` (R148). Left:
-  `params_at` (the naming question).
+  `unpack` (the naming question).
 - **PP-1 The program with parameters:** §2 and §3.2, one evaluator, the performance gate first.
   Done when the MPC baselines (`test_mpc.py`, the trajopt parity scenario) are byte-identical
   with `params = {"x_start": …}` and the plain programs of tutorial 08 and the optimization demos

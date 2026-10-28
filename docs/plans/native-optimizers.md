@@ -5,7 +5,7 @@ and the agent's read (§3–§4). Lane: research. The rows: the proof of concept
 fixed-`K` form, NS-8, NS-9) is [TODO.md](TODO.md) §1.8 ([core-architecture.md](core-architecture.md)
 §8); the rest is TODO §4.
 
-**Preliminary choices, 2026-10-27** (open to readjustment with the final architecture):
+**Choices of 2026-10-27** (the architecture of record since 2026-10-28, R166):
 - the two-layer split of §3: a pure kernel run by `Optimizer`, a step-system view for the
   lesson; §4.1–§4.2's categories and algorithms added only with the first solver that needs them
   ([R132](../reviews/2026-10-27-design-questions-rulings.md));
@@ -365,7 +365,7 @@ comes back with NS-5 (R122, §4.7).
 
 ## 7. Parametric and stochastic programs
 
-**Preliminary choice, 2026-10-27 (R131, [record](../reviews/2026-10-27-design-questions-rulings.md)),
+**Choice, 2026-10-27 (R131, [record](../reviews/2026-10-27-design-questions-rulings.md)),
 on one program noun (R130):**
 - inside, a program's functions always see a complete tree (R121); at the user boundary
   (`solve(params=...)`) a partial tree is merged once onto the defaults; no `bind` on programs

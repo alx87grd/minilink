@@ -181,7 +181,7 @@ nominal sequence is `U = (u_0, …, u_{N-1})`, each `u_k ∈ ℝ^m`.
    the paper; a later option, not the prototype). `n_iterations` repeats 1–5 on the
    same `x_0`; the default is one pass per tick, the MPPI of the literature.
 6. **Apply and shift.** The solve's output is `U`; the MPC block applies its input at `t`
-   (`pv.policy`) and starts the next solve from the shifted sequence
+   (`pv.command`) and starts the next solve from the shifted sequence
    `U ← (u_1, …, u_{N-1}, u_{N-1})` (`pv.shift`, planner-and-mpc.md §6.2).
 
 The record of a solve carries the things a user tunes against: `S_min`, the weighted
@@ -383,7 +383,7 @@ block). MPPI fills the face so (its §4 row):
 | `initial(params)` | zeros, or the nominal input of the ports, at `params["t_start"]` |
 | `solve(params, z0)` | §5's body: `n_iterations` passes from `z0`, pure on the `seed` leaf |
 | `shift(z, t)` | `U` moved to the origin `t` (R155), the last input repeated (a shift that is not a multiple of MPPI's `dt`: open, §3) |
-| `policy(z, x, t)` | the input of `U` held at `t`; `x` ignored (an open-loop plan) |
+| `command(z, x, t)` | the input of `U` held at `t`; `x` ignored (an open-loop plan) |
 | `prediction(z, t)` | the nominal rollout of `U` at `t` (for `x_ref`, `u_ref`) |
 | `solution(z)` | the `PlanningSolution` and its `MPPIRecord`, host-side |
 | `pack(guess)` | a `Trajectory` or a `PlanningSolution` resampled to `U` |
@@ -434,7 +434,7 @@ stated in the report.
   `dp.py`.
 - [ ] **MP-2 The hand-loop demo** (research lane).
   `experimental/mppi/pendulum_mppi.py`: the planner, `compute_command`-style
-  hand loop (`pv.shift`, `pv.solve`, apply `pv.policy`, step the plant with `discretize`)
+  hand loop (`pv.shift`, `pv.solve`, apply `pv.command`, step the plant with `discretize`)
   until MP-4; `print(solution)`; the plan over the closed-loop trajectory.
   Done when it runs in the nightly sweep's wall-clock budget.
 - [ ] **MP-3 The stochastic branch.** `n_plant_samples`, `plant_realizations`,

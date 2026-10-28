@@ -9,6 +9,9 @@ each answer as a preliminary choice; when the final architecture is drafted, the
 open to readjustment. The R-ids are anchors for citation; each heading says "preliminary". The
 plan doc each choice shapes and TODO carry it, with the same caveat.
 
+**Confirmed (2026-10-28, R166):** these choices are the architecture of record for the v0.3 core; the
+"preliminary" caveat is lifted ([record](2026-10-28-session-rulings.md)).
+
 ## R124 (2026-10-27, preliminary) Three owners of a start; a diagram's state derived from its blocks
 
 The question: does a diagram's start state become a parameter (S29)?

@@ -8,7 +8,7 @@ agent-managed. Landed rows leave this file; their history is git and
 [docs/reviews/](../reviews/). The pieces live elsewhere:
 - **Why each v0.3 row exists:** [core-architecture.md](core-architecture.md) §N, the same N as
   §1.N here.
-- **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md); the preliminary choices
+- **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md); the choices
   are [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
   [R141–R153](../reviews/2026-10-27-core-vision-decisions.md), the latter taking the decisions of
   [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md).
@@ -32,25 +32,21 @@ Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or rev
 agent starts. They are details, versions and demos, not design questions (those are
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
-**One go per lane (an ask, 2026-10-27 evening):** 23 of the 43 open rows of §1 are
-**[ask — core]**, and R141–R153 now rule their shape. The asks with an option left are the
-discretized problem's cost, D15 and the one-score points (QUESTIONS.md); one go per lane of
-[core-architecture.md](core-architecture.md) §10 would let the rest start.
+**The core's rows have the go** (2026-10-28, R166): every row of §1 is cleared to start under its
+"done when"; the internal choices an agent meets (the default output stub's type under JAX, the
+open-loop face as the evaluator or a sibling, the hold slots' labels) are decided as the
+maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your review of the overnight run's open decisions | OD-7 … OD-35 | v0.3 (the merge, §1.10) | review the number changes first, then the rest as a block |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
-| The default output stub builds a NumPy array under JAX | T1 | v0.3 (the core, §1) | the returned type of the default `h` (`np.zeros(p)`) |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
 | `Source.show_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
-| A connected input rewired silently | S66 | v0.3 (the core, hardening) | `connect` refuses to rewire it |
 | Your demo pass, and a tabular Q-learning demo | K4 | v0.3 (the clean-up lane) | your pass; the demo beside value iteration (R65) |
-| The noise seeds on the draws | V1 step 7 | v0.3 (the core, §3) | your go on the row; its shape ruled (R128, R143, R144) |
 | LQG as a planner | LQGPlanner | v0.4 | `LQGPlanner(problem)` beside `LQRPlanner` |
-| The field object | A1 | v0.3 (the core, Fields) | `StateField` → `Field` in `core/fields.py`; the certificate's `V` a field |
 | GMC714's names pinned | G3 | v0.3 (the clean-up lane) | `test_teaching_surface.py` pins the teaching names, each with a demo |
 | The unsupported plants to the experimental tier | K8-3 | v0.3 (the clean-up lane) | per plant, from K1's table |
 | Workspace geometry | A3 | v0.4 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
@@ -72,9 +68,6 @@ discretized problem's cost, D15 and the one-score points (QUESTIONS.md); one go 
 | Behavior cloning | — | after v1.0 | the game mode and the fitting planner |
 | A plant that owns its noise ports | — | later | the example (R57), then the two noisy plants revisited |
 | Simon's curve speed scaler | — | later | into the path-tracking project, or the cap `v ≤ √(a_y,max / κ)` |
-| Names across the API (keywords, `mount`, separators, `NeuralPolicy`) | — | v0.3 (the core, §1) | one sweep per name, every caller, no alias (R134, R151) |
-| `problem.compile` refuses the stateless MPC | — | v0.3 (the core, §5) | the refusal, naming the sampled loop |
-| The failure price under cost overrides | S76 | v0.3 (the core, §7) | follow the overrides with a cache, or the problem's price once |
 | The LQR warning on a declared `U` | V1.2 rest | v0.3 (the clean-up lane) | warn, or "U ignored" in the record (amends R21) |
 | Three hand gradient-loop demos | S74 rest | v0.3 (the clean-up lane) | convert all, two, or none |
 | `DynamicBicycle`'s base | S32 | v0.3 (the clean-up lane) | rename `M` → `H` now, the base with K8 |
@@ -127,8 +120,8 @@ discretized problem's cost, D15 and the one-score points (QUESTIONS.md); one go 
 
 Why: [core-architecture.md](core-architecture.md) §1.
 
-- [ ] **One contract for every core math object** **[ask — core]** (R140, the maintainer's
-  direction of 2026-10-27, a preliminary choice,
+- [ ] **One contract for every core math object** (R140, the maintainer's
+  direction of 2026-10-27, a choice,
   [record](../reviews/2026-10-27-design-questions-rulings.md)): a consolidation of the code style
   and the interface of every core math object, what everything converges back to:
   - its mathematics is a function of its specific arguments and `params`, `params=None` reading
@@ -155,8 +148,8 @@ Why: [core-architecture.md](core-architecture.md) §1.
   when one contract test walks every public core math object on both backends (its `params`, a
   `params=None` call equal to a call with its defaults, `jax.grad` through a float leaf, the
   same values twice from one seed) and the exceptions list is written.
-- [ ] **Names across the API, before the new signatures** **[ask — public names]** (R134, R151,
-  preliminary choices of 2026-10-27), one sweep per line, every caller in the same change, no
+- [ ] **Names across the API, before the new signatures** (R134, R151,
+  choices of 2026-10-27), one sweep per line, every caller in the same change, no
   alias (R82):
   - one keyword per concept, written in DESIGN §4: `compile_backend=` becomes `backend=`, the
     `Optimizer.backend` attribute becomes `adapter`, a planner's `optimizer_method=` becomes
@@ -169,9 +162,11 @@ Why: [core-architecture.md](core-architecture.md) §1.
     swept once with R143's cells) **[student-facing, given]**;
   - the names the day's rulings left to this sweep: `sys.discretize(dt)` as the facade of
     `discretize` (R141), the dense-run evaluator method (R147), and the planner and MPC names of
-    [planner-and-mpc.md](planner-and-mpc.md) §11 (`pv.policy`, the letter `z`, `PlanFollower`),
-    and the rule `dt` at the calls, `sample_period` on the blocks that hold a clock (R157),
-    written in DESIGN §4.
+    [planner-and-mpc.md](planner-and-mpc.md) §11, all ruled on 2026-10-28 (R164): `update` (the
+    seconds state face), `rollout_dense` (the dense evaluator method), `pv.command`, the letter
+    `z`, `PlanFollower`, `inputs=`, `delay=`, `lookahead=`, `t_start` for the run's origin on
+    every runner (today's `t0`), `program.unpack(z)` (was `params_at`); and `dt` at the calls,
+    `sample_period` on the blocks (R157).
 
   Done when DESIGN §4 states the rule and no public signature uses `compile_backend`,
   `optimizer_method` or the geometry `bind`. Later, not in this row: the compiled-model classes →
@@ -192,8 +187,8 @@ Why: [core-architecture.md](core-architecture.md) §1.
     (scan: examples#10).
 
   `log_prob` lives on the seeded policy, not on `Distribution` (R129).
-- [ ] **Three owners of a start; a diagram's state derived from its blocks** **[ask — core]**
-  (S29; the maintainer's preliminary choice of 2026-10-27, R124,
+- [ ] **Three owners of a start; a diagram's state derived from its blocks**
+  (S29; the maintainer's choice of 2026-10-27, R124,
   [record](../reviews/2026-10-27-design-questions-rulings.md)):
   - a diagram's `x0`, `n` and `state` become views computed from its blocks; setting
     `diagram.x0` writes through to the blocks; the structural parts are cached and recomputed
@@ -212,7 +207,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
   baselines are byte-identical.
 - [ ] **Distributions read `params`** (RN-2 of [randomness.md](randomness.md)):
   `Gaussian(cov=)`, and every `sample` takes a key.
-- [ ] **Sets as costs, the lowerings, the metrics as constraints** **[ask — core]** (was V1
+- [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
   - `shaping.py` (today `planning/spatial/shaping.py`) moves to `core/`;
   - `Set.as_cost(weight=, shaping=)`, the field `as_cost` applied to the set's margin (R133);
@@ -228,7 +223,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
   `merge_params`), `core/compile/evaluators/jacobian.py` (`flatten_params`, `replace_leaf`)
   and `core/assembly.py`, become one `core/params.py` used by every caller. Done when the four
   copies are gone and a seeded baseline is byte-identical.
-- [ ] **The core's textbook leftovers** (T1) **[ask — core]**:
+- [ ] **The core's textbook leftovers** (T1):
   - `system.py`'s default `h` stub builds `np.zeros(p)`, a returned-type decision under JAX;
   - `wiring.py`'s `refresh` still guards with `hasattr(self, "solver_info")`.
 
@@ -247,13 +242,13 @@ Why: [core-architecture.md](core-architecture.md) §1.
 
 Why: [core-architecture.md](core-architecture.md) §2.
 
-- [ ] **One same-tick semantic** **[ask — core]** (a preliminary choice, R125, 2026-10-27,
+- [ ] **One same-tick semantic** (a choice, R125, 2026-10-27,
   [record](../reviews/2026-10-27-design-questions-rulings.md)): every step diagram and runner
   propagates within the tick; `Computer.tick` stops reading the last tick's committed buffer;
   a delay exists only as a block (`UnitDelay`, the MPC's delay, a held slow output); an
   algebraic loop is refused at wiring time. Done when the step-diagram evaluator and
   `Computer.tick` agree on every hybrid demo and the moved numbers carry a closeness report.
-- [ ] **The composition operators on step systems** **[ask — core]** (R126, R146, preliminary
+- [ ] **The composition operators on step systems** (R126, R146,
   choices of 2026-10-27): `@`, `>>` and `+` on `StepSystem` and `StepDiagramSystem`, on
   `core/assembly.py`, returning a step diagram (a `SampledDiagramSystem` when a block has a clock,
   §1.5); a continuous and a step operand together refused, naming `%`, except
@@ -312,13 +307,13 @@ Why: [core-architecture.md](core-architecture.md) §2.
 Why: [core-architecture.md](core-architecture.md) §3. Design and the per-step files and "done
 when": [randomness.md](randomness.md) §9.
 
-- [ ] **Per-block seeds and disturbance signals, one draw on both backends** **[ask — core]**
+- [ ] **Per-block seeds and disturbance signals, one draw on both backends**
   (merges V1 step 7, RN-4, the rest of RN-5 and the rest of P10's AC-7, which randomness.md §9
   calls one row):
   - `problem.realize(key, n)` gains one seed per random block, named by path (RN-4), so a noise
     block inside the loop or on a port draws per trial under the same
     `evaluate(..., n_trials, key)`;
-  - disturbances are source blocks only (R128, a preliminary choice of 2026-10-27,
+  - disturbances are source blocks only (R128, a choice of 2026-10-27,
     [record](../reviews/2026-10-27-design-questions-rulings.md)): the problem's system wires
     them onto the plant's ports, `disturbances={"d": block}` the shortcut that builds that
     diagram, a bare `Distribution` refused naming the fix, on `PlanningProblem` too; this fixes
@@ -355,8 +350,8 @@ when": [randomness.md](randomness.md) §9.
 Why: [core-architecture.md](core-architecture.md) §4. Design:
 [future-policies.md](future-policies.md) §5 point 4 and §5.1 (D29).
 
-- [ ] **The standard stochastic policy as a seeded block** **[ask — core]** (the maintainer's
-  direction, 2026-10-22; its shape a preliminary choice of 2026-10-27, R129,
+- [ ] **The standard stochastic policy as a seeded block** (the maintainer's
+  direction, 2026-10-22; its shape a choice of 2026-10-27, R129,
   [record](../reviews/2026-10-27-design-questions-rulings.md)):
   - one block, `GaussianPolicy(mean, log_std, *, sample_period, seed=None)`:
     `u = μ_θ(x) + σ_θ(x) · ε(t)`, `ε(t)` the noise block's counter-based signal at `⌊t/Δ⌋`,
@@ -367,18 +362,20 @@ Why: [core-architecture.md](core-architecture.md) §4. Design:
   - the collectors moved from their own keys to per-episode seeds. The RL numbers change once,
     with a baseline and one re-pin.
 
-  Its deterministic face is `NeuralPolicy` (R151). Done when the RL demos re-pin and a policy
-  block vmaps over seeds on both backends. Open: whether the heads' rebuild lands with the block
-  or in v0.4 with C5 (the reviewers: v0.4).
+  Its deterministic face is `NeuralPolicy` (R151). The heads are rebuilt in v0.3 with the block
+  (R160), with one gate: the training performance is unchanged after the move (the learning
+  curve and the final score within the Monte Carlo spread on the same demo and seeds, the training
+  time within the budget's 2× bar). Done when the RL demos re-pin and a policy block vmaps over
+  seeds on both backends.
 
 ### 1.5 The sampled loop: a step diagram, two runners
 
 Why: [core-architecture.md](core-architecture.md) §5. Design: [sampled-path.md](sampled-path.md).
-Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices of 2026-10-27,
+Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27,
 [record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
 `SampledSystem` the sampled-data kind (2026-10-28, [record](../reviews/2026-10-28-session-rulings.md)).
 
-- [ ] **`SampledSystem`, a system on a clock** **[ask — core]** (R145, R146): `Discretization` is
+- [ ] **`SampledSystem`, a system on a clock** (R145, R146): `Discretization` is
   renamed `SampledSystem(source, sample_period, *, solver, substeps)` (its callers `dp.py`,
   `policy_eval.py`, the trajectory-optimization planner and one test file, none student-facing;
   `dt` becomes `sample_period`; `ExactDiscretization` folded as `solver="exact"`); it accepts a
@@ -392,7 +389,7 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   out the hand-written Euler difference equation, `ev.step(x, u, t, dt=)` and `update` agree bit
   for bit, and the discretize baselines are byte-identical.
 - [ ] **Periods on blocks; `SampledDiagramSystem`; no `Computer`, `StepSchedule` or
-  `HybridDiagram`** **[ask — core]** (merges S31, D13 and P10's AC-8b; R146): a diagram with a
+  `HybridDiagram`** (merges S31, D13 and P10's AC-8b; R146): a diagram with a
   clocked block is a `SampledDiagramSystem`, its base period the gcd of its blocks', a block of
   divisor `d > 1` firing on `k mod d = 0` with its held outputs as state slots, a period not a
   multiple of the base refused at wiring (the ratios checked to a tolerance, today's `1e-9` of
@@ -410,7 +407,7 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   scheduling a block into a `Computer`). Done when
   every hybrid demo runs as a `SampledDiagramSystem` and matches today's `Computer.tick` after the
   same-tick change, with the moved numbers in a closeness report.
-- [ ] **Two run verbs that agree** **[ask — core]** (R147): `compute_rollout` gives the ticks;
+- [ ] **Two run verbs that agree** (R147): `compute_rollout` gives the ticks;
   `compute_trajectory` on an object with a continuous source is the same scan with the plant's
   substeps kept, through one new evaluator method beside `rollout` (its name in the names sweep);
   `solver="scipy"` is the host clock runner with an adaptive plant between samples; `x0_plant=`
@@ -418,13 +415,14 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   samples, the re-clocked loop at `Δ/substeps` matches the dense run to `rtol 1e-12`, and
   `solver="scipy"` agrees within its tolerance.
 - [ ] **The host clock runner over the pure blocks** (the two-runner row): today's
-  `HybridSimulator` shape kept for realtime and game mode, hardware in the loop and host-only
-  blocks (an Ipopt MPC), reading the same blocks as the step diagram, which is its test oracle;
+  `HybridSimulator` shape kept for the scipy cross-check and host-only blocks (an Ipopt MPC),
+  reading the same blocks as the step diagram, which is its test oracle;
   its conventions drift fixed with it (scan: compile-sim#4, #5: shared input coercion, the
-  positional `input_port_id`, the framed verbose panel). The realtime simulator's re-base waits
-  for the realtime review (v1.0), the reviewers' view. Done when the runner and the step diagram
-  agree on every hybrid demo.
-- [ ] **The sampled face** **[ask — core]** (was V1 step 7b; R105):
+  positional `input_port_id`, the framed verbose panel). The realtime simulator's re-base is a
+  v0.4 feature (§4, R161); in v0.3 the realtime loop calls the blocks' faces and never
+  re-implements a hold or a divisor. Done when the runner and the step diagram agree on every
+  hybrid demo.
+- [ ] **The sampled face** (was V1 step 7b; R105):
   `problem.compile(controller)` reads the controller's kind; a continuous law runs the loop as a
   diagram; a sampled controller (a digital PID, a held neural policy, the MPC, the RL policies)
   runs the `SampledDiagramSystem` on its JAX face (`dt=` omitted reads the loop's base period,
@@ -432,35 +430,37 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (preliminary choices o
   `evaluate` and `program` serve both; the `require_continuous` refusal goes. Done when the
   gradient of a digital PID's `objective` matches a central difference and a continuous law's
   numbers are unchanged.
-- [ ] **`problem.compile` refuses the stateless MPC, until the MPC is rebuilt** **[ask — core]**:
+- [ ] **`problem.compile` refuses the stateless MPC, until the MPC is rebuilt**:
   `MPCStatelessController` is a plain `System`, so it is accepted today and its tick latch runs at
   the RK4 stages, a silent continuous-feedback MPC (KNOWN_ISSUES). Refuse it now, naming the
   sampled loop; the rebuilt MPC (§1.8) replaces it. Done when `problem.compile(mpc)` raises with
   the fix named.
 
-AC-8a, the sampled loop kept in step with the core rules, is a §3 step; it edits code R146 and
-R148 remove, so whether it still lands first is open **[ask]** (automation-by-convention.md).
+The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
+no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
+construction.
 
 ### 1.6 One score
 
 Why: [core-architecture.md](core-architecture.md) §6. Design:
-[differentiable-problem.md](differentiable-problem.md) §9. Ruled: R141, R142, R150; three points
-open (QUESTIONS, the one-score entry).
+[differentiable-problem.md](differentiable-problem.md) §9. Ruled: R141, R142, R150, R154, and the
+three points (R159, 2026-10-28): the sampled check accepted, the run priced to the horizon with
+the input held, a solver's own objective allowed but the score always the problem's cost.
 
-- [ ] **`StepPlanningProblem` and `StepCost`** **[ask — core]** (R141): a problem on a
+- [ ] **`StepPlanningProblem` and `StepCost`** (R141): a problem on a
   `StepSystem` with a horizon `N`, a per-step `gamma` and a `StepCost` (`c(x, u, k)`, `h(x, k)`);
   `SampledCost(g, h, plant, dt, *, solver=, substeps=)` the `StepCost` of a discretized problem,
   its `c` integrating one period when called directly with the plant's solver and substeps
   (R154); sharing the sets, the start, the tree and `realize` with `PlanningProblem` by composition. Done
   when a grid world solves by value iteration as a `StepPlanningProblem`.
-- [ ] **The compiled step face** **[ask — core]** (R141, R142): `problem.compile(dt=, solver=,
+- [ ] **The compiled step face** (R141, R142): `problem.compile(dt=, solver=,
   substeps=)` with no controller gives `transition(x, u, k, params) -> (x_next, c_k)`, `N`,
   `gamma = e^{−ρ dt}`, the sets at `t_k` and the price; `c_k` integrated with the state in the
   stationary form; `discretize(problem, dt)` (facade `problem.discretize`) returns the explicit
   `StepPlanningProblem` compiling to the same face. Done when the augmented step's state rows are
   byte-identical to `step_body`, its `c_k` equals `g·dt` under Euler to the last bit, and the
   discretized problem's face equals `problem.compile(dt=)`'s.
-- [ ] **The judge, value iteration and the RL environment on `transition`** **[ask — core]**
+- [ ] **The judge, value iteration and the RL environment on `transition`**
   (after the open points): `problem.compile(controller)` scans `transition`; value iteration's
   backup and the RL environment's step read it; the environment's step and `score_run` share one
   failure, price and horizon rule (R108's one owner); the judge's `J` re-pinned once (R80). Done
@@ -476,7 +476,7 @@ open (QUESTIONS, the one-score entry).
 Why: [core-architecture.md](core-architecture.md) §7. Design:
 [parametric-program.md](parametric-program.md), [native-optimizers.md](native-optimizers.md) §7.
 
-- [ ] **The parametric program binds every problem parameter** **[ask — core]** (S76, steps
+- [ ] **The parametric program binds every problem parameter** (S76, steps
   PP-0–PP-5; PP-0, the names, in V1's step 0).
   - **Today:** the compiled MPC program binds the measured `x0` only: direct collocation freezes
     the plant, cost and set parameters in closures; the online call refuses every other key; the
@@ -487,15 +487,14 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
     cost, sets; the scene with A3), the frozen default when `None`; the values passed at the solve
     (`Optimizer(program).solve(params=...)`); hand-written programs stay `J(z)`; one evaluator
     body serves both, and the optimizer sees a flat `z`; `ParametricMathematicalProgram` folds in.
-  - **The failure price under cost overrides:** today the price keeps the problem's own weights
-    (4096 calls of `g` per evaluation when no exact bound exists). Settle it in this row: follow
-    the overridden weights with a cache keyed on the cost's parameters (reviewers B and C), or
-    compute the problem's price once at compile (reviewer A).
+  - **The failure price under cost overrides** (R165): the price follows the overridden weights,
+    with a cache keyed on the cost's parameters (today it keeps the problem's own weights, 4096
+    calls of `g` per evaluation when no exact bound exists).
   - **The performance gate, first:** benchmark compile time and per-solve time of the compiled
     MPC program carrying `params` against the same program with them frozen; if carrying them
     costs speed, an export option compiles a parameter-free program.
   - **First users:** direct collocation and the rebuilt MPC, whose inputs bind leaves of the tree
-    (R148, `inputs={"plant.mu": "mu_hat"}`); the export gains `program.params_at(z)`, the full
+    (R148, `inputs={"plant.mu": "mu_hat"}`); the export gains `program.unpack(z)`, the full
     tuned tree.
   - **Order:** PP-1, PP-2 and PP-4 on S74's backend factory (OPW-1); then PP-3, the cost and set
     leaves, on A2.
@@ -503,7 +502,7 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
   Done when one compiled MPC program, bound with two values of a plant parameter and of a cost
   target, gives what a rebuild gives; the MPC baselines are byte-identical with only `x_start`
   bound; the friction-aware MPC example runs from a port.
-- [ ] **`t_start` and the start from `x_start`** **[ask — core]** (R148): a problem's horizon is
+- [ ] **`t_start` and the start from `x_start`** (R148): a problem's horizon is
   `[t_start, t_start + tf]` (`t_start = 0` reproduces today); the discount and the horizon count
   from `t_start`, costs, sets and references read absolute time; on a native step problem
   `t_start` is the tick offset, and a discretized problem keeps `(dt, t_start)` in seconds (R158);
@@ -514,7 +513,7 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
 - [ ] **One optimizer backend table for the parametric path** (OPW-1–OPW-5, after S74, with S76;
   [parametric-program.md](parametric-program.md) §6; scan: planning#9). Done when `method="ipopt"`
   reaches the parametric MPC path and the plan's OPW-4 tests pass.
-- [ ] **The stochastic program as the parametric program's seed case** **[ask — core]**
+- [ ] **The stochastic program as the parametric program's seed case**
   (native-optimizers.md §7; R131): every program is deterministic given its parameters, the seed
   one of them; integers never in `wrt`; complete trees inside, one merge at the boundary; sizes
   structural; the warm start on the solve call; the core keeps the sample-average export,
@@ -529,20 +528,20 @@ Why: [core-architecture.md](core-architecture.md) §8. Design:
 [native-optimizers.md](native-optimizers.md), [planner-and-mpc.md](planner-and-mpc.md). Better
 solvers and MPPI are v0.4 (§4).
 
-- [ ] **The native kernel and the fixed-count solve** **[ask — core]** (NS-1, NS-2's fixed-`K`
+- [ ] **The native kernel and the fixed-count solve** (NS-1, NS-2's fixed-`K`
   form; R132, R149): pure `init` / `step` laws for `gd` and `adam` on the array module, run by
   `Optimizer`, with `as_step_system`; `Optimizer(program, method=, iterations=K)` exactly `K`
   steps in one `lax.scan`, `iterations=None` to a tolerance (`maxiter` its cap). Done when the
   NumPy path is byte-identical and `jax.grad` through `K` iterations matches a central difference.
-- [ ] **The planner's compiled face** **[ask — core]** (R148): `planner.compile()` gives `n_z`,
-  `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `policy(z, x, t)`,
+- [ ] **The planner's compiled face** (R148): `planner.compile()` gives `n_z`,
+  `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `command(z, x, t)`,
   `prediction`, `solution`, `pack`, `program`; `planner.params` is the problem's tree plus
   `"method"` and `seed`; `planner.solve(params=None, *, guess=None, ...)` rebuilt on it, with no
   mutation (`last_solution` and the caches leave the pure path; the plotting shortcuts move to
   the solution, with D1.4); trajectory optimization first, then LQR and value iteration, the
   others as they are wrapped. Done when `pv.solution(pv.solve(p)[0])` reproduces today's
   `planner.solve()` byte-identically and `jax.vmap` over starts runs on the native method.
-- [ ] **The MPC rebuilt on the planner's face** **[ask — core]** (NS-8; R148, R123):
+- [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
   the delayed form a block whose state is `z` alone, its origin inside (R155; its kind under the
   R158: a native `SampledSystem`, `update` solving and the `u` port applying), `x0` from
@@ -566,11 +565,11 @@ solvers and MPPI are v0.4 (§4).
 Why: [core-architecture.md](core-architecture.md) §9. Design: [fields.md](fields.md). Baselines
 first.
 
-- [ ] **A minimal field object, `core/fields.py`** **[ask — core]** (A1, steps 4.1–4.3 of
+- [ ] **A minimal field object, `core/fields.py`** (A1, steps 4.1–4.3 of
   fields.md; R133, R153):
   - promote `StateField` to `Field` on `(x, u, t)`, with `as_set` / `as_input_set` / `as_cost`
     and `gradient`; `as_constraint` and `as_input_constraint` renamed with every caller, the
-    track demos included, no alias (R82) **[ask — student-facing]**;
+    track demos included, no alias (R82) **[student-facing, given]** (R165);
   - `as_terminal_cost(weight=, shaping=)` beside `as_cost`, the terminal cost `h` (R153);
   - the shaping functions moved from `planning/spatial/shaping.py` to `core/`, and `Field.as_cost`
     the one implementation that `Set.as_cost` (§1.1) reuses on a set's margin;
@@ -588,7 +587,7 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
 
-- [ ] **Wiring mistakes fail at wiring time** **[ask — core]** (S66; RULES 4.10; scan: core#2,
+- [ ] **Wiring mistakes fail at wiring time** (S66; RULES 4.10; scan: core#2,
   #13):
   - `connect` refuses to rewire a connected subsystem input;
   - the compile probe detects an output that moves with an input it does not declare and
@@ -597,8 +596,8 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
   - after P10's AC-4 (landed 2026-10-14), the loop-input junctions still rewire the connected
     input they sum into (`composition.sum_into`), so S66 changes them first.
 
-  The error family (S70, §5) lands before or with this row, since it types the errors this
-  row raises (the reviewers' view).
+  The refusals use plain `ValueError` and `TypeError` with clear messages (R165); the typed
+  error family (S70) stays where it is planned, §5.
 - [ ] **Material and contracts** (was V1 step 9;
   [differentiable-problem.md](differentiable-problem.md) §8):
   - each step updates DESIGN when it lands (§4 `Trajectory` and parameters, §5 the rollout, §6
@@ -938,6 +937,12 @@ The maintainer's direction (2026-10-26): v0.4 adds features built on the finishe
 intertwined with it; the rows are independent and run in any order. A row that reads a core
 pillar names it.
 
+- [ ] **The realtime runner on the pure blocks** (R161, 2026-10-28): game mode and hardware in
+  the loop re-based on the sampled loop's blocks (`update`, the port functions, `step`), pacing the
+  ticks on the wall clock and reading the keyboard or the device between them; the step diagram its
+  test oracle at the ticks; the GRO501 game demos re-pinned once. Reads core §5. Done when every
+  realtime demo runs the same blocks the judge scores and matches the scan at the ticks.
+
 - [ ] **Identification and generation** (C4) (its design states which fitting route it takes and
   flags it for the behavior-cloning decision, R136): identification is V1's program export
   (`pe.program(wrt=["plant.…"])` and the `Optimizer`) with a data-mismatch cost (`identification/fitting.py` on `rollout_batch`; physical params and NN
@@ -1068,7 +1073,7 @@ pillar names it.
   fixed-iteration tick (native-optimizers.md §4.6b; the proof of concept puts the gradient MPC
   first); long term, convergence analysed as stability
   (NS-5, with the discrete step analysis ruled in, R122) —
-  [native-optimizers.md](native-optimizers.md) (its shape a preliminary choice, R132; v0.4 by the direction
+  [native-optimizers.md](native-optimizers.md) (its shape a choice, R132; v0.4 by the direction
   of 2026-10-26).
 
 ---
@@ -1096,7 +1101,7 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   there. Done when every course link resolves and both CIs pass.
 - [ ] **S27** Diffrax as an optional JAX solver backend, beside the step model's integrators,
   only if a benchmark asks for it, an optional extra (`solver="diffrax"`), never required (R139,
-  a preliminary choice of 2026-10-27)
+  a choice of 2026-10-27)
   (`core/compile/evaluators/stepping.py`, kept there by OD-11). S37 (evaluators keep pure maps and one scannable step; the integrators'
   move; the evaluator internals deduplicated: ZOH sugar, the JAX step rollout, the four
   Jacobian probes, the undeclared batch cache; scan: compile-sim#9) is absorbed by S75's SM-1
@@ -1108,7 +1113,7 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   two importable public types share a name with the geometry solids (R139). **[ask — public
   names]**
 - [ ] **The frozen surface** (V3) **[ask — public names]**: list the names the v1.0 freeze
-  covers, drawn from one rule (R139, a preliminary choice of 2026-10-27): a name joins the freeze
+  covers, drawn from one rule (R139, a choice of 2026-10-27): a name joins the freeze
   when it has its teaching demo, its test, and has gone through one release unchanged. `StepSystem`, `StepDiagramSystem`, `UnitDelay` (blocks facade), `ModelPredictiveController`
   (control facade) and the spatial names A3 moves to `core/geometry/` (provisional teaching
   names, ROADMAP §2) join it or move behind a visibly provisional name. Done when the
@@ -1225,7 +1230,7 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   planner that fits a policy to them (imitation beside the RL planner, `NeuralPolicy`
   as its output); the cloned controller closed on the plant and compared against the
   demonstrator. Its first scenes are realtime games written for it (pyro's are not ported, R109).
-  How fitting enters the API is decided here (R136, a preliminary choice of 2026-10-27): the
+  How fitting enters the API is decided here (R136, a choice of 2026-10-27): the
   program export with a data-mismatch cost (a dataset as `Trajectory`s, no new verb), or a `fit`
   verb beside `solve` with a dataset noun ([future-policies.md](future-policies.md) §7).
 

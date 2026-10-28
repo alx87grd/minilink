@@ -6,7 +6,7 @@
 session. Each entry records the maintainer's choice and how it was reached. The questions on
 time in the core (the clock port and what `t` is for every block) are under three independent
 reviews and are recorded here when ruled.
-**Status:** preliminary choices, like R141–R153, open to readjustment with the final architecture.
+**Status:** the architecture of record (R166): the "preliminary" caveat of R124–R158 is lifted.
 
 | Ruling | In one line | Design home |
 | --- | --- | --- |
@@ -15,6 +15,14 @@ reviews and are recorded here when ruled.
 | R156 | A performance budget: a benchmark script, the ninth item of the definition of done, 2× on five measured numbers | [core-architecture](../plans/core-architecture.md) §11 |
 | R157 | `dt` at the calls, `sample_period` on the blocks that hold a clock | DESIGN §4 |
 | R158 | Time belongs to the loop; `SampledSystem` the sampled-data kind with two faces; the MPC its first native child; no clock port | [sampled-path](../plans/sampled-path.md) §8.1–§8.2, [planner-and-mpc](../plans/planner-and-mpc.md) §6 |
+| R159 | The one-score's three points: the sampled check, priced to the horizon with the input held, a solver's own objective allowed but the score the problem's | [differentiable-problem](../plans/differentiable-problem.md) §9.4 |
+| R160 | The RL heads rebuilt on the seeded policy in v0.3, training performance unchanged as the gate | TODO §1.4 |
+| R161 | The realtime runner's re-base on the pure blocks is a v0.4 feature; the v0.3 loop a thin caller | TODO §4 |
+| R162 | The left operand of `@` is `controller` in both algebras, block or box | [automation-by-convention](../plans/automation-by-convention.md) §4.5 |
+| R163 | The conventions' first sampled-loop step (AC-8a) folded into the loop lane | TODO §1.5 |
+| R164 | The names: `update`, `rollout_dense`, `pv.command`, `z`, `PlanFollower`, `inputs=`, `delay=`, `lookahead=`, `t_start` everywhere, `program.unpack(z)` | [planner-and-mpc](../plans/planner-and-mpc.md) §11 |
+| R165 | The failure price follows overridden cost weights (cached); the `as_constraint` → `as_set` rename given; plain exceptions for the wiring-time refusals | TODO §1.7, §1.9, §1.10 |
+| R166 | The architecture of record: R124–R165 confirmed, the go for every lane, the "ask, core" marks removed; the 10-24 run's decisions reviewed with the new run's log | TODO §1, QUESTIONS |
 
 ## R154 (2026-10-28, preliminary) The discretized problem's cost is a `SampledCost`
 
@@ -150,3 +158,78 @@ skeleton and corrected the same two points; the maintainer ruled the amended des
   law from `(seed, k)`.
 - **Names for the sweep:** `update` (`advance` the alternative; outputs are ports); `t0`
   and `t_start` one word for the run's origin on every runner.
+
+## R159 (2026-10-28) The one-score's three points
+
+1. **Between the samples:** accepted as the sampled check. The sets and costs are evaluated at the
+   sample times; the score is the score of the sampled loop, which is all the controller sees; a
+   substep check may exist as a diagnostic on `compute_trajectory`, never inside the score.
+2. **The failure rule and the hold:** a run is priced to the horizon, every violation priced
+   (today's judge); the RL environment may still end an episode early as a training device but
+   reports the judge's `J`; the input is held over each period (zero-order hold) unless a planner
+   states its own interpolation. Ending the run at the exit would make `J` jump when a parameter
+   moves the exit by one sample.
+3. **A solver's objective, the maintainer's generalization:** a solver may optimize an objective
+   that is not the problem's cost (a smoothed cost, a first-order hold, a training discount as in
+   R150), but a solution's score is always the problem's cost through the common step function,
+   and a planner whose objective differs says so in its record. Shooting therefore reports the
+   judge's `J`.
+
+## R160 (2026-10-28) The RL heads rebuilt on the seeded policy in v0.3
+
+Rebuilt with the block, in the sweep that already touches every RL notebook (R143, R150, R151),
+not in v0.4 as the reviewers of 10-26 leaned. **The gate** (the maintainer): training performance
+is unchanged after the move, on the same demo with the same seed count: the learning curve and
+the final score within the Monte Carlo spread, the training time within the budget's 2× bar
+(R156).
+
+## R161 (2026-10-28) The realtime runner's re-base is a v0.4 feature
+
+The host clock runner serves the scipy cross-check and host-only blocks in v0.3; the realtime
+runner (game mode, hardware in the loop) is re-based on the pure blocks as a v0.4 feature row,
+with one condition in v0.3: the realtime loop calls the blocks' faces (`update`, the port
+functions, `step`) and never re-implements a hold or a divisor, so it is a thin caller when its
+row comes.
+
+## R162 (2026-10-28) `controller` is the left operand of `@`
+
+In both algebras, whatever the left operand is, one block or a box of blocks on clocks; a box's
+leaves are reached through it (`controller.filter.tau`, `controller.law.Kp`). No `computer` role:
+the word stays the runner's and the drawing's.
+
+## R163 (2026-10-28) The conventions' first sampled-loop step is folded
+
+AC-8a (standard port names only, the MPC gives `u`, no port guessing) edited code the loop lane
+deletes; its intent is the lane's "done when".
+
+## R164 (2026-10-28) The names
+
+`update(x, u, t)`, the seconds state face of a system on a clock (outputs are ports, no verb);
+`rollout_dense`, the evaluator method behind `compute_trajectory` on a sampled system;
+`pv.command(z, x, t)`, the compiled planner's pure command function (the maintainer: `policy`
+collides with `solution.policy`, the block; `command` is the library's own word, `command_port`);
+the letter `z`; `PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `t_start` for the run's origin
+on every runner (today's `t0` renamed in the sweep); `program.unpack(z)` for the export's full
+tuned tree (was `params_at`; the evaluator already has `pe.unpack`).
+
+## R165 (2026-10-28) Three details from the triage of the core's rows
+
+- **The failure price under cost overrides** follows the overridden weights, with a cache keyed on
+  the cost's parameters; a price that does not move with the cost it is derived from is a surprise
+  in a tuning loop.
+- **The `as_constraint` → `as_set` and `as_input_constraint` → `as_input_set` rename** with every
+  caller, the corridor and racetrack demos included, is given (student-facing).
+- **The wiring-time refusals** use plain `ValueError` and `TypeError` with clear messages; the
+  typed error family (S70) stays where it is planned.
+
+## R166 (2026-10-28) The architecture of record, and the go
+
+- R124–R165 are the architecture of record for the v0.3 core; the "preliminary, open to
+  readjustment with the final architecture" caveat is lifted from every doc and record.
+- Every row of TODO §1 has the go; the 24 "ask, core" marks are removed. The triage found no
+  design decision left in them; the internal choices an agent meets (the default output stub's
+  type under JAX, the open-loop compiled face as the evaluator or a sibling, the hold slots'
+  labels, helper names) are decided as the maintainer would and logged in the run's record, the
+  10-24 rule.
+- The 10-24 overnight run's open decisions (OD-7 to OD-35) are reviewed in the morning after the
+  new run, both logs together.

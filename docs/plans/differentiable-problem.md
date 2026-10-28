@@ -26,7 +26,7 @@
   - step 7b: the sampled face;
   - step 8: sets as costs, a source policy's samples as leaves;
   - step 9: the material;
-  - §9: the one score, its object and per-step cost decided (R141, R142), three points open;
+  - §9: the one score, decided (R141, R142, R154, R159);
   - traceable linear analysis (S73, §4.6).
 - **Two leftovers of landed steps** wait for the maintainer in [TODO.md](TODO.md) §2: the LQR
   warning on a declared `U` (OD-33 of the run's log), and the three demos that teach a hand
@@ -190,7 +190,7 @@ one intended change, which gets its own test and a ledger line. Every math line 
 
 ## 9. One score
 
-**Decided in part (2026-10-27, preliminary):** the object and the per-step cost
+**Decided (2026-10-27 and 2026-10-28):** the object and the per-step cost
 ([R141, R142](../reviews/2026-10-27-core-vision-decisions.md)). Three points stay open (§9.4).
 The question and the reviewers' views are in [QUESTIONS.md](../dev/QUESTIONS.md).
 
@@ -247,11 +247,17 @@ a step system, so the evaluation unifies from there, with time as an index.
   move; the judge's trapezoid `J` changes once (an intended change, R80). A logged run scored by
   `evaluate_trajectory` keeps the trapezoid and says so.
 
-### 9.4 Still open
+### 9.4 The three points (R159, 2026-10-28)
 
-Three points, kept with their options in one home, [QUESTIONS.md](../dev/QUESTIONS.md) (the
-one-score entry), for the maintainer:
-1. time-varying sets and the margins between samples;
-2. one failure rule and the input hold;
-3. shooting's reported score.
+1. **Between the samples:** the sets and costs are checked at the sample times; the score is the
+   score of the sampled loop. The substep check is a diagnostic on `compute_trajectory`, never
+   inside the score.
+2. **The failure rule and the hold:** a run is priced to the horizon, every violation priced
+   (today's judge); the RL environment may end an episode early as a training device but reports
+   the judge's `J`; the input is held over each period unless a planner states its own
+   interpolation.
+3. **A solver's objective:** a solver may optimize its own objective (a smoothed cost, another
+   hold, a training discount, as R150), but a solution's score is always the problem's cost
+   through the common step function; a planner whose objective differs says so in its record.
+   Shooting reports the judge's `J`.
 

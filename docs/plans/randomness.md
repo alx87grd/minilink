@@ -1,7 +1,7 @@
 # One convention for randomness
 
 Status: decided (§8: RD-D1–RD-D12 on 2026-09-26, RD-D13–RD-D24 on 2026-09-30), and brought in
-line with the 2026-10-27 preliminary choices (below), which hold where they differ.
+line with the 2026-10-27 choices (below), which hold where they differ.
 - **Landed:**
   - RN-1 on 2026-09-30: `WhiteNoise` on the counter-based cipher, `System.realize`, the solver
     hint (DESIGN §4, "Randomness").
@@ -21,7 +21,7 @@ line with the 2026-10-27 preliminary choices (below), which hold where they diff
   - RN-6: the docs, with each step.
 
   RN-4 and RN-5 change public behaviour and the Monte Carlo numbers once.
-- **The 2026-10-27 preliminary choices** (open to readjustment with the final architecture):
+- **The 2026-10-27 choices** (the architecture of record since 2026-10-28, R166):
   - **disturbances are source blocks** (R128, [record](../reviews/2026-10-27-design-questions-rulings.md)):
     no `Distribution` on a port; a source block wired into the problem's system, with
     `disturbances={"d": block}` as the shortcut that wires it; RD-R4 taken to its end;
@@ -550,7 +550,7 @@ where they conflict, the later rulings hold:
     that is not finite is failed (R31);
   - the RL environment keeps its own episode (R43), a training setting reading the problem's
     fields as hints.
-- **R128, R143, R144, R146 (2026-10-27, preliminary):**
+- **R128, R143, R144, R146 (2026-10-27):**
   - RD-D6, RD-D7 and RD-D22: the port route is the shortcut that wires a source block into the
     problem's system, one diagram; a bare law refused on every problem;
   - RD-R5: the start law is `x_start=` on either problem class; `StochasticPlanningProblem`,

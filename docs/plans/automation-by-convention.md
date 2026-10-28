@@ -26,7 +26,7 @@ the second opinion and its eight rulings (R1–R8) are in
 - the cost's draws are the core's draws ([core-architecture.md](core-architecture.md) §3,
   [TODO.md](TODO.md) §1.3);
 - the sampled loop is the core's hybrid loop (core-architecture §5, TODO §1.5); keeping today's
-  loop in step (AC-8a) runs alongside (TODO §3);
+  loop in step (AC-8a) is folded into it (R163, 2026-10-28);
 - the plots and the animation stay in the plotting lane (TODO §3).
 
 Sections 1 to 4.4 described the landed part and were cut (the history is in git); the
@@ -84,9 +84,9 @@ conventions.
   `(P >> Sat) % dt`, the plots, the cost and Monte Carlo read it like any loop;
   `compute_rollout` gives the ticks and `compute_trajectory` the dense plant (R147). Until
   then, the reference is passed with `compute_forced(r, input_port_id="r")`.
-- **Open:** the role name of the computer side inside the loop (`controller`, as a continuous
-  `@` gives, or a box holding `controller`, `error` and `filter`), settled with the landing
-  change.
+- **Ruled (R162, 2026-10-28):** the left operand of `@` is `controller` in both algebras, one
+  block or a box; a box's leaves are reached through it (`controller.filter.tau`,
+  `controller.law.Kp`); "computer" stays the word of the runner and of the drawing.
 
 ### 4.6 Time is the argument, not a port (R158; was the clock port `t` of R148)
 
@@ -140,8 +140,8 @@ The removals tagged AC-0, AC-2, AC-OP and AC-3, the renames and their migrations
 | `hybrid_closed_loop`'s `schedule=` and `computer=`, with `Computer`, `StepSchedule` and `HybridDiagram` | periods on blocks; `computer @ plant` a `SampledDiagramSystem` (R146) | AC-8b |
 | The camera copied at composition time, and `camera_priority` (never read) | the camera chosen when animating | AC-6 |
 
-AC-8a's three rows edit code that R146 and R148 remove in AC-8b; whether AC-8a still lands
-first is open, for the maintainer ([TODO.md](TODO.md) §1.5).
+AC-8a's three rows edit code that R146 and R148 remove in AC-8b, so AC-8a is folded into the
+loop lane (R163): its intent is the lane's "done when" ([TODO.md](TODO.md) §1.5).
 
 **Migrations:**
 
@@ -162,7 +162,7 @@ roles and control-law sweeps) is captured before and after each step and compare
 | AC-5 | Plots (§5): the auto mode, role selectors, paths into boxes, labels, units and colours by role, one default | plotting lane |
 | AC-6 | Animation (§5): the camera chosen when animating, looking inside `plant`; no compensator skin in a loop; the camera copy goes | plotting lane |
 | AC-7 | Cost and tools (§5): one compiled loop (the compiled problem) for every evaluation, `command_port`, controllers with state, time, cost params, one price; Gym and the rollout environment aligned | the deterministic part landed with V1's steps 2–4 (the plant scored, controllers with state, the price switch of R32); the draws (R143, R144) with V1's step 7, RN-4's per-block noise seeds and the rest of RN-5 (TODO §1.3) |
-| AC-8a | The sampled loop keeps in step (§4.5, §6): `hybrid_closed_loop`'s keywords and the port guesses go, MPC gives `u` | alongside (TODO §3) |
+| AC-8a | The sampled loop keeps in step (§4.5, §6): `hybrid_closed_loop`'s keywords and the port guesses go, MPC gives `u` | folded into AC-8b (R163) |
 | AC-8b | The sampled loop goes mainstream (§4.5, §4.6): `%` as `discretize`, `computer @ plant` a `SampledDiagramSystem`, the two run verbs, time the argument (R145–R148, R158) | with S31 (TODO §1.5) |
 
 **Done when:**

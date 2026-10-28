@@ -4,7 +4,7 @@
 - the core's hybrid loop, "one model, two runners" ([core-architecture.md](core-architecture.md)
   §5); its rows are [TODO.md](TODO.md) §1.5, with the conventions' sampled-loop steps
   (AC-8a, AC-8b of [automation-by-convention.md](automation-by-convention.md));
-- the decisions: the 2026-10-27 preliminary choices, R145–R147 of
+- the decisions: the 2026-10-27 choices, R145–R147 of
   [the core-vision record](../reviews/2026-10-27-core-vision-decisions.md) and R125–R127 of
   [the design-questions record](../reviews/2026-10-27-design-questions-rulings.md) (R127 revised
   by R146 and R147); before them R104, R105 and R123
@@ -17,7 +17,7 @@
   [B](../reviews/2026-10-28-time-in-the-core-reviewer-b.md),
   [C](../reviews/2026-10-28-time-in-the-core-reviewer-c.md)).
 
-**Lane:** core; every step is **[ask — core]**.
+**Lane:** core; every step has the go (R166, 2026-10-28).
 
 The plant half of the loop, the step model (`discretize`, the compiled evaluator's `step` and
 `rollout`), landed on 2026-10-24; its contract is DESIGN §5 ("One body per method", "The step
@@ -191,8 +191,8 @@ StepSystem                               pure tick: step(x, u, k, params); no cl
   (`core/compile/evaluators/stepping.py`) already computes the plant at `t_k + j·Δ/substeps`; the
   dense path keeps every substep end, so its value at each tick is the tick value, bit for bit.
   The input is the held staircase; outputs are evaluated at every substep point.
-- **One new evaluator method beside `rollout`**: `rollout` keeps its shape `(N+1, n)`, the new
-  method returns `(N·substeps+1, n)` from one shared period body, on the system and the
+- **One new evaluator method beside `rollout`, `rollout_dense`** (R164): `rollout` keeps its shape
+  `(N+1, n)`, the new method returns `(N·substeps+1, n)` from one shared period body, on the system and the
   sampled-diagram evaluators. `compute_rollout` calls `rollout`, `compute_trajectory` the new
   method; no flag changes `rollout`'s return shape.
 - **The substep count is structural, on the loop's plant `SampledSystem`**, defaulting from the
@@ -233,16 +233,10 @@ wall clock never reaches a block.
   `hybrid_composition.py` load `simulation/discrete/computer.py` on first use (a written
   exception, R100); those modules go with R146, so what is left is whether the host clock runner
   keeps a lazy import.
-- **The realtime runner's re-base** on the pure blocks: in the v0.3 core, or with the realtime
-  architectural review (its v1.0 row in [TODO.md](TODO.md)), the reviewers' view.
-- **The role name of the computer side** inside `computer @ plant` (`controller`, or a box holding
-  `controller`, `error` and `filter`): automation-by-convention.md §4.5, settled with the landing
-  change.
-- **Between the samples** (the one-score question, [QUESTIONS.md](../dev/QUESTIONS.md)):
-  time-varying sets and the margins between samples; one failure rule and the input hold.
-- **Names for the sweep:** the dense evaluator method (`rollout_path`, `rollout_dense`, …);
-  `update` (`advance` the alternative; outputs are ports and need no verb); `t0` and `t_start`, one word
-  for the run's origin on every runner.
+- Settled 2026-10-28: the realtime runner's re-base is a v0.4 feature, the v0.3 loop calling the
+  blocks' faces and never re-implementing a hold (R161); the left operand of `@` is `controller`,
+  box or block (R162); between the samples, the sampled check is the score (R159); the names:
+  `update`, `rollout_dense`, `t_start` on every runner (R164).
 
 ### 8.8 The sampled loop's details, D13–D15
 

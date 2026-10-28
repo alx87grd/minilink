@@ -8,6 +8,9 @@ maintainer's choice and how it was reached.
 [R124–R140](2026-10-27-design-questions-rulings.md): open to readjustment when the final
 architecture is drafted.
 
+**Confirmed (2026-10-28, R166):** these choices are the architecture of record for the v0.3 core; the
+"preliminary" caveat is lifted ([record](2026-10-28-session-rulings.md)).
+
 ## The rulings in one screen
 
 | Ruling | Decision | In one line | Design home |

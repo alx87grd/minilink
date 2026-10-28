@@ -1,8 +1,7 @@
 # The planner and the MPC: one interface for every planner
 
 The design home of the planner interface and of `ModelPredictiveController`, as converged in the
-review of 2026-10-27. The choices are preliminary (open to readjustment with the final
-architecture): [R148](../reviews/2026-10-27-core-vision-decisions.md) and its amendment, on top
+review of 2026-10-27, the architecture of record since 2026-10-28 (R166): [R148](../reviews/2026-10-27-core-vision-decisions.md) and its amendment, on top
 of R141–R147 of the same record and R123, R104, R130–R135. How it was reached, the use cases and
 the rejected candidates: [the study](../reviews/2026-10-27-mpc-planner-interface-proposal.md).
 The rows are TODO §1.7 and §1.8 ([core-architecture.md](core-architecture.md) §7, §8); MPPI
@@ -17,7 +16,7 @@ already does for systems and problems:
 | --- | --- | --- |
 | System | `sys.f`, `sys.params`, `sys.compute_trajectory()` | `ev = sys.compile()`: `ev.step`, `ev.rollout` |
 | Problem | `problem.cost`, the sets, `problem.params` | `problem.compile(dt=)`: `transition` (R141) |
-| Planner | `planner.params`, `planner.solve()` | `pv = planner.compile()`: `pv.solve`, `pv.shift`, `pv.policy`, … |
+| Planner | `planner.params`, `planner.solve()` | `pv = planner.compile()`: `pv.solve`, `pv.shift`, `pv.command`, … |
 
 Two rules hold throughout:
 - **A planner does not know it runs in a loop** (R135). What shifting a solution means is the
@@ -53,9 +52,9 @@ pv  = planner.compile(backend="jax")
 | `initial` | `initial(params=None) -> z` | the default initial guess in `z` form, before any solve (§4); what `solve` starts from when `z0` is `None` |
 | `solve` | `solve(params=None, z0=None) -> (z, status)` | the solve as a function: from the guess `z0` as given, no time logic, no mutation of the planner; it records in `z` the origin it solved from (`params["t_start"]`); `status` is a small numeric record (success, iterations, residual) |
 | `shift` | `shift(z, t) -> z` | the same plan rebased to the absolute time `t` (R155): the planner's data moved by `t − origin` on its own knots, its recorded origin set to `t`; the identity for a solution that does not depend on time (the base default) |
-| `policy` | `policy(z, x, t, params=None) -> u` | the command a solution gives at state `x` and time `t`: the traceable bridge from a solution to an input. `policy(z, x_start, t_start)` is the first action; `policy(z, x_k, t_k)` reads the plan later. Open-loop plans ignore `x`; feedback plans read it |
+| `command` | `command(z, x, t, params=None) -> u` | the command a solution gives at state `x` and time `t`: the traceable bridge from a solution to an input. `policy(z, x_start, t_start)` is the first action; `policy(z, x_k, t_k)` reads the plan later. Open-loop plans ignore `x`; feedback plans read it |
 | `prediction` | `prediction(z, t, params=None) -> (x, u)` | optional: the planned state and input at `t`, for planners that predict |
-| `solution` | `solution(z, params=None) -> PlanningSolution` | host-side: the policy as a block, the nominal trajectory, the cost-to-go as a `Field` (value iteration's stays a callable until `GridField`, v0.4, R153), the record. `solution.policy.h(x, ·, t)` equals `pv.policy(z, x, t)` |
+| `solution` | `solution(z, params=None) -> PlanningSolution` | host-side: the policy as a block, the nominal trajectory, the cost-to-go as a `Field` (value iteration's stays a callable until `GridField`, v0.4, R153), the record. `solution.policy.h(x, ·, t)` equals `pv.command(z, x, t)` |
 | `pack` | `pack(guess, params=None) -> z` | the other way: from a `Trajectory` or a `PlanningSolution` (a user's guess, a saved solution, another planner's result) |
 | `program` | `MathematicalProgram` or `None` | the parametric program, for planners that have one; outside the MPC's contract |
 
@@ -67,14 +66,14 @@ CONSTITUTION §4.6); the planner keeps no `last_solution` or cache on the pure p
 
 ```python
 z, st = pv.solve(p | {"x_start": x1}, z0=pv.shift(pv.pack(sol), 0.05))   # re-solve, warm
-u0    = pv.policy(z, x1, p["t_start"])                                   # the first action
+u0    = pv.command(z, x1, p["t_start"])                                   # the first action
 zs, _ = jax.vmap(lambda x: pv.solve(p | {"x_start": x}))(starts)         # a family, traced
 pv.solution(zs[3]).plot_trajectory()                                     # look at one
 ```
 
 ## 4. What each planner puts in `z`
 
-| Planner | `z` | `initial(params)` | `shift(z, t)` | `policy(z, x, t)` |
+| Planner | `z` | `initial(params)` | `shift(z, t)` | `command(z, x, t)` |
 | --- | --- | --- | --- | --- |
 | Trajectory optimization (collocation, shooting) | the decision vector, the origin `t_start`, Ipopt's multipliers where used | today's default guess (`default_initial_trajectory`: a cubic path for a mechanical plant, else linear, from `x_start` to the goal; zero or nominal inputs), packed | re-read the knots `dt` later, hold the tail | the input of the plan at `t` |
 | MPPI | the nominal input sequence `U`, `t_start` | zeros or the nominal input | shift `U`, repeat the last input | the input of `U` at `t` |
@@ -143,7 +142,7 @@ class ModelPredictiveController(SampledSystem):          # no source: a native s
         self.add_output_port("z", dim=pv.n_z, function=self.compute_state)
 
     def compute_u(self, z, y, t, params=None):           # u_k = π(z, x̂_k, t_k), the stored plan
-        return pv.policy(z, y, t)
+        return pv.command(z, y, t)
 
     def update(self, z, y, t, params=None):              # one solve per tick, from the rebased plan
         P = bind(params, self.inputs, y) | {"t_start": t + self.lookahead}
@@ -167,7 +166,7 @@ class ModelPredictiveController(SampledSystem):          # no source: a native s
 
 ### 6.3 The pure form (`delay=False`)
 
-One static block, no memory: `u_k = pv.policy(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
+One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
 solve from the default guess. It is the ideal law, a reference for studies; a cold start each tick
 is slow on Ipopt and weak for a fixed-iteration solver. It needs **one signal pass per tick** in
 the step evaluators (today they compute the signals in `step` and again in `outputs`,
@@ -180,7 +179,7 @@ the step evaluators (today they compute the signals in `step` and again in `outp
 - **The tree:** `pe.params["controller"]` is `planner.params`: `controller.cost.Q` to tune,
   `controller.plant.m` beside `plant.m` for a model-mismatch study, `controller.method.lr`.
 - **Dual rate:** `(mpc % 0.05) >> (PlanFollower(planner) % 0.01)`, the follower applying
-  `pv.policy` to the `z` it receives. The plan solved from `y_j` reaches the follower at the next
+  `pv.command` to the `z` it receives. The plan solved from `y_j` reaches the follower at the next
   slow tick: one slow period of delay, as on a real computer, not two.
 - **Delay compensation:** `lookahead=Δ` binds `t_start = t + Δ`, and `x_start` is bound to a
   predictor block (`inputs={"x_start": "x_pred"}`); the keyword alone shifts only the time.
@@ -224,7 +223,8 @@ pair `MPCStatelessController` / `MPCStatefulController`, `export_to_computer`, `
    handing them `t_k` (R158).
 5. One signal pass per tick in the step evaluators (for the pure form).
 
-## 11. Names for the sweep
+## 11. Names (ruled R164, 2026-10-28)
 
-`pv.policy` (or `action`, `control`); the letter `z` (a planner's `z` is its decision, extended);
-`PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `update` (sampled-path.md §8.7).
+`pv.command(z, x, t)`, the pure function (`solution.policy` stays the block, so the two never
+share a word); the letter `z`; `PlanFollower`; `inputs=`; `delay=`; `lookahead=`; `update` for
+the seconds state face; `program.unpack(z)` for the export's full tuned tree.
