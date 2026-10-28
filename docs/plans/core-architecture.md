@@ -428,7 +428,9 @@ From reviewer C §3.3, in the ruled names. v0.3 is done when these scripts run a
     score within the Monte Carlo spread of today's, the training time within the budget's bar.
 
 The scripts live as `tests/unittest/test_v03_core.py` (one test per script, named by its
-number and lane) and `benchmarks/v03_budget.py` for script 9.
+number and lane) and `benchmarks/v03_budget.py` for script 9. Six demo scripts in
+`examples/demos/compile/` are the user-facing proof, one per seam (R167; the list in
+[the run brief](../reviews/2026-10-28-v03-run-brief.md) §8).
 
 ## 12. The core and the features
 

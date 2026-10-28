@@ -22,7 +22,7 @@ reviews and are recorded here when ruled.
 | R163 | The conventions' first sampled-loop step (AC-8a) folded into the loop lane | TODO §1.5 |
 | R164 | The names: `update`, `rollout_dense`, `pv.command`, `z`, `PlanFollower`, `inputs=`, `delay=`, `lookahead=`, `t_start` everywhere, `program.unpack(z)` | [planner-and-mpc](../plans/planner-and-mpc.md) §11 |
 | R165 | The failure price follows overridden cost weights (cached); the `as_constraint` → `as_set` rename given; plain exceptions for the wiring-time refusals | TODO §1.7, §1.9, §1.10 |
-| R167 | The notebooks' code moved to the new API and debugged at the end of the run; no new tutorial or demo notebook; four acceptance scripts added | core-architecture §11, the run brief |
+| R167 | The notebooks' code moved to the new API and debugged at the end of the run; no new notebook; four acceptance scripts and six new demo scripts added | core-architecture §11, the run brief |
 | R166 | The architecture of record: R124–R165 confirmed, the go for every lane, the "ask, core" marks removed; the 10-24 run's decisions reviewed with the new run's log | TODO §1, QUESTIONS |
 
 ## R154 (2026-10-28, preliminary) The discretized problem's cost is a `SampledCost`
@@ -245,7 +245,9 @@ tuned tree (was `params_at`; the evaluator already has `pe.unpack`).
   reading seconds in a sampled loop, a loop started at `t_start = 100`, the RL heads' gate) and
   the dual-rate clause on script 5; they live in `tests/unittest/test_v03_core.py`, the budget in
   `benchmarks/v03_budget.py`.
-- New demo scripts on the new pipeline in `examples/` (six were proposed: the digital PID tuned,
-  the LQG Monte Carlo, the multi-rate computer, the native MPC tuned by gradient, a grid world as
-  a step problem, a terminal field) remain the maintainer's call, `examples/` being
-  student-facing.
+- **Six new demo scripts on the new pipeline, given** (the maintainer: "the final proof the new
+  core architecture is working"): the digital PID tuned, the multi-rate computer, the LQG Monte
+  Carlo, a grid world as a step problem, the native MPC tuned by gradient, a terminal field; in
+  `examples/demos/compile/`, minimal and flat like the PID autotuning demo, each written at the
+  seam that makes it possible and added to the flagship manifest (the run brief §8). The demo
+  pass (K4) merges or trims them later.
