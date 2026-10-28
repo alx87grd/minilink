@@ -345,7 +345,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
 @pytest.mark.jax
 def test_the_backends_share_the_score_on_identical_starts():
     pytest.importorskip("jax")
-    from minilink.control import NeuralPolicyController
+    from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
     from minilink.planning import evaluate
 
@@ -360,7 +360,7 @@ def test_the_backends_share_the_score_on_identical_starts():
         def h(self, x, t=0.0, params=None):
             return 3.0
 
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=5)  # bounded by construction
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=5)  # bounded by construction
     one_start = Particles([[2.5, 0.0]])
     for kwargs in ({"tf": np.inf}, {"tf": 1.0, "infeasible_cost": 20.0}):
         problem = StochasticPlanningProblem(
@@ -460,14 +460,14 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
 @pytest.mark.jax
 def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     pytest.importorskip("jax")
-    from minilink.control import NeuralPolicyController
+    from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
     from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=5)
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
     task = dict(cost=quadratic(plant), tf=np.inf, x0_distribution=start)
     heavy = StochasticPlanningProblem(

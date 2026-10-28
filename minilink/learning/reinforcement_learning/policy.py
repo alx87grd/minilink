@@ -35,11 +35,11 @@ def over_states(method):
 ###############################################################################
 
 
-class StochasticPolicy:
+class ExplorationPolicy:
     """
     ``pi_theta(a | x)``: the law of a controller block, made stochastic by an exploration head.
 
-    The controller, a :class:`~minilink.control.neural.NeuralPolicyController`,
+    The controller, a :class:`~minilink.control.neural.NeuralPolicy`,
     gives the normalized mean action ``mu_theta(x) = MLP(z(x))`` and the map
     from a normalized action onto the plant's input port. The head gives the
     distribution around the mean: ``sample``, ``log_prob``, ``entropy``. The

@@ -12,7 +12,7 @@ from minilink.core.system import System
 ###############################################################################
 
 
-class NeuralPolicyController(System):
+class NeuralPolicy(System):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
 
@@ -312,9 +312,7 @@ def require_squash(squash):
 def require_finite_action_bounds(u_lb, u_ub):
     """Refuse an action port without finite bounds: the normalized action spans them."""
     if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
-        raise ValueError(
-            "NeuralPolicyController needs finite bounds on the plant's action port"
-        )
+        raise ValueError("NeuralPolicy needs finite bounds on the plant's action port")
 
 
 def setpoint_plant_of(ctl):

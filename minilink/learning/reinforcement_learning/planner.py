@@ -8,7 +8,7 @@ from functools import partial
 
 import numpy as np
 
-from minilink.control.neural import NeuralPolicyController
+from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.trajectory import Trajectory
 from minilink.learning.reinforcement_learning.algorithms import (
@@ -27,9 +27,9 @@ from minilink.learning.reinforcement_learning.collect import (
 from minilink.learning.reinforcement_learning.critics import QFunction, ValueFunction
 from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.learning.reinforcement_learning.policy import (
+    ExplorationPolicy,
     GaussianHead,
     SquashedGaussianHead,
-    StochasticPolicy,
 )
 from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner
@@ -66,7 +66,7 @@ class ReinforcementLearningPlanner(Planner):
     The loop is generic, collect experience then update, and the update rule
     is an :class:`~minilink.learning.reinforcement_learning.algorithms.Algorithm`,
     so a new method is one file, not a new planner. The law being trained is
-    a :class:`~minilink.learning.reinforcement_learning.policy.StochasticPolicy`:
+    a :class:`~minilink.learning.reinforcement_learning.policy.ExplorationPolicy`:
     the controller block's mean action with the algorithm family's
     exploration head around it.
 
@@ -78,7 +78,7 @@ class ReinforcementLearningPlanner(Planner):
         trained from its single ``x_start``.
     dt : float
         Control period of the learned law (one RK4 step per period).
-    policy : NeuralPolicyController, optional
+    policy : NeuralPolicy, optional
         The law to train; default built from ``features``, ``hidden``,
         ``activation`` and ``normalize`` on the problem's plant.
     algorithm : str or Algorithm
@@ -108,9 +108,9 @@ class ReinforcementLearningPlanner(Planner):
 
     Attributes
     ----------
-    controller : NeuralPolicyController
+    controller : NeuralPolicy
         The law, updated in place after every learning iteration.
-    policy : StochasticPolicy
+    policy : ExplorationPolicy
         The controller with its exploration head, what the algorithm trains.
     critic : ValueFunction or QFunction or None
         The critic of the algorithm's family.
@@ -182,7 +182,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The law, the exploration head and the critic of the algorithm's family,
         # bound to the algorithm with the one discount
-        self.controller = policy or NeuralPolicyController(
+        self.controller = policy or NeuralPolicy(
             problem.sys,
             features=features,
             hidden=hidden,
@@ -191,7 +191,7 @@ class ReinforcementLearningPlanner(Planner):
             seed=seed,
         )
         head = self.build_head(hidden, activation, log_std_init, seed)
-        self.policy = StochasticPolicy(self.controller, head)
+        self.policy = ExplorationPolicy(self.controller, head)
         self.critic = self.build_critic(hidden, activation, seed)
         self.algorithm.bind(self.policy, self.critic, self.resolve_discount(gamma))
 

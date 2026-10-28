@@ -484,7 +484,7 @@ class TestDispatchTable(unittest.TestCase):
             PI,
             ComputedTorque,
             IntegralImpedance,
-            NeuralPolicyController,
+            NeuralPolicy,
             OutputReference,
             SingleMass,
             SlidingMode,
@@ -568,7 +568,7 @@ class TestDispatchTable(unittest.TestCase):
             ),
             (
                 "NeuralPolicy",
-                NeuralPolicyController(Pendulum()) @ Pendulum(),
+                NeuralPolicy(Pendulum()) @ Pendulum(),
                 ["controller", "plant"],
                 {"x": ("plant", "x")},
             ),

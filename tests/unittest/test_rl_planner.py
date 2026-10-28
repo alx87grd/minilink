@@ -16,7 +16,7 @@ pytest.importorskip("jax")
 import jax  # noqa: E402
 import jax.numpy as jnp  # noqa: E402
 
-from minilink.control.neural import NeuralPolicyController  # noqa: E402
+from minilink.control.neural import NeuralPolicy  # noqa: E402
 from minilink.learning.reinforcement_learning import (  # noqa: E402
     PPO,
     ReinforcementLearningPlanner,
@@ -117,7 +117,7 @@ def test_environment_finite_horizon_charges_h_and_infeasible_cost():
 
 def test_neural_policy_controller_normalizes_and_composes():
     plant = bounded_pendulum()
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=0)
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=0)
     z = ctl.observe(np.array([np.pi, 8.0]))
     np.testing.assert_allclose(z, [1.0, 1.0])
     u = ctl.action(np.zeros(2))
@@ -146,7 +146,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
     ctl = planner.get_controller()
-    assert isinstance(ctl, NeuralPolicyController) and solution.policy is ctl
+    assert isinstance(ctl, NeuralPolicy) and solution.policy is ctl
     # the controller carries the trained weights
     actor = planner.algorithm.params(planner.train_state)["policy"]["mlp"]
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
@@ -326,7 +326,7 @@ def test_the_backends_score_a_fixed_law_on_their_own_draws():
     prob = problem(tf=np.inf)
     plant = prob.sys
 
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=3)  # any fixed static law
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=3)  # any fixed static law
     settings = dict(dt=0.05, n_trials=6, episode_length=1.0, key=0)
     report_jax = evaluate(prob, ctl, backend="jax", **settings)
     report_np = evaluate(prob, ctl, backend="numpy", **settings)
@@ -340,7 +340,7 @@ def test_the_backends_score_a_fixed_law_on_their_own_draws():
 
 def test_the_evaluation_refuses_a_period_that_does_not_divide_the_horizon():
     prob = problem(tf=0.25)
-    ctl = NeuralPolicyController(prob.sys, hidden=(8,), seed=3)
+    ctl = NeuralPolicy(prob.sys, hidden=(8,), seed=3)
     for backend in ("numpy", "jax"):
         with pytest.raises(ValueError, match="divide"):
             evaluate(prob, ctl, dt=0.1, n_trials=2, backend=backend)
@@ -466,7 +466,7 @@ def test_replay_buffer_refuses_a_draw_before_any_transition():
 
 def test_neural_closed_loop_compiles_and_differentiates_under_jax():
     plant = bounded_pendulum()
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=0)
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=0)
     cl_sys = ctl @ plant
     evaluator = cl_sys.compile(backend="jax", verbose=False)
     x = jnp.array([0.3, 0.0])

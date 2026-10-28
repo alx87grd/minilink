@@ -132,7 +132,7 @@ the plants a course needs, with their parameters and start as data (`Pendulum`,
 `CartPole`, `DoublePendulum`, `UR5Manipulator`, `KinematicBicycle`, `UdeSRacecar`,
 `Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `Impedance`,
 `StateFeedback`, `ComputedTorque`, `SlidingMode`,
-`ModelPredictiveController`, `NeuralPolicyController`):
+`ModelPredictiveController`, `NeuralPolicy`):
 
 ```python
 from minilink import Pendulum

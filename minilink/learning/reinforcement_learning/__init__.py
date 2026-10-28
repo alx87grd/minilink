@@ -16,7 +16,7 @@ from minilink.learning.reinforcement_learning.environment import RolloutEnvironm
 from minilink.learning.reinforcement_learning.planner import (
     ReinforcementLearningPlanner,
 )
-from minilink.learning.reinforcement_learning.policy import StochasticPolicy
+from minilink.learning.reinforcement_learning.policy import ExplorationPolicy
 from minilink.learning.reinforcement_learning.tabular import (
     SARSA,
     UCB,
@@ -34,7 +34,7 @@ __all__ = [
     "SAC",
     "ReinforcementLearningPlanner",
     "RolloutEnvironment",
-    "StochasticPolicy",
+    "ExplorationPolicy",
     "advantages",
     "gae",
     "returns_to_go",

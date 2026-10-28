@@ -16,7 +16,7 @@ from parking import (
 )
 
 from minilink import (
-    NeuralPolicyController,
+    NeuralPolicy,
     PlanningProblem,
     Trajectory,
     TrajectoryOptimizationPlanner,
@@ -43,7 +43,7 @@ for water, current in WATERS.items():
 
     # The two state-feedback laws: the cascade, and PPO's weights from parking_ppo.py
     cascade = CascadeParkingController(boat)
-    ppo = NeuralPolicyController(boat, features=dock_features, hidden=POLICY_HIDDEN)
+    ppo = NeuralPolicy(boat, features=dock_features, hidden=POLICY_HIDDEN)
     ppo.params["mlp"] = dict(np.load(POLICY_WEIGHTS))
     for name, ctl in (("Cascade", cascade), ("PPO", ppo)):
         loop = ctl @ boat

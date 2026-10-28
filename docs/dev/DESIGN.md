@@ -1054,11 +1054,11 @@ are those of value iteration, and the same grid solved by
 learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
 (the controller as `policy`, a `ReinforcementLearningRecord`, the critic as
 `cost_to_go` when the discounts match), `get_controller()` →
-`control.neural.NeuralPolicyController` (`u = u_mid + u_half · squash(MLP(z(x)))`,
+`control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
 map), `solve_trajectory_from(x0)` → a `PlanningSolution` carrying the
 learned law's rollout.
-What the algorithm trains is a `StochasticPolicy`: the controller block's mean action
+What the algorithm trains is a `ExplorationPolicy`: the controller block's mean action
 with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
 `sample`, `log_prob`, `entropy` and `input(a)`. Critics `ValueFunction` and `QFunction` sit

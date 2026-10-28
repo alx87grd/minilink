@@ -89,7 +89,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.control.state",
         "TrajectoryFeedback",
     ),
-    "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
+    "NeuralPolicy": ("minilink.control.neural", "NeuralPolicy"),
     # Analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearization", "linearize"),

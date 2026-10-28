@@ -674,7 +674,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
   pass on those lines; the options: drop the line from the LQR lessons then warn, keep it and warn,
   or never warn and say "U ignored" in the Riccati record's `str`, which amends R21, the
-  reviewers' choice) **[ask — student-facing]**; `ReinforcementLearningPlanner` sizes its default `NeuralPolicyController`
+  reviewers' choice) **[ask — student-facing]**; `ReinforcementLearningPlanner` sizes its default `NeuralPolicy`
   from `problem.U.bounding_box()` and refuses an unbounded `problem.U` (R21), and
   `StateSpaceGrid.state_bounds` aligns with `input_bounds`.
 - [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand

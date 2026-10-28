@@ -657,14 +657,14 @@ class TestRoboticWrappers(unittest.TestCase):
         )
 
     def test_neural_setpoint_ball_on_joint_reference(self):
-        from minilink.control.neural import NeuralPolicyController
+        from minilink.control.neural import NeuralPolicy
 
         arm = TwoLinkManipulator()
         inner = JointImpedance(arm) @ arm
         inner.inputs["r"].lower_bound = -np.ones(2)
         inner.inputs["r"].upper_bound = np.ones(2)
         x = inner.x0
-        ctl = NeuralPolicyController(inner, hidden=(4,), seed=0)
+        ctl = NeuralPolicy(inner, hidden=(4,), seed=0)
         self.assertEqual(ctl.tf(None, x), {})
         self.assertEqual(ctl.get_dynamic_geometry(None, x), {})
 
