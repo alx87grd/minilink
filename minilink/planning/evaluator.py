@@ -111,7 +111,6 @@ class ProblemEvaluator:
         if self.sampled:
             dt = sampled_dt_of(self.loop, dt)
             require_loop_knobs(solver, substeps, self.adaptive)
-        warn_if_disturbed(problem)
         self.solver = solver
         self.substeps = int(substeps)
 
@@ -361,8 +360,9 @@ class ProblemEvaluator:
             xp = array_module(params["x_start"])
             return xp.reshape(params["x_start"], (1, -1)), params
 
-        # x0 ~ p(x0) and each law, n_trials times, from one key on the backend: one tree
-        tree = problem.realize(trial_key(key, self.backend), n_trials)
+        # x0 ~ p(x0), each law and each source's seed, n_trials times: one tree,
+        # drawn on the host from an integer key whatever the backend
+        tree = problem.realize(key, n_trials)
         x_starts = tree["x_start"]
 
         # The drawn leaves override theirs (the problem's paths are the run's)
@@ -651,6 +651,7 @@ def closed_loop_of(problem, controller):
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
     if is_loop and "plant" in controller.subsystems:
         require_plant_block(controller, plant)
+        require_no_problem_sources(problem)
         return controller
     if isinstance(plant, StepSystem):
         raise TypeError(
@@ -658,9 +659,9 @@ def closed_loop_of(problem, controller):
             "a continuous loop"
         )
     if int(controller.m) == 0:
-        return open_loop_of(controller, plant)
+        return with_sources(open_loop_of(controller, plant), problem.disturbances)
 
-    return closed_loop(controller, plant)
+    return with_sources(closed_loop(controller, plant), problem.disturbances)
 
 
 ###############################################################################
@@ -813,19 +814,23 @@ def open_loop_of(source, plant):
     return loop
 
 
-def warn_if_disturbed(problem):
-    """Warn when the problem has disturbance sources: the evaluated loop holds those ports at nominal."""
-    if not problem.disturbances:
-        return
-    ports = sorted(problem.disturbances)
+def with_sources(loop, sources):
+    """The loop with each disturbance source wired onto its plant port, under the port's name (R128)."""
+    for port, block in sources.items():
+        loop.add_subsystem(block, port)
+        loop.connect(port, next(iter(block.outputs)), "plant", port)
 
-    warnings.warn(
-        f"the evaluation does not draw the disturbances on {ports}: the loop reads "
-        "those ports at their nominal values. The per-step draws run in the stepped "
-        "environment (Sys2Gym.from_problem); a disturbance inside the loop is a source "
-        "block (closed_loop(controller, plant, disturbance=WhiteNoise(...)))",
-        stacklevel=4,
-    )
+    return loop
+
+
+def require_no_problem_sources(problem):
+    """Refuse the problem's disturbance sources on a loop built by hand: that loop wires its own."""
+    if problem.disturbances:
+        raise ValueError(
+            f"the problem's disturbances {sorted(problem.disturbances)} cannot be wired "
+            "into a loop built by hand: wire the source blocks in the loop, or pass "
+            "the controller and let the problem close the loop"
+        )
 
 
 def require_continuous_or_clocked(controller):
@@ -1273,12 +1278,3 @@ def unbatch(trajs, n):
         )
 
     return out
-
-
-def trial_key(key, backend):
-    """The draws' key on the backend: a JAX PRNG key, or a NumPy generator."""
-    if backend == BACKEND_JAX:
-        jax = ensure_jax_x64()
-        return jax.random.PRNGKey(key) if isinstance(key, int) else key
-
-    return np.random.default_rng(key)

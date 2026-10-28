@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import warnings
+import zlib
 from collections.abc import Mapping
 
 import numpy as np
 
-from minilink.core.backends import is_jax_key, numpy_generator, require_jax
+from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
-from minilink.core.distributions import Distribution, split_keys
+from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import flatten, lookup, merge_tree, set_leaf, with_leaf
 from minilink.core.sets import (
@@ -295,10 +296,18 @@ class PlanningProblem:
 
         The problem's numbers (:meth:`parts_view`), with ``"x_start"`` of shape
         ``(n, nx)``, each law's leaf drawn ``n`` times in its number's shape
-        (``(n, *shape)``); the other leaves are shared.
+        (``(n, *shape)``), and each random disturbance source's ``seed`` an
+        integer leaf of shape ``(n,)``; the other leaves are shared. Each
+        consumer draws from its own stream, named by its path
+        (``child_seed(key, "x_start")``, ``child_seed(key, "plant.m")``; a
+        source's seed by its port and the trial): adding a law or a source
+        leaves every other draw unchanged. An integer key draws on the host,
+        the same values for a NumPy and a JAX run (RD-D13); a JAX key draws
+        traceable JAX arrays.
         :meth:`drawn_paths` names the leaves with a trial axis. A deterministic
         problem has one realization, its own start. ``key`` follows the draw
-        convention of :class:`~minilink.core.distributions.Distribution`.
+        convention of :class:`~minilink.core.distributions.Distribution`; the
+        sources' seeds need an integer key.
         """
         n = int(n)
         tree = self.parts_view()
@@ -309,24 +318,21 @@ class PlanningProblem:
             tree["x_start"] = self.sample_x0(None, n)
             return tree
 
-        # One stream for the starts, one for the laws (today's positional split)
-        if is_jax_key(key):
-            jax = require_jax()
-            x_key, law_key = jax.random.split(key)
-        else:
-            x_key = law_key = numpy_generator(key)
+        # x(0) ~ the start's law, n times, from the stream named "x_start"
+        tree["x_start"] = self.sample_x0(stream_of(key, "x_start"), n)
 
-        # x(0) ~ the start's law, n times (a point start, n copies)
-        tree["x_start"] = self.sample_x0(x_key, n)
-
-        # Each law's leaf n times, in its number's shape (the tree copied along its
-        # path: the parts' own dicts stay untouched)
-        paths = [path for path, _ in flatten(self.laws)]
-        keys = split_keys(law_key, len(paths))
-        for path, k in zip(paths, keys):
+        # Each law's leaf n times, in its number's shape, from the stream named by
+        # its path (the tree copied along the path: the parts' dicts stay untouched)
+        for path, law in flatten(self.laws):
             nominal = np.shape(lookup(tree, path))
-            values = lookup(self.laws, path).sample(k, n)
+            values = law.sample(stream_of(key, ".".join(path)), n)
             tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+
+        # Each random source's seed, n times, named by its port and the trial
+        for port, block in self.disturbances.items():
+            if block.is_random:
+                seeds = source_seeds(block, key, port, n)
+                tree = with_leaf(tree, (port, "seed"), seeds)
 
         return tree
 
@@ -334,6 +340,11 @@ class PlanningProblem:
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
         paths = [("x_start",)]
         paths.extend(path for path, _ in flatten(self.laws))
+        paths.extend(
+            (port, "seed")
+            for port, block in self.disturbances.items()
+            if block.is_random
+        )
 
         return paths
 
@@ -763,6 +774,35 @@ def require_criterion(criterion, criteria) -> None:
         raise ValueError(
             "criterion must be 'expectation', 'worst_case' or ('cvar', alpha) with "
             f"0 < alpha <= 1, got {criterion!r}"
+        )
+
+
+def stream_of(key, name):
+    """The stream of the consumer ``name`` under ``key``: an integer seed, or a JAX key folded by the name."""
+    if is_jax_key(key):
+        jax = require_jax()
+        return jax.random.fold_in(key, zlib.crc32(name.encode()))
+
+    require_integer_key(key)
+
+    return child_seed(int(key), name)
+
+
+def source_seeds(block, key, port, n):
+    """The seeds of a random source over ``n`` trials: trial ``i`` its realization under ``child_seed(key, "trial i")``."""
+    require_integer_key(key)
+    trial_keys = [child_seed(int(key), f"trial {i}") for i in range(n)]
+    seeds = [block.realize(child_seed(k, port))["seed"] for k in trial_keys]
+
+    return np.asarray(seeds)
+
+
+def require_integer_key(key):
+    """Refuse a key that is not an integer (or a JAX key, for the laws alone)."""
+    if isinstance(key, bool) or not isinstance(key, (int, np.integer)):
+        raise TypeError(
+            "the problem's draws are realized from an integer key (a JAX key draws "
+            f"the laws, but not a source's seed): got {type(key).__name__}"
         )
 
 

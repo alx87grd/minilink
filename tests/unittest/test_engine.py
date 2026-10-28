@@ -637,7 +637,7 @@ def test_the_cvar_counts_the_worst_fraction_without_rounding_up():
     assert reduce_criterion(J, ("cvar", 0.07)) == np.mean(J[-7:])
 
 
-def test_a_disturbance_the_loop_does_not_draw_is_announced():
+def test_a_disturbance_source_runs_in_the_evaluated_loop_with_a_seed_per_trial():
     from minilink import NoisyPendulum
 
     sys = NoisyPendulum()
@@ -645,14 +645,50 @@ def test_a_disturbance_the_loop_does_not_draw_is_announced():
         sys,
         cost=QuadraticCost.from_system(sys),
         x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        tf=1.0,
         disturbances={"d": WhiteNoise(1, psd=1.0, sample_period=0.05)},
     )
-    with pytest.warns(UserWarning, match="does not draw the disturbances on \\['d'\\]"):
-        problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+    pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
+    assert "d" in pe.loop.subsystems and pe.params["d"]["psd"].shape == (1,)
+
+    # Each trial its own seed, named by the port: the same trial without the
+    # noise scores differently, and the seeds are the tree's leaves
+    tree = problem.realize(1, 3)
+    assert tree["d"]["seed"].shape == (3,) and len(set(tree["d"]["seed"])) == 3
+    quiet = problem.replace(disturbances={}).compile(PID(Kp=5.0, Kd=1.0), dt=0.05)
+    assert not np.allclose(
+        pe.evaluate(n_trials=3, key=1).J, quiet.evaluate(n_trials=3, key=1).J
+    )
 
     # A disturbance is a source block: a bare law is refused, naming the fix
     with pytest.raises(TypeError, match="WhiteNoise"):
         PlanningProblem(sys, disturbances={"d": Gaussian([0.0], [1.0])})
+
+
+@pytest.mark.jax
+def test_one_integer_key_draws_the_same_trials_on_both_backends():
+    pytest.importorskip("jax")
+    problem = stochastic_problem()
+    scores = {
+        backend: problem.compile(pid(), dt=0.01, backend=backend).evaluate(
+            n_trials=4, key=7
+        )
+        for backend in ("numpy", "jax")
+    }
+    np.testing.assert_array_equal(scores["numpy"].x0, scores["jax"].x0)
+    np.testing.assert_allclose(scores["numpy"].J, scores["jax"].J, rtol=1e-9)
+
+
+def test_each_law_draws_from_its_own_stream():
+    problem = stochastic_problem()
+    first = problem.realize(0, 4)
+    assert len({tuple(x) for x in first["x_start"]}) == 4  # distinct trials
+
+    # Adding a law leaves the other draws unchanged
+    laws = {"plant": {**problem.laws["plant"], "l": Uniform([0.9], [1.1])}}
+    more = problem.replace(params=laws).realize(0, 4)
+    np.testing.assert_array_equal(more["x_start"], first["x_start"])
+    np.testing.assert_array_equal(more["plant"]["m"], first["plant"]["m"])
 
 
 @pytest.mark.parametrize("substeps", [2.0, np.float32(2.0), True, 0])

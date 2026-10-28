@@ -218,32 +218,16 @@ Why: [core-architecture.md](core-architecture.md) §2.
 Why: [core-architecture.md](core-architecture.md) §3. Design and the per-step files and "done
 when": [randomness.md](randomness.md) §9.
 
-- [ ] **Per-block seeds and disturbance signals, one draw on both backends**
-  (merges V1 step 7, RN-4, the rest of RN-5 and the rest of P10's AC-7, which randomness.md §9
-  calls one row):
-  - `problem.realize(key, n)` gains one seed per random block, named by path (RN-4), so a noise
-    block inside the loop or on a port draws per trial under the same
-    `evaluate(..., n_trials, key)`;
-  - disturbances are source blocks only (R128, a choice of 2026-10-27,
-    [record](../reviews/2026-10-27-design-questions-rulings.md)): the problem's system wires
-    them onto the plant's ports, `disturbances={"d": block}` the shortcut that builds that
-    diagram, a bare `Distribution` refused naming the fix, on `PlanningProblem` too; this fixes
-    the frozen-noise defect, and CONSTITUTION §2's sentence is amended in the same change;
-  - `problem.realize(key, n_trials) -> params`, one tree (R144): a law in a leaf drawn to a value
-    from a sub-key derived by the leaf's path, a source block given an integer seed leaf, every
-    drawn leaf with a trial axis; the `"disturbances"` key goes;
-  - the Monte Carlo evaluator is a batched simulation of the closed loop on its test set (RN-5;
-    the fold landed as V1.4b, R44);
-  - the cost is scored on the plant across every evaluator and design tool, with the draws
-    (AC-7's rest, [automation-by-convention.md](automation-by-convention.md) §5, §7; its
-    deterministic half landed with V1's steps 2–4);
-  - one integer key draws the same values on NumPy and JAX (KNOWN_ISSUES);
-  - RN-6, the contract in DESIGN, goes with each step.
-
-  Done when:
-  - two trials from one key draw distinct noise;
-  - adding a random block leaves every other stream unchanged;
-  - RN-5's LQG loop scores within the covariance prediction's sampling error.
+- [ ] **Per-block seeds and disturbance signals, one draw on both backends** (merges V1 step 7,
+  RN-4, the rest of RN-5 and the rest of P10's AC-7). Landed in the v0.3 run: `problem.realize`
+  one tree with a stream per consumer by name and a seed per random source; disturbances are
+  source blocks only, wired into the evaluated loop; one integer key draws the same trials on
+  NumPy and JAX (the KNOWN_ISSUES entry gone). Rest:
+  - the cost scored on the plant across every design tool with the draws (AC-7's rest,
+    [automation-by-convention.md](automation-by-convention.md) §5, §7);
+  - RN-5's LQG loop within the covariance prediction's sampling error: the acceptance script 1
+    and the `lqg_monte_carlo` demo;
+  - RN-6, the contract in DESIGN, with each step.
 - [ ] **A problem stochastic by its parts** (R143): landed in the v0.3 run (no
   `StochasticPlanningProblem`; `x_start=` a law or a set, `params=` laws, `disturbances=` source
   blocks, `criterion=` and `nominal()` on `PlanningProblem`), every Python caller swept; the

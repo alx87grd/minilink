@@ -1055,9 +1055,13 @@ fraction; an evaluation's `objective` is this reduction of the runs' `J`, and th
 which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
 parts; `problem.params` shows each law at its leaf and the start's law under `"x_start"`;
 `problem.realize(key, n)` is one tree (R144): the problem's numbers with `"x_start"` of shape
-`(n, nx)` and each law's leaf drawn `n` times (`drawn_paths()` names them); `nominal()`
-replaces each law by its mean and drops the random sources. `evaluate` holds the disturbance
-ports at their nominal value and warns; the stepped environment reads each source at `t_k`
+`(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
+integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
+path (`child_seed(key, "plant.m")`, a source's seed by its port and the trial), so adding a law
+or a source leaves every other draw unchanged, and an integer key draws on the host: the same
+trials on NumPy and JAX. `nominal()` replaces each law by its mean and drops the random
+sources. `evaluate` wires each source onto its plant port in the evaluated loop, under the
+port's name (its seed the leaf `"d.seed"`); the stepped environment reads each source at `t_k`
 with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
 from the mean start and warns; `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.

@@ -583,7 +583,8 @@ its deterministic twin (RD-D23). RN-3 comes with its first consumer.
   `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)` as the first demo. Done when the twin
   test of a sampled sensor passes (the sample covariance against `R_d`) and `WhiteNoise`'s tests
   pass untouched.
-- [ ] **RN-4 `realize` and the problem** (RD-R4, RD-R4b, RD-D6, RD-D7, RD-D10, RD-D18,
+- [x] **RN-4 `realize` and the problem** (landed in the v0.3 run, the objects lane: items 1–3; the
+  hold rule (4) stands as written; colored noise (5) waits for its demo and twin test) (RD-R4, RD-R4b, RD-D6, RD-D7, RD-D10, RD-D18,
   RD-D20–RD-D22; R128, R143, R144).
   1. `problem.realize(key, n_trials) -> params`, one tree: each law in a leaf drawn to a value
      from a sub-key by its path, each source block (on the shortcut or inside `sys`) given a seed
