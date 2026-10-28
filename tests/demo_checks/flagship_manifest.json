@@ -92,6 +92,13 @@
     ]
   },
   {
+    "id": "terminal_field_mpc",
+    "path": "examples/demos/compile/terminal_field_mpc.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
     "id": "grid_world_step_problem",
     "path": "examples/demos/compile/grid_world_step_problem.py",
     "requires": []

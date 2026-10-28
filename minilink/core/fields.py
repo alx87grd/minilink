@@ -7,12 +7,13 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.linalg import solve_triangular
 
-from minilink.core.backends import array_module, require_jax
+from minilink.core.backends import array_module, numpy_generator, require_jax
 from minilink.core.compile.evaluators.jacobian import central_difference
 from minilink.core.costs import CostFunction, param_view
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.sets import InputSet, Set
+from minilink.core.sets import BoxSet, InputSet, Set
 
 # The step of the central difference that a NumPy gradient takes
 GRADIENT_EPS = 1e-6
@@ -37,11 +38,22 @@ class Field(ABC):
     numbers (``{}`` for a field with none).
     """
 
-    params = {}
+    @property
+    def params(self) -> dict:
+        """The field's numbers: this instance's own (``{}`` until it sets some)."""
+        return self.__dict__.setdefault("own_params", {})
+
+    @params.setter
+    def params(self, value):
+        self.__dict__["own_params"] = value
 
     @abstractmethod
     def value(self, x, u=None, t=0.0, params=None):
         """The field's scalar value at ``(x, u, t)``."""
+
+    def __call__(self, x, u=None, t=0.0, params=None):
+        """``V(x, u, t)``, the same as :meth:`value`."""
+        return self.value(x, u, t, params)
 
     def gradient(self, x, u=None, t=0.0, params=None):
         """``∂V/∂x`` at ``(x, u, t)``: ``jax.grad`` on JAX arrays, central differences on NumPy."""
@@ -226,6 +238,157 @@ class MarginField(Field):
         return least
 
 
+@dataclass(frozen=True)
+class QuadraticField(Field):
+    """
+    The quadratic field ``V(x, t) = (x − c)ᵀ P(t) (x − c)``: a Lyapunov function, an LQR value.
+
+    ``P`` is one symmetric matrix ``(n, n)``, or a schedule ``(N, n, n)`` on the
+    times ``t`` ``(N,)``, interpolated linearly in ``t`` and held past its
+    ends, as a time-varying gain is read: ``value(x, t)`` is then the
+    finite-horizon LQR value ``(x − c)ᵀ S(t) (x − c)``. ``params`` holds
+    ``center`` and ``P``; the gradient is exact, ``2 P(t) (x − c)``. A stack of
+    states ``(N, n)`` gives one value per row. Its sublevel set
+    ``as_set(upper=level)`` is an :class:`EllipsoidSet`, which draws and
+    bounds itself.
+    """
+
+    center: np.ndarray
+    P: np.ndarray
+    t: np.ndarray | None = None
+
+    def __post_init__(self) -> None:
+        center = np.asarray(self.center, dtype=float).reshape(-1)
+        P = np.asarray(self.P, dtype=float)
+        t = None if self.t is None else np.asarray(self.t, dtype=float).reshape(-1)
+        require_quadratic_shapes(center, P, t)
+
+        object.__setattr__(self, "center", center)
+        object.__setattr__(self, "P", P)
+        object.__setattr__(self, "t", t)
+
+    @property
+    def params(self) -> dict:
+        """``{"center", "P"}``, the field's numbers."""
+        return {"center": self.center, "P": self.P}
+
+    def value(self, x, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        center = params["center"]
+        P_t = self.matrix_at(t, params)
+
+        # V = dᵀ P(t) d, d = x − c, one value per row of a stack
+        d = xp.atleast_2d(x - center)
+        v = xp.einsum("ij,jk,ik->i", d, P_t, d)
+        v = v if x.ndim > 1 else v[0]
+
+        return v
+
+    def gradient(self, x, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        center = params["center"]
+        P_t = self.matrix_at(t, params)
+
+        # ∂V/∂x = 2 P(t) (x − c), P symmetric
+        d = x - center
+        dV_dx = 2.0 * (d @ P_t)
+
+        return dV_dx
+
+    def matrix_at(self, t=0.0, params=None):
+        """``P(t)``: the matrix, or the schedule read linearly in ``t`` and held past its ends."""
+        params = self.params if params is None else params
+
+        P = params["P"]
+        times = self.t
+        if times is None:
+            return P
+        xp = array_module(P, t)
+        n = P.shape[-1]
+
+        # P(t) entry by entry, linear between the schedule's times
+        flat = xp.reshape(P, (P.shape[0], n * n))
+        entries = xp.stack([xp.interp(t, times, flat[:, j]) for j in range(n * n)])
+        P_t = xp.reshape(entries, (n, n))
+
+        return P_t
+
+    def as_set(self, *, lower: float | None = 0.0, upper: float | None = None) -> Set:
+        """``{x : lower ≤ V(x) ≤ upper}``; the sublevel set of a constant ``P`` (``upper`` alone, ``lower`` 0 or ``None``) is an :class:`EllipsoidSet`."""
+        sublevel = upper is not None and lower in (None, 0.0) and self.t is None
+        if sublevel:
+            return EllipsoidSet(self, None, upper)
+
+        return FieldSet(self, lower, upper)
+
+
+@dataclass(frozen=True)
+class EllipsoidSet(FieldSet):
+    """
+    The sublevel set of a quadratic field, ``{x : (x − c)ᵀ P (x − c) ≤ level}``, which draws and bounds itself.
+
+    :meth:`sample` draws uniformly inside (a Gaussian direction, a radius
+    ``r^{1/n}``, mapped through ``P = L Lᵀ``); :meth:`bounding_box` is
+    ``c ± √(level · diag(P⁻¹))``, the ellipsoid's shadow on each axis.
+    """
+
+    @property
+    def level(self) -> float:
+        """The sublevel ``c`` of ``V``."""
+        return float(self.upper)
+
+    def sample(self, key, n=None, params=None):
+        """Draw uniformly inside the ellipsoid: ``(n_x,)`` for one point, ``(n, n_x)`` with ``n``; ``key=None`` the center."""
+        field = self.field
+        center = field.center
+        P = field.P
+        level = self.level
+        dim = center.size
+
+        # No key: the center, the design point
+        if key is None:
+            return center if n is None else np.tile(center, (int(n), 1))
+
+        count = 1 if n is None else int(n)
+        rng = numpy_generator(key)
+
+        # z uniform in the unit ball: a Gaussian direction, a radius drawn as r^(1/dim)
+        z = rng.standard_normal((count, dim))
+        z *= (rng.random((count, 1)) ** (1.0 / dim)) / np.linalg.norm(
+            z, axis=1, keepdims=True
+        )
+
+        # P = L Lᵀ, so d = √c L⁻ᵀ z satisfies dᵀ P d ≤ c
+        L = np.linalg.cholesky(P)
+        d = np.sqrt(level) * solve_triangular(L.T, z.T, lower=False).T
+        points = center + d
+
+        return points[0] if n is None else points
+
+    @property
+    def half_width(self) -> np.ndarray:
+        """``√(level · diag(P⁻¹))``: the ellipsoid's half-width along each axis."""
+        P = self.field.P
+        level = self.level
+
+        # The shadow on axis i: √(c (P⁻¹)ᵢᵢ)
+        half_width = np.sqrt(level * np.diag(np.linalg.inv(P)))
+
+        return half_width
+
+    def bounding_box(self):
+        """``c ± half_width``: the ellipsoid's shadow on each axis."""
+        center = self.field.center
+        half_width = self.half_width
+
+        box = BoxSet(center - half_width, center + half_width)
+
+        return box
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -235,3 +398,16 @@ def require_a_bound(lower, upper):
     """Refuse a field set with neither a lower nor an upper bound."""
     if lower is None and upper is None:
         raise ValueError("a field's set requires at least one of lower or upper")
+
+
+def require_quadratic_shapes(center, P, t):
+    """Refuse a quadratic field whose matrix, or schedule, does not match its center."""
+    n = center.size
+    if t is None and P.shape != (n, n):
+        raise ValueError(
+            f"P must be ({n}, {n}) for a center of size {n}, got {P.shape}"
+        )
+    if t is not None and P.shape != (t.size, n, n):
+        raise ValueError(
+            f"a schedule P must be ({t.size}, {n}, {n}) on {t.size} times, got {P.shape}"
+        )

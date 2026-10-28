@@ -6,15 +6,19 @@ import textwrap
 from dataclasses import dataclass, field
 
 import numpy as np
-from scipy.linalg import solve_continuous_lyapunov, solve_triangular
+from scipy.linalg import solve_continuous_lyapunov
 
 from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
+from minilink.core.fields import EllipsoidSet, QuadraticField
 from minilink.core.sets import BoxSet, Set
 
 #: Families of Lyapunov function this tool can build.
 METHODS = ("quadratic", "sos")
+
+#: The seed of the states a certificate tests: it must read the same twice.
+CERTIFICATE_SEED = 0
 
 
 ###############################################################################
@@ -208,17 +212,15 @@ class LyapunovCertificate:
 
     # The certificate itself
 
-    def V(self, x):
-        """Lyapunov function at one state ``(n,)`` or a stack of states ``(N, n)``."""
-        x_bar = self.x_bar
-        P = self.P
+    @property
+    def V(self) -> QuadraticField:
+        """The Lyapunov function ``V(x) = (x − x̄)ᵀ P (x − x̄)``, one state ``(n,)`` or a stack ``(N, n)``."""
+        return QuadraticField(self.x_bar, self.P)
 
-        d = np.atleast_2d(np.asarray(x, dtype=float)) - x_bar
-
-        # V = dᵀ P d, one value per row
-        v = np.einsum("ij,jk,ik->i", d, P, d)
-
-        return v if np.ndim(x) > 1 else float(v[0])
+    @property
+    def region(self) -> EllipsoidSet:
+        """The certified region ``{x : V(x) ≤ c}``, which draws and bounds itself."""
+        return self.V.as_set(upper=self.level)
 
     def V_dot(self, x):
         """Derivative of ``V`` along the nonlinear dynamics, same shapes as :meth:`V`."""
@@ -247,14 +249,8 @@ class LyapunovCertificate:
 
     @property
     def extent(self) -> np.ndarray:
-        """Half-width of the certified region along each state."""
-        P = self.P
-        level = self.level
-
-        # The shadow of the ellipsoid on axis i: √(c (P⁻¹)ᵢᵢ)
-        extent = np.sqrt(level * np.diag(np.linalg.inv(P)))
-
-        return extent
+        """Half-width of the certified region along each state: its shadow on each axis."""
+        return self.region.half_width
 
     def slice_extent(self, x_axis: int = 0, y_axis: int = 1) -> np.ndarray:
         """
@@ -323,15 +319,14 @@ class LyapunovCertificate:
         and the report carries the offending state.
         """
         x_bar = self.x_bar
-        P = self.P
-        level = self.level
+        region = self.region
 
         # Ten time constants of the slowest mode, a hundredth of the certified extent
         tf = horizon_of(self) if tf is None else float(tf)
         tol = 0.01 * float(np.max(self.extent)) if tol is None else float(tol)
 
         # Initial states drawn uniformly in {V ≤ c}, each integrated for tf
-        x0 = x_bar + sample_in_ellipsoid(P, level, n)
+        x0 = region.sample(CERTIFICATE_SEED, n)
         x_final = self.rollout(tf)(x0)
 
         # Every trial must end within tol of the equilibrium
@@ -681,23 +676,6 @@ def horizon_of(cert):
     return horizon
 
 
-def sample_in_ellipsoid(P, level, n: int) -> np.ndarray:
-    """``n`` offsets drawn uniformly inside ``{d : dᵀ P d <= level}``."""
-    # A fixed seed: a certificate must read the same twice
-    rng = np.random.default_rng(0)
-    dim = int(P.shape[0])
-
-    # z uniform in the unit ball: a Gaussian direction, a radius drawn as r^(1/dim)
-    z = rng.standard_normal((n, dim))
-    z *= (rng.random((n, 1)) ** (1.0 / dim)) / np.linalg.norm(z, axis=1, keepdims=True)
-
-    # P = L Lᵀ, so d = √c L⁻ᵀ z satisfies dᵀ P d ≤ c
-    L = np.linalg.cholesky(P)
-    d = np.sqrt(level) * solve_triangular(L.T, z.T, lower=False).T
-
-    return d
-
-
 def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
     """Return ``rollout(X0) -> X_final`` integrating each state for ``tf``."""
     n_steps = max(1, int(round(tf / dt)))
@@ -837,7 +815,7 @@ def draw_region(
     # The states verify() would test, marked by whether they converged; the draw
     # lies on the plane only in a two-state loop
     if verified and int(cert.sys.n) == 2:
-        x0 = cert.x_bar + sample_in_ellipsoid(cert.P, cert.level, int(verified))
+        x0 = cert.region.sample(CERTIFICATE_SEED, int(verified))
         final = cert.rollout(horizon)(x0)
         distance = np.linalg.norm(final - cert.x_bar, axis=1)
         converged = distance < 0.01 * np.max(cert.extent)

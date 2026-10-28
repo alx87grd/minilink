@@ -362,7 +362,8 @@ def _make_numpy_planner(x_start=0.0):
 
 def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
     """The single integrator brought to ``goal`` over 1 s on 6 collocation knots (5 periods of 0.2 s)."""
-    configure_jax(enable_x64=True)
+    if backend == "jax":
+        configure_jax(enable_x64=True)
     sys = JaxSingleIntegrator() if backend == "jax" else SingleIntegrator()
     cost = QuadraticCost.from_system(
         sys, Q=np.eye(1), R=0.1 * np.eye(1), xbar=np.array([goal])

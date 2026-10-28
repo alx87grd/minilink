@@ -444,16 +444,17 @@ first.
   - landed in the v0.3 run (step 2): `Field` in `core/fields.py` with `gradient` and the four
     conversions, `as_set` / `as_input_set` renamed with every caller, `core/shaping.py`, and
     `Set.as_cost` reusing `Field.as_cost` (the log's RD-20, RD-21);
-  - `QuadraticField` (the Lyapunov `V`, the LQR value, the `S(t)` schedule), with the ellipsoid
-    as its sublevel set;
-  - the DESIGN §4 fields bullet.
+  - landed in the v0.3 run (step 6): `QuadraticField` (the Lyapunov `V`, the LQR value, the
+    `S(t)` schedule), with the `EllipsoidSet` as its sublevel set; the certificate's `V` and
+    `region` on them (fields.md 4.3; the log's RD-57); the DESIGN §4 fields bullet; script 7 and
+    the `terminal_field_mpc` demo.
 
   Done when the RoA baseline `cmp`s, `test_analysis_lyapunov.py` and the corridor and RRT demos
   pass, and an LQR value serves as an MPC terminal cost through
   `QuadraticField.as_terminal_cost`.
 
 The rest of the field plan (steps 4.4–4.7: `GridField`, `CallableField`, `LinearApproximator`
-and `LyapunovCertificate.V` as fields, `PolicyEvaluator`'s field-shaped result) is a row of §4,
+and `PolicyEvaluator`'s field-shaped result) is a row of §4,
 after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
@@ -831,7 +832,8 @@ pillar names it.
 - [ ] **The rest of the field object** **[ask — core]** (A1's steps 4.4–4.8 of
   [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField` (DP and tabular
   tables, a per-sweep time axis); `CallableField` (RL critics); `LinearApproximator` as a field;
-  `LyapunovCertificate.V` a field; `PolicyEvaluator` takes the evaluators' verb and returns a
+  `LyapunovCertificate.V_dot` and `search_level` on `V.gradient` (its `V` and `region` landed in
+  v0.3); `PolicyEvaluator` takes the evaluators' verb and returns a
   field-shaped result (scan: planning#4). Done when the DP baselines `cmp` and
   `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass.
 

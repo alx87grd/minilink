@@ -1,6 +1,6 @@
 # The field object
 
-Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included); not started, step 4.7 done 2026-10-12; the field signature `value(x, u=None, t=0.0, params=None)` already on `StateField`.
+Status: core contract — agreed 2026-09-15 (FD-C12, time and action arguments included); steps 4.1 (the v0.3 run, step 2), 4.2 and 4.3 (step 6) landed, step 4.7 done 2026-10-12. Of 4.3, `V_dot` as `gradient · f` and `search_level` on `V.value` / `V.gradient` wait with 4.4–4.6 (their sums differ from today's in the last bit, so the RoA baseline would move), and `as_box` / `clip_box` stay (they coerce the user's window); `sample_in_ellipsoid` is `EllipsoidSet.sample` (the run log's RD-57).
 Where it sits: the core's Fields pillar ([core-architecture.md](core-architecture.md) §9), row A1 of [TODO.md](TODO.md) §1.9. Depends on the sets-and-distributions pass (landed 2026-09-15: `bounding_box`, `.box`, the draw convention); the Lyapunov rulings it cites were open items of ROADMAP §6, now QUESTIONS.md (R111 ruled the certificates a research-lane tool).
 **Choice, 2026-10-27 (R133, [record](../reviews/2026-10-27-design-questions-rulings.md)):** the core builds
 steps 4.1–4.3 (a minimal `Field`, `QuadraticField`, the shaping in `core/`); 4.4–4.8 come later with

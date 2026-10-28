@@ -675,6 +675,14 @@ provided.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
   the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).
+  `QuadraticField(center, P, t=None)` is `V = (x − c)ᵀ P(t) (x − c)` with the exact gradient
+  `2 P(t) (x − c)`; `P` one matrix, or a schedule `(N, n, n)` on the times `t` (the Riccati
+  `S(t)` of `lqr_gain_schedule`), read linearly in `t` and held past its ends. Its sublevel set
+  `as_set(upper=level)` is an `EllipsoidSet`, which draws uniformly inside (`sample`, the center
+  for `key=None`) and bounds itself (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
+  `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
+  and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
+  a short-horizon MPC.
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
