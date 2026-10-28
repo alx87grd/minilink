@@ -475,7 +475,7 @@ class ProblemEvaluator:
             )
         else:
             f_aug = ev.rhs_with_cost(loop_params, "plant", rate)
-            z0 = np.concatenate([np.asarray(x0, dtype=float), np.zeros(1)])
+            z0 = xp.concatenate([xp.asarray(x0, dtype=float), xp.zeros(1)])
             zs = integrate_adaptive(f_aug, z0, u, ts, self.adaptive)
             xs, running = zs[:, :-1], zs[:, -1]
         us = xp.broadcast_to(u, (N + 1, u.size))

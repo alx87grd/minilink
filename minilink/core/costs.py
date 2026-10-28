@@ -566,16 +566,26 @@ class SampledCost(StepCost):
         self.cost.params = value
 
     def c(self, x, u, k=0, params=None):
-        t_k = self.t_start + k * self.dt
+        t_start = self.t_start
+        dt = self.dt
+
+        # t_k = t_start + k dt, the period's start
+        t_k = t_start + k * dt
         c = self.stage_cost_at(x, u, t_k, params)
 
         return c
 
     def h(self, x, k=0, params=None):
         params = self.params if params is None else params
-        t_k = self.t_start + k * self.dt
+        t_start = self.t_start
+        dt = self.dt
+        h = self.cost.h
 
-        return self.cost.h(x, t_k, params)
+        # h(x_k, t_k), t_k = t_start + k dt
+        t_k = t_start + k * dt
+        h_k = h(x, t_k, params)
+
+        return h_k
 
     def stage_cost_at(
         self, x, u, t_k, params=None, plant_params=None, discount_rate=None
