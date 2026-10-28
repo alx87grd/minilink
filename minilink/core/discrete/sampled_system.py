@@ -206,7 +206,6 @@ class SampledSystem(StepSystem):
 
         return y
 
-
     # Display: the source's drawing, its poses at the time it is read
 
     def get_kinematic_geometry(self):
