@@ -439,7 +439,7 @@ solvers and MPPI are v0.4 (§4).
 Why: [core-architecture.md](core-architecture.md) §9. Design: [fields.md](fields.md). Baselines
 first.
 
-- [ ] **A minimal field object, `core/fields.py`** (A1, steps 4.1–4.3 of
+- [x] **A minimal field object, `core/fields.py`** (A1, steps 4.1–4.3 of
   fields.md; R133, R153):
   - landed in the v0.3 run (step 2): `Field` in `core/fields.py` with `gradient` and the four
     conversions, `as_set` / `as_input_set` renamed with every caller, `core/shaping.py`, and
@@ -837,8 +837,9 @@ pillar names it.
 - [ ] **The rest of the field object** **[ask — core]** (A1's steps 4.4–4.8 of
   [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField` (DP and tabular
   tables, a per-sweep time axis); `CallableField` (RL critics); `LinearApproximator` as a field;
-  `LyapunovCertificate.V_dot` and `search_level` on `V.gradient` (its `V` and `region` landed in
-  v0.3); `PolicyEvaluator` takes the evaluators' verb and returns a
+  `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the field (its
+  `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon` handing out
+  `QuadraticField(x̄, S, t)` beside its controller; `PolicyEvaluator` takes the evaluators' verb and returns a
   field-shaped result (scan: planning#4). Done when the DP baselines `cmp` and
   `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass.
 

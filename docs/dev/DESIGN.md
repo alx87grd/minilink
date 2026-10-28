@@ -660,8 +660,8 @@ provided.
   plant's run by static indexing.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
-  boolean under JAX); `sample(key, n=None, params=None)`, the key required,
-  follows the distributions' draw convention below (`BoxSet.sample` traces);
+  boolean under JAX); `sample(key, n=None, params=None)` follows the distributions' draw
+  convention below (a set that has a design point gives it for `key=None`) (`BoxSet.sample` traces);
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
@@ -682,10 +682,14 @@ provided.
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
   the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).
   `QuadraticField(center, P, t=None)` is `V = (x − c)ᵀ P(t) (x − c)` with the exact gradient
-  `2 P(t) (x − c)`; `P` one matrix, or a schedule `(N, n, n)` on the times `t` (the Riccati
-  `S(t)` of `lqr_gain_schedule`), read linearly in `t` and held past its ends. Its sublevel set
-  `as_set(upper=level)` is an `EllipsoidSet`, which draws uniformly inside (`sample`, the center
-  for `key=None`) and bounds itself (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
+  `2 P(t) (x − c)`; `P` one symmetric matrix (a non-symmetric one is refused), or a schedule
+  `(N, n, n)` on `N ≥ 2` times `t` (the Riccati `S(t)` of `lqr_gain_schedule`), read linearly
+  in `t` and held past its ends. The sublevel set of a constant `P`, `as_set(upper=level)`
+  with `lower` 0 or `None`, is an `EllipsoidSet` (any other band, or a schedule, a plain
+  `FieldSet`): its `params` are `{"center", "P", "level"}` and `with_params` the moved copy; it
+  draws uniformly inside (`sample` on a NumPy generator, an integer seed or a JAX key; like a
+  distribution, the center, its design point, for `key=None`) and bounds itself
+  (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
   a short-horizon MPC.

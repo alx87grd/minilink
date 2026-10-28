@@ -221,6 +221,10 @@ class TestQuadraticCertificate(unittest.TestCase):
         np.testing.assert_array_equal(roa.extent, roa.region.half_width)
         self.assertEqual(roa.region.level, roa.level)
         self.assertTrue(roa.region.contains(roa.x_bar))
+        self.assertEqual(roa.V(list(x)), roa.V(x))
+        self.assertEqual(roa.contains(list(x)), roa.contains(x))
+        self.assertEqual(roa.V(list(x)), roa.V(x))
+        self.assertEqual(roa.contains(list(x)), roa.contains(x))
 
 
 @pytest.mark.optional

@@ -162,7 +162,7 @@ def trajectory_text(traj):
 
 def set_text(obj):
     # A real cycle: sets imports this module
-    from minilink.core.fields import FieldSet
+    from minilink.core.fields import EllipsoidSet, FieldSet
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -181,6 +181,9 @@ def set_text(obj):
     if isinstance(obj, IntersectionSet):
         parts = ", ".join(type(member).__name__ for member in obj.sets)
         return f"IntersectionSet of {parts}"
+    if isinstance(obj, EllipsoidSet):
+        center = array_text(obj.params["center"])
+        return f"EllipsoidSet, dim={obj.params['center'].size}, (z - {center})ᵀ P (z - {center}) <= {obj.level:g}"
     if isinstance(obj, FieldSet):
         bounds = []
         if obj.lower is not None:
