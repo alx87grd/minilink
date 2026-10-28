@@ -553,7 +553,7 @@ class PlanningProblem:
 
     def compile(
         self,
-        controller,
+        controller=None,
         dt=None,
         *,
         solver="rk4",
@@ -562,14 +562,25 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
+        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem, or its step face.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
-        clock: ``dt`` omitted reads its base period.
+        clock: ``dt`` omitted reads its base period. With no controller,
+        ``problem.compile(dt=)`` is the step face
+        (:class:`~minilink.planning.step_face.StepFace`, R141):
+        ``transition(x, u, k, params) -> (x_next, c_k)`` on the plant's
+        ``solver`` and ``substeps``.
         """
+        # No controller: the step face, the problem at its period
+        if controller is None:
+            # Lazy import: the face loads with its first compile
+            from minilink.planning.step_face import StepFace
+
+            return StepFace(self, dt=dt, solver=solver, substeps=substeps)
+
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator
 
@@ -582,6 +593,19 @@ class PlanningProblem:
             backend=backend,
             episode_length=episode_length,
         )
+
+    def discretize(self, dt, *, solver="rk4", substeps=1):
+        """
+        The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem` (R141).
+
+        Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
+        ``N = tf / dt``, ``γ = e^{−ρ dt}``; its face equals
+        ``self.compile(dt=dt, solver=solver, substeps=substeps)``'s.
+        """
+        # Lazy import: the step problem imports this module
+        from minilink.planning.step_problems import discretize_problem
+
+        return discretize_problem(self, dt, solver=solver, substeps=substeps)
 
     def horizon_kind(self) -> str:
         """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""

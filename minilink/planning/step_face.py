@@ -1,0 +1,221 @@
+"""The compiled step face of a problem (R141): ``transition(x, u, k, params) -> (x_next, c_k)``."""
+
+from __future__ import annotations
+
+import numpy as np
+
+from minilink.core.backends import array_module
+from minilink.core.costs import SampledCost
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.step_problems import StepPlanningProblem
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+class StepFace:
+    """
+    The step face of a problem: one tick of its plant and its stage cost, the one face the step tools read (R141).
+
+    ``transition(x, u, k, params) -> (x_next, c_k)`` advances the plant one
+    tick from ``x`` under ``u`` and returns the stage cost of the tick:
+
+    - for a continuous problem compiled at ``dt`` (``problem.compile(dt=)``),
+      the plant's step model over one period, the input held, with
+      ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside the state by the same
+      scheme and substeps (R142; under one Euler step ``g dt`` to the last bit);
+    - for a :class:`~minilink.planning.step_problems.StepPlanningProblem`, its
+      system's ``step`` and its cost's ``c`` (a discretized problem's
+      :class:`~minilink.core.costs.SampledCost` fused into the same one step,
+      so its face equals the continuous problem's).
+
+    ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``. :attr:`N` is the horizon in ticks
+    (``None`` infinite), :attr:`gamma` the discount per tick, :attr:`params`
+    the tree every call reads (``params=None``: these numbers),
+    :meth:`time_of` the time of tick ``k`` (``t_start + k dt``, or the tick for
+    a native problem), :meth:`terminal` the terminal cost, :attr:`X`,
+    :attr:`U` and :attr:`Xf` the sets. Value iteration, the RL environment and
+    the judge read this face only.
+    """
+
+    def __init__(self, problem, *, dt=None, solver="rk4", substeps=1):
+        problem.require_cost()
+        self.problem = problem
+        self.sys = problem.sys
+        self.n = int(problem.sys.n)
+        self.m = int(problem.sys.m)
+
+        # A step problem: its own horizon, discount and stage
+        if isinstance(problem, StepPlanningProblem):
+            self.dt = problem.dt
+            self.N = problem.N
+            self.gamma = problem.gamma
+            cost = problem.cost
+            self.stage = cost if isinstance(cost, SampledCost) else None
+
+        # A continuous problem at dt: N = tf / dt, γ = e^{−ρ dt}, the stage its SampledCost
+        else:
+            require_period(dt)
+            # Lazy import: the evaluator's grid helper loads with the first face
+            from minilink.planning.evaluator import steps_of
+
+            self.dt = float(dt)
+            rho = problem.discount_rate
+            finite = problem.horizon_kind() == "finite"
+            self.N = steps_of(problem.tf, self.dt) if finite else None
+            self.gamma = float(np.exp(-rho * self.dt))
+            self.stage = SampledCost(
+                problem.cost,
+                problem.sys,
+                self.dt,
+                solver=solver,
+                substeps=substeps,
+                discount_rate=rho,
+                t_start=problem.t_start,
+            )
+
+    @property
+    def params(self) -> dict:
+        """The numbers every call reads: ``plant`` (a random plant at its mean), ``cost``, ``x_start``, ``t_start``, and the discount."""
+        problem = self.problem
+        plant = nominal_plant_params(problem) if is_continuous(problem) else None
+        tree = {
+            "plant": problem.sys.params if plant is None else plant,
+            "cost": problem.cost.params,
+            "x_start": np.asarray(problem.x_start, dtype=float),
+            "t_start": problem.t_start,
+        }
+        if is_continuous(problem):
+            tree["discount_rate"] = problem.discount_rate
+
+        return tree
+
+    @property
+    def X(self):
+        return self.problem.X
+
+    @property
+    def U(self):
+        return self.problem.U
+
+    @property
+    def Xf(self):
+        return self.problem.Xf
+
+    @property
+    def t_start(self):
+        return self.problem.t_start
+
+    def time_of(self, k, params=None):
+        """The time of tick ``k``: ``t_start + k dt`` (seconds), or ``t_start + k`` (a native problem's ticks)."""
+        t_start = self.t_start if params is None else params["t_start"]
+        if self.dt is None:
+            return t_start + k
+
+        return t_start + k * self.dt
+
+    def transition(self, x, u, k, params=None):
+        """``(x_{k+1}, c_k)``: tick ``k`` of the plant and its stage cost."""
+        t_k = self.time_of(k, params)
+
+        return self.transition_at(x, u, t_k, params)
+
+    def transition_at(self, x, u, t, params=None):
+        """``(x_next, c)`` of the tick that starts at time ``t`` (a native problem's tick index)."""
+        params = self.params if params is None else params
+
+        # A continuous plant: the plant and its stage cost in one step
+        if self.stage is not None:
+            rho = params.get("discount_rate")
+            return self.stage.stage_at(
+                x, u, t, params["cost"], params["plant"], discount_rate=rho
+            )
+
+        # A native step system: its step and its cost's c
+        x_next = self.sys.step(x, u, t, params["plant"])
+        c = self.problem.cost.c(x, u, t, params["cost"])
+
+        return x_next, c
+
+    def terminal(self, x, t=None, params=None):
+        """The terminal cost ``h(x)`` at the horizon's end (or at ``t``); ``0`` on an infinite horizon."""
+        params = self.params if params is None else params
+        xp = array_module(x)
+        if self.N is None and t is None:
+            return xp.asarray(0.0)
+
+        t = self.time_of(self.N, params) if t is None else t
+
+        return self.problem.cost.h(x, t, params["cost"])
+
+    def price(self, gamma=None):
+        """The price of a failure, over the horizon, at the discount ``gamma`` per tick (default the face's)."""
+        problem = self.problem
+        gamma = self.gamma if gamma is None else float(gamma)
+        if not is_continuous(problem):
+            return problem.infeasibility_price(gamma=gamma)
+
+        # The continuous problem's price at the rate ρ that makes e^{−ρ dt} = γ
+        dt = self.dt
+        if gamma >= 1.0:
+            return problem.infeasibility_price(discount_rate=0.0, dt=dt)
+        rho = -np.log(gamma) / dt if gamma > 0.0 else np.inf
+
+        return problem.infeasibility_price(np.inf, discount_rate=rho, dt=dt)
+
+    def run(self, policy, x_start=None, params=None, n_steps=None):
+        """
+        The face's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
+
+        ``n_steps`` defaults to :attr:`N`. The states ``(n_steps + 1, n)``, the
+        inputs and stage costs ``(n_steps,)``-long, on the array module of the
+        start: the one sum every tool's score is.
+        """
+        params = self.params if params is None else params
+        x = np.asarray(params["x_start"] if x_start is None else x_start, dtype=float)
+        N = self.N if n_steps is None else int(n_steps)
+        require_horizon(N)
+        gamma = self.gamma
+
+        xs, us, cs = [x], [], []
+        J = 0.0
+        for k in range(N):
+            t_k = self.time_of(k, params)
+            u = np.asarray(policy(x, t_k), dtype=float).reshape(self.m)
+
+            # x_{k+1}, c_k = transition(x_k, u_k, k); J += γᵏ c_k
+            x, c = self.transition_at(x, u, t_k, params)
+            J = J + gamma**k * float(c)
+            xs.append(np.asarray(x, dtype=float))
+            us.append(u)
+            cs.append(float(c))
+
+        # J += γᴺ h(x_N)
+        J = J + gamma**N * float(self.terminal(x, params=params))
+
+        return np.stack(xs), np.stack(us), np.asarray(cs), J
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def is_continuous(problem) -> bool:
+    """Whether a problem is a continuous one (``PlanningProblem``), compiled at a period."""
+    return isinstance(problem, PlanningProblem)
+
+
+def require_period(dt):
+    """Refuse a continuous problem's face without its period."""
+    if dt is None:
+        raise ValueError(
+            "a continuous problem's step face needs its period: problem.compile(dt=...)"
+        )
+
+
+def require_horizon(N):
+    """Refuse a rollout with no number of ticks."""
+    if N is None:
+        raise ValueError("an infinite horizon needs n_steps= for a rollout")
