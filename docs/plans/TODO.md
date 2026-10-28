@@ -189,8 +189,6 @@ Why: [core-architecture.md](core-architecture.md) §1.
   `log_prob` lives on the seeded policy, not on `Distribution` (R129).
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
   step 8; [differentiable-problem.md](differentiable-problem.md) §8):
-  - `TrajectorySource` holds its table in `params` (its `h` already traces), so `"x_start"` and
-    `"controller.values"` are decision leaves, with `Xf` lowered;
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.4 row.
 

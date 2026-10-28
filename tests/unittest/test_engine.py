@@ -710,3 +710,29 @@ def test_the_gradient_reaches_an_observers_start():
         )
         central = (pe.evaluate(up).objective - pe.evaluate(down).objective) / (2 * eps)
         np.testing.assert_allclose(grad[i], central, rtol=1e-6)
+
+
+@pytest.mark.jax
+def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
+    pytest.importorskip("jax")
+    from minilink import Optimizer
+    from minilink.blocks.sources import TrajectorySource
+    from minilink.dynamics.catalog.equations import DoubleIntegrator
+
+    sys = DoubleIntegrator()
+    cost = QuadraticCost.from_system(sys, Q=np.zeros((2, 2)), R=np.eye(1))
+    goal = BallSet(center=[1.0, 0.0], radius=0.05)
+    problem = PlanningProblem(sys, x_start=np.zeros(2), cost=cost, tf=2.0, Xf=goal)
+    source = TrajectorySource(np.linspace(0.0, 2.0, 11), np.zeros(11))
+    pe = problem.compile(source, dt=0.01, backend="jax")
+    assert pe.params["controller"]["values"].shape == (1, 11)
+    assert not pe.evaluate().reached[0]
+
+    wrt = ["controller.values"]
+    program = pe.program(wrt)
+    assert program.n_z == 11 and program.metadata["rows"] == ["reachability_margin"]
+    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 200}).solve()
+
+    # The goal reached to the solver's tolerance: the optimum sits on its boundary
+    planned = pe.evaluate(pe.unpack(result.z, wrt, pe.params))
+    assert result.success and float(planned.reachability_margin[0]) >= -1e-8
