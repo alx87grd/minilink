@@ -17,7 +17,8 @@ Status: **draft plan**, its shape decided (2026-10-27; the architecture of recor
   - R130's performance gate (§2);
   - the name of `program.unpack(z)`, the full tuned tree from an exported program (the
     naming question).
-- **Not started:** PP-1–PP-5 (OPW-1–OPW-5 landed, §6). They build on the optimizer method table and the
+- **Landed in the v0.3 run:** PP-1 (the noun, `Optimizer.solve(params=, z0=)`, one evaluator
+  body; §3.2) and OPW-1–OPW-5 (§6). **Not started:** PP-2–PP-5. They build on the optimizer method table and the
   first-order backend that S74 landed (R74, 2026-10-24), on the compiled problem's program
   export, and on A2's cost leaves.
 - **Scope:** direct collocation and the MPC first; the other transcriptions later (§5).

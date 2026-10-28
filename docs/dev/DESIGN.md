@@ -951,7 +951,14 @@ and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_sls
 (the default), `scipy_trust_constr`, `ipopt`. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
-constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. One method table
+constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
+declare parameters (R130): `MathematicalProgram(..., params=tree)` takes callables of
+`(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` merges a partial
+tree once onto the defaults (`core.params.merge_known`: an unknown path raises naming the known
+ones, a new shape raises) and binds it, so one compiled program is solved for many values
+without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
+body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
+differentiates in `z`. One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
 (`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
 among them, as the offline `Optimizer` does (OPW-1).
@@ -1219,8 +1226,8 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `solve_trajectory` always rebuilds a fresh
-`MathematicalProgram`. Optional `compile_parametric_program()` builds a
-`ParametricMathematicalProgram` (``h(z, x0)``) once so
+`MathematicalProgram`. Optional `compile_parametric_program()` builds the
+collocation program with the start as its parameter (`params={"x_start": …}`) once so
 `solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
 parametric path; with ``backend='numpy'`` or ``'direct'``, each
 from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning

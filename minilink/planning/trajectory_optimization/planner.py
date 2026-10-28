@@ -12,6 +12,7 @@ import numpy as np
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
+from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -306,13 +307,7 @@ class TrajectoryOptimizationPlanner(Planner):
         require_jax_compile_backend(self.options.backend)
         require_parametric_transcription(self.transcription)
 
-        # Lazy import: the parametric JAX evaluator loads on first compile, not with
-        # the planner
-        from minilink.planning.trajectory_optimization.parametric_evaluator import (
-            JaxParametricProgramEvaluator,
-        )
-
-        # The program with the start x0 as its parameter
+        # The program with the start x_start as its parameter
         t0 = time.perf_counter()
         self.program = self.transcription.transcribe_parametric(
             self.problem,
@@ -325,12 +320,10 @@ class TrajectoryOptimizationPlanner(Planner):
             self.transcription.initial_guess_time_grid(self.problem),
         )
         z0 = self.transcription.pack_initial_guess(self.problem, guess)
-        self.program_evaluator = JaxParametricProgramEvaluator(
-            self.program,
-            sample_z=z0,
-            sample_x0=self.problem.x_start,
+        self.program_evaluator = compile_program_evaluator(
+            self.program, BACKEND_JAX, sample_z=z0
         )
-        self.program_evaluator.bind(self.problem.x_start)
+        self.program_evaluator.bind({"x_start": self.problem.x_start})
 
         # The compiled dynamics that read each tick's plan back
         params = nominal_plant_params(self.problem)
@@ -645,7 +638,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
         problem_k = self.problem.replace(x_start=x_arr, X0=SingletonSet(x_arr))
-        self.program_evaluator.bind(x_arr)
+        self.program_evaluator.bind({"x_start": x_arr})
 
         # The seed: the given guess, else the default schedule from the measured state
         if initial_guess is None:

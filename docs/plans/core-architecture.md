@@ -288,10 +288,11 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     seed (stochastic approximation) is an `Optimizer` strategy for later
     ([native-optimizers.md](native-optimizers.md) §7).
 - **Ruled:** R26 (the key `plant`), R130, R131, R148.
-- **Today:** `ParametricMathematicalProgram` varies `x0` only; collocation closes over the plant,
+- **Today:** the one noun is in (PP-1, the v0.3 run): `MathematicalProgram(..., params=)`,
+  `Optimizer.solve(params=, z0=)`, one evaluator body (the parametric program and its evaluator
+  folded in); collocation's compiled program declares `x_start` only and closes over the plant,
   cost and set parameters, and `require_online_params` refuses every other key; the MPC port
-  functions drop `params`; `JaxParametricProgramEvaluator` repeats about half of the plain
-  evaluator; the compiled path takes every method of the one table (OPW, landed in the v0.3 run); problems have no start time; shooting and
+  functions drop `params`; the compiled path takes every method of the one table (OPW, landed in the v0.3 run); problems have no start time; shooting and
   collocation pin the start through `X0`; `pe.program(wrt, key, n_trials)` refuses `"x_start"` in
   `wrt` on a stochastic problem.
 - **Open:** nothing; the export's full tuned tree is `program.unpack(z)` (R164). The performance

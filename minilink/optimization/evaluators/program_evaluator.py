@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
+from minilink.core.params import merge_known
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 ###############################################################################
@@ -22,6 +23,11 @@ class MathematicalProgramEvaluator(ABC):
     backend-native ``J`` / ``h`` / ``g`` methods. The base class defines
     SciPy/Ipopt bridge helpers that convert native scalar and array
     expressions to Python ``float`` / flat NumPy arrays.
+
+    One body serves a program with parameters and one without (R130): the
+    evaluator holds the bound tree :attr:`params` (the program's defaults
+    until :meth:`bind`), every call reads it, and the solver sees a function
+    of ``z`` alone. A program without parameters binds the empty tree.
     """
 
     def __init__(self, program: MathematicalProgram, sample_z=None):
@@ -38,6 +44,9 @@ class MathematicalProgramEvaluator(ABC):
         self.backend = ""
         self.n_h = 0
         self.n_g = 0
+
+        # The bound parameters: the program's defaults, the empty tree for none
+        self.params = self.native_tree(program.params or {})
 
     @abstractmethod
     def J(self, z):
@@ -78,6 +87,24 @@ class MathematicalProgramEvaluator(ABC):
     def has_jacobian_g(self) -> bool:
         """True when :meth:`jacobian_g` can be evaluated (see :attr:`has_jacobian_h`)."""
         return self.n_g == 0
+
+    def bind(self, params=None) -> None:
+        """
+        Bind the parameter values of the next calls: the program's defaults with ``params`` merged over them.
+
+        ``None`` (or ``{}``) binds the defaults. The merge is the one at the
+        boundary: a path the program does not declare raises naming the known
+        ones, and a leaf of a new shape raises; a program without parameters
+        refuses any.
+        """
+        defaults = self.program.params
+        if params:
+            require_declared_params(defaults)
+            tree = merge_known(defaults, params)
+        else:
+            tree = defaults or {}
+
+        self.params = self.native_tree(tree)
 
     # The SciPy/Ipopt bridge: Python floats and flat NumPy arrays
 
@@ -179,6 +206,17 @@ class MathematicalProgramEvaluator(ABC):
     # Internal machinery
     ###########################################################################
 
+    def call(self, function, z):
+        """A program callable at ``z`` and the bound parameters: ``function(z, params)``, or ``function(z)`` for a program without them."""
+        if self.program.params is None:
+            return function(z)
+
+        return function(z, self.params)
+
+    def native_tree(self, tree):
+        """The bound tree as the evaluator's backend reads it (NumPy keeps it as given)."""
+        return tree
+
     def check_derivative_shapes(self, z) -> None:
         """Evaluate every available quantity once at ``z``: each checks its own shape (a JAX evaluator compiles it)."""
         self.objective(z)
@@ -227,3 +265,17 @@ class MathematicalProgramEvaluator(ABC):
         if arr.shape != shape:
             raise ValueError(f"{label} must have shape {shape}")
         return arr
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_declared_params(defaults):
+    """Refuse parameter values for a program that declares none."""
+    if defaults is None:
+        raise ValueError(
+            "this program declares no parameters: its functions take z alone "
+            "(MathematicalProgram(..., params=...) declares them)"
+        )

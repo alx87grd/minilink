@@ -340,6 +340,9 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
     tuned tree.
   - **Order:** PP-1, PP-2 and PP-4 on S74's backend factory (OPW-1); then PP-3, the cost and set
     leaves, on A2.
+  - **Landed in the v0.3 run:** PP-1, the noun with its optional `params`, `Optimizer.solve(params=,
+    z0=)` with the one checked merge (`core.params.merge_known`), one evaluator body;
+    `ParametricMathematicalProgram` and `JaxParametricProgramEvaluator` folded in.
 
   Done when one compiled MPC program, bound with two values of a plant parameter and of a cost
   target, gives what a rebuild gives; the MPC baselines are byte-identical with only `x_start`

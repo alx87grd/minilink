@@ -153,6 +153,7 @@ class Optimizer:
     def solve(
         self,
         *,
+        params=None,
         z0=None,
         callback: OptimizationProgressCallback | None = None,
         record_solve_time: bool = False,
@@ -163,9 +164,14 @@ class Optimizer:
 
         Parameters
         ----------
+        params : dict, optional
+            The values of the program's parameters for this solve, a partial
+            tree merged once onto the program's defaults (R130; a path the
+            program does not declare raises). ``None`` solves at the defaults.
+            The compiled program is reused: a new value never recompiles.
         z0 : array_like, optional
-            One-off initial decision vector. If omitted, use the default ``z0``
-            supplied to :class:`Optimizer`.
+            One-off initial decision vector, the warm start. If omitted, use
+            the default ``z0`` supplied to :class:`Optimizer`.
         record_solve_time : bool, optional
             If True, set
             :attr:`~minilink.optimization.mathematical_program.OptimizationResult.solve_time_s`
@@ -183,6 +189,9 @@ class Optimizer:
         """
         z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or verbose
+
+        # The values of this solve, bound once at the boundary
+        self.program_evaluator.bind(params)
 
         if verbose:
             self.print_solve_preamble(z_start)

@@ -104,17 +104,12 @@ class DirectCollocationTranscription(Transcription):
         *,
         backend: str = BACKEND_JAX,
     ):
-        """Build a JAX parametric collocation program with runtime ``x0``.
+        """Build the JAX collocation program with the start as its parameter, ``params = {"x_start": x0}``.
 
-        Equality constraints are ``h(z, x0)``: dynamics / terminal (fixed) plus
-        the initial-state residual ``x[:, 0] - x0``. Requires singleton ``X0``.
+        The equalities are ``h(z, params)``: the dynamics and the terminal
+        boundary, then the initial residual ``x[:, 0] − params["x_start"]``.
+        Requires a singleton ``X0``.
         """
-        # Lazy import: the parametric program loads on first use, not with the
-        # transcription
-        from minilink.planning.trajectory_optimization.parametric_program import (
-            ParametricMathematicalProgram,
-        )
-
         require_jax_compile_backend(backend)
         require_singleton_x0(problem)
 
@@ -124,10 +119,10 @@ class DirectCollocationTranscription(Transcription):
         unpack_jax, J, dynamics_residual = self.jax_objective_and_defects(problem, jax)
         n = int(problem.sys.n)
 
-        # x_0 − x0 = 0: the measured initial state is the program's parameter
-        def initial_residual(z, x0):
+        # x_0 − x_start = 0: the measured initial state is the program's parameter
+        def initial_residual(z, params):
             x, _ = unpack_jax(z)
-            residual = x[:, 0] - x0
+            residual = x[:, 0] - params["x_start"]
             return residual.reshape(-1)
 
         # Dynamics and the terminal boundary, fixed at compile time
@@ -143,19 +138,21 @@ class DirectCollocationTranscription(Transcription):
         self.add_path_constraints(problem, inequalities=inequalities)
         lower, upper = self.decision_bounds(problem)
 
-        # h(z, x0) = [h_fixed(z); x_0 − x0]
+        # h(z, params) = [h_fixed(z); x_0 − x_start]
         fixed_h = stack_constraints(fixed_equalities)
+        fixed_g = stack_constraints(inequalities)
 
-        def h(z, x0):
-            parts = [fixed_h(z), initial_residual(z, x0)]
+        def h(z, params):
+            parts = [fixed_h(z), initial_residual(z, params)]
             return jnp.concatenate(parts)
 
-        return ParametricMathematicalProgram(
+        g = None if fixed_g is None else (lambda z, params: fixed_g(z))
+
+        return MathematicalProgram(
             n_z=self.decision_dimension(problem),
-            n_x0=n,
-            J=J,
+            J=lambda z, params: J(z),
             h=h,
-            g=stack_constraints(inequalities),
+            g=g,
             lower=lower,
             upper=upper,
             backend=BACKEND_JAX,
@@ -163,6 +160,7 @@ class DirectCollocationTranscription(Transcription):
                 "transcription": "direct_collocation_parametric",
                 "backend": backend,
             },
+            params={"x_start": np.zeros(n)},
         )
 
     def reconstruct_result(

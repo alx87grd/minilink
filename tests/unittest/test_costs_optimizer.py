@@ -709,3 +709,51 @@ def test_the_method_table_gives_ipopt():
     from minilink.optimization.optimizers.ipopt import IpoptOptimizer
 
     assert isinstance(make_optimizer_backend("ipopt"), IpoptOptimizer)
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_one_program_with_parameters_solves_for_each_value(backend):
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    traces = []
+
+    # J(z; c) = ‖z − c‖², its minimum at c
+    def J(z, params):
+        traces.append(1)
+        c = params["target"]["c"]
+        return (z - c) @ (z - c)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend=backend, params={"target": {"c": np.array([1.0, 2.0])}}
+    )
+    opt = Optimizer(program, z0=[0.0, 0.0], method="l-bfgs")
+    n_traces = len(traces)
+
+    np.testing.assert_allclose(opt.solve().z, [1.0, 2.0], atol=1e-6)
+    moved = opt.solve(params={"target": {"c": np.array([-3.0, 0.5])}})
+    np.testing.assert_allclose(moved.z, [-3.0, 0.5], atol=1e-6)
+    np.testing.assert_allclose(
+        opt.solve().z, [1.0, 2.0], atol=1e-6
+    )  # the defaults again
+    if backend == "jax":
+        assert len(traces) == n_traces  # compiled once, never retraced
+
+    # The one merge at the boundary: an unknown path, a new shape
+    with pytest.raises(ValueError, match="known entries are"):
+        opt.solve(params={"target": {"d": 1.0}})
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(params={"target": {"c": np.zeros(3)}})
+
+
+def test_a_program_without_parameters_refuses_values():
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
+    opt = Optimizer(program, z0=[1.0], method="l-bfgs")
+    assert abs(opt.solve(params={}).z[0]) < 1e-6
+    with pytest.raises(ValueError, match="declares no parameters"):
+        opt.solve(params={"c": 1.0})
+    with pytest.raises(TypeError, match="must be a dict"):
+        MathematicalProgram(n_z=1, J=lambda z, p: z @ z, params=[1.0])

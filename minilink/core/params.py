@@ -69,6 +69,29 @@ def merge_tree(tree, override):
     return merged
 
 
+def merge_known(tree, override):
+    """
+    ``tree`` with the leaves of ``override`` replacing its own: the one merge at a boundary.
+
+    A partial tree is checked against the structure it merges onto: a key the
+    tree lacks raises and names the known ones, a subtree given as a leaf (or a
+    leaf as a subtree) raises, and a leaf of a new shape raises (a ``None``
+    leaf, such as a seed at its mean, takes any value).
+    """
+    merged = dict(tree)
+    for key, value in override.items():
+        require_known_key(key, tree)
+        node = tree[key]
+        if isinstance(node, dict):
+            require_subtree(key, value)
+            merged[key] = merge_known(node, value)
+        else:
+            require_same_shape(key, value, node)
+            merged[key] = value
+
+    return merged
+
+
 def flatten(tree, prefix=()):
     """Yield ``(keys, leaf)`` pairs of a nested parameter dict, depth-first; ``None`` has none."""
     if tree is None:
@@ -102,3 +125,39 @@ def float_leaves(tree):
         return None
 
     return np.asarray(tree, dtype=float)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_known_key(key, tree):
+    """Refuse a key the tree does not have, naming the ones it has."""
+    if key not in tree:
+        raise ValueError(
+            f"params has no entry {key!r}; the known entries are {sorted(tree)}"
+        )
+
+
+def require_subtree(key, value):
+    """Refuse a leaf where the tree has a subtree."""
+    if not isinstance(value, dict):
+        raise ValueError(
+            f"params[{key!r}] is a subtree: give a dict of its entries, got "
+            f"{type(value).__name__}"
+        )
+
+
+def require_same_shape(key, value, node):
+    """Refuse a subtree where the tree has a leaf, or a leaf of another shape."""
+    if isinstance(value, dict):
+        raise ValueError(f"params[{key!r}] is a leaf, got a dict")
+    if value is None or node is None:
+        return
+    shape, expected = np.shape(value), np.shape(node)
+    if shape != expected:
+        raise ValueError(
+            f"params[{key!r}] has shape {expected}, got {shape}: a value may change, "
+            "its shape is the program's structure"
+        )
