@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import warnings
 
-from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.core.system import AUTO_DT_SCALE, DEFAULT_SMALLEST_TIME_CONSTANT
 
 ###############################################################################
 # Public API

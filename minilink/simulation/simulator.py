@@ -10,7 +10,12 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
 )
 from minilink.core.inspect import inspect_text
-from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
+from minilink.core.system import (
+    AUTO_DT_SCALE,
+    DEFAULT_SMALLEST_TIME_CONSTANT,
+    HELD_SIGNAL_STEPS_PER_SAMPLE,
+    DynamicSystem,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
@@ -23,7 +28,7 @@ from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
-from minilink.simulation.time_grid import AUTO_DT_SCALE, build_time_grid
+from minilink.simulation.time_grid import build_time_grid
 
 # User-facing solver labels: (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
@@ -83,10 +88,6 @@ RK4_AUTO_MIN_TIME_POINTS = 10_000
 FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
-
-# Steps per sample period of a held signal on a smooth loop with no declared time
-# constant: the period is the resolution the user chose; ``dt`` buys a finer one
-HELD_SIGNAL_STEPS_PER_SAMPLE = 1
 
 # Pass ``backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
@@ -311,7 +312,7 @@ class Simulator:
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
         the grid, so ``dt`` comes from the system's smallest time constant
-        scaled by :data:`~minilink.simulation.time_grid.AUTO_DT_SCALE`, rounded
+        scaled by :data:`~minilink.core.system.AUTO_DT_SCALE`, rounded
         down to a divisor of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.

@@ -17,6 +17,14 @@ if TYPE_CHECKING:
 # Solver hint of a system that declares no time constant of its own (seconds)
 DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 
+# Automatic step of a fixed-step solver, smooth or discontinuous loop alike:
+# dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"]
+AUTO_DT_SCALE = 0.1
+
+# Integration steps per sample of a held signal on a smooth loop that declares
+# no time constant: the period itself is the resolution
+HELD_SIGNAL_STEPS_PER_SAMPLE = 1
+
 
 ###############################################################################
 # Public API

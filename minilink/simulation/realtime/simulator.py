@@ -29,10 +29,9 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.compile.evaluators.stepping import substeps_of
-from minilink.core.system import DynamicSystem
+from minilink.core.system import AUTO_DT_SCALE, DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
-from minilink.simulation.time_grid import AUTO_DT_SCALE
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.

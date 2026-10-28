@@ -10,10 +10,6 @@ import numpy as np
 # oscillations. Fixed-step solvers derive ``dt`` from the plant instead.
 DEFAULT_N_STEPS = 10001
 
-# Automatic step of a fixed-step solver, smooth or discontinuous loop alike:
-# dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"]
-AUTO_DT_SCALE = 0.1
-
 
 ###############################################################################
 # Public API

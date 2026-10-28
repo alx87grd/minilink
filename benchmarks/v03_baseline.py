@@ -33,7 +33,8 @@ from minilink.core.backends import array_module, configure_jax
 
 sys.path.insert(0, __file__.rsplit("/", 1)[0])
 from step_model_baseline import ENTRIES as STEP_MODEL_ENTRIES  # noqa: E402
-from step_model_baseline import as_list, compare  # noqa: E402
+from step_model_baseline import as_list  # noqa: E402
+from step_model_baseline import compare as compare_flat  # noqa: E402
 
 configure_jax(enable_x64=True)
 warnings.simplefilter("ignore")
@@ -449,6 +450,33 @@ ENTRIES = (*STEP_MODEL_ENTRIES,) + (
     gym_problem_entries,
     field_entries,
 )
+
+
+def flattened(data):
+    """Every nested entry as its own key (``key/name``, ``key/0``): arrays and strings only."""
+    flat = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            flat.update(flattened({f"{key}/{k}": v for k, v in value.items()}))
+        elif isinstance(value, list) and not is_array(value):
+            flat.update(flattened({f"{key}/{i}": v for i, v in enumerate(value)}))
+        else:
+            flat[key] = value
+    return flat
+
+
+def is_array(value):
+    """Whether a JSON list is one rectangular array of numbers."""
+    try:
+        np.asarray(value, dtype=float)
+    except (TypeError, ValueError):
+        return False
+    return True
+
+
+def compare(current, reference, rtol):
+    """Every key that is missing, new, an error, or differs beyond ``rtol``."""
+    return compare_flat(flattened(current), flattened(reference), rtol)
 
 
 def capture():

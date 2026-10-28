@@ -9,7 +9,7 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.core.system import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -1411,7 +1411,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
         from minilink import Pendulum, WhiteNoise
-        from minilink.simulation.simulator import HELD_SIGNAL_STEPS_PER_SAMPLE
+        from minilink.core.system import HELD_SIGNAL_STEPS_PER_SAMPLE
 
         cases = [
             # (declared plant time constant, sample period, discontinuous) -> (solver, dt)

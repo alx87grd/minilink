@@ -69,7 +69,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 | Package | Role |
 | --- | --- |
 | `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
-| `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
+| `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `SampledSystem` (`sampled_system.py`: a system on a clock), `StepDiagramSystem` (`step_diagram.py`), the hybrid loop (`hybrid_diagram.py`: `HybridDiagram`; `hybrid_composition.py`: `hybrid_closed_loop` and the port resolution behind `Computer @ plant`), `StepRollout` (`step_rollout.py`) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
 **System libraries** — `System` subclasses you drop into a diagram, shelved by
@@ -768,13 +768,18 @@ value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, 
 the Lyapunov sampler, the problem evaluator and the hybrid and realtime simulators all
 call them, or the one-period formula they share (`step_body`). The adaptive
 SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py`).
-`discretize(plant, dt, *, solver="rk4", substeps=1) -> StepSystem` (its method facade
-`plant.discretize(dt)`) is the plant one sample
-period later, the input held: `solver` is `"rk4"` or `"euler"` (`substeps` per period) or
-`"exact"` (the matrix exponential, a linear model only). Its `step(x, u, k=0, params=None)`
-takes the integer tick and binds `t_k = k dt` (the origin 0; R158 gives a consumer with an origin
-the seconds face); the sample time is `dt` alone, never a
-key of the plant's `params`. The hold belongs to sequences (`rollout`), never to a step.
+`discretize(sys, dt, *, solver="rk4", substeps=1) -> SampledSystem` (its method facade
+`plant.discretize(dt)`) is the system on a clock of period `dt`, the input held
+(`core/discrete/sampled_system.py`). A `SampledSystem` is a view of its source: its `params`,
+ports (their functions included) and state metadata are the source's, its `sample_period`
+structural. One equation, two faces: the seconds face `update(x, u, t, params=None)`, the state
+one period after the sampling instant `t` (a continuous source integrated by `solver`, `"rk4"`
+or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of a linear model;
+a static source has `n = 0`), its output ports functions in seconds; the tick face
+`step(x, u, k)` and `h(x, u, k)`, `t_k = k·sample_period` (the origin 0; a consumer with an origin
+calls the seconds face, R158). A tick source (a `StepSystem`) keeps its count and has no seconds
+face (`counts` is true). The sample time is `dt` alone, never a key of the plant's `params`. The
+hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,
 `compile_step_diagram`, the shape probe), `plan.py` (`ExecutionPlan` and `StepExecutionPlan`, their
