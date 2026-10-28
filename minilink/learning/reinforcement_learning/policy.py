@@ -53,7 +53,7 @@ class ExplorationPolicy:
     :class:`~minilink.core.distributions.CounterKey` ``(seed, k)``: the
     collectors draw with the episode's seed at the tick, so the head's draw is
     the one :class:`~minilink.control.GaussianPolicy` makes with that seed at
-    that sample (R160); the off-policy losses keep JAX keys.
+    that sample; the off-policy losses keep JAX keys.
     """
 
     def __init__(self, controller, head):

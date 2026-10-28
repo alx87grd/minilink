@@ -32,13 +32,13 @@ class RolloutEnvironment:
     """
     A planning problem seen by a learner: ``reset`` draws a start, ``step`` runs one control period.
 
-    The problem is compiled once to its step face (R141). ``step`` is the face's
+    The problem is compiled once to its step face. ``step`` is the face's
     ``transition``: the plant over ``dt`` with the input held and the period's
     stage cost ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside it by the same
-    scheme (R142), the reward ``−c_k``; it tells how the episode ends: at the
+    scheme, the reward ``−c_k``; it tells how the episode ends: at the
     horizon, at a failure (the state left ``X`` or the input left ``U``, checked
     at the sample as the judge does: a priced terminal event, a training device
-    that ends the episode early, R159), or at the edge of the training zone (a
+    that ends the episode early), or at the edge of the training zone (a
     truncation: the model is not studied there, the value of the state stands in
     for the rest). On the JAX backend every method traces, so collectors ``vmap`` over plants and ``scan`` over time with
     no Python per step; on NumPy the same methods drive plain loops (tabular
@@ -95,6 +95,7 @@ class RolloutEnvironment:
         self.n_steps_per_episode = int(round(self.tf / self.dt))
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
         self.discount_rate = problem.discount_rate
+        self.t_start = float(problem.t_start)
 
         # Plant and stage cost: the problem's step face at dt, one transition per
         # control period, on nominal or drawn parameters
@@ -146,7 +147,7 @@ class RolloutEnvironment:
         The episode's realization: ``{"plant": draws, port: {"seed": s}}`` (empty when nothing is drawn).
 
         Each law of the plant is drawn once, at its path; each random source gets
-        the episode's seed (RD-D21), so two episodes from one training key see
+        the episode's seed, so two episodes from one training key see
         distinct noise.
         """
         if not self.randomizes_params:
@@ -181,8 +182,10 @@ class RolloutEnvironment:
 
         dt = self.dt
         tf = self.tf
+        t_start = self.t_start
         finite_horizon = self.finite_horizon
         face = self.face
+        gamma = face.gamma
         X = self.X
         U = self.U
         zone = self.training_zone
@@ -192,7 +195,7 @@ class RolloutEnvironment:
         # Plant input: the action on its port, each source's signal at t on theirs
         u_full = self.input_vector(u, t, params)
 
-        # Transition: x_{k+1}, c_k over one control period, input held (R141, R142)
+        # Transition: x_{k+1}, c_k over one control period, input held
         x_next, c = face.transition_at(x, u_full, t, tree)
         t_next = t + dt
 
@@ -211,13 +214,16 @@ class RolloutEnvironment:
         out_of_X = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0)
         failed = out_of_X | out_of_U | ~finite
         left_zone = ~xp.all(zone.margin(x_next, t_next, set_params) >= 0.0)
-        horizon_reached = xp.asarray(t_next >= tf - 0.5 * dt)
+        horizon_reached = xp.asarray(t_next >= t_start + tf - 0.5 * dt)
 
-        # A failure pays the price of infeasibility; a finite horizon pays h(x_N)
+        # A failure pays the price of infeasibility; a finite horizon pays h(x_N),
+        # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
+        # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
         penalty = self.infeasible_penalty(x_next, t_next)
         reward = reward - xp.where(failed, penalty, 0.0)
         if finite_horizon:
-            reward = reward - horizon_reached * face.terminal(x_next, t_next, tree)
+            h_N = face.terminal(x_next, t_next, tree)
+            reward = reward - horizon_reached * gamma * h_N
 
         # What is paid is terminal; what is left unpaid is truncated
         terminated = failed | (horizon_reached & finite_horizon)
@@ -247,7 +253,7 @@ class RolloutEnvironment:
 
         The action is applied as given; port bounds are information, not
         saturation. A random source reads the episode's seed from ``params``;
-        without one it is at its mean (RD-D17).
+        without one it is at its mean.
         """
         xp = array_module(u)
 

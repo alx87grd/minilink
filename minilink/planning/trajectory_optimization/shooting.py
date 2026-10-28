@@ -191,9 +191,9 @@ class ShootingTranscription(Transcription):
 
         The tree is :meth:`program_params`: the rollout starts at
         ``params["x_start"]`` at ``params["t_start"]`` on the plant's numbers,
-        the cost reads the cost's and the discount, the sets their own (R148).
+        the cost reads the cost's and the discount, the sets their own.
         With no terminal set and no state or input set beyond the input box, the
-        program is box-bounded: the native methods solve it (R149).
+        program is box-bounded: the native methods solve it.
         """
         jax = ensure_jax_x64()
         jnp = jax.numpy
@@ -267,7 +267,7 @@ class ShootingTranscription(Transcription):
         )
 
     def program_params(self, problem: PlanningProblem) -> dict:
-        """The JAX program's tree: ``x_start``, ``t_start``, the plant's, the cost's, the discount, and each set it reads by role (R148)."""
+        """The JAX program's tree: ``x_start``, ``t_start``, the plant's, the cost's, the discount, and each set it reads by role."""
         plant = nominal_plant_params(problem)
         tree = {
             "x_start": np.asarray(problem.x_start, dtype=float),
@@ -369,7 +369,7 @@ class ShootingTranscription(Transcription):
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:
-        """The rollout's start: the problem's ``x_start``, which a singleton ``X0`` is derived from (R148)."""
+        """The rollout's start: the problem's ``x_start``, which a singleton ``X0`` is derived from."""
         return problem.x_start
 
     def rollout_loop(self, f, u, x0, problem: PlanningProblem) -> np.ndarray:

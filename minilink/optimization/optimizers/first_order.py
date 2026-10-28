@@ -27,8 +27,8 @@ class FirstOrderOptimizer(OptimizerBackend):
     box: ``z ← Π(z − η ∇J)`` for ``"gd"``, the bias-corrected moment step of
     :class:`Adam` for ``"adam"``. :meth:`solve` stops after ``maxiter`` steps,
     or when ``‖∇J‖ ≤ gtol``; :meth:`run` takes exactly ``K`` steps, one
-    ``lax.scan`` on JAX, pure and differentiable (R149). Both run the method's
-    pure law (:meth:`law`, R132): ``init(z0) -> state`` and
+    ``lax.scan`` on JAX, pure and differentiable. Both run the method's
+    pure law (:meth:`law`): ``init(z0) -> state`` and
     ``update(grad, state) -> state``, the gradient oracle beside it.
 
     Parameters
@@ -144,7 +144,7 @@ class FirstOrderOptimizer(OptimizerBackend):
         Exactly ``iterations`` steps of the law from ``z0`` on the tree ``params``: ``(z_K, J(z_K))``.
 
         On a JAX program the steps are one ``lax.scan``: pure, so the solve
-        traces under ``jit``, ``vmap`` and ``grad`` (R149); on NumPy, a loop of
+        traces under ``jit``, ``vmap`` and ``grad``; on NumPy, a loop of
         the same steps. No tolerance, no early stop: the count is the contract.
         """
         require_gradient(program_evaluator)

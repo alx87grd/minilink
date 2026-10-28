@@ -24,7 +24,7 @@ def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
     is ``(x, t, ep_return, params, seed)`` with a leading ``n_envs`` axis:
     ``seed`` is the episode's seed of the policy, which draws the action of
     tick ``k = ⌊t/dt⌋`` at ``CounterKey(seed, k)``, the draw the seeded policy
-    block makes with that seed (R160).
+    block makes with that seed.
     """
     jax, jnp = require_jax(), require_jax_numpy()
 
@@ -193,9 +193,9 @@ def restart_finished_episodes(env, carry, done, k_reset, k_params, k_seed):
 
     x_next, t_next, ep_return, params, seed = carry
 
-    # A finished episode restarts from a fresh start, at t = 0, with a zero return
+    # A finished episode restarts from a fresh start, at t_start, with a zero return
     x_next = jnp.where(done, env.reset(k_reset), x_next)
-    t_next = jnp.where(done, 0.0, t_next)
+    t_next = jnp.where(done, env.t_start, t_next)
     ep_return = jnp.where(done, 0.0, ep_return)
     seed = jnp.where(done, episode_policy_seed(k_seed), seed)
 
@@ -234,12 +234,12 @@ def reset_carry(env, key, n_envs):
     k_x, k_params = jax.random.split(key)
     k_seed = jax.random.fold_in(key, 1)
 
-    # A fresh start, fresh parameters and a fresh policy seed per plant, at t = 0
+    # A fresh start, fresh parameters and a fresh policy seed per plant, at t_start
     # with a zero return
     x = jax.vmap(env.reset)(jax.random.split(k_x, n_envs))
     params = jax.vmap(env.sample_params)(jax.random.split(k_params, n_envs))
     seed = jax.vmap(episode_policy_seed)(jax.random.split(k_seed, n_envs))
-    t = jnp.zeros(n_envs)
+    t = jnp.full(n_envs, env.t_start)
     ep_return = jnp.zeros(n_envs)
 
     return x, t, ep_return, params, seed

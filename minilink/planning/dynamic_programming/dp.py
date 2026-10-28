@@ -202,7 +202,7 @@ class DynamicProgrammingPlanner(Planner):
             t = tf - k * dt
 
             # Bellman backup from the cost-to-go one step ahead:
-            # J(x) = min_u [ g(x, u, t) dt + alpha J_next(x + f(x, u, t) dt) ]
+            # J(x_k) = min_u [ c(x_k, u) + α J_next(x_{k+1}) ], the face's stage cost and step
             J_next = J
             J, pi = backward_step(J_next, t)
 
@@ -336,7 +336,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def running_cost_table(self, t, admissible=None, x_next=None) -> np.ndarray:
         """
-        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step face's ``c`` (R142, ``g dt`` under Euler).
+        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step face's ``c`` (``g dt`` under Euler).
 
         Pairs that are not ``admissible`` (action outside the input set, or a
         successor outside the state set or the grid) cost ``out_of_bound_cost``:
@@ -683,7 +683,8 @@ class ValueIterationRecord:
 def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid:
     """The grid passed in, or one built from the shapes and ``dt`` (never both)."""
     if grid is None:
-        # A step problem ticks on its own: its grid needs no dt
+        # A step problem ticks on its own: its grid needs no dt, and takes none
+        require_no_period_on_ticks(problem, dt)
         native = isinstance(problem, StepPlanningProblem) and dt is None
         if x_grid is None or u_grid is None or (dt is None and not native):
             raise ValueError(
@@ -754,3 +755,12 @@ def require_tables(result):
     """Refuse a cleanup before any solve has produced the tables."""
     if result is None:
         raise ValueError("No solution has been computed yet")
+
+
+def require_no_period_on_ticks(problem, dt):
+    """Refuse a ``dt`` for a step problem's grid: it ticks on its own clock."""
+    if isinstance(problem, StepPlanningProblem) and dt is not None:
+        raise ValueError(
+            "a step problem ticks on its own clock: omit dt (its period, if it has "
+            "one, is the problem's dt)"
+        )

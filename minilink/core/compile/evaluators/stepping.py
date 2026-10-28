@@ -55,7 +55,7 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
 
 def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
     """
-    ``(x(t + dt), c)``: one period of :func:`step_body` with the stage cost integrated beside the state (R142).
+    ``(x(t + dt), c)``: one period of :func:`step_body` with the stage cost integrated beside the state.
 
     The state is augmented with ``c``, ``ċ = rate(x, u, τ)``, ``c(t) = 0``,
     and stepped by the same scheme and substeps, the input held: the state
@@ -69,14 +69,15 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
     # the augmented step's own two rows (the state's is euler's, to the bit)
     if solver == "euler" and substeps == 1:
         x_next = euler(f, x, u, u, t, dt)
-        c = dt * rate(x, u, t)
+        c = dt * xp.reshape(rate(x, u, t), ())
         return x_next, c
 
     # ż = [f(x, u, τ); rate(x, u, τ)], the cost a state of its own
     def f_aug(z, u, tau):
         x_s = z[:n]
         c_dot = xp.reshape(rate(x_s, u, tau), (1,))
-        return xp.concatenate([f(x_s, u, tau), c_dot])
+        z_dot = xp.concatenate([f(x_s, u, tau), c_dot])
+        return z_dot
 
     # z(t) = [x; 0], stepped over one period
     z0 = xp.concatenate([x, xp.zeros(1)])
@@ -88,7 +89,8 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
 def stage_cost(f, rate, x, u, t, dt, solver, substeps):
     """The stage cost alone of :func:`step_with_cost`: under one Euler step ``dt · rate(x, u, t)``, the plant not evaluated."""
     if solver == "euler" and substeps == 1:
-        c = dt * rate(x, u, t)
+        xp = array_module(x, u)
+        c = dt * xp.reshape(rate(x, u, t), ())
         return c
 
     _, c = step_with_cost(f, rate, x, u, t, dt, solver, substeps)

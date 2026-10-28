@@ -566,7 +566,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     plant = Pendulum()
     problem = PlanningProblem(
         plant,
-        cost=QuadraticCost.from_system(plant),
+        cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
         x_start=np.array([0.5, 0.0]),
         tf=3.0,
         U=plant.input_box,
@@ -599,7 +599,8 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
 
     # One J, the planner's own score among them (the law held over each period, R159)
     J_planner = float(np.squeeze(solution.evaluation.J))
-    assert J_judge == J_face == J_env == J_planner
+    assert J_judge == J_planner
+    np.testing.assert_allclose([J_judge, J_env], J_face, rtol=1e-14, atol=0.0)
 
     # The planner's evidence is the same held loop on the face
     evidence = vi.nominal_trajectory()

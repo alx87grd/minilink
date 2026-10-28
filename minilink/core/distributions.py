@@ -32,7 +32,7 @@ class Distribution(ABC):
     :class:`CounterKey` ``(seed, k)``: one draw by the library's cipher, the same
     on both backends (what a noise source holds over its sample ``k``).
     The law's numbers are its ``params``; ``sample(key, n, params)`` draws from
-    the law they name, so a noise level is a parameter like a mass (RD-R1).
+    the law they name, so a noise level is a parameter like a mass.
     """
 
     support: Set | None = None
@@ -64,7 +64,7 @@ class Distribution(ABC):
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
         JAX PRNG key (JAX arrays out, traceable); ``key=None`` draws nothing
         and returns the mean (:meth:`mean_draw`), as a noise block's
-        ``seed=None`` gives its mean signal (the maintainer, 2026-10-28).
+        ``seed=None`` gives its mean signal.
         ``params=None`` reads the law's own :attr:`params`.
         """
         ...
@@ -304,9 +304,11 @@ def check_points(points):
 
 
 def split_keys(key, n):
-    """``n`` independent keys from a JAX key, or the same NumPy generator ``n`` times."""
+    """``n`` independent keys from a JAX key, the same NumPy generator ``n`` times, or ``n`` times ``None`` (no key: every draw at its mean)."""
     if n == 0:
         return []
+    if key is None:
+        return [None] * n
 
     if is_jax_key(key):
         jax = require_jax()

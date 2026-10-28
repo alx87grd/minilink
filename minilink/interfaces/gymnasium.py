@@ -59,7 +59,7 @@ class Sys2Gym(gym.Env):
     t_start : float
         Initial time (only relevant if the system is time dependent).
     x_start : Distribution, optional
-        The law of the initial state on :meth:`reset` (RD-R5), drawn with the
+        The law of the initial state on :meth:`reset`, drawn with the
         environment's ``np_random`` (``Uniform(lower, upper)``,
         ``Gaussian(mean, std)``, any :class:`~minilink.core.distributions.Distribution`);
         ``None`` starts every episode at ``sys.x0``.

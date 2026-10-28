@@ -99,7 +99,7 @@ class CostFunction(ABC):
         The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
 
         ``cost_rate`` is the integrand ``e^{−ρ (t_k − t_start)} g(x_k, u_k, t_k)``
-        at each sample, the discount counted from the horizon's start (R148),
+        at each sample, the discount counted from the horizon's start,
         and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
         ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
         trajectory's array module, so it traces under JAX.
@@ -496,14 +496,22 @@ class StepCost(ABC):
     """
     The cost of a step problem: a stage cost ``c(x, u, k)`` and a terminal cost ``h(x, k)``.
 
-    ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)`` (R141): the stage cost is
+    ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``: the stage cost is
     paid per tick, already integrated over its period, and the discount is the
     problem's ``γ`` per tick. ``params`` holds the cost's numbers (``{}`` for
     none), the System pattern: ``params=None`` reads them.
     """
 
-    params = {}
     id = None
+
+    @property
+    def params(self) -> dict:
+        """The cost's numbers: this instance's own (``{}`` until it sets some)."""
+        return self.__dict__.setdefault("own_params", {})
+
+    @params.setter
+    def params(self, value):
+        self.__dict__["own_params"] = value
 
     @abstractmethod
     def c(self, x, u, k=0, params=None):
@@ -524,13 +532,13 @@ class StepCost(ABC):
 
 class SampledCost(StepCost):
     """
-    The stage cost of a continuous cost on a plant sampled at ``dt`` (R154): ``c_k = ∫₀^dt e^{−ρτ} g dτ``.
+    The stage cost of a continuous cost on a plant sampled at ``dt``: ``c_k = ∫₀^dt e^{−ρτ} g dτ``.
 
     ``c(x, u, k)`` integrates ``e^{−ρ(τ − t_k)} g(x(τ), u, τ)`` over one period
     from ``x`` at ``t_k = t_start + k dt``, the input held, with the plant's
     solver and substeps (the plant evaluated beside the cost: a direct call is
     the second plant evaluation a compiled face fuses away); ``h(x, k)`` is
-    the terminal cost at ``t_k``. The stationary form (R142): ``c_k`` does not
+    the terminal cost at ``t_k``. The stationary form: ``c_k`` does not
     depend on ``k`` except through the time the cost reads, and under one
     Euler step it is ``g(x_k, u_k, t_k) dt`` to the last bit. ``params`` are
     the cost's; the plant's numbers are the plant's own.
@@ -587,6 +595,15 @@ class SampledCost(StepCost):
 
         return h_k
 
+    def terminal_at(self, x, t, params=None):
+        """The terminal cost at the absolute time ``t`` (seconds): the continuous cost's ``h(x, t)``."""
+        params = self.params if params is None else params
+        h = self.cost.h
+
+        h_t = h(x, t, params)
+
+        return h_t
+
     def stage_cost_at(
         self, x, u, t_k, params=None, plant_params=None, discount_rate=None
     ):
@@ -631,7 +648,8 @@ class SampledCost(StepCost):
         # ċ = e^{−ρ(τ − t_k)} g(x, u, τ): the discount counted from the period's start
         def rate(x, u, tau):
             xp = array_module(x, u, tau)
-            return xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
+            c_dot = xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
+            return c_dot
 
         return dynamics, rate
 

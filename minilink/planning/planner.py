@@ -9,7 +9,7 @@ from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.evaluator import evaluate
+from minilink.planning.evaluator import evaluate, policy_of
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -47,6 +47,11 @@ class Planner(ABC):
     #: the others read its start set ``X0`` and its ``x_start``, and warn.
     accepts_stochastic = False
 
+    #: Planners whose feedback law runs on the grid of its ``dt`` (value
+    #: iteration, the learners) score it held over each period; a planner whose
+    #: law is continuous (the LQR) clears this and scores the continuous loop.
+    holds_policy = True
+
     def __init__(self, problem: PlanningProblem) -> None:
         # The declarative problem
         self.problem = problem
@@ -59,8 +64,9 @@ class Planner(ABC):
             warnings.warn(
                 f"{type(self).__name__} is a deterministic planner: it reads the "
                 "start set X0 of this stochastic problem (the support of its start "
-                "law) and its x_start, and ignores its laws and random sources. "
-                "Pass problem.nominal() to plan from the mean start alone.",
+                "law) and its x_start, and plans on its parameters' means with its "
+                "random sources at their mean. Pass problem.nominal() to plan from "
+                "the mean start alone.",
                 stacklevel=2,
             )
 
@@ -178,7 +184,7 @@ class Planner(ABC):
         One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
         ``None`` when the problem declares no cost (a search without one). A
         feedback law with no clock of its own is held over each period of
-        ``dt`` (``policy % dt``, R159), the loop its planner designs for; an
+        ``dt`` (``policy % dt``), the loop its planner designs for; an
         open-loop source keeps the interpolation its planner states.
         """
         problem = self.problem if problem is None else problem
@@ -190,8 +196,9 @@ class Planner(ABC):
         # One run when nothing is random, n_trials draws otherwise
         trials = int(n_trials) if problem.is_stochastic else None
 
-        # The law the run holds: a feedback law on the clock of dt
-        law = held_feedback(policy, dt)
+        # The law the run holds: a feedback law on the clock of dt, when the
+        # planner designs it on that grid
+        law = held_feedback(policy, dt) if self.holds_policy else policy
 
         return evaluate(
             problem,
@@ -215,10 +222,14 @@ class Planner(ABC):
 
 
 def held_feedback(policy, dt):
-    """A feedback law with no clock of its own on the clock of ``dt`` (``policy % dt``); any other policy as given."""
+    """A feedback law with no clock of its own on the clock of ``dt`` (``policy % dt``); a source, a tick law or a clocked law as given."""
+    # Lazy import: the step system loads with the compile chain
+    from minilink.core.discrete.step_system import StepSystem
+
+    policy = policy_of(policy)
     reads_input = int(getattr(policy, "m", 0)) > 0
-    clocked = getattr(policy, "sample_period", None) is not None
-    if reads_input and not clocked:
+    tick_or_clocked = isinstance(policy, StepSystem)
+    if reads_input and not tick_or_clocked:
         return policy % float(dt)
 
     return policy

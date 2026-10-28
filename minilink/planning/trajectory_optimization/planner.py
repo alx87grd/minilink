@@ -168,12 +168,12 @@ class TrajectoryOptimizationPlanner(Planner):
 
     @property
     def params(self) -> dict:
-        """The tree the plan depends on (R148): ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets the program reads."""
+        """The tree the plan depends on: ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets the program reads."""
         return self.transcription.program_params(self.problem)
 
     def compile(self, backend=None):
         """
-        The planner's pure face, ``pv`` (R148): its solve as functions of ``(params, z)``.
+        The planner's pure face, ``pv``: its solve as functions of ``(params, z)``.
 
         ``backend`` defaults to the planner's. See
         :class:`~minilink.planning.trajectory_optimization.compiled.CompiledTrajectoryPlanner`.
@@ -378,7 +378,7 @@ class TrajectoryOptimizationPlanner(Planner):
             The values of this tick, a partial tree of the problem's leaves
             (``{"plant": {"mu": 0.6}, "cost": {"xbar": …}, "t_start": t}``),
             merged once onto the program's defaults with ``x0`` as its
-            ``x_start`` (R148): an unknown path raises naming the known ones.
+            ``x_start``: an unknown path raises naming the known ones.
             ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
             scene bind (A3) and raises.
         initial_guess : ndarray or Trajectory, optional
@@ -655,7 +655,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_MAIN)
 
     def build_parametric_optimizer_backend(self):
-        """The solver of the online ticks: the method's preset from the one table (OPW-1), the planner's options over it."""
+        """The solver of the online ticks: the method's preset from the one table, the planner's options over it."""
         method = method_for(self.program, self.options.method)
         options = dict(self.options.optimizer_options)
 
@@ -841,7 +841,7 @@ class TrajectoryOptimizationOptions:
     #: custom ``callback`` takes precedence.
     live_plot: bool = False
     #: A native method's fixed step count, forwarded to its ``Optimizer``
-    #: (R149): exactly this many steps; ``None`` runs to the method's tolerance.
+    #:: exactly this many steps; ``None`` runs to the method's tolerance.
     iterations: int | None = None
 
 

@@ -66,6 +66,9 @@ class LQRPlanner(Planner):
         Central-difference step.
     """
 
+    # The law is continuous: its score closes it as a continuous loop
+    holds_policy = False
+
     def __init__(
         self,
         problem: PlanningProblem,

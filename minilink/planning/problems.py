@@ -45,10 +45,10 @@ class PlanningProblem:
     The parameters live on the parts; :attr:`params` is their live view by role,
     as a diagram's are by block.
 
-    A problem is stochastic by its parts (R143): where a number goes, a law may
+    A problem is stochastic by its parts: where a number goes, a law may
     go (``x_start=`` a law or a set; ``params=`` laws in the tree's own shape),
-    and a disturbance is a source block on a plant port (R128). :meth:`realize`
-    draws them into one tree (R144), :meth:`nominal` is the problem without its
+    and a disturbance is a source block on a plant port. :meth:`realize`
+    draws them into one tree, :meth:`nominal` is the problem without its
     laws (the start at its law's mean, the parts at their own numbers), and
     :attr:`is_stochastic` is read off the parts.
 
@@ -57,7 +57,7 @@ class PlanningProblem:
     sys : System
         Minilink system or diagram to plan for.
     x_start : array_like, Distribution or Set, optional
-        The plant's start (R124): a point, a law over ``x(0)``, or a set (the
+        The plant's start: a point, a law over ``x(0)``, or a set (the
         uniform law on it). A point is the representative start: when ``X0`` is
         omitted, it creates a singleton ``X0``; when ``X0`` is provided, it must
         belong to ``X0``. A law's mean is the representative start and its
@@ -92,7 +92,7 @@ class PlanningProblem:
         MPC grids require a finite ``tf`` — demos should always set it
         explicitly. Knot count ``N`` lives on transcription options.
     t_start : float, optional
-        The start time of the horizon, ``[t_start, t_start + tf]`` (R148): a run
+        The start time of the horizon, ``[t_start, t_start + tf]``: a run
         starts at ``t_start``, its costs, sets and references read absolute
         time, and the discount counts from it. ``0`` (default) is today's
         horizon; it is a leaf of :attr:`params`, so an MPC binds the time of its
@@ -117,8 +117,7 @@ class PlanningProblem:
         :class:`~minilink.core.distributions.Distribution` over that number,
         drawn per trial by :meth:`realize` (domain randomization, robustness).
     disturbances : mapping, optional
-        Source blocks on the plant's input ports, ``{"d": WhiteNoise(...)}``
-        (R128): the loop the evaluator closes is exactly the one ``closed_loop``
+        Source blocks on the plant's input ports, ``{"d": WhiteNoise(...)}``: the loop the evaluator closes is exactly the one ``closed_loop``
         builds with the same sources, the source of ``d`` its block
         ``disturbance`` and of ``n`` its ``noise`` (any other port's under the
         port's name), so its seed is the leaf ``"disturbance.seed"``. A bare law
@@ -326,7 +325,7 @@ class PlanningProblem:
 
     def realize(self, key=None, n=1):
         """
-        ``n`` realizations of the problem's draws from one key: one tree (R144).
+        ``n`` realizations of the problem's draws from one key: one tree.
 
         The problem's numbers (:meth:`parts_view`), with ``"x_start"`` of shape
         ``(n, nx)``, each law's leaf drawn ``n`` times in its number's shape
@@ -336,14 +335,14 @@ class PlanningProblem:
         (``child_seed(key, "x_start")``, ``child_seed(key, "plant.m")``; a
         source's seed by its port and the trial): adding a law or a source
         leaves every other draw unchanged. An integer key draws on the host,
-        the same values for a NumPy and a JAX run (RD-D13); a JAX key draws
+        the same values for a NumPy and a JAX run; a JAX key draws
         traceable JAX arrays.
         :meth:`drawn_paths` names the leaves with a trial axis. A deterministic
         problem has one realization, its own start. ``key`` follows the draw
         convention of :class:`~minilink.core.distributions.Distribution`; the
         sources' seeds need an integer key. ``key=None`` draws nothing: every
         law at its mean (tiled ``n`` times) and every source's seed ``None``,
-        its mean signal (the maintainer, 2026-10-28): the tree :meth:`nominal`
+        its mean signal: the tree :meth:`nominal`
         writes.
         """
         n = int(n)
@@ -417,7 +416,7 @@ class PlanningProblem:
         A copy, its parts copied (the caller's stay as they are): the start at
         its law's mean (a singleton ``X0``), each parameter with a law at the
         law's mean in the copied part, each random source kept with its seed
-        ``None``, its mean signal (the maintainer, 2026-10-28); no law remains.
+        ``None``, its mean signal; no law remains.
         """
         tree = self.realize(None)
 
@@ -521,7 +520,7 @@ class PlanningProblem:
         ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
         with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
         a warning naming ``infeasible_cost``. ``params`` are the cost's numbers to
-        bound (an evaluation's overridden weights, R165); ``None`` reads its own.
+        bound (an evaluation's overridden weights); ``None`` reads its own.
         """
         cost = self.require_cost()
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
@@ -588,7 +587,7 @@ class PlanningProblem:
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
         clock: ``dt`` omitted reads its base period. With no controller,
         ``problem.compile(dt=)`` is the step face
-        (:class:`~minilink.planning.step_face.StepFace`, R141):
+        (:class:`~minilink.planning.step_face.StepFace`):
         ``transition(x, u, k, params) -> (x_next, c_k)`` on the plant's
         ``solver`` and ``substeps``.
         """
@@ -614,7 +613,7 @@ class PlanningProblem:
 
     def discretize(self, dt, *, solver="rk4", substeps=1):
         """
-        The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem` (R141).
+        The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem`.
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
         ``N = tf / dt``, ``γ = e^{−ρ dt}``; its face equals
@@ -814,7 +813,7 @@ def coerce_disturbances(disturbances, sys) -> dict:
         if isinstance(block, Distribution):
             raise TypeError(
                 f"disturbances[{port!r}] is a bare law: a disturbance is a source block "
-                "that states its time behaviour (R128); pass WhiteNoise(...) for a "
+                "that states its time behaviour; pass WhiteNoise(...) for a "
                 "white noise, NoiseSource(law, sample_period=...) for a held draw"
             )
         if not isinstance(block, System) or int(block.m) != 0:
@@ -952,11 +951,22 @@ def require_one_run(n):
 
 
 def nominal_plant_params(problem):
-    """The plant's parameters to plan with: a random plant's draw at its mean, else ``None`` (its own)."""
-    if problem.sys.is_random:
-        return problem.sys.realize(None)
+    """
+    The plant's parameters to plan with, the design point: every law of the plant at its mean, a random plant's seeds ``None``.
 
-    return None
+    ``None`` (the plant's own numbers) when the plant draws nothing and no law
+    is declared on it; the same numbers ``problem.nominal()`` plans with.
+    """
+    plant = problem.sys.realize(None) if problem.sys.is_random else None
+    means = problem.sample_params(None).get("plant")
+    if not means:
+        return plant
+
+    # Each law's mean over the plant's own numbers
+    base = problem.sys.params if plant is None else plant
+    design = merge_tree(base, means)
+
+    return design
 
 
 def require_roles(value, view):

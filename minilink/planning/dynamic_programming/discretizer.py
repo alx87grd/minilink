@@ -82,7 +82,7 @@ class StateSpaceGrid:
         precompute_backend: str = BACKEND_NUMPY,
         verbose: bool = False,
     ) -> None:
-        # The problem, its system's dimensions and its step face (R141): one period
+        # The problem, its system's dimensions and its step face: one period
         # of the plant and its stage cost, the one face value iteration reads
         require_step_knobs(solver, 1)
         self.problem = problem
@@ -211,7 +211,7 @@ class StateSpaceGrid:
         return self.face.step_at(x, u, t, params)
 
     def stage_cost(self, x, u, t, params=None):
-        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (R142; ``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
+        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
         return self.face.stage_cost_at(x, u, t, params)
 
     # The successor tables
@@ -597,6 +597,17 @@ class StateSpaceGrid:
         return centre
 
 
+def face_of(problem, dt, solver):
+    """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
+    # Lazy import: the step problem loads with the first grid on one
+    from minilink.planning.step_problems import StepPlanningProblem
+
+    if isinstance(problem, StepPlanningProblem):
+        return problem.compile()
+
+    return problem.compile(dt=dt, solver=solver)
+
+
 if __name__ == "__main__":
     from minilink.core.system import DynamicSystem
 
@@ -616,14 +627,3 @@ if __name__ == "__main__":
     grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)
-
-
-def face_of(problem, dt, solver):
-    """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
-    # Lazy import: the step problem loads with the first grid on one
-    from minilink.planning.step_problems import StepPlanningProblem
-
-    if isinstance(problem, StepPlanningProblem):
-        return problem.compile()
-
-    return problem.compile(dt=dt, solver=solver)

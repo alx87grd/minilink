@@ -185,3 +185,99 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     np.testing.assert_array_equal(J, distance)
     assert vi.grid.dt == 1.0 and vi.options.alpha == 1.0
+
+
+class TimedTerminal(QuadraticCost):
+    """``h(x, t) = 1 + t``: a terminal cost that reads the time it is charged at."""
+
+    def h(self, x, t=0.0, params=None):
+        return 1.0 + t + 0.0 * x[0]
+
+
+def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        cost=TimedTerminal.from_system(plant),
+        x_start=[0.3, 0.0],
+        tf=2.0,
+        t_start=0.5,
+    )
+    face = problem.compile(dt=0.05)
+    sampled = problem.discretize(0.05).compile()
+    x = np.array([0.1, 0.2])
+    assert face.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
+    law = lambda x, t: np.array([-x[0]])  # noqa: E731
+    assert face.run(law)[3] == sampled.run(law)[3]
+
+
+def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
+    from minilink.planning import DynamicProgrammingPlanner
+
+    problem = swing_problem(tf=3.0, discount_rate=0.5)
+    kwargs = dict(x_grid=(21, 21), u_grid=(5,), solver="rk4")
+    vi = DynamicProgrammingPlanner(problem, dt=0.1, **kwargs)
+    vd = DynamicProgrammingPlanner(problem.discretize(0.1, solver="rk4"), **kwargs)
+    assert vi.options.out_of_bound_cost == vd.options.out_of_bound_cost
+    vi.solve()
+    vd.solve()
+    np.testing.assert_array_equal(vi.result.J, vd.result.J)
+    np.testing.assert_array_equal(vi.result.pi, vd.result.pi)
+
+
+def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize():
+    from minilink import WhiteNoise
+    from minilink.catalog import NoisyPendulum
+    from minilink.planning import DynamicProgrammingPlanner
+
+    with pytest.raises(ValueError, match="own clock"):
+        DynamicProgrammingPlanner(
+            swing_problem().discretize(0.1), x_grid=(5, 5), u_grid=(3,), dt=0.1
+        )
+    plant = NoisyPendulum()
+    noisy = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        x_start=[0.3, 0.0],
+        tf=1.0,
+        disturbances={"d": WhiteNoise(1, psd=0.5, sample_period=0.01, seed=1)},
+    )
+    with pytest.raises(ValueError, match="disturbance sources"):
+        noisy.discretize(0.1)
+
+
+def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
+    from minilink.planning import DynamicProgrammingPlanner
+    from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
+
+    problem = swing_problem(tf=np.inf, discount_rate=0.5)
+    vi = DynamicProgrammingPlanner(
+        problem,
+        x_grid=(21, 21),
+        u_grid=(5,),
+        dt=0.1,
+        solver="rk4",
+        tol=1e-10,
+        clean_infeasible=False,
+    )
+    vi.solve()
+    pe = PolicyEvaluator(
+        problem, grid=vi.grid, policy=vi.get_controller(), options=vi.options
+    )
+    np.testing.assert_allclose(pe.solve(), vi.result.J, atol=1e-6)
+
+
+def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
+    from minilink import Uniform
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        x_start=[0.3, 0.0],
+        tf=1.0,
+        params={"plant": {"m": Uniform(1.5, 2.5)}},
+    )
+    assert problem.sample_params(None)["plant"]["m"] == 2.0
+    face = problem.compile(dt=0.1)
+    assert face.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]

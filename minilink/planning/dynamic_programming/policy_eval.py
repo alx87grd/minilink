@@ -13,7 +13,7 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
 from minilink.planning.evaluator import policy_of
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
 # Public API
@@ -103,7 +103,7 @@ class PolicyEvaluator:
             k = k + 1
 
             # Bellman expectation backup, the action fixed by the policy:
-            # J(x) = g(x, π(x), t) dt + α J_next(x + f(x, π(x), t) dt)
+            # J(x_k) = c(x_k, π(x_k)) + α J_next(x_{k+1}), the face's stage cost and step
             J_next = J
             J_arrival = grid.interpolate(J_next, x_next, method)
             J = G + alpha * J_arrival
@@ -140,13 +140,11 @@ class PolicyEvaluator:
         """Per-state successor and running cost under the fixed policy."""
         grid = self.grid
         policy = self.policy
-        g = self.problem.cost.g
         X = self.problem.X
         U = self.problem.U
-        sys_params = nominal_plant_params(self.problem)
-        cost_params = self.problem.cost.params
+        tree = grid.face.params
+        sys_params = tree["plant"]
         set_params = None
-        dt = grid.dt
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
         INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
@@ -174,8 +172,8 @@ class PolicyEvaluator:
             )
 
             if valid:
-                # Running cost over one step
-                G[s] = float(g(x, u, t, cost_params)) * dt
+                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the face
+                G[s] = float(grid.stage_cost(x, u, t, tree))
             else:
                 # The step leaves the admissible set: the penalty
                 G[s] = infeasible_penalty(INF, x_next, t)
@@ -185,12 +183,12 @@ class PolicyEvaluator:
     def terminal_cost(self, t):
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
-        h = self.problem.cost.h
-        cost_params = self.problem.cost.params
+        face = grid.face
+        tree = face.params
         N = grid.nodes_n
 
-        # Final cost of every state node
-        J = np.array([float(h(grid.states[s], t, cost_params)) for s in range(N)])
+        # Final cost of every state node: the face's h(x, t)
+        J = np.array([float(face.terminal(grid.states[s], t, tree)) for s in range(N)])
 
         return J
 

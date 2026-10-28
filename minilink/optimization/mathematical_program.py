@@ -34,7 +34,7 @@ class MathematicalProgram:
     backend casting, JAX compilation and SciPy-friendly wrappers live on the
     program evaluators the optimizers own.
 
-    A program may declare parameters (R130): with ``params`` a tree of
+    A program may declare parameters: with ``params`` a tree of
     numbers, every callable takes ``(z, params)`` (``J(z, params)``,
     ``h(z, params)``, ``grad_J(z, params)``, …), ``params`` the frozen default
     the values of a solve are merged onto

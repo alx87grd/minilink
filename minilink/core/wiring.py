@@ -51,7 +51,7 @@ class WiredDiagramMixin:
     @property
     def x0(self):
         """
-        The diagram's initial state: a view stacked from its blocks' ``x0`` (R124).
+        The diagram's initial state: a view stacked from its blocks' ``x0``.
 
         Read-only as an array; assigning a whole vector writes each block's
         slice through to the block, which owns its start.

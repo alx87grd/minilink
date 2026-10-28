@@ -57,11 +57,10 @@ class ReinforcementLearningPlanner(Planner):
     Policy-family planner that learns ``u = pi(x)`` by reinforcement learning.
 
     The training objective is the expected discounted return on the control
-    grid, ``E[-Σ_k γᵏ c_k]``, ``c_k`` the stage cost of the problem's step face
-    (R141, R142): a failure (leaving ``X`` or ``U``) pays the problem's price
+    grid, ``E[-Σ_k γᵏ c_k]``, ``c_k`` the stage cost of the problem's step face: a failure (leaving ``X`` or ``U``) pays the problem's price
     of infeasibility, leaving the training zone truncates the episode. The
     discount ``γ`` is the problem's own per period unless ``gamma=`` overrides
-    it, a training hyperparameter the record states beside the scored one (R150).
+    it, a training hyperparameter the record states beside the scored one.
     ``solve`` returns the learned law as a
     :class:`~minilink.planning.results.PlanningSolution`; asked to evaluate, it
     also rolls the law out and scores it by Monte Carlo on the problem's own
@@ -672,14 +671,15 @@ class ReinforcementLearningPlanner(Planner):
             x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
             return (x_next, t_next), (x, u)
 
-        # The N periods from x0 at t = 0
+        # The N periods from x0 at t_start
         x0 = jnp.asarray(x0, dtype=float)
-        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, 0.0), None, length=n_steps)
+        t_start = env.t_start
+        (x_end, _), (xs, us) = jax.lax.scan(body, (x0, t_start), None, length=n_steps)
 
         # N + 1 samples: the final state appended, the last input held at it
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
         us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
-        t = env.dt * np.arange(n_steps + 1)
+        t = t_start + env.dt * np.arange(n_steps + 1)
 
         return Trajectory(t=t, x=xs.T, u=us.T)
 
@@ -693,8 +693,7 @@ class ReinforcementLearningRecord:
     and falling. ``history`` holds one dict per learning iteration
     (``timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
-    training used, ``scored_gamma`` the problem's, the one its score uses
-    (R150); the record says when they differ.
+    training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
     """
 
     algorithm: str
@@ -715,7 +714,7 @@ class ReinforcementLearningRecord:
 
     @property
     def discount_differs(self) -> bool:
-        """The training discount is not the scored one: an override (R150)."""
+        """The training discount is not the scored one: an override."""
         if self.gamma is None or self.scored_gamma is None:
             return False
 

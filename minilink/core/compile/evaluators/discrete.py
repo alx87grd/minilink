@@ -488,7 +488,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
     def rollout_with_cost(self, x0, u_seq, params, rate, *, n_steps=None, t_start=0.0):
         """
-        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the loop's plant carrying its stage cost (R142).
+        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the loop's plant carrying its stage cost.
 
         The plant's period is :meth:`SampledSystem.update_with_cost`, the
         cost's integrand ``rate(x_plant, u_plant, τ)`` integrated beside the

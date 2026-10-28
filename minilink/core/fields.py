@@ -34,7 +34,7 @@ class Field(ABC):
     over ``u`` at a given ``x``), :meth:`as_cost` (the running cost ``g``) and
     :meth:`as_terminal_cost` (the terminal cost ``h``). ``V.as_set(upper=level)``
     is the sublevel set ``{x : V(x) ≤ level}``. ``params`` is the field's own
-    numbers (``{}`` for a field with none, R140).
+    numbers (``{}`` for a field with none).
     """
 
     params = {}

@@ -1,4 +1,4 @@
-"""The compiled step face of a problem (R141): ``transition(x, u, k, params) -> (x_next, c_k)``."""
+"""The compiled step face of a problem: ``transition(x, u, k, params) -> (x_next, c_k)``."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from minilink.planning.step_problems import StepPlanningProblem
 
 class StepFace:
     """
-    The step face of a problem: one tick of its plant and its stage cost, the one face the step tools read (R141).
+    The step face of a problem: one tick of its plant and its stage cost, the one face the step tools read.
 
     ``transition(x, u, k, params) -> (x_next, c_k)`` advances the plant one
     tick from ``x`` under ``u`` and returns the stage cost of the tick:
@@ -24,7 +24,7 @@ class StepFace:
     - for a continuous problem compiled at ``dt`` (``problem.compile(dt=)``),
       the plant's step model over one period, the input held, with
       ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside the state by the same
-      scheme and substeps (R142; under one Euler step ``g dt`` to the last bit);
+      scheme and substeps (under one Euler step ``g dt`` to the last bit);
     - for a :class:`~minilink.planning.step_problems.StepPlanningProblem`, its
       system's ``step`` and its cost's ``c`` (a discretized problem's
       :class:`~minilink.core.costs.SampledCost` fused into the same one step,
@@ -115,10 +115,17 @@ class StepFace:
     def time_of(self, k, params=None):
         """The time of tick ``k``: ``t_start + k dt`` (seconds), or ``t_start + k`` (a native problem's ticks)."""
         t_start = self.t_start if params is None else params["t_start"]
-        if self.dt is None:
-            return t_start + k
+        dt = self.dt
 
-        return t_start + k * self.dt
+        # A native problem's tick: t_k = t_start + k
+        if dt is None:
+            t_k = t_start + k
+            return t_k
+
+        # t_k = t_start + k dt
+        t_k = t_start + k * dt
+
+        return t_k
 
     def transition(self, x, u, k, params=None):
         """``(x_{k+1}, c_k)``: tick ``k`` of the plant and its stage cost."""
@@ -172,10 +179,17 @@ class StepFace:
         """The time of the horizon's end, ``t_start + tf`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
         if self.N is None:
             return None
-        if is_continuous(self.problem):
-            return self.t_start + self.problem.tf
+        t_start = self.t_start
 
-        return self.time_of(self.N)
+        # t_end = t_start + tf
+        if is_continuous(self.problem):
+            tf = self.problem.tf
+            t_end = t_start + tf
+            return t_end
+
+        t_end = self.time_of(self.N)
+
+        return t_end
 
     def stage_cost_at(self, x, u, t, params=None):
         """``c`` alone of the tick that starts at ``t``: :meth:`transition_at`'s cost, the plant not stepped where the scheme allows."""
@@ -199,7 +213,29 @@ class StepFace:
 
         t = self.time_of(self.N, params) if t is None else t
 
-        return self.problem.cost.h(x, t, params["cost"])
+        # A sampled stage: the continuous cost's h at the time t
+        if self.stage is not None:
+            h_N = self.stage.terminal_at(x, t, params["cost"])
+            return h_N
+
+        # A native step cost: its h at the tick t
+        h_N = self.problem.cost.h(x, t, params["cost"])
+
+        return h_N
+
+    def gamma_at(self, params=None):
+        """The discount per tick the tree gives: ``e^{−ρ dt}`` at its ``discount_rate`` (a continuous problem), else :attr:`gamma`."""
+        params = self.params if params is None else params
+        rho = params.get("discount_rate")
+        if rho is None:
+            return self.gamma
+        xp = array_module(rho)
+        dt = self.dt
+
+        # γ = e^{−ρ dt}
+        gamma = xp.exp(-rho * dt)
+
+        return gamma
 
     def price(self, gamma=None):
         """The price of a failure, over the horizon, at the discount ``gamma`` per tick (default the face's): :func:`price_at`."""
@@ -219,13 +255,14 @@ class StepFace:
         x = np.asarray(params["x_start"] if x_start is None else x_start, dtype=float)
         N = self.N if n_steps is None else int(n_steps)
         require_horizon(N)
-        gamma = self.gamma
+        gamma = float(self.gamma_at(params))
+        m = self.m
 
         xs, us, cs = [x], [], []
         J = 0.0
         for k in range(N):
             t_k = self.time_of(k, params)
-            u = np.asarray(policy(x, t_k), dtype=float).reshape(self.m)
+            u = np.asarray(policy(x, t_k), dtype=float).reshape(m)
 
             # x_{k+1}, c_k = transition(x_k, u_k, k); J += γᵏ c_k
             x, c = self.transition_at(x, u, t_k, params)
@@ -249,11 +286,16 @@ def price_at(problem, gamma, dt):
     """
     The price of a failure at the discount ``gamma`` per step: ``infeasible_cost`` when a number, else the cost bound.
 
-    A step problem's bound at ``γ``; a continuous problem's on the step tool's
+    A native step problem's bound at ``γ``; a continuous problem's (and a
+    discretized one's, priced as the problem it samples) on the step tool's
     own sum: with ``γ < 1`` the sweeps run to convergence,
     ``Σ_{k≥0} γᵏ dt = dt / (1 − γ)``, the rate ``ρ = −ln(γ) / dt`` making
     ``e^{−ρ dt} = γ``; with ``γ = 1``, the problem's horizon undiscounted.
     """
+    # A discretized problem prices as the continuous problem it samples
+    origin = getattr(problem, "origin", None)
+    problem = problem if origin is None else origin
+
     if not is_continuous(problem):
         return problem.infeasibility_price(gamma=gamma)
     if gamma >= 1.0:

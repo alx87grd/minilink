@@ -85,13 +85,14 @@ class DiagramEvaluator(ContinuousEvaluator):
         return dx, x_b, u_b
 
     def rhs_with_cost(self, params, sys_id, rate):
-        """``ż = [dx; rate(x_b, u_b, t)]`` of the loop augmented with one block's stage cost (R142)."""
+        """``ż = [dx; rate(x_b, u_b, t)]`` of the loop augmented with one block's stage cost."""
         xp = self.xp
 
         def f_aug(z, u, t):
             dx, x_b, u_b = self.f_and_block(z[:-1], u, t, params, sys_id)
             c_dot = xp.reshape(rate(x_b, u_b, t), (1,))
-            return xp.concatenate([dx, c_dot])
+            z_dot = xp.concatenate([dx, c_dot])
+            return z_dot
 
         return f_aug
 
@@ -110,7 +111,7 @@ class DiagramEvaluator(ContinuousEvaluator):
         n_steps=None,
     ):
         """
-        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the running stage cost of one block integrated beside the state (R142).
+        ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the running stage cost of one block integrated beside the state.
 
         ``C(t) = ∫_{t_start}^t rate(x_b, u_b, τ) dτ``, ``x_b`` and ``u_b`` the
         block's own state and input at every stage of the same scheme and

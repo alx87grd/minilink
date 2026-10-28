@@ -153,7 +153,7 @@ class ProblemEvaluator:
 
         ``{block_id: block params}`` for every block of the loop, a stateful block
         other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
-        ``observer.x0``; R124: the plant's start is the problem's ``x_start``); the
+        ``observer.x0``; the plant's start is the problem's ``x_start``); the
         problem's own leaves (``"cost"``, the parameters of the sets that hold any by
         role, ``"x_start"``, ``"discount_rate"``); and each free input of the loop at
         its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
@@ -351,7 +351,7 @@ class ProblemEvaluator:
 
     def price_and_bound(self, params):
         """
-        The price of a failure and the cost bound of a run not finite, at the cost's numbers of ``params`` (R165).
+        The price of a failure and the cost bound of a run not finite, at the cost's numbers of ``params``.
 
         The bound follows the overridden weights: it is computed once per value
         of the cost's leaves and cached by it (and by the problem's parts and
@@ -385,7 +385,7 @@ class ProblemEvaluator:
         trial ``i`` realizes the loop's random blocks under
         ``child_seed(key, "trial i")``, whether they are the problem's sources or
         blocks of the loop itself (a block's own seed is only its default
-        realization, never an evaluation's, RD-R4b): an integer key gives the
+        realization, never an evaluation's): an integer key gives the
         same draws on NumPy and JAX. A run with nothing random is the one run.
         """
         problem = self.problem
@@ -448,7 +448,7 @@ class ProblemEvaluator:
         u_seq = xp.broadcast_to(u, (N, u.size))
 
         # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1, with the
-        # plant's stage cost integrated beside the state (R142); or the adaptive
+        # plant's stage cost integrated beside the state; or the adaptive
         # integral reported on that grid
         loop_params = {
             sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
@@ -503,7 +503,7 @@ class ProblemEvaluator:
         )
 
     def cost_rate(self, params):
-        """The plant's discounted cost rate ``e^{−ρ(τ − t_start)} g(x, u, τ)`` on the run's tree: the integrand the run carries (R142)."""
+        """The plant's discounted cost rate ``e^{−ρ(τ − t_start)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
         g = self.problem.require_cost().g
         cost_params = params["cost"]
         rho = params["discount_rate"]
@@ -512,7 +512,8 @@ class ProblemEvaluator:
         # ċ = e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ)
         def rate(x, u, tau):
             xp = array_module(x, u, tau)
-            return xp.exp(-rho * (tau - t_start)) * g(x, u, tau, cost_params)
+            c_dot = xp.exp(-rho * (tau - t_start)) * g(x, u, tau, cost_params)
+            return c_dot
 
         return rate
 
@@ -646,11 +647,10 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
 
     ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
-    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period, R141), nominal
+    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
     parameters, on NumPy, from ``t_start``: the sampled loop a feedback planner
     designs for (its grid, its model), reported beside its policy; the
-    planner's evaluation scores the same law held on the plant's own clock
-    (R159). A stochastic problem runs at its mean start; ``tf`` is the run's
+    planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
     length for an infinite horizon. ``u`` is the plant's command port.
     """
     # Lazy import: the loop roles load with the first rollout
@@ -889,7 +889,7 @@ def open_loop_of(source, plant):
 
 
 def with_sources(loop, sources):
-    """The loop with each disturbance source wired onto its plant port (R128), under its block id (:func:`~minilink.planning.problems.source_id`)."""
+    """The loop with each disturbance source wired onto its plant port, under its block id (:func:`~minilink.planning.problems.source_id`)."""
     for port, block in sources.items():
         sys_id = source_id(port)
         loop.add_subsystem(block, sys_id)
@@ -1127,12 +1127,12 @@ def trials_of(draws, n_trials):
 
 
 def require_no_seed(wrt):
-    """Refuse a seed among the tuned leaves: an integer leaf, never a decision (R131)."""
+    """Refuse a seed among the tuned leaves: an integer leaf, never a decision."""
     seeds = [path for path in wrt if split_path(path)[-1] == "seed"]
     if seeds:
         raise ValueError(
             f"cannot put {seeds} in wrt: a seed is an integer leaf, a parameter of the "
-            "program, never a decision (R131); fix it, or average over seeds with n_trials"
+            "program, never a decision; fix it, or average over seeds with n_trials"
         )
 
 

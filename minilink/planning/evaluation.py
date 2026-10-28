@@ -18,7 +18,7 @@ from minilink.core.trajectory import Trajectory
 PROBLEM_PRICE = "problem"  # score_run's price read from the problem
 
 
-# The run's discounted running cost, integrated with the state (R142): the evaluator's recorded signal
+# The run's discounted running cost, integrated with the state: the evaluator's recorded signal
 RUNNING_COST = "plant:running_cost"
 
 ###############################################################################
@@ -156,10 +156,10 @@ def score_run(
     run can reach: its ``J`` stays finite and above that of any finite run. Its
     gradient is not defined, since the rollout itself overflowed before the
     ``where``. ``running_cost`` is the run's integral of
-    ``e^{−ρ(t − t_start)} g`` carried with the state by the step model (R142,
-    the evaluator's), ``(N + 1,)``; without it, a logged run, the integral is
+    ``e^{−ρ(t − t_start)} g`` carried with the state by the step model (the
+    evaluator's), ``(N + 1,)``; without it, a logged run, the integral is
     the trapezoid on the samples. ``tf`` is the horizon's length (by default the run's,
-    ``t[-1] − t_start``) and ``t_start`` its start (R148). ``params`` overrides
+    ``t[-1] − t_start``) and ``t_start`` its start. ``params`` overrides
     the problem's own leaves (``"cost"``, the sets' by role, ``"t_start"``,
     ``"discount_rate"``); ``None`` reads the problem's. ``price``
     is the failure price as :func:`price_of` resolves it (``None`` the switch
@@ -246,14 +246,14 @@ def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
     (``traj.of("plant")``); a trajectory without roles is the plant's own only
     when its ``x`` and ``u`` have the plant's sizes and it records no signals
     (a logged run). A loop's run from the evaluator carries its running cost,
-    the stage cost integrated with the state (R142), so its score is the
+    the stage cost integrated with the state, so its score is the
     evaluator's; a logged run, which has none, is scored by the trapezoid on
     its samples. On the trajectory's array module.
     """
     run = plant_run_of(problem, traj)
     xp = array_module(run.x)
 
-    # A loop's run carries its running cost (R142): its score is the evaluator's;
+    # A loop's run carries its running cost: its score is the evaluator's;
     # a logged run is scored on its samples by the trapezoid
     running = traj.signals.get(RUNNING_COST)
     row = score_run(problem, run, running_cost=None if running is None else running[0])
@@ -330,7 +330,7 @@ def price_of(problem, tf, cost_params=None):
     """The price of a failed or missed run of length ``tf``: ``None`` (switch off), the bound (``True``), or the number.
 
     ``cost_params`` are the cost's numbers the bound is taken at (an
-    evaluation's overridden weights, R165); ``None`` reads the cost's own.
+    evaluation's overridden weights); ``None`` reads the cost's own.
     """
     price = problem.infeasible_cost
     if price is None:

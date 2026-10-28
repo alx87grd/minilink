@@ -1,4 +1,4 @@
-"""Step planning problems: a task on a step system, a horizon of ticks, a stage cost (R141)."""
+"""Step planning problems: a task on a step system, a horizon of ticks, a stage cost."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from minilink.planning.problems import (
 
 class StepPlanningProblem:
     """
-    A planning problem on a step system (R141): ``x_{k+1} = step(x_k, u_k, k)``, ``N`` ticks, a discount ``γ`` per tick.
+    A planning problem on a step system: ``x_{k+1} = step(x_k, u_k, k)``, ``N`` ticks, a discount ``γ`` per tick.
 
     The objective is ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``, ``c`` and
     ``h`` a :class:`~minilink.core.costs.StepCost`. ``N=None`` is the infinite
@@ -28,8 +28,7 @@ class StepPlanningProblem:
     :class:`~minilink.planning.problems.PlanningProblem`'s, shared by
     composition (:attr:`parts`). ``t_start`` is the tick offset, an integer,
     for a native step problem; a discretized problem
-    (:meth:`PlanningProblem.discretize`) keeps ``(dt, t_start)`` in seconds
-    (R158), its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
+    (:meth:`PlanningProblem.discretize`) keeps ``(dt, t_start)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
     and its cost a :class:`~minilink.core.costs.SampledCost`. ``compile()``
     gives the step face (:class:`~minilink.planning.step_face.StepFace`), the
     one face value iteration, the RL environment and the judge read.
@@ -63,6 +62,9 @@ class StepPlanningProblem:
         self.gamma = coerce_gamma(gamma)
         self.dt = None if dt is None else float(dt)
         self.t_start = coerce_tick_offset(t_start, self.dt)
+
+        # The continuous problem it samples, for a discretized one (problem.discretize)
+        self.origin = None
 
         # The start, the sets and the laws, shared with the continuous problem
         self.parts = PlanningProblem(
@@ -239,15 +241,18 @@ class StepPlanningProblem:
 
 def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanningProblem:
     """
-    The continuous problem as a step problem on its plant sampled at ``dt`` (R141): the explicit discretization.
+    The continuous problem as a step problem on its plant sampled at ``dt``: the explicit discretization.
 
     The plant becomes its :class:`~minilink.core.discrete.sampled_system.SampledSystem`,
     the cost a :class:`~minilink.core.costs.SampledCost` (the one-period
-    integral of ``e^{−ρτ} g``, R154), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
-    ``(dt, t_start)`` in seconds (R158); the start, the sets and the laws as
+    integral of ``e^{−ρτ} g``), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
+    ``(dt, t_start)`` in seconds; the start, the sets and the laws as
     they are. Its face equals ``problem.compile(dt=dt, solver=, substeps=)``'s
-    to the bit.
+    to the bit, its price of failure the continuous problem's rule. A problem
+    with disturbance sources is refused: the step problem feeds no source.
     """
+    require_no_sources(problem)
+
     # Lazy imports: the sampled view and the evaluator's grid helpers load on use
     from minilink.core.discrete.sampled_system import SampledSystem
     from minilink.planning.evaluator import steps_of
@@ -260,7 +265,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     # γ = e^{−ρ dt}, the discount of one period
     gamma = float(np.exp(-rho * dt))
 
-    return StepPlanningProblem(
+    step = StepPlanningProblem(
         SampledSystem(problem.sys, dt, solver=solver, substeps=substeps),
         N=N,
         cost=SampledCost(
@@ -285,6 +290,11 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
         params=problem.laws or None,
         criterion=problem.criterion,
     )
+
+    # The continuous description it samples: its price rule is the face's
+    step.origin = problem
+
+    return step
 
 
 ###############################################################################
@@ -314,7 +324,7 @@ def coerce_gamma(gamma) -> float:
 
 
 def coerce_tick_offset(t_start, dt):
-    """The start: a whole tick offset for a native problem (R158), seconds for a discretized one."""
+    """The start: a whole tick offset for a native problem, seconds for a discretized one."""
     if dt is not None:
         return float(t_start)
     if int(t_start) != t_start:
@@ -341,4 +351,14 @@ def require_no_controller(controller):
         raise NotImplementedError(
             "StepPlanningProblem.compile(controller) is not built yet: compile() gives "
             "the step face; score a policy with face.run(policy, x_start)"
+        )
+
+
+def require_no_sources(problem):
+    """Refuse to discretize a problem with disturbance sources: a step problem feeds none."""
+    if problem.disturbances:
+        raise ValueError(
+            f"the problem has disturbance sources on {sorted(problem.disturbances)}: a "
+            "step problem feeds no source; score it with problem.compile(controller) "
+            "or train on it with the RL environment"
         )

@@ -24,7 +24,7 @@ class MathematicalProgramEvaluator(ABC):
     SciPy/Ipopt bridge helpers that convert native scalar and array
     expressions to Python ``float`` / flat NumPy arrays.
 
-    One body serves a program with parameters and one without (R130): the
+    One body serves a program with parameters and one without: the
     evaluator holds the bound tree :attr:`params` (the program's defaults
     until :meth:`bind`), every call reads it, and the solver sees a function
     of ``z`` alone. A program without parameters binds the empty tree.

@@ -216,7 +216,7 @@ class NoiseSource(Source):
 
     ``w(t) = w_k`` on ``[kΔ, (k+1)Δ)``, ``w_k`` the law drawn at the counter key
     ``(seed, k)`` by the library's cipher, so the signal is a pure function of
-    ``(t, params)``, the same on NumPy and JAX (RD-D13). The law's numbers are
+    ``(t, params)``, the same on NumPy and JAX. The law's numbers are
     the ``"law"`` entry of :attr:`params` (``{"seed", "sample_period", "law"}``),
     so a noise level is a parameter. A per-sample covariance keeps each sample
     when ``Δ`` is edited, and so changes the physics: that is what sampled
