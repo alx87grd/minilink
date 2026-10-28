@@ -55,15 +55,15 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the multiple-shooting nonlinear program."""
         # The JAX backend builds the same program, vectorized over the knots
-        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
-            return self.transcribe_jax(problem, compile_backend=compile_backend)
+        if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
+            return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        step = self.make_step(problem, compile_backend)
+        step = self.make_step(problem, backend)
 
         # Dynamics: the shooting defect of every interval vanishes
         equalities: list[ConstraintFunction] = [
@@ -87,10 +87,10 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
-            backend=program_backend_for_compile(compile_backend),
+            backend=program_backend_for_compile(backend),
             metadata={
                 "transcription": "multiple_shooting",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
@@ -155,9 +155,9 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
 
         return unpack_jax, J, dynamics_residual
 
-    def make_step(self, problem: PlanningProblem, compile_backend: str):
+    def make_step(self, problem: PlanningProblem, backend: str):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""
-        f = dynamics_function(problem, compile_backend)
+        f = dynamics_function(problem, backend)
         dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):

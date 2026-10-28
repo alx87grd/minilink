@@ -86,7 +86,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **2.7 One keyword per kind of choice.** `method=` is the verb's own numerical method (the
   derivative, the optimizer's algorithm, the interpolation, the certificate family); `solver=`
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
-  `compute_forced`, `evaluate`, `discretize`, the RL planners); `backend=` is the array module (spelled `compile_backend=` on the simulation facades, as today).
+  `compute_forced`, `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule
   (ruled 2026-10-23, R42).
 
@@ -158,7 +158,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **4.6 Libraries are silent.** Library functions and classes must never `print()`, except when
   an explicit `verbose=True` argument is passed. Delete debug scaffolding before handoff.
 - **4.7 Unified flag names.** Standardize parameter names across tools (e.g., use `verbose`,
-  `solver`, `compile_backend`). Unify the *name*, not the format: `verbose=True` keeps the
+  `solver`, `backend`). Unify the *name*, not the format: `verbose=True` keeps the
   framed simulation panel.
 - **4.8 Diagram connection operators and feedback topologies.** Does it add a way to wire a
   diagram beside `>>`, `+`, `@`, `DiagramSystem.connect()` and `feedback()`, or a hybrid

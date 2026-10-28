@@ -304,16 +304,14 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+            options=TrajectoryOptimizationOptions(backend="numpy"),
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
-        self.assertEqual(to.options.compile_backend, "numpy")
+        self.assertEqual(to.options.backend, "numpy")
         guess = default_initial_trajectory(
             problem, to.transcription.initial_guess_time_grid(problem)
         )
-        program = to.transcription.transcribe(
-            problem, compile_backend=to.options.compile_backend
-        )
+        program = to.transcription.transcribe(problem, backend=to.options.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)
@@ -327,7 +325,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
@@ -352,7 +350,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
                 verbose=True,
             ),
@@ -376,7 +374,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="direct",
+                backend="direct",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
                 record_history=True,
             ),
@@ -384,7 +382,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         traj = planner.solve().trajectory
         warm_started = planner.solve(warm_start=True).trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "direct")
+        self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.iteration_history), 0)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         np.testing.assert_allclose(warm_started.x[:, -1], [1.0], atol=1e-07)
@@ -396,13 +394,13 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.metadata["backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
@@ -418,13 +416,13 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.metadata["backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
@@ -462,11 +460,11 @@ class TestPlanningArchitecture(unittest.TestCase):
         guess = default_initial_trajectory(
             problem, transcription.initial_guess_time_grid(problem)
         )
-        program = transcription.transcribe(problem, compile_backend="direct")
+        program = transcription.transcribe(problem, backend="direct")
         z0 = transcription.pack_initial_guess(problem, guess)
         self.assertEqual(program.n_z, 5)
         np.testing.assert_allclose(z0, guess.u.reshape(-1))
-        self.assertEqual(program.metadata["compile_backend"], "direct")
+        self.assertEqual(program.metadata["backend"], "direct")
 
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
         sys = self.make_single_integrator()
@@ -601,7 +599,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 20, "ftol": 0.001},
             ),
@@ -610,13 +608,13 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             problem,
             n_steps=5,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
             record_solve_time=True,
             optimizer_options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
-        self.assertEqual(flat.options.compile_backend, nested.options.compile_backend)
+        self.assertEqual(flat.options.backend, nested.options.backend)
         self.assertEqual(
             flat.options.record_solve_time, nested.options.record_solve_time
         )
@@ -647,7 +645,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "compile_backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
 @pytest.mark.parametrize(
     "transcription, options",
@@ -659,7 +657,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
     ids=["direct_collocation", "shooting", "multiple_shooting"],
 )
 def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
-    transcription, options, compile_backend
+    transcription, options, backend
 ):
     class MarginInputSet(InputSet):
         def __init__(self, margin_fn):
@@ -679,18 +677,16 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
             U=MarginInputSet(margin_fn),
             Xf=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
         )
-        program = transcription(options(n_steps=4)).transcribe(
-            problem, compile_backend=compile_backend
-        )
+        program = transcription(options(n_steps=4)).transcribe(problem, backend=backend)
         z = np.linspace(0.1, 0.5, program.n_z)
-        if compile_backend == "jax":
+        if backend == "jax":
             import jax.numpy as jnp
 
             z = jnp.asarray(z)
         return np.asarray(program.g(z))
 
     def scalar(z):
-        if compile_backend == "jax":
+        if backend == "jax":
             return 2.0  # float() of a tracer does not trace; a constant does
         return 2.0 - float(z[0])
 
@@ -762,7 +758,7 @@ class TestHybridDefaultComputerX0(unittest.TestCase):
             problem,
             n_steps=4,
             transcription="direct_collocation",
-            compile_backend="jax",
+            backend="jax",
             optimizer_options={"maxiter": 30, "ftol": 0.001},
         )
         mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
@@ -772,11 +768,11 @@ class TestHybridDefaultComputerX0(unittest.TestCase):
             tf=0.4,
             x0_plant=np.array([0.0]),
             x0_computer=z0,
-            compile_backend="numpy",
+            backend="numpy",
             verbose=False,
         )
         without = hybrid.compute_trajectory(
-            tf=0.4, x0_plant=np.array([0.0]), compile_backend="numpy", verbose=False
+            tf=0.4, x0_plant=np.array([0.0]), backend="numpy", verbose=False
         )
         np.testing.assert_allclose(
             without.plant.x[:, -1], with_helper.plant.x[:, -1], atol=1e-08, rtol=1e-08
@@ -2102,7 +2098,7 @@ class TestParametricCapabilityFlag(unittest.TestCase):
             problem,
             n_steps=10,
             transcription="multiple_shooting",
-            compile_backend="jax",
+            backend="jax",
         )
         with self.assertRaises(TypeError):
             planner.compile_parametric_program()
@@ -2132,7 +2128,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             self._pendulum_problem(20.0),
             n_steps=20,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
         ).solve()
         md = plan.solver
         self.assertTrue(md.success)
@@ -2146,7 +2142,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             self._pendulum_problem(0.0, tf=1.0),
             n_steps=10,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
         ).solve()
         md = plan.solver
         self.assertFalse(md.feasible)
@@ -2170,7 +2166,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
                 self._pendulum_problem(0.0, tf=1.0),
                 n_steps=10,
                 transcription="direct_collocation",
-                compile_backend="numpy",
+                backend="numpy",
             ).solve()
         self.assertEqual(plan.solver.message, "solver claims success")
         self.assertTrue(plan.solver.solver_success)

@@ -655,7 +655,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         problem,
         n_steps=OBS_N_STEPS,
         transcription="direct_collocation",
-        compile_backend="jax",
+        backend="jax",
         record_solve_time=True,
         optimizer_options={"maxiter": 500, "ftol": 1e-1},
     )
@@ -696,7 +696,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         problem,
         n_steps=CORNER_N_STEPS,
         transcription="direct_collocation",
-        compile_backend=backend,
+        backend=backend,
         record_solve_time=True,
         optimizer_method="scipy_slsqp",
         optimizer_options={"maxiter": 150, "ftol": 0.1},

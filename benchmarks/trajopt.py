@@ -56,7 +56,7 @@ class TrajectoryOptimizationBenchmarkConfig:
     n_runs: int = 1
     warm_guess_path: str | Path | None = None
     #: If true, print :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
-    #: details once per distinct ``(transcription, compile_backend, n_steps, tf)``.
+    #: details once per distinct ``(transcription, backend, n_steps, tf)``.
     print_mathematical_program_details: bool = False
 
 
@@ -66,7 +66,7 @@ class TrajectoryOptimizationBenchmarkVariant:
 
     name: str
     transcription: str
-    compile_backend: str
+    backend: str
     derivative: str
     precision: str = "n/a"
     start: str = "cold"
@@ -129,19 +129,19 @@ def default_trajectory_optimization_variants(
         TrajectoryOptimizationBenchmarkVariant(
             name="numpy-collocation-slsqp",
             transcription="collocation",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
         ),
         TrajectoryOptimizationBenchmarkVariant(
             name="numpy-shooting-slsqp",
             transcription="shooting",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
         ),
         TrajectoryOptimizationBenchmarkVariant(
             name="numpy-multiple-slsqp",
             transcription="multiple_shooting",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
         ),
     ]
@@ -151,35 +151,35 @@ def default_trajectory_optimization_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-collocation-grad-x64",
                 transcription="collocation",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="x64",
             ),
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-shooting-grad-x64",
                 transcription="shooting",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="x64",
             ),
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-multiple-grad-x64",
                 transcription="multiple_shooting",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="x64",
             ),
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-collocation-grad-f32-strict",
                 transcription="collocation",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="f32",
             ),
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-collocation-grad-f32-relaxed",
                 transcription="collocation",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="f32",
                 optimizer_options={"ftol": max(float(ftol), 1e-5)},
@@ -191,7 +191,7 @@ def default_trajectory_optimization_variants(
                 TrajectoryOptimizationBenchmarkVariant(
                     name="jax-collocation-ipopt",
                     transcription="collocation",
-                    compile_backend="jax",
+                    backend="jax",
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="ipopt",
@@ -202,7 +202,7 @@ def default_trajectory_optimization_variants(
                 TrajectoryOptimizationBenchmarkVariant(
                     name="jax-shooting-ipopt",
                     transcription="shooting",
-                    compile_backend="jax",
+                    backend="jax",
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="ipopt",
@@ -213,7 +213,7 @@ def default_trajectory_optimization_variants(
                 TrajectoryOptimizationBenchmarkVariant(
                     name="jax-multiple-ipopt",
                     transcription="multiple_shooting",
-                    compile_backend="jax",
+                    backend="jax",
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="ipopt",
@@ -227,7 +227,7 @@ def default_trajectory_optimization_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="numpy-collocation-ipopt",
                 transcription="collocation",
-                compile_backend="numpy",
+                backend="numpy",
                 derivative="finite-diff",
                 optimizer_backend="ipopt",
                 optimizer_method="ipopt",
@@ -236,7 +236,7 @@ def default_trajectory_optimization_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="numpy-shooting-ipopt",
                 transcription="shooting",
-                compile_backend="numpy",
+                backend="numpy",
                 derivative="finite-diff",
                 optimizer_backend="ipopt",
                 optimizer_method="ipopt",
@@ -245,7 +245,7 @@ def default_trajectory_optimization_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="numpy-multiple-ipopt",
                 transcription="multiple_shooting",
-                compile_backend="numpy",
+                backend="numpy",
                 derivative="finite-diff",
                 optimizer_backend="ipopt",
                 optimizer_method="ipopt",
@@ -273,7 +273,7 @@ def default_trajectory_optimization_solver_variants(
         TrajectoryOptimizationBenchmarkVariant(
             name="numpy-collocation-slsqp",
             transcription="collocation",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
             optimizer_backend="scipy",
             optimizer_method="scipy_slsqp",
@@ -285,7 +285,7 @@ def default_trajectory_optimization_solver_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="jax-collocation-slsqp",
                 transcription="collocation",
-                compile_backend="jax",
+                backend="jax",
                 derivative="jax",
                 precision="x64",
                 optimizer_backend="scipy",
@@ -297,7 +297,7 @@ def default_trajectory_optimization_solver_variants(
                 TrajectoryOptimizationBenchmarkVariant(
                     name="jax-collocation-trust",
                     transcription="collocation",
-                    compile_backend="jax",
+                    backend="jax",
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="scipy",
@@ -310,7 +310,7 @@ def default_trajectory_optimization_solver_variants(
                 TrajectoryOptimizationBenchmarkVariant(
                     name="jax-collocation-ipopt",
                     transcription="collocation",
-                    compile_backend="jax",
+                    backend="jax",
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="ipopt",
@@ -324,7 +324,7 @@ def default_trajectory_optimization_solver_variants(
             TrajectoryOptimizationBenchmarkVariant(
                 name="numpy-collocation-ipopt",
                 transcription="collocation",
-                compile_backend="numpy",
+                backend="numpy",
                 derivative="finite-diff",
                 optimizer_backend="ipopt",
                 optimizer_method="ipopt",
@@ -407,7 +407,7 @@ def _mathematical_program_detail_key(
 ) -> tuple[str, str, int, float]:
     return (
         variant.transcription,
-        str(variant.compile_backend),
+        str(variant.backend),
         int(config.n_steps),
         float(config.tf),
     )
@@ -442,15 +442,10 @@ def _print_mathematical_program_details(
 ) -> None:
     print()
     print("=" * 72)
-    print(
-        "MathematicalProgram detail (once per transcription / compile_backend / grid)"
-    )
+    print("MathematicalProgram detail (once per transcription / backend / grid)")
     print("=" * 72)
     print(f"representative variant: {variant.name!r} start={variant.start!r}")
-    print(
-        f"transcription={variant.transcription!r} "
-        f"compile_backend={variant.compile_backend!r}"
-    )
+    print(f"transcription={variant.transcription!r} backend={variant.backend!r}")
     print(f"grid: tf={config.tf:g} n_steps={config.n_steps}")
     print(f"n_z={program.n_z}")
     print(f"n_h={ev.n_h} n_g={ev.n_g}")
@@ -485,7 +480,7 @@ def _run_trajopt_variant(
     transcribe_t0 = time.perf_counter()
     program = planner.transcription.transcribe(
         planner.problem,
-        compile_backend=planner.options.compile_backend,
+        backend=planner.options.backend,
     )
     z0 = planner.transcription.pack_initial_guess(planner.problem, guess)
     transcribe_s = time.perf_counter() - transcribe_t0
@@ -581,7 +576,7 @@ def _planner(
         _problem(variant, config),
         transcription=_transcription(variant, config),
         options=TrajectoryOptimizationOptions(
-            compile_backend=variant.compile_backend,
+            backend=variant.backend,
             optimizer_method=variant.optimizer_method,
             use_hessian=variant.use_hessian,
             optimizer_options=_optimizer_options(variant, config),
@@ -593,7 +588,7 @@ def _problem(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> PlanningProblem:
-    if variant.compile_backend == "jax":
+    if variant.backend == "jax":
         _configure_jax(variant)
     return _cartpole_problem(CartPole(), tf=config.tf)
 
@@ -664,19 +659,19 @@ def _warm_initial_trajectory(
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=config.n_steps)
         )
-        compile_backend = "jax"
+        backend = "jax"
     else:
         problem = _cartpole_problem(CartPole(), tf=config.tf)
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=config.n_steps)
         )
-        compile_backend = "numpy"
+        backend = "numpy"
 
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=transcription,
         options=TrajectoryOptimizationOptions(
-            compile_backend=compile_backend,
+            backend=backend,
             optimizer_options=_warm_optimizer_options(config),
         ),
     )
@@ -781,7 +776,7 @@ def _trajopt_table_row(
     return (
         f"{variant.name:<{widths['name']}} "
         f"{variant.transcription:<{widths['transcription']}} "
-        f"{variant.start:<{widths['start']}} {variant.compile_backend:<7} "
+        f"{variant.start:<{widths['start']}} {variant.backend:<7} "
         f"{variant.derivative:<11} {variant.precision:<4} "
         f"{str(variant.use_hessian):<4} "
         f"{variant.optimizer_backend:<7} {variant.optimizer_method:<12} "

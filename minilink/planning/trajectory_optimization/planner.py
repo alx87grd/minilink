@@ -39,7 +39,7 @@ from minilink.planning.trajectory_optimization.transcription import (
 _UNSET = object()  # Marks a keyword the caller did not pass
 
 _TRAJOPT_OPTION_KEYS = (
-    "compile_backend",
+    "backend",
     "initial_guess",
     "warm_start",
     "optimizer_method",
@@ -90,7 +90,7 @@ class TrajectoryOptimizationPlanner(Planner):
         transcription: Transcription | str | None = None,
         n_steps: int | None = None,
         options: TrajectoryOptimizationOptions | None = None,
-        compile_backend=_UNSET,
+        backend=_UNSET,
         initial_guess=_UNSET,
         warm_start=_UNSET,
         optimizer_method=_UNSET,
@@ -118,7 +118,7 @@ class TrajectoryOptimizationPlanner(Planner):
             already carries its grid (must not conflict if also passed).
         options : TrajectoryOptimizationOptions, optional
             Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-        compile_backend, initial_guess, warm_start, optimizer_method,
+        backend, initial_guess, warm_start, optimizer_method,
         optimizer_options, use_hessian, record_history, callback,
         record_solve_time, verbose, feasibility_tol, live_plot
             Tier-1 flat mirrors of :class:`TrajectoryOptimizationOptions`.
@@ -132,7 +132,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # Workflow options: the flat keywords over the bag
         self.options = trajopt_options_of(
             options,
-            compile_backend=compile_backend,
+            backend=backend,
             initial_guess=initial_guess,
             warm_start=warm_start,
             optimizer_method=optimizer_method,
@@ -203,14 +203,14 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """Compute and store a trajectory-optimization solution (always rebuild)."""
         workflow_t0 = time.perf_counter()
-        compile_backend = self.options.compile_backend
+        backend = self.options.backend
         guess = self.resolve_initial_guess(initial_guess, warm_start)
 
         # The problem transcribed into a program, and the seed packed into its z0
         transcribe_t0 = time.perf_counter()
         program = self.transcription.transcribe(
             self.problem,
-            compile_backend=compile_backend,
+            backend=backend,
         )
         transcribe_s = time.perf_counter() - transcribe_t0
         z0 = self.transcription.pack_initial_guess(self.problem, guess)
@@ -233,7 +233,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # back from z*
         self.iteration_history = []
         optimization_result = optimizer.solve(
-            callback=self.build_callback(optimizer, compile_backend),
+            callback=self.build_callback(optimizer, backend),
             record_solve_time=self.options.record_solve_time or self.options.verbose,
             verbose=False,
         )
@@ -241,7 +241,7 @@ class TrajectoryOptimizationPlanner(Planner):
         trajectory = self.transcription.reconstruct_result(
             optimization_result,
             problem=self.problem,
-            compile_backend=compile_backend,
+            backend=backend,
         )
         reconstruct_s = time.perf_counter() - reconstruct_t0
         total_s = time.perf_counter() - workflow_t0
@@ -301,17 +301,15 @@ class TrajectoryOptimizationPlanner(Planner):
     def compile_parametric_program(self) -> None:
         """Build and JIT-compile a parametric NLP once (idempotent).
 
-        Requires ``options.compile_backend='jax'`` and a transcription that
+        Requires ``options.backend='jax'`` and a transcription that
         implements :meth:`~Transcription.transcribe_parametric` (direct
         collocation).
         """
         if self.has_parametric_program:
             return
 
-        compile_backend = normalize_backend(
-            self.options.compile_backend, allow_direct=True
-        )
-        require_jax_compile_backend(self.options.compile_backend)
+        backend = normalize_backend(self.options.backend, allow_direct=True)
+        require_jax_compile_backend(self.options.backend)
         require_parametric_transcription(self.transcription)
 
         # Lazy import: the parametric JAX evaluator loads on first compile, not with
@@ -324,7 +322,7 @@ class TrajectoryOptimizationPlanner(Planner):
         t0 = time.perf_counter()
         self.program = self.transcription.transcribe_parametric(
             self.problem,
-            compile_backend=compile_backend,
+            backend=backend,
         )
 
         # Its evaluator, traced on the default seed and bound to the problem's start
@@ -342,7 +340,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The compiled dynamics that read each tick's plan back
         params = nominal_plant_params(self.problem)
-        evaluator = self.problem.sys.compile(backend=compile_backend, verbose=False)
+        evaluator = self.problem.sys.compile(backend=backend, verbose=False)
         if params is None:
             self._dynamics = evaluator.f
         else:
@@ -466,7 +464,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_DIV)
         print("transcription:", type(self.transcription).__name__)
         print("transcription_options:", self.transcription_options())
-        print(f"compile_backend={self.options.compile_backend!r}")
+        print(f"backend={self.options.backend!r}")
         print(f"program_backend={optimizer.program_evaluator.backend!r}")
         print("n_z:", int(program.n_z))
         print(
@@ -476,7 +474,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print("z0:", preview_vector(z0))
         print(DISP_RULE_DIV)
         print(f"method={self.options.optimizer_method!r}")
-        print("options:", getattr(optimizer.backend, "options", {}))
+        print("options:", getattr(optimizer.adapter, "options", {}))
         print(f"setup: transcribe={transcribe_s:.6g}s compile={compile_s:.6g}s")
         print(DISP_RULE_DIV)
         print("Running trajectory optimization...")
@@ -492,7 +490,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def build_callback(
         self,
         optimizer: Optimizer,
-        compile_backend: str,
+        backend: str,
     ) -> OptimizationProgressCallback | None:
         """The optimizer's progress hook (history, live plot, user callback), or ``None``."""
         callback = self.options.callback
@@ -519,7 +517,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # One dynamics callable for every iterate (reconstruct_result would
         # otherwise compile the plant again on each optimizer step).
-        dynamics = dynamics_function(self.problem, compile_backend)
+        dynamics = dynamics_function(self.problem, backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
@@ -528,7 +526,7 @@ class TrajectoryOptimizationPlanner(Planner):
             iteration = self.iteration_from_z(
                 optimizer,
                 z_arr,
-                compile_backend,
+                backend,
                 iteration_index,
                 cost=J,
                 dynamics=dynamics,
@@ -545,7 +543,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         optimizer: Optimizer,
         z: np.ndarray,
-        compile_backend: str,
+        backend: str,
         iteration_index: int,
         *,
         cost: float | None = None,
@@ -558,7 +556,7 @@ class TrajectoryOptimizationPlanner(Planner):
         trajectory = self.transcription.reconstruct_result(
             OptimizationResult(z=z, success=False, cost=cost),
             problem=self.problem,
-            compile_backend=compile_backend,
+            backend=backend,
             dynamics=dynamics,
         )
         max_eq, min_ineq, _ = optimizer.program_evaluator.constraint_violations(z)
@@ -752,12 +750,12 @@ class TrajectoryOptimizationPlanner(Planner):
         """One online tick by an offline solve from ``x0`` (warns once, on JAX, to compile instead)."""
         # Once: on JAX, a compiled parametric program would skip the rebuild
         if not self._warned_uncompiled_from:
-            backend = normalize_backend(self.options.compile_backend, allow_direct=True)
+            backend = normalize_backend(self.options.backend, allow_direct=True)
             if backend == BACKEND_JAX:
                 warnings.warn(
                     "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
                     "the NLP each call. Call compile_parametric_program() once for "
-                    "fast bind-only from-solves (requires compile_backend='jax').",
+                    "fast bind-only from-solves (requires backend='jax').",
                     UserWarning,
                     stacklevel=3,
                 )
@@ -794,10 +792,10 @@ class TrajectoryOptimizationOptions:
     one rollout/unpack per iteration; leave it off for production solves.
 
     Parametric compile (:meth:`TrajectoryOptimizationPlanner.compile_parametric_program`)
-    requires ``compile_backend='jax'``.
+    requires ``backend='jax'``.
     """
 
-    compile_backend: str = BACKEND_NUMPY
+    backend: str = BACKEND_NUMPY
     initial_guess: np.ndarray | Trajectory | None = None
     warm_start: bool = False
     optimizer_method: str = "scipy_slsqp"

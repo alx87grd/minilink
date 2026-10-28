@@ -40,7 +40,7 @@ def main() -> None:
         tf=TF,
         dt=DT,
         solver=SOLVER,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=False,
     ).solve()
     if not np.all(np.isfinite(traj.x)):
@@ -58,7 +58,7 @@ def main() -> None:
         "tf": TF,
         "dt": DT,
         "solver": SOLVER,
-        "compile_backend": "numpy",
+        "backend": "numpy",
         "input_mode": "zero_torque",
         "gravity": GRAVITY,
         "x0": x0.tolist(),

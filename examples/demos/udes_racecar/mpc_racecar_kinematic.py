@@ -64,7 +64,7 @@ planner = TrajectoryOptimizationPlanner(
     PlanningProblem(sys=car, x_start=x0, cost=cost, tf=MPC_HORIZON, U=car.input_box),
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
@@ -75,7 +75,7 @@ diagram = mpc @ car
 
 # diagram.plot_diagram()
 result = diagram.compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=0.01, compile_backend="jax"
+    tf=TF, x0_plant=x0, plant_dt_inner=0.01, backend="jax"
 )
 # diagram.plot_trajectory()
 

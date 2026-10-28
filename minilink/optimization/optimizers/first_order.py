@@ -225,7 +225,7 @@ def require_gradient(program_evaluator):
     if not program_evaluator.has_gradient:
         raise ValueError(
             "a first-order method needs the objective's gradient: give the program "
-            "grad_J, or compile it on JAX (compile_backend='jax')"
+            "grad_J, or compile it on JAX (backend='jax')"
         )
 
 

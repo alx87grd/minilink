@@ -103,7 +103,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
@@ -179,7 +179,7 @@ result = hybrid.compute_trajectory(
     x0_plant=x0_plant,
     x0_computer=mpc_default_computer_x0(planner),
     plant_dt_inner=SIM_DT,
-    compile_backend="numpy",
+    backend="numpy",
     verbose=True,
 )
 hybrid.plot_trajectory()

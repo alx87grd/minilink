@@ -39,7 +39,7 @@ class SystemSimulation:
         solver=None,
         show=False,
         x0=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
     ):
         """
@@ -52,9 +52,9 @@ class SystemSimulation:
 
         Parameters
         ----------
-        compile_backend : str
+        backend : str
             Passed to the simulator (default ``"numpy"``).
-            Use ``compile_backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print simulator setup (solver, ``dt``, compile backend). Default
@@ -77,7 +77,7 @@ class SystemSimulation:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
         )
         traj = sim.solve()
@@ -103,7 +103,7 @@ class SystemSimulation:
         solver=None,
         show=False,
         x0=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
     ):
         """
@@ -147,7 +147,7 @@ class SystemSimulation:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
         )
         traj = sim.solve_forced(u, input_port_id=input_port_id)
@@ -209,7 +209,7 @@ class DynamicSimulation:
         solver=None,
         show=False,
         x0=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
         solver_warnings="warn",
     ):
@@ -222,9 +222,9 @@ class DynamicSimulation:
 
         Parameters
         ----------
-        compile_backend : str
+        backend : str
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
-            Use ``compile_backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print solver selection, time grid, and compile backend (default
@@ -249,7 +249,7 @@ class DynamicSimulation:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
@@ -276,7 +276,7 @@ class DynamicSimulation:
         solver=None,
         show=False,
         x0=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
         solver_warnings="warn",
     ):
@@ -323,7 +323,7 @@ class DynamicSimulation:
             n_steps=n_steps,
             dt=dt,
             solver=solver,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
@@ -371,7 +371,7 @@ class StepSimulation:
         u=None,
         *,
         x0=None,
-        compile_backend="numpy",
+        backend="numpy",
         show=False,
         verbose=False,
     ):
@@ -390,7 +390,7 @@ class StepSimulation:
             Input schedule passed to the compiled evaluator rollout.
         x0 : array, optional
             Initial state; defaults to :attr:`x0`.
-        compile_backend : str
+        backend : str
             Backend passed to :meth:`compile`.
         show : bool
             If ``True``, plot the rollout via :meth:`plot_rollout`.
@@ -400,7 +400,7 @@ class StepSimulation:
         StepRollout
             The rollout, also stored in :attr:`rollout`.
         """
-        ev = self.compile(backend=compile_backend, verbose=verbose)
+        ev = self.compile(backend=backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
         rollout = ev.rollout(x0, n_steps=n_steps, u=u)
 

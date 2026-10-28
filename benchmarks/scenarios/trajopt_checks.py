@@ -80,7 +80,7 @@ def run_showcase_cartpole_trajopt(
             DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             optimizer_method="scipy_slsqp",
             optimizer_options={
                 "maxiter": maxiter,

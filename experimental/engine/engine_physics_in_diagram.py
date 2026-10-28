@@ -49,7 +49,7 @@ diagram.add_subsystem(sys, "world")
 diagram.connect("force_cmd", "y", "world", "u")
 diagram.plot_diagram()
 
-traj = diagram.compute_trajectory(tf=10.0, compile_backend="auto")
+traj = diagram.compute_trajectory(tf=10.0, backend="auto")
 
 diagram.plot_trajectory()
 diagram.animate(renderer="meshcat")

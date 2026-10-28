@@ -9,16 +9,16 @@ from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 ###############################################################################
 
 
-def resolve_auto_backend(build, compile_backend):
+def resolve_auto_backend(build, backend):
     """Return ``(backend_name, evaluator)`` using ``build(backend)`` to compile.
 
-    ``compile_backend=BACKEND_AUTO`` tries JAX first (when importable) and
+    ``backend=BACKEND_AUTO`` tries JAX first (when importable) and
     falls back to NumPy on import or compile failure; any other value compiles
     exactly as requested.
     """
     # A named backend compiles as requested
-    if compile_backend != BACKEND_AUTO:
-        return compile_backend, build(compile_backend)
+    if backend != BACKEND_AUTO:
+        return backend, build(backend)
 
     # NumPy when JAX does not import (a bare probe: the evaluators apply the x64 policy)
     try:

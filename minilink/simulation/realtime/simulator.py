@@ -104,7 +104,7 @@ class RealtimeSimulator:
     plot_backend : str
         Signal plotting backend of the live plot (``"matplotlib"`` or
         ``"plotly"``), as on every plotting verb.
-    compile_backend : str or None
+    backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
         when available and the system is JAX-compatible, otherwise NumPy.
         Pass ``"numpy"`` or ``"jax"`` to force a backend.
@@ -142,7 +142,7 @@ class RealtimeSimulator:
         output=None,
         plot=False,
         plot_backend="matplotlib",
-        compile_backend=None,
+        backend=None,
         max_steps=None,
         tf=None,
         verbose=False,
@@ -182,9 +182,7 @@ class RealtimeSimulator:
         self._compile_s = 0.0
 
         t_compile = time.perf_counter()
-        self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
-            compile_backend
-        )
+        self.backend, self.evaluator = self._resolve_and_build_evaluator(backend)
         self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
@@ -245,7 +243,7 @@ class RealtimeSimulator:
                 sim_dt=self.sim_dt,
                 sim_dt_auto=self._auto_sim_dt,
                 sync=self.sync,
-                compile_backend=self.compile_backend,
+                backend=self.backend,
                 renderer=self.renderer,
                 compile_s=self._compile_s,
                 warm_up_s=warm_up_s,
@@ -389,13 +387,13 @@ class RealtimeSimulator:
 
     # Internal machinery
 
-    def _resolve_and_build_evaluator(self, compile_backend):
+    def _resolve_and_build_evaluator(self, backend):
         """Compile with an explicit backend, or auto-try JAX then NumPy.
 
         ``None`` and ``"auto"`` share the same policy: prefer JAX when the
         package is installed and the system is JAX-compatible.
         """
-        if compile_backend is None or compile_backend == BACKEND_AUTO:
+        if backend is None or backend == BACKEND_AUTO:
             try:
                 import jax  # noqa: F401
             except ImportError:
@@ -407,7 +405,7 @@ class RealtimeSimulator:
                     "JAX compile failed, falling back to numpy", exc_info=True
                 )
                 return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-        return compile_backend, self.sys.compile(backend=compile_backend)
+        return backend, self.sys.compile(backend=backend)
 
     def _offline_auto_dt(self):
         """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
@@ -495,8 +493,8 @@ class RealtimeSimulator:
         fps_budget = 1.0 / self.frame_dt
         fps_actual = 1.0 / wall_frame_s if wall_frame_s > 0.0 else float("inf")
         tip = (
-            "try compile_backend='jax' or a larger frame_dt / sim_dt"
-            if self.compile_backend == BACKEND_NUMPY
+            "try backend='jax' or a larger frame_dt / sim_dt"
+            if self.backend == BACKEND_NUMPY
             else "try a larger frame_dt / sim_dt, or a lighter renderer"
         )
         warnings.warn(
@@ -505,7 +503,7 @@ class RealtimeSimulator:
                 f"{wall_frame_s * 1000:.1f} ms "
                 f"(budget {self.frame_dt * 1000:.1f} ms, "
                 f"~{fps_actual:.1f} Hz vs {fps_budget:.1f} Hz target, "
-                f"backend={self.compile_backend!r}, overruns={self.n_overruns}). "
+                f"backend={self.backend!r}, overruns={self.n_overruns}). "
                 f"Suggestion: {tip}."
             ),
             UserWarning,

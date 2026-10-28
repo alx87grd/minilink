@@ -23,7 +23,7 @@ class SimulationBenchmarkVariant:
     """One simulator solver and compile-backend option."""
 
     solver: str
-    compile_backend: str
+    backend: str
 
 
 @dataclass(frozen=True)
@@ -287,13 +287,13 @@ def print_standard_simulation_benchmark(
     truth = results[0][1].truth if results else TRUTH_SIMULATION_VARIANT
     print("\n=== Standard simulator suite ===")
     print(
-        f"truth=({truth.solver}, {truth.compile_backend})  "
+        f"truth=({truth.solver}, {truth.backend})  "
         "speedup = truth_mean_time / candidate_mean_time  err = L2% vs truth final x"
     )
     print(f"{'case':<22} {'mean_s':>10} {'speedup':>9} {'err_%':>10}  {'cand':<18}")
     print("-" * 80)
     for label, result in results:
-        backend = format_benchmark_backend_label(result.candidate.compile_backend)
+        backend = format_benchmark_backend_label(result.candidate.backend)
         candidate = f"{result.candidate.solver}+{backend}"
         print(
             f"{label:<22} {result.mean_time:>10.5f} "
@@ -333,7 +333,7 @@ def print_simulation_matrix_header(result: SimulationBenchmarkResult) -> None:
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} "
             f"mode={mode} truth=({result.truth.solver}, "
-            f"{format_benchmark_backend_label(result.truth.compile_backend)}) "
+            f"{format_benchmark_backend_label(result.truth.backend)}) "
             f"truth_total={truth_total:.6f}s "
             f"truth_solve={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
@@ -343,7 +343,7 @@ def print_simulation_matrix_header(result: SimulationBenchmarkResult) -> None:
         print(
             f"t0={result.t0} tf={result.tf} dt={result.dt} runs={result.n_runs} "
             f"mode={mode} truth=({result.truth.solver}, "
-            f"{format_benchmark_backend_label(result.truth.compile_backend)}) "
+            f"{format_benchmark_backend_label(result.truth.backend)}) "
             f"truth_total={result.truth_mean_time:.6f}s "
             f"truth_cmp={result.truth_mean_compile_time:.6f}s "
             f"truth_slv={result.truth_mean_solve_time:.6f}s "
@@ -427,9 +427,9 @@ class _TimedSimulator(Simulator):
         self._last_solve_s = 0.0
         super().__init__(*args, **kwargs)
 
-    def build_evaluator(self, sys, compile_backend):
+    def build_evaluator(self, sys, backend):
         t0 = time.perf_counter()
-        evaluator = super().build_evaluator(sys, compile_backend)
+        evaluator = super().build_evaluator(sys, backend)
         self._last_compile_s = time.perf_counter() - t0
         return evaluator
 
@@ -449,10 +449,10 @@ class _CachedCompileTimedSimulator(_TimedSimulator):
         self._eval_cache = _eval_cache
         super().__init__(*args, **kwargs)
 
-    def build_evaluator(self, sys, compile_backend):
-        key = (id(sys), compile_backend)
+    def build_evaluator(self, sys, backend):
+        key = (id(sys), backend)
         if key not in self._eval_cache:
-            self._eval_cache[key] = super().build_evaluator(sys, compile_backend)
+            self._eval_cache[key] = super().build_evaluator(sys, backend)
             return self._eval_cache[key]
         self._last_compile_s = 0.0
         return self._eval_cache[key]
@@ -521,7 +521,7 @@ def _run_compile_once(
     return _SimulationRun(
         stats=stats,
         mean_compile_s=_compile_time(
-            variant.compile_backend,
+            variant.backend,
             sim._last_compile_s,
             first_compile_s_by_backend,
         ),
@@ -576,7 +576,7 @@ def _new_timed_sim(
         dt=dt,
         solver=variant.solver,
         verbose=False,
-        compile_backend=variant.compile_backend,
+        backend=variant.backend,
     )
     if evaluator_cache is None:
         return _TimedSimulator(system, **kwargs)
@@ -599,7 +599,7 @@ def _simulation_row(
     return SimulationBenchmarkRow(
         solver=variant.solver,
         method=integration_method_for_solver_mode(variant.solver),
-        backend=format_benchmark_backend_label(variant.compile_backend),
+        backend=format_benchmark_backend_label(variant.backend),
         mean_time=run.stats.mean,
         std_time=run.stats.std,
         mean_compile_time=run.mean_compile_s,
@@ -750,7 +750,7 @@ def _print_matrix_row_line(
     line = _format_matrix_row(row, compile_once=compile_once)
     is_baseline = (
         row.solver == truth.solver
-        and _compile_backend_key_for_compare(row.backend) == truth.compile_backend
+        and _compile_backend_key_for_compare(row.backend) == truth.backend
     )
     if is_winner:
         line = ansi(line, 1, 92)

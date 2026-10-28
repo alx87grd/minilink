@@ -95,9 +95,9 @@ class TestSys2Gym(unittest.TestCase):
         np.testing.assert_allclose(env.x, expected)
 
     def test_default_step_is_rk4_on_the_compiled_plant(self):
-        env = self.make_env(reset_mode="determinist", compile_backend="numpy")
+        env = self.make_env(reset_mode="determinist", backend="numpy")
         self.assertEqual(env.solver, "rk4")
-        self.assertEqual(env.compile_backend, "numpy")
+        self.assertEqual(env.backend, "numpy")
         env.reset()
         x, t, dt = env.x.copy(), env.t, env.dt
         u = np.array([0.4])
@@ -122,7 +122,7 @@ class TestSys2Gym(unittest.TestCase):
                 tf=1.0,
                 reset_mode="determinist",
                 solver=name,
-                compile_backend="numpy",
+                backend="numpy",
             )
             for name in ("rk4", "euler")
         ]
@@ -172,13 +172,13 @@ class TestSys2Gym(unittest.TestCase):
         plant = make_unbounded_pendulum()
         cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
         for mode in ("uniform", "gaussian"):
-            env = Sys2Gym(plant, cost, reset_mode=mode, compile_backend="numpy")
+            env = Sys2Gym(plant, cost, reset_mode=mode, backend="numpy")
             with self.assertRaisesRegex(ValueError, "state bounds"):
                 env.reset(seed=0)
-        env = Sys2Gym(plant, cost, reset_mode="determinist", compile_backend="numpy")
+        env = Sys2Gym(plant, cost, reset_mode="determinist", backend="numpy")
         np.testing.assert_array_equal(env.reset(seed=0)[0], [0.0, 0.0])
         # a start spread set by hand is drawn as given
-        env = Sys2Gym(plant, cost, compile_backend="numpy")
+        env = Sys2Gym(plant, cost, backend="numpy")
         env.x0_lb, env.x0_ub = np.array([-0.5, -1.0]), np.array([0.5, 1.0])
         y, _ = env.reset(seed=0)
         self.assertTrue(np.all(np.abs(y) <= [0.5, 1.0]))
@@ -204,7 +204,7 @@ class TestSys2Gym(unittest.TestCase):
             tf=1.0,
             U=plant.input_box,
         )
-        env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+        env = Sys2Gym.from_problem(problem, backend="numpy")
         y, info = env.reset(seed=0)
         np.testing.assert_allclose(info["state"], [0.2, 0.0])
         np.testing.assert_allclose(y, [0.2, 0.0])
@@ -213,7 +213,7 @@ class TestSys2Gym(unittest.TestCase):
         problem = StochasticPlanningProblem(
             make_bounded_pendulum(), cost=cost, tf=1.0, x0_distribution=start
         )
-        env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+        env = Sys2Gym.from_problem(problem, backend="numpy")
         for seed in (0, 7):
             rng, _ = seeding.np_random(seed)
             _, info = env.reset(seed=seed)
@@ -250,7 +250,7 @@ class TestSys2Gym(unittest.TestCase):
                 infeasible_cost=50.0,
                 U=plant.input_box,
             )
-            env = Sys2Gym.from_problem(problem, compile_backend="numpy")
+            env = Sys2Gym.from_problem(problem, backend="numpy")
             env.reset(seed=0)
             env.x = np.array([x, 0.0])
             _, reward, terminated, _, _ = env.step(np.array([0.0]))
@@ -275,12 +275,12 @@ class TestSys2GymJax(unittest.TestCase):
 
     def test_jax_is_picked_when_the_plant_traces(self):
         env = self._envs()
-        self.assertEqual(env.compile_backend, "jax")
+        self.assertEqual(env.backend, "jax")
 
     def test_jax_step_matches_numpy_step(self):
         env_jax, env_np = (
-            self._envs(compile_backend="jax"),
-            self._envs(compile_backend="numpy"),
+            self._envs(backend="jax"),
+            self._envs(backend="numpy"),
         )
         env_jax.reset()
         env_np.reset()
@@ -311,11 +311,11 @@ class TestSys2GymJax(unittest.TestCase):
         plant = Branching()
         cost = QuadraticCost.from_system(plant, xbar=np.zeros(plant.n))
         env = Sys2Gym(plant, cost, dt=0.05, tf=1.0)
-        self.assertEqual(env.compile_backend, "numpy")
+        self.assertEqual(env.backend, "numpy")
         env.reset()
         env.step(np.zeros(plant.m))
         with self.assertRaises(RuntimeError):
-            Sys2Gym(plant, cost, dt=0.05, tf=1.0, compile_backend="jax")
+            Sys2Gym(plant, cost, dt=0.05, tf=1.0, backend="jax")
 
 
 @pytest.mark.rl

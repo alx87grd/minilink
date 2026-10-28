@@ -41,7 +41,7 @@ class HybridSimulator:
     plant_dt_inner : float, optional
         RK4 sub-step inside each base tick for the plant; also sets plant
         :class:`~minilink.core.trajectory.Trajectory` sample spacing.
-    compile_backend : str
+    backend : str
         Backend for plant compile (default ``numpy``).
     verbose : bool
         Print setup information.
@@ -57,7 +57,7 @@ class HybridSimulator:
         tf=10,
         n_steps=None,
         plant_dt_inner=None,
-        compile_backend=BACKEND_NUMPY,
+        backend=BACKEND_NUMPY,
         verbose=False,
     ):
         require_hybrid_diagram(hybrid)
@@ -81,7 +81,7 @@ class HybridSimulator:
 
         # The compiled computer and plant
         self.computer.compile()
-        self.plant_eval = self.plant.compile(backend=compile_backend)
+        self.plant_eval = self.plant.compile(backend=backend)
 
         # The initial states, each diagram's own x0 unless given
         self.x0_plant = require_x0(

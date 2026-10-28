@@ -116,7 +116,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend=BACKEND,
+    backend=BACKEND,
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},

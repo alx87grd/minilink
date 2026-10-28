@@ -296,7 +296,7 @@ def optimizer_text(opt):
     body = [
         body_line("program", inspect_inline(opt.program)),
         body_line("z0", preview_vector(opt.z0)),
-        body_line("compile_backend", opt.compile_backend),
+        body_line("backend", opt.backend),
     ]
 
     return format_inspect(headline, body)

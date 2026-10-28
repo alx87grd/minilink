@@ -109,7 +109,7 @@ class HybridDiagram:
         x0_computer=None,
         n_steps=None,
         plant_dt_inner=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
         show=False,
     ):
@@ -132,7 +132,7 @@ class HybridDiagram:
             x0_computer=x0_computer,
             n_steps=n_steps,
             plant_dt_inner=plant_dt_inner,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
         ).solve()
         self.cache_result(result)
@@ -153,7 +153,7 @@ class HybridDiagram:
         x0_computer=None,
         n_steps=None,
         plant_dt_inner=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=True,
         show=False,
     ):
@@ -176,7 +176,7 @@ class HybridDiagram:
             x0_computer=x0_computer,
             n_steps=n_steps,
             plant_dt_inner=plant_dt_inner,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
         ).solve_forced(u, input_port_id=input_port_id)
         self.cache_result(result)
@@ -396,7 +396,7 @@ class HybridDiagram:
         x0_computer=None,
         n_steps=None,
         plant_dt_inner=None,
-        compile_backend="numpy",
+        backend="numpy",
         verbose=False,
     ):
         """The :class:`~minilink.simulation.discrete.hybrid_simulator.HybridSimulator` of one run."""
@@ -411,7 +411,7 @@ class HybridDiagram:
             tf=tf,
             n_steps=n_steps,
             plant_dt_inner=plant_dt_inner,
-            compile_backend=compile_backend,
+            backend=backend,
             verbose=verbose,
         )
 

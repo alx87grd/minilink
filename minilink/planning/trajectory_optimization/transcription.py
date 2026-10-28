@@ -48,7 +48,7 @@ class Transcription(ABC):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional mathematical program."""
         ...
@@ -68,7 +68,7 @@ class Transcription(ABC):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> Trajectory:
         """Convert an optimizer result back into a trajectory."""
         ...
@@ -170,13 +170,13 @@ def trapezoidal_defect(x, dx, dt):
 ###############################################################################
 
 
-def program_backend_for_compile(compile_backend: str) -> str:
+def program_backend_for_compile(backend: str) -> str:
     """Return the mathematical-program evaluator backend for a transcription."""
-    key = normalize_backend(compile_backend, allow_direct=True)
+    key = normalize_backend(backend, allow_direct=True)
     return BACKEND_JAX if key == BACKEND_JAX else BACKEND_NUMPY
 
 
-def dynamics_function(problem: PlanningProblem, compile_backend: str):
+def dynamics_function(problem: PlanningProblem, backend: str):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
     ``"numpy"`` and ``"jax"`` use a compiled evaluator; system params from
@@ -184,7 +184,7 @@ def dynamics_function(problem: PlanningProblem, compile_backend: str):
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """
-    key = normalize_backend(compile_backend, allow_direct=True)
+    key = normalize_backend(backend, allow_direct=True)
     params = nominal_plant_params(problem)
 
     # The escape hatch: the system's own f, uncompiled
@@ -271,10 +271,9 @@ def require_fixed_grid_horizon(tf):
         raise ValueError("fixed-grid tf must be positive and finite")
 
 
-def require_jax_compile_backend(compile_backend):
+def require_jax_compile_backend(backend):
     """Refuse a parametric program on any compile backend but JAX."""
-    if normalize_backend(compile_backend, allow_direct=True) != BACKEND_JAX:
+    if normalize_backend(backend, allow_direct=True) != BACKEND_JAX:
         raise ValueError(
-            "a parametric program requires compile_backend='jax' "
-            f"(got {compile_backend!r})."
+            f"a parametric program requires backend='jax' (got {backend!r})."
         )

@@ -88,7 +88,7 @@ def trajopt(problem, transcription, n_steps=10):
         problem,
         transcription=transcription(n_steps),
         options=TrajectoryOptimizationOptions(
-            compile_backend="numpy", optimizer_options={"maxiter": 200, "ftol": 1e-10}
+            backend="numpy", optimizer_options={"maxiter": 200, "ftol": 1e-10}
         ),
     )
 

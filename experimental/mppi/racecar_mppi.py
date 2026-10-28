@@ -163,14 +163,14 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
 mpc = ModelPredictiveController(planner, dt_mpc=DT, warm_start=True)
 t0 = time.perf_counter()
 result = (mpc @ car).compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
+    tf=TF, x0_plant=x0, plant_dt_inner=SIM_DT, backend="jax"
 )
 mpc_wall = time.perf_counter() - t0
 traj_mpc = result.plant

@@ -101,7 +101,7 @@ class Optimizer:
         program's class (see :func:`program_class`): L-BFGS for an unconstrained
         or box-bounded program, SLSQP for a constrained one. A method the class
         does not admit is refused (``gd`` on a program with constraint rows).
-    compile_backend : str, optional
+    backend : str, optional
         Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
         Defaults to ``program.backend`` (the native backend of the program's
         callables).
@@ -121,7 +121,7 @@ class Optimizer:
         z0=None,
         *,
         method: str = "scipy_slsqp",
-        compile_backend: str | None = None,
+        backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,
         **method_kwargs,
@@ -133,20 +133,18 @@ class Optimizer:
         self.program = program
         self.z0 = self.decision_vector(start_of(program, z0), program.n_z)
         self.method = method
-        self.compile_backend = (
-            program.backend if compile_backend is None else compile_backend
-        )
+        self.backend = program.backend if backend is None else backend
         self.program_evaluator = compile_program_evaluator(
             program,
-            backend=self.compile_backend,
+            backend=self.backend,
             sample_z=self.z0,
             use_hessian=use_hessian,
         )
 
-        # The solver backend: the method's preset, the caller's keywords and options over it
-        backend_key, preset = _USER_OPTIMIZER_METHODS[method]
+        # The solver adapter: the method's preset, the caller's keywords and options over it
+        adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
         kwargs = backend_kwargs_of(preset, method_kwargs, options)
-        self.backend = self.select_backend(backend_key, kwargs)
+        self.adapter = self.select_adapter(adapter_key, kwargs)
 
     def __str__(self):
         return inspect_text(self)
@@ -205,7 +203,7 @@ class Optimizer:
                 callback(z_arr.copy(), J, t_elapsed)
 
         # The backend solve
-        result = self.backend.solve(
+        result = self.adapter.solve(
             self.program_evaluator,
             z_start,
             callback=backend_cb,
@@ -234,9 +232,9 @@ class Optimizer:
         return arr
 
     @staticmethod
-    def select_backend(backend_key: str, kwargs: dict) -> OptimizerBackend:
-        """The optimizer backend of a preset's key, built from its keyword arguments."""
-        if backend_key == "scipy_minimize":
+    def select_adapter(adapter_key: str, kwargs: dict) -> OptimizerBackend:
+        """The solver adapter of a preset's key, built from its keyword arguments."""
+        if adapter_key == "scipy_minimize":
             # Lazy import: SciPy's solvers load on first use, not with the optimizer
             from minilink.optimization.optimizers.scipy_minimize import (
                 ScipyMinimizeOptimizer,
@@ -244,7 +242,7 @@ class Optimizer:
 
             return ScipyMinimizeOptimizer(**kwargs)
 
-        if backend_key == "ipopt":
+        if adapter_key == "ipopt":
             # Lazy import: the Ipopt adapter loads on first use, not with the optimizer
             from minilink.optimization.optimizers.ipopt import (
                 IpoptOptimizer,
@@ -256,7 +254,7 @@ class Optimizer:
 
             return IpoptOptimizer(**kwargs)
 
-        if backend_key == "first_order":
+        if adapter_key == "first_order":
             # Lazy import: the first-order loop loads on first use
             from minilink.optimization.optimizers.first_order import (
                 FirstOrderOptimizer,
@@ -264,7 +262,7 @@ class Optimizer:
 
             return FirstOrderOptimizer(**kwargs)
 
-        raise ValueError(f"Unknown optimizer backend key {backend_key!r}.")
+        raise ValueError(f"Unknown optimizer adapter key {adapter_key!r}.")
 
     def print_solve_preamble(self, z0: np.ndarray) -> None:
         """Open the solve panel: the program, the start and the method."""
@@ -275,7 +273,7 @@ class Optimizer:
         for line in inspect_text(self).splitlines():
             print(line)
         print("z0:", preview_vector(z0))
-        print("options:", getattr(self.backend, "options", {}))
+        print("options:", getattr(self.adapter, "options", {}))
         print(DISP_RULE_DIV)
         print("Running solver...")
 

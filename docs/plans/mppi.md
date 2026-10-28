@@ -63,7 +63,7 @@ What exists, what it is coupled to, and what MPPI reuses.
 (`minilink/planning/trajectory_optimization/mpc/controller.py`) accepts "a duck-typed
 `TrajectoryOptimizationPlanner`", and `validate_mpc_planner` (line 905) requires
 `compile_parametric_program`, `has_parametric_program`, `solve_trajectory_from`,
-`planner.transcription.options.n_steps`, `planner.options.compile_backend` and
+`planner.transcription.options.n_steps`, `planner.options.backend` and
 `planner.transcription.decision_dimension(problem)`. The tick latch (`MPCTickLatch`,
 line 567) reads `planner.last_optimization_result.z` after every solve and builds the
 warm start through `mpc_warm_start_guess`, which unpacks `z` with

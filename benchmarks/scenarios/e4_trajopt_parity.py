@@ -81,7 +81,7 @@ def run_cartpole_rebuild(
     return _metrics_from_result(
         prefix="e4.cartpole_rebuild",
         result=result,
-        notes="CartPole TOP.solve, scipy_slsqp, compile_backend=jax",
+        notes="CartPole TOP.solve, scipy_slsqp, backend=jax",
     )
 
 
@@ -125,7 +125,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
             DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             optimizer_method="scipy_slsqp",
             optimizer_options={
                 "maxiter": maxiter,
@@ -237,7 +237,7 @@ def run_bicycle_parametric(
             DirectCollocationOptions(n_steps=n_steps)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             optimizer_method="scipy_slsqp",
             record_solve_time=True,
             optimizer_options={

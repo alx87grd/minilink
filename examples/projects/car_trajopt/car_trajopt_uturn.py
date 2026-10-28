@@ -55,7 +55,7 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     # optimizer_method="ipopt",
     verbose=PRINT_SOLVE_REPORT,
     optimizer_options={

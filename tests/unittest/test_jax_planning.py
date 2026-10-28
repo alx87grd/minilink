@@ -88,13 +88,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -112,13 +112,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
             problem,
             transcription=ShootingTranscription(ShootingOptions(n_steps=5)),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -140,13 +140,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
                 MultipleShootingOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -171,7 +171,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         tr = DirectCollocationTranscription(DirectCollocationOptions(n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
-        program = tr.transcribe(problem, compile_backend="jax")
+        program = tr.transcribe(problem, backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0

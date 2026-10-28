@@ -4,7 +4,7 @@
   "tf": 0.5,
   "dt": 0.001,
   "solver": "rk4_fixedsteps",
-  "compile_backend": "numpy",
+  "backend": "numpy",
   "input_mode": "zero_torque",
   "gravity": 0.0,
   "x0": [

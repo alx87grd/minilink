@@ -912,8 +912,8 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
     the verbs ``compile_parametric_program``, ``has_parametric_program`` and
     ``solve_trajectory_from``. A planner missing any of them is a ``TypeError``.
 
-    ``compile_backend='jax'`` auto-compiles a parametric NLP once (bind + solve
-    each tick). ``compile_backend='numpy'`` or ``'direct'`` skips parametric
+    ``backend='jax'`` auto-compiles a parametric NLP once (bind + solve
+    each tick). ``backend='numpy'`` or ``'direct'`` skips parametric
     compile; each tick rebuilds via :meth:`~TrajectoryOptimizationPlanner.solve_trajectory_from`.
     """
     # The planner's interface: its problem, transcription and options, a parametric
@@ -944,17 +944,14 @@ def validate_mpc_planner(planner) -> tuple[int, int, int]:
         )
 
     # A JAX planner compiles its parametric NLP once, here
-    if (
-        normalize_backend(planner.options.compile_backend, allow_direct=True)
-        == BACKEND_JAX
-    ):
+    if normalize_backend(planner.options.backend, allow_direct=True) == BACKEND_JAX:
         if not planner.has_parametric_program:
             planner.compile_parametric_program()
 
         if not planner.has_parametric_program:
             raise RuntimeError(
                 "planner.compile_parametric_program() did not produce a parametric "
-                "program (check compile_backend='jax' and transcription support)."
+                "program (check backend='jax' and transcription support)."
             )
 
     # The block's sizes: the plant's state and input, the packed decision vector

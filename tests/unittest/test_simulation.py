@@ -91,14 +91,14 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="numpy",
+            backend="numpy",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "scipy")
 
     def test_default_compile_backend_is_numpy(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
-        self.assertEqual(sim.compile_backend, "numpy")
+        self.assertEqual(sim.backend, "numpy")
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -108,10 +108,10 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=5,
-            compile_backend=COMPILE_BACKEND_AUTO,
+            backend=COMPILE_BACKEND_AUTO,
             verbose=False,
         )
-        self.assertEqual(sim.compile_backend, "jax")
+        self.assertEqual(sim.backend, "jax")
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -121,7 +121,7 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="jax",
+            backend="jax",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
@@ -134,7 +134,7 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=9999,
-            compile_backend="jax",
+            backend="jax",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "scipy")
@@ -147,7 +147,7 @@ class TestNewSimulator(unittest.TestCase):
             DiscontinuousLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="jax",
+            backend="jax",
             solver_warnings="ignore",
             verbose=False,
         )
@@ -484,7 +484,7 @@ class TestStaticSimulatorJax(unittest.TestCase):
     def test_gain_jax_compile_backend(self):
         gain = Gain(K=2.0, dim=1)
         traj = gain.compute_trajectory(
-            t0=0, tf=0.5, n_steps=3, compile_backend="jax", verbose=False
+            t0=0, tf=0.5, n_steps=3, backend="jax", verbose=False
         )
         self.assertEqual(traj.x.shape, (0, 3))
         self.assertIn("y", traj.signals)
@@ -887,7 +887,7 @@ class TestAsComputer(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_method="scipy_slsqp",
                 optimizer_options={"maxiter": 5, "ftol": 0.1},
@@ -966,14 +966,14 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=0.01,
             renderer=None,
-            compile_backend=None,
+            backend=None,
             max_steps=1,
         )
         if _have_jax():
-            self.assertEqual(rt_sim.compile_backend, "jax")
+            self.assertEqual(rt_sim.backend, "jax")
         else:
-            self.assertEqual(rt_sim.compile_backend, "numpy")
-        self.assertEqual(rt_sim.evaluator.backend, rt_sim.compile_backend)
+            self.assertEqual(rt_sim.backend, "numpy")
+        self.assertEqual(rt_sim.evaluator.backend, rt_sim.backend)
 
     def test_realtime_overrun_emits_warning(self):
         import time
@@ -987,7 +987,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             input=CallbackInput(slow_u),
             max_steps=2,
         )
@@ -1009,7 +1009,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
         # Default plant offline_dt=1e-4 → many steps fit; live ceiling (10) binds.
@@ -1027,7 +1027,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             sys,
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
         n_max = rt_sim._auto_n_sub_max()
@@ -1044,7 +1044,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
         real_step = rt_sim.evaluator.step
@@ -1068,7 +1068,7 @@ class TestRealtimeSimulator(unittest.TestCase):
                 StableLinearSystem(),
                 frame_dt=0.01,
                 renderer=None,
-                compile_backend="numpy",
+                backend="numpy",
                 max_steps=2,
                 verbose=True,
             ).run()
@@ -1097,7 +1097,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             frame_dt=0.01,
             sim_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             input=CallbackInput(lambda t, x: np.array([2.0])),
             output=live_out,
             max_steps=6,
@@ -1134,7 +1134,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             frame_dt=0.01,
             sim_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             plot=True,
             output=CallbackOutput(lambda t, x, u, outputs: published.append(outputs)),
             max_steps=3,
@@ -1241,7 +1241,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             frame_dt=0.01,
             sim_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             input=CallbackInput(interrupt_on_third_step),
             max_steps=10,
         )
@@ -1293,7 +1293,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             frame_dt=0.01,
             sim_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             output=live_out,
             max_steps=2,
         )
@@ -1494,9 +1494,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     def test_jax_automatic_grid_never_selects_rk4(self):
         from minilink.simulation.time_grid import DEFAULT_N_STEPS
 
-        sim = Simulator(
-            StableLinearSystem(), tf=10.0, compile_backend="jax", verbose=False
-        )
+        sim = Simulator(StableLinearSystem(), tf=10.0, backend="jax", verbose=False)
         self.assertEqual(sim.solver_mode, "scipy")
         self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
 

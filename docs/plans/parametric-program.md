@@ -226,7 +226,7 @@ whether the evaluator came from a one-shot transcription or a compiled program w
 | Path | Entry | Solver wiring | IPOPT (`cyipopt`) |
 | --- | --- | --- | --- |
 | Offline / rebuild | `solve()` / `solve_trajectory_from` without parametric compile | `Optimizer(program, method=…)` | **Yes** (`examples/demos/trajopt/trajopt_cartpole_collocation_jax.py`) |
-| NumPy MPC rebuild | `compile_backend='numpy'`, no parametric compile | the same `Optimizer` via `build_optimizer` | **Yes** (with the optional dependency) |
+| NumPy MPC rebuild | `backend='numpy'`, no parametric compile | the same `Optimizer` via `build_optimizer` | **Yes** (with the optional dependency) |
 | JAX MPC fast path | `compile_parametric_program()` + `solve_trajectory_from` | **custom** `build_parametric_optimizer_backend` | **No**, SciPy only |
 
 ### Why the compiled path breaks on a solver swap
@@ -273,7 +273,7 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=40,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     optimizer_method="ipopt",          # today's keywords; the constructor's names go with the sweep (R134)
     optimizer_options={"max_iter": 500, "tol": 1e-6},
 )

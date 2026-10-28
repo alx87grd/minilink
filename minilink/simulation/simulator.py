@@ -88,7 +88,7 @@ FIXED_STEP_SOLVERS = tuple(
 # constant: the period is the resolution the user chose; ``dt`` buys a finer one
 HELD_SIGNAL_STEPS_PER_SAMPLE = 1
 
-# Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
+# Pass ``backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
 # importing it from the simulator keep working.
 COMPILE_BACKEND_AUTO = BACKEND_AUTO
@@ -113,7 +113,7 @@ class Simulator:
     Parameters
     ----------
     sys : System
-        Model to simulate; compiled with ``compile_backend`` as below.
+        Model to simulate; compiled with ``backend`` as below.
     x0 : array_like, optional
         Initial state in :math:`\\mathbb{R}^n`. If ``None``, uses ``sys.x0``.
     t0, tf : float
@@ -131,7 +131,7 @@ class Simulator:
         (same pattern as ``"rk4_fixedsteps"``).
     verbose : bool
         Print setup information (default quiet).
-    compile_backend : str
+    backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
         (the string ``auto``) to try JAX if importable, then fall back to NumPy.
@@ -150,7 +150,7 @@ class Simulator:
         dt=None,
         solver=None,
         verbose=False,
-        compile_backend=BACKEND_NUMPY,
+        backend=BACKEND_NUMPY,
         solver_warnings="warn",
     ):
         require_dynamic_system(sys)
@@ -175,9 +175,7 @@ class Simulator:
         self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
         # Compile the system
-        self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
-            sys, compile_backend
-        )
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
 
         # Solver and time grid. With an automatic grid the solver is chosen
         # first and the grid is sized to it; with an explicit grid the solver
@@ -350,7 +348,7 @@ class Simulator:
         - If a block holds a signal over a sample period (``solver_info
           ["sample_period"]``, a noise source), return ``"rk4_fixedsteps"``:
           the automatic grid then steps at a divisor of that period.
-        - If the time grid was given explicitly, ``compile_backend`` is
+        - If the time grid was given explicitly, ``backend`` is
           ``"jax"``, the grid is uniform, and it has at least
           :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
           (fast JIT rollout). The automatic grid never triggers this rule.
@@ -364,7 +362,7 @@ class Simulator:
             return "rk4_fixedsteps"
         if (
             not self.auto_time_grid
-            and self.compile_backend == BACKEND_JAX
+            and self.backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
             and time_grid_is_uniform(self.t)
         ):
@@ -375,15 +373,15 @@ class Simulator:
     # Internal machinery
     ###########################################################################
 
-    def resolve_and_build_evaluator(self, sys, compile_backend):
-        """``(backend, evaluator)``: ``sys`` compiled with ``compile_backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
+    def resolve_and_build_evaluator(self, sys, backend):
+        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
         return resolve_auto_backend(
-            lambda backend: self.build_evaluator(sys, backend), compile_backend
+            lambda backend: self.build_evaluator(sys, backend), backend
         )
 
-    def build_evaluator(self, sys, compile_backend):
-        """Compile ``sys`` with ``compile_backend``; subclasses wrap it (timings, caches)."""
-        return sys.compile(backend=compile_backend)
+    def build_evaluator(self, sys, backend):
+        """Compile ``sys`` with ``backend``; subclasses wrap it (timings, caches)."""
+        return sys.compile(backend=backend)
 
     def parse_solver(self, solver):
         """``(backend key, options)`` of a solver label."""
@@ -472,7 +470,7 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         dt=sim.dt,
         solver_mode=sim.solver_mode,
         user_solver=sim.user_solver,
-        compile_backend=sim.compile_backend,
+        backend=sim.backend,
         auto_time_grid=sim.auto_time_grid,
         solver_options=sim.solver_backend_options or None,
         notes=notes or None,

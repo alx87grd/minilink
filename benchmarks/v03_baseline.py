@@ -215,14 +215,14 @@ def mpc_entries(out):
         ),
         n_steps=8,
         transcription="direct_collocation",
-        compile_backend="numpy",
+        backend="numpy",
         optimizer_options={"maxiter": 80, "ftol": 1e-6},
         verbose=False,
     )
     mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True, verbose=False)
     hybrid = mpc @ plant
     traj = hybrid.compute_trajectory(
-        tf=1.0, x0_plant=x0, plant_dt_inner=0.01, compile_backend="numpy"
+        tf=1.0, x0_plant=x0, plant_dt_inner=0.01, backend="numpy"
     )
     out["mpc.integrator.x"] = traj.plant.x
 
@@ -270,7 +270,7 @@ def optimizer_entries(out):
             program,
             z0=np.array([-1.0, 1.0]),
             method=method,
-            compile_backend="jax",
+            backend="jax",
             options=options,
         ).solve()
         out[f"optimizer.rosenbrock.{method}"] = np.asarray(result.z)

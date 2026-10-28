@@ -32,7 +32,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
@@ -41,7 +41,7 @@ mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose
 
 loop = mpc @ boat
 result = loop.compute_trajectory(
-    tf=TF_SIM, x0_plant=X_START, plant_dt_inner=SIM_DT, compile_backend="jax"
+    tf=TF_SIM, x0_plant=X_START, plant_dt_inner=SIM_DT, backend="jax"
 )
 loop.plot_trajectory()
 loop.animate(

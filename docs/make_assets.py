@@ -204,7 +204,7 @@ def gif_cartpole() -> None:
         problem,
         n_steps=40,
         transcription="direct_collocation",
-        compile_backend="jax",
+        backend="jax",
         optimizer_method="scipy_slsqp",
         verbose=False,
     )
@@ -374,7 +374,7 @@ def racecar_mpc() -> None:
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
-        compile_backend="jax",
+        backend="jax",
         optimizer_method="scipy_slsqp",
         optimizer_options={"maxiter": 60, "ftol": 1.0},
     )
@@ -388,7 +388,7 @@ def racecar_mpc() -> None:
 
     lap = mpc @ car
     result = lap.compute_trajectory(
-        tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
+        tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, backend="jax"
     )
     # one sample per video frame: the trail's pages stay small
     traj = result.plant.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)

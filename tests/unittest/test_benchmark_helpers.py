@@ -108,7 +108,7 @@ class TestBenchmarkSmoke(unittest.TestCase):
         variant = TrajectoryOptimizationBenchmarkVariant(
             name="unit-numpy-collocation",
             transcription="collocation",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
             start="cold",
         )

@@ -38,7 +38,7 @@ class StaticSimulator:
         dt=None,
         solver=None,
         verbose=False,
-        compile_backend=BACKEND_NUMPY,
+        backend=BACKEND_NUMPY,
     ):
         require_static_system(sys)
         if solver is not None:
@@ -62,10 +62,8 @@ class StaticSimulator:
             verbose=verbose,
         )
 
-        # The compiled system, on compile_backend or, for "auto", JAX then NumPy
-        self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
-            sys, compile_backend
-        )
+        # The compiled system, on backend or, for "auto", JAX then NumPy
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
 
     def solve(self):
         """Sample the outputs on the grid under the nominal input."""
@@ -83,10 +81,10 @@ class StaticSimulator:
     # Internal machinery
     ###########################################################################
 
-    def resolve_and_build_evaluator(self, sys, compile_backend):
-        """The backend and its evaluator: ``compile_backend``, or JAX then NumPy for ``"auto"``."""
+    def resolve_and_build_evaluator(self, sys, backend):
+        """The backend and its evaluator: ``backend``, or JAX then NumPy for ``"auto"``."""
         return resolve_auto_backend(
-            lambda backend: sys.compile(backend=backend), compile_backend
+            lambda backend: sys.compile(backend=backend), backend
         )
 
     def nominal_u_traj(self):

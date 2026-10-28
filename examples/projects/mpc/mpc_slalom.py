@@ -87,7 +87,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
     optimizer_method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
@@ -106,7 +106,7 @@ result = hybrid.compute_trajectory(
     tf=TF_SIM,
     x0_plant=x0,
     plant_dt_inner=SIM_DT,
-    compile_backend="jax",
+    backend="jax",
 )
 hybrid.plot_trajectory()
 hybrid.animate(

@@ -43,7 +43,7 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=40,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     optimizer_method=OPTIMIZER,
     # optimizer_method="scipy_slsqp",
     # optimizer_options={"maxiter": 500, "ftol": 1e-2},

@@ -59,15 +59,15 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the trapezoidal collocation nonlinear program."""
         # The JAX backend builds the same program, vectorized over the knots
-        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
-            return self.transcribe_jax(problem, compile_backend=compile_backend)
+        if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
+            return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        dynamics = dynamics_function(problem, compile_backend)
+        dynamics = dynamics_function(problem, backend)
 
         # Dynamics: the trapezoidal defect of every interval vanishes
         equalities: list[ConstraintFunction] = [
@@ -91,10 +91,10 @@ class DirectCollocationTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
-            backend=program_backend_for_compile(compile_backend),
+            backend=program_backend_for_compile(backend),
             metadata={
                 "transcription": "direct_collocation",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
@@ -102,7 +102,7 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_JAX,
+        backend: str = BACKEND_JAX,
     ):
         """Build a JAX parametric collocation program with runtime ``x0``.
 
@@ -115,7 +115,7 @@ class DirectCollocationTranscription(Transcription):
             ParametricMathematicalProgram,
         )
 
-        require_jax_compile_backend(compile_backend)
+        require_jax_compile_backend(backend)
         require_singleton_x0(problem)
 
         jax = ensure_jax_x64()
@@ -161,7 +161,7 @@ class DirectCollocationTranscription(Transcription):
             backend=BACKEND_JAX,
             metadata={
                 "transcription": "direct_collocation_parametric",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
@@ -170,13 +170,13 @@ class DirectCollocationTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
         dynamics=None,
     ) -> Trajectory:
         """Read ``(x, u)`` from the optimizer result.
 
         Prefer a cached ``dynamics`` callable (parametric compile path);
-        otherwise build one via ``compile_backend``.
+        otherwise build one via ``backend``.
         """
         x, u = self.unpack(result.z, problem)
 
@@ -185,7 +185,7 @@ class DirectCollocationTranscription(Transcription):
         u = np.asarray(u, dtype=float)
         t = np.asarray(self.options.t(problem), dtype=float)
         if dynamics is None:
-            dynamics = dynamics_function(problem, compile_backend)
+            dynamics = dynamics_function(problem, backend)
 
         # f_k = f(x_k, u_k, t_k) at every knot
         dx = np.zeros_like(x)
@@ -291,7 +291,7 @@ class DirectCollocationTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str,
+        backend: str,
     ) -> MathematicalProgram:
         """Build the JAX-vectorized program of :meth:`jax_objective_and_defects`.
 
@@ -330,7 +330,7 @@ class DirectCollocationTranscription(Transcription):
             backend=BACKEND_JAX,
             metadata={
                 "transcription": self.name,
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 

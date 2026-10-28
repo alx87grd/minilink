@@ -179,7 +179,7 @@ class DynamicAnimation:
         plot=False,
         plot_backend="matplotlib",
         sync="locked",
-        compile_backend=None,
+        backend=None,
         max_steps=None,
         tf=None,
         x0=None,
@@ -209,7 +209,7 @@ class DynamicAnimation:
         to show (``plot=("slip", "grip")``), to open a live rolling-window
         time-signal plot alongside the scene, on ``plot_backend``.
 
-        ``compile_backend=None`` (default) tries JAX when available and
+        ``backend=None`` (default) tries JAX when available and
         compatible, otherwise NumPy — preferred for live sessions where speed
         matters.
         """
@@ -233,7 +233,7 @@ class DynamicAnimation:
             plot_backend=plot_backend,
             input=input,
             output=output,
-            compile_backend=compile_backend,
+            backend=backend,
             max_steps=max_steps,
             tf=tf,
             verbose=verbose,

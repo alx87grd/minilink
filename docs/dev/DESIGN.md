@@ -6,7 +6,7 @@ Architecture and public contracts, under the law of [CONSTITUTION.md](CONSTITUTI
 
 NumPy required; JAX optional (the `full` extra, or `pip install jax jaxlib`), imported lazily via
 `minilink.core.backends` (`require_jax_numpy()`, `array_module()`). No `minilink.jax`
-package, no global mode. Explicit `compile_backend` and evaluator backend args.
+package, no global mode. Explicit `backend` and evaluator backend args.
 
 **One class by default** (`xp = array_module(x)`). Law: CONSTITUTION §6, 'Backend-native
 math'.
@@ -334,6 +334,10 @@ read `params` yet, the gap is tracked below.
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
+- **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
+  `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
+  `solver=` is the time integration; `method=` is the verb's own numerical method; the
+  optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
 - **Two words for two times (R157).** `dt` is the step of a computation and names it at every
   call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
   `sample_period` is the clock a block holds and names it on every such block (the sampled
@@ -814,7 +818,7 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 An input left unwired is a constant at its declared `nominal_value` (the
 Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
-via `compute_forced`. Facades default `compile_backend="numpy"`.
+via `compute_forced`. Facades default `backend="numpy"`.
 
 **Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
@@ -1095,7 +1099,7 @@ and the solver's own flag stays in `message` / `stats`. The worst equality
 residual / inequality margin / bound violation are recorded on the record.
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
-(`n_steps=…`, `transcription="direct_collocation"`, `compile_backend=…`,
+(`n_steps=…`, `transcription="direct_collocation"`, `backend=…`,
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
@@ -1103,7 +1107,7 @@ and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `MathematicalProgram`. Optional `compile_parametric_program()` builds a
 `ParametricMathematicalProgram` (``h(z, x0)``) once so
 `solve_trajectory_from(x0, params=None)` is bind + solve only on the JAX
-parametric path; with ``compile_backend='numpy'`` or ``'direct'``, each
+parametric path; with ``backend='numpy'`` or ``'direct'``, each
 from-solve rebuilds the NLP (expected for no-JAX MPC). A one-time speed warning
 is emitted only when a JAX planner omits parametric compile.
 Online ``params`` binds `x0` only; the reserved key ``scene`` raises
@@ -1114,7 +1118,7 @@ options); the time grid is
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
-evaluator's `f`). `compile_backend="direct"` calls `system.f`
+evaluator's `f`). `backend="direct"` calls `system.f`
 uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
 its callables in its `backend` field, and the `Optimizer` compiles with it by
 default.

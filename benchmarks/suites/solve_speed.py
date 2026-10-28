@@ -134,7 +134,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="numpy",
+            backend="numpy",
             optimizer_method="scipy_slsqp",
             optimizer_options={
                 "maxiter": PENDULUM_MAXITER,
@@ -173,7 +173,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             value=float(np.mean(total_times)),
             unit="s",
             notes=(
-                f"catalog Pendulum swing-up, compile_backend=numpy, "
+                f"catalog Pendulum swing-up, backend=numpy, "
                 f"n_steps={PENDULUM_N_STEPS}, scipy_slsqp"
             ),
         ),

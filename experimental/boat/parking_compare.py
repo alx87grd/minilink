@@ -62,13 +62,13 @@ for water, current in WATERS.items():
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
-        compile_backend="jax",
+        backend="jax",
         optimizer_method="scipy_slsqp",
         optimizer_options={"maxiter": 40, "ftol": 1e-3},
     )
     mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
     result = (mpc @ boat).compute_trajectory(
-        tf=TF, x0_plant=X_START, plant_dt_inner=DT, compile_backend="jax"
+        tf=TF, x0_plant=X_START, plant_dt_inner=DT, backend="jax"
     )
     runs["MPC", water] = result.plant
 

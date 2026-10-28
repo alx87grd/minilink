@@ -85,7 +85,7 @@ def _bicycle_planner():
             DirectCollocationOptions(n_steps=N_STEPS)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
@@ -117,7 +117,7 @@ def run_hybrid_zoh() -> list[MetricRecord]:
         x0_plant=x0,
         x0_computer=mpc_default_computer_x0(planner),
         plant_dt_inner=SIM_DT,
-        compile_backend="jax",
+        backend="jax",
     )
     wall = time.perf_counter() - t0
     traj = result.plant
@@ -198,7 +198,7 @@ def run_dual_rate() -> list[MetricRecord]:
         x0_plant=x0,
         x0_computer=mpc_default_computer_x0(planner),
         plant_dt_inner=SIM_DT,
-        compile_backend="jax",
+        backend="jax",
     )
     wall = time.perf_counter() - t0
     traj = result.plant

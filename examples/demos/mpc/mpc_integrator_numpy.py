@@ -54,7 +54,7 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="numpy",
+    backend="numpy",
     optimizer_options={"maxiter": 80, "ftol": 1e-6},
 )
 
@@ -68,6 +68,6 @@ hybrid.compute_trajectory(
     tf=TF_SIM,
     x0_plant=x0,
     plant_dt_inner=SIM_DT,
-    compile_backend="numpy",
+    backend="numpy",
 )
 hybrid.plot_trajectory()

@@ -64,7 +64,7 @@ class TestModelPredictiveController(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -255,7 +255,7 @@ class TestModelPredictiveController(unittest.TestCase):
                 tf=tf,
                 x0_plant=x0,
                 x0_computer=x0_computer,
-                compile_backend="numpy",
+                backend="numpy",
                 verbose=False,
             )
         finally:
@@ -307,7 +307,7 @@ class TestMPCAlgebraicController(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -393,7 +393,7 @@ class TestMPCWarmStartController(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -498,7 +498,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -571,7 +571,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -636,7 +636,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
@@ -677,7 +677,7 @@ def _planner():
             DirectCollocationOptions(n_steps=5)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 5, "ftol": 0.1},
@@ -784,7 +784,7 @@ def _make_numpy_planner(x_start=0.0):
         problem,
         n_steps=5,
         transcription="direct_collocation",
-        compile_backend="numpy",
+        backend="numpy",
         optimizer_options={"maxiter": 50, "ftol": 0.0001},
     )
 
@@ -925,7 +925,7 @@ class TestMPCNumPyRebuild(unittest.TestCase):
         with patch.object(
             planner, "solve_trajectory_from", wraps=planner.solve_trajectory_from
         ) as solve:
-            hybrid.compute_trajectory(tf=tf, compile_backend="numpy", verbose=False)
+            hybrid.compute_trajectory(tf=tf, backend="numpy", verbose=False)
             self.assertEqual(solve.call_count, n_ticks)
 
     def test_hybrid_closed_loop_smoke(self):
@@ -958,7 +958,7 @@ class TestMPCNumPyRebuild(unittest.TestCase):
                 tf=tf,
                 x0_plant=plant.x0,
                 x0_computer=mpc_default_computer_x0(planner),
-                compile_backend="numpy",
+                backend="numpy",
                 verbose=False,
             )
         finally:
@@ -1152,7 +1152,7 @@ def _build_bicycle_hybrid(*, mpc_hz=5.0):
         template_problem,
         transcription=transcription,
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 0.01},
@@ -1289,7 +1289,7 @@ def _build_bicycle_hybrid_warm(*, mpc_hz=5.0):
         template_problem,
         transcription=transcription,
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": 80, "ftol": 0.01},
@@ -1420,7 +1420,7 @@ def _make_planner(sys_mpc, cost, x0):
         problem,
         transcription=transcription,
         options=TrajectoryOptimizationOptions(
-            compile_backend="jax",
+            backend="jax",
             record_solve_time=True,
             optimizer_method="scipy_slsqp",
             optimizer_options={"maxiter": MPC_MAXITER, "ftol": MPC_FTOL},
@@ -1544,7 +1544,7 @@ class TestMpcHybridDemoParity(unittest.TestCase):
             plant_dt_inner=SIM_DT,
             x0_plant=x0,
             x0_computer=z0,
-            compile_backend="jax",
+            backend="jax",
         ).solve()
         n_mpc = hand["t_mpc"].size
         self.assertEqual(result.computer.n_samples, n_mpc)

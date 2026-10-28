@@ -53,17 +53,17 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the input-knot nonlinear program."""
         # The JAX backend builds the same program, its rollout scanned over the knots
-        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
-            return self.transcribe_jax(problem, compile_backend=compile_backend)
+        if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
+            return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
 
         # The states are not decision variables: each function of z rolls them out
-        rollout = self.make_rollout(problem, compile_backend)
+        rollout = self.make_rollout(problem, backend)
         equalities: list[ConstraintFunction] = []
         inequalities: list[ConstraintFunction] = []
 
@@ -85,10 +85,10 @@ class ShootingTranscription(Transcription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
-            backend=program_backend_for_compile(compile_backend),
+            backend=program_backend_for_compile(backend),
             metadata={
                 "transcription": "shooting",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
@@ -97,12 +97,12 @@ class ShootingTranscription(Transcription):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> Trajectory:
         """Roll out the optimized input sequence."""
         # The program's rollout, and the dynamics for the state rates
-        rollout = self.make_rollout(problem, compile_backend)
-        dynamics = dynamics_function(problem, compile_backend)
+        rollout = self.make_rollout(problem, backend)
+        dynamics = dynamics_function(problem, backend)
 
         # The optimized input knots, and the states they roll out
         u = self.unpack(result.z, problem)
@@ -182,7 +182,7 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str,
+        backend: str,
     ) -> MathematicalProgram:
         """Build a JAX scan-based single-shooting program."""
         jax = ensure_jax_x64()
@@ -251,18 +251,18 @@ class ShootingTranscription(Transcription):
             backend=BACKEND_JAX,
             metadata={
                 "transcription": "shooting",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
     def make_rollout(
         self,
         problem: PlanningProblem,
-        compile_backend: str,
+        backend: str,
     ):
         """``rollout(u) -> x``: the compiled RK4 integrator, or the knot loop (direct mode, system params)."""
         x0 = self.initial_state(problem)
-        key = normalize_backend(compile_backend, allow_direct=True)
+        key = normalize_backend(backend, allow_direct=True)
 
         # A compiled system without explicit params: its own integrator over the grid
         if key != BACKEND_DIRECT and nominal_plant_params(problem) is None:
@@ -281,7 +281,7 @@ class ShootingTranscription(Transcription):
             return rollout
 
         # Direct mode or explicit system params: step the dynamics per knot
-        f = dynamics_function(problem, compile_backend)
+        f = dynamics_function(problem, backend)
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:

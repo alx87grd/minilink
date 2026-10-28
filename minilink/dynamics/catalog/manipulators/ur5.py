@@ -606,6 +606,6 @@ if __name__ == "__main__":
         lambda t: np.zeros(6),
         tf=3.0,
         n_steps=120,
-        compile_backend="jax",
+        backend="jax",
     )
     sys.animate(renderer="meshcat", is_3d=True)

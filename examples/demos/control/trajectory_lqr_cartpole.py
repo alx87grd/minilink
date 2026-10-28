@@ -41,7 +41,7 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=40,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     optimizer_method=OPTIMIZER,
 )
 reference = planner.solve().trajectory

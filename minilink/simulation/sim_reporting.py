@@ -26,7 +26,7 @@ def print_simulation_preamble(
     dt: float,
     solver_mode: str,
     user_solver: str | None,
-    compile_backend: str,
+    backend: str,
     auto_time_grid: bool,
     solver_options: dict | None = None,
     notes: list[str] | None = None,
@@ -51,7 +51,7 @@ def print_simulation_preamble(
         print(f"solver: {solver_mode!r} (auto-selected)")
     else:
         print(f"solver: {solver_mode!r} (user={user_solver!r})")
-    print(f"compile_backend={compile_backend!r}")
+    print(f"backend={backend!r}")
     if solver_options:
         print("solver_options:", solver_options)
 
@@ -106,7 +106,7 @@ def print_realtime_preamble(
     sim_dt: float,
     sim_dt_auto: bool,
     sync: str,
-    compile_backend: str,
+    backend: str,
     renderer,
     compile_s: float,
     warm_up_s: float,
@@ -138,7 +138,7 @@ def print_realtime_preamble(
     sim_note = " (auto)" if sim_dt_auto else ""
     print(f"sim_dt: {sim_dt:g}{sim_note}  ({n_sub} substeps/frame)")
     print(f"sync: {sync!r}")
-    print(f"compile_backend: {compile_backend!r}")
+    print(f"backend: {backend!r}")
     print(f"renderer: {renderer!r}")
 
     # The time spent before the loop

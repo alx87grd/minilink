@@ -70,14 +70,14 @@ class Sys2Gym(gym.Env):
         Integration scheme of the step model on the compiled plant.
     substeps : int
         Integration steps per env step, the action held over them.
-    compile_backend : {None, "numpy", "jax"}
+    backend : {None, "numpy", "jax"}
         Evaluator used for the step. ``None`` picks JAX when it is installed
         and the plant traces (one jitted step per env step), NumPy otherwise;
-        :attr:`compile_backend` records the choice.
+        :attr:`backend` records the choice.
 
     Attributes
     ----------
-    compile_backend : str
+    backend : str
         Backend actually used for the step (``"numpy"`` or ``"jax"``).
     evaluator : DynamicEvaluator or DiagramEvaluator
         Compiled plant the step runs on.
@@ -106,7 +106,7 @@ class Sys2Gym(gym.Env):
         reset_mode="uniform",
         solver="rk4",
         substeps=1,
-        compile_backend=None,
+        backend=None,
     ):
         self.sys = sys
         self.cost = cost
@@ -118,7 +118,7 @@ class Sys2Gym(gym.Env):
         require_step_knobs(solver, substeps)
         self.solver = solver
         self.substeps = int(substeps)
-        self.compile_backend, self.evaluator = _compiled_step(sys, compile_backend)
+        self.backend, self.evaluator = _compiled_step(sys, backend)
 
         # Boundaries
         self.x_lb, self.x_ub = _state_bounds(sys)
@@ -385,19 +385,18 @@ class ProblemEnv(Sys2Gym):
         return y, r, terminated, truncated, info
 
 
-def _compiled_step(sys, compile_backend):
+def _compiled_step(sys, backend):
     """Return ``(backend, evaluator)``; the env steps through ``evaluator.step``.
 
-    ``compile_backend=None`` tries JAX when it is installed and falls back to
+    ``backend=None`` tries JAX when it is installed and falls back to
     NumPy for plants that do not trace (catalog plants written with NumPy
     branches). Under JAX the whole step is one jitted call.
     """
-    if compile_backend is None:
+    if backend is None:
         from minilink.core.compile.compiler import compile_auto
 
         backend, evaluator = compile_auto(sys)
     else:
-        backend = compile_backend
         evaluator = sys.compile(backend=backend, verbose=False)
 
     return backend, evaluator
