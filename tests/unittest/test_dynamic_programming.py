@@ -171,6 +171,16 @@ class TestValueIteration(unittest.TestCase):
             u = grid.inputs[result.pi[grid.nearest_node(x)]][0]
             self.assertEqual(np.sign(u), sign)
 
+    def test_a_second_discount_is_refused(self):
+        sys = DoubleIntegrator()
+        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        problem = PlanningProblem(
+            sys, x_goal=np.zeros(2), cost=cost, U=sys.input_box, discount_rate=0.5
+        )
+        grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+        with self.assertRaisesRegex(ValueError, "discount a second time"):
+            DynamicProgrammingPlanner(problem, grid=grid, alpha=0.9)
+
     def test_solve_steps_runs_fixed_count(self):
         problem = make_problem()
         grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(5,), dt=0.1)

@@ -784,6 +784,12 @@ def check_sampled_plan_traces(evaluator, plan, verbose):
 
 def require_one_plant_period(costs, plant):
     """Refuse a sampled loop whose plant did not take its one period: its stage cost has no owner."""
+    if not costs:
+        raise ValueError(
+            "the loop has no plant integrated inside its period to carry the stage cost "
+            "(a plant held exactly, discretize(..., solver='exact'), or on a slower "
+            "clock): discretize the plant with solver='rk4' or 'euler' to score the loop"
+        )
     if len(costs) != 1:
         raise ValueError(
             f"the loop's plant {getattr(plant, 'sys_id', plant)!r} took {len(costs)} periods "

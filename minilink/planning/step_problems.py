@@ -346,11 +346,11 @@ def require_step_cost(cost):
 
 
 def require_no_controller(controller):
-    """Refuse a controller on a step problem's compile until its judge is built (the face alone)."""
+    """Refuse a controller on a step problem's compile: the step face scores a policy itself."""
     if controller is not None:
         raise NotImplementedError(
-            "StepPlanningProblem.compile(controller) is not built yet: compile() gives "
-            "the step face; score a policy with face.run(policy, x_start)"
+            "StepPlanningProblem.compile() takes no controller: it gives the step face; "
+            "score a policy with face.run(policy, x_start)"
         )
 
 

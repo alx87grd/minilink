@@ -746,6 +746,17 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
 
 
 class TestTheMPCOnANumPyPlanner(unittest.TestCase):
+    def test_a_delayed_mpc_compiles_with_no_solve(self):
+        # The compile's shape probe does not run a native law's update (a solve)
+        planner = integrator_planner(backend="numpy")
+        mpc = ModelPredictiveController(planner)
+        loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
+        with mock.patch.object(
+            CompiledTrajectoryPlanner, "solve", autospec=True
+        ) as solve:
+            loop.compile()
+        assert solve.call_count == 0
+
     def test_the_face_keeps_the_tree_it_was_compiled_with(self):
         # planner.compile() is a build: a later edit of the problem is not the face's
         planner = integrator_planner(backend="numpy")

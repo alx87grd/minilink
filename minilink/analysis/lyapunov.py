@@ -106,10 +106,12 @@ def region_of_attraction(
     poles = np.linalg.eigvals(A)
     require_hurwitz(poles)
 
-    # AᵀP + PA = −Q, with Q = I unless given
+    # AᵀP + PA = −Q, with Q = I unless given; P = (P + Pᵀ) / 2 drops the solver's
+    # rounding off the symmetric solution
     n = int(sys.n)
     Q = np.eye(n) if Q is None else np.asarray(Q, dtype=float)
     P = solve_continuous_lyapunov(A.T, -Q)
+    P = 0.5 * (P + P.T)
 
     # V̇ needs f on many states at once: compile once for the whole certificate
     backend, evaluator = compiled(sys)

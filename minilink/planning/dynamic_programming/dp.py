@@ -712,6 +712,7 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless alpha is set
     if "alpha" not in given and face.gamma < 1.0:
         opt = replace(opt, alpha=face.gamma)
+    require_one_discount(given, face.gamma)
 
     # The price of leaving the grid, unless set: the problem's, else the bound of its cost
     if opt.out_of_bound_cost is None:
@@ -728,6 +729,17 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
         raise ValueError(f"Unknown backend {opt.backend!r}")
 
     return opt
+
+
+def require_one_discount(given, gamma):
+    """Refuse ``alpha=`` on a problem that discounts already: each period's stage cost carries ``e^{−ρτ}``."""
+    alpha = given.get("alpha")
+    if alpha is not None and gamma < 1.0 and abs(float(alpha) - gamma) > 1e-12:
+        raise ValueError(
+            f"the problem discounts at γ = {gamma:.6g} per period (its discount_rate), "
+            f"and alpha={alpha!r} would discount a second time; give the discount once: "
+            "the problem's discount_rate, or alpha= on an undiscounted problem"
+        )
 
 
 def grid_price(problem, alpha, dt):

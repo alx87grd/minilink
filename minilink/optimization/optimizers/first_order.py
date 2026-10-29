@@ -244,10 +244,12 @@ class GradientDescentLaw:
         xp = array_module(grad, state["z"])
 
         eta = self.learning_rate
+        lower = self.lower
+        upper = self.upper
         z = state["z"]
 
         # z ← Π(z − η ∇J)
-        z_next = xp.clip(z - eta * grad, self.lower, self.upper)
+        z_next = xp.clip(z - eta * grad, lower, upper)
 
         return {"z": z_next}
 
@@ -295,6 +297,8 @@ class AdamLaw:
         b2 = self.b2
         eps = self.eps
         max_norm = self.max_grad_norm
+        lower = self.lower
+        upper = self.upper
         z = state["z"]
 
         # The gradient clipped to one norm, then the step count k advanced
@@ -309,9 +313,7 @@ class AdamLaw:
 
         # Bias-corrected step: z ← Π(z − η_k m / (√v + ε)), η_k = η √(1 − β₂ᵏ) / (1 − β₁ᵏ)
         eta_k = eta * (1 - b2**step) ** 0.5 / (1 - b1**step)
-        z_next = xp.clip(
-            z - eta_k * m / (safe_root(v, xp) + eps), self.lower, self.upper
-        )
+        z_next = xp.clip(z - eta_k * m / (safe_root(v, xp) + eps), lower, upper)
 
         return {"z": z_next, "m": m, "v": v, "step": step}
 
