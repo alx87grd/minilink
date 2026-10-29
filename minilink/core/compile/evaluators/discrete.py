@@ -501,15 +501,29 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         u_seq = self.input_sequence_of(u_seq, n_steps)
         ks = self.indices(u_seq.shape[0])
 
-        # One signal pass per period: the step, the substep points and the record share it
+        # One signal pass per period: the step, the substep points and the record share
+        # it; the plant is integrated once, its substep path giving the tick's state
         def period(x, k, u_k):
             x_f, u_f = self.float_arrays(x, u_k)
             signals = self.port_signals(x_f, u_f, k, params, t_start=t_start)
+            paths = []
+
+            def advance(system, local_x, local_u, time, p_op):
+                path = system.update_path(local_x, local_u, time, p_op)
+                paths.append(path)
+                return path[-1]
+
             x_next = self.next_from_signals(
-                x_f, u_f, k, params, signals, t_start=t_start
+                x_f,
+                u_f,
+                k,
+                params,
+                signals,
+                t_start=t_start,
+                advance=advance if S > 1 else None,
             )
             x_next = xp.reshape(x_next, (n,))
-            points = self.substep_points(x, u_k, k, params, x_next, t_start, signals)
+            points = self.points_of(x, x_next, paths[0] if paths else None)
             if not layout:
                 return x_next, points
             return x_next, points, self.recorded(layout, signals, u_f)
@@ -691,23 +705,17 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return gather_u(op.gather_sources, op.u_dim, signals, u, self.xp, self.dtype)
 
-    def substep_points(self, x, u, k, params, x_next, t_start, signals):
-        """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``; ``signals`` the tick's signal buffer."""
+    def points_of(self, x, x_next, path):
+        """``(S, n)``: the plant at its substep ends ``path``, every other block at the tick, the last row ``x_{k+1}``."""
         xp = self.xp
         dtype = self.dtype
         S = self.plan.dense_points
-        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
-        points = xp.tile(x_old, (S, 1))
         if S == 1:
             return xp.reshape(x_next, (1, -1))
 
-        params = self._frozen_params if params is None else params
-        t_k = t_start + k * self.sample_period
         op = self.plan.plant_op
-        local_u = self.plant_input_from(signals, u)
-        path = op.system.update_path(
-            x_old[op.local_x_slice], local_u, t_k, lookup(params, op.params_path)
-        )
+        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        points = xp.tile(x_old, (S, 1))
 
         # The plant at its substep ends, every other block at the tick
         points = assigned(xp, points, (slice(0, S), op.local_x_slice), path)
