@@ -624,6 +624,24 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         np.testing.assert_allclose(seen[0]["x_start"], expected, atol=1e-9)
         assert float(seen[0]["t_start"]) == pytest.approx(0.3)
 
+    def test_a_planner_with_a_start_set_is_refused(self):
+        from minilink.core.sets import BoxSet
+
+        problem = self.planner.problem
+        boxed = PlanningProblem(
+            sys=problem.sys,
+            cost=problem.cost,
+            tf=problem.tf,
+            x_start=np.array([0.5]),
+            X0=BoxSet(np.array([0.4]), np.array([0.6])),
+            U=problem.U,
+        )
+        planner = TrajectoryOptimizationPlanner(
+            boxed, n_steps=5, transcription="direct_collocation", backend="jax"
+        )
+        with pytest.raises(ValueError, match="point start"):
+            ModelPredictiveController(planner, delay=False)
+
     def test_a_failed_solve_keeps_the_last_plan(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]

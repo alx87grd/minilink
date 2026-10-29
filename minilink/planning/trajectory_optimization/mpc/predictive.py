@@ -556,10 +556,14 @@ def predicts(pv) -> bool:
 
 def require_point_start(problem):
     """Refuse a planner whose problem starts from a set or a law: the MPC binds a point."""
-    if problem.start_law is not None:
+    # Lazy import: the sets load with the core, this module with the planners
+    from minilink.core.sets import SingletonSet
+
+    if problem.start_law is not None or not isinstance(problem.X0, SingletonSet):
         raise ValueError(
             "the MPC binds the measured state to the plan's start: give the planner's "
-            "problem a point start (x_start), not a set or a law"
+            "problem a point start (x_start), not a set or a law (its X0 is "
+            f"{type(problem.X0).__name__}; a plan would start anywhere in it)"
         )
 
 
