@@ -41,19 +41,21 @@ lands. Last checked against the code: 2026-10-28.
 - **Workaround:** read the key back (`plant.params["m"]`) after a change.
 - **Fix:** a Later idea in TODO §6 (a `validate_params` hook on `System`).
 
-### A structural attribute edited after a JAX run is not seen until `clear_compiled()`
+### A class's method replaced after a JAX run is not seen until `clear_compiled()`
 - **Symptom:** the JAX convenience calls (`compute_trajectory`, `Simulator`,
-  `problem.compile`) reuse a compiled evaluator keyed by the blocks' structure. Plain
-  attributes (a `Sum`'s signs, a flag, a period), a law's `params` and the numbers of a model
-  a block holds (a computed-torque law's plant) are in the key; an attribute an equation
-  reads through another object (a lookup table held on a helper, a function stored on the
-  block, a module global) is not, so a run after editing it reuses the old trace.
-- **Reproduce:** a block whose `f` reads `self.table.gain` (a plain object without `params`),
-  run with `backend="jax"`, then `block.table.gain = 2.0` and run again: the old gain.
+  `problem.compile`) reuse a compiled evaluator keyed by the blocks' structure: each block's
+  identity and edit count (any attribute assigned on the block), its ports, the wiring, the
+  numbers and arrays it holds, a held model and a plain-data helper by value. Two edits stay
+  outside the key: a method replaced on the class (`Pendulum.f = new_f`), and a change deep
+  inside a rich object a block holds (an object holding other objects, where the key reads the
+  object's identity only).
+- **Reproduce:** `plant.compute_trajectory(backend="jax")`, then `type(plant).f = other_f` and
+  run again: the old `f`.
 - **Workaround:** `from minilink.core.compile.cache import clear_compiled; clear_compiled()`
-  after such an edit, or put the number in the block's `params`.
-- **Fix:** none planned; the compile-once plan's risk §6
-  ([compile-once](../plans/compile-once.md)).
+  after such an edit, or compile a handle of your own (`plant.compile(backend="jax")`); put a
+  number the equations read in the block's `params`.
+- **Fix:** none planned: the key cannot read a class or an arbitrary object graph without
+  guessing ([the night run's log](../reviews/2026-10-29-night-run-log.md), N-2).
 
 ### `copy.deepcopy` of a plant fails after a JAX simulation
 - **Symptom:** `plant.compute_trajectory(backend="jax")` then `copy.deepcopy(plant)` raises

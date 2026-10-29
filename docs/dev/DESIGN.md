@@ -871,11 +871,14 @@ tree is made the dtype and shape of the compiled default (`9`, `9.0`, `np.float6
 0-d array share one trace) and the tree is put on the device once per distinct value; a tree
 holding a leaf of more than 1000 numbers (a network's weights) always goes as an argument,
 never as constants. The convenience calls reuse a JAX evaluator through
-`compiled_of(system, backend)`, keyed by the structure a compile reads (blocks by identity,
-ports, wiring, clocks, plain attributes), never by parameter values, and pass
-`evaluator.call_params()`: `None` while the live values are the compiled ones, else the live
-tree, so a sweep of values through `compute_trajectory` compiles once. A structural attribute
-edited after a run is seen after `clear_compiled()`. The `jit` sits at the outermost pure
+`compiled_of(system, backend)`, keyed by the structure a compile reads: each block by
+identity and its edit count (`System.edits`, bumped by every assignment of an attribute but
+the block's values and run records), its ports, the wiring, the numbers and arrays a block
+holds by their bytes, a held model and a plain-data helper by value, the float policy; never
+by parameter values. They pass `evaluator.call_params()`: `None` while the live values are the
+compiled ones, else the live tree, so a sweep of values through `compute_trajectory` compiles
+once. A method replaced on a class, or a change deep inside a rich object a block holds, is
+seen after `clear_compiled()` (KNOWN_ISSUES). The `jit` sits at the outermost pure
 computation of each pipeline: the rollout (not `f`), the problem's trial function, the
 fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
 host SLSQP) calls jitted `f`, Jacobian, objective and gradient.

@@ -255,9 +255,11 @@ def flatten_any(tree, prefix=()):
 
 
 def leaf_bytes(leaf) -> bytes:
-    """What a digest reads of one leaf: a JAX array's identity (it is immutable), else its type, shape and bytes."""
+    """What a digest reads of one leaf: its type, shape and bytes (a JAX array's too); a traced value its identity."""
+    if is_tracer(leaf):
+        return b"tracer" + id(leaf).to_bytes(8, "little")
     if is_jax_value(leaf):
-        return b"jax" + id(leaf).to_bytes(8, "little")
+        leaf = np.asarray(leaf)
     if leaf is None or isinstance(leaf, (bool, str)):
         return repr(leaf).encode()
     if isinstance(leaf, (int, float, complex, np.ndarray, np.generic)):

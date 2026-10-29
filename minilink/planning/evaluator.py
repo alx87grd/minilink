@@ -1092,8 +1092,16 @@ def gather_samples(sources, signals, us, xp):
 
 
 def problem_parts(problem):
-    """The objects a trial's trace reads from the problem: its cost and its sets."""
-    return (problem.cost, problem.X, problem.U, problem.Xf)
+    """The objects a trial's trace reads from the problem: its cost, its sets, its start and its disturbances."""
+    return (
+        problem.cost,
+        problem.X,
+        problem.U,
+        problem.Xf,
+        problem.X0,
+        problem.start_law,
+        problem.disturbances,
+    )
 
 
 def horizon_of(problem, episode_length):

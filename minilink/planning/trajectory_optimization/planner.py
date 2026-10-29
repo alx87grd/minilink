@@ -464,8 +464,8 @@ class TrajectoryOptimizationPlanner(Planner):
             fingerprint(problem.sys),
             structure_of(problem),
             tree_digest(params_of(problem)),
-            repr(self.transcription.options),
-            repr(self.options),
+            structure_of(self.transcription.options),
+            structure_of(self.options),
         )
 
     def build_optimizer(

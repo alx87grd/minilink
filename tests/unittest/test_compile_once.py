@@ -147,11 +147,13 @@ def test_a_leaf_given_as_any_number_type_shares_one_trace():
         tree[leaf] = value
         n, _ = compiles(lambda: ev.rollout(X0, None, 0.0, 0.01, tree, n_steps=50))
         counts.append(n)
-    # The first JAX scalar compiles the tiny cast that makes it strong, once; the
-    # rollout itself traces once for every value
-    assert counts[0] == 1 and counts[1:4] == [0, 0, 0] and counts[4] <= 1
+    # The first new JAX scalar compiles the tiny cast that makes it strong, once (a
+    # JAX 9.0 equal to the NumPy 9.0 before it is a repeat); the rollout itself
+    # traces once for every value
+    assert counts[0] == 1 and counts[1:4] == [0, 0, 0]
     tree[leaf] = jax.numpy.asarray(8.0)
-    assert compiles(lambda: ev.rollout(X0, None, 0.0, 0.01, tree, n_steps=50))[0] == 0
+    n, _ = compiles(lambda: ev.rollout(X0, None, 0.0, 0.01, tree, n_steps=50))
+    assert counts[4] + n <= 1
 
     # A time given as an int or a float: the same trace
     ev.rollout(X0, None, 0.0, 0.01, n_steps=50)
@@ -281,14 +283,101 @@ def test_a_copy_never_shares_its_sources_evaluator():
     assert compiled_of(copy.copy(sampled), "jax") is not compiled_of(sampled, "jax")
 
 
-def test_a_structural_edit_is_seen_after_clear_compiled():
+def test_a_structural_edit_is_seen_without_clear_compiled():
     signs = Sum(signs=(1.0, -1.0), dim=1)
     ev = compiled_of(signs, "jax")
     u = np.array([2.0, 1.0])
     assert float(ev.outputs(np.zeros(0), u)["y"][0]) == 1.0
-    signs.signs = np.array([1.0, 1.0])
-    clear_compiled()
+    signs.signs[1] = 1.0  # in place: the array's bytes are in the key
     assert float(compiled_of(signs, "jax").outputs(np.zeros(0), u)["y"][0]) == 3.0
+
+
+# The edits the key sees: every case where a reused evaluator would be stale
+
+
+class Helper:
+    """A plain object a model holds: a lookup table."""
+
+    def __init__(self, gain):
+        self.gain = gain
+
+
+class Leak(DynamicSystem):
+    """``dx/dt = −k x + r(t)``, ``k`` on a helper and ``r`` a function stored on the block."""
+
+    def __init__(self):
+        super().__init__(1, input_dim=1)
+        self.x0 = np.array([0.0])
+        self.r = lambda t: 1.0
+        self.helper = Helper(1.0)
+        self.table = jax.numpy.array([1.0])
+
+    def f(self, x, u, t=0, params=None):
+        return -self.helper.gain * self.table[0] * x + self.r(t)
+
+
+def final(sys, backend):
+    run = dict(SIM, backend=backend, tf=1.0, n_steps=101)
+    return float(np.asarray(sys.compute_trajectory(**run).x)[0, -1])
+
+
+@pytest.mark.parametrize(
+    "edit",
+    [
+        lambda s: setattr(s, "r", lambda t: 5.0),  # a function swapped
+        lambda s: setattr(s, "r", lambda t: 2.0),  # and another: no id reuse
+        lambda s: setattr(s.helper, "gain", 10.0),  # inside a held helper
+        lambda s: setattr(s, "helper", Helper(0.1)),  # a helper swapped
+        lambda s: setattr(s, "table", jax.numpy.array([3.0])),  # a JAX array
+    ],
+)
+def test_an_edit_after_a_jax_run_is_seen_by_the_next(edit):
+    sys = Leak()
+    final(sys, "jax")
+    edit(sys)
+    assert final(sys, "jax") == pytest.approx(final(sys, "numpy"), rel=1e-9)
+
+
+def test_a_run_records_nothing_that_counts_as_an_edit():
+    plant = cartpole()
+    plant.compute_trajectory(**SIM)
+    n, _ = compiles(lambda: plant.compute_trajectory(**SIM))
+    assert n == 0
+
+
+def test_a_port_bound_is_part_of_the_key():
+    plant = cartpole()
+    first = compiled_of(plant, "jax")
+    plant.inputs["u"].nominal_value = np.array([1.0])
+    assert compiled_of(plant, "jax") is not first
+
+
+def test_a_class_method_replaced_is_seen_after_clear_compiled():
+    # The one edit the key cannot see: the class, not the block, changed
+    class Drift(DynamicSystem):
+        def __init__(self):
+            super().__init__(1, input_dim=1)
+            self.x0 = np.array([0.0])
+
+        def f(self, x, u, t=0, params=None):
+            return x * 0.0 + 1.0
+
+    sys = Drift()
+    final(sys, "jax")
+    Drift.f = lambda self, x, u, t=0, params=None: x * 0.0 + 2.0
+    clear_compiled()
+    assert final(sys, "jax") == pytest.approx(final(sys, "numpy"))
+
+
+def test_the_cache_drops_its_oldest_evaluator_beyond_its_size():
+    from minilink.core.compile.cache import CACHE_SIZE, COMPILED
+
+    plants = [Integrator() for _ in range(CACHE_SIZE + 1)]
+    first = compiled_of(plants[0], "jax")
+    for plant in plants[1:]:
+        compiled_of(plant, "jax")
+    assert len(COMPILED) <= CACHE_SIZE
+    assert compiled_of(plants[0], "jax") is not first
 
 
 def test_an_embedded_models_numbers_are_part_of_the_key():
