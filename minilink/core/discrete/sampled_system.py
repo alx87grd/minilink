@@ -164,7 +164,7 @@ class SampledSystem(StepSystem):
         params = self.params if params is None else params
 
         source = self.source
-        h = self.sample_period
+        dt = self.sample_period
         solver = self.solver
         substeps = self.substeps
 
@@ -173,13 +173,13 @@ class SampledSystem(StepSystem):
             return x
 
         if solver == "exact":
-            return exact_update(source, x, u, t, h, params)
+            return exact_update(source, x, u, t, dt, params)
 
         def f(x, u, t):
             return source.f(x, u, t, params)
 
-        # x(t + h) = Φ(x(t), u(t), t), the input held over [t, t + h]
-        x_next = step_body(f, x, u, u, t, h, solver, substeps)
+        # x(t + Δt) = Φ(x(t), u(t), t), the input held over [t, t + Δt]
+        x_next = step_body(f, x, u, u, t, dt, solver, substeps)
 
         return x_next
 
@@ -194,7 +194,7 @@ class SampledSystem(StepSystem):
         params = self.params if params is None else params
 
         source = self.source
-        h = self.sample_period
+        dt = self.sample_period
         solver = self.solver
         substeps = self.substeps
 
@@ -203,8 +203,8 @@ class SampledSystem(StepSystem):
         def f(x, u, t):
             return source.f(x, u, t, params)
 
-        # [x(t + h); c] = Φ([x(t); 0], u(t), t), the cost a state of its own
-        x_next, c = step_with_cost(f, rate, x, u, t, h, solver, substeps)
+        # [x(t + Δt); c] = Φ([x(t); 0], u(t), t), the cost a state of its own
+        x_next, c = step_with_cost(f, rate, x, u, t, dt, solver, substeps)
 
         return x_next, c
 
@@ -226,7 +226,7 @@ class SampledSystem(StepSystem):
         params = self.params if params is None else params
 
         source = self.source
-        h = self.sample_period
+        dt = self.sample_period
         solver = self.solver
         substeps = self.substeps
 
@@ -235,22 +235,22 @@ class SampledSystem(StepSystem):
         def f(x, u, t):
             return source.f(x, u, t, params)
 
-        # x(t + j h / s) for j = 1 … s, the input held over [t, t + h]
-        x_path = step_path(f, x, u, u, t, h, solver, substeps)
+        # x(t + j Δt / s) for j = 1 … s, the input held over [t, t + Δt]
+        x_path = step_path(f, x, u, u, t, dt, solver, substeps)
 
         return x_path
 
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
 
-        h = self.sample_period
+        dt = self.sample_period
 
         if self.counts:
             return self.source.step(x, u, k, params)
 
-        t_k = k * h
+        t_k = k * dt
 
-        # x_{k+1} = update(x_k, u_k, t_k), t_k = k h
+        # x_{k+1} = update(x_k, u_k, t_k), t_k = k Δt
         x_next = self.update(x, u, t_k, params)
 
         return x_next
@@ -427,7 +427,7 @@ def sampled_substeps(plant, sample_period) -> int:
 ###############################################################################
 
 
-def exact_update(source, x, u, t, h, params):
+def exact_update(source, x, u, t, dt, params):
     """``x(t + h) = A_d x + B_d u``, the exact hold of a linear model."""
     xp = array_module(x, u)
 
@@ -444,7 +444,7 @@ def exact_update(source, x, u, t, h, params):
         [xp.zeros((m, n)), xp.zeros((m, m))],
     ])
     # fmt: on
-    E = expm(M * h)
+    E = expm(M * dt)
     A_d = E[:n, :n]
     B_d = E[:n, n:]
 

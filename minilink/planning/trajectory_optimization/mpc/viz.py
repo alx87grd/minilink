@@ -195,10 +195,10 @@ def plant_trail_of(rollout, loop):
 
 
 def plant_states_of(rollout, loop):
-    """The plant's state slice of a sampled loop's run."""
-    start, end = loop.state_index["plant"]
+    """The plant's state slice of a sampled loop's run: the plan's plant, at any depth."""
+    plant_op = loop.compile().plan.plant_op
 
-    return rollout.x[start:end]
+    return rollout.x[plant_op.local_x_slice]
 
 
 def plan_history_of(rollout, mpc, loop, block):
