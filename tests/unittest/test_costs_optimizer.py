@@ -184,7 +184,7 @@ def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
     assert list(cost.terms) == ["QuadraticCost", "TimeCost", "QuadraticCost2"]
     assert cost.params["TimeCost"] == {
         "weight": 5.0,
-        "cost": {"xbar": obstacle.cost.xbar},
+        "cost": {"xbar": obstacle.cost.xbar, "eps": obstacle.cost.eps},
     }
 
     # A partial override changes its term only; the attributes are views

@@ -1484,12 +1484,12 @@ class TestLTISystem(unittest.TestCase):
         np.testing.assert_allclose(sys.f(x, u), np.array([-4.0, -0.2]))
         np.testing.assert_allclose(sys.h(x, u), np.array([7.5]))
 
-    def test_constant_matrices_ignore_params(self):
+    def test_the_matrices_are_the_params(self):
         sys = LTISystem(np.array([[2.0]]), np.array([[3.0]]))
-        np.testing.assert_allclose(
-            sys.f(np.array([4.0]), np.array([5.0]), params={"A": np.array([[0.0]])}),
-            np.array([23.0]),
-        )
+        x, u = np.array([4.0]), np.array([5.0])
+        np.testing.assert_allclose(sys.f(x, u), np.array([23.0]))
+        moved = {**sys.params, "A": np.array([[0.0]])}
+        np.testing.assert_allclose(sys.f(x, u, params=moved), np.array([15.0]))
 
     def test_rejects_invalid_dimensions(self):
         with self.assertRaisesRegex(ValueError, "A must be"):
