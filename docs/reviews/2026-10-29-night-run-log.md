@@ -103,6 +103,41 @@ steps/s, rocket 53 004 → 51 239); misses fixed in step 6: value iteration (`vi
 3.44 → **3.18** (the large-leaf check read once, `ab02eb65`); `readme_examples` 9.85 → 10.45
 (N-21). The rest within 3 %.
 
+**The final sweep** (`da27b503`; every demo the three versions share, 72 × 0.2.0 / pre-run
+`8db211c4` / tonight × 3 reps, median, M4 Max): no failure on any version; the total of the
+demos 482.4 s (0.2.0), 489.5 s (pre-run), 493.1 s (tonight), the difference the cart-pole RL
+demo's 3M steps (+18 s; its throughput 5 % faster). Against the better of 0.2.0 and the pre-run
+code:
+
+| Demo | 0.2.0 | pre-run | tonight | ratio |
+| --- | --- | --- | --- | --- |
+| `udes_racecar/mpc_racecar_kinematic` | 35.25 | 35.39 | 23.52 | 0.67 |
+| `udes_racecar/mpc_racecar_dynamic` | 23.39 | 22.74 | 17.48 (16.99 after the plant-once commit) | 0.77 |
+| `mpc/mpc_car_circuit` | 10.77 | 10.43 | 8.59 (8.42 after) | 0.82 |
+| `robotic/computed_torque_two_link` | 1.28 | 1.31 | 1.12 | 0.88 |
+| `analysis/analysis_region_of_attraction` | 2.57 | 2.57 | 2.39 | 0.93 |
+| `value_iteration/vi_double_pendulum_jax` | 37.83 | 37.36 | 37.09 | 0.99 |
+| `graphical/animation_renderers` | 20.34 | 20.89 | 20.19 | 0.99 |
+| `mpc/mpc_car_minimal` | 1.87 | 1.74 | 1.76 | 1.01 |
+| `compile/diagram_compiling` | 3.44 | 3.10 | 3.18 | 1.03 |
+| `rl/rocket_landing_rl` | 78.63 | 79.32 | 81.17 | 1.03 |
+| `trajopt/trajopt_cartpole_collocation_jax` | 2.20 | 2.21 | 2.32 | 1.06 |
+| `value_iteration/vi_pendulum_swingup` | 17.47 | 18.75 | 19.32 | 1.11 (1.03 against the pre-run code) |
+| `rl/drone_learn_to_fly_rl` | 7.32 | 7.50 | 8.29 | 1.13 |
+| `value_iteration/vi_minimum_time` | 2.71 | 2.91 | 3.07 | 1.13 (1.05 against the pre-run code) |
+| `value_iteration/vi_quadratic` | 5.67 | 6.30 | 6.56 | 1.16 (1.04 against the pre-run code) |
+| `core/diagram_nested_loop` | 0.75 | 0.77 | 0.87 | 1.16 (0.92 against 0.85 after the plant-once commit) |
+| `hybrid/sampled_smc_pendulum` | 0.64 | 0.67 | 0.77 | 1.20 (0.65 after the plant-once commit: faster than both) |
+| `core/readme_examples` | 8.47 | 10.01 | 10.59 | 1.25 (1.06 against the pre-run code, N-21) |
+| `rl/cartpole_swing_up_rl` | 44.97 | 44.85 | 63.03 | 1.41 (3M steps against 2M; per step 5 % faster) |
+
+The other 53 demos are within ±7 %. The gaps against 0.2.0 that the pre-run code already had
+(value iteration, `readme_examples`) are the v0.3 run's one score, not tonight's. The regression
+suites pass on all three versions (6 of 6 each); the v0.3 budget on tonight's code: the one score
+10.0 ms (reference 44 ms), the sampled loop 24.0 ms (93), the native MPC 36.7 ms (134), the
+parametric program 0.6 ms against the frozen 0.6, the gravity family 9.9 ms against the plain
+batch 10.1 (the mass family 70.1 ms, reported).
+
 The evening's first sweep (one rep, 72 demos × 0.2.0 / pre-run `8db211c4` / `7c21f63f`, M4 Max):
 every demo within about ±10 % except `mpc_car_circuit` 10.8 → 161 s and `mpc_racecar_dynamic`
 23.0 → 97.5 s (the animation re-solving the MPC per frame: fixed in `37c45da4`, 13.5 s and 17.9 s
@@ -152,3 +187,8 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 | 6 | The large-leaf check read once | `ab02eb65` | test_compile_once, test_simulation, test_engine |
 | 6 | `compile_parametric_program` warms the parametric form (the regression gate's `e4.bicycle_parametric.solve_s`) | `2a40c65a` | the e4 suite green (0.0085 s) |
 | 7 | The gate on `2a40c65a`'s parent, then the regression gate again | — | ruff; full `pytest` green; regression gates with the CI flags green (after `2a40c65a`); flagship demos and catalog `--fast` green; notebook smoke 34/34; docs build `-W` green |
+| 6 | A JAX program compiles nothing at construction; each consumer warms its form | `da27b503` | full `pytest`, regression gates, flagship 17 and catalog 50 green; baseline byte-identical |
+| 6 | The final sweep (§4) | — | 72 demos × 3 versions × 3 reps, no failure; regression suites 6/6 on each version; the budget within |
+| 6 | The dense run integrates its plant once per period | (the commit after the sweep) | test_sampled_loop, test_mpc, test_mppi, test_step_discrete, test_v03_core; baseline byte-identical |
+| 7 | The final gate on the last commit | — | ruff; full `pytest`; regression gates with the CI flags; flagship 17 (one interactive skipped); catalog 50; notebook smoke 34; docs build `-W`: all green |
+| 7 | `dev-v0.3-night` merged into `dev-v0.3` (`--no-ff`) | the merge | the gate above |
