@@ -158,7 +158,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
 
     def make_step(self, problem: PlanningProblem, backend: str):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""
-        f = dynamics_function(problem, backend)
+        f = dynamics_function(problem, backend, self.plant_evaluator(problem, backend))
         dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):

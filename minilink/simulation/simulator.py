@@ -9,7 +9,6 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.compile.cache import compiled_of
 from minilink.core.inspect import inspect_text
 from minilink.core.system import (
     AUTO_DT_SCALE,
@@ -175,7 +174,7 @@ class Simulator:
         # The initial state, checked
         self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
-        # Compile the system, or reuse its compiled form; the parameters it runs on
+        # Compile the system; the parameters it runs on
         # (None while they are the compiled ones)
         self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
         self.params = self.evaluator.call_params()
@@ -390,8 +389,8 @@ class Simulator:
         )
 
     def build_evaluator(self, sys, backend):
-        """``sys`` compiled with ``backend``: a JAX form reused while its structure is unchanged."""
-        return compiled_of(sys, backend)
+        """``sys`` compiled with ``backend``."""
+        return sys.compile(backend=backend)
 
     def parse_solver(self, solver):
         """``(backend key, options)`` of a solver label."""

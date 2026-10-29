@@ -1,4 +1,4 @@
-"""Compile once, in the form the call needs: repeats, sweeps and type changes cost no new compile."""
+"""Compile once, in the form the call needs: a held tool's repeats, sweeps and type changes cost no new compile."""
 
 import copy
 
@@ -18,14 +18,13 @@ from minilink import (  # noqa: E402
     Pendulum,
     PlanningProblem,
     QuadraticCost,
+    Simulator,
     StateFeedback,
-    Sum,
     System,
     TrajectoryOptimizationPlanner,
     lqr,
 )
 from minilink.core.backends import configure_jax  # noqa: E402
-from minilink.core.compile.cache import clear_compiled, compiled_of  # noqa: E402
 
 configure_jax(enable_x64=True)
 
@@ -64,23 +63,35 @@ def pendulum_problem(tf=2.0):
     )
 
 
-# A repeat costs no compile, pipeline by pipeline
+# A held tool's repeat costs no compile, pipeline by pipeline
 
 
-def test_a_repeated_simulation_compiles_nothing():
+def test_a_held_simulation_compiles_nothing_on_a_repeat():
     plant = cartpole()
     loop = lqr(plant, np.eye(4), np.eye(1)) @ plant
     sampled = (P(2.0) % 0.05) @ Integrator()
+    options = dict(tf=2.0, n_steps=201, solver="rk4_fixedsteps", backend="jax")
+    held = [
+        Simulator(plant, **options),
+        Simulator(plant, tf=2.0, solver="scipy", backend="jax"),
+        Simulator(loop, **options),
+    ]
+    ev = sampled.compile(backend="jax")
+    u = np.ones((20, 1))
     runs = [
-        lambda: plant.compute_trajectory(**SIM).x,
-        lambda: plant.compute_trajectory(**{**SIM, "solver": "scipy"}).x,
-        lambda: loop.compute_trajectory(**SIM).x,
-        lambda: sampled.compute_trajectory(tf=1.0, u=np.ones(1), backend="jax").x,
-        lambda: sampled.compute_rollout(20, u=np.ones(1), backend="jax").x,
+        *(lambda sim=sim: sim.solve().x for sim in held),
+        lambda: ev.rollout_dense(np.zeros(1), u, None, n_steps=20),
+        lambda: ev.rollout(np.zeros(1), u, None, n_steps=20),
     ]
     for run in runs:
         run()
         assert compiles(run)[0] == 0
+
+
+def test_a_convenience_call_compiles_each_time():
+    plant = cartpole()
+    plant.compute_trajectory(**SIM)
+    assert compiles(lambda: plant.compute_trajectory(**SIM).x)[0] > 0
 
 
 def test_a_repeated_evaluation_and_its_trajectory_compile_nothing():
@@ -169,20 +180,22 @@ def test_an_evaluation_override_of_any_number_type_shares_one_trace():
         assert compiles(lambda: pe.evaluate({"x_start": start}).objective)[0] == 0
 
 
-def test_a_parameter_sweep_through_the_simulation_compiles_once_and_reads_each_value():
+def test_a_parameter_sweep_through_a_held_evaluator_compiles_once_and_reads_each_value():
     plant = cartpole()
-    plant.compute_trajectory(**SIM)
-    name = next(iter(plant.params))
+    ev = plant.compile(backend="jax")
+    tree = copy.deepcopy(ev.params)
+    name = next(iter(tree))
+    ev.rollout(X0, None, 0.0, 0.01, tree, n_steps=200)
     total = 0
     for scale in (1.1, 1.2, 1.3):
-        plant.params[name] = scale * np.asarray(plant.params[name])
-        n, run = compiles(lambda: plant.compute_trajectory(**SIM).x)
+        tree[name] = scale * np.asarray(plant.params[name])
+        n, run = compiles(lambda: ev.rollout(X0, None, 0.0, 0.01, tree, n_steps=200))
         total += n
         twin = cartpole()
-        twin.params = copy.deepcopy(plant.params)
-        fresh = twin.compute_trajectory(**{**SIM, "backend": "numpy"}).x
+        twin.params = copy.deepcopy(tree)
+        fresh = twin.compute_trajectory(**{**SIM, "backend": "numpy"}).x.T
         np.testing.assert_allclose(run, fresh, rtol=1e-9, atol=1e-12)
-    assert total <= 1
+    assert total == 0
 
 
 def test_a_repeated_gradient_through_a_compiled_method_never_reuses_a_tracer():
@@ -266,33 +279,7 @@ def test_a_large_frozen_leaf_is_an_argument_not_a_constant():
     np.testing.assert_allclose(frozen, parametric, rtol=1e-12)
 
 
-# What the reuse is keyed by
-
-
-def test_a_loop_rebuilt_over_the_same_blocks_reuses_its_evaluator():
-    plant = cartpole()
-    law = lqr(plant, np.eye(4), np.eye(1))
-    assert compiled_of(law @ plant, "jax") is compiled_of(law @ plant, "jax")
-    assert compiled_of(law @ plant, "numpy") is not compiled_of(law @ plant, "numpy")
-
-
-def test_a_copy_never_shares_its_sources_evaluator():
-    plant = cartpole()
-    sampled = P(2.0) % 0.1
-    assert compiled_of(copy.deepcopy(plant), "jax") is not compiled_of(plant, "jax")
-    assert compiled_of(copy.copy(sampled), "jax") is not compiled_of(sampled, "jax")
-
-
-def test_a_structural_edit_is_seen_without_clear_compiled():
-    signs = Sum(signs=(1.0, -1.0), dim=1)
-    ev = compiled_of(signs, "jax")
-    u = np.array([2.0, 1.0])
-    assert float(ev.outputs(np.zeros(0), u)["y"][0]) == 1.0
-    signs.signs[1] = 1.0  # in place: the array's bytes are in the key
-    assert float(compiled_of(signs, "jax").outputs(np.zeros(0), u)["y"][0]) == 3.0
-
-
-# The edits the key sees: every case where a reused evaluator would be stale
+# A convenience call compiles each time, so it sees every edit
 
 
 class Helper:
@@ -338,22 +325,7 @@ def test_an_edit_after_a_jax_run_is_seen_by_the_next(edit):
     assert final(sys, "jax") == pytest.approx(final(sys, "numpy"), rel=1e-9)
 
 
-def test_a_run_records_nothing_that_counts_as_an_edit():
-    plant = cartpole()
-    plant.compute_trajectory(**SIM)
-    n, _ = compiles(lambda: plant.compute_trajectory(**SIM))
-    assert n == 0
-
-
-def test_a_port_bound_is_part_of_the_key():
-    plant = cartpole()
-    first = compiled_of(plant, "jax")
-    plant.inputs["u"].nominal_value = np.array([1.0])
-    assert compiled_of(plant, "jax") is not first
-
-
-def test_a_class_method_replaced_is_seen_after_clear_compiled():
-    # The one edit the key cannot see: the class, not the block, changed
+def test_a_class_method_replaced_is_seen_by_the_next_call():
     class Drift(DynamicSystem):
         def __init__(self):
             super().__init__(1, input_dim=1)
@@ -365,22 +337,10 @@ def test_a_class_method_replaced_is_seen_after_clear_compiled():
     sys = Drift()
     final(sys, "jax")
     Drift.f = lambda self, x, u, t=0, params=None: x * 0.0 + 2.0
-    clear_compiled()
     assert final(sys, "jax") == pytest.approx(final(sys, "numpy"))
 
 
-def test_the_cache_drops_its_oldest_evaluator_beyond_its_size():
-    from minilink.core.compile.cache import CACHE_SIZE, COMPILED
-
-    plants = [Integrator() for _ in range(CACHE_SIZE + 1)]
-    first = compiled_of(plants[0], "jax")
-    for plant in plants[1:]:
-        compiled_of(plant, "jax")
-    assert len(COMPILED) <= CACHE_SIZE
-    assert compiled_of(plants[0], "jax") is not first
-
-
-def test_an_embedded_models_numbers_are_part_of_the_key():
+def test_an_embedded_models_numbers_are_seen_by_the_next_call():
     from minilink.control.modelbased import ComputedTorque
 
     plant = Pendulum()
@@ -422,14 +382,6 @@ def test_a_parameter_edit_runs_on_a_diagram_holding_a_sink():
         diagram.compute_trajectory(**run, backend="numpy").x,
         rtol=1e-12,
     )
-
-
-def test_two_blocks_naming_each_other_have_a_fingerprint():
-    from minilink.core.compile.cache import fingerprint
-
-    first, second = Integrator(), Integrator()
-    first.other, second.other = second, first
-    assert fingerprint(first) == fingerprint(first)
 
 
 def test_a_new_horizon_before_a_solve_is_a_new_program():

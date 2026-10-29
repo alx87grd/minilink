@@ -411,7 +411,7 @@ class StepSimulation:
         require_run_solver(solver)
         h = self.sample_period
         n_steps = int(round((float(tf) - float(t_start)) / h))
-        ev = compiled_run_of(self, "numpy" if solver else backend, verbose)
+        ev = self.compile(backend="numpy" if solver else backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
         u_steps = u_samples[:, :n_steps].T
@@ -523,7 +523,7 @@ class StepSimulation:
         # A real cycle through minilink.core.system
         from minilink.core.trajectory import Trajectory
 
-        ev = compiled_run_of(self, backend, verbose)
+        ev = self.compile(backend=backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
 
@@ -550,17 +550,6 @@ class StepSimulation:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def compiled_run_of(system, backend, verbose):
-    """The evaluator a run verb steps: a fresh compile when verbose (it prints its stages), else the reused one."""
-    # Lazy import: the compiler imports the systems
-    from minilink.core.compile.cache import compiled_of
-
-    if verbose:
-        return system.compile(backend=backend, verbose=True)
-
-    return compiled_of(system, backend)
 
 
 def require_continuous_underneath(system):

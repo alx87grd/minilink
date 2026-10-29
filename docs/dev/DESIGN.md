@@ -876,23 +876,19 @@ a `bool` or `str` mode switch, which belongs on the constructor, R118), so the w
 `vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
 no parametric twin, no trace tier, no `jit` namespace.
 
-**Compile once, in the form the call needs** (`core/compile/cache.py`, the plan
-[compile-once](../plans/compile-once.md)). A compiled method has two forms behind its one
+**Compile once, in the form the call needs.** A compiled method has two forms behind its one
 name: `params=None` is the frozen form (the compiled values are constants of the trace, the
 fastest run of one fixed model), a tree is the parametric form (its leaves traced, so new
 values never retrace). Before the jitted call, every scalar argument and every leaf of the
 tree is made the dtype and shape of the compiled default (`9`, `9.0`, `np.float64(9.0)` and a
 0-d array share one trace) and the tree is put on the device once per distinct value; a tree
 holding a leaf of more than 1000 numbers (a network's weights) always goes as an argument,
-never as constants. The convenience calls reuse a JAX evaluator through
-`compiled_of(system, backend)`, keyed by the structure a compile reads: each block by
-identity and its edit count (`System.edits`, bumped by every assignment of an attribute but
-the block's values and run records), its ports, the wiring, the numbers and arrays a block
-holds by their bytes, a held model and a plain-data helper by value, the float policy; never
-by parameter values. They pass `evaluator.call_params()`: `None` while the live values are the
-compiled ones, else the live tree, so a sweep of values through `compute_trajectory` compiles
-once. A method replaced on a class, or a change deep inside a rich object a block holds, is
-seen after `clear_compiled()` (KNOWN_ISSUES). The `jit` sits at the outermost pure
+never as constants. A tool passes `evaluator.call_params()`: `None` while the live values are
+the compiled ones (the frozen form), else the live tree (the parametric form), so a value
+sweep on one tool compiles once. A convenience call (`compute_trajectory`, `problem.compile`,
+`closed_loop`) compiles each time, so it sees every edit; speed is a tool held by the user
+(`Simulator(sys, backend="jax")`, `pe = problem.compile(ctl)`, `planner.compile()`), built
+once and run many times (R168: no cache, no hidden registry). The `jit` sits at the outermost pure
 computation of each pipeline: the rollout (not `f`), the problem's trial function, the
 fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
 host SLSQP) calls jitted `f`, Jacobian, objective and gradient.

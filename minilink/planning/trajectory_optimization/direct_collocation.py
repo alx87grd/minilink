@@ -68,7 +68,9 @@ class DirectCollocationTranscription(Transcription):
             return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        dynamics = dynamics_function(problem, backend)
+        dynamics = dynamics_function(
+            problem, backend, self.plant_evaluator(problem, backend)
+        )
 
         # Dynamics: the trapezoidal defect of every interval vanishes
         equalities: list[ConstraintFunction] = [
@@ -140,7 +142,9 @@ class DirectCollocationTranscription(Transcription):
         u = np.asarray(u, dtype=float)
         t = np.asarray(self.options.t(problem), dtype=float)
         if dynamics is None:
-            dynamics = dynamics_function(problem, backend)
+            dynamics = dynamics_function(
+                problem, backend, self.plant_evaluator(problem, backend)
+            )
 
         # f_k = f(x_k, u_k, t_k) at every knot
         dx = np.zeros_like(x)

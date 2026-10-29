@@ -184,10 +184,8 @@ Why: [core-architecture.md](core-architecture.md) §1.
   controller's standard `params` dict (for example `{"Kp": …, "Kd": …, "model": {…}}`), the
   model hooks called with that subtree. Then a model mismatch is one parameter edit, the
   model's numbers sweep, draw and differentiate like any other leaf, and the compiled reuse
-  keys the law by structure alone (today a law holding its plant puts the plant's numbers in
-  the key, so a sweep of them through `ComputedTorque(plant) @ plant` compiles once per value:
-  the v0.3 run log's RD-66). Done when DESIGN's rule says so, the law tests and the robotic
-  demos run, and the compile-once cache no longer digests a held system's numbers.
+  traces the law once for every value of them. Done when DESIGN's rule says so, the law tests and the robotic
+  demos run.
 
 ### 1.2 The step algebra first-class
 
@@ -514,11 +512,10 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
   In the v0.3 run (step 7): DESIGN and ROADMAP §3 were brought up at each step, the
   gradient one-liner reads `allow_int=True`, the showcases run on the new API (RD-63) and the
   budget is `benchmarks/v03_budget.py` (RD-62); K4 and OD-32 stay the maintainer's.
-- [x] **Compile once, in the form the call needs** ([compile-once.md](compile-once.md)): a
-  repeated convenience call (a simulation, an evaluation, a solve, an MPC loop, an RL rollout)
-  costs no compile; a sweep of parameter values compiles once; `params=None` runs the frozen
-  form; the NumPy loops match `main`'s speed. Landed after the v0.3 run (the log's RD-65 to
-  RD-69); `benchmarks/compile_once.py` is its report.
+- [x] **Compile once, in the form the call needs** (DESIGN §5): a held tool's repeat (a
+  simulator, an evaluation, a solve, an MPC loop, an RL rollout) costs no compile; a sweep of
+  parameter values compiles once; `params=None` runs the frozen form; a convenience call
+  compiles each time (R168, no cache). `benchmarks/compile_once.py` is its report.
 - [ ] **The merge**:
   - every notebook moved to the new interface (R47) — done in the v0.3 run (step 7, RD-63; the
     MPC notebooks' prose and the SB3 runs are for the maintainer's review);

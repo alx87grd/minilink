@@ -11,7 +11,6 @@ from dataclasses import dataclass, field, replace
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
-from minilink.core.compile.cache import compiled_of, fingerprint, structure_of
 from minilink.core.params import merge_known, tree_digest
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
@@ -152,7 +151,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_optimization_result: OptimizationResult | None = None
         self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
-        # The offline program and its optimizer, kept with the key they were built on
+        # The offline program and its optimizer, kept with the key they were built on and
+        # the problem's parts the key names (held, so no identity in it is reused)
         self.offline = None
 
         # The compiled parametric program, its optimizer and its dynamics
@@ -245,7 +245,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # into its z0
         key = self.offline_key(problem)
         transcribe_t0 = time.perf_counter()
-        if key is None or self.offline is None or self.offline[0] != key:
+        if key is None or self.offline is None or self.offline[0][0] != key[0]:
             program = self.transcription.transcribe(
                 problem,
                 backend=backend,
@@ -379,7 +379,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.program_evaluator.warm_parametric()
 
         # The compiled plant that reads each tick's plan back, on the tick's numbers
-        self._dynamics = compiled_of(self.problem.sys, backend).f
+        self._dynamics = self.problem.sys.compile(backend=backend).f
 
         # The optimizer every online tick reuses
         self.optimizer_backend = self.build_parametric_optimizer_backend()
@@ -457,18 +457,34 @@ class TrajectoryOptimizationPlanner(Planner):
         return default_initial_trajectory(problem, t)
 
     def offline_key(self, problem):
-        """What an offline program is built from: the problem's structure and numbers, the transcription's and the planner's options (``None``: build every time)."""
+        """
+        What an offline program is built from, ``(key, parts)``: the problem's parts by identity, its horizon and its numbers (``None``: build every time).
+
+        The planner is built once and run many times: a part replaced on the
+        problem (its plant, cost or a set), a new horizon or new numbers build a
+        new program; an edit inside a part (a plant's method, a transcription's
+        options) needs a new planner. ``parts`` are held with the program, so no
+        identity in the key is reused while it is kept.
+        """
         params_of = getattr(self.transcription, "program_params", None)
         if params_of is None:
             return None
 
-        return (
-            fingerprint(problem.sys),
-            structure_of(problem),
-            tree_digest(params_of(problem)),
-            structure_of(self.transcription.options),
-            structure_of(self.options),
+        parts = (
+            problem.sys,
+            problem.cost,
+            problem.X,
+            problem.U,
+            problem.X0,
+            problem.Xf,
         )
+        key = (
+            tuple(id(part) for part in parts),
+            problem.tf,
+            tree_digest(params_of(problem)),
+        )
+
+        return key, parts
 
     def build_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
@@ -564,7 +580,11 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # One dynamics callable for every iterate (reconstruct_result would
         # otherwise compile the plant again on each optimizer step).
-        dynamics = dynamics_function(self.problem, backend)
+        dynamics = dynamics_function(
+            self.problem,
+            backend,
+            self.transcription.plant_evaluator(self.problem, backend),
+        )
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:

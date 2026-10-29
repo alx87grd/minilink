@@ -893,15 +893,14 @@ def require_static_law(controller):
 
 
 def compile_loop(loop, backend):
-    """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces; a JAX form reused."""
+    """``(backend, evaluator)`` of the loop: JAX when asked, or when ``"auto"`` and it traces."""
     # Lazy import: the compiler loads with the first evaluator
-    from minilink.core.compile.cache import compiled_of
     from minilink.core.compile.compiler import compile_auto
 
     if backend == "auto":
-        backend, evaluator = compile_auto(loop, reuse=True)
+        backend, evaluator = compile_auto(loop)
     else:
-        evaluator = compiled_of(loop, backend)
+        evaluator = loop.compile(backend=backend)
     if backend == BACKEND_JAX:
         ensure_jax_x64()
 

@@ -1,11 +1,11 @@
-"""Compile once, in the form the call needs: the first call, a repeat and the compile count of each JAX pipeline.
+"""Compile once, in the form the call needs: the first call, a repeat and the compile count of each held JAX tool.
 
     python benchmarks/compile_once.py [OUT.json]
 
-A report, not a gate (CPU, float64). Part 1, for each pipeline a convenience call reaches
-(a simulation, an evaluation, a trajectory optimization, a native MPC, value iteration, an RL
-rollout): the first call's seconds, a repeat's and the XLA compilations the repeat costs (0
-is the contract). Part 2, at the problem and the program layers: the parametric form (the
+A report, not a gate (CPU, float64). Part 1, for each pipeline's held tool (a simulator, a
+compiled loop, an evaluation, a trajectory optimization, a native MPC, value iteration): the
+first call's seconds, a repeat's and the XLA compilations the repeat costs (0 is the
+contract; a convenience call compiles each time). Part 2, at the problem and the program layers: the parametric form (the
 tree an argument, held on the device) against a frozen one (the tree closed over, constants
 of the trace); a frozen form is worth building at a layer only if it is steadily more than
 15 % faster.
@@ -26,6 +26,7 @@ from minilink import (
     Pendulum,
     PlanningProblem,
     QuadraticCost,
+    Simulator,
     StateFeedback,
     lqr,
 )
@@ -74,14 +75,18 @@ def timed(call):
 
 
 def pipelines():
-    """The convenience calls of each pipeline, by name."""
+    """The held tool of each pipeline, by name."""
     cart = CartPole()
     cart.x0 = np.array([0.1, 0.2, 0.0, 0.0])
     pend = Pendulum()
     cost = QuadraticCost.from_system(pend, R=0.1 * np.eye(1))
-    sim = dict(tf=5.0, n_steps=5001, solver="rk4_fixedsteps", verbose=False)
+    sim = dict(tf=5.0, n_steps=5001, solver="rk4_fixedsteps", backend="jax")
     loop = lqr(cart, np.eye(4), np.eye(1)) @ cart
     sampled = (lqr(cart, np.eye(4), np.eye(1)) % 0.01) @ cart
+    plant_sim = Simulator(cart, **sim)
+    scipy_sim = Simulator(cart, tf=2.0, solver="scipy", backend="jax")
+    loop_sim = Simulator(loop, **sim)
+    sampled_ev = sampled.compile(backend="jax")
 
     problem = PlanningProblem(
         pend, cost=cost, x_start=np.array([0.5, 0.0]), tf=5.0, U=pend.input_box
@@ -115,6 +120,7 @@ def pipelines():
         optimizer_options={"learning_rate": 0.05},
     )
     mpc_loop = (ModelPredictiveController(native) % 0.05) @ pend
+    mpc_ev = mpc_loop.compile(backend="jax")
     dp = DynamicProgrammingPlanner(
         PlanningProblem(
             pend, cost=cost, x_start=np.array([0.5, 0.0]), U=pend.input_box
@@ -129,19 +135,11 @@ def pipelines():
     )
 
     return {
-        "sim  plant.compute_trajectory (rk4)": lambda: (
-            cart.compute_trajectory(**sim, backend="jax").x
-        ),
-        "sim  plant.compute_trajectory (scipy)": lambda: (
-            cart.compute_trajectory(
-                tf=2.0, solver="scipy", backend="jax", verbose=False
-            ).x
-        ),
-        "sim  (lqr @ plant).compute_trajectory": lambda: (
-            loop.compute_trajectory(**sim, backend="jax").x
-        ),
-        "sim  sampled loop compute_trajectory": lambda: (
-            sampled.compute_trajectory(tf=5.0, backend="jax").x
+        "sim  Simulator(plant) (rk4)": lambda: plant_sim.solve().x,
+        "sim  Simulator(plant) (scipy)": lambda: scipy_sim.solve().x,
+        "sim  Simulator(lqr @ plant)": lambda: loop_sim.solve().x,
+        "sim  sampled loop, compiled": lambda: sampled_ev.rollout_dense(
+            sampled.x0, None, None, n_steps=500
         ),
         "eval pe.evaluate()": lambda: pe.evaluate().objective,
         "eval pe.evaluate(params)": lambda: pe.evaluate(pe.params).objective,
@@ -152,8 +150,8 @@ def pipelines():
         "opt  native planner.solve()": lambda: (
             native.solve(evaluate=False).trajectory.x
         ),
-        "mpc  (mpc % dt) @ plant compute_trajectory": lambda: (
-            mpc_loop.compute_trajectory(tf=1.0, backend="jax").x
+        "mpc  (mpc % dt) @ plant, compiled": lambda: mpc_ev.rollout_dense(
+            mpc_loop.x0, None, None, n_steps=20
         ),
         "dp   value iteration planner.solve()": lambda: dp.solve(evaluate=False),
     }

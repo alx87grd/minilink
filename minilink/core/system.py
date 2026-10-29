@@ -22,12 +22,6 @@ DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 # dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"]
 AUTO_DT_SCALE = 0.1
 
-# The attributes whose assignment is no edit of a block's structure: its values (the
-# compile reads them as parameters and starts) and its run records
-NOT_EDITS = frozenset(
-    {"edits", "params", "params_override", "x0", "own_x0", "hold_x0", "traj"}
-)
-
 # Integration steps per sample of a held signal on a smooth loop that declares
 # no time constant: the period itself is the resolution
 HELD_SIGNAL_STEPS_PER_SAMPLE = 1
@@ -88,16 +82,6 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
     #: Whether the block draws random numbers from a seed in its ``params``.
     is_random = False
-
-    #: How many times an attribute of the block's structure was assigned: the
-    #: compile-once key (:func:`~minilink.core.compile.cache.compiled_of`) reads it
-    edits = 0
-
-    def __setattr__(self, name, value):
-        """Set an attribute; assigning anything but the block's values and its run records counts as an edit of its structure."""
-        object.__setattr__(self, name, value)
-        if name not in NOT_EDITS and not name.startswith("last_"):
-            object.__setattr__(self, "edits", self.edits + 1)
 
     def __init__(self, n=0):
         """

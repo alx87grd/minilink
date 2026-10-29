@@ -10,7 +10,6 @@ from minilink.core.backends import (
     ensure_jax_x64,
     normalize_backend,
 )
-from minilink.core.compile.cache import compiled_of
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.sets import BoxInputSet, BoxSet, SingletonSet
 from minilink.core.trajectory import Trajectory
@@ -104,7 +103,9 @@ class ShootingTranscription(Transcription):
         """Roll out the optimized input sequence."""
         # The program's rollout, and the dynamics for the state rates
         rollout = self.make_rollout(problem, backend)
-        dynamics = dynamics_function(problem, backend)
+        dynamics = dynamics_function(
+            problem, backend, self.plant_evaluator(problem, backend)
+        )
 
         # The optimized input knots, and the states they roll out
         u = self.unpack(result.z, problem)
@@ -351,7 +352,7 @@ class ShootingTranscription(Transcription):
 
         # A compiled system without explicit params: its own integrator over the grid
         if key != BACKEND_DIRECT and nominal_plant_params(problem) is None:
-            evaluator = compiled_of(problem.sys, key)
+            evaluator = self.plant_evaluator(problem, key)
             params = evaluator.call_params()
 
             def rollout(u):
@@ -367,7 +368,7 @@ class ShootingTranscription(Transcription):
             return rollout
 
         # Direct mode or explicit system params: step the dynamics per knot
-        f = dynamics_function(problem, backend)
+        f = dynamics_function(problem, backend, self.plant_evaluator(problem, backend))
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:
