@@ -276,6 +276,15 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
+- **Path integral control:** `MPPIPlanner(problem, *, dt, n_samples, temperature, noise,
+  control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
+  JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
+  rolls each out on `RolloutEnvironment.step` (the one owner of the stage cost, the exit price
+  and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
+  weighted noise. Its compiled face (`n_z = N m + 1`, `shift` holding the last input,
+  `command` the held input, `predicts = False`) is the trajectory face, so
+  `ModelPredictiveController(MPPIPlanner(...))` runs in every form; `temperature`, `noise`,
+  `control_cost` are `params["method"]`, `seed` is `params["seed"]` with the tick folded in.
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
   delay=True, warm_start=True, lookahead=0.0, verbose=False)` closes a planner's compiled face `pv = planner.compile()` on the
   loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native

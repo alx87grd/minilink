@@ -899,21 +899,18 @@ pillar names it.
 
 **On the spine.**
 
-- [ ] **The path-integral planner (MPPI)** (S72) (a planner under the compiled-face contract of
-  [planner-and-mpc.md](planner-and-mpc.md), R148; the seed and the tick, R104; one plant draw by
-  default, R107), after the core's sampled loop and draws (§1.3, §1.5), its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
-  [mppi.md](mppi.md); the standalone prototypes `experimental/mppi/pendulum_mppi.py`
-  and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
-  `MPPIPlanner` / `MPPIRecord` (R106), its compiled face (mppi.md §6) on
-  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples; MP-0 first moves it to
-  `planning/environment.py`, the RL import kept, R108), the six-beat body of the plan's
-  §5; MP-2 the hand-loop demo
-  `experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
-  (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
-  criterion) and the fan of sampled futures as `solution.plot_samples()`. Done when the
-  seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic twin of the
-  stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the rebuilt MPC on MPPI) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
-  MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
+- [ ] **The path-integral planner (MPPI), the rest** (S72) (design [mppi.md](mppi.md)). Landed in the
+  night run of 2026-10-29: `MPPIPlanner` / `MPPIRecord` on the `minilink.planning` facade
+  (`planning/trajectory_optimization/path_integral.py`), its compiled face on
+  `RolloutEnvironment` (moved to `planning/environment.py`, R108), the `method` and `seed`
+  leaves (RD-54), the MPC in its three forms on it, the seeded-determinism, LQR-direction and
+  swing-up tests (`test_mppi.py`), the demos `examples/demos/mpc/mppi_pendulum.py` and
+  `mppi_racecar.py`. Rest: MP-3 the stochastic branch (`n_plant_samples` realizations per
+  control sample, mean or CVaR by the problem's criterion; today a stochastic problem plans on
+  its nominal with the deterministic planner's warning) and the fan of sampled futures as
+  `solution.plot_samples()` and `mpc_animation_overlays(samples=)`; the plan readers
+  (`mpc_plans_from_rollout`) for an input-only plan; MP-6 (the `loop` backend, DESIGN §6) with
+  V3.
 - [ ] **RL follow-ups** (C5):
   - [ ] **SAC actor step** (S50) **[ask]**: pre-update critic (today, kept for bit-identity) or
     updated critic (SB3, CleanRL). One line in `algorithms/sac.py`; re-measure

@@ -57,6 +57,16 @@ class CompiledTrajectoryPlanner:
         """The compiled defaults: the tree the plan depends on."""
         return self.transcription.program_params(self.problem)
 
+    @property
+    def predicts(self) -> bool:
+        """Whether the plan carries its states, so :meth:`prediction` reads ``x`` (collocation)."""
+        return isinstance(self.transcription, DirectCollocationTranscription)
+
+    @property
+    def knot_spacing(self) -> float:
+        """The time between the plan's knots: the model's step for a prediction."""
+        return float(self.offsets[1] - self.offsets[0])
+
     def initial(self, params=None):
         """The default guess in ``z`` form (``default_initial_trajectory``, packed), at ``params`` when they have values, else at the defaults."""
         problem = self.problem_at(params if has_values(params) else None)

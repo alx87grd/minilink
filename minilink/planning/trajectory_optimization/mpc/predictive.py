@@ -14,9 +14,6 @@ from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import NativeSampledSystem
 from minilink.core.params import lookup, with_leaf
 from minilink.core.system import System
-from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationTranscription,
-)
 
 # The default binding: the measured state on the input port y is the plan's start
 DEFAULT_INPUTS = {"x_start": "y"}
@@ -451,7 +448,7 @@ def predicted_start(pv, x, u_k, t, lookahead, params):
 
     f = pv.problem.sys.f
     plant = params["plant"] or None
-    spacing = float(pv.offsets[1] - pv.offsets[0])
+    spacing = pv.knot_spacing
     n_sub = max(1, int(np.ceil(4.0 * lookahead / spacing)))
 
     def dynamics(x, u, tau):
@@ -538,8 +535,8 @@ def measured_start(block, u):
 
 
 def predicts(pv) -> bool:
-    """Whether the plan carries its states, so the face predicts ``x`` (collocation)."""
-    return isinstance(pv.transcription, DirectCollocationTranscription)
+    """Whether the plan carries its states, so the face predicts ``x`` (its own word)."""
+    return pv.predicts
 
 
 def require_point_start(problem):
