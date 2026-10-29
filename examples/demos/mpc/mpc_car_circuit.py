@@ -8,7 +8,6 @@ from minilink import (
     QuadraticCost,
     TrajectoryOptimizationPlanner,
 )
-from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.core.geometry import Sphere
 from minilink.core.shaping import (
@@ -203,9 +202,9 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 18.0
 sys_sim.x0 = x0.copy()
 
-hybrid = (mpc % MPC_DT) @ discretize(sys_sim, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+hybrid = (mpc % MPC_DT) @ sys_sim
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(tf=TF_SIM)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(result, mpc, loop=hybrid, scene=scene, track=track)

@@ -82,9 +82,11 @@ class ProblemEvaluator:
         clock) runs on its own base period: ``dt`` omitted reads it, and a ``dt``
         that differs is refused.
     solver : {"rk4", "euler"}
-        Integration formula of one step.
-    substeps : int
-        Integration steps per sample period.
+        Integration formula of one step (a sampled loop: its plant's).
+    substeps : int, optional
+        Integration steps per sample period: 1 by default on a continuous loop;
+        on a sampled loop, the plant's steps per base period (``None`` is the
+        automatic step, ``⌈Δ / Δt⌉``, the continuous simulator's ``Δt``).
     backend : {"auto", "jax", "numpy"}
         ``"auto"`` is JAX when it is installed and the loop traces on it.
     episode_length : float, optional
@@ -98,27 +100,28 @@ class ProblemEvaluator:
         dt=None,
         *,
         solver="rk4",
-        substeps=1,
+        substeps=None,
         backend="auto",
         episode_length=None,
     ):
         require_one_of("backend", backend, BACKENDS)
         self.adaptive = adaptive_options(solver)
         if self.adaptive is None:
-            require_step_knobs(solver, substeps)
+            require_step_knobs(solver, 1 if substeps is None else substeps)
         else:
             backend = require_numpy_for_adaptive(backend)
 
         # The task and the loop that runs it: a continuous diagram, or a sampled
-        # loop on its own clock
+        # loop on its own clock, its plant integrated at the step asked
         self.problem = problem
         self.loop = closed_loop_of(problem, controller)
         self.sampled = is_sampled(self.loop)
         if self.sampled:
             dt = sampled_dt_of(self.loop, dt)
-            require_loop_knobs(solver, substeps, self.adaptive)
+            require_loop_knobs(self.adaptive)
+            self.loop = plant_stepped(self.loop, solver, substeps)
         self.solver = solver
-        self.substeps = int(substeps)
+        self.substeps = 1 if substeps is None else int(substeps)
 
         # The grid: N periods of dt to the horizon
         self.dt = float(require_dt(dt))
@@ -651,7 +654,7 @@ def evaluate(
     *,
     dt,
     solver="rk4",
-    substeps=1,
+    substeps=None,
     n_trials=None,
     key=0,
     record=False,
@@ -990,14 +993,25 @@ def sampled_dt_of(loop, dt):
     return base
 
 
-def require_loop_knobs(solver, substeps, adaptive):
-    """Refuse integration knobs on a sampled loop: its plant's solver and substeps are the plant block's."""
-    if adaptive is not None or solver != "rk4" or int(substeps) != 1:
+def require_loop_knobs(adaptive):
+    """Refuse an adaptive solver on a sampled loop: its plant steps a fixed number of times per period."""
+    if adaptive is not None:
         raise ValueError(
-            "a sampled loop integrates its plant as its plant block says "
-            "(discretize(plant, dt, solver=, substeps=)); leave solver and substeps "
-            "at their defaults"
+            "a sampled loop integrates its plant in fixed steps inside each period: "
+            "pass solver='rk4' or 'euler' and substeps="
         )
+
+
+def plant_stepped(loop, solver, substeps):
+    """The sampled loop with its plant at ``substeps`` steps of ``solver`` per period; as is when the knobs are the defaults."""
+    # Lazy import: the sampled diagram loads with the first sampled loop
+    from minilink.core.discrete.sampled_diagram import with_plant_steps
+
+    solver = None if solver == "rk4" else solver
+    if solver is None and substeps is None:
+        return loop
+
+    return with_plant_steps(loop, substeps=substeps, solver=solver)
 
 
 def require_dt(dt):

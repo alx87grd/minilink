@@ -100,7 +100,7 @@ def sampled_entry():
     """100 starts × 3000 base ticks of a digital PID on its clock."""
     _, problem = pendulum_task(30.0, spread_of_starts())
     pid = PID(Kp=2.0, Ki=0.1, Kd=0.5)
-    pe = problem.compile(pid % 0.01, backend="jax")
+    pe = problem.compile(pid % 0.01, substeps=1, backend="jax")
     params = pe.params
 
     seconds = best_time(lambda: pe.evaluate(params, n_trials=100).objective)
@@ -127,7 +127,7 @@ def mpc_entry():
     plant, task = pendulum_task(3.0, np.array([0.5, 0.0]))
     _, plan = pendulum_task(1.0, np.array([0.5, 0.0]))
     mpc = ModelPredictiveController(mpc_planner(plan, 20, 15))
-    pe = task.compile(mpc % 0.05, backend="jax")
+    pe = task.compile(mpc % 0.05, substeps=1, backend="jax")
     params = pe.params
 
     seconds = best_time(lambda: pe.evaluate(params).objective)

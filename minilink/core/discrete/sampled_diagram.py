@@ -8,7 +8,7 @@ from math import gcd
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.discrete.sampled_system import SampledSystem
+from minilink.core.discrete.sampled_system import SampledSystem, steps_per_period
 from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.wiring import (
@@ -103,12 +103,20 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return x_next
 
-    def compile(self, backend="numpy", verbose=False):
-        """Compile the sampled diagram into its stateless evaluator, the schedule in its plan."""
+    def compile(self, backend="numpy", verbose=False, *, substeps=None, solver=None):
+        """
+        Compile the sampled diagram into its stateless evaluator, the schedule in its plan.
+
+        ``substeps`` and ``solver`` choose the plant's integration inside each
+        base period (``None`` keeps the automatic step, ``⌈Δ / Δt⌉`` RK4 steps);
+        a diagram with no continuous plant takes neither.
+        """
         # Lazy import: a cycle, the compiler reads SampledDiagramSystem from here
         from minilink.core.compile.compiler import compile_sampled_diagram
 
-        return compile_sampled_diagram(self, backend=backend, verbose=verbose)
+        diagram = with_plant_steps(self, substeps=substeps, solver=solver)
+
+        return compile_sampled_diagram(diagram, backend=backend, verbose=verbose)
 
     def animate(self, traj=None, **options):
         """
@@ -227,6 +235,53 @@ def diagram_on_clock(diagram, dt):
     return clocked
 
 
+def with_plant_steps(diagram, *, substeps=None, solver=None):
+    """
+    The diagram with its plant integrated in ``substeps`` steps of ``solver`` per period: a view sharing every block.
+
+    ``None`` keeps each. The plant is the one continuous system on the base
+    clock, at any depth; the copy shares the blocks, their numbers and their
+    starts, so only the plant's integration step differs. A diagram with no
+    plant refuses the knobs: it has nothing integrated inside its periods.
+    """
+    if substeps is None and solver is None:
+        return diagram
+
+    stepped = replace_plant(diagram, substeps, solver)
+    if stepped is None:
+        raise ValueError(
+            f"{diagram.name} has no continuous plant: its blocks run on the clock "
+            "alone, there is no integration step to choose (dt=, substeps=, solver=)"
+        )
+
+    return stepped
+
+
+def plant_steps_of(diagram, dt=None, solver=None) -> dict:
+    """``{"substeps", "solver"}`` from a run's ``dt`` (the plant's step, ``⌈Δ / dt⌉`` per period) and ``solver``."""
+    substeps = None if dt is None else steps_per_period(diagram.sample_period, dt)
+
+    return {"substeps": substeps, "solver": solver}
+
+
+def replace_plant(diagram, substeps, solver):
+    """A shallow copy of ``diagram`` with its plant view restepped, at any depth; ``None`` when it holds no plant."""
+    for sys_id, sys in diagram.subsystems.items():
+        if isinstance(sys, SampledSystem) and sys.is_plant:
+            new = sys.with_steps(substeps=substeps, solver=solver)
+        elif isinstance(sys, WiredDiagramMixin):
+            new = replace_plant(sys, substeps, solver)
+        else:
+            continue
+        if new is None:
+            continue
+        stepped = copy.copy(diagram)
+        stepped.subsystems = {**diagram.subsystems, sys_id: new}
+        return stepped
+
+    return None
+
+
 def plant_run_of(loop, rollout, params=None):
     """
     ``(plant, run)``: the loop's plant and its run inside the loop's dense run, ``(None, None)`` with no plant.
@@ -252,9 +307,7 @@ def plant_run_of(loop, rollout, params=None):
     n_samples = rollout.t.size
 
     # S = the samples per period of this run: the dense run's substeps, a ticks run's one
-    period = float(loop.sample_period)
-    spacing = float(rollout.t[1] - rollout.t[0]) if n_samples > 1 else period
-    S = max(1, int(round(period / spacing)))
+    S = samples_per_period(rollout, loop.sample_period)
 
     # u_k = the plant's gathered input at tick k, held over the samples of its period
     # and, for the last tick, over the end sample
@@ -271,6 +324,15 @@ def plant_run_of(loop, rollout, params=None):
     x = rollout.x[op.local_x_slice]
 
     return plant, Trajectory(t=rollout.t, x=x, u=u)
+
+
+def samples_per_period(rollout, period) -> int:
+    """``S``, the samples per base period of a run: its own spacing read (the dense run's substeps, a ticks run's one)."""
+    n_samples = rollout.t.size
+    period = float(period)
+    spacing = float(rollout.t[1] - rollout.t[0]) if n_samples > 1 else period
+
+    return max(1, int(round(period / spacing)))
 
 
 def clock_periods(diagram):

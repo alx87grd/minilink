@@ -120,7 +120,7 @@ def pipelines():
         optimizer_options={"learning_rate": 0.05},
     )
     mpc_loop = (ModelPredictiveController(native) % 0.05) @ pend
-    mpc_ev = mpc_loop.compile(backend="jax")
+    mpc_ev = mpc_loop.compile(backend="jax", substeps=1)
     dp = DynamicProgrammingPlanner(
         PlanningProblem(
             pend, cost=cost, x_start=np.array([0.5, 0.0]), U=pend.input_box

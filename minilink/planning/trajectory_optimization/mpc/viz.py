@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from minilink.core.discrete.sampled_diagram import plant_run_of
+from minilink.core.discrete.sampled_diagram import plant_run_of, samples_per_period
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import (
@@ -328,8 +328,8 @@ def tick_solves_of(rollout, mpc, loop):
     path, block = solving_block_of(loop, mpc.pv)
     divisor = ev.operation_of(path).divisor
     x_slice, _ = nested_layout(loop)[path]
-    S = ev.plan.dense_points
     base = loop.sample_period
+    S = samples_per_period(rollout, base)
     t_start = float(rollout.t[0])
     n_ticks = (rollout.t.size - 1) // S
 

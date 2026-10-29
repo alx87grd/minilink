@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink import Pendulum, SlidingMode
-from minilink.analysis import discretize
 
 TF = 5.0
 SIM_DT = 0.001
@@ -18,8 +17,8 @@ ctl = SlidingMode(plant, **smc_params)
 ctl.inputs["r"].nominal_value = REF
 
 # The law on its clock, the plant integrated in substeps of SIM_DT between samples
-hybrid = (ctl % TS) @ discretize(plant, TS, substeps=round(TS / SIM_DT))
-hybrid.compute_trajectory(tf=TF)
+hybrid = (ctl % TS) @ plant
+hybrid.compute_trajectory(tf=TF, dt=SIM_DT)
 
 
 hybrid.plot_diagram()

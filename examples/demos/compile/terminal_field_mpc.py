@@ -45,14 +45,16 @@ def mpc_ended_by(cost):
 
 
 # The same short MPC, without and with the LQR value as its terminal cost
-short = problem.compile(mpc_ended_by(score) % DT, backend="jax")
-ended = problem.compile(mpc_ended_by(score + V.as_terminal_cost()) % DT, backend="jax")
+short = problem.compile(mpc_ended_by(score) % DT, substeps=1, backend="jax")
+ended = problem.compile(
+    mpc_ended_by(score + V.as_terminal_cost()) % DT, substeps=1, backend="jax"
+)
 print("short horizon, no terminal cost:", short.evaluate(short.params))
 print("short horizon, ended by V      :", ended.evaluate(ended.params))
 
 # The infinite-horizon law the terminal cost stands for, sampled at the same period: it
 # asks for more torque than the plant has, so its run is reported failed
-law = problem.compile(lqr(plant, Q, R) % DT, backend="jax")
+law = problem.compile(lqr(plant, Q, R) % DT, substeps=1, backend="jax")
 print("LQR at the same period         :", law.evaluate(law.params))
 
 ended.loop.plot_trajectory(ended.trajectory(ended.params))

@@ -170,6 +170,7 @@ def closed_loop(
     reads_plant_state = "x" in roles.measurements and observer is None
     plant_box = plant_box_with_state(plant) if reads_plant_state else plant
     loop_blocks = (controller, observer, filter, reference, disturbance, noise)
+    require_clock_on_the_computer(loop_blocks, plant)
     plant_box = on_the_loop_clock(loop_blocks, plant_box)
 
     # The controller and the plant, each under its role name, in their algebra
@@ -498,19 +499,44 @@ def on_the_loop_clock(blocks, plant):
     """A continuous plant in a loop with clocked blocks: the plant on the loop's base clock, else as is.
 
     ``sampled @ continuous`` is where the two algebras meet: the plant becomes
-    ``discretize(plant, Δ, substeps=n)``, ``Δ`` the greatest common divisor of
-    the clocked blocks' periods (the controller's, a filter's, a source's) and
-    ``n`` from the automatic step rule.
+    the loop's one continuous system, a view of kind ``"plant"`` on the base
+    clock ``Δ`` (the greatest common divisor of the clocked blocks' periods:
+    the controller's, a filter's, a source's), integrated by RK4 in
+    ``n = ⌈Δ / Δt⌉`` steps, ``Δt`` the continuous simulator's automatic step
+    (the run's ``dt=`` or the compile's ``substeps=`` choose another).
     """
     clocked = [b for b in blocks if isinstance(b, System) and kind_of(b) == "clocked"]
     if not clocked or kind_of(plant) != "continuous":
         return plant
 
     base = base_period_of([b.sample_period for b in clocked])
-    sampled = SampledSystem(plant, base, substeps=sampled_substeps(plant, base))
+    substeps = sampled_substeps(plant, base)
+    sampled = SampledSystem(plant, base, substeps=substeps, kind="plant")
     sampled.name = plant.name
 
     return sampled
+
+
+def require_clock_on_the_computer(blocks, plant) -> None:
+    """Refuse a clock on the plant side of a continuous law, and a tick law meeting a continuous plant with no clock."""
+    controller = blocks[0]
+    controller_kind = kind_of(controller)
+    plant_kind = kind_of(plant)
+    kinds = {kind_of(b) for b in blocks if isinstance(b, System)}
+    if controller_kind == "continuous" and plant_kind == "clocked":
+        raise TypeError(
+            f"{plant.name} is on a clock and {controller.name} is a continuous law: the "
+            "clock belongs to the computer, write (controller % dt) @ plant"
+        )
+    if (
+        controller_kind == "tick"
+        and plant_kind == "continuous"
+        and "clocked" not in kinds
+    ):
+        raise TypeError(
+            f"{controller.name} is a tick law: a tick law needs a clock to meet a "
+            f"continuous plant, write ({controller.name} % dt) @ {plant.name}"
+        )
 
 
 def plant_box_with_state(plant):

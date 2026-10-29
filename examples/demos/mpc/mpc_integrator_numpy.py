@@ -9,7 +9,6 @@ from minilink import (
     SingletonSet,
     TrajectoryOptimizationPlanner,
 )
-from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 
 
@@ -62,10 +61,10 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(planner, delay=False)
 
 # The MPC on its clock, the plant sampled at it with SIM_DT steps inside each period
-hybrid = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+hybrid = (mpc % MPC_DT) @ sys
 
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(tf=TF_SIM)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 if VERBOSE:
     start, end = hybrid.state_index["plant"]
     print(f"x(tf) = {result.x[start:end, -1]}, the goal {x_goal}")

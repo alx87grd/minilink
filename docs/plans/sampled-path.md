@@ -160,24 +160,37 @@ StepSystem                               pure tick: step(x, u, k, params); no cl
   expensive computation, with no change to the `StepSystem` contract: it needs one signal pass per
   tick in the step evaluators (planner-and-mpc.md §10).
 
-### 8.4 The operators; `sampled @ continuous` is where the worlds meet (R126, R145, R146)
+### 8.4 The loop's grammar: the plant continuous, the computer clocked (R174, R175)
 
-- **`%` is `discretize` with Euler** (R145): `sys % dt` is `discretize(sys, dt, solver="euler")`
-  for any system. A law with continuous states (a PID, a lead-lag, an observer) becomes its
-  difference equation, `z_{k+1} = z_k + dt·f(z_k, e_k)`; a static block and a `StepSystem` are
-  tagged with their period; a native sampled law gets its period. `discretize(sys, dt)` keeps RK4
-  as its default, for plants; `%` takes no `solver=`. Both return a `SampledSystem` and leave the
-  source unchanged.
-- **`>>`, `+` and `@` between step systems** have their continuous meaning, on the same assembly
-  code (`core/assembly.py`); the result is a `StepDiagramSystem`, or a `SampledDiagramSystem`
-  when a block is clocked.
-- **`sampled @ continuous` is the one place the two worlds meet:** the continuous plant becomes
-  `discretize(plant, Δ, substeps=n)` under the role name `plant`, and `computer @ plant` is a
-  `SampledDiagramSystem`; no loop class of its own. Every other mix of a continuous and a step
-  operand is refused, naming `%`.
-- **The step tools apply to the loop:** `jacobian` (and `wrt="t"` on a seconds face), the
-  linearization and the sampled-data loop's poles against the unit circle (for a multi-rate loop,
-  over one hyperperiod), `problem.compile`, `vmap`, `grad`.
+The five rules (the consolidation of 2026-10-29, which replaced "`%` is `discretize` with
+Euler"):
+
+1. **`%` means one thing:** this block runs on the computer at period `Δ`. A continuous law
+   becomes its Euler difference equation, a static block is sampled and held, a tick law gets
+   its clock, a box each block. The block's kind decides its third argument: a `System`
+   receives seconds `t_k = t_start + kΔ`, a `StepSystem` its own count `k`, a
+   `NativeSampledSystem` (a sampled-data law written in seconds) seconds, its period set at
+   construction (`%` on it refused). A static block in a pure step diagram receives `t = k`.
+   `block % Δ` is a `SampledSystem` of kind `"law"`, never integrated inside its period.
+2. **A sampled diagram holds at most one continuous system:** the plant, found by kind (the view
+   `(ctl % Δ) @ plant` wraps, kind `"plant"`), never by id; two are refused, "compose them
+   into one continuous system first".
+3. **`discretize(sys, Δ, solver=, substeps=)` is the textbook verb:** a discrete-time model
+   (kind `"model"`) for the discrete tools; never needed to close a loop, and a loop built on
+   one is a loop of step systems.
+4. **The dense run, the substeps and the host runner** exist exactly when the loop has a
+   continuous system; a loop of step systems has only its ticks.
+5. **Time:** seconds wherever there is a clock, the count where there is none (R158).
+
+The plant's integration step is the continuous simulator's rule, no exception: RK4 at
+`Δt = AUTO_DT_SCALE·τ_min`, `substeps = ⌈Δ / Δt⌉`; `dt=` at the run verbs and `substeps=` at
+the compiles choose another. `>>`, `+` and `@` between step systems keep their continuous
+meaning on the same assembly code. The refusals: `pid @ (plant % Δ)`, two continuous systems in
+a sampled diagram, `UnitDelay() @ plant` with no clock, a closed loop on the right of `>>`
+(`a >> b @ plant` binds `@` first), a bare tick law in a nested box slower than the loop.
+**The step tools apply to the loop:** `jacobian`, `linearize` (a `DiscreteLTISystem` with its
+period: the poles against the unit circle, `pzmap` in `z`, the Bode at `G(e^{jωΔ})`; for a
+multi-rate loop over its base tick), `problem.compile`, `vmap`, `grad`.
 
 ### 8.5 Two run verbs that agree; the dense path (R147)
 

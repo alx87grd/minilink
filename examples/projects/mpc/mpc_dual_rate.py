@@ -18,7 +18,6 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.planning.problems import PlanningProblem
@@ -72,11 +71,11 @@ planner = TrajectoryOptimizationPlanner(
 
 mpc = ModelPredictiveController(planner, delay=False)
 computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
-hybrid = computer @ discretize(sys, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT))
+hybrid = computer @ sys
 
 hybrid.plot_diagram()
 
-result = hybrid.compute_trajectory(tf=TF_SIM)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 if STEP_DISP:
     start, end = hybrid.state_index["plant"]
     print(f"{round(TF_SIM / MPC_DT)} solves; final state {result.x[start:end, -1]}")

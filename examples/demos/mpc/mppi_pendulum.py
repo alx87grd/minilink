@@ -4,7 +4,6 @@ import jax.numpy as jnp
 import numpy as np
 
 from minilink import CostFunction, Pendulum, PlanningProblem
-from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.planning import MPPIPlanner
 from minilink.planning.trajectory_optimization.mpc import plot_sampled_futures
@@ -42,8 +41,8 @@ planner = MPPIPlanner(problem, dt=DT, n_samples=K, temperature=LAMBDA, noise=SIG
 print(planner.solve().solver)
 
 mpc = ModelPredictiveController(planner, delay=False, verbose=True)
-loop = (mpc % DT) @ discretize(plant, DT)
-run = loop.compute_trajectory(tf=TF_SIM)
+loop = (mpc % DT) @ plant
+run = loop.compute_trajectory(tf=TF_SIM, dt=DT)
 loop.plot_trajectory()
 
 # The fan of sampled futures at three ticks: the angle against time, the plan in black

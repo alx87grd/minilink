@@ -14,7 +14,6 @@ from minilink import (  # noqa: E402
     PlanningProblem,
     QuadraticCost,
 )
-from minilink.analysis import discretize  # noqa: E402
 from minilink.control import ModelPredictiveController  # noqa: E402
 from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
     DoubleIntegrator,
@@ -130,16 +129,16 @@ def test_the_mpc_runs_mppi_in_every_form(form, kind):
     planner = swing_up_planner()
     mpc = ModelPredictiveController(planner, **form)
     assert isinstance(mpc, kind)
-    loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
-    run = loop.compute_trajectory(tf=0.5)
+    loop = (mpc % DT) @ planner.problem.sys
+    run = loop.compute_trajectory(tf=0.5, dt=DT)
     assert np.all(np.isfinite(run.x)) and run.has_signal("plant:u")
 
 
 def test_the_zero_delay_mppi_swings_the_pendulum_up():
     planner = swing_up_planner(n_samples=1024)
     mpc = ModelPredictiveController(planner, delay=False)
-    loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
-    run = loop.compute_trajectory(tf=6.0)
+    loop = (mpc % DT) @ planner.problem.sys
+    run = loop.compute_trajectory(tf=6.0, dt=DT)
     theta, dtheta = run.of("plant").x[:, -1]
     upright = np.arctan2(np.sin(theta - np.pi), np.cos(theta - np.pi))
     assert abs(upright) < 0.2 and abs(dtheta) < 0.5
@@ -166,8 +165,8 @@ def test_mppi_refuses_an_unboxed_input_and_a_ragged_horizon():
 def zero_delay_run(tf=0.5, verbose=False):
     planner = swing_up_planner()
     mpc = ModelPredictiveController(planner, delay=False, verbose=verbose)
-    loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
-    run = loop.compute_trajectory(tf=tf)
+    loop = (mpc % DT) @ planner.problem.sys
+    run = loop.compute_trajectory(tf=tf, dt=DT)
     return mpc, loop, run
 
 

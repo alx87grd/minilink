@@ -113,7 +113,6 @@ def step_diagram_entries(out):
 def hybrid_entries(out):
     """The hybrid demos' loops on the sampled loop: multi-rate filter and controller, sampled SMC, sampled PD."""
     from minilink import SlidingMode, Step, closed_loop
-    from minilink.analysis import discretize
 
     def plant_x(loop, traj):
         start, end = loop.state_index["plant"]
@@ -123,11 +122,11 @@ def hybrid_entries(out):
     for i in range(2):
         loop = closed_loop(
             P(10.0, ports="reference") % 0.1,
-            discretize(Integrator(), 0.01, substeps=5),
+            Integrator(),
             reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
             filter=DiscreteLowPass(alpha=0.6) % 0.01,
         )
-        traj = loop.compute_trajectory(tf=2.0)
+        traj = loop.compute_trajectory(tf=2.0, dt=0.002)
         out[f"hybrid.multi_rate.plant_x.{i}"] = plant_x(loop, traj)
         out[f"hybrid.multi_rate.loop_x.{i}"] = traj.x
 
@@ -136,16 +135,16 @@ def hybrid_entries(out):
     plant.x0 = np.array([np.pi + 0.25, 0.0])
     ctl = SlidingMode(plant, lam=2.0, gain=8.0, nab=0.15)
     ctl.inputs["r"].nominal_value = np.array([0.0, 0.0])
-    loop = (ctl % 0.05) @ discretize(plant, 0.05, substeps=50)
-    traj = loop.compute_trajectory(tf=1.0)
+    loop = (ctl % 0.05) @ plant
+    traj = loop.compute_trajectory(tf=1.0, dt=0.001)
     out["hybrid.smc.plant_x"] = plant_x(loop, traj)
     out["hybrid.smc.loop_x"] = traj.x
 
     # A sampled state feedback, the dense run
     plant = Pendulum()
     plant.x0 = X0.copy()
-    loop = (pd_controller() % 0.05) @ discretize(plant, 0.05, substeps=5)
-    traj = loop.compute_trajectory(tf=1.0)
+    loop = (pd_controller() % 0.05) @ plant
+    traj = loop.compute_trajectory(tf=1.0, dt=0.01)
     out["hybrid.pd.trajectory_x"] = plant_x(loop, traj)
 
 
@@ -156,7 +155,6 @@ def mpc_entries(out):
         SingletonSet,
         TrajectoryOptimizationPlanner,
     )
-    from minilink.analysis import discretize
     from minilink.control import ModelPredictiveController
 
     class SingleIntegrator(DynamicSystem):
@@ -196,8 +194,8 @@ def mpc_entries(out):
         verbose=False,
     )
     mpc = ModelPredictiveController(planner)
-    loop = (mpc % 0.2) @ discretize(plant, 0.2, substeps=20)
-    traj = loop.compute_trajectory(tf=1.0)
+    loop = (mpc % 0.2) @ plant
+    traj = loop.compute_trajectory(tf=1.0, dt=0.01)
     start, end = loop.state_index["plant"]
     out["mpc.integrator.x"] = traj.x[start:end]
 

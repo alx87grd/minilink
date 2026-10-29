@@ -267,7 +267,6 @@ def ur5_impedance() -> None:
 
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
-    from minilink.analysis import discretize
     from minilink.catalog import UdeSRacecarDyn
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
@@ -388,8 +387,8 @@ def racecar_mpc() -> None:
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d
 
-    lap = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / SIM_DT))
-    result = lap.compute_trajectory(tf=TF_SIM)
+    lap = (mpc % MPC_DT) @ car
+    result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
     # one sample per video frame: the trail's pages stay small
     frames = result.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
     traj = plant_run(frames, lap)

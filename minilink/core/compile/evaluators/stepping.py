@@ -11,6 +11,10 @@ from minilink.core.backends import array_module
 SOLVERS = ("rk4", "euler")
 HOLDS = ("zoh", "foh")
 
+# Substeps traced one by one under JAX up to this count; more run in a rolled loop,
+# so a plant at the automatic step (a thousand steps a period) traces as one body
+UNROLLED_SUBSTEPS = 64
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -43,6 +47,8 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
     """``x(t + dt)`` from ``x(t)``: ``substeps`` steps of ``solver``, the input linear from ``u0`` to ``u1``."""
     integrate = rk4 if solver == "rk4" else euler
     h = dt / substeps
+    if rolled(x, substeps):
+        return rolled_steps(integrate, f, x, u0, u1, t, h, substeps)[0]
 
     # The substeps, the input at their ends read off the line from u0 to u1
     for i in range(substeps):
@@ -103,6 +109,8 @@ def step_path(f, x, u0, u1, t, dt, solver, substeps):
     xp = array_module(x)
     integrate = rk4 if solver == "rk4" else euler
     h = dt / substeps
+    if rolled(x, substeps):
+        return rolled_steps(integrate, f, x, u0, u1, t, h, substeps)[1]
 
     # The substeps, each end kept, the input at their ends read off the line from u0 to u1
     path = []
@@ -115,6 +123,27 @@ def step_path(f, x, u0, u1, t, dt, solver, substeps):
     x_path = xp.stack(path)
 
     return x_path
+
+
+def rolled(x, substeps) -> bool:
+    """Whether the substeps run in a rolled loop: JAX arrays, more than :data:`UNROLLED_SUBSTEPS`."""
+    return substeps > UNROLLED_SUBSTEPS and array_module(x) is not np
+
+
+def rolled_steps(integrate, f, x, u0, u1, t, h, substeps):
+    """``(x(t + s h), [x(t + h), …, x(t + s h)])``: the substeps in one ``lax.scan``, the input read off the line from u0 to u1."""
+    # Lazy import: JAX loads with the first traced plant
+    import jax
+
+    def substep(x, i):
+        ua = u0 + (i / substeps) * (u1 - u0)
+        ub = u0 + ((i + 1) / substeps) * (u1 - u0)
+        x_next = integrate(f, x, ua, ub, t + i * h, h)
+        return x_next, x_next
+
+    x_end, path = jax.lax.scan(substep, x, np.arange(substeps, dtype=float))
+
+    return x_end, path
 
 
 def substeps_of(dt_hold, dt_inner=None):

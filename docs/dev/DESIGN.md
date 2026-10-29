@@ -92,7 +92,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
-| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
+| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ` and its `plot_pzmap` with the unit circle, R175), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `step_problems.py` and `step_face.py` (the step problem and the compiled step face), `results.py`, `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -186,9 +186,24 @@ rate; step and sampled systems live on sibling types and separate compile and si
 (`StepSystem` beside `DynamicSystem`), and nothing of theirs enters `DynamicSystem`, flow
 `compile()` or `Simulator`.
 
-**The sampled loop is a step diagram on a clock** (R146, R158). `sys % dt` is
-`discretize(sys, dt, solver="euler")`, a `SampledSystem` (a law with states becomes its
-difference equation; a static block and a tick law take the period). On a step diagram (a box
+**The sampled loop is a step diagram on a clock** (R146, R158, R174). `%` means one thing: this
+block runs on the computer at period `Δ`. The block's kind (its base class) decides what its
+third argument is, never the operator:
+
+| Block | `block % Δ` | Its third argument |
+| --- | --- | --- |
+| a continuous law (`System` with states) | its Euler difference equation, `z_{k+1} = z_k + Δ·f(z_k, e_k, t_k)` | seconds, `t_k = t_start + kΔ` |
+| a static block (`n = 0`) | sampled and held | seconds |
+| a tick law (`StepSystem`) | its clock | `k`, its own count of firings, never seconds or `Δ` |
+| a sampled-data law (`NativeSampledSystem`) | refused: its period is set at construction | seconds |
+| a box | each block on the clock | each block's own |
+
+A static block in a *pure* step diagram (no clock anywhere) receives `t = k`. `block % Δ` is a
+`SampledSystem` of kind `"law"`: never integrated inside its period (no substeps, no dense
+points, never adaptive). `discretize(sys, Δ, solver=, substeps=)` is the textbook verb, a
+discrete-time model (kind `"model"`) for the discrete tools (the step face, value iteration,
+the RL environment, z-domain analysis), never needed to close a loop: a loop built on one is a
+loop of step systems, which has only its ticks. On a step diagram (a box
 of tick laws and static blocks, the zero-delay MPC among them) `box % dt` clocks each block with
 its own face kept, a static block reading seconds and a tick law its count, and returns a
 `SampledDiagramSystem` of the same wiring and kind (`diagram_on_clock`); a box holding a clocked
@@ -198,8 +213,21 @@ code; the operands decide the algebra (`core/assembly.py`, `algebra_of`): a cloc
 makes a `SampledDiagramSystem`, a tick law a `StepDiagramSystem`, continuous and static operands
 a `DiagramSystem`; a static block joins any of them; a continuous operand with states beside a
 step one is refused, naming `%`, except `sampled @ continuous`, the one place the two worlds
-meet, where the plant becomes the plant on the controller's base clock (`plant` role,
-`discretize(plant, Δ, substeps=n)`, `n` from the automatic step rule). A
+meet, where the plant becomes the plant on the controller's base clock (`plant` role, a
+`SampledSystem` of kind `"plant"` the user never builds). Its integration step is the continuous
+simulator's, one rule: RK4 at `Δt = AUTO_DT_SCALE·τ_min` (the plant's
+`solver_info["smallest_time_constant"]`, the catalog default 1 ms), `substeps = ⌈Δ / Δt⌉`;
+`dt=` at the run verbs (`loop.compute_trajectory(tf, dt=0.01)`, `loop.compute_rollout(N,
+dt=0.01)`) and `substeps=` at the compiles (`loop.compile(substeps=20)`,
+`problem.compile(mpc % Δ, substeps=20)`) choose another, `solver=` beside them (`"rk4"`,
+`"euler"`; `"scipy"` the host runner). More than `UNROLLED_SUBSTEPS` substeps run in one rolled
+`lax.scan` under JAX. A sampled diagram holds at most one continuous system, found by kind,
+never by id: two are refused ("compose them into one continuous system first"). The refusals
+of the grammar, each naming the fix: a clocked plant under a continuous law
+(`pid @ (plant % Δ)`: write `(pid % Δ) @ plant`), a tick law meeting a continuous plant with no
+clock (`UnitDelay() @ plant`), a closed loop with its plant on the right of `>>`
+(`a >> b @ plant` binds `@` first: write `(a >> b) @ plant` or `closed_loop(b, plant, filter=a)`).
+A
 `SampledDiagramSystem`'s base period `Δ` is the greatest common divisor of its clocked blocks'
 periods (on a nanosecond grid); a block of divisor `d > 1` fires on `k mod d = 0`, its held
 outputs state slots after the blocks' states (`hold_index`); its compiled plan
@@ -209,12 +237,14 @@ outputs state slots after the blocks' states (`hold_index`); its compiled plan
 bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
 `where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
 for a rate names it (`filt % 0.01`); one inside a nested box clocked slower than the loop's base
-is refused at compile, since it would tick faster there than in its box alone. The loop's plant, whose substeps the dense run keeps and
-the host runner integrates adaptively, is the block integrated inside every base period (the
-one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
+is refused at compile, since it would tick faster there than in its box alone. The loop's plant
+(the one continuous system, at any depth) is what the dense run keeps the substeps of and the
+host runner integrates adaptively; the dense run, the substeps and the host runner exist exactly
+when the loop has one. Signals propagate within the tick (R125): a delay is a
 block. A run records signals from its own signal pass: `compute_trajectory(record=("path/block:port",
 …))` keeps each tick's value held over its period (the end sample the last tick's) in the
-trajectory's `signals`, and a loop with a plant always records `"plant:u"` and its `plant` role,
+trajectory's `signals`, `compute_rollout(record=)` the same at the ticks, and a loop with a
+plant always records `"plant:u"` and its `plant` role,
 so `traj.of("plant")`, the plots, the animation and the MPC overlays compute nothing again; the
 planning evaluator's run takes its signals from the same pass (`rollout_with_cost(signals=True)`).
 A continuous diagram's `record=` and `reconstruct_internal_signals(traj, ports=…)` evaluate
@@ -952,8 +982,8 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
   `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
   diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass;
   on a clock with a continuous plant underneath, `compute_trajectory(tf, u=None, *, x0=None,
-  t_start=0.0, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
-  `rollout_dense`, `(N·S + 1, n)`, `S` the plant block's substeps), equal to the ticks bit for
+  t_start=0.0, dt=None, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
+  `rollout_dense`, `(N·S + 1, n)`, `S` the plant's substeps, `⌈Δ / dt⌉` when `dt` is given), equal to the ticks bit for
   bit at the ticks, and `solver="scipy"` the host clock runner
   (`simulation/discrete/clock_runner.py`: the same blocks ticked on the host, the plant integrated
   by `solve_ivp` between the held inputs, NumPy), the cross-check; a tick law refuses it
@@ -1208,13 +1238,14 @@ from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
-`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=1, backend="auto")` closes
+`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto")` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once. The
 controller's kind decides the loop (R105): a continuous law runs the continuous diagram on the
 grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
-refused (D15), its plant's solver and substeps the plant block's; a tick law with no clock and
+refused (D15), `solver` and `substeps` its plant's integration per base period (`None`, the
+automatic step; a continuous loop's `substeps` is 1 by default); a tick law with no clock and
 the stateless MPC are refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
 plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,

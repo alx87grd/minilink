@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
-from minilink.analysis import discretize
 from minilink.catalog import UdeSRacecarDyn
 from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import (
@@ -149,9 +148,9 @@ car.params["mu"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 
-lap = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+lap = (mpc % MPC_DT) @ car
 # lap.plot_diagram()
-result = lap.compute_trajectory(tf=TF_SIM)
+result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 # lap.plot_trajectory()
 
 

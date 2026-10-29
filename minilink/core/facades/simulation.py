@@ -368,6 +368,7 @@ class StepSimulation:
         *,
         x0=None,
         t_start=0.0,
+        dt=None,
         solver=None,
         backend="numpy",
         record=None,
@@ -382,7 +383,8 @@ class StepSimulation:
         and every other block its state at the tick, the input held.
         ``solver="scipy"`` runs the host clock runner instead: the same blocks
         ticked on the host and the plant integrated adaptively between the
-        ticks, the cross-check (NumPy).
+        ticks, the cross-check (NumPy). A loop of step systems (no continuous
+        plant) has only its ticks: it refuses, naming :meth:`compute_rollout`.
 
         Parameters
         ----------
@@ -394,8 +396,14 @@ class StepSimulation:
             Initial state; defaults to :attr:`x0`.
         t_start : float
             The clock's origin.
-        solver : None or "scipy"
-            ``None``: the scan with its substeps; ``"scipy"``: the host clock runner.
+        dt : float, optional
+            The plant's integration step, ``⌈Δ / dt⌉`` steps per period (a loop
+            with a continuous plant); ``None`` is the automatic step,
+            ``AUTO_DT_SCALE`` times the plant's smallest time constant.
+        solver : None, "rk4", "euler" or "scipy"
+            ``None``: the scan with the plant's own formula (RK4); ``"rk4"`` or
+            ``"euler"``: the scan with that formula; ``"scipy"``: the host clock
+            runner.
         record : sequence of str, optional
             Signals kept from the run's own signal pass, in the trajectory's
             ``signals``: ``"path/block:port"`` (a block's output) or ``"plant:u"``.
@@ -411,7 +419,9 @@ class StepSimulation:
         require_run_solver(solver)
         h = self.sample_period
         n_steps = int(round((float(tf) - float(t_start)) / h))
-        ev = self.compile(backend="numpy" if solver else backend, verbose=verbose)
+        host = solver == "scipy"
+        run = stepped_view(self, dt, None if host else solver)
+        ev = run.compile(backend="numpy" if host else backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
         u_steps = u_samples[:, :n_steps].T
@@ -419,12 +429,12 @@ class StepSimulation:
 
         # What the run records: the named signals, and a loop's plant input
         plant_op = getattr(getattr(ev, "plan", None), "plant_op", None)
-        record = recorded_names(record, plant_op, solver)
+        record = recorded_names(record, plant_op, host)
         signals = {}
         roles = {}
 
         # The scan with its substeps, or the host runner on the same blocks
-        if solver is None and record:
+        if not host and record:
             xs, signals = ev.rollout_dense(
                 x0,
                 u_steps,
@@ -436,7 +446,7 @@ class StepSimulation:
             signals = {
                 name: np.asarray(v, dtype=float).T for name, v in signals.items()
             }
-        elif solver is None:
+        elif not host:
             xs = ev.rollout_dense(
                 x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
             )
@@ -444,7 +454,7 @@ class StepSimulation:
             # Tools import core (DESIGN §3): the host runner loads on first use
             from minilink.simulation.discrete.clock_runner import run_on_the_clock
 
-            xs = run_on_the_clock(self, u_steps, x0=x0, t_start=t_start, points=S)
+            xs = run_on_the_clock(run, u_steps, x0=x0, t_start=t_start, points=S)
 
         # t = t_start + (k + j/S) Δ, the input held over each period
         t = t_start + h * np.arange(n_steps * S + 1) / S
@@ -489,6 +499,8 @@ class StepSimulation:
         *,
         x0=None,
         t_start=0.0,
+        dt=None,
+        record=None,
         backend="numpy",
         show=False,
         verbose=False,
@@ -510,6 +522,12 @@ class StepSimulation:
             Initial state; defaults to :attr:`x0`.
         t_start : float
             The clock's origin, the time of the first tick (a system on a clock).
+        dt : float, optional
+            The continuous plant's integration step, as for :meth:`compute_trajectory`.
+        record : sequence of str, optional
+            Signals kept at the ticks from the run's own signal pass, as for
+            :meth:`compute_trajectory`; a loop with a plant always records
+            ``"plant:u"`` and its ``plant`` role.
         backend : str
             Backend passed to :meth:`compile`.
         show : bool
@@ -521,24 +539,61 @@ class StepSimulation:
             The ticks ``(t, x, u)``, also stored in :attr:`traj`.
         """
         # A real cycle through minilink.core.system
+        from minilink.core.compile.plan import PLANT_INPUT
         from minilink.core.trajectory import Trajectory
 
-        ev = self.compile(backend=backend, verbose=verbose)
+        run = stepped_view(self, dt)
+        ev = run.compile(backend=backend, verbose=verbose)
         x0 = x0 if x0 is not None else self.x0
         u_samples = ev.rollout_inputs_of(n_steps, u)
+        u_steps = u_samples[:, :n_steps].T
 
-        # x_{k+1} = step(x_k, u_k, k) for k = 0 … N − 1, at the ticks' times
-        xs = ev.rollout(
-            x0,
-            u_samples[:, :n_steps].T,
-            ev.call_params(),
-            n_steps=n_steps,
-            t_start=t_start,
-        )
+        # What the run records: the named signals, and a loop's plant input
+        plant_op = getattr(getattr(ev, "plan", None), "plant_op", None)
+        if record:
+            require_clocked_signals_to_record(self)
+        record = recorded_names(record, plant_op, False)
+        signals = {}
+        roles = {}
+
+        # x_{k+1} = step(x_k, u_k, k) for k = 0 … N − 1, at the ticks' times; a
+        # record keeps the ticks of the dense run, the same states bit for bit
+        if record:
+            S = ev.plan.dense_points
+            xs, dense = ev.rollout_dense(
+                x0,
+                u_steps,
+                ev.call_params(),
+                n_steps=n_steps,
+                t_start=t_start,
+                record=record,
+            )
+            xs = np.asarray(xs)[::S]
+            signals = {
+                name: np.asarray(v, dtype=float)[::S].T for name, v in dense.items()
+            }
+        else:
+            xs = ev.rollout(
+                x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
+            )
         k = np.arange(n_steps + 1, dtype=float)
         t = k if self.sample_period is None else t_start + k * self.sample_period
 
-        traj = Trajectory(t=t, x=np.asarray(xs, dtype=float).T, u=u_samples)
+        # The plant role: its state slice and its recorded input
+        if PLANT_INPUT in signals:
+            plant_slice = plant_op.local_x_slice
+            roles["plant"] = {
+                "x": (plant_slice.start, plant_slice.stop),
+                "u": PLANT_INPUT,
+            }
+
+        traj = Trajectory(
+            t=t,
+            x=np.asarray(xs, dtype=float).T,
+            u=u_samples,
+            signals=signals,
+            roles=roles,
+        )
         self.traj = traj
 
         if show:
@@ -572,11 +627,47 @@ def require_continuous_underneath(system):
 
 
 def require_run_solver(solver):
-    """Refuse a solver the dense run does not have: the scan (``None``) or the host runner (``"scipy"``)."""
-    if solver not in (None, "scipy"):
+    """Refuse a solver the dense run does not have: the scan (``None``, ``"rk4"``, ``"euler"``) or the host runner (``"scipy"``)."""
+    if solver not in (None, "rk4", "euler", "scipy"):
         raise ValueError(
-            f"solver must be None (the scan with its substeps) or 'scipy' (the host "
-            f"clock runner with an adaptive plant), got {solver!r}"
+            f"solver must be None, 'rk4' or 'euler' (the scan with its substeps) or "
+            f"'scipy' (the host clock runner with an adaptive plant), got {solver!r}"
+        )
+
+
+def stepped_view(system, dt=None, solver=None):
+    """The system with its continuous plant integrated at the step ``dt`` by ``solver``; itself when both are ``None``."""
+    # A real cycle through minilink.core.system
+    from minilink.core.discrete.sampled_diagram import (
+        SampledDiagramSystem,
+        plant_steps_of,
+        with_plant_steps,
+    )
+    from minilink.core.discrete.sampled_system import steps_per_period
+
+    if dt is None and solver is None:
+        return system
+    if isinstance(system, SampledDiagramSystem):
+        return with_plant_steps(system, **plant_steps_of(system, dt, solver))
+    if system.resolves:
+        substeps = None if dt is None else steps_per_period(system.sample_period, dt)
+        return system.with_steps(substeps=substeps, solver=solver)
+
+    raise ValueError(
+        f"{system.name} integrates no continuous system inside its period: it has no "
+        "integration step to choose (dt=, solver=)"
+    )
+
+
+def require_clocked_signals_to_record(system):
+    """Refuse a ticks-run record outside a sampled diagram: the signal pass it keeps is a sampled loop's."""
+    # A real cycle through minilink.core.system
+    from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+
+    if not isinstance(system, SampledDiagramSystem):
+        raise TypeError(
+            f"{system.name} is not a sampled diagram: record= keeps the signals of a "
+            "sampled loop's own signal pass ((block % dt) @ plant)"
         )
 
 
@@ -589,13 +680,13 @@ def require_signals_to_record(system):
         )
 
 
-def recorded_names(record, plant_op, solver) -> tuple:
+def recorded_names(record, plant_op, host) -> tuple:
     """The signals a dense run records: the names asked, and a loop's plant input first; none on the host runner."""
     # A real cycle: the plan imports the diagrams, which import these facades
     from minilink.core.compile.plan import PLANT_INPUT
 
     names = tuple(record or ())
-    if solver is not None:
+    if host:
         require_no_record(names)
         return ()
     if plant_op is not None and PLANT_INPUT not in names:

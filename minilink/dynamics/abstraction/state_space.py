@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import latex_inspect
 from minilink.core.system import DynamicSystem
 
@@ -176,6 +177,104 @@ class LTISystem(StateSpaceSystem):
 
     def _repr_latex_(self):
         return latex_inspect(self)
+
+
+class DiscreteLTISystem(StepSystem):
+    """Linear time-invariant difference equation with constant matrices::
+
+        x_{k+1} = A_d @ x_k + B_d @ u_k
+        y_k     = C_d @ x_k + D_d @ u_k
+
+    The discrete-time model of :func:`~minilink.analysis.linearization.linearize`
+    on a step or sampled system: its poles are read against the unit circle
+    (``|z| < 1`` is stable), its frequency response is ``G(e^{jωΔ})``.
+    ``period`` is the sample period ``Δ`` in seconds of the system it was taken
+    from, ``None`` for a tick law (its frequencies are then per tick, ``Δ = 1``);
+    it describes the model and puts it on no clock (``model % Δ`` does). The
+    matrices are its ``params`` (``{"A", "B", "C", "D"}``) and it carries its
+    operating point as :class:`LTISystem` does.
+    """
+
+    def __init__(
+        self,
+        A,
+        B,
+        C=None,
+        D=None,
+        *,
+        period=None,
+        name=None,
+        xbar=None,
+        ubar=None,
+        ybar=None,
+    ):
+        # The matrices: C = I and D = 0 when omitted
+        C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
+        D = (
+            zeros_on(B, (matrix_shape("C", C)[0], matrix_shape("B", B)[1]))
+            if D is None
+            else D
+        )
+        n, m, p = dimensions_of(A, B, C, D)
+        feedthrough = bool(np.any(np.asarray(D)))
+        super().__init__(
+            n=n,
+            input_dim=m,
+            output_dim=p,
+            y_dependencies=("u",) if feedthrough else (),
+        )
+        if name is not None:
+            self.name = name
+        self.period = None if period is None else float(period)
+
+        # Parameters: the four matrices
+        self.params = {"A": A, "B": B, "C": C, "D": D}
+
+        # The operating point the deviations are measured from
+        self.xbar = point_component(xbar, n, "xbar")
+        self.ubar = point_component(ubar, m, "ubar")
+        self.ybar = (
+            np.asarray(C, dtype=float) @ self.xbar
+            + np.asarray(D, dtype=float) @ self.ubar
+            if ybar is None
+            else point_component(ybar, p, "ybar")
+        )
+
+    def A(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["A"]
+
+    def B(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["B"]
+
+    def C(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["C"]
+
+    def D(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["D"]
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        # x_{k+1} = A_d x_k + B_d u_k
+        x_next = params["A"] @ x + params["B"] @ u
+
+        return x_next
+
+    def h(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        # y_k = C_d x_k + D_d u_k
+        y = params["C"] @ x + params["D"] @ u
+
+        return y
+
+    def __str__(self):
+        period = "per tick" if self.period is None else f"Δ = {self.period:g} s"
+        return f"{super().__str__()}\n  {period}\n{matrices_text(self)}"
 
 
 ###############################################################################

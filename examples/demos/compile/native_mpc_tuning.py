@@ -38,7 +38,7 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(planner)
 
 # The closed loop, one scan on JAX: J of the plan's weights
-pe = problem.compile(mpc % DT, backend="jax")
+pe = problem.compile(mpc % DT, substeps=1, backend="jax")
 start = pe.params
 print(pe.evaluate(start))
 

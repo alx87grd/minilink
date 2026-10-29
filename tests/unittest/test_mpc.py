@@ -11,7 +11,6 @@ import pytest
 
 matplotlib.use("Agg")
 
-from minilink.analysis import discretize
 from minilink.core.backends import configure_jax, require_jax_numpy
 from minilink.core.costs import QuadraticCost
 from minilink.core.system import DynamicSystem
@@ -431,9 +430,9 @@ class TestTheDelayedMPC(unittest.TestCase):
     def test_the_loop_applies_each_plan_one_period_late(self):
         mpc = self.mpc
         plant = self.planner.problem.sys
-        loop = (mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop = (mpc % DT) @ plant
         loop.subsystems["plant"].x0 = np.array([0.5])
-        run = loop.compute_rollout(5)
+        run = loop.compute_rollout(5, dt=DT / 4)
         start, end = loop.state_index["controller"]
         origins = run.x[start:end][-1]
         np.testing.assert_allclose(origins, [0.0, 0.0, 0.2, 0.4, 0.6, 0.8])
@@ -476,8 +475,8 @@ class TestTheDelayedMPC(unittest.TestCase):
     def test_the_plans_of_a_run_are_read_back_on_their_knots(self):
         mpc = self.mpc
         plant = self.planner.problem.sys
-        loop = (mpc % DT) @ discretize(plant, DT, substeps=4)
-        run = loop.compute_trajectory(tf=1.0)
+        loop = (mpc % DT) @ plant
+        run = loop.compute_trajectory(tf=1.0, dt=DT / 4)
         plans = mpc_plans_from_rollout(run, mpc, loop=loop)
         # One plan per solve, labelled by its origin (the tick-0 guess is no solve)
         assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8]
@@ -547,9 +546,11 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_the_loop_is_the_hand_loop_with_one_solve_per_tick(self):
         pv = self.pv
         plant = self.planner.problem.sys
-        loop = (self.mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop = (self.mpc % DT) @ plant
         loop.subsystems["plant"].x0 = np.array([0.5])
-        ev = loop.compile()  # the compile's own checks solve; the run is counted
+        ev = loop.compile(
+            substeps=4
+        )  # the compile's own checks solve; the run is counted
         with mock.patch.object(
             CompiledTrajectoryPlanner,
             "solve",
@@ -586,9 +587,9 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         # The run records the plant's input: the plant's run, the plan readers, the
         # overlays and the animation read the record, so a run solves once per tick
         plant = self.planner.problem.sys
-        loop = (self.mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop = (self.mpc % DT) @ plant
         loop.subsystems["plant"].x0 = np.array([0.5])
-        run = loop.compute_trajectory(tf=1.0)
+        run = loop.compute_trajectory(tf=1.0, dt=DT / 4)
         assert run.has_signal("plant:u") and "plant" in run.roles
         with mock.patch.object(
             CompiledTrajectoryPlanner,
@@ -657,8 +658,8 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_the_dual_rate_follower_gets_the_plan_at_the_slow_tick(self):
         follower = PlanFollower(self.planner)
         computer = (self.mpc % DT) >> (follower % 0.05)
-        loop = computer @ discretize(self.planner.problem.sys, 0.05)
-        run = loop.compute_trajectory(tf=0.6)
+        loop = computer @ self.planner.problem.sys
+        run = loop.compute_trajectory(tf=0.6, dt=0.05)
         plans = mpc_plans_from_rollout(run, self.mpc, loop=loop)
         assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]
         assert plant_run(run, loop).u.shape == (1, run.t.size)
@@ -757,11 +758,11 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         # The compile's shape probe does not run a native law's update (a solve)
         planner = integrator_planner(backend="numpy")
         mpc = ModelPredictiveController(planner)
-        loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
+        loop = (mpc % DT) @ planner.problem.sys
         with mock.patch.object(
             CompiledTrajectoryPlanner, "solve", autospec=True
         ) as solve:
-            loop.compile()
+            loop.compile(substeps=1)
         assert solve.call_count == 0
 
     def test_the_face_keeps_the_tree_it_was_compiled_with(self):
@@ -783,9 +784,9 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         planner = integrator_planner(backend="numpy")
         mpc = ModelPredictiveController(planner)
         plant = planner.problem.sys
-        loop = (mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop = (mpc % DT) @ plant
         loop.subsystems["plant"].x0 = np.array([0.5])
-        run = loop.compute_rollout(5)
+        run = loop.compute_rollout(5, dt=DT / 4)
         p0, p1 = loop.state_index["plant"]
         assert abs(run.x[p0:p1, -1][0] - 2.0) < 0.6
 
@@ -793,11 +794,11 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         def printed(verbose):
             planner = integrator_planner(backend="numpy")
             mpc = ModelPredictiveController(planner, delay=False, verbose=verbose)
-            loop = (mpc % DT) @ discretize(planner.problem.sys, DT, substeps=4)
+            loop = (mpc % DT) @ planner.problem.sys
             loop.subsystems["plant"].x0 = np.array([0.5])
             out = io.StringIO()
             with contextlib.redirect_stdout(out):
-                loop.compute_trajectory(tf=1.0)
+                loop.compute_trajectory(tf=1.0, dt=DT / 4)
             return [line for line in out.getvalue().splitlines() if "MPC @" in line]
 
         # Five ticks, one line each, at the ticks' times
@@ -873,8 +874,8 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
         planner = integrator_planner()
         mpc = ModelPredictiveController(planner)
         computer = (mpc % DT) >> (PlanFollower(planner) % 0.05)
-        loop = computer @ discretize(planner.problem.sys, 0.05)
-        run = loop.compute_trajectory(tf=0.6)
+        loop = computer @ planner.problem.sys
+        run = loop.compute_trajectory(tf=0.6, dt=0.05)
         plans = mpc_plans_from_rollout(run, mpc, loop=loop)
         assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]
 
@@ -883,8 +884,8 @@ def test_plant_run_carries_the_input_the_loop_fed_the_plant():
     from minilink import P, Integrator
     from minilink.planning.trajectory_optimization.mpc import plant_run
 
-    loop = (P(2.0, ports="reference") % 0.1) @ discretize(Integrator(), 0.1, substeps=2)
-    run = loop.compute_trajectory(tf=0.5, u=np.array([1.0]))
+    loop = (P(2.0, ports="reference") % 0.1) @ Integrator()
+    run = loop.compute_trajectory(tf=0.5, u=np.array([1.0]), dt=0.1 / 2)
     plant = plant_run(run, loop)
 
     # u = 2 (r − y) at each tick, held over its period and the last over the end
@@ -908,7 +909,7 @@ def test_plant_run_reads_open_ports_boxes_and_a_late_clock():
 
     # A command from a box: u = 3 · 2 (r − y) at each tick
     boxed = closed_loop((P(2.0) % 0.1) >> (Gain([3.0]) % 0.1), Integrator())
-    run = boxed.compute_trajectory(tf=0.5, u=np.array([1.0]))
+    run = boxed.compute_trajectory(tf=0.5, u=np.array([1.0]), dt=0.1)
     plant = plant_run(run, boxed)
     np.testing.assert_allclose(
         plant.u[0, :-1], 6.0 * (1.0 - plant.x[0, :-1]), atol=1e-12
@@ -917,7 +918,9 @@ def test_plant_run_reads_open_ports_boxes_and_a_late_clock():
 
     # A clock started late: the tick of a sample is its index
     late = (P(2.0) % 1e-3) @ Integrator()
-    run = late.compute_trajectory(tf=1e5 + 0.01, u=np.array([1.0]), t_start=1e5)
+    run = late.compute_trajectory(
+        tf=1e5 + 0.01, u=np.array([1.0]), t_start=1e5, dt=1e-3
+    )
     plant = plant_run(run, late)
     np.testing.assert_allclose(
         plant.u[0, :-1], 2.0 * (1.0 - plant.x[0, :-1]), atol=1e-12

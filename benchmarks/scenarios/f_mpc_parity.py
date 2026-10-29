@@ -17,7 +17,6 @@ from benchmarks.scenarios.common import (
 )
 from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
-from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -124,10 +123,10 @@ def run_hybrid_zoh() -> list[MetricRecord]:
     planner, sys, x0 = _bicycle_planner()
     mpc = ModelPredictiveController(planner)
     solves = TimedSolves(mpc.pv)
-    loop = (mpc % MPC_DT) @ discretize(sys, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+    loop = (mpc % MPC_DT) @ sys
 
     t0 = time.perf_counter()
-    result = loop.compute_trajectory(tf=TF_HYBRID)
+    result = loop.compute_trajectory(tf=TF_HYBRID, dt=SIM_DT)
     wall = time.perf_counter() - t0
     traj = plant_run(loop, result)
     assert_simulation_finite(traj)
@@ -194,12 +193,10 @@ def run_dual_rate() -> list[MetricRecord]:
     mpc = ModelPredictiveController(planner)
     solves = TimedSolves(mpc.pv)
     computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
-    loop = computer @ discretize(
-        sys, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT)
-    )
+    loop = computer @ sys
 
     t0 = time.perf_counter()
-    result = loop.compute_trajectory(tf=TF_HYBRID)
+    result = loop.compute_trajectory(tf=TF_HYBRID, dt=SIM_DT)
     wall = time.perf_counter() - t0
     traj = plant_run(loop, result)
     assert_simulation_finite(traj)

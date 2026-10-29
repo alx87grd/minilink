@@ -21,7 +21,6 @@ from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
 from minilink import BicycleDynRate
-from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
@@ -158,12 +157,10 @@ vehicle.x0[5] = 0.0
 vehicle.x0[6] = U_TARGET / r_r
 vehicle.x0[7] = 0.0
 
-hybrid = computer @ discretize(
-    plant, DT_BROADCAST, substeps=round(DT_BROADCAST / SIM_DT)
-)
+hybrid = computer @ plant
 
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(tf=TF_SIM, verbose=True)
+result = hybrid.compute_trajectory(tf=TF_SIM, verbose=True, dt=SIM_DT)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(

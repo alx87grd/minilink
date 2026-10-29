@@ -24,7 +24,7 @@ problem = PlanningProblem(plant, cost=cost, tf=TF)
 
 # The digital PID: its difference equation on a 100 Hz clock, closed on the plant
 pid = PID(Kp=1.0, Ki=0.0, Kd=1.0)
-pe = problem.compile(pid % DT)
+pe = problem.compile(pid % DT, substeps=1)
 start = pe.params
 start["r"] = np.array([R_REF])
 print(pe.evaluate(start))

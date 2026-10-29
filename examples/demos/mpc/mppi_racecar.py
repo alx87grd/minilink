@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, UdeSRacecar
-from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
@@ -72,8 +71,8 @@ planner = MPPIPlanner(
     control_cost=ALPHA,
 )
 mpc = ModelPredictiveController(planner, delay=False, verbose=True)
-loop = (mpc % DT) @ discretize(car, DT, substeps=round(DT / SIM_DT))
-run = loop.compute_trajectory(tf=TF)
+loop = (mpc % DT) @ car
+run = loop.compute_trajectory(tf=TF, dt=SIM_DT)
 loop.plot_trajectory()
 # loop.animate()
 

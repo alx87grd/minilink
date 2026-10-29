@@ -105,12 +105,12 @@ def test_sampled_at_continuous_is_the_hand_written_loop(backend):
     plant = Pendulum()
     plant.x0 = np.array([0.3, 0.0])
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)
-    loop = (pid % dt) @ discretize(plant, dt)
+    loop = (pid % dt) @ plant
     assert isinstance(loop, SampledDiagramSystem)
     a, b = loop.state_index["plant"]
     c, d = loop.state_index["controller"]
 
-    run = loop.compute_rollout(50, backend=backend)
+    run = loop.compute_rollout(50, dt=dt, backend=backend)
 
     # e_k = r − θ_k, the PID's difference equation, the plant one RK4 period on
     sampled_plant = discretize(plant, dt)
@@ -253,21 +253,17 @@ def test_the_seconds_face_is_the_evaluators_step():
 
 
 @pytest.mark.parametrize(
-    "loop",
+    "loop, dt",
     [
-        lambda: multi_rate_computer_on_an_integrator(),
-        lambda: (
-            (SlidingModeOf(Pendulum()) % 0.05)
-            @ discretize(Pendulum(), 0.05, substeps=10)
-        ),
+        (lambda: multi_rate_computer_on_an_integrator(), None),
+        (lambda: (SlidingModeOf(Pendulum()) % 0.05) @ Pendulum(), 0.005),
     ],
 )
-def test_the_host_runner_agrees_on_the_hybrid_demos(loop):
+def test_the_host_runner_agrees_on_the_hybrid_demos(loop, dt):
     loop = loop()
-    dense = loop.compute_trajectory(tf=1.0, u=np.ones(loop.m) if loop.m else None)
-    host = loop.compute_trajectory(
-        tf=1.0, u=np.ones(loop.m) if loop.m else None, solver="scipy"
-    )
+    u = np.ones(loop.m) if loop.m else None
+    dense = loop.compute_trajectory(tf=1.0, u=u, dt=dt)
+    host = loop.compute_trajectory(tf=1.0, u=u, dt=dt, solver="scipy")
     np.testing.assert_allclose(host.x, dense.x, atol=1e-6)
 
 
@@ -296,24 +292,47 @@ def test_a_block_with_nothing_to_integrate_has_one_point_per_period(block):
     np.testing.assert_array_equal(host.x, ticks.x)
 
 
-def test_the_plant_is_the_continuous_block_on_the_base_clock_whatever_its_id():
+def test_the_plant_is_found_by_kind_never_by_id():
+    # A model (discretize) in a chain is a step system: ticks only, no plant
     chain = (Sine() % 0.05) >> discretize(Pendulum(), 0.05, substeps=5)
-    assert "plant" not in chain.subsystems
+    assert chain.compile().plan.plant_op is None
+    assert chain.compute_trajectory(tf=0.5).x.shape[1] == 10 + 1
+
+    # The continuous plant a loop closes on is its plant, at any depth
+    inner = (PID(Kp=8.0, Ki=1.0, Kd=2.0) % 0.01) @ Pendulum()
+    cascade = (PID(Kp=1.0) % 0.05) @ inner
+    plan = cascade.compile(substeps=5).plan
+    assert plan.plant_op.label == "plant/plant"
+    assert plan.dense_points == 5
+
+
+def test_two_continuous_systems_in_a_sampled_diagram_are_refused():
+    both = SampledDiagramSystem()
+    both.add_subsystem((PID(Kp=1.0) % 0.01) @ Integrator(), "a")
+    both.add_subsystem((PID(Kp=1.0) % 0.01) @ Integrator(), "b")
+    with pytest.raises(ValueError, match="compose them into one continuous system"):
+        both.compile()
+
+
+def test_a_chain_of_two_euler_laws_is_a_computer_with_no_plant():
+    chain = (PID(Kp=1.0, Ki=1.0) % 0.01) >> (LowPass() % 0.01)
     ev = chain.compile()
-    assert ev.plan.dense_points == 5
+    assert ev.plan.plant_op is None
+    run = chain.compute_trajectory(tf=0.1, u=np.ones(chain.m))
+    np.testing.assert_array_equal(
+        run.x, chain.compute_rollout(10, u=np.ones(chain.m)).x
+    )
 
-    dense = chain.compute_trajectory(tf=0.5)
-    host = chain.compute_trajectory(tf=0.5, solver="scipy")
-    assert dense.x.shape[1] == 10 * 5 + 1
-    np.testing.assert_allclose(host.x, dense.x, atol=1e-7)
 
-
-def test_several_continuous_blocks_and_none_named_plant_are_refused():
-    loop = SampledDiagramSystem()
-    loop.add_subsystem(discretize(Integrator(), 0.01, substeps=2), "a")
-    loop.add_subsystem(discretize(Integrator(), 0.01, substeps=3), "b")
-    with pytest.raises(ValueError, match="'plant'"):
-        loop.compile().plan.dense_points
+def test_the_run_step_sets_the_plants_substeps():
+    loop = a_digital_pid_on_a_pendulum()
+    assert loop.subsystems["plant"].substeps == 20
+    run = loop.compute_trajectory(tf=0.1, dt=0.002)
+    assert run.t.size == 10 * 5 + 1
+    assert loop.compile(substeps=5).plan.dense_points == 5
+    np.testing.assert_array_equal(loop.compute_rollout(10, dt=0.002).x, run.x[:, ::5])
+    with pytest.raises(ValueError, match="no continuous plant"):
+        ((PID() % 0.01) >> (LowPass() % 0.01)).compile(substeps=4)
 
 
 def test_a_static_box_joins_a_sampled_loop():
@@ -364,8 +383,8 @@ def test_animating_a_loop_reads_the_recorded_plant_input():
     plant = Pendulum()
     plant.x0 = np.array([0.3, 0.0])
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)
-    loop = (pid % 0.05) @ discretize(plant, 0.05, substeps=5)
-    run = loop.compute_trajectory(tf=1.0)
+    loop = (pid % 0.05) @ plant
+    run = loop.compute_trajectory(tf=1.0, dt=0.01)
     port = pid.outputs["u"]
     original = port.compute
     calls = []
@@ -475,9 +494,9 @@ def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
     # floating point; the runner's grid ends on the period exactly
     plant = Pendulum()
     plant.x0 = np.array([0.3, 0.0])
-    loop = (PID(Kp=8.0, Ki=1.0, Kd=2.0) % 0.05) @ discretize(plant, 0.05, substeps=3)
-    host = loop.compute_trajectory(tf=0.2, solver="scipy")
-    dense = loop.compute_trajectory(tf=0.2)
+    loop = (PID(Kp=8.0, Ki=1.0, Kd=2.0) % 0.05) @ plant
+    host = loop.compute_trajectory(tf=0.2, dt=0.05 / 3, solver="scipy")
+    dense = loop.compute_trajectory(tf=0.2, dt=0.05 / 3)
     assert host.t.shape == dense.t.shape
     np.testing.assert_allclose(host.x, dense.x, atol=1e-4)
 

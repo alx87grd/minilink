@@ -190,6 +190,76 @@ they differ:
 - **C-20 (step 5) A region start's default** (the amendment): the bounding box's centre when
   finite and inside, else `sys.x0` when inside, else a refusal naming `x_start` (before:
   `sys.x0`, refused when outside).
+- **C-21 (step 5, found in step 6) The guess's target inside `X`.** C-19 aimed the straight-line
+  guess at the cost's `xbar` even when `xbar` lies outside the state constraint `X`; an MPC test
+  (`X` a ball of radius 0.5, `xbar = 2`) then left the solver infeasible. `goal_point()` now
+  takes `xbar` only when `X` contains it, else the start. Landed in the step 6 commit.
+- **C-22 (step 6) What a clock made of its source is the view's `kind`.** `SampledSystem.kind`
+  is `"law"` (`block % Δ`), `"model"` (`discretize`) or `"plant"` (the view `closed_loop`
+  wraps on the loop's base clock; never the user's). The plan's `plant_op` reads `kind ==
+  "plant"`; `resolves` is false on a law, so `pid % Δ` alone is never integrated inside its
+  period and a chain of two Euler laws is a computer with no plant. A loop wired by hand
+  (`SampledDiagramSystem.add_subsystem`) on a `discretize`d model is a loop of step systems,
+  ticks only: there is no public way to hand-wire a continuous plant into a sampled diagram
+  (`@` or `closed_loop` wraps it). **To raise:** whether a hand-wired loop needs one
+  (`SampledDiagramSystem.add_plant(plant, "plant")`, say).
+- **C-23 (step 6) The continuous simulator's held-signal grid stays.** The plan removes
+  `HELD_SIGNAL_STEPS_PER_SAMPLE`, the loop's exception (one step per period for a plant that
+  declares no time constant); it is gone from the sampled loop. The continuous `Simulator`
+  read the same constant for a held source (a `WhiteNoise` or a sampled policy in a continuous
+  diagram): removing it there too would move the numbers of the noise demos and notebooks
+  (`lqg_cartpole`, `lqg_monte_carlo`, the state-space notebooks) and make them about 100
+  times slower (`Δt = 0.1 ms`). The Simulator keeps it. **To raise:** one rule there too,
+  with the demos given an explicit `dt`?
+- **C-24 (step 6) Long substep runs are rolled under JAX.** At the automatic step, a plant
+  that declares no time constant takes `⌈Δ / 0.1 ms⌉` RK4 steps per period (1000 at
+  `Δ = 0.1`), which unrolled would make a JAX trace of every step. More than
+  `UNROLLED_SUBSTEPS = 64` run in one `lax.scan` (`stepping.rolled_steps`); up to 64 stay
+  unrolled, so every existing configuration traces as before.
+- **C-25 (step 6) The knobs:** `dt=` on `compute_trajectory` and `compute_rollout` (the plant's
+  step, `⌈Δ / dt⌉` per period), `substeps=` and `solver=` on `loop.compile` and
+  `problem.compile` (`substeps=None` the automatic step; a continuous loop's default stays 1),
+  `solver` on `compute_trajectory` widened to `None | "rk4" | "euler" | "scipy"`. A diagram
+  with no plant refuses them by name. `compute_rollout(record=)` keeps the ticks of the dense
+  run (the same states bit for bit), and a loop with a plant always records `"plant:u"` and
+  its role there too.
+- **C-26 (step 6) The demos' loop lines.** Every `@ discretize(sys, Δ, substeps=round(Δ /
+  SIM_DT))` became `@ sys` with `dt=SIM_DT` at the run (the same substeps, so the same
+  numbers): 12 demos and projects, 3 notebooks, the v0.3 baseline (byte-identical: all 116
+  entries agree at rtol 0), `f_mpc_parity`, `docs/make_assets.py`; the compile demos'
+  `problem.compile(ctl % DT)` (plants with no declared time constant, one step a period
+  before) name `substeps=1`: `digital_pid_tuning`, `lqg_monte_carlo`, `native_mpc_tuning`,
+  `terminal_field_mpc`, `benchmarks/v03_budget.py`, `benchmarks/compile_once.py`. A loop on
+  an undeclared plant that relied on the old one-step exception (the showcase notebook's
+  `(ctl % 0.1) @ plant`) now integrates at the automatic step: its numbers move (more
+  accurate, slower); left without a `dt` since the old step was the exception the plan removes.
+- **C-27 (step 6) `NativeSampledSystem`'s period at construction** (rule 1) lands with step 7:
+  its one subclass is the delayed MPC, which step 7 deletes.
+- **C-28 (step 6) z-domain analysis** (R175): `DiscreteLTISystem` (a `StepSystem`, params
+  `{"A", "B", "C", "D"}`, `period` a description, not a clock); `linearize` on a step or
+  sampled system returns it; `bode`, `margins`, `nyquist`, `frequency_response` read
+  `G(e^{jωΔ})` on a grid three decades up to `π/Δ` (per tick for a tick law); `plot_pzmap`
+  draws the unit circle. The root-locus and step-response tools stay continuous-only (not in
+  the plan). The demo: `examples/demos/analysis/analysis_digital_pid_poles.py`.
+
+- **C-29 (step 6) The `>>` refusal reads the chain's left side.** The plan refuses
+  `(filt % 0.01) >> (ctl % 0.1) @ plant` (`@` binds first, so the filter feeds the loop from
+  outside). A source with no input driving the loop's reference, `Sine() >> (pid % dt) @
+  plant`, is the acceptance script 11 and says what it does: the refusal fires only when the
+  chain so far has an input (a law), never for a source.
+- **C-30 (step 6) The judge integrates at the continuous simulator's step.** A held law
+  scored by `problem.compile(law % dt)` (and so every planner's `evaluate`, the evidence of
+  value iteration, the RL and MPPI planners) integrates a plant that declares no time
+  constant at `Δt = 0.1 ms`, not in one RK4 step a period: it no longer equals the step face
+  to the bit (script 6: 7e-5 relative), and `substeps=1` gives the face's number back (the
+  test checks both). The compile demos and budgets that relied on the old step name
+  `substeps=1` (C-26). **To raise:** whether a planner's evidence should score on its own
+  step model instead.
+- **C-31 (step 6) `experimental/` is left as it is.** Three scripts there close loops on
+  `discretize(...)` (`experimental/boat/parking_compare.py`, `parking_mpc.py`,
+  `experimental/mppi/racecar_mppi.py`); under the grammar they become loops of step systems
+  (ticks only). They are the maintainer's scratch (AGENTS.md: never without an ask).
+  **To raise:** move them to `@ plant` with `dt=`?
 
 ## 3. Ledger of intended number changes
 
@@ -198,6 +268,8 @@ they differ:
 | Step 4, the RL reward | `rl.ppo.*` and `rl_env.*` of the v0.3 baseline (`rl_env` 1.5e-3 relative, the PPO history 1e-8 to 4e-3); re-pinned in `benchmarks/baselines/v03_core.json` (those keys only) | the training reward is `−g dt` (R171) |
 | Step 5, the default initial guess | `trajopt.shooting.u`, `trajopt.shooting.x` of the v0.3 baseline (6e-4 relative), re-pinned | the guess aims at the cost's `xbar` when there is no `Xf` (C-19) |
 | Step 5, RRT's goal bias | an RRT problem with an `Xf` region and no `x_goal` draws its goal bias now (none of the demos: each had an `x_goal` at the region's centre) | C-17 |
+| Step 6, the loop's automatic step | a sampled loop on a plant that declares no time constant, run with no `dt`: before one RK4 step per period, now `⌈Δ / 0.1 ms⌉` (the showcase notebook's `(ctl % 0.1) @ plant`); every demo, project and baseline loop that named its step keeps its numbers (C-26) | R174, one rule |
+| Step 6, the judge on an undeclared plant | `problem.compile(law % dt)` and the planners' `evaluate` (value iteration, RL, MPPI evidence) on a plant that declares no time constant: the plant at the automatic step, not one RK4 step a period (script 6: 7e-5 relative) | C-30 |
 | Step 4, value iteration's `alpha` | no baseline entry moves (the baseline's value iteration runs Euler, where the two discounts agree); under RK4 the backed-up `J` is the consistent one (the new test) | R173 |
 
 ## 4. Textbook check
@@ -205,6 +277,9 @@ they differ:
 Every math diff was read beside `planning/dynamic_programming/dp.py`.
 
 - Step 1: no equation line changed.
+- Step 6: `steps_per_period` (`n = ⌈Δ / Δt⌉`), `rolled_steps` (the RK4 substep in a scan, the
+  input line `u0 + (i/s)(u1 − u0)`), `DiscreteLTISystem.step`/`h`, the discrete response
+  `z = e^{jωΔ}`, read beside `dp.py`.
 - Step 4: the reward line (`g = cost.g(...)`, `reward = −g dt`), `sampled_cost_bound` (ρ from
   γ), `tool_rate_of`, the score's charged term, read beside `dp.py`.
 - Step 2: the fields' margins and costs, the shapes' `sdf`, the paths' distance and arc
@@ -224,3 +299,7 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 | Step | Commit | Row |
 | --- | --- | --- |
 | 1 | `dd7822d4` | the compile cache out (R168) |
+| 2 | `09bf4b71`, `c342acbb` | every number a parameter (R169) |
+| 3 | `5bbf5058` | one tree per planner (R170) |
+| 4 | `0a79f9de` | the one score's edges (R171–R173) |
+| 5 | `fcd1da56` | the problem's boundary dials (R177) |

@@ -461,17 +461,21 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         return closed_loop(self, other)
 
     def __mod__(self, dt: float):
-        """Return this block on a clock of period ``dt``: ``discretize(self, dt, solver="euler")``.
+        """Return this block on the computer at period ``dt``: one meaning, the block's kind decides the rest.
 
-        A law with states becomes its difference equation,
-        ``z_{k+1} = z_k + dt·f(z_k, e_k, t_k)``; a static block and a tick law
-        keep their equations and take the period. See
+        A continuous law becomes its Euler difference equation,
+        ``z_{k+1} = z_k + dt·f(z_k, e_k, t_k)``, receiving seconds
+        ``t_k = t_start + k·dt``; a static block is sampled and held, receiving
+        seconds; a tick law (a :class:`~minilink.core.discrete.step_system.StepSystem`)
+        gets its clock and receives ``k``, its own count of firings. It is never
+        integrated inside the period: the continuous plant a loop closes on is
+        (``(block % dt) @ plant``). See
         :class:`~minilink.core.discrete.sampled_system.SampledSystem`.
         """
         # A real cycle: the sampled system imports System from this module
         from minilink.core.discrete.sampled_system import SampledSystem
 
-        sampled = SampledSystem(self, dt, solver="euler")
+        sampled = SampledSystem(self, dt, solver="euler", kind="law")
         sampled.name = f"{self.name} % {float(dt):g}"
 
         return sampled

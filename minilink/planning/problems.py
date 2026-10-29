@@ -335,11 +335,13 @@ class PlanningProblem:
 
     def goal_point(self) -> np.ndarray:
         """
-        The point a heuristic aims at: ``Xf``'s point, else the cost's target ``xbar``, else the start.
+        The point a heuristic aims at: ``Xf``'s point, else the cost's target ``xbar`` inside ``X``, else the start.
 
         ``Xf``'s point is a singleton's point, a ball's centre, else the centre of
-        its bounding box when finite. An initial guess's end, RRT's goal bias and
-        a plot's anchor read it; it never constrains a plan.
+        its bounding box when finite. A target outside the state constraint
+        ``X`` is no place to aim a guess at: the start is. An initial guess's
+        end, RRT's goal bias and a plot's anchor read it; it never constrains a
+        plan.
         """
         point = set_point(self.Xf)
         if point is not None:
@@ -347,7 +349,9 @@ class PlanningProblem:
 
         xbar = None if self.cost is None else self.cost.params.get("xbar")
         if xbar is not None:
-            return np.asarray(xbar, dtype=float).reshape(-1).copy()
+            xbar = np.asarray(xbar, dtype=float).reshape(-1).copy()
+            if self.X is None or bool(self.X.contains(xbar, self.t_start)):
+                return xbar
 
         return self.x_start.copy()
 
@@ -605,7 +609,7 @@ class PlanningProblem:
         dt=None,
         *,
         solver="rk4",
-        substeps=1,
+        substeps=None,
         backend="auto",
         episode_length=None,
     ):
@@ -620,13 +624,16 @@ class PlanningProblem:
         ``problem.compile(dt=)`` is the step face
         (:class:`~minilink.planning.step_face.StepFace`):
         ``transition(x, u, k, params) -> (x_next, c_k)`` on the plant's
-        ``solver`` and ``substeps``.
+        ``solver`` and ``substeps`` (1 by default). On a sampled loop
+        ``substeps`` is the plant's steps per base period, ``None`` the
+        automatic step (``problem.compile(mpc % 0.2, substeps=20)``).
         """
         # No controller: the step face, the problem at its period
         if controller is None:
             # Lazy import: the face loads with its first compile
             from minilink.planning.step_face import StepFace
 
+            substeps = 1 if substeps is None else substeps
             return StepFace(self, dt=dt, solver=solver, substeps=substeps)
 
         # Lazy import: the engine loads with its first evaluator

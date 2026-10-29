@@ -16,12 +16,15 @@ from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import (
     AUTO_DT_SCALE,
     DEFAULT_SMALLEST_TIME_CONSTANT,
-    HELD_SIGNAL_STEPS_PER_SAMPLE,
     DynamicSystem,
     System,
 )
 
 SAMPLED_SOLVERS = ("rk4", "euler", "exact")
+
+# What a clock makes of its source: the computer's law (block % dt), a discrete-time
+# model (discretize), or a loop's continuous plant on the base clock
+SAMPLED_KINDS = ("law", "model", "plant")
 
 
 ###############################################################################
@@ -50,8 +53,15 @@ class SampledSystem(StepSystem):
     or ``"exact"`` for a linear model, the matrix exponential), ``substeps``
     steps per period; a static source is read at the sampling instants; a
     tick source (a :class:`StepSystem`) keeps its own count, so it has no
-    seconds face. :func:`~minilink.analysis.discretization.discretize` and
-    ``sys % dt`` build one.
+    seconds face.
+
+    ``kind`` says what the clock made of the source: ``"law"`` the computer's
+    difference equation (``sys % dt``, one Euler step per period, never
+    integrated inside it), ``"model"`` a discrete-time model for the discrete
+    tools (:func:`~minilink.analysis.discretization.discretize`), ``"plant"``
+    a loop's continuous plant on the base clock (``(ctl % dt) @ plant`` wraps
+    it; the user never builds one). The plant alone is integrated inside the
+    loop's periods: a loop's dense run, substeps and host runner are its.
     """
 
     def __init__(
@@ -61,14 +71,17 @@ class SampledSystem(StepSystem):
         *,
         solver: str = "rk4",
         substeps: int = 1,
+        kind: str = "model",
     ):
         require_sampleable(source, solver, substeps)
+        require_kind(kind)
 
         # The source and the clock
         self.source = source
         self.sample_period = positive_period(sample_period)
         self.solver = solver
         self.substeps = int(substeps)
+        self.kind = kind
 
         # The System shell: a static source has no state (n = 0); the shell's zero
         # start would write through to the source, whose own start is put back
@@ -210,11 +223,28 @@ class SampledSystem(StepSystem):
 
     @property
     def resolves(self) -> bool:
-        """Whether a continuous source is integrated inside the period, so its substeps can be kept."""
+        """Whether a continuous source is integrated inside the period, so its substeps can be kept: a model or a plant, never a law."""
         source = self.source
         continuous = isinstance(source, DynamicSystem) and source.n > 0
 
-        return continuous and self.solver != "exact"
+        return continuous and self.solver != "exact" and self.kind != "law"
+
+    @property
+    def is_plant(self) -> bool:
+        """Whether this is a loop's continuous plant on the base clock."""
+        return self.kind == "plant"
+
+    def with_steps(self, substeps=None, solver=None):
+        """This view with another integration step: ``substeps`` per period and ``solver`` (``None`` keeps each)."""
+        substeps = self.substeps if substeps is None else int(substeps)
+        solver = self.solver if solver is None else solver
+        require_sampleable(self.source, solver, substeps)
+
+        stepped = copy.copy(self)
+        stepped.substeps = substeps
+        stepped.solver = solver
+
+        return stepped
 
     def update_path(self, x, u, t, params=None):
         """
@@ -303,6 +333,7 @@ class NativeSampledSystem(SampledSystem):
         self.source = None
         self.solver = None
         self.substeps = 1
+        self.kind = "law"
         self.sample_period = (
             None if sample_period is None else positive_period(sample_period)
         )
@@ -404,20 +435,24 @@ class NativeSampledSystem(SampledSystem):
 
 def sampled_substeps(plant, sample_period) -> int:
     """
-    The integration steps per period of a plant on a clock: the automatic step rule.
+    The integration steps per period of a plant on a clock: the continuous simulator's step rule.
 
-    ``Δ / n ≤ AUTO_DT_SCALE · τ_min``, the plant's smallest time constant; a smooth
-    plant that declares none takes :data:`HELD_SIGNAL_STEPS_PER_SAMPLE` steps.
+    ``Δt = AUTO_DT_SCALE · τ_min``, the plant's smallest time constant (the
+    catalog default 1 ms when it declares none), so ``n = ⌈Δ / Δt⌉``.
     """
-    info = plant.solver_info
-    tau = info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
-    discontinuous = info.get("discontinuous_behavior", False)
+    tau = plant.solver_info.get(
+        "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
+    )
 
-    if tau == DEFAULT_SMALLEST_TIME_CONSTANT and not discontinuous:
-        return HELD_SIGNAL_STEPS_PER_SAMPLE
+    return steps_per_period(sample_period, AUTO_DT_SCALE * tau)
 
-    # n = ⌈Δ / (AUTO_DT_SCALE τ_min)⌉
-    n = int(np.ceil(float(sample_period) / (AUTO_DT_SCALE * tau) - 1e-9))
+
+def steps_per_period(sample_period, dt) -> int:
+    """``n = ⌈Δ / Δt⌉``: the steps of at most ``dt`` that make up one period (a multiple's round)."""
+    dt = positive_period(dt)
+
+    # n = ⌈Δ / Δt⌉, a multiple of Δt landing on its round despite the division
+    n = int(np.ceil(float(sample_period) / dt - 1e-9))
 
     return max(1, n)
 
@@ -505,6 +540,12 @@ def require_sampleable(source, solver, substeps) -> None:
             "the sample period is the clock's, which f never receives; remove 'dt' "
             "from the params and call discretize(system, dt)."
         )
+
+
+def require_kind(kind) -> None:
+    """Refuse a kind of sampled view the clock does not make."""
+    if kind not in SAMPLED_KINDS:
+        raise ValueError(f"kind must be one of {list(SAMPLED_KINDS)!r}, got {kind!r}")
 
 
 def require_resolved(system) -> None:

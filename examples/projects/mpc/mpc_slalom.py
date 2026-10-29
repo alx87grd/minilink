@@ -11,7 +11,6 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.analysis import discretize
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
@@ -101,9 +100,9 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 12.0
 sys_sim.x0 = x0.copy()
 
-hybrid = (mpc % MPC_DT) @ discretize(sys_sim, MPC_DT, substeps=round(MPC_DT / SIM_DT))
+hybrid = (mpc % MPC_DT) @ sys_sim
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(tf=TF_SIM)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(

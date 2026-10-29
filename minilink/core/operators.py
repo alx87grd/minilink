@@ -237,8 +237,36 @@ def expose_free_inputs(diagram, sys_id: str) -> None:
 # The series rule
 
 
+def require_no_closed_loop_on_the_right(chain, right) -> None:
+    """
+    Refuse a law (a block with an input) chained into a sampled loop with its plant: ``@`` binds first.
+
+    ``filt >> ctl @ plant`` reads as a filter on the measurement but is the
+    filter feeding the loop from outside; a source (no input) driving the
+    loop's reference, ``Sine() >> (ctl % dt) @ plant``, is what it says.
+    """
+    if chain.inputs and holds_plant(right):
+        raise TypeError(
+            f"{right.name} is a closed loop with its plant: in a >> b @ plant the @ "
+            "binds first, so the chain feeds the loop from outside; write "
+            "(a >> b) @ plant with the parentheses, or closed_loop(b, plant, filter=a)"
+        )
+
+
+def holds_plant(sys) -> bool:
+    """Whether ``sys`` holds a loop's continuous plant on its base clock, at any depth."""
+    if getattr(sys, "kind", None) == "plant":
+        return True
+    if not is_box(sys):
+        return False
+
+    return any(holds_plant(block) for block in sys.subsystems.values())
+
+
 def series_pair(diagram, right) -> None:
     """Append ``right`` to ``diagram`` (the chain so far) by the ``>>`` rule."""
+    require_no_closed_loop_on_the_right(diagram, right)
+
     # The chain's output and the right side's input the rule connects
     outputs = edge_outputs(diagram)
     source_name, target_name = series_connection(diagram, outputs, right.inputs)

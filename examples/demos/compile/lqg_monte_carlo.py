@@ -67,5 +67,7 @@ print(
 )
 
 # The same loop with its computer sampled: the noise blocks realized per trial alike
-sampled = problem.compile(box % DT, backend="jax").evaluate(n_trials=N_TRIALS, key=1)
+sampled = problem.compile(box % DT, substeps=1, backend="jax").evaluate(
+    n_trials=N_TRIALS, key=1
+)
 print(f"sampled computer: E[J] = {np.mean(sampled.J):.4f}")

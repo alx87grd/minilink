@@ -558,19 +558,13 @@ class SampledExecutionPlan:
 
     @cached_property
     def plant_op(self):
-        """The state advance of the loop's plant: the block integrated inside every base period, else ``None``.
+        """The state advance of the loop's plant: the one continuous system, integrated inside every base period, else ``None``.
 
-        A continuous block on the base clock is the plant whatever its id; of
-        several, the one whose id is ``plant``, at any depth.
+        Found by kind, never by id: the continuous plant ``(ctl % dt) @ plant``
+        wrapped on the base clock, at any depth; two are refused.
         """
-        candidates = [
-            op
-            for op in self.step_ops
-            if op.divisor == 1 and op.face == "seconds" and op.system.resolves
-        ]
-        if len(candidates) > 1:
-            candidates = [op for op in candidates if op.params_path[-1] == "plant"]
-            require_one_plant(candidates, self.step_ops)
+        candidates = [op for op in self.step_ops if is_plant_wrap(op.system)]
+        require_one_plant(candidates)
 
         return candidates[0] if candidates else None
 
@@ -656,7 +650,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         if src is not None:
             external[out_port_id] = output_slices[tuple(src)]
 
-    return SampledExecutionPlan(
+    plan = SampledExecutionPlan(
         state_dim=diagram.n,
         signal_dim=signal_dim,
         base_period=base,
@@ -666,6 +660,11 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         external_output_slices=external,
         paths=paths,
     )
+
+    # The one continuous plant, refused at compile when there are several
+    plan.plant_op
+
+    return plan
 
 
 def require_tick_laws_on_their_box_clock(diagram, base, prefix=()):
@@ -720,18 +719,27 @@ def nested_layout(diagram, offset=0, prefix=()):
     return layout
 
 
-def require_one_plant(candidates, step_ops) -> None:
-    """Refuse a loop of several continuous blocks on the base clock none of which, or more than one, is the plant."""
-    if len(candidates) != 1:
-        integrated = [
-            op.label
-            for op in step_ops
-            if op.divisor == 1 and op.face == "seconds" and op.system.resolves
-        ]
+def is_plant_wrap(system) -> bool:
+    """Whether ``system`` is a loop's continuous plant on its base clock."""
+    return getattr(system, "kind", None) == "plant"
+
+
+def require_one_plant(candidates) -> None:
+    """Refuse a sampled diagram that holds several continuous systems: it has one plant."""
+    if len(candidates) > 1:
         raise ValueError(
-            f"the blocks {integrated} are all integrated inside the base period; the "
-            "dense run keeps one plant's substeps: name it 'plant'"
+            f"the sampled diagram holds {len(candidates)} continuous systems "
+            f"{[op.label for op in candidates]}; a loop has one plant: compose them "
+            "into one continuous system first (actuator >> plant >> sensor), then "
+            "close the computer on it"
         )
+    for op in candidates:
+        if op.divisor != 1:
+            raise ValueError(
+                f"the plant {op.label!r} is on a clock {op.divisor} times slower than "
+                "the loop's base: a loop's plant is integrated on its base clock; put "
+                "the faster blocks inside the loop (closed_loop(..., filter=...))"
+            )
 
 
 def require_clock(diagram, base) -> None:

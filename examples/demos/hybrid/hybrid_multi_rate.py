@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink import Integrator, P, Step, StepSystem, closed_loop
-from minilink.analysis import discretize
 from minilink.core.backends import array_module
 
 DT_BASE = 0.01
@@ -32,8 +31,8 @@ class DiscreteLowPass(StepSystem):
         return xp.asarray(x, dtype=float).reshape(1).copy()
 
 
-# The plant on the base clock, integrated in substeps of PLANT_DT_INNER
-plant = discretize(Integrator(), DT_BASE, substeps=round(DT_BASE / PLANT_DT_INNER))
+# The continuous plant: the loop integrates it in steps of PLANT_DT_INNER (the run's dt)
+plant = Integrator()
 
 # A 10 Hz gain on a 100 Hz filtered measurement, the reference a step down at 1 s
 loop = closed_loop(
@@ -45,5 +44,5 @@ loop = closed_loop(
 
 loop.plot_diagram()
 
-loop.compute_trajectory(tf=TF)
+loop.compute_trajectory(tf=TF, dt=PLANT_DT_INNER)
 loop.plot_trajectory(show=True)
