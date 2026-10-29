@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from math import gcd
 
 import numpy as np
@@ -109,6 +110,26 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return compile_sampled_diagram(self, backend=backend, verbose=verbose)
 
+    def animate(self, traj=None, **options):
+        """
+        Animate the loop's plant on its own run: its states, and the input the loop held on it each period.
+
+        The loop's blocks are evaluated once per tick to read the plant's input
+        (a pure MPC solves once per tick), never once per frame. A loop with no
+        plant (a computer alone) animates as any diagram. ``options`` are
+        :meth:`~minilink.core.facades.animation.SystemAnimation.animate`'s.
+        """
+        # The run passed, else the last one computed, else a fresh one
+        if traj is None:
+            traj = self.traj if self.traj is not None else self.compute_trajectory()
+
+        # The plant's own run, drawn by the continuous plant it samples
+        plant, plant_traj = plant_run_of(self, traj)
+        if plant is None:
+            return super().animate(traj, **options)
+
+        return plant.animate(plant_traj, **options)
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
@@ -159,6 +180,93 @@ class SampledDiagramSystem(StepDiagramSystem):
             [state.nominal_value, np.zeros(self.hold_dim)]
         )
         self.n = start
+
+
+def diagram_on_clock(diagram, dt):
+    """
+    ``diagram % dt``: a sampled diagram of the same blocks and wiring, each block ``% dt``.
+
+    A sampled diagram keeps its kind and its own attributes (a zero-delay MPC
+    its planner's face); a tick diagram becomes a :class:`SampledDiagramSystem`.
+    """
+    require_no_clocks(diagram)
+
+    # The same kind with empty wiring, or a sampled diagram for a tick diagram
+    if isinstance(diagram, SampledDiagramSystem):
+        clocked = copy.copy(diagram)
+        StepDiagramSystem.__init__(clocked)
+    else:
+        clocked = SampledDiagramSystem()
+
+    # Each block on the clock: a static block reads seconds, a tick law its count
+    for sys_id, sys in diagram.subsystems.items():
+        clocked.add_subsystem(sys % dt, sys_id)
+
+    # The edge inputs, the wiring and the edge outputs, as they were
+    for port_id, port in diagram.inputs.items():
+        clocked.inputs[port_id] = copy.copy(port)
+    for target_sys_id, sources in diagram.connections.items():
+        if target_sys_id == "output":
+            continue
+        for target_port_id, source in sources.items():
+            if source is not None:
+                clocked.connect(*source, target_sys_id, target_port_id)
+    for port_id, port in diagram.outputs.items():
+        clocked.connect_new_output_port(
+            *port.source,
+            port_id,
+            port.declared_dependencies,
+            nominal_value=port.nominal_value,
+            labels=port.labels,
+            units=port.units,
+            lower_bound=port.lower_bound,
+            upper_bound=port.upper_bound,
+        )
+    clocked.name = f"{diagram.name} % {float(dt):g}"
+
+    return clocked
+
+
+def plant_run_of(loop, rollout, params=None):
+    """
+    ``(plant, run)``: the loop's plant and its run inside the loop's dense run, ``(None, None)`` with no plant.
+
+    ``run.x`` is the plant's state slice; ``run.u`` the input the loop fed it,
+    held over each period: the run's recorded ``"plant:u"`` when it has one (a
+    dense run records it, nothing is computed again), else gathered by the
+    compiled plan at each tick; the end sample holds the last tick's input, as
+    the record does. ``params`` is the tree the run was made with (``None``:
+    the loop's own).
+    """
+    # Lazy import: a real cycle, the trajectory module reads the systems
+    from minilink.core.trajectory import Trajectory
+
+    ev = loop.compile()
+    op = ev.plan.plant_op
+    if op is None:
+        return None, None
+    plant = getattr(op.system, "source", op.system)
+    if "plant" in rollout.roles:
+        return plant, rollout.of("plant")
+    S = ev.plan.dense_points
+    t_start = float(rollout.t[0])
+    n_samples = rollout.t.size
+
+    # u_k = the plant's gathered input at tick k, held over the samples of its period
+    # and, for the last tick, over the end sample
+    ticks = np.minimum(np.arange(n_samples) // S, (n_samples - 1) // S - 1)
+    u = np.zeros((int(op.u_dim), n_samples))
+    for k in np.unique(ticks):
+        samples = np.flatnonzero(ticks == k)
+        first = samples[0]
+        u_k = ev.plant_input(
+            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
+        )
+        u[:, samples] = np.asarray(u_k).reshape(-1, 1)
+
+    x = rollout.x[op.local_x_slice]
+
+    return plant, Trajectory(t=rollout.t, x=x, u=u)
 
 
 def clock_periods(diagram):
@@ -241,6 +349,16 @@ def leaves_of(diagram, prefix=()):
                 (inside, port) in hold_index for port in leaf.outputs
             )
             yield leaf_path, leaf, held_here
+
+
+def require_no_clocks(diagram):
+    """Refuse to clock a diagram that already holds a clocked block: clock each block once."""
+    periods = clock_periods(diagram)
+    if periods:
+        raise TypeError(
+            f"{diagram.name} already holds blocks on a clock of {periods[0]:g} s: "
+            "clock the unclocked diagram, or clock its blocks one by one"
+        )
 
 
 def require_sampled_subsystem(sys, sys_id):

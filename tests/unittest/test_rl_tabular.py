@@ -13,10 +13,10 @@ from minilink.learning.reinforcement_learning import (
     QLearning,
     TabularLearningPlanner,
 )
-from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning import Uniform
 from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
+from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
 GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)

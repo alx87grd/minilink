@@ -298,20 +298,6 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
   projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
-- [ ] **Clocking a box** (the maintainer's decision 5 of 2026-10-28, composition first):
-  `box % dt` clocks each of the box's blocks and keeps their faces (a block in seconds reads
-  seconds), instead of wrapping the box as a tick law (today a static block inside reads the
-  tick count `0, 1, 2` where seconds are `0, 0.1, 0.2`). Done when a step box holding a static
-  block reads `t_k` in seconds under `% dt`, the zero-delay MPC's own `__mod__` is deleted for
-  it, and the baselines stay byte-identical. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.1)
-- [ ] **Recording the signals, and reconstructing a few** (the maintainer's decision 6 of
-  2026-10-28): a run that records the signals it computes (the plant's input, a named port) in
-  the same scan, and a read-back that computes only the ancestors of the requested ports (today
-  `compute_internal_signals_dict` and the read-backs on it fill the whole buffer, so an
-  expensive block, a solve, runs again for every sample read back). Done when a zero-delay MPC
-  run with its overlays solves exactly once per tick, read-backs included, and the delayed
-  form's read-backs stay free. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.2)
-
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
 construction.
@@ -460,8 +446,8 @@ solvers and MPPI are v0.4 (§4).
   stays the default. Rest: whether the course notebooks that run an MPC (GRO501
   `racecar_toward_mpc`, the showcase, `mpc_spatial_stack`) move to `delay=False` **[ask —
   teaching call]**.
-- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, after the two core
-  rows of §1.5 below, "Clocking a box" and "Recording the signals"): the delayed and pure forms
+- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28; its two prerequisites,
+  clocking a box and recording the signals, landed in the night run of 2026-10-29): the delayed and pure forms
   as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
   `lookahead`); one tuning path for every form (`controller.cost.R` or
   `controller.solve.cost.R`, one of them); `DelayedPredictiveController` and
@@ -913,21 +899,18 @@ pillar names it.
 
 **On the spine.**
 
-- [ ] **The path-integral planner (MPPI)** (S72) (a planner under the compiled-face contract of
-  [planner-and-mpc.md](planner-and-mpc.md), R148; the seed and the tick, R104; one plant draw by
-  default, R107), after the core's sampled loop and draws (§1.3, §1.5), its plant the step model (S75), on the evaluator's batched rollout over realizations. Design:
-  [mppi.md](mppi.md); the standalone prototypes `experimental/mppi/pendulum_mppi.py`
-  and `racecar_mppi.py` run today. MP-1 `planning/trajectory_optimization/path_integral.py`:
-  `MPPIPlanner` / `MPPIRecord` (R106), its compiled face (mppi.md §6) on
-  `RolloutEnvironment` (`jit(vmap(scan))` over `K` samples; MP-0 first moves it to
-  `planning/environment.py`, the RL import kept, R108), the six-beat body of the plan's
-  §5; MP-2 the hand-loop demo
-  `experimental/mppi/pendulum_mppi.py`; MP-3 the stochastic branch
-  (`n_plant_samples` realizations per control sample, mean or CVaR by the problem's
-  criterion) and the fan of sampled futures as `solution.plot_samples()`. Done when the
-  seeded-determinism, LQR-agreement and swing-up tests pass, the deterministic twin of the
-  stochastic branch is byte-identical, and the body reads next to `dp.py`. MP-4 (the rebuilt MPC on MPPI) and MP-5 (demos, `compare(MPC=, MPPI=)`) before v0.9;
-  MP-6 (the `loop` backend, facade names, DESIGN §6) with V3.
+- [ ] **The path-integral planner (MPPI), the rest** (S72) (design [mppi.md](mppi.md)). Landed in the
+  night run of 2026-10-29: `MPPIPlanner` / `MPPIRecord` on the `minilink.planning` facade
+  (`planning/trajectory_optimization/path_integral.py`), its compiled face on
+  `RolloutEnvironment` (moved to `planning/environment.py`, R108), the `method` and `seed`
+  leaves (RD-54), the MPC in its three forms on it, the seeded-determinism, LQR-direction and
+  swing-up tests (`test_mppi.py`), the demos `examples/demos/mpc/mppi_pendulum.py` and
+  `mppi_racecar.py`. Rest: MP-3 the stochastic branch (`n_plant_samples` realizations per
+  control sample, mean or CVaR by the problem's criterion; today a stochastic problem plans on
+  its nominal with the deterministic planner's warning) and the fan of sampled futures as
+  `solution.plot_samples()` and `mpc_animation_overlays(samples=)`; the plan readers
+  (`mpc_plans_from_rollout`) for an input-only plan; MP-6 (the `loop` backend, DESIGN §6) with
+  V3.
 - [ ] **RL follow-ups** (C5):
   - [ ] **SAC actor step** (S50) **[ask]**: pre-update critic (today, kept for bit-identity) or
     updated critic (SB3, CleanRL). One line in `algorithms/sac.py`; re-measure

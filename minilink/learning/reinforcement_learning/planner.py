@@ -25,12 +25,12 @@ from minilink.learning.reinforcement_learning.collect import (
     rollout,
 )
 from minilink.learning.reinforcement_learning.critics import QFunction, ValueFunction
-from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.learning.reinforcement_learning.policy import (
     ExplorationPolicy,
     GaussianHead,
     SquashedGaussianHead,
 )
+from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution

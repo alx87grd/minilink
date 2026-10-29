@@ -14,6 +14,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
 )
 from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.compile.plan import PLANT_INPUT
 from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
 from minilink.core.params import (
@@ -44,7 +45,6 @@ from minilink.planning.problems import seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
-PLANT_INPUT = "plant:u"  # the recorded signal of the plant's input, the plant role's u
 
 
 ###############################################################################
@@ -393,14 +393,19 @@ class ProblemEvaluator:
         if numbers is None:
             cost_params, numbers = None, "own"
 
-        # The key: the price switch and the numbers; the entry holds the parts it
-        # was taken on, so a part replaced since takes a new bound
+        # The evaluation's discount rate, when it has a value (a traced one prices at
+        # the problem's)
+        rate = params.get("discount_rate", problem.discount_rate)
+        rate = float(rate) if is_concrete_number(rate) else problem.discount_rate
+
+        # The key: the price switch, the rate and the numbers; the entry holds the
+        # parts it was taken on, so a part replaced since takes a new bound
         parts = problem_parts(problem)
-        key = (problem.infeasible_cost, problem.discount_rate, numbers)
+        key = (problem.infeasible_cost, rate, numbers)
         cached = self.price_cache.get(key)
         if cached is None or any(a is not b for a, b in zip(cached[0], parts)):
-            price = price_of(problem, self.tf, cost_params)
-            bound = diverged_cost_of(problem, self.tf, price, cost_params)
+            price = price_of(problem, self.tf, cost_params, rate)
+            bound = diverged_cost_of(problem, self.tf, price, cost_params, rate)
             cached = self.price_cache[key] = (parts, price, bound)
 
         return cached[1:]
@@ -486,8 +491,8 @@ class ProblemEvaluator:
         ts = t_start + xp.arange(N + 1) * dt
         rate = self.cost_rate(params)
         if self.sampled:
-            xs, running = ev.rollout_with_cost(
-                x0, u_seq, loop_params, rate, n_steps=N, t_start=t_start
+            xs, running, signals = ev.rollout_with_cost(
+                x0, u_seq, loop_params, rate, n_steps=N, t_start=t_start, signals=True
             )
         elif self.adaptive is None:
             xs, running = ev.rollout_with_cost(
@@ -508,10 +513,9 @@ class ProblemEvaluator:
             xs, running = zs[:, :-1], zs[:, -1]
         us = xp.broadcast_to(u, (N + 1, u.size))
 
-        # Every block output at every sample, and the plant's input among them
-        if self.sampled:
-            signals = signals_at_ticks(ev, xs, us, loop_params, t_start)
-        else:
+        # Every block output at every sample, and the plant's input among them: a
+        # sampled loop's from the run's own signal pass
+        if not self.sampled:
             signals = signals_along(ev, xs, us, ts, loop_params)
         u_plant = gather_samples(self.plant_input, signals, us, xp)
 
@@ -1066,24 +1070,6 @@ def signal_name_of(ev, sys_id, sampled):
     return "/".join(ev.plan.paths[sys_id])
 
 
-def signals_at_ticks(ev, xs, us, params, t_start=0.0):
-    """Every block output at every tick of a sampled loop, ``(N + 1, n_signals)``, the clock started at ``t_start``: ``vmap`` on JAX."""
-    xp = array_module(xs)
-    if xp is np:
-        return xp.stack(
-            [
-                ev.signals(x, u, k, params, t_start=t_start)
-                for k, (x, u) in enumerate(zip(xs, us))
-            ]
-        )
-
-    jax = ensure_jax_x64()
-    ks = jax.numpy.arange(xs.shape[0])
-    return jax.vmap(lambda x, u, k: ev.signals(x, u, k, params, t_start=t_start))(
-        xs, us, ks
-    )
-
-
 def signals_along(ev, xs, us, ts, params):
     """Every block output at every sample, shape ``(N + 1, n_signals)``: ``vmap`` on JAX."""
     xp = array_module(xs)
@@ -1110,9 +1096,27 @@ def gather_samples(sources, signals, us, xp):
     return xp.concatenate(pieces, axis=1)
 
 
+def is_concrete_number(value) -> bool:
+    """Whether ``value`` is a number with a value on the host (a traced one has none)."""
+    try:
+        float(value)
+    except TypeError:  # a tracer cannot be concretized
+        return False
+
+    return True
+
+
 def problem_parts(problem):
-    """The objects a trial's trace reads from the problem: its cost and its sets."""
-    return (problem.cost, problem.X, problem.U, problem.Xf)
+    """The objects a trial's trace reads from the problem: its cost, its sets, its start and its disturbances."""
+    return (
+        problem.cost,
+        problem.X,
+        problem.U,
+        problem.Xf,
+        problem.X0,
+        problem.start_law,
+        problem.disturbances,
+    )
 
 
 def horizon_of(problem, episode_length):

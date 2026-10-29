@@ -729,16 +729,18 @@ def test_one_program_with_parameters_solves_for_each_value(backend):
         n_z=2, J=J, backend=backend, params={"target": {"c": np.array([1.0, 2.0])}}
     )
     opt = Optimizer(program, z0=[0.0, 0.0], method="l-bfgs")
-    n_traces = len(traces)
 
     np.testing.assert_allclose(opt.solve().z, [1.0, 2.0], atol=1e-6)
     moved = opt.solve(params={"target": {"c": np.array([-3.0, 0.5])}})
     np.testing.assert_allclose(moved.z, [-3.0, 0.5], atol=1e-6)
+    n_traces = len(traces)  # the frozen form and the parametric one, each traced once
+    again = opt.solve(params={"target": {"c": np.array([0.5, -1.0])}})
+    np.testing.assert_allclose(again.z, [0.5, -1.0], atol=1e-6)
     np.testing.assert_allclose(
         opt.solve().z, [1.0, 2.0], atol=1e-6
     )  # the defaults again
     if backend == "jax":
-        assert len(traces) == n_traces  # compiled once, never retraced
+        assert len(traces) == n_traces  # a new value never retraces
 
     # The one merge at the boundary: an unknown path, a new shape
     with pytest.raises(ValueError, match="known entries are"):

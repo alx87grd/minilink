@@ -6,13 +6,13 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
     grid_of,
     grid_price,
 )
+from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution

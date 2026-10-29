@@ -188,7 +188,11 @@ rate; step and sampled systems live on sibling types and separate compile and si
 
 **The sampled loop is a step diagram on a clock** (R146, R158). `sys % dt` is
 `discretize(sys, dt, solver="euler")`, a `SampledSystem` (a law with states becomes its
-difference equation; a static block and a tick law take the period). The operators `>>`, `+`
+difference equation; a static block and a tick law take the period). On a step diagram (a box
+of tick laws and static blocks, the zero-delay MPC among them) `box % dt` clocks each block with
+its own face kept, a static block reading seconds and a tick law its count, and returns a
+`SampledDiagramSystem` of the same wiring and kind (`diagram_on_clock`); a box holding a clocked
+block is clocked once, block by block. The operators `>>`, `+`
 and `@` compose step systems with the meaning they have on continuous ones, on the same assembly
 code; the operands decide the algebra (`core/assembly.py`, `algebra_of`): a clocked operand
 makes a `SampledDiagramSystem`, a tick law a `StepDiagramSystem`, continuous and static operands
@@ -204,10 +208,17 @@ outputs state slots after the blocks' states (`hold_index`); its compiled plan
 (a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
 bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
 `where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
-for a rate names it (`filt % 0.01`). The loop's plant, whose substeps the dense run keeps and
+for a rate names it (`filt % 0.01`); one inside a nested box clocked slower than the loop's base
+is refused at compile, since it would tick faster there than in its box alone. The loop's plant, whose substeps the dense run keeps and
 the host runner integrates adaptively, is the block integrated inside every base period (the
 one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
-block.
+block. A run records signals from its own signal pass: `compute_trajectory(record=("path/block:port",
+…))` keeps each tick's value held over its period (the end sample the last tick's) in the
+trajectory's `signals`, and a loop with a plant always records `"plant:u"` and its `plant` role,
+so `traj.of("plant")`, the plots, the animation and the MPC overlays compute nothing again; the
+planning evaluator's run takes its signals from the same pass (`rollout_with_cost(signals=True)`).
+A continuous diagram's `record=` and `reconstruct_internal_signals(traj, ports=…)` evaluate
+only the named ports and the blocks they read, once per sample after the run.
 
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`
@@ -265,8 +276,17 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
+- **Path integral control:** `MPPIPlanner(problem, *, dt, n_samples, temperature, noise,
+  control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
+  JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
+  rolls each out on `RolloutEnvironment.step` (the one owner of the stage cost, the exit price
+  and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
+  weighted noise. Its compiled face (`n_z = N m + 1`, `shift` holding the last input,
+  `command` the held input, `predicts = False`) is the trajectory face, so
+  `ModelPredictiveController(MPPIPlanner(...))` runs in every form; `temperature`, `noise`,
+  `control_cost` are `params["method"]`, `seed` is `params["seed"]` with the tick folded in.
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
-  delay=True, warm_start=True, lookahead=0.0)` closes a planner's compiled face `pv = planner.compile()` on the
+  delay=True, warm_start=True, lookahead=0.0, verbose=False)` closes a planner's compiled face `pv = planner.compile()` on the
   loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native
   `SampledSystem` (`core.discrete.sampled_system.NativeSampledSystem`: no source, its seconds
   face `update` and its port functions written in seconds, `%` setting the period on a copy)
@@ -277,7 +297,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `params`, so `controller.cost.Q` tunes the plan) with each leaf named in `inputs` read from
   its port (default `{"x_start": "y"}`) and `t_start` the tick's time; `lookahead=Δ` starts the
   plan at `t_k + Δ` from the measured start predicted that far under the stored plan (the
-  planner's model, its commands linear between knots). The zero-delay form (`delay=False`) is a small
+  planner's model, its commands linear between knots). `verbose=True` prints one line per solve on a host run (the tick's
+  time, success, iterations, cost, wall time). The zero-delay form (`delay=False`) is a small
   sampled diagram of pure blocks, the textbook MPC's optimizer and memory: `PlanSolver`
   (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0=warm)`, `warm` the last plan shifted one
   period with its first state knot at the measurement, the default guess while there is no
@@ -859,11 +880,14 @@ tree is made the dtype and shape of the compiled default (`9`, `9.0`, `np.float6
 0-d array share one trace) and the tree is put on the device once per distinct value; a tree
 holding a leaf of more than 1000 numbers (a network's weights) always goes as an argument,
 never as constants. The convenience calls reuse a JAX evaluator through
-`compiled_of(system, backend)`, keyed by the structure a compile reads (blocks by identity,
-ports, wiring, clocks, plain attributes), never by parameter values, and pass
-`evaluator.call_params()`: `None` while the live values are the compiled ones, else the live
-tree, so a sweep of values through `compute_trajectory` compiles once. A structural attribute
-edited after a run is seen after `clear_compiled()`. The `jit` sits at the outermost pure
+`compiled_of(system, backend)`, keyed by the structure a compile reads: each block by
+identity and its edit count (`System.edits`, bumped by every assignment of an attribute but
+the block's values and run records), its ports, the wiring, the numbers and arrays a block
+holds by their bytes, a held model and a plain-data helper by value, the float policy; never
+by parameter values. They pass `evaluator.call_params()`: `None` while the live values are the
+compiled ones, else the live tree, so a sweep of values through `compute_trajectory` compiles
+once. A method replaced on a class, or a change deep inside a rich object a block holds, is
+seen after `clear_compiled()` (KNOWN_ISSUES). The `jit` sits at the outermost pure
 computation of each pipeline: the rollout (not `f`), the problem's trial function, the
 fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
 host SLSQP) calls jitted `f`, Jacobian, objective and gradient.

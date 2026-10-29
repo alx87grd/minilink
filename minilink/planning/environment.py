@@ -167,7 +167,7 @@ class RolloutEnvironment:
             if block.is_random
         }
 
-    def step(self, x, t, u, key, params=None):
+    def step(self, x, t, u, key, params=None, *, t_origin=None):
         """
         One control period: ``(x_next, t_next, reward, terminated, truncated)``.
 
@@ -176,13 +176,15 @@ class RolloutEnvironment:
         the episode with its cost fully accounted: the finite horizon is
         reached, or the state left ``X`` (a failure, charged). ``truncated``
         ends it with the value of ``x_next`` still to come: the episode length
-        is reached, or the state left the training zone.
+        is reached, or the state left the training zone. ``t_origin`` is the
+        episode's start when it is not the problem's ``t_start`` (a receding
+        horizon solved from a later tick): the horizon is ``tf`` after it.
         """
         xp = array_module(x)
 
         dt = self.dt
         tf = self.tf
-        t_start = self.t_start
+        t_start = self.t_start if t_origin is None else t_origin
         finite_horizon = self.finite_horizon
         face = self.face
         gamma = face.gamma

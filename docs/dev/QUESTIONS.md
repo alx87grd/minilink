@@ -16,7 +16,26 @@ TODO; the entry then leaves this file. The v0.3 core's rulings are the architect
 
 ## The core
 
-Nothing open (2026-10-28, R166): the v0.3 core's architecture is of record.
+The v0.3 core's architecture is of record (2026-10-28, R166); one question came from the
+night run's review (2026-10-29).
+
+### Should a field's numbers be leaves of the set's and the cost's tree?
+- **Today:** a field's wrappers read the field's own parameters, never the tree they are given
+  (`FieldSet.margin`, `FieldInputSet.margin`, `FieldCost.g`, `FieldTerminalCost.h` call
+  `field.value(...)` without `params`; fields.md says "the field reads its own parameters").
+  A field's numbers (a track's waypoints, an ellipsoid's `P`, a barrier's center) are then
+  outside the problem's tree: `jit`, `grad` and a parameter family do not reach them, against
+  the constitution's "one signature: an object that does not yet read `params` is a gap".
+- **Evidence:** the night run's textbook review (finding 4). `QuadraticField.value` itself
+  reads its `params`; only the wrappers drop it.
+- **Options:**
+  - (a) the wrappers take `{"weight": w, "field": field.params}` and pass `params["field"]`
+    through: every problem holding a field cost gains those leaves (the racecar's corridor, the
+    circuit's track), traced into the collocation programs;
+  - (b) keep the field's numbers out of the tree, stated as a design (a field is structure,
+    like a set's shape), and close the gap in the constitution's words.
+- **Detail:** [the night run's log](../reviews/2026-10-29-night-run-log.md), N-19.
+- **Answer:**
 
 ## Toward v1.0
 

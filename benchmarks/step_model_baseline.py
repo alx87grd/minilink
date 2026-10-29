@@ -117,7 +117,7 @@ def problem_of(plant, x0):
 
 def rl_environment_entries(out):
     """The RL environment's control period, both backends."""
-    from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
+    from minilink.planning.environment import RolloutEnvironment
 
     plant = Pendulum()
     problem = problem_of(plant, X0)

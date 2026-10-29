@@ -114,6 +114,20 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         return compile_step_diagram(self, backend=backend, verbose=verbose)
 
+    def __mod__(self, dt: float):
+        """
+        This diagram on a clock of period ``dt``: each block clocked with its own face, the wiring kept.
+
+        A sampled diagram of the same blocks and wiring, each block ``% dt``: a
+        static block reads seconds, a tick law its own count, a box inside is
+        clocked block by block. The blocks are the same (a clocked block is a
+        view of its source), so their numbers and starts are shared.
+        """
+        # Lazy import: a cycle, the sampled diagram builds on this module
+        from minilink.core.discrete.sampled_diagram import diagram_on_clock
+
+        return diagram_on_clock(self, dt)
+
     ###########################################################################
     # Internal machinery
     ###########################################################################

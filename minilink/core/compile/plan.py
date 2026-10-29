@@ -35,6 +35,10 @@ from minilink.core.wiring import WiredDiagramMixin
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
+
+# The name of the plant's input among a run's signals: the plant role's u
+PLANT_INPUT = "plant:u"
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -585,6 +589,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
 
     base = diagram.sample_period
     require_clock(diagram, base)
+    require_tick_laws_on_their_box_clock(diagram, base)
 
     # The wiring of one flat level; the slices of the nested layout
     flat, report = flatten_diagram(diagram)
@@ -661,6 +666,32 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         external_output_slices=external,
         paths=paths,
     )
+
+
+def require_tick_laws_on_their_box_clock(diagram, base, prefix=()):
+    """
+    Refuse a bare tick law in a nested box whose own clock is slower than the loop's base.
+
+    A bare tick law ticks on the base clock of the loop it runs in (R158): in a
+    box clocked at ``Δ_box`` nested in a loop of finer base ``Δ``, it would tick
+    ``Δ_box / Δ`` times faster than in its box alone. It takes its own clock
+    instead (``law % Δ_box``).
+    """
+    for sys_id, sys in diagram.subsystems.items():
+        if not isinstance(sys, WiredDiagramMixin):
+            continue
+        box_base = getattr(sys, "sample_period", None)
+        for inner_id, inner in sys.subsystems.items():
+            bare = isinstance(inner, StepSystem) and inner.sample_period is None
+            bare = bare and not isinstance(inner, WiredDiagramMixin)
+            if bare and box_base is not None and abs(box_base - base) > 1e-12 * base:
+                path = "/".join((*prefix, sys_id, inner_id))
+                raise TypeError(
+                    f"the tick law {path!r} has no clock of its own: in its box it ticks "
+                    f"every {box_base:g} s, in this loop every {base:g} s; give it its "
+                    f"box's clock ({inner.name} % {box_base:g})"
+                )
+        require_tick_laws_on_their_box_clock(sys, base, (*prefix, sys_id))
 
 
 def face_of(sys, sampled_kind) -> str:

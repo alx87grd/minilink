@@ -110,6 +110,7 @@ mpc  = ModelPredictiveController(planner, delay=False, warm_start=False)  # the 
 mpc  = ModelPredictiveController(planner, inputs={"x_start": "x_hat",
                                                   "plant.m": "m_hat", "plant.mu": "mu_hat"})
 mpc  = ModelPredictiveController(planner, lookahead=0.05)     # delay compensation, with a predictor on x_start
+mpc  = ModelPredictiveController(planner, verbose=True)       # one line per solve, for tuning
 loop = (mpc % 0.05) @ plant                                   # % sets the native law's period
 ```
 

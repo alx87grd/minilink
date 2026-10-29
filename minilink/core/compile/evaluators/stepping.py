@@ -125,57 +125,82 @@ def substeps_of(dt_hold, dt_inner=None):
     return max(1, int(round(float(dt_hold) / float(dt_inner))))
 
 
-def iterate(evaluator, transition, x0, sequences):
+def iterate(evaluator, transition, x0, sequences, *, records=False):
     """``[x_0, …, x_N]`` of ``x_{k+1} = transition(x_k, *row_k)`` over the rows of ``sequences``.
 
-    A Python loop on NumPy, one ``lax.scan`` on JAX.
+    With ``records``, ``transition`` returns ``(x_{k+1}, record_k)`` (a vector
+    computed at tick ``k``) and the run returns ``(x_samples, records)``,
+    ``records`` ``(N, r)``. A Python loop on NumPy, one ``lax.scan`` on JAX.
     """
     if evaluator.backend != "jax":
         x = x0
         x_path = [x]
+        record_path = []
         for row in zip(*sequences):
-            x = transition(x, *row)
+            if records:
+                x, record = transition(x, *row)
+                record_path.append(record)
+            else:
+                x = transition(x, *row)
             x_path.append(x)
         x_samples = np.array(x_path)
+        if not records:
+            return x_samples
 
-        return x_samples
+        return x_samples, np.stack(record_path)
 
     def scan_body(x, row):
+        if records:
+            x_next, record = transition(x, *row)
+            return x_next, (x_next, record)
         x_next = transition(x, *row)
         return x_next, x_next
 
-    _, xs = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    _, outputs = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    xs = outputs[0] if records else outputs
     x_samples = evaluator.jnp.concatenate((x0[None, :], xs), axis=0)
+    if not records:
+        return x_samples
 
-    return x_samples
+    return x_samples, outputs[1]
 
 
 def iterate_dense(evaluator, period, x0, sequences):
-    """``[x_0, …]`` of every point a run keeps: ``period(x_k, *row_k) -> (x_{k+1}, points_k)``.
+    """``[x_0, …]`` of every point a run keeps: ``period(x_k, *row_k) -> (x_{k+1}, points_k[, record_k])``.
 
     ``points_k`` is ``(S, n)``, the state at the ``S`` points of the period after
     its start, its last row ``x_{k+1}``; the run returns ``(N·S + 1, n)``. A
-    Python loop on NumPy, one ``lax.scan`` on JAX.
+    period that also returns ``record_k`` (a vector, the signals recorded at
+    tick ``k``) makes the run return ``(x_samples, records)``, ``records``
+    ``(N, r)``. A Python loop on NumPy, one ``lax.scan`` on JAX.
     """
     if evaluator.backend != "jax":
         x = x0
         x_path = [x0[None, :]]
+        records = []
         for row in zip(*sequences):
-            x, points = period(x, *row)
+            x, points, *record = period(x, *row)
             x_path.append(points)
+            records.extend(record)
         x_samples = np.concatenate(x_path, axis=0)
+        if not records:
+            return x_samples
 
-        return x_samples
+        return x_samples, np.stack(records)
 
     def scan_body(x, row):
-        x_next, points = period(x, *row)
-        return x_next, points
+        x_next, *outputs = period(x, *row)
+        return x_next, tuple(outputs)
 
-    _, points = evaluator.jax.lax.scan(scan_body, x0, sequences)
+    _, outputs = evaluator.jax.lax.scan(scan_body, x0, sequences)
     n = x0.shape[0]
-    x_samples = evaluator.jnp.concatenate((x0[None, :], points.reshape(-1, n)), axis=0)
+    x_samples = evaluator.jnp.concatenate(
+        (x0[None, :], outputs[0].reshape(-1, n)), axis=0
+    )
+    if len(outputs) == 1:
+        return x_samples
 
-    return x_samples
+    return x_samples, outputs[1]
 
 
 def held_inputs(u_seq, hold):

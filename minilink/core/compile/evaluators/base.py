@@ -81,6 +81,7 @@ class Evaluator(JacobianMixin):
         self.params_reader = None
         self.on_device = DeviceTree()
         self.frozen_on_device = None
+        self.frozen_large = None
 
     @property
     def params(self):
@@ -110,7 +111,10 @@ class Evaluator(JacobianMixin):
         """
         frozen = self._frozen_params
         if params is None:
-            if not has_large_leaf(frozen):
+            # The compiled tree never changes: whether it holds a large leaf is read once
+            if self.frozen_large is None:
+                self.frozen_large = has_large_leaf(frozen)
+            if not self.frozen_large:
                 return None
             # The compiled tree never changes: on the device once (put inside an
             # outer trace, the result is traced: returned, not kept)

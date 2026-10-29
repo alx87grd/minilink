@@ -21,7 +21,11 @@ from minilink.core.compile.evaluators.base import (
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
 from minilink.core.compile.evaluators.stepping import iterate, iterate_dense
-from minilink.core.compile.plan import SampledPortOperation, StepExecutionPlan
+from minilink.core.compile.plan import (
+    PLANT_INPUT,
+    SampledPortOperation,
+    StepExecutionPlan,
+)
 from minilink.core.diagram import check_diagram_params
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_system import StepSystem
@@ -467,8 +471,10 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             for port_id, sl in self.plan.external_output_slices.items()
         }
 
-    @compiled(static=("n_steps",))
-    def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
+    @compiled(static=("n_steps", "record"))
+    def rollout_dense(
+        self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0, record=()
+    ):
         """
         The run with the plant's substeps kept: ``(N·S + 1, n)`` at ``t_start + (k + j/S)·Δ``.
 
@@ -477,31 +483,79 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         the same, bit for bit; inside the period the loop's plant (a continuous
         plant integrated by its substeps) shows its substep ends, every other
         block its state at the tick, the input held.
+
+        ``record`` names signals to keep from the same signal pass, so nothing is
+        computed again after the run: ``"path/block:port"`` (a block's output, by
+        its nested path) or ``"plant:u"`` (the plant's gathered input). With a
+        record the run returns ``(x_samples, {name: (N·S + 1, dim)})``: each
+        tick's value held over its period, the end sample holding the last
+        tick's.
         """
         self.require_params(params)
         xp = self.xp
         n = self.n
+        S = self.plan.dense_points
+        layout = record_layout(self.plan, record)
 
         x0 = xp.asarray(x0, dtype=float).reshape(n)
         u_seq = self.input_sequence_of(u_seq, n_steps)
         ks = self.indices(u_seq.shape[0])
 
-        # One signal pass per period: the step and the substep points share it
+        # One signal pass per period: the step, the substep points and the record share
+        # it; the plant is integrated once, its substep path giving the tick's state
         def period(x, k, u_k):
             x_f, u_f = self.float_arrays(x, u_k)
             signals = self.port_signals(x_f, u_f, k, params, t_start=t_start)
+            paths = []
+
+            def advance(system, local_x, local_u, time, p_op):
+                path = system.update_path(local_x, local_u, time, p_op)
+                paths.append(path)
+                return path[-1]
+
             x_next = self.next_from_signals(
-                x_f, u_f, k, params, signals, t_start=t_start
+                x_f,
+                u_f,
+                k,
+                params,
+                signals,
+                t_start=t_start,
+                advance=advance if S > 1 else None,
             )
             x_next = xp.reshape(x_next, (n,))
-            points = self.substep_points(x, u_k, k, params, x_next, t_start, signals)
-            return x_next, points
+            points = self.points_of(x, x_next, paths[0] if paths else None)
+            if not layout:
+                return x_next, points
+            return x_next, points, self.recorded(layout, signals, u_f)
 
-        x_samples = iterate_dense(self, period, x0, (ks, u_seq))
+        if not layout:
+            return iterate_dense(self, period, x0, (ks, u_seq))
+        x_samples, records = iterate_dense(self, period, x0, (ks, u_seq))
 
-        return x_samples
+        # Each tick's value over the S samples of its period, the end holding the last
+        dense = xp.concatenate([xp.repeat(records, S, axis=0), records[-1:]], axis=0)
+        recorded = {}
+        start = 0
+        for name, _, dim in layout:
+            recorded[name] = dense[:, start : start + dim]
+            start += dim
 
-    def rollout_with_cost(self, x0, u_seq, params, rate, *, n_steps=None, t_start=0.0):
+        return x_samples, recorded
+
+    def recorded(self, layout, signals, u):
+        """The recorded signals of one tick, stacked: each named port's slice, the plant's input."""
+        xp = self.xp
+
+        pieces = [
+            self.plant_input_from(signals, u) if sl is None else signals[sl]
+            for _, sl, _ in layout
+        ]
+
+        return xp.concatenate([xp.reshape(piece, (-1,)) for piece in pieces])
+
+    def rollout_with_cost(
+        self, x0, u_seq, params, rate, *, n_steps=None, t_start=0.0, signals=False
+    ):
         """
         ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the loop's plant carrying its stage cost.
 
@@ -509,7 +563,9 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         cost's integrand ``rate(x_plant, u_plant, τ)`` integrated beside the
         plant's state by its solver and substeps, the input held; ``C_k`` is
         the running sum of the periods' costs, ``C_0 = 0``. The states are
-        :meth:`rollout`'s.
+        :meth:`rollout`'s. With ``signals`` the run also returns each tick's
+        signal buffer from its own pass, ``(N + 1, n_signals)``, the end sample
+        holding the last tick's: nothing is computed again to record it.
         """
         xp = self.xp
         n = self.n
@@ -522,7 +578,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         # z_{k+1} = [x_{k+1}; C_k + c_k]: the loop's tick, its plant advanced with its cost
         def transition(z, k, u_k):
             x, u_f = self.float_arrays(z[:n], u_k)
-            signals = self.port_signals(x, u_f, k, params, t_start=t_start)
+            buffer = self.port_signals(x, u_f, k, params, t_start=t_start)
             costs = []
 
             def advance(system, local_x, local_u, time, p_op):
@@ -531,18 +587,24 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 return x_i
 
             x_next = self.next_from_signals(
-                x, u_f, k, params, signals, t_start=t_start, advance=advance
+                x, u_f, k, params, buffer, t_start=t_start, advance=advance
             )
             require_one_plant_period(costs, plant)
             z_next = xp.concatenate(
                 [xp.reshape(x_next, (n,)), xp.reshape(z[n] + costs[0], (1,))]
             )
+            if signals:
+                return z_next, buffer
             return z_next
 
         z0 = xp.concatenate([x0, xp.zeros(1)])
-        z_samples = iterate(self, transition, z0, (ks, u_seq))
+        if not signals:
+            z_samples = iterate(self, transition, z0, (ks, u_seq))
+            return z_samples[:, :n], z_samples[:, n]
+        z_samples, buffers = iterate(self, transition, z0, (ks, u_seq), records=True)
+        buffers = xp.concatenate([buffers, buffers[-1:]], axis=0)
 
-        return z_samples[:, :n], z_samples[:, n]
+        return z_samples[:, :n], z_samples[:, n], buffers
 
     def signals(self, x, u, k=0, params=None, *, t_start=0.0):
         """The signal buffer at tick ``k``: every block output, flat (``plan.output_slices``)."""
@@ -643,23 +705,17 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return gather_u(op.gather_sources, op.u_dim, signals, u, self.xp, self.dtype)
 
-    def substep_points(self, x, u, k, params, x_next, t_start, signals):
-        """The loop's state at the ``S`` points of the period after ``t_k``: ``(S, n)``, the last ``x_{k+1}``; ``signals`` the tick's signal buffer."""
+    def points_of(self, x, x_next, path):
+        """``(S, n)``: the plant at its substep ends ``path``, every other block at the tick, the last row ``x_{k+1}``."""
         xp = self.xp
         dtype = self.dtype
         S = self.plan.dense_points
-        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
-        points = xp.tile(x_old, (S, 1))
         if S == 1:
             return xp.reshape(x_next, (1, -1))
 
-        params = self._frozen_params if params is None else params
-        t_k = t_start + k * self.sample_period
         op = self.plan.plant_op
-        local_u = self.plant_input_from(signals, u)
-        path = op.system.update_path(
-            x_old[op.local_x_slice], local_u, t_k, lookup(params, op.params_path)
-        )
+        x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
+        points = xp.tile(x_old, (S, 1))
 
         # The plant at its substep ends, every other block at the tick
         points = assigned(xp, points, (slice(0, S), op.local_x_slice), path)
@@ -680,6 +736,29 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
     def _jac_validate_params(self, params):
         check_diagram_params(params, self._subsystem_ids)
+
+
+def record_layout(plan, record) -> tuple:
+    """``((name, slice, dim), …)`` of the recorded signals: a port's buffer slice, ``None`` for the plant's input."""
+    paths = plan.paths
+    by_name = {
+        f"{'/'.join(paths[sys_id])}:{port_id}": sl
+        for (sys_id, port_id), sl in plan.output_slices.items()
+    }
+    layout = []
+    for name in record:
+        if name in by_name:
+            sl = by_name[name]
+            layout.append((name, sl, sl.stop - sl.start))
+        elif name == PLANT_INPUT and plan.plant_op is not None:
+            layout.append((name, None, int(plan.plant_op.u_dim)))
+        else:
+            raise KeyError(
+                f"no signal {name!r} to record; the loop's signals are "
+                f"{sorted(by_name)}{' and ' + repr(PLANT_INPUT) if plan.plant_op else ''}"
+            )
+
+    return tuple(layout)
 
 
 def time_of(op, k, t_k):
@@ -713,6 +792,12 @@ def check_sampled_plan_traces(evaluator, plan, verbose):
 
 def require_one_plant_period(costs, plant):
     """Refuse a sampled loop whose plant did not take its one period: its stage cost has no owner."""
+    if not costs:
+        raise ValueError(
+            "the loop has no plant integrated inside its period to carry the stage cost "
+            "(a plant held exactly, discretize(..., solver='exact'), or on a slower "
+            "clock): discretize the plant with solver='rk4' or 'euler' to score the loop"
+        )
     if len(costs) != 1:
         raise ValueError(
             f"the loop's plant {getattr(plant, 'sys_id', plant)!r} took {len(costs)} periods "

@@ -354,9 +354,11 @@ def validate_equation_shapes(system, label=None):
     output ports created by the constructor (``y`` -> ``h``, ``x`` -> state)
     are evaluated at ``(x0, u_nominal, t=0)``; a wrong-length result raises
     ``ValueError`` naming the block, the hook, and both shapes. Custom port
-    computes are not probed (they may be expensive or stateful).
+    computes and a native sampled law's update are not probed (they may be
+    expensive or stateful: a delayed MPC's update is a solve).
     """
     from minilink.core.diagram import DiagramSystem
+    from minilink.core.discrete.sampled_system import NativeSampledSystem
     from minilink.core.discrete.step_diagram import StepDiagramSystem
     from minilink.core.discrete.step_system import StepSystem
     from minilink.core.system import DynamicSystem
@@ -374,7 +376,7 @@ def validate_equation_shapes(system, label=None):
 
     if isinstance(system, DynamicSystem) and n > 0:
         require_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")
-    elif isinstance(system, StepSystem):
+    elif isinstance(system, StepSystem) and not isinstance(system, NativeSampledSystem):
         require_shape(system.step(x0, u0, 0), (n,), f"step() of '{name}'", f"for n={n}")
 
     for port_id, port in system.outputs.items():

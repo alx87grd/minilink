@@ -12,7 +12,6 @@ from minilink.learning.reinforcement_learning.collect import (
     gae,
     returns_to_go,
 )
-from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
 from minilink.learning.reinforcement_learning.planner import (
     ReinforcementLearningPlanner,
 )
@@ -25,6 +24,7 @@ from minilink.learning.reinforcement_learning.tabular import (
     QLearning,
     TabularLearningPlanner,
 )
+from minilink.planning.environment import RolloutEnvironment
 
 __all__ = [
     "Algorithm",

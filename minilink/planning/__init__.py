@@ -34,6 +34,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationOptions",
     ),
+    # Path integral control (MPPI)
+    "MPPIPlanner": (
+        "minilink.planning.trajectory_optimization.path_integral",
+        "MPPIPlanner",
+    ),
+    "MPPIRecord": (
+        "minilink.planning.trajectory_optimization.path_integral",
+        "MPPIRecord",
+    ),
     # Dynamic programming
     "StateSpaceGrid": (
         "minilink.planning.dynamic_programming.discretizer",
