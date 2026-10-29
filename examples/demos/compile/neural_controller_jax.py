@@ -29,7 +29,7 @@ diagram.connect_new_output_port("plant", "y", "y")
 
 diagram.plot_diagram()
 
-diagram.x0[0] = 2.0
+plant.x0[0] = 2.0
 diagram.compute_trajectory()
 diagram.plot_trajectory()
 
