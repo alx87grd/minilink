@@ -393,14 +393,19 @@ class ProblemEvaluator:
         if numbers is None:
             cost_params, numbers = None, "own"
 
-        # The key: the price switch and the numbers; the entry holds the parts it
-        # was taken on, so a part replaced since takes a new bound
+        # The evaluation's discount rate, when it has a value (a traced one prices at
+        # the problem's)
+        rate = params.get("discount_rate", problem.discount_rate)
+        rate = float(rate) if is_concrete_number(rate) else problem.discount_rate
+
+        # The key: the price switch, the rate and the numbers; the entry holds the
+        # parts it was taken on, so a part replaced since takes a new bound
         parts = problem_parts(problem)
-        key = (problem.infeasible_cost, problem.discount_rate, numbers)
+        key = (problem.infeasible_cost, rate, numbers)
         cached = self.price_cache.get(key)
         if cached is None or any(a is not b for a, b in zip(cached[0], parts)):
-            price = price_of(problem, self.tf, cost_params)
-            bound = diverged_cost_of(problem, self.tf, price, cost_params)
+            price = price_of(problem, self.tf, cost_params, rate)
+            bound = diverged_cost_of(problem, self.tf, price, cost_params, rate)
             cached = self.price_cache[key] = (parts, price, bound)
 
         return cached[1:]
@@ -1089,6 +1094,16 @@ def gather_samples(sources, signals, us, xp):
             pieces.append(xp.broadcast_to(xp.asarray(where), (n_samples, dim)))
 
     return xp.concatenate(pieces, axis=1)
+
+
+def is_concrete_number(value) -> bool:
+    """Whether ``value`` is a number with a value on the host (a traced one has none)."""
+    try:
+        float(value)
+    except TypeError:  # a tracer cannot be concretized
+        return False
+
+    return True
 
 
 def problem_parts(problem):

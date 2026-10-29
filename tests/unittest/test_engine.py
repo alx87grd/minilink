@@ -923,3 +923,23 @@ def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
     ).compile(PID(Kp=10.0, Kd=1.0), dt=0.02, backend=backend)
     with pytest.raises(ValueError, match="integer leaf"):
         noisy.program(["disturbance.seed"], key=4, n_trials=2)
+
+
+def test_the_failure_price_follows_the_evaluations_discount_rate():
+    from minilink import Pendulum, PlanningProblem, QuadraticCost, StateFeedback
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    problem = PlanningProblem(
+        plant,
+        cost=cost,
+        tf=2.0,
+        x_start=np.array([0.5, 0.0]),
+        U=plant.input_box,
+        infeasible_cost=True,
+    )
+    pe = problem.compile(StateFeedback(np.array([[2.0, 0.5]])), dt=0.05)
+    price_own, _ = pe.price_and_bound(pe.params)
+    price_fast, _ = pe.price_and_bound({**pe.params, "discount_rate": 2.0})
+    assert price_fast == pytest.approx(problem.cost_bound(2.0, discount_rate=2.0))
+    assert price_fast < price_own
