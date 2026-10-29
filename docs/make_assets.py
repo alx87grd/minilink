@@ -122,7 +122,6 @@ def tool_montage() -> None:
     problem = PlanningProblem(
         sys=plant,
         x_start=np.zeros(2),
-        x_goal=x_up,
         Xf=BallSet(x_up, 0.2),
         tf=4.0,
         cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),

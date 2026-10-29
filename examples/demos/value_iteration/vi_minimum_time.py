@@ -19,7 +19,7 @@ plant.inputs["u"].lower_bound = np.array([-1.0])
 plant.inputs["u"].upper_bound = np.array([1.0])
 
 cost = TimeCost.from_system(plant, eps=1e-3)
-problem = PlanningProblem(plant, x_goal=np.zeros(2), cost=cost, U=plant.input_box)
+problem = PlanningProblem(plant, cost=cost, U=plant.input_box)
 
 planner = DynamicProgrammingPlanner(
     problem,

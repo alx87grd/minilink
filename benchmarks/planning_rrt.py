@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
+from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
@@ -80,7 +80,7 @@ def holonomic_problem():
     problem = PlanningProblem(
         sys=sys,
         x_start=np.array([-4.0, -4.0]),
-        x_goal=x_goal,
+        Xf=BallSet(x_goal, GOAL_TOLERANCE),
         X=X,
         U=sys.input_box,
     )
@@ -96,7 +96,6 @@ def _make_options(planner_cls, seed, nearest_backend):
     if planner_cls is RRTStarPlanner:
         return RRTStarOptions(
             seed=seed,
-            goal_tolerance=GOAL_TOLERANCE,
             goal_bias=GOAL_BIAS,
             max_nodes=MAX_NODES,
             nearest_backend=nearest_backend,
@@ -106,7 +105,6 @@ def _make_options(planner_cls, seed, nearest_backend):
         )
     return RRTOptions(
         seed=seed,
-        goal_tolerance=GOAL_TOLERANCE,
         goal_bias=GOAL_BIAS,
         max_nodes=MAX_NODES,
         nearest_backend=nearest_backend,

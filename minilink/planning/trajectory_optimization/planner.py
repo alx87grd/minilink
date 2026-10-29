@@ -538,7 +538,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print("system:", getattr(sys, "name", type(sys).__name__))
         print(f"dimensions: n={int(sys.n)}, m={int(sys.m)}, p={int(sys.p)}")
         print("x_start:", preview_vector(problem.x_start))
-        print("x_goal:", preview_vector(problem.x_goal))
+        print("goal point:", preview_vector(problem.goal_point()))
         print("X:", type_name(problem.X))
         print("U:", type_name(problem.U))
         print("X0:", type_name(problem.X0))
@@ -705,8 +705,8 @@ class TrajectoryOptimizationPlanner(Planner):
         print("max_bound:", record.max_bound_violation)
         print("x(0):", preview_vector(trajectory.x[:, 0]))
         print("x(tf):", preview_vector(trajectory.x[:, -1]))
-        if self.problem.x_goal is not None:
-            terminal_error = trajectory.x[:, -1] - self.problem.x_goal
+        if self.problem.Xf is not None:
+            terminal_error = trajectory.x[:, -1] - self.problem.goal_point()
             print("terminal_error_inf:", float(np.max(np.abs(terminal_error))))
         print(
             "timing:",

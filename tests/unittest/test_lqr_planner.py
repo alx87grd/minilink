@@ -26,7 +26,6 @@ def pendulum_problem(tf=np.inf, S=None):
     return PlanningProblem(
         plant,
         x_start=UPRIGHT + [0.3, 0.0],
-        x_goal=UPRIGHT,
         cost=cost,
         tf=tf,
         U=plant.input_box,

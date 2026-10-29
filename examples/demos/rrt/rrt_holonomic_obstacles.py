@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink import (
+    BallSet,
     BoxSet,
     HolonomicMobileRobot,
     PlanningProblem,
@@ -67,9 +68,7 @@ def make_holonomic_problem(*, robot_radius=0.25):
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
     body = mount(disc(robot_radius), on=sys)
     X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
-    problem = PlanningProblem(
-        sys=sys, x_start=X_START, x_goal=X_GOAL, X=X, U=sys.input_box
-    )
+    problem = PlanningProblem(sys=sys, x_start=X_START, X=X, U=sys.input_box)
     return sys, scene, body, problem
 
 
@@ -134,6 +133,7 @@ def run_rrt_vs_rrt_star():
     import matplotlib.pyplot as plt
 
     _, scene, _, problem = make_holonomic_problem()
+    problem = problem.replace(Xf=BallSet(X_GOAL, GOAL_TOLERANCE))  # the goal region
     extender = make_steering_extender(
         max_distance=STEERING_MAX_DISTANCE,
         resolution=STEERING_RESOLUTION,
@@ -143,7 +143,6 @@ def run_rrt_vs_rrt_star():
         problem,
         extender,
         seed=SEED,
-        goal_tolerance=GOAL_TOLERANCE,
         max_nodes=MAX_NODES,
     )
     sol_rrt = rrt.solve()
@@ -151,7 +150,6 @@ def run_rrt_vs_rrt_star():
         problem,
         extender,
         seed=SEED,
-        goal_tolerance=GOAL_TOLERANCE,
         max_nodes=MAX_NODES,
         optimize_after_goal=True,
         cost_tol=COST_TOL,
@@ -194,6 +192,7 @@ def run_extender_comparison():
     import matplotlib.pyplot as plt
 
     _, scene, _, problem = make_holonomic_problem()
+    problem = problem.replace(Xf=BallSet(X_GOAL, EXTENDER_GOAL_TOLERANCE))
     extenders = {
         "steering": make_steering_extender(max_distance=0.6, resolution=0.05),
         "kinodynamic": make_kinodynamic_extender(horizon=0.6, n_substeps=6),
@@ -205,7 +204,6 @@ def run_extender_comparison():
             problem,
             extender,
             seed=SEED,
-            goal_tolerance=EXTENDER_GOAL_TOLERANCE,
             max_nodes=EXTENDER_MAX_NODES,
         )
         traj = planner.solve().trajectory

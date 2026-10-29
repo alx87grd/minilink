@@ -451,8 +451,9 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
 - **A problem's parameters are a view of its parts** (as a diagram's are of its
   blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x_start",
   "discount_rate"}`, assembled on each access from the parts, which stay the one home of
-  each number; assigning a dictionary routes each entry to its part (a singleton `X0`
-  moves with `x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
+  each number (the start's singleton `X0` is not an entry: its point is `x_start`, one home);
+  assigning a dictionary routes each entry to its part (a singleton `X0` moves with
+  `x_start`, and so does assigning `problem.x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
   a set that holds no parameters refuses a write). Library costs
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
   `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
@@ -1058,8 +1059,15 @@ horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs,
 references read absolute time, the discount counts from it, the fixed grids of the
 transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
 evaluator's tree, so `jax.grad` differentiates it), the discount rate and the failure cost
-switch (below). The planners pin the start from `x_start`; a singleton `X0` is derived from it. `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
-and `x_goal` never creates `Xf` (an exact terminal state is `Xf=SingletonSet(x_goal)`).
+switch (below). **The boundary dials** (R177): `X0=` is the start constraint `x(0) ∈ X0` (a
+vector is its singleton; by default the start's singleton, a law's support, else the
+singleton at `sys.x0`); `Xf=` the terminal constraint (a vector its singleton, a hard terminal
+equality for collocation and shooting; `None` a free end); `x_start=` the evaluation start, a
+point or a law (by default `X0`'s point: a singleton's, a region's bounding-box centre when
+finite and inside, else `sys.x0` when inside), which must belong to `X0`; the cost's `xbar` the
+objective's target. There is no goal shortcut: `problem.goal_point()` (`Xf`'s point, else the
+cost's `xbar`, else the start) is what a heuristic aims at (an initial guess's end, RRT's goal
+bias, a plot's anchor); it never constrains a plan. The planners pin the start from `x_start`.
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner: the
@@ -1482,7 +1490,9 @@ Build viz costs with ``mount(point_probe(), on=sys)``; MPC may still use ``car_o
 
 **Search / RRT** (`planning/search/`): `RRTPlanner(Planner)` owns the invariant loop and
 sources every concern from the problem — collision `problem.X.contains` (optional
-orchestrator `edge_resolution` densification along edges), goal `problem.Xf`/`x_goal`,
+orchestrator `edge_resolution` densification along edges), goal region `problem.Xf` (a ball
+written as one, `Xf=BallSet(goal, tol)`; a singleton or no `Xf` is refused), its goal bias
+toward `problem.goal_point()`,
 free-space sampling from `problem.X` (direct `Set.sample` or rejection from the bounding box of `X`), dynamics `problem.sys.f` — so the system stays pure. After
 `solve()`, `reached_goal` and `solution_node` report success vs
 best-effort fallback (`return_best_effort`). The two swappable pieces are an injected

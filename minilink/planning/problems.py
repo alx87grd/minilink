@@ -15,6 +15,7 @@ from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import flatten, lookup, merge_tree, set_leaf, with_leaf
 from minilink.core.sets import (
+    BallSet,
     BoxInputSet,
     BoxSet,
     InputSet,
@@ -57,18 +58,12 @@ class PlanningProblem:
     sys : System
         Minilink system or diagram to plan for.
     x_start : array_like, Distribution or Set, optional
-        The plant's start: a point, a law over ``x(0)``, or a set (the
-        uniform law on it). A point is the representative start: when ``X0`` is
-        omitted, it creates a singleton ``X0``; when ``X0`` is provided, it must
-        belong to ``X0``. A law's mean is the representative start and its
-        support the default ``X0``; a set is the default ``X0``. Defaults to the
-        singleton ``X0`` when available, otherwise ``sys.x0``.
-    x_goal : array_like, optional
-        Representative terminal target, for the tools that need one point (an
-        initial guess, RRT's goal bias). It never creates ``Xf``: an exact
-        terminal state is ``Xf=SingletonSet(x_goal)``, written. When ``Xf`` is
-        provided, ``x_goal`` must belong to it; unset, it is the point of a
-        singleton ``Xf``.
+        The evaluation start, where runs begin and what :meth:`realize` draws: a
+        point, or a law over ``x(0)`` (a set given here is the uniform law on
+        it; no randomness unless a law is given). It must belong to ``X0``. By
+        default: the point of a singleton ``X0``; for a region, the centre of its
+        bounding box when finite and inside, else ``sys.x0`` when inside (a
+        region holding neither is refused: give ``x_start``).
     cost : CostFunction, optional
         Planning cost. Required by solvers that optimize an objective.
     X : Set, optional
@@ -82,10 +77,29 @@ class PlanningProblem:
         to its ports' declared range. A planner that needs a finite box (value
         iteration's grid, an RL action space, RRT's bang-bang controls) refuses
         an unbounded one.
-    X0, Xf : Set, optional
-        Initial and terminal boundary sets. These are the authoritative
-        feasibility constraints; ``x_start`` and ``x_goal`` are shortcuts or
-        representative points.
+    X0 : Set or array_like, optional
+        The start constraint ``x(0) ∈ X0``, what planners enforce; a vector is
+        the singleton at it. By default from ``x_start``: a point's singleton, a
+        law's support; with neither, the singleton at ``sys.x0``.
+    Xf : Set or array_like, optional
+        The terminal constraint ``x(tf) ∈ Xf``; a vector is the singleton at it
+        (a hard terminal equality for collocation and shooting); ``None``
+        (default) is a free end.
+
+    The dials, in one table:
+
+    =========== =========================================== =====================================
+    dial        meaning                                     default
+    =========== =========================================== =====================================
+    ``X0``      the start constraint ``x(0) ∈ X0``          from ``x_start``, else ``sys.x0``
+    ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
+    ``x_start`` the evaluation start (a point or a law)     from ``X0``
+    ``xbar``    the objective's target, the cost's number   the cost's
+    =========== =========================================== =====================================
+
+    :meth:`goal_point` is the point a heuristic aims at (an initial guess's
+    end, RRT's goal bias, a plot's anchor): ``Xf``'s point, else the cost's
+    ``xbar``, else the start.
     tf : float, optional
         Continuous planning horizon length in seconds. ``None`` means unset
         (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
@@ -133,7 +147,6 @@ class PlanningProblem:
     FIELDS = (
         "sys",
         "x_start",
-        "x_goal",
         "cost",
         "X",
         "U",
@@ -165,7 +178,6 @@ class PlanningProblem:
         self,
         sys: System,
         x_start=None,
-        x_goal=None,
         cost: CostFunction | None = None,
         X: Set | None = None,
         U: InputSet | None = None,
@@ -187,15 +199,14 @@ class PlanningProblem:
             if X0 is None:
                 X0 = self.start_law.support
 
-        # The fields as given, coerced below
+        # The fields as given, coerced below; a vector boundary is its singleton
         self.sys = sys
-        self.x_start = x_start
-        self.x_goal = x_goal
+        self.start_point = x_start
         self.cost = cost
         self.X = X
         self.U = U
-        self.X0 = X0
-        self.Xf = Xf
+        self.X0 = boundary_set_of(X0)
+        self.Xf = boundary_set_of(Xf)
         self.tf = tf
         self.t_start = coerce_start_time(t_start)
         self.penalize_failure = penalize_failure
@@ -209,16 +220,11 @@ class PlanningProblem:
         self.penalize_failure = coerce_switch(self.penalize_failure)
         self.failure_cost = coerce_failure_cost(self.failure_cost)
 
-        # The representative start and goal
+        # The evaluation start: the point given, else the law's mean, else X0's
         x_start = self.coerce_state(
             self.default_x_start(),
             label="x_start",
             required=True,
-        )
-        x_goal = self.coerce_state(
-            self.default_x_goal(),
-            label="x_goal",
-            required=False,
         )
 
         # The sets: X and U unconstrained unless given, X0 the start's singleton,
@@ -235,28 +241,18 @@ class PlanningProblem:
         if Xf is not None:
             self.require_type("Xf", Xf, Set)
 
-        # The representative points: states of size n, inside their boundary sets
+        # The start: a state of size n inside X0
         self.check_state_shape("x_start", x_start, n)
-        if x_goal is not None:
-            self.check_state_shape("x_goal", x_goal, n)
         self.require_member(
             X0,
             x_start,
             set_label="X0",
             point_label="x_start",
         )
-        if Xf is not None and x_goal is not None:
-            self.require_member(
-                Xf,
-                x_goal,
-                set_label="Xf",
-                point_label="x_goal",
-            )
 
         # The coerced fields
         self.tf = tf
-        self.x_start = x_start
-        self.x_goal = x_goal
+        self.start_point = x_start
         self.X = X
         self.U = U
         self.X0 = X0
@@ -318,6 +314,15 @@ class PlanningProblem:
             else:
                 setattr(self, role, moved_set(role, getattr(self, role), entry))
 
+    @property
+    def x_start(self) -> np.ndarray:
+        """The evaluation start's point (a law's mean): the one leaf ``params["x_start"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
+        return self.start_point
+
+    @x_start.setter
+    def x_start(self, value):
+        self.move_start(value)
+
     def move_start(self, x_start):
         """Set ``x_start``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
         start = self.coerce_state(x_start, label="x_start", required=True)
@@ -326,7 +331,25 @@ class PlanningProblem:
             self.X0 = SingletonSet(start)
         self.require_member(self.X0, start, set_label="X0", point_label="x_start")
 
-        self.x_start = start
+        self.start_point = start
+
+    def goal_point(self) -> np.ndarray:
+        """
+        The point a heuristic aims at: ``Xf``'s point, else the cost's target ``xbar``, else the start.
+
+        ``Xf``'s point is a singleton's point, a ball's centre, else the centre of
+        its bounding box when finite. An initial guess's end, RRT's goal bias and
+        a plot's anchor read it; it never constrains a plan.
+        """
+        point = set_point(self.Xf)
+        if point is not None:
+            return point
+
+        xbar = None if self.cost is None else self.cost.params.get("xbar")
+        if xbar is not None:
+            return np.asarray(xbar, dtype=float).reshape(-1).copy()
+
+        return self.x_start.copy()
 
     def realize(self, key=None, n=1):
         """
@@ -493,8 +516,9 @@ class PlanningProblem:
             view["cost"] = self.cost.params
         for role in ("X", "U", "X0", "Xf"):
             set_ = getattr(self, role)
-            if set_ is not None:
-                view[role] = getattr(set_, "params", None)
+            if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
+                continue  # The start's singleton: its point is x_start, one home
+            view[role] = getattr(set_, "params", None)
         for port, block in getattr(self, "disturbances", {}).items():
             view[source_id(port)] = block.params
         view["x_start"] = self.x_start
@@ -645,7 +669,9 @@ class PlanningProblem:
     def require_goal(self) -> Set:
         """Refuse a problem without a terminal set; return it."""
         if self.Xf is None:
-            raise ValueError("This planner requires a terminal set or x_goal")
+            raise ValueError(
+                "This planner requires a terminal set: give the problem Xf"
+            )
 
         return self.Xf
 
@@ -692,15 +718,34 @@ class PlanningProblem:
         return value
 
     def default_x_start(self):
-        """The start given, else its law's mean, else the point of a singleton ``X0``, else ``sys.x0``."""
-        if self.x_start is not None:
-            return self.x_start
+        """
+        The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
+
+        With no ``X0`` the start is ``sys.x0``; a region holding neither its
+        centre nor ``sys.x0`` is refused.
+        """
+        if self.start_point is not None:
+            return self.start_point
         if self.start_law is not None:
             return self.start_law.mean
-        if isinstance(self.X0, SingletonSet):
-            return self.X0.point
+        X0 = self.X0
+        if X0 is None:
+            return self.sys.x0
+        if isinstance(X0, SingletonSet):
+            return X0.point
 
-        return self.sys.x0
+        # A region: the centre of its bounding box, else the plant's own start
+        centre = region_centre(X0)
+        if centre is not None and bool(X0.contains(centre)):
+            return centre
+        x0 = np.asarray(self.sys.x0, dtype=float).reshape(-1)
+        if x0.size == int(self.sys.n) and bool(X0.contains(x0)):
+            return x0
+
+        raise ValueError(
+            f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
+            "sys.x0: give x_start, a point of X0 or a law over it"
+        )
 
     @staticmethod
     def coerce_state(
@@ -716,15 +761,6 @@ class PlanningProblem:
             return None
 
         return np.asarray(x, dtype=float).reshape(-1).copy()
-
-    def default_x_goal(self):
-        """The goal given, else the point of a singleton ``Xf``, else ``None``."""
-        if self.x_goal is not None:
-            return self.x_goal
-        if isinstance(self.Xf, SingletonSet):
-            return self.Xf.point
-
-        return None
 
     @staticmethod
     def require_type(label: str, value: object, expected_type: type) -> None:
@@ -994,6 +1030,40 @@ def moved_set(role, set_, entry):
         raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters")
 
     return set_.with_params(entry)
+
+
+def boundary_set_of(boundary):
+    """A boundary set as given (``None``, a :class:`~minilink.core.sets.Set`), or a vector's singleton."""
+    if boundary is None or isinstance(boundary, Set):
+        return boundary
+
+    return SingletonSet(np.asarray(boundary, dtype=float).reshape(-1))
+
+
+def set_point(set_):
+    """A set's point: a singleton's, a ball's centre, else its bounding box's centre when finite (``None``: no set or no point)."""
+    if set_ is None:
+        return None
+    if isinstance(set_, SingletonSet):
+        return set_.point.copy()
+    if isinstance(set_, BallSet):
+        return np.asarray(set_.center, dtype=float).copy()
+
+    return region_centre(set_)
+
+
+def region_centre(set_):
+    """The centre of a set's bounding box, ``None`` when it has none or it is not finite."""
+    box = set_.bounding_box()
+    if box is None or not is_finite_box(box):
+        return None
+
+    # c = (lower + upper) / 2
+    centre = 0.5 * (
+        np.asarray(box.lower, dtype=float) + np.asarray(box.upper, dtype=float)
+    )
+
+    return centre
 
 
 def coerce_switch(penalize_failure) -> bool:

@@ -234,7 +234,6 @@ def rrt_entries(out):
     problem = PlanningProblem(
         plant,
         x_start=np.zeros(2),
-        x_goal=x_goal,
         Xf=BallSet(x_goal, 0.5),
         X=plant.state.box,
         U=plant.input_box,

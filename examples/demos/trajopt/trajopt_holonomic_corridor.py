@@ -111,7 +111,6 @@ problem = PlanningProblem(
     sys=sys,
     tf=TF,
     x_start=X_START,
-    x_goal=X_GOAL,
     X=X,
     Xf=SingletonSet(X_GOAL),
     cost=control_cost + path_cost,

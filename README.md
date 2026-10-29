@@ -173,7 +173,7 @@ from minilink import (
 plant = Pendulum()
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
-    sys=plant, x_start=x_down, x_goal=x_up, Xf=BallSet(x_up, 0.2), tf=4.0,
+    sys=plant, x_start=x_down, Xf=BallSet(x_up, 0.2), tf=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
     X=plant.state.box, U=plant.input_box,
 )

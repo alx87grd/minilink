@@ -583,18 +583,8 @@ class StateSpaceGrid:
         return index
 
     def default_anchor(self):
-        """The problem's goal, otherwise the grid's centre."""
-        goal = self.problem.x_goal
-        x_lb = self.x_lb
-        x_ub = self.x_ub
-
-        if goal is not None:
-            return np.asarray(goal, dtype=float)
-
-        # (x_lb + x_ub) / 2
-        centre = 0.5 * (x_lb + x_ub)
-
-        return centre
+        """The problem's goal point (``Xf``'s point, else the cost's ``xbar``, else the start)."""
+        return self.problem.goal_point()
 
 
 def face_of(problem, dt, solver):
@@ -623,7 +613,7 @@ if __name__ == "__main__":
             return np.array([x[1], u[0]])
 
     plant = DoubleIntegrator()
-    problem = PlanningProblem(plant, x_goal=np.zeros(2), U=plant.input_box)
+    problem = PlanningProblem(plant, U=plant.input_box)
     grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)

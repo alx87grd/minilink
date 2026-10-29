@@ -357,8 +357,8 @@ def mark_endpoints(ax, planner, x_axis, y_axis):
     ax.plot([x0[x_axis]], [x0[y_axis]], "ks", zorder=4, label="start")
 
     # The goal, and the circle of the goal region around it
-    if problem.x_goal is not None:
-        xg = np.asarray(problem.x_goal, dtype=float)
+    if problem.Xf is not None:
+        xg = problem.goal_point()
         ax.plot([xg[x_axis]], [xg[y_axis]], "r*", markersize=13, zorder=4, label="goal")
         radius = goal_radius(planner)
         if radius is not None:
@@ -375,16 +375,13 @@ def mark_endpoints(ax, planner, x_axis, y_axis):
 
 
 def goal_radius(planner):
-    """The radius of a ball goal region, else the goal tolerance around a goal state, else ``None``."""
+    """The radius of a ball goal region, else ``None``."""
     # Lazy import: the core sets load on first use, not with the plots
     from minilink.core.sets import BallSet
 
     Xf = planner.problem.Xf
     if isinstance(Xf, BallSet):
         return float(Xf.radius)
-
-    if planner.problem.x_goal is not None:
-        return float(planner.options.goal_tolerance)
 
     return None
 
@@ -406,8 +403,8 @@ def label_axes(ax, sys, x_axis, y_axis):
 def set_limits(ax, planner, x_axis, y_axis):
     """Fit the axes to the tree's nodes and the goal, with a 5 % margin."""
     pts = np.array([node.x for node in planner.tree.nodes], dtype=float)
-    if planner.problem.x_goal is not None:
-        pts = np.vstack([pts, np.asarray(planner.problem.x_goal, dtype=float)])
+    if planner.problem.Xf is not None:
+        pts = np.vstack([pts, planner.problem.goal_point()])
 
     for axis, setter in ((x_axis, ax.set_xlim), (y_axis, ax.set_ylim)):
         lo = float(pts[:, axis].min())

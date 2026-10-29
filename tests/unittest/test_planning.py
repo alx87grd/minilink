@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import numpy as np
 from minilink.core.costs import QuadraticCost
-from minilink.core.sets import BallSet, BoxSet, SingletonSet
+from minilink.core.sets import BallSet, BoxSet, CallableSet, SingletonSet
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
@@ -151,21 +151,20 @@ class TestPlanningArchitecture(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "finite problem.tf"):
             options.t(unset)
 
-    def test_planning_problem_open_boundary_sets_use_representatives(self):
+    def test_planning_problem_open_boundary_sets_and_the_goal_point(self):
         sys = self.make_system()
         X0 = BallSet(center=np.zeros(2), radius=0.5)
         Xf = BallSet(center=np.array([0.5, 0.0]), radius=0.25)
         x_start = np.array([0.1, -0.1])
-        x_goal = np.array([0.5, 0.0])
         problem = PlanningProblem(
-            sys=sys, x_start=x_start, x_goal=x_goal, X0=X0, Xf=Xf, U=sys.input_box
+            sys=sys, x_start=x_start, X0=X0, Xf=Xf, U=sys.input_box
         )
         self.assertIs(problem.X0, X0)
         self.assertIs(problem.Xf, Xf)
         np.testing.assert_allclose(problem.x_start, x_start)
-        np.testing.assert_allclose(problem.x_goal, x_goal)
+        np.testing.assert_allclose(problem.goal_point(), [0.5, 0.0])
 
-    def test_planning_problem_derives_representatives_from_singleton_sets(self):
+    def test_planning_problem_derives_the_start_and_the_goal_from_singleton_sets(self):
         sys = self.make_system()
         x_start = np.array([0.25, -0.5])
         x_goal = np.array([0.75, 0.5])
@@ -173,22 +172,53 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal), U=sys.input_box
         )
         np.testing.assert_allclose(problem.x_start, x_start)
-        np.testing.assert_allclose(problem.x_goal, x_goal)
+        np.testing.assert_allclose(problem.goal_point(), x_goal)
 
-    def test_planning_problem_rejects_representatives_outside_boundary_sets(self):
+        # A vector is the singleton at it
+        vectors = PlanningProblem(sys=sys, X0=x_start, Xf=x_goal, U=sys.input_box)
+        self.assertIsInstance(vectors.X0, SingletonSet)
+        self.assertIsInstance(vectors.Xf, SingletonSet)
+        np.testing.assert_allclose(vectors.Xf.point, x_goal)
+
+    def test_the_goal_point_falls_back_to_the_costs_target_then_the_start(self):
+        sys = self.make_system()
+        xbar = np.array([0.3, 0.0])
+        cost = QuadraticCost.from_system(sys, xbar=xbar)
+        x_start = np.array([0.1, 0.1])
+        with_cost = PlanningProblem(sys=sys, x_start=x_start, cost=cost)
+        np.testing.assert_allclose(with_cost.goal_point(), xbar)
+        bare = PlanningProblem(sys=sys, x_start=x_start)
+        np.testing.assert_allclose(bare.goal_point(), x_start)
+
+    def test_a_region_start_defaults_to_its_centre_else_the_plants_start(self):
+        sys = self.make_system()
+        box = BoxSet([0.0, 0.0], [1.0, 2.0])
+        problem = PlanningProblem(sys=sys, X0=box)
+        np.testing.assert_allclose(problem.x_start, [0.5, 1.0])
+        ball = BallSet(center=np.array([2.0, 0.0]), radius=0.1)
+        np.testing.assert_allclose(
+            PlanningProblem(sys=sys, X0=ball).x_start, [2.0, 0.0]
+        )
+        with self.assertRaisesRegex(ValueError, "give x_start"):
+            # An annulus with no bounding box: neither a centre nor sys.x0 = 0 in it
+            annulus = CallableSet(lambda z, t, p: np.array([1.0 - z @ z, z @ z - 0.25]))
+            PlanningProblem(sys=sys, X0=annulus)
+
+    def test_assigning_the_start_moves_its_singleton_one_home_in_the_tree(self):
+        sys = self.make_system()
+        problem = PlanningProblem(sys=sys, x_start=np.array([0.1, 0.0]))
+        problem.x_start = np.array([0.2, 0.3])
+        np.testing.assert_allclose(problem.X0.point, [0.2, 0.3])
+        self.assertNotIn("X0", problem.params)
+        np.testing.assert_allclose(problem.params["x_start"], [0.2, 0.3])
+
+    def test_planning_problem_rejects_a_start_outside_x0(self):
         sys = self.make_system()
         with self.assertRaisesRegex(ValueError, "x_start must belong to X0"):
             PlanningProblem(
                 sys=sys,
                 x_start=np.array([1.0, 0.0]),
                 X0=BallSet(center=np.zeros(2), radius=0.25),
-                U=sys.input_box,
-            )
-        with self.assertRaisesRegex(ValueError, "x_goal must belong to Xf"):
-            PlanningProblem(
-                sys=sys,
-                x_goal=np.array([1.0, 0.0]),
-                Xf=BallSet(center=np.zeros(2), radius=0.25),
                 U=sys.input_box,
             )
 
@@ -793,9 +823,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(
-            seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
-        ),
+        options=RRTOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -846,7 +874,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -859,10 +887,11 @@ def test_kinodynamic_reaches_goal_and_stays_free():
 
 def test_kinodynamic_random_controls_reaches_goal():
     problem, _ = make_holonomic_obstacle_problem()
+    problem = problem.replace(Xf=BallSet(problem.goal_point(), 0.6))
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=1, goal_tolerance=0.6, max_nodes=6000),
+        options=RRTOptions(seed=1, max_nodes=6000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -879,7 +908,7 @@ def test_seeded_run_is_deterministic():
                 extender=KinodynamicExtender(
                     controls=COMPASS, horizon=0.6, n_substeps=6
                 ),
-                options=RRTOptions(seed=7, goal_tolerance=0.5, max_nodes=4000),
+                options=RRTOptions(seed=7, max_nodes=4000),
             )
             .solve()
             .trajectory
@@ -897,7 +926,7 @@ def test_steering_reaches_goal_and_stays_free():
         extender=SteeringExtender(
             StraightLineSteering(speed=1.0), max_distance=0.6, resolution=0.05
         ),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -966,7 +995,6 @@ def test_dubins_rrt_reaches_goal_pose():
     problem = PlanningProblem(
         sys=sys,
         x_start=x_start,
-        x_goal=x_goal,
         X=X,
         Xf=BallSet(x_goal, 0.6),
         U=sys.input_box,
@@ -1155,7 +1183,7 @@ def test_plot_tree_and_animate_search_smoke():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=2000),
+        options=RRTOptions(seed=0, max_nodes=2000),
     )
     planner.solve()
     fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
@@ -1182,7 +1210,7 @@ def test_rrt_star_reaches_goal():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTStarOptions(seed=0, max_nodes=4000),
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -1198,9 +1226,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
-        ),
+        options=RRTStarOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -1214,7 +1240,7 @@ def test_rrt_star_improves_path_cost_over_rrt():
     star_costs = []
     rrt_costs = []
     for seed in range(12):
-        options = RRTStarOptions(seed=seed, goal_tolerance=0.5, max_nodes=3000)
+        options = RRTStarOptions(seed=seed, max_nodes=3000)
         rrt = RRTPlanner(problem, extender=extender, options=options)
         rrt.solve()
         star = RRTStarPlanner(problem, extender=extender, options=options)
@@ -1233,14 +1259,12 @@ def test_rewire_false_is_at_least_as_costly():
     with_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=True),
+        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=True),
     )
     without_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(
-            seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=False
-        ),
+        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=False),
     )
     with_rewire.solve()
     without_rewire.solve()
@@ -1252,7 +1276,7 @@ def test_rewire_false_is_at_least_as_costly():
 def test_rrt_star_is_deterministic():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    options = RRTStarOptions(seed=11, goal_tolerance=0.5, max_nodes=2000)
+    options = RRTStarOptions(seed=11, max_nodes=2000)
 
     def run():
         planner = RRTStarPlanner(problem, extender=extender, options=options)
@@ -1301,7 +1325,6 @@ def test_search_callback_invoked_on_rrt():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=0,
-            goal_tolerance=0.5,
             max_nodes=200,
             callback=RecordingCallback(),
             live_plot_every=1,
@@ -1326,7 +1349,6 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=1,
-            goal_tolerance=0.5,
             max_nodes=2500,
             optimize_after_goal=True,
             convergence_patience=100,
@@ -1357,7 +1379,7 @@ def test_live_plot_option_builds_callback():
 def test_optimize_after_goal_runs_longer_and_refines_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    base = dict(seed=4, goal_tolerance=0.5, max_nodes=3500, goal_bias=0.05)
+    base = dict(seed=4, max_nodes=3500, goal_bias=0.05)
     first_hit = RRTStarPlanner(
         problem,
         extender=extender,
@@ -1385,7 +1407,6 @@ def test_convergence_patience_stops_search():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=6,
-            goal_tolerance=0.5,
             max_nodes=8000,
             optimize_after_goal=True,
             cost_tol=0.05,
@@ -1405,7 +1426,6 @@ def test_record_history_for_animation():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=0,
-            goal_tolerance=0.5,
             max_nodes=800,
             record_history=True,
             history_stride=25,

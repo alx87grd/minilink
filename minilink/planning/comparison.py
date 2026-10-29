@@ -302,7 +302,7 @@ def sample_cost_to_go(
 
     # The other axes pinned at the anchor: the goal, else the start
     if anchor is None:
-        anchor = problem.x_start if problem.x_goal is None else problem.x_goal
+        anchor = problem.goal_point()
     anchor = np.asarray(anchor, dtype=float)
 
     # The mesh levels of the two axes

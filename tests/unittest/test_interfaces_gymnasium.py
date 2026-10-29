@@ -198,7 +198,6 @@ class TestSys2Gym(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.array([0.2, 0.0]),
-            x_goal=np.zeros(2),
             cost=cost,
             tf=1.0,
             U=plant.input_box,

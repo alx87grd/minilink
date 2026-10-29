@@ -182,7 +182,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
             horizon=0.6,
             n_substeps=6,
         ),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     solution = planner.solve()
     assert solution.success and solution.solver.reached_goal

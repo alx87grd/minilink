@@ -156,11 +156,48 @@ they differ:
   none: `−g dt` carries no discount inside the period); its record's `scored_gamma` stays the
   problem's.
 
+- **C-15 (step 5) The goal point.** `x_goal` is gone from `PlanningProblem`,
+  `StepPlanningProblem` and every caller; `problem.goal_point()` is the plan's heuristic end
+  (`Xf`'s point: a singleton's, a ball's centre, else a finite bounding box's centre; else the
+  cost's `params["xbar"]`; else the start). It feeds the default initial guess, the DP grid's
+  plot anchor (before: the goal, else the grid's centre), the comparison's anchor, RRT's goal
+  bias and best effort, and the planner's verbose report (`terminal_error` only with an `Xf`).
+- **C-16 (step 5) `start_law` stays** the name of the law a problem draws its start from (the
+  plan's "the `start_law` attribute becomes the law held in `x_start`" is read as: the law is
+  given through `x_start=` and is the tree's `"x_start"` entry, as it already was);
+  `problem.x_start` is a property (the point, a law's mean) whose setter is `move_start`, so
+  `problem.x_start = v` moves a singleton `X0` (the review's desync); the start's singleton
+  `X0` is no longer an entry of `problem.params` (one home: `"x_start"`).
+- **C-17 (step 5) RRT's goal region is `Xf`; `goal_tolerance` is removed** from `RRTOptions`
+  and `RRTStarOptions` (it only made a ball around `x_goal`): `Xf=BallSet(goal, tol)` says it;
+  a singleton or missing `Xf` is refused with that line. The goal bias now always draws (it was
+  skipped when no `x_goal` was given), toward `goal_point()`. **To raise:** the option's
+  removal (a public keyword) follows from R177 but was not named in it.
+- **C-18 (step 5) The per-demo `x_goal` lines** ([ask] for the maintainer, plan §9): deleted
+  where the cost's `xbar` (or the `Xf` already given) is the same point, so nothing moves: the
+  five value-iteration demos, `readme_examples.py` and README, the showcase notebook,
+  `docs/make_assets.py`, `trajopt_holonomic_corridor.py`, `rrt_pendulum_swingup.py`, the eight
+  GRO860 and RL-topic value-iteration notebooks (their 2-D grids pin no axis), the
+  benchmarks' value-iteration and parity problems; turned into `Xf=BallSet(goal, tol)` where
+  RRT needed a region (`rrt_holonomic_obstacles.py` with its two tolerances,
+  `rrt_star_live.py`, `benchmarks/planning_rrt.py`, the test fixtures). No demo turned an
+  `x_goal` into a hard `Xf`.
+- **C-19 (step 5) The default initial guess now aims at the cost's target.** With no `Xf`, the
+  straight-line guess ran from the start to the start (a constant); it now runs to the cost's
+  `xbar` (the plan's rule). A problem with no `Xf` and an `xbar` away from its start starts
+  its solve from another guess: the v0.3 baseline's `trajopt.shooting.*` moved (6e-4
+  relative, re-pinned); the regression gates say whether any other plan moved (§3).
+- **C-20 (step 5) A region start's default** (the amendment): the bounding box's centre when
+  finite and inside, else `sys.x0` when inside, else a refusal naming `x_start` (before:
+  `sys.x0`, refused when outside).
+
 ## 3. Ledger of intended number changes
 
 | Row | What moved | Why |
 | --- | --- | --- |
 | Step 4, the RL reward | `rl.ppo.*` and `rl_env.*` of the v0.3 baseline (`rl_env` 1.5e-3 relative, the PPO history 1e-8 to 4e-3); re-pinned in `benchmarks/baselines/v03_core.json` (those keys only) | the training reward is `−g dt` (R171) |
+| Step 5, the default initial guess | `trajopt.shooting.u`, `trajopt.shooting.x` of the v0.3 baseline (6e-4 relative), re-pinned | the guess aims at the cost's `xbar` when there is no `Xf` (C-19) |
+| Step 5, RRT's goal bias | an RRT problem with an `Xf` region and no `x_goal` draws its goal bias now (none of the demos: each had an `x_goal` at the region's centre) | C-17 |
 | Step 4, value iteration's `alpha` | no baseline entry moves (the baseline's value iteration runs Euler, where the two discounts agree); under RK4 the backed-up `J` is the consistent one (the new test) | R173 |
 
 ## 4. Textbook check

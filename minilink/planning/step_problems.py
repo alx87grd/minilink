@@ -42,7 +42,6 @@ class StepPlanningProblem:
         cost: StepCost | None = None,
         gamma: float = 1.0,
         x_start=None,
-        x_goal=None,
         X=None,
         U=None,
         X0=None,
@@ -71,7 +70,6 @@ class StepPlanningProblem:
         self.parts = PlanningProblem(
             sys,
             x_start=x_start,
-            x_goal=x_goal,
             X=X,
             U=U,
             X0=X0,
@@ -91,10 +89,6 @@ class StepPlanningProblem:
     @property
     def start_law(self):
         return self.parts.start_law
-
-    @property
-    def x_goal(self):
-        return self.parts.x_goal
 
     @property
     def X(self):
@@ -291,7 +285,6 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
         ),
         gamma=gamma,
         x_start=problem.start_law if problem.start_law is not None else problem.x_start,
-        x_goal=problem.x_goal,
         X=problem.X,
         U=problem.U,
         X0=None if problem.start_law is not None else problem.X0,

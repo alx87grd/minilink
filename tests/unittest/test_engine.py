@@ -389,12 +389,12 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
     sys, cost = problem.sys, problem.cost
     view = problem.params
     assert view["plant"] is sys.params and view["cost"] is cost.params
+    # The start's singleton X0 is not a second entry: its point is x_start
     assert set(view) == {
         "plant",
         "cost",
         "X",
         "U",
-        "X0",
         "x_start",
         "t_start",
         "discount_rate",

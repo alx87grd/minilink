@@ -4,7 +4,13 @@ import time
 
 import numpy as np
 
-from minilink import BoxSet, HolonomicMobileRobot, PlanningProblem, RRTStarPlanner
+from minilink import (
+    BallSet,
+    BoxSet,
+    HolonomicMobileRobot,
+    PlanningProblem,
+    RRTStarPlanner,
+)
 from minilink.core.geometry import Sphere
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt_star import RRTStarOptions
@@ -47,7 +53,9 @@ X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
 
 x_start = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])
-problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, X=X, U=sys.input_box)
+problem = PlanningProblem(
+    sys=sys, x_start=x_start, Xf=BallSet(x_goal, GOAL_TOLERANCE), X=X, U=sys.input_box
+)
 
 extender = SteeringExtender(
     StraightLineSteering(speed=1.0), max_distance=0.55, resolution=0.05
@@ -72,7 +80,6 @@ if LIVE_PLOT:
 options = RRTStarOptions(
     seed=SEED,
     goal_bias=0.08,
-    goal_tolerance=GOAL_TOLERANCE,
     max_nodes=MAX_NODES,
     optimize_after_goal=True,
     cost_tol=COST_TOL,

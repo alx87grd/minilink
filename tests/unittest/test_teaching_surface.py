@@ -374,7 +374,7 @@ loop.plot_diagram(show=False)          # degrades without graphviz
 lti = linearize(plant, x_bar=[0.0, 0.0])
 lqr(lti, np.eye(2), np.eye(1))
 goal = np.array([np.pi, 0.0])
-problem = PlanningProblem(plant, x_goal=goal, U=plant.input_box,
+problem = PlanningProblem(plant, U=plant.input_box,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal))
 grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(3,), dt=0.05)
 DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20, verbose=False).solve()
