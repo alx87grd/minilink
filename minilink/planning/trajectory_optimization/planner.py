@@ -255,6 +255,7 @@ class TrajectoryOptimizationPlanner(Planner):
             z0 = self.transcription.pack_initial_guess(problem, seed)
             compile_t0 = time.perf_counter()
             optimizer = self.build_optimizer(program, z0)
+            warm_bound_form(optimizer)
             compile_s = time.perf_counter() - compile_t0
             self.offline = (key, program, optimizer)
         else:
@@ -944,6 +945,13 @@ def require_no_scene(params) -> None:
             "the online params key 'scene' waits for the scene bind (A3); "
             "bind the problem's own leaves (plant, cost, t_start, …)"
         )
+
+
+def warm_bound_form(optimizer) -> None:
+    """Compile a JAX program's bound form before a timed solve (a NumPy program compiles nothing)."""
+    warm = getattr(optimizer.program_evaluator, "warm", None)
+    if warm is not None:
+        warm()
 
 
 def host_tree(tree):

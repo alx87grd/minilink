@@ -128,10 +128,12 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         if verbose:
             print("[compile] Warm-starting JAX mathematical-program evaluator.")
 
-        # The constraint sizes, then every available quantity once at the sample
-        self.n_h = int(np.asarray(self.form("h")(z_sample)).reshape(-1).size)
-        self.n_g = int(np.asarray(self.form("g")(z_sample)).reshape(-1).size)
-        self.check_derivative_shapes(z_sample)
+        # The constraint sizes and every derivative's shape, traced at the sample and
+        # never compiled: the consumer compiles the form it uses (warm, warm_parametric,
+        # else the first call)
+        self.n_h = int(np.prod(jax.eval_shape(h_raw, z_sample, self.params).shape))
+        self.n_g = int(np.prod(jax.eval_shape(g_raw, z_sample, self.params).shape))
+        self.check_traced_shapes(z_sample)
 
     @property
     def has_gradient(self) -> bool:
@@ -195,6 +197,34 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def warm(self) -> None:
+        """Compile every form of the bound tree now, at the sample (the frozen one while the defaults are bound): an offline solve pays no compile inside its timed solve."""
+        z_sample = self.jnp.asarray(self.sample_z)
+
+        for name in self.raw_forms:
+            self.jax.block_until_ready(self.form(name)(z_sample))
+
+    def check_traced_shapes(self, z_sample) -> None:
+        """Every derivative's shape at the sample, by tracing alone: ``∇J`` ``(n_z,)``, ``∂h/∂z`` ``(n_h, n_z)``, ``∂g/∂z`` ``(n_g, n_z)``, ``∇²J`` ``(n_z, n_z)``."""
+        n_z = int(np.asarray(self.sample_z).size)
+        expected = {
+            "J": (),
+            "grad_J": (n_z,),
+            "hess_J": (n_z, n_z),
+            "jac_h": (self.n_h, n_z),
+            "jac_g": (self.n_g, n_z),
+        }
+
+        for name, shape in expected.items():
+            raw = self.raw_forms.get(name)
+            if raw is None or name in ("jac_h", "jac_g") and shape[0] == 0:
+                continue
+            traced = self.jax.eval_shape(raw, z_sample, self.params).shape
+            if int(np.prod(traced)) != int(np.prod(shape)):
+                raise ValueError(
+                    f"the program's {name} has shape {tuple(traced)}; expected {shape}"
+                )
 
     def warm_parametric(self) -> None:
         """Compile every parametric form now, at the sample: a program built to be solved on bound values (an online tick) pays no compile inside its first solve."""

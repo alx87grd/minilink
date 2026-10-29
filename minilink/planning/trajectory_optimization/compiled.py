@@ -58,6 +58,14 @@ class CompiledTrajectoryPlanner:
         self.optimizer = planner.build_optimizer(self.program, z_guess[:-1])
         self.n_z = int(self.program.n_z) + 1
 
+        # The face solves on bound values (an MPC tick, a sweep): its parametric form,
+        # compiled now
+        warm_parametric = getattr(
+            self.optimizer.program_evaluator, "warm_parametric", None
+        )
+        if self.program.params is not None and warm_parametric is not None:
+            warm_parametric()
+
     @property
     def params(self) -> dict:
         """The compiled defaults: the tree the plan depends on, as it was at :meth:`planner.compile`."""
