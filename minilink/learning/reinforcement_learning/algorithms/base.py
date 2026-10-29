@@ -25,8 +25,13 @@ class Algorithm(ABC):
     distribution, ``"gaussian"`` or ``"squashed"``. ``critic_kind`` names
     what the critic estimates, ``"V"``, ``"Q"`` or ``None``. An ``episodic``
     method learns from complete episodes: every plant restarts before a
-    collection, which then lasts one episode.
+    collection, which then lasts one episode. :attr:`NUMBERS` names the
+    method's numbers its :attr:`method_params` reports (the discount among
+    them), the optimizer's under ``"optimizer"``.
     """
+
+    #: The attributes that are the method's numbers (the counts and sizes are structure)
+    NUMBERS = ("gamma",)
 
     on_policy = True
     head_kind = "gaussian"
@@ -39,6 +44,16 @@ class Algorithm(ABC):
     #: The stochastic policy and its critic, bound by the planner.
     policy = None
     critic = None
+
+    @property
+    def method_params(self) -> dict:
+        """The method's numbers, by name, and its optimizer's under ``"optimizer"``: what it trains with."""
+        numbers = {name: getattr(self, name) for name in self.NUMBERS}
+        optimizer = getattr(self, "optimizer", None)
+        if optimizer is not None and hasattr(optimizer, "method_params"):
+            numbers["optimizer"] = optimizer.method_params
+
+        return numbers
 
     def bind(self, policy, critic, gamma):
         """Receive the policy, its critic (``None`` for a critic-free method) and the one discount."""

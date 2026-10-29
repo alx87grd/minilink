@@ -27,8 +27,15 @@ class OptimizerBackend(ABC):
     :class:`~minilink.optimization.evaluators.program_evaluator.MathematicalProgramEvaluator`
     to a third-party solver such as SciPy or Ipopt. The user-facing
     :class:`minilink.optimization.optimizer.Optimizer` owns program compilation,
-    timing, diagnostics, and default initial guesses.
+    timing, diagnostics, and default initial guesses. :attr:`method_params`
+    is the method's numbers a solve can rebind (``{}`` for a method whose
+    options are its stopping rule only).
     """
+
+    @property
+    def method_params(self) -> dict:
+        """The method's numbers, by name: ``{}`` (a host solver's options are its stopping rule)."""
+        return {}
 
     @abstractmethod
     def solve(

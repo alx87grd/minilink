@@ -34,9 +34,11 @@ class MPPIPlanner(Planner):
     ``ModelPredictiveController(MPPIPlanner(...)) % dt`` is MPPI in the loop.
 
     ``dt``, ``n_samples``, ``n_iterations`` and ``solver`` are structure, fixed
-    at build; ``temperature`` (``λ``), ``noise`` (``Σ``) and ``control_cost``
-    (``α``) are the leaves of ``params["method"]`` and ``seed`` of
-    ``params["seed"]``, so a solve can rebind them. JAX only: the solve is one
+    at build, and so is the input box the samples are clipped to; the tree is
+    the problem's leaves (``x_start``, ``t_start``, the plant's, the cost's,
+    the discount, ``X``'s numbers), ``temperature`` (``λ``), ``noise`` (``Σ``)
+    and ``control_cost`` (``α``) under ``params["method"]`` and ``seed`` under
+    ``params["seed"]``, so a solve can rebind any of them. JAX only: the solve is one
     jitted function of ``(params, z)``. A deterministic problem is the
     textbook algorithm, the noise on the inputs only.
 
@@ -103,16 +105,21 @@ class MPPIPlanner(Planner):
 
     @property
     def params(self) -> dict:
-        """The tree the plan depends on: the start, its time, the plant's numbers, the method's and the seed."""
+        """The planner's tree: the problem's leaves (the start, its time, the plant's, the cost's, the discount, ``X``'s), the method's numbers and the seed."""
         problem = self.problem
-
-        return {
+        tree = {
             "x_start": np.asarray(problem.x_start, dtype=float),
             "t_start": float(problem.t_start),
             "plant": copy.deepcopy(problem.sys.params or {}),
-            "method": copy.deepcopy(self.method),
-            "seed": self.seed,
+            "cost": copy.deepcopy(problem.require_cost().params),
+            "discount_rate": float(problem.discount_rate),
         }
+        if problem.X.params:
+            tree["X"] = copy.deepcopy(problem.X.params)
+        tree["method"] = copy.deepcopy(self.method)
+        tree["seed"] = self.seed
+
+        return tree
 
     def compile(self, backend=None):
         """The planner's pure face, ``pv``: its solve as one jitted function of ``(params, z)``."""
@@ -476,13 +483,13 @@ class CompiledMPPIPlanner:
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        gamma = env.face.gamma
-        plant = {"plant": P["plant"]}
+        episode = problem_leaves(P)
+        gamma = env.face.gamma_at(episode)
 
         def period(carry, v):
             x, t, S, alive, discount = carry
             x_next, t_next, reward, terminated, _ = env.step(
-                x, t, v, None, plant, t_origin=t0
+                x, t, v, None, episode, t_origin=t0
             )
             # S += γ^t c_t while alive; a failure is charged once, its state then frozen
             S = S - jnp.where(alive, discount * reward, 0.0)
@@ -499,7 +506,7 @@ class CompiledMPPIPlanner:
         x_path = jnp.concatenate([x_start[None, :], xs], axis=0)
 
         # Left X: an end before the horizon's, or a last state outside X
-        inside = jnp.all(env.X.margin(x_N, t_N, env.set_params) >= 0.0)
+        inside = jnp.all(env.X.margin(x_N, t_N, episode.get("X")) >= 0.0)
         left_X = jnp.any(ended[:-1]) | ~inside
 
         return S, left_X, x_path
@@ -509,12 +516,12 @@ class CompiledMPPIPlanner:
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        plant = {"plant": P["plant"]}
+        episode = problem_leaves(P)
 
         def period(carry, u):
             x, t = carry
             x_next, t_next, _, _, _ = env.step(
-                x, t, u, None, plant, t_origin=P["t_start"]
+                x, t, u, None, episode, t_origin=P["t_start"]
             )
             return (x_next, t_next), x_next
 
@@ -522,6 +529,19 @@ class CompiledMPPIPlanner:
         _, xs = jax.lax.scan(period, (x0, P["t_start"]), U)
 
         return jnp.concatenate([x0[None, :], xs], axis=0)
+
+
+def problem_leaves(P):
+    """The episode tree a rollout reads from the planner's tree: the plant's, the cost's, the discount and ``X``'s numbers."""
+    leaves = {
+        "plant": P["plant"],
+        "cost": P["cost"],
+        "discount_rate": P["discount_rate"],
+    }
+    if "X" in P:
+        leaves["X"] = P["X"]
+
+    return leaves
 
 
 def steps_of(tf, dt) -> int:

@@ -24,6 +24,7 @@ from minilink.optimization.optimizer import (
     Optimizer,
     make_optimizer_backend,
     method_for,
+    method_params_of,
 )
 from minilink.optimization.reporting import (
     DISP_RULE_DIV,
@@ -171,8 +172,23 @@ class TrajectoryOptimizationPlanner(Planner):
 
     @property
     def params(self) -> dict:
-        """The tree the plan depends on: ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets the program reads."""
-        return self.transcription.program_params(self.problem)
+        """
+        The planner's tree: the problem's leaves the program reads, ``"method"`` and ``"seed"``.
+
+        ``x_start``, ``t_start``, the plant's, the cost's, the discount and the
+        sets the program reads; ``"method"`` the method's numbers (a native
+        law's learning rate and moments, ``{}`` for a host method, whose name
+        and tolerances are structure); ``"seed"`` ``None`` (a gradient method
+        draws nothing).
+        """
+        options = self.options
+        method = method_params_of(options.method, dict(options.optimizer_options))
+
+        return {
+            **self.transcription.program_params(self.problem),
+            "method": method,
+            "seed": None,
+        }
 
     def compile(self, backend=None):
         """
@@ -230,11 +246,14 @@ class TrajectoryOptimizationPlanner(Planner):
         n_trials: int = 50,
     ) -> PlanningSolution:
         """Compute and store a trajectory-optimization solution on the problem holding ``params`` (always rebuild)."""
-        problem = problem_with(self.problem, host_tree(params))
+        problem_params, method = planner_parts(params)
+        problem = problem_with(self.problem, host_tree(problem_params))
 
-        return self.solve_on(problem, guess, evaluate, n_trials)
+        return self.solve_on(problem, guess, evaluate, n_trials, method)
 
-    def solve_on(self, problem, guess, evaluate, n_trials) -> PlanningSolution:
+    def solve_on(
+        self, problem, guess, evaluate, n_trials, method=None
+    ) -> PlanningSolution:
         """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store."""
         workflow_t0 = time.perf_counter()
         backend = self.options.backend
@@ -277,6 +296,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # back from z*
         self.iteration_history = []
         optimization_result = optimizer.solve(
+            params=None if method is None else {"method": method},
             z0=z0,
             callback=self.build_callback(optimizer, backend),
             record_solve_time=self.options.record_solve_time or self.options.verbose,
@@ -995,6 +1015,17 @@ def host_subtree(tree):
 def host_leaf(value):
     """One leaf on the host: a NumPy value, ``None`` kept."""
     return None if value is None else np.asarray(value)
+
+
+def planner_parts(params):
+    """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the seed dropped: a gradient method draws nothing)."""
+    if not params:
+        return params, None
+    problem = {
+        key: value for key, value in params.items() if key not in ("method", "seed")
+    }
+
+    return problem, params.get("method")
 
 
 def problem_with(problem, params):

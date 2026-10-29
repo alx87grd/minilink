@@ -2486,3 +2486,36 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
     J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
     assert float(status["cost"][0]) < J0
+
+
+def test_every_planner_has_one_tree_shape():
+    pytest.importorskip("jax")
+    from minilink import (
+        Pendulum,
+        PlanningProblem,
+        ReinforcementLearningPlanner,
+        TrajectoryOptimizationPlanner,
+    )
+    from minilink.planning import MPPIPlanner
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+    problem = PlanningProblem(
+        plant, cost=cost, tf=1.0, x_start=np.array([0.5, 0.0]), U=plant.input_box
+    )
+    planners = [
+        TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
+        MPPIPlanner(problem, dt=0.1, n_samples=16),
+        ReinforcementLearningPlanner(
+            problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,), verbose=False
+        ),
+    ]
+    for planner in planners:
+        tree = planner.params
+        assert isinstance(tree["method"], dict) and "seed" in tree
+    trajopt, mppi, rl = (planner.params for planner in planners)
+    assert {"learning_rate", "b1", "b2", "eps"} <= set(trajopt["method"])
+    assert trajopt["seed"] is None and trajopt["cost"] is not None
+    assert {"temperature", "noise", "control_cost"} <= set(mppi["method"])
+    assert "cost" in mppi and "discount_rate" in mppi
+    assert "gamma" in rl["method"] and rl["seed"] == 0

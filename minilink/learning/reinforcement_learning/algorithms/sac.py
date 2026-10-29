@@ -35,6 +35,8 @@ class SAC(Algorithm):
     head_kind = "squashed"
     critic_kind = "Q"
 
+    NUMBERS = ("gamma", "tau")
+
     def __init__(
         self,
         *,

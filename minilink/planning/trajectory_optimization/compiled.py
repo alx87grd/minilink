@@ -26,9 +26,10 @@ class CompiledTrajectoryPlanner:
     ``z`` is the planner's solution vector: the transcription's decision vector
     (the knots, ``(rows, N)`` row after row: collocation's states then inputs,
     shooting's inputs) with the origin ``t_start`` it was solved from appended,
-    ``n_z`` entries. ``params`` is the tree the plan depends on, the program's:
-    ``x_start``, ``t_start``, the plant's, the cost's, the discount and the sets
-    read as constraints. :meth:`solve`, :meth:`shift`, :meth:`command` and
+    ``n_z`` entries. ``params`` is the planner's tree: the program's leaves
+    (``x_start``, ``t_start``, the plant's, the cost's, the discount and the
+    sets read as constraints), the method's numbers under ``"method"`` and
+    ``"seed"``. :meth:`solve`, :meth:`shift`, :meth:`command` and
     :meth:`prediction` are pure wherever the method is (a native method with
     ``iterations=K`` on JAX traces under ``jit``, ``vmap`` and ``grad``); SLSQP
     and Ipopt run on the host. :meth:`solution` rebuilds the rich
@@ -51,7 +52,7 @@ class CompiledTrajectoryPlanner:
 
         # The tree the program is compiled with: a later edit of the problem is not the
         # face's (compile again to take it)
-        self.defaults = copy.deepcopy(transcription.program_params(problem))
+        self.defaults = copy.deepcopy(planner.params)
 
         # The program, compiled once with its optimizer at the default guess
         self.program = transcription.transcribe(problem, backend=backend)
@@ -103,14 +104,19 @@ class CompiledTrajectoryPlanner:
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
+        problem_params, _ = planner_parts(params)
+        numbers = {"method": tree["method"]}
         z_start = self.initial(params) if z0 is None else z0
         z_dec0 = z_start[:-1]
 
-        # z* = argmin J(z; p) from the guess, by the planner's method
+        # z* = argmin J(z; p) from the guess, by the planner's method on its numbers
         if self.program.params is None:
-            result = self.optimizer_at(params, z_dec0).solve(z0=z_dec0)
+            optimizer = self.optimizer_at(problem_params, z_dec0)
+            result = optimizer.solve(params=numbers, z0=z_dec0)
         else:
-            result = self.optimizer.solve(params=params, z0=z_dec0)
+            result = self.optimizer.solve(
+                params={**(problem_params or {}), **numbers}, z0=z_dec0
+            )
 
         # z = [z*, t_start]: the decision vector and the origin it was solved from
         xp = array_module(result.z, tree["t_start"])
@@ -224,7 +230,7 @@ class CompiledTrajectoryPlanner:
             evaluator = self.optimizer_at(params, z_dec).program_evaluator
         else:
             evaluator = self.optimizer.program_evaluator
-            evaluator.bind(params)
+            evaluator.bind(planner_parts(params)[0])
         max_eq, min_ineq, max_bound = evaluator.constraint_violations(z_dec)
         tol = float(self.planner.options.feasibility_tol)
         feasible = bool(
@@ -272,6 +278,7 @@ class CompiledTrajectoryPlanner:
 
     def optimizer_at(self, params, z_dec):
         """The optimizer of a NumPy program at ``params``: the compiled one for none, else one rebuilt on a copy of the problem holding them."""
+        params, _ = planner_parts(params)
         if not params:
             return self.optimizer
 
@@ -295,12 +302,22 @@ class CompiledTrajectoryPlanner:
             problem_with,
         )
 
-        return problem_with(self.problem, host_tree(self.merged(params)))
+        problem_params, _ = planner_parts(self.merged(params))
+
+        return problem_with(self.problem, host_tree(problem_params))
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def planner_parts(params):
+    """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the planner's :func:`~minilink.planning.trajectory_optimization.planner.planner_parts`)."""
+    # Lazy import: the planner module imports this one
+    from minilink.planning.trajectory_optimization import planner
+
+    return planner.planner_parts(params)
 
 
 def has_values(tree) -> bool:

@@ -283,8 +283,9 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
   weighted noise. Its compiled face (`n_z = N m + 1`, `shift` holding the last input,
   `command` the held input, `predicts = False`) is the trajectory face, so
-  `ModelPredictiveController(MPPIPlanner(...))` runs in every form; `temperature`, `noise`,
-  `control_cost` are `params["method"]`, `seed` is `params["seed"]` with the tick folded in.
+  `ModelPredictiveController(MPPIPlanner(...))` runs in every form; its tree is the problem's
+  leaves (`cost`, `discount_rate`, `X`'s numbers among them), `temperature`, `noise`,
+  `control_cost` under `params["method"]`, `seed` under `params["seed"]` with the tick folded in.
   `pv.samples(params, z0, n_shown)` redraws a solve's own samples on that key (one `passes`
   owns the sampling for both), so after a run `mpc_sampled_futures(run, mpc, loop=)` rebuilds
   every tick's fan from the solve inputs read back through the loop
@@ -1367,7 +1368,12 @@ options); the time grid is
 `t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face** (R148):
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
 `z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
-`pv.params` the tree (`planner.params`); `pv.initial(params)` the default guess packed;
+`pv.params` the tree (`planner.params`: **one shape for every planner** (R170), the problem's
+leaves the plan reads, `"method"` the method's numbers (a native law's `learning_rate`, `b1`,
+`b2`, `eps`; MPPI's `temperature`, `noise`, `control_cost`; the RL planner's `gamma` and its
+algorithm's and optimizer's numbers; `{}` for a host method, whose name and tolerances are
+structure) and `"seed"` (`None` for a method that draws nothing); the method's name is a
+constructor option); `pv.initial(params)` the default guess packed;
 `pv.solve(params=None, z0=None) -> (z, status)`; `pv.shift(z, t)` the knot rows re-read at
 `t + offset`, the tail held; `pv.command(z, x, t)` the input at `t`; `pv.prediction(z, t)` the
 planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side

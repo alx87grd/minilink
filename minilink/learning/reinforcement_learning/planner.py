@@ -152,6 +152,7 @@ class ReinforcementLearningPlanner(Planner):
         # Training settings
         self.dt = float(dt)
         self.n_envs = int(n_envs)
+        self.seed = int(seed)
         self.verbose = bool(verbose)
 
         # Training progress: plant steps, wall-clock time, the latest mean episode
@@ -228,6 +229,17 @@ class ReinforcementLearningPlanner(Planner):
     def gamma(self):
         """The one discount per control period the algorithm trains with."""
         return self.algorithm.gamma
+
+    @property
+    def params(self) -> dict:
+        """
+        The planner's tree: ``"method"``, the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
+
+        The numbers are read when the update is first traced: set them on the
+        algorithm before learning. The problem's own leaves are the problem's
+        (the score is always the problem's).
+        """
+        return {"method": self.algorithm.method_params, "seed": self.seed}
 
     def solve(
         self, timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None

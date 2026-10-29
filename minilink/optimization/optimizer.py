@@ -163,6 +163,13 @@ class Optimizer:
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
+    @property
+    def params(self) -> dict:
+        """The solve's tree: the program's parameters (``{}`` without), and the method's numbers under ``"method"`` (``{}`` for a host method)."""
+        program = self.program_evaluator.merged(None) or {}
+
+        return {**program, "method": self.adapter.method_params}
+
     def solve(
         self,
         *,
@@ -180,8 +187,10 @@ class Optimizer:
         params : dict, optional
             The values of the program's parameters for this solve, a partial
             tree merged once onto the program's defaults (a path the
-            program does not declare raises). ``None`` solves at the defaults.
-            The compiled program is reused: a new value never recompiles.
+            program does not declare raises), and under ``"method"`` the
+            method's numbers (:attr:`params`). ``None`` solves at the
+            defaults. The compiled program is reused: a new value never
+            recompiles.
         z0 : array_like, optional
             One-off initial decision vector, the warm start. If omitted, use
             the default ``z0`` supplied to :class:`Optimizer`.
@@ -200,10 +209,13 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
+        # The program's values and the method's numbers of this solve
+        params, method = split_method(params)
+
         # A fixed count of native steps: the pure solve
         if self.iterations is not None:
             require_no_hook(callback)
-            return self.solve_count(params, z0)
+            return self.solve_count(params, z0, method)
 
         z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
         time_solve = record_solve_time or verbose
@@ -227,11 +239,13 @@ class Optimizer:
                 t_elapsed = time.perf_counter() - t_cb0
                 callback(z_arr.copy(), J, t_elapsed)
 
-        # The backend solve
+        # The backend solve, on the method's numbers when it has some
+        numbers = {"method": method} if method else {}
         result = self.adapter.solve(
             self.program_evaluator,
             z_start,
             callback=backend_cb,
+            **numbers,
         )
 
         # The wall-clock time of the backend solve alone
@@ -255,10 +269,13 @@ class Optimizer:
         so ``compute_rollout(K)`` gives the iterates of a ``K``-step solve.
         """
         require_native(self.method)
-        return IterationSystem(self, self.program_evaluator.merged(params))
+        params, method = split_method(params)
+        tree = self.program_evaluator.merged(params)
 
-    def solve_count(self, params, z0):
-        """Exactly :attr:`iterations` native steps from ``z0`` on the merged tree: a pure solve, its result traced or on the host."""
+        return IterationSystem(self, tree, method)
+
+    def solve_count(self, params, z0, method=None):
+        """Exactly :attr:`iterations` native steps from ``z0`` on the merged tree and the method's numbers: a pure solve, its result traced or on the host."""
         evaluator = self.program_evaluator
         K = self.iterations
 
@@ -267,7 +284,7 @@ class Optimizer:
         z_start = self.z0 if z0 is None else self.start_vector(z0)
 
         # z_K = S^K(z0; p), and J(z_K; p)
-        z, J = self.adapter.run(evaluator, z_start, tree, K)
+        z, J = self.adapter.run(evaluator, z_start, tree, K, method)
 
         return OptimizationResult(
             z=host_or_traced(z),
@@ -382,9 +399,9 @@ def adapter_of(adapter_key: str, kwargs: dict) -> OptimizerBackend:
 
 
 class IterationSystem(StepSystem):
-    """A native solve as a step system: the law's state flattened, one tick one step (:meth:`Optimizer.as_step_system`)."""
+    """A native solve as a step system: the law's state flattened, one tick one step (:meth:`Optimizer.as_step_system`); ``params`` the program's tree and ``"method"``, the law's numbers."""
 
-    def __init__(self, optimizer, tree):
+    def __init__(self, optimizer, tree, method=None):
         evaluator = optimizer.program_evaluator
         law = optimizer.adapter.law(evaluator)
         state0 = law.init(np.asarray(optimizer.z0, dtype=float))
@@ -399,17 +416,21 @@ class IterationSystem(StepSystem):
         n_z = int(optimizer.program.n_z)
         StepSystem.__init__(self, n, output_dim=n_z)
         self.name = f"{optimizer.method} on the program"
-        self.params = tree
+        self.params = {
+            **(tree or {}),
+            "method": law.params if method is None else method,
+        }
         self.x0 = self.flat(state0)
 
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
 
+        program, method = split_method(params)
         state = self.unflat(x)
 
-        # x_{k+1} = S(x_k, ∇J(z_k; p))
-        grad = self.evaluator.native_gradient(state["z"], params)
-        state_next = self.law.update(grad, state)
+        # x_{k+1} = S(x_k, ∇J(z_k; p); η, …)
+        grad = self.evaluator.native_gradient(state["z"], program or None)
+        state_next = self.law.update(grad, state, method)
 
         return self.flat(state_next)
 
@@ -435,6 +456,23 @@ class IterationSystem(StepSystem):
             start += size
 
         return state
+
+
+def method_params_of(method: str, options: dict | None = None) -> dict:
+    """The numbers of a method preset with ``options`` over it: a native law's (``learning_rate``, …), ``{}`` for a host method or ``"auto"``."""
+    if method not in NATIVE_METHODS:
+        return {}
+
+    return make_optimizer_backend(method, options=options).method_params
+
+
+def split_method(params):
+    """``(program, method)``: a solve's tree without its ``"method"`` entry (``None`` when nothing is left), and that entry (``None`` when absent)."""
+    if not params or "method" not in params:
+        return params, None
+    program = {key: value for key, value in params.items() if key != "method"}
+
+    return (program or None), params["method"]
 
 
 def host_or_traced(value, cast=None):

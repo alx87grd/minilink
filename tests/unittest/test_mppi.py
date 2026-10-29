@@ -235,3 +235,60 @@ def test_verbose_prints_mppis_account():
     line = out.getvalue().splitlines()[0]
     assert line.startswith("MPC @ t=0.00s") and "S_min=" in line
     assert "effective_samples=" in line and "/512" in line and "exit_rate=" in line
+
+
+def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
+    planner = double_integrator_planner()
+    pv = planner.compile()
+    assert {
+        "x_start",
+        "t_start",
+        "plant",
+        "cost",
+        "discount_rate",
+        "method",
+        "seed",
+    } <= set(pv.params)
+    z0 = pv.initial()
+    z, _ = pv.solve(None, z0)
+    heavy = {"cost": {**pv.params["cost"], "R": 100.0 * np.eye(1)}}
+    z_heavy, _ = pv.solve(heavy, z0)
+    assert np.max(np.abs(z_heavy[:-1])) < np.max(np.abs(z[:-1]))
+
+
+def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():
+    plant = Pendulum()
+    plant.inputs["u"].lower_bound = np.array([-4.0])
+    plant.inputs["u"].upper_bound = np.array([4.0])
+    cost = QuadraticCost.from_system(plant, R=0.01 * np.eye(1))
+    problem = PlanningProblem(
+        plant, cost=cost, tf=0.5, x_start=[1.0, 0.0], U=plant.input_box
+    )
+    planner = MPPIPlanner(problem, dt=DT, n_samples=256, temperature=0.1, noise=4.0)
+    mpc = ModelPredictiveController(planner, delay=False)
+    pe = problem.replace(tf=0.3).compile(mpc % DT, backend="numpy")
+    base = pe.params
+    solve = base["controller"]["solve"]
+    heavy = {
+        **base,
+        "controller": {
+            **base["controller"],
+            "solve": {**solve, "cost": {**solve["cost"], "R": 100.0 * np.eye(1)}},
+        },
+    }
+    u_base = pe.trajectory().of("plant").u
+    u_heavy = pe.trajectory(heavy).of("plant").u
+    assert not np.allclose(u_heavy, u_base)
+
+
+def test_a_gradient_through_mppis_temperature_is_finite():
+    pv = double_integrator_planner().compile()
+    z0 = jnp.asarray(pv.initial())
+
+    def cost(lam):
+        _, status = pv.solve_fn(
+            {**pv.params, "method": {**pv.params["method"], "temperature": lam}}, z0
+        )
+        return status["cost"]
+
+    assert np.isfinite(float(jax.grad(cost)(0.01)))

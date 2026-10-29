@@ -38,6 +38,8 @@ class ActorCritic(Algorithm):
     head_kind = "gaussian"
     critic_kind = "V"
 
+    NUMBERS = ("gamma", "gae_lambda", "ent_coef", "vf_coef")
+
     def __init__(
         self,
         *,

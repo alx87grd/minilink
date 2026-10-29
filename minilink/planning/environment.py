@@ -187,12 +187,13 @@ class RolloutEnvironment:
         t_start = self.t_start if t_origin is None else t_origin
         finite_horizon = self.finite_horizon
         face = self.face
-        gamma = face.gamma
         X = self.X
         U = self.U
         zone = self.training_zone
-        set_params = self.set_params
+        X_params = (params or {}).get("X", self.set_params)
+        U_params = self.set_params
         tree = self.episode_tree(params)
+        gamma = face.gamma_at(tree) if "discount_rate" in (params or {}) else face.gamma
 
         # Plant input: the action on its port, each source's signal at t on theirs
         u_full = self.input_vector(u, t, params)
@@ -214,10 +215,10 @@ class RolloutEnvironment:
         reward = -c
 
         # Leaving X or U is a failure; leaving the training zone is not; the horizon ends
-        out_of_U = ~xp.all(U.margin(u_full, x, t, set_params) >= 0.0)
-        out_of_X = ~xp.all(X.margin(x_next, t_next, set_params) >= 0.0)
+        out_of_U = ~xp.all(U.margin(u_full, x, t, U_params) >= 0.0)
+        out_of_X = ~xp.all(X.margin(x_next, t_next, X_params) >= 0.0)
         failed = out_of_X | out_of_U | ~finite
-        left_zone = ~xp.all(zone.margin(x_next, t_next, set_params) >= 0.0)
+        left_zone = ~xp.all(zone.margin(x_next, t_next) >= 0.0)
         horizon_reached = xp.asarray(t_next >= t_start + tf - 0.5 * dt)
 
         # A failure pays the price of infeasibility; a finite horizon pays h(x_N),
@@ -242,14 +243,22 @@ class RolloutEnvironment:
         return self.face.step_at(x, u_full, t, tree["plant"])
 
     def episode_tree(self, params=None):
-        """The face's tree with the episode's plant draws merged in (none: the face's own)."""
-        plant = (params or {}).get("plant")
-        if not plant:
+        """The face's tree with the episode's plant draws, and a planner's cost and discount, merged in (none: the face's own)."""
+        params = params or {}
+        plant = params.get("plant")
+        cost = params.get("cost")
+        if not plant and cost is None and "discount_rate" not in params:
             return self.face_params
 
-        return dict(
-            self.face_params, plant=merge_tree(self.face_params["plant"], plant)
-        )
+        tree = dict(self.face_params)
+        if plant:
+            tree["plant"] = merge_tree(self.face_params["plant"], plant)
+        if cost is not None:
+            tree["cost"] = merge_tree(self.face_params["cost"], cost)
+        if "discount_rate" in params:
+            tree["discount_rate"] = params["discount_rate"]
+
+        return tree
 
     def input_vector(self, u, t, params=None):
         """

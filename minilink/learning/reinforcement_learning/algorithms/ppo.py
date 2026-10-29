@@ -35,6 +35,7 @@ class PPO(Algorithm):
     on_policy = True
     head_kind = "gaussian"
     critic_kind = "V"
+    NUMBERS = ("gamma", "gae_lambda", "clip_range", "ent_coef", "vf_coef")
 
     def __init__(
         self,

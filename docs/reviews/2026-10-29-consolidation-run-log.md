@@ -97,6 +97,29 @@ they differ:
   rule" is rewritten. **To raise:** the deep copy rather than an alias of the plant's dict (an
   alias would make "the model's numbers" and "the plant's numbers" one edit again).
 
+- **C-8 (step 3) The method's numbers through the optimizer.** The native laws hold
+  `params` (`GradientDescentLaw {"learning_rate"}`, `AdamLaw {"learning_rate", "b1", "b2",
+  "eps"}` and `"max_grad_norm"` when clipped, the clip's presence structure);
+  `Optimizer.params` is the program's tree with `"method"`, and `Optimizer.solve(params=)`
+  splits `"method"` off for the law (an argument of the jitted run, so a new learning rate
+  never recompiles). A host method (SLSQP, trust-constr, Ipopt, L-BFGS) has `"method": {}`:
+  its options are its stopping rule, kept as constructor options. The trajectory-optimization
+  planner's tree is the program's leaves, `"method"` and `"seed": None`; `planner.solve(params)`
+  and `pv.solve(params)` split the method's numbers off before the problem copy.
+- **C-9 (step 3) The RL planner's tree is a report.** `planner.params = {"method":
+  algorithm.method_params, "seed": seed}`: the discount and the algorithm's numbers (PPO's
+  `gae_lambda`, `clip_range`, `ent_coef`, `vf_coef`; SAC's `tau`) and its Adam's under
+  `"optimizer"`. Their home stays the algorithm's attributes, read when the update is first
+  traced (set them before learning); no `solve(params=)` rebinds them. **To raise:** a
+  training run with a tree argument (every update reading the numbers as arguments) is
+  possible, and a larger change of the four algorithms.
+- **C-10 (step 3) MPPI's tree** gains `cost`, `discount_rate` and `X`'s numbers (when `X` has
+  some); the environment's step merges a given cost and discount into the face's tree and reads
+  a given `X` (the input box the samples are clipped to stays structure, read at build). The
+  failure price is the problem's at build (a moved weight does not move it; §4 rewrites it).
+  An MPPI MPC on a traced loop (`problem.compile(mpc % dt, backend="jax")`) fails because the
+  face's `initial(params)` is host-only; that is plan §6's traced first guess, landed there.
+
 ## 3. Ledger of intended number changes
 
 | Row | What moved | Why |

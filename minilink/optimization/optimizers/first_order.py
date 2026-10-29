@@ -56,24 +56,23 @@ class FirstOrderOptimizer(OptimizerBackend):
         self.algorithm = algorithm
         self.options = {**self.DEFAULTS, **(options or {})}
 
+    @property
+    def method_params(self) -> dict:
+        """The law's numbers: ``{"learning_rate"}`` for gradient descent, and Adam's ``b1``, ``b2``, ``eps`` (and its clip when set)."""
+        return self.law_of(None, None).params
+
+    def numbers(self, method=None):
+        """The law's numbers of a solve: its own, ``method``'s given ones over them."""
+        if not method:
+            return self.method_params
+
+        return {**self.method_params, **method}
+
     def law(self, program_evaluator):
         """The method's pure law on the program's box: :class:`GradientDescentLaw` or :class:`AdamLaw`."""
-        opts = self.options
         lower, upper = box_of(program_evaluator)
-        eta = float(opts["learning_rate"])
 
-        if self.algorithm == "gd":
-            return GradientDescentLaw(eta, lower, upper)
-
-        return AdamLaw(
-            eta,
-            lower,
-            upper,
-            b1=opts["b1"],
-            b2=opts["b2"],
-            eps=opts["eps"],
-            max_grad_norm=opts["max_grad_norm"],
-        )
+        return self.law_of(lower, upper)
 
     def solve(
         self,
@@ -81,8 +80,9 @@ class FirstOrderOptimizer(OptimizerBackend):
         z0: np.ndarray,
         *,
         callback: BackendIterateCallback | None = None,
+        method=None,
     ) -> OptimizationResult:
-        """Run the first-order loop from ``z0`` to its tolerance (``maxiter`` its cap) and return a backend-neutral result."""
+        """Run the first-order loop from ``z0`` to its tolerance (``maxiter`` its cap) on the law's numbers ``method`` (``None``: its own) and return a backend-neutral result."""
         require_gradient(program_evaluator)
         require_no_constraints(program_evaluator)
         opts = self.options
@@ -90,9 +90,10 @@ class FirstOrderOptimizer(OptimizerBackend):
         maxiter = int(opts["maxiter"])
         gtol = float(opts["gtol"])
         lower, upper = box_of(program_evaluator)
+        method = self.numbers(method)
 
-        # The law, Adam's update compiled once per program and numbers when JAX is at
-        # hand (not once per step, nor once per solve)
+        # The law, Adam's update compiled once per program when JAX is at hand (not
+        # once per step, nor once per solve); its numbers an argument
         law = self.law(program_evaluator)
         update = (
             law.update
@@ -112,7 +113,7 @@ class FirstOrderOptimizer(OptimizerBackend):
                 break
 
             # z ← Π(z − η ∇J), or Π of Adam's step
-            state = update(grad, state)
+            state = update(grad, state, method)
             z_next = np.asarray(state["z"], dtype=float)
 
             # Gradient descent at a fixed point in floating point: the step no longer
@@ -144,9 +145,12 @@ class FirstOrderOptimizer(OptimizerBackend):
             stats={"nit": k, "grad_norm": grad_norm, "algorithm": self.algorithm},
         )
 
-    def run(self, program_evaluator, z0, params, iterations):
+    def run(self, program_evaluator, z0, params, iterations, method=None):
         """
         Exactly ``iterations`` steps of the law from ``z0`` on the tree ``params``: ``(z_K, J(z_K))``.
+
+        ``method`` is the law's numbers (``None``: its own), an argument of the
+        jitted run, so a new learning rate never recompiles.
 
         On a JAX program the steps are one ``lax.scan``: pure, so the solve
         traces under ``jit``, ``vmap`` and ``grad``; on NumPy, a loop of
@@ -158,20 +162,21 @@ class FirstOrderOptimizer(OptimizerBackend):
 
         # On JAX the whole count is one jitted function of (z0, params), compiled once
         # per program and numbers: a call from Python is one dispatch
+        method = self.numbers(method)
         if program_evaluator.backend == "jax":
-            return self.compiled_run(program_evaluator, K)(z0, params)
+            return self.compiled_run(program_evaluator, K)(z0, params, method)
 
-        return self.steps(program_evaluator, z0, params, K)
+        return self.steps(program_evaluator, z0, params, K, method)
 
-    def steps(self, program_evaluator, z0, params, K):
-        """``(z_K, J(z_K))`` after ``K`` steps of the law: one ``lax.scan`` on JAX, a loop on NumPy."""
+    def steps(self, program_evaluator, z0, params, K, method=None):
+        """``(z_K, J(z_K))`` after ``K`` steps of the law on its numbers ``method``: one ``lax.scan`` on JAX, a loop on NumPy."""
         law = self.law(program_evaluator)
         gradient = program_evaluator.native_gradient
 
-        # z_{k+1} = S(z_k, ∇J(z_k; p)), k = 0 … K − 1
+        # z_{k+1} = S(z_k, ∇J(z_k; p); η, …), k = 0 … K − 1
         def body(state, _):
             grad = gradient(state["z"], params)
-            return law.update(grad, state), None
+            return law.update(grad, state, method), None
 
         state = law.init(z0)
         if program_evaluator.backend == "jax":
@@ -193,7 +198,9 @@ class FirstOrderOptimizer(OptimizerBackend):
         if key not in forms:
             jax = require_jax()
             forms[key] = jax.jit(
-                lambda z0, params: self.steps(program_evaluator, z0, params, K)
+                lambda z0, params, method: self.steps(
+                    program_evaluator, z0, params, K, method
+                )
             )
 
         return forms[key]
@@ -209,12 +216,28 @@ class FirstOrderOptimizer(OptimizerBackend):
 
         return forms[key]
 
-    def numbers_key(self, program_evaluator):
-        """What the law bakes in at trace time: the step rule, its options and the program's box."""
-        lower, upper = box_of(program_evaluator)
-        options = tuple(
-            sorted((name, repr(value)) for name, value in self.options.items())
+    def law_of(self, lower, upper):
+        """The law on the box ``[lower, upper]``, its numbers from the options."""
+        opts = self.options
+        eta = float(opts["learning_rate"])
+
+        if self.algorithm == "gd":
+            return GradientDescentLaw(eta, lower, upper)
+
+        return AdamLaw(
+            eta,
+            lower,
+            upper,
+            b1=opts["b1"],
+            b2=opts["b2"],
+            eps=opts["eps"],
+            max_grad_norm=opts["max_grad_norm"],
         )
+
+    def numbers_key(self, program_evaluator):
+        """What the law bakes in at trace time: the step rule, its structure (a clip or none) and the program's box."""
+        lower, upper = box_of(program_evaluator)
+        options = (self.options["max_grad_norm"] is None,)
 
         return (
             self.algorithm,
@@ -225,10 +248,10 @@ class FirstOrderOptimizer(OptimizerBackend):
 
 
 class GradientDescentLaw:
-    """Projected gradient descent as a pure law: ``z ← Π(z − η ∇J)`` on the array module of its input."""
+    """Projected gradient descent as a pure law: ``z ← Π(z − η ∇J)`` on the array module of its input; ``params`` is ``{"learning_rate"}``."""
 
     def __init__(self, learning_rate, lower, upper):
-        self.learning_rate = float(learning_rate)
+        self.params = {"learning_rate": float(learning_rate)}
         self.lower = lower
         self.upper = upper
 
@@ -239,11 +262,12 @@ class GradientDescentLaw:
 
         return {"z": z}
 
-    def update(self, grad, state):
+    def update(self, grad, state, params=None):
         """One step: ``z ← Π(z − η ∇J)``."""
+        params = self.params if params is None else params
         xp = array_module(grad, state["z"])
 
-        eta = self.learning_rate
+        eta = params["learning_rate"]
         lower = self.lower
         upper = self.upper
         z = state["z"]
@@ -255,7 +279,13 @@ class GradientDescentLaw:
 
 
 class AdamLaw:
-    """Projected Adam on a flat ``z`` as a pure law, on the array module of its input: :class:`Adam`'s step, then ``Π``."""
+    """
+    Projected Adam on a flat ``z`` as a pure law, on the array module of its input: :class:`Adam`'s step, then ``Π``.
+
+    ``params`` is ``{"learning_rate", "b1", "b2", "eps"}``, and
+    ``"max_grad_norm"`` when the gradient is clipped (the clip's presence is
+    structure).
+    """
 
     def __init__(
         self,
@@ -267,12 +297,17 @@ class AdamLaw:
         eps=1e-8,
         max_grad_norm=None,
     ):
-        # Hyperparameters: the step size η, the moment decay rates β₁ and β₂, and ε
-        self.learning_rate = float(learning_rate)
-        self.b1 = float(b1)
-        self.b2 = float(b2)
-        self.eps = float(eps)
-        self.max_grad_norm = None if max_grad_norm is None else float(max_grad_norm)
+        # Parameters: the step size η, the moment decay rates β₁ and β₂, ε, and the
+        # gradient's clip when there is one
+        self.params = {
+            "learning_rate": float(learning_rate),
+            "b1": float(b1),
+            "b2": float(b2),
+            "eps": float(eps),
+        }
+        self.clipped = max_grad_norm is not None
+        if self.clipped:
+            self.params["max_grad_norm"] = float(max_grad_norm)
 
         # The box the step is projected on
         self.lower = lower
@@ -288,21 +323,22 @@ class AdamLaw:
 
         return {"z": z, "m": zeros, "v": zeros, "step": step}
 
-    def update(self, grad, state):
+    def update(self, grad, state, params=None):
         """One step: the clipped gradient's moments, the bias-corrected step, then ``Π``."""
+        params = self.params if params is None else params
         xp = array_module(grad, state["z"])
 
-        eta = self.learning_rate
-        b1 = self.b1
-        b2 = self.b2
-        eps = self.eps
-        max_norm = self.max_grad_norm
+        eta = params["learning_rate"]
+        b1 = params["b1"]
+        b2 = params["b2"]
+        eps = params["eps"]
         lower = self.lower
         upper = self.upper
         z = state["z"]
 
         # The gradient clipped to one norm, then the step count k advanced
-        if max_norm is not None:
+        if self.clipped:
+            max_norm = params["max_grad_norm"]
             norm = safe_root(xp.sum(grad**2), xp)
             grad = grad * xp.minimum(1.0, max_norm / (norm + 1e-6))
         step = state["step"] + 1
@@ -337,6 +373,20 @@ class Adam:
 
         # Gradient clip: the largest global norm, or None for none
         self.max_grad_norm = None if max_grad_norm is None else float(max_grad_norm)
+
+    @property
+    def method_params(self) -> dict:
+        """The step's numbers, by name: ``learning_rate``, ``b1``, ``b2``, ``eps`` (and the clip when set)."""
+        numbers = {
+            "learning_rate": self.learning_rate,
+            "b1": self.b1,
+            "b2": self.b2,
+            "eps": self.eps,
+        }
+        if self.max_grad_norm is not None:
+            numbers["max_grad_norm"] = self.max_grad_norm
+
+        return numbers
 
     def init(self, params):
         """Zero moment estimates and a step counter."""
