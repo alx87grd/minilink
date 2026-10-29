@@ -1,5 +1,7 @@
 """The compiled trajectory-optimization planner: the planner's pure face, ``pv = planner.compile()``."""
 
+import copy
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -46,6 +48,10 @@ class CompiledTrajectoryPlanner:
         self.n = int(problem.sys.n)
         self.m = int(problem.sys.m)
 
+        # The tree the program is compiled with: a later edit of the problem is not the
+        # face's (compile again to take it)
+        self.defaults = copy.deepcopy(transcription.program_params(problem))
+
         # The program, compiled once with its optimizer at the default guess
         self.program = transcription.transcribe(problem, backend=backend)
         z_guess = self.initial()
@@ -54,8 +60,8 @@ class CompiledTrajectoryPlanner:
 
     @property
     def params(self) -> dict:
-        """The compiled defaults: the tree the plan depends on."""
-        return self.transcription.program_params(self.problem)
+        """The compiled defaults: the tree the plan depends on, as it was at :meth:`planner.compile`."""
+        return copy.deepcopy(self.defaults)
 
     @property
     def predicts(self) -> bool:
@@ -69,7 +75,7 @@ class CompiledTrajectoryPlanner:
 
     def initial(self, params=None):
         """The default guess in ``z`` form (``default_initial_trajectory``, packed), at ``params`` when they have values, else at the defaults."""
-        problem = self.problem_at(params if has_values(params) else None)
+        problem = self.problem_at(params if has_values(params) else self.defaults)
 
         guess = default_initial_trajectory(
             problem, self.transcription.initial_guess_time_grid(problem)

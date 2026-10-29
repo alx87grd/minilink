@@ -746,6 +746,15 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
 
 
 class TestTheMPCOnANumPyPlanner(unittest.TestCase):
+    def test_the_face_keeps_the_tree_it_was_compiled_with(self):
+        # planner.compile() is a build: a later edit of the problem is not the face's
+        planner = integrator_planner(backend="numpy")
+        pv = planner.compile()
+        planner.problem.params = {**planner.problem.params, "t_start": 5.0}
+        assert pv.params["t_start"] == 0.0 and pv.initial()[-1] == 0.0
+        z, _ = pv.solve()
+        assert z[-1] == 0.0
+
     def test_the_numpy_program_is_rebuilt_each_tick(self):
         planner = integrator_planner(backend="numpy")
         mpc = ModelPredictiveController(planner)
