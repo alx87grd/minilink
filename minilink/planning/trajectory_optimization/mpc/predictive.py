@@ -11,7 +11,7 @@ from minilink.blocks.step import UnitDelay
 from minilink.core.backends import array_module
 from minilink.core.compile.evaluators.base import assigned
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
-from minilink.core.discrete.sampled_system import NativeSampledSystem, require_no_clock
+from minilink.core.discrete.sampled_system import NativeSampledSystem
 from minilink.core.params import lookup, with_leaf
 from minilink.core.system import System
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -105,7 +105,7 @@ def ModelPredictiveController(
     if delay:
         return DelayedPredictiveController(pv, bindings, lookahead, verbose)
     if warm_start:
-        return WarmStartedPredictiveController(pv, bindings, lookahead, verbose=verbose)
+        return WarmStartedPredictiveController(pv, bindings, lookahead, verbose)
 
     return PurePredictiveController(pv, bindings, lookahead, verbose)
 
@@ -220,15 +220,13 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
     plan at once; the delay keeps it for the next tick. Every block is pure and
     the loop computes each signal once per tick, so a tick solves once. Built
     by :func:`ModelPredictiveController` with ``delay=False``; ``mpc % dt``
-    puts its three blocks on the clock.
+    puts its three blocks on the clock (a step diagram's ``%``).
 
     Ports: inputs per ``inputs``; outputs ``u`` (the command) and ``z`` (the
     plan solved at this tick, for dual rate and logging).
     """
 
-    def __init__(
-        self, pv, bindings, lookahead=0.0, sample_period=None, *, verbose=False
-    ):
+    def __init__(self, pv, bindings, lookahead=0.0, verbose=False):
         super().__init__()
         self.name = "ModelPredictiveController"
 
@@ -239,14 +237,10 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
         self.verbose = bool(verbose)
 
         # The blocks: the solve, the command and the plan's memory, which starts at
-        # the default guess (no plan yet); on the clock when one is given
+        # the default guess (no plan yet); mpc % dt clocks each of them
         solve = PlanSolver(pv, bindings, lookahead, verbose)
         command = PlanCommand(pv)
         memory = PlanMemory(pv)
-        if sample_period is not None:
-            solve, command, memory = (
-                block % sample_period for block in (solve, command, memory)
-            )
         self.add_subsystem(solve, "solve")
         self.add_subsystem(command, "command")
         self.add_subsystem(memory, "memory")
@@ -262,25 +256,6 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
         self.connect("solve", "z", "memory", "u")
         self.connect_new_output_port("command", "u", "u")
         self.connect_new_output_port("solve", "z", "z")
-
-    def __mod__(self, dt):
-        """This MPC on a clock of period ``dt``: its three blocks clocked, its numbers and its start kept."""
-        require_no_clock(self)
-
-        clocked = WarmStartedPredictiveController(
-            self.pv,
-            self.bindings,
-            self.lookahead,
-            sample_period=dt,
-            verbose=self.verbose,
-        )
-        clocked.subsystems["solve"].source.params = copy.deepcopy(
-            self.subsystems["solve"].params
-        )
-        clocked.x0 = self.x0
-        clocked.name = f"{self.name} % {float(dt):g}"
-
-        return clocked
 
 
 class PlanMemory(UnitDelay):

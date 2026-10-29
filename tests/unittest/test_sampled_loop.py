@@ -379,3 +379,92 @@ def test_animating_a_loop_reads_the_plant_input_once_per_tick():
 
     # 20 ticks and the end's
     assert len(calls) == 21
+
+
+# The time table: what each block reads as time on a clock (the night run's step 1)
+
+
+class TickCount(StepSystem):
+    """A tick law whose output is its own count: ``y_k = k``."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+    def step(self, x, u, k=0, params=None):
+        return x
+
+    def h(self, x, u, k=0, params=None):
+        xp = array_module(x, u)
+        return xp.array([float(k)])
+
+
+def box_of(block):
+    """A tick diagram holding one block, its output on the edge."""
+    box = StepDiagramSystem()
+    box.add_subsystem(block, "block")
+    box.connect_new_output_port("block", "y", "y")
+    return box
+
+
+def output_at(sampled, k):
+    ev = sampled.compile()
+    x = np.asarray(sampled.x0, dtype=float)
+    u = np.zeros(sampled.m)
+    return ev.outputs(x, u, k)["y"]
+
+
+def test_a_static_block_in_a_box_on_a_clock_reads_seconds():
+    clocked = box_of(Sine()) % 0.1
+    assert isinstance(clocked, SampledDiagramSystem)
+    np.testing.assert_allclose(output_at(clocked, 3), np.sin(0.3))
+
+
+def test_a_tick_law_in_a_box_on_a_clock_reads_its_count():
+    clocked = box_of(TickCount()) % 0.1
+    np.testing.assert_allclose(output_at(clocked, 3), 3.0)
+
+
+def test_a_box_nested_in_a_box_is_clocked_block_by_block():
+    outer = StepDiagramSystem()
+    outer.add_subsystem(box_of(Sine()), "inner")
+    outer.connect_new_output_port("inner", "y", "y")
+    np.testing.assert_allclose(output_at(outer % 0.1, 3), np.sin(0.3))
+
+
+def test_a_slow_box_reads_seconds_at_its_ticks_and_holds_between():
+    loop = SampledDiagramSystem()
+    loop.add_subsystem(box_of(Sine()) % 0.1, "slow")
+    loop.add_subsystem(Sine() % 0.05, "fast")
+    loop.connect_new_output_port("slow", "y", "y")
+    assert loop.sample_period == 0.05
+    np.testing.assert_allclose(output_at(loop, 2), np.sin(0.1))
+    ev = loop.compile()
+    x = ev.step(np.asarray(loop.x0, dtype=float), np.zeros(0), 2)
+    np.testing.assert_allclose(ev.outputs(x, np.zeros(0), 3)["y"], np.sin(0.1))
+
+
+def test_a_box_is_clocked_once():
+    clocked = box_of(Sine()) % 0.1
+    with pytest.raises(TypeError, match="already holds blocks on a clock"):
+        clocked % 0.1
+
+
+def test_a_bare_tick_law_is_refused_where_a_nested_box_would_speed_it_up():
+    inner = SampledDiagramSystem()
+    inner.add_subsystem(Sine() % 0.1, "sine")
+    inner.add_subsystem(LowPass(), "filter")
+    inner.connect("sine", "y", "filter", "u")
+    inner.connect_new_output_port("filter", "y", "y")
+    loop = SampledDiagramSystem()
+    loop.add_subsystem(inner, "box")
+    loop.add_subsystem(Sine() % 0.05, "fast")
+    with pytest.raises(TypeError, match="give it its box's clock"):
+        loop.compile()
+
+
+def test_the_zero_delay_mpc_has_no_clock_operator_of_its_own():
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        WarmStartedPredictiveController,
+    )
+
+    assert "__mod__" not in vars(WarmStartedPredictiveController)

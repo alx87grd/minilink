@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from math import gcd
 
 import numpy as np
@@ -181,6 +182,51 @@ class SampledDiagramSystem(StepDiagramSystem):
         self.n = start
 
 
+def diagram_on_clock(diagram, dt):
+    """
+    ``diagram % dt``: a sampled diagram of the same blocks and wiring, each block ``% dt``.
+
+    A sampled diagram keeps its kind and its own attributes (a zero-delay MPC
+    its planner's face); a tick diagram becomes a :class:`SampledDiagramSystem`.
+    """
+    require_no_clocks(diagram)
+
+    # The same kind with empty wiring, or a sampled diagram for a tick diagram
+    if isinstance(diagram, SampledDiagramSystem):
+        clocked = copy.copy(diagram)
+        StepDiagramSystem.__init__(clocked)
+    else:
+        clocked = SampledDiagramSystem()
+
+    # Each block on the clock: a static block reads seconds, a tick law its count
+    for sys_id, sys in diagram.subsystems.items():
+        clocked.add_subsystem(sys % dt, sys_id)
+
+    # The edge inputs, the wiring and the edge outputs, as they were
+    for port_id, port in diagram.inputs.items():
+        clocked.inputs[port_id] = copy.copy(port)
+    for target_sys_id, sources in diagram.connections.items():
+        if target_sys_id == "output":
+            continue
+        for target_port_id, source in sources.items():
+            if source is not None:
+                clocked.connect(*source, target_sys_id, target_port_id)
+    for port_id, port in diagram.outputs.items():
+        clocked.connect_new_output_port(
+            *port.source,
+            port_id,
+            port.declared_dependencies,
+            nominal_value=port.nominal_value,
+            labels=port.labels,
+            units=port.units,
+            lower_bound=port.lower_bound,
+            upper_bound=port.upper_bound,
+        )
+    clocked.name = f"{diagram.name} % {float(dt):g}"
+
+    return clocked
+
+
 def plant_run_of(loop, rollout, params=None):
     """
     ``(plant, run)``: the loop's plant and its run inside the loop's dense run, ``(None, None)`` with no plant.
@@ -298,6 +344,16 @@ def leaves_of(diagram, prefix=()):
                 (inside, port) in hold_index for port in leaf.outputs
             )
             yield leaf_path, leaf, held_here
+
+
+def require_no_clocks(diagram):
+    """Refuse to clock a diagram that already holds a clocked block: clock each block once."""
+    periods = clock_periods(diagram)
+    if periods:
+        raise TypeError(
+            f"{diagram.name} already holds blocks on a clock of {periods[0]:g} s: "
+            "clock the unclocked diagram, or clock its blocks one by one"
+        )
 
 
 def require_sampled_subsystem(sys, sys_id):

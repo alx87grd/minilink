@@ -188,7 +188,11 @@ rate; step and sampled systems live on sibling types and separate compile and si
 
 **The sampled loop is a step diagram on a clock** (R146, R158). `sys % dt` is
 `discretize(sys, dt, solver="euler")`, a `SampledSystem` (a law with states becomes its
-difference equation; a static block and a tick law take the period). The operators `>>`, `+`
+difference equation; a static block and a tick law take the period). On a step diagram (a box
+of tick laws and static blocks, the zero-delay MPC among them) `box % dt` clocks each block with
+its own face kept, a static block reading seconds and a tick law its count, and returns a
+`SampledDiagramSystem` of the same wiring and kind (`diagram_on_clock`); a box holding a clocked
+block is clocked once, block by block. The operators `>>`, `+`
 and `@` compose step systems with the meaning they have on continuous ones, on the same assembly
 code; the operands decide the algebra (`core/assembly.py`, `algebra_of`): a clocked operand
 makes a `SampledDiagramSystem`, a tick law a `StepDiagramSystem`, continuous and static operands
@@ -204,7 +208,8 @@ outputs state slots after the blocks' states (`hold_index`); its compiled plan
 (a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
 bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
 `where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
-for a rate names it (`filt % 0.01`). The loop's plant, whose substeps the dense run keeps and
+for a rate names it (`filt % 0.01`); one inside a nested box clocked slower than the loop's base
+is refused at compile, since it would tick faster there than in its box alone. The loop's plant, whose substeps the dense run keeps and
 the host runner integrates adaptively, is the block integrated inside every base period (the
 one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
 block.

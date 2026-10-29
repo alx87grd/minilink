@@ -298,12 +298,6 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
   projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
-- [ ] **Clocking a box** (the maintainer's decision 5 of 2026-10-28, composition first):
-  `box % dt` clocks each of the box's blocks and keeps their faces (a block in seconds reads
-  seconds), instead of wrapping the box as a tick law (today a static block inside reads the
-  tick count `0, 1, 2` where seconds are `0, 0.1, 0.2`). Done when a step box holding a static
-  block reads `t_k` in seconds under `% dt`, the zero-delay MPC's own `__mod__` is deleted for
-  it, and the baselines stay byte-identical. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.1)
 - [ ] **Recording the signals, and reconstructing a few** (the maintainer's decision 6 of
   2026-10-28): a run that records the signals it computes (the plant's input, a named port) in
   the same scan, and a read-back that computes only the ancestors of the requested ports (today
@@ -460,8 +454,8 @@ solvers and MPPI are v0.4 (§4).
   stays the default. Rest: whether the course notebooks that run an MPC (GRO501
   `racecar_toward_mpc`, the showcase, `mpc_spatial_stack`) move to `delay=False` **[ask —
   teaching call]**.
-- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, after the two core
-  rows of §1.5 below, "Clocking a box" and "Recording the signals"): the delayed and pure forms
+- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, after §1.5's row
+  "Recording the signals" below; clocking a box landed in the night run of 2026-10-29): the delayed and pure forms
   as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
   `lookahead`); one tuning path for every form (`controller.cost.R` or
   `controller.solve.cost.R`, one of them); `DelayedPredictiveController` and
