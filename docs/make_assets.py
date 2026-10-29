@@ -452,7 +452,8 @@ def gif_rocket() -> None:
         x_start=Gaussian(
             [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
         ),
-        infeasible_cost=100.0,
+        penalize_failure=True,
+        failure_cost=100.0,
         X=plant.state.box,
         U=plant.input_box,
     )

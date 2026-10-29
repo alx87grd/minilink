@@ -33,11 +33,14 @@ class RolloutEnvironment:
     A planning problem seen by a learner: ``reset`` draws a start, ``step`` runs one control period.
 
     The problem is compiled once to its step face. ``step`` is the face's
-    ``transition``: the plant over ``dt`` with the input held and the period's
-    stage cost ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside it by the same
-    scheme, the reward ``−c_k``; it tells how the episode ends: at the
+    ``transition``: the plant over ``dt`` with the input held; the training
+    reward is ``r_k = −g(x_k, u_k, t_k) dt``, the running cost at the period's
+    start (``reward="stage"``: ``−c_k``, the face's stage cost
+    ``∫₀^dt e^{−ρτ} g dτ`` integrated beside the state, the score's own; a native
+    step problem's reward is ``−c_k``); the score of a trained law is always the
+    problem's. It tells how the episode ends: at the
     horizon, at a failure (the state left ``X`` or the input left ``U``, checked
-    at the sample as the judge does: a priced terminal event, a training device
+    at the sample as the judge does: a charged terminal event, a training device
     that ends the episode early), or at the edge of the training zone (a
     truncation: the model is not studied there, the value of the state stands in
     for the rest). On the JAX backend every method traces, so collectors ``vmap`` over plants and ``scan`` over time with
@@ -47,7 +50,7 @@ class RolloutEnvironment:
     Parameters
     ----------
     problem : PlanningProblem
-        The task: plant, cost, constraint set ``X`` and its price of infeasibility,
+        The task: plant, cost, constraint set ``X`` and the cost of a failure,
         horizon, start (a point, a set or a law), the plant's parameter laws and
         the disturbance sources. A point start restarts every episode at
         ``x_start``.
@@ -65,7 +68,11 @@ class RolloutEnvironment:
     training_zone : Set, optional
         Where episodes run; leaving it truncates the episode. A training
         management choice, not a constraint: the plant's state box by default.
+    reward : {"running", "stage"}
+        The training reward: ``−g dt`` (default) or ``−c_k``.
     """
+
+    REWARDS = ("running", "stage")
 
     def __init__(
         self,
@@ -77,6 +84,7 @@ class RolloutEnvironment:
         substeps=1,
         backend="jax",
         training_zone=None,
+        reward="running",
     ):
         # The task: the problem, its plant and its cost, on one control period
         self.problem = problem
@@ -106,6 +114,11 @@ class RolloutEnvironment:
         self.face = problem.compile(dt=self.dt, solver=solver, substeps=self.substeps)
         self.face_params = self.face.params
 
+        # The training reward: −g dt on a continuous problem unless the stage cost is
+        # asked for; a native step problem has only its stage cost
+        require_reward(reward, self.REWARDS)
+        self.reward = reward if is_continuous(problem) else "stage"
+
         # The episode's realization: the plant's laws drawn, a seed per random source
         self.laws = problem.laws.get("plant", {})
         self.sources = dict(problem.disturbances)
@@ -127,9 +140,11 @@ class RolloutEnvironment:
         self.m = int(self.sys.inputs[self.action_port].dim)
         self.nominal_inputs = self.nominal_port_values()
 
-        # The price of infeasibility a failure is charged: declared on the problem,
-        # else the bound of its cost over an episode
-        self.infeasible_cost = self.price_of_infeasibility()
+        # The cost a failure is charged: declared on the problem, else the face's cost
+        # bound over the episode, the sum the return runs
+        self.failure_cost = self.face.failure_cost_over(
+            self.n_steps_per_episode, self.face.gamma
+        )
 
         # Noise the held-input rollout never sees is announced
         warn_inert_noise(self.sys, self.sources)
@@ -203,16 +218,19 @@ class RolloutEnvironment:
         t_next = t + dt
 
         # A step that blew up ends the episode; the last finite state stands in
-        # for the next one and its stage cost counts for nothing (the failure pays
-        # the price below), so rewards, values and the reset stay finite
+        # for the next one and its cost counts for nothing (the failure is charged
+        # below), so rewards, values and the reset stay finite
         finite = xp.all(xp.isfinite(x_next))
         x_next = xp.where(finite, x_next, x)
-        c = xp.where(finite, c, 0.0)
 
-        # Reward: r_k = −c_k, the stage cost on the plant's whole input with its
-        # sign flipped; the discount enters the return once, through the
-        # algorithm, never the reward
-        reward = -c
+        # Reward: r_k = −g(x_k, u_k, t_k) dt, the running cost on the plant's whole
+        # input at the period's start, or r_k = −c_k, the stage cost; the discount
+        # enters the return once, through the algorithm, never the reward
+        if self.reward == "running":
+            g = self.cost.g(x, u_full, t, tree["cost"])
+            reward = xp.where(finite, -g * dt, 0.0)
+        else:
+            reward = xp.where(finite, -c, 0.0)
 
         # Leaving X or U is a failure; leaving the training zone is not; the horizon ends
         out_of_U = ~xp.all(U.margin(u_full, x, t, U_params) >= 0.0)
@@ -221,10 +239,10 @@ class RolloutEnvironment:
         left_zone = ~xp.all(zone.margin(x_next, t_next) >= 0.0)
         horizon_reached = xp.asarray(t_next >= t_start + tf - 0.5 * dt)
 
-        # A failure pays the price of infeasibility; a finite horizon pays h(x_N),
+        # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
         # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
-        penalty = self.infeasible_penalty(x_next, t_next)
+        penalty = self.failure_penalty(x_next, t_next)
         reward = reward - xp.where(failed, penalty, 0.0)
         if finite_horizon:
             h_N = face.terminal(x_next, t_next, tree)
@@ -285,26 +303,27 @@ class RolloutEnvironment:
 
         return u_full
 
-    def infeasible_penalty(self, x, t):
-        """The price of infeasibility at ``(x, t)``: one number for every exit."""
-        return self.infeasible_cost
+    def failure_penalty(self, x, t):
+        """The cost of a failure at ``(x, t)``: one number for every exit."""
+        return self.failure_cost
 
     def full_params(self, params):
         """The plant's params with the episode's draws merged in (other entries untouched)."""
         return merge_tree(self.sys.params, params)
 
     def describe(self) -> str:
-        """One line naming the horizon, the constraint's price, the training zone and the randomization."""
+        """One line naming the horizon, the reward, the cost of a failure, the training zone and the randomization."""
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
-        price = self.infeasible_cost
-        charged = f"{price:.3g}"
+        charged = f"{self.failure_cost:.3g}"
+        reward = "-g dt" if self.reward == "running" else "-c_k (the stage cost)"
         names = [".".join(path) for path, _ in flatten(self.laws)]
         randomized = f", randomized params {sorted(names)}" if self.laws else ""
 
         return (
-            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; a failure (leaving X or U, "
-            f"or a non-finite state) terminates and is charged {charged}; leaving the "
-            f"training zone truncates (value bootstrapped){randomized}"
+            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; reward {reward}, "
+            f"scored on the problem's cost; a failure (leaving X or U, or a non-finite "
+            f"state) terminates and is charged {charged}; leaving the training zone "
+            f"truncates (value bootstrapped){randomized}"
         )
 
     ###########################################################################
@@ -324,14 +343,24 @@ class RolloutEnvironment:
 
         return values
 
-    def price_of_infeasibility(self):
-        """The problem's ``infeasible_cost`` when a number, else the bound of its cost over the episode."""
-        return self.problem.infeasibility_price(self.tf, dt=self.dt)
-
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def is_continuous(problem) -> bool:
+    """Whether the problem is a continuous one, with a running cost ``g`` (not a native step problem)."""
+    # Lazy import: the problems import the planners' modules
+    from minilink.planning.problems import PlanningProblem
+
+    return isinstance(problem, PlanningProblem)
+
+
+def require_reward(reward, supported):
+    """Refuse a training reward the environment does not have."""
+    if reward not in supported:
+        raise ValueError(f"reward must be one of {supported}, got {reward!r}")
 
 
 def require_episode_steps(n_steps, tf, dt):

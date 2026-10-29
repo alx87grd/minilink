@@ -209,7 +209,8 @@ def double_integrator_problem():
         x_start=[1.0, 0.0],
         cost=cost,
         tf=np.inf,
-        infeasible_cost=20.0,
+        penalize_failure=True,
+        failure_cost=20.0,
         U=plant.input_box,
     )
 
@@ -313,7 +314,8 @@ def solved_pendulum():
         cost=cost,
         tf=np.inf,
         X=plant.state.box,
-        infeasible_cost=500.0,
+        penalize_failure=True,
+        failure_cost=500.0,
         U=plant.input_box,
     )
     vi = DynamicProgrammingPlanner(
@@ -436,7 +438,8 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
         cost=problem.cost,
         tf=np.inf,
         X=problem.X,
-        infeasible_cost=500.0,
+        penalize_failure=True,
+        failure_cost=500.0,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=problem.sys.input_box,
     )

@@ -70,7 +70,7 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
     )
     env = RolloutEnvironment(free, dt=0.1, episode_length=0.3)
     assert not env.finite_horizon and np.isfinite(
-        env.infeasible_cost
+        env.failure_cost
     )  # bound over the zone
     x, t = jnp.zeros(2), 0.0
     for _ in range(2):
@@ -85,17 +85,17 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
         jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
     )
     assert bool(truncated) and not bool(terminated)
-    expected = -float(
-        env.face.stage_cost_at(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0)
-    )
+    expected = -0.1 * float(env.cost.g(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0))
     np.testing.assert_allclose(
         float(r_exit), expected
-    )  # the running cost only, no price
+    )  # the running cost only, no failure_cost
 
 
-def test_environment_finite_horizon_charges_h_and_infeasible_cost():
-    env = RolloutEnvironment(problem(tf=0.2, infeasible_cost=50.0), dt=0.1)
-    assert env.finite_horizon and env.infeasible_cost == 50.0
+def test_environment_finite_horizon_charges_h_and_the_failure_cost():
+    env = RolloutEnvironment(
+        problem(tf=0.2, penalize_failure=True, failure_cost=50.0), dt=0.1
+    )
+    assert env.finite_horizon and env.failure_cost == 50.0
     x, t, r1, terminated, _ = env.step(
         jnp.zeros(2), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
     )
@@ -209,14 +209,14 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
     )
     np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
-    # the step reward is −c_k, the face's stage cost in its stationary form:
-    # gamma carries the discount between ticks, never exp(−ρ t) in r
+    # the step reward is −g dt, the running cost at the period's start: gamma
+    # carries the discount between ticks, never exp(−ρ t) in r
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
-    c0 = float(planner.env.face.stage_cost_at(x, u, 0.0))
+    g0 = float(planner.env.cost.g(x, u, 0.0))
     _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
     _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
-    np.testing.assert_allclose(float(r0), -c0, atol=1e-6)
+    np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
         ReinforcementLearningPlanner(prob, dt=0.1, algorithm="sac?", verbose=0)
@@ -844,7 +844,9 @@ def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
 
 def test_environment_reward_stays_finite_when_a_step_blows_up():
     env = RolloutEnvironment(
-        problem(tf=0.2, infeasible_cost=50.0), dt=0.1, backend="numpy"
+        problem(tf=0.2, penalize_failure=True, failure_cost=50.0),
+        dt=0.1,
+        backend="numpy",
     )
     env.face.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
     x = np.array([0.1, 0.0])

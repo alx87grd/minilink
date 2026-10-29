@@ -35,7 +35,7 @@ class CostFunction(ABC):
     ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
     The horizon is the planning problem's: a finite ``tf`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
-    set is priced by the problem (``infeasible_cost``), not by the cost.
+    set is charged by the problem (``failure_cost``), not by the cost.
 
     ``g`` and ``h`` are native-array equation paths: NumPy in, NumPy out;
     JAX in, JAX out. :meth:`integrate` gives the running cost along a
@@ -831,7 +831,7 @@ def require_finite_bounds(lower, upper):
         raise ValueError(
             "a sampled bound of the cost needs finite boxes: declare X and U on the "
             "problem (X=plant.state.box, U=plant.input_box), or give the problem "
-            "infeasible_cost as a number"
+            "failure_cost as a number"
         )
 
 

@@ -69,7 +69,7 @@ def occupancy(scale: float = 1.0):
 
     ``~0`` well outside, ``0.5`` on the boundary, ``~1`` deep inside. Bounded,
     so weighting an obstacle term against an unbounded cost is interpretable —
-    at the price of a gradient that saturates far from the boundary.
+    at the cost of a gradient that saturates far from the boundary.
     """
     return Occupancy(scale)
 

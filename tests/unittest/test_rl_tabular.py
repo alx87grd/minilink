@@ -29,7 +29,9 @@ def double_integrator_problem(stochastic=False):
     plant.inputs["u"].lower_bound = np.array([-1.0])
     plant.inputs["u"].upper_bound = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
-    exit_rule = dict(infeasible_cost=20.0)  # one price for both tools
+    exit_rule = dict(
+        penalize_failure=True, failure_cost=20.0
+    )  # one failure_cost for both tools
     if stochastic:
         return PlanningProblem(
             plant,
@@ -56,7 +58,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     vi = DynamicProgrammingPlanner(problem, alpha=0.9, tol=1e-6, **GRID)
     vi.solve()
 
-    # The same grid, Euler step and exit price; the learner samples what value iteration sweeps
+    # The same grid, Euler step and exit failure_cost; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
         problem, alpha=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
@@ -174,7 +176,7 @@ def test_numpy_environment_steps_like_the_problem():
         x, t, r, terminated, truncated = env.step(x, t, np.array([0.5]), rng)
         assert np.isfinite(r) and not terminated
         assert bool(truncated) == (k == 2)
-    # a state pushed out of the box pays the problem's exit price and terminates
+    # a state pushed out of the box pays the problem's exit failure_cost and terminates
     _, _, r, terminated, truncated = env.step(
         np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
     )

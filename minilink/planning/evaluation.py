@@ -1,4 +1,4 @@
-"""The scores of a run: the problem's price, its margins, and the Evaluation record of a batch."""
+"""The scores of a run: the problem's failure cost, its margins, and the Evaluation record of a batch."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from minilink.core.backends import (
 )
 from minilink.core.trajectory import Trajectory
 
-PROBLEM_PRICE = "problem"  # score_run's price read from the problem
+PROBLEM_FAILURE_COST = "problem"  # score_run's failure cost read from the problem
 
 
 # The run's discounted running cost, integrated with the state: the evaluator's recorded signal
@@ -36,8 +36,8 @@ class Evaluation:
 
     - ``cost``: ``∫₀^{tf} e^{−ρt} g dt + e^{−ρ tf} h(x(tf))``, ``+inf`` for a run
       that is not finite;
-    - ``J``: the cost, plus the problem's price when the run failed or missed the
-      goal (with the price switch on);
+    - ``J``: the cost, plus the problem's failure cost when the run failed or
+      missed the goal (with ``penalize_failure`` on);
     - ``feasibility_margin``: the least margin of ``x`` to ``X`` and of ``u`` to
       ``U`` along the run, and ``failed`` (not finite, or a negative margin);
     - ``reachability_margin``: the margin of ``x(tf)`` to ``Xf`` (``+inf`` without
@@ -131,7 +131,7 @@ def score_run(
     *,
     tf=None,
     params=None,
-    price=PROBLEM_PRICE,
+    failure_cost=PROBLEM_FAILURE_COST,
     cost_bound=None,
     running_cost=None,
 ) -> dict:
@@ -147,12 +147,12 @@ def score_run(
         reachability_margin = Xf.margin(x(t_end), t_end)   reached = margin ≥ 0  (no Xf: reached)
         cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)
                               (+inf when not finite), t_end = t_start + tf
-        J                   = cost, or with the price on
-                              cost + price · (failed or not reached)   finite
-                              cost_bound + price                       not finite
+        J                   = cost, or with penalize_failure on
+                              cost + failure_cost · (failed or not reached)   finite
+                              cost_bound + failure_cost                       not finite
 
-    A run that is not finite is scored on zeros (a safe ``where``), and with the
-    price on its cost term is the problem's cost bound, the largest cost a finite
+    A run that is not finite is scored on zeros (a safe ``where``), and with
+    the failure charged its cost term is the problem's cost bound, the largest cost a finite
     run can reach: its ``J`` stays finite and above that of any finite run. Its
     gradient is not defined, since the rollout itself overflowed before the
     ``where``. ``running_cost`` is the run's integral of
@@ -161,9 +161,9 @@ def score_run(
     the trapezoid on the samples. ``tf`` is the horizon's length (by default the run's,
     ``t[-1] − t_start``) and ``t_start`` its start. ``params`` overrides
     the problem's own leaves (``"cost"``, the sets' by role, ``"t_start"``,
-    ``"discount_rate"``); ``None`` reads the problem's. ``price``
-    is the failure price as :func:`price_of` resolves it (``None`` the switch
-    off); by default the problem's. ``cost_bound`` is the cost bound as
+    ``"discount_rate"``); ``None`` reads the problem's. ``failure_cost``
+    is the cost of a failure as :func:`failure_cost_of` resolves it (``None``:
+    ``penalize_failure`` off); by default the problem's. ``cost_bound`` is the cost bound as
     :func:`diverged_cost_of` resolves it; by default the problem's
     ``cost_bound(tf)``, its ``1e6`` fallback when the boxes bound no cost.
     """
@@ -186,9 +186,10 @@ def score_run(
     u = traj.u.T
     tf = t[-1] - t_start if tf is None else tf
     t_end = t_start + tf
-    price = price_of(problem, tf) if price is PROBLEM_PRICE else price
+    if failure_cost is PROBLEM_FAILURE_COST:
+        failure_cost = failure_cost_of(problem, tf)
     if cost_bound is None:
-        cost_bound = diverged_cost_of(problem, tf, price)
+        cost_bound = diverged_cost_of(problem, tf, failure_cost)
 
     # Finite: every sample, then the run on zeros where it is not (the safe where)
     finite = xp.all(xp.isfinite(x)) & xp.all(xp.isfinite(u))
@@ -221,12 +222,13 @@ def score_run(
         cost = cost + xp.exp(-rho * tf) * cost_fn.h(x[-1], t_end, cost_params)
     cost = xp.where(finite, cost, xp.inf)  # A run not finite costs +inf
 
-    # J = cost, or with the price on cost + price · (failed or not reached),
-    # and cost_bound + price for a run not finite
-    if price is None:
+    # J = cost, or with the failure charged cost + failure_cost · (failed or not
+    # reached), and cost_bound + failure_cost for a run not finite
+    if failure_cost is None:
         J = cost
     else:
-        J = xp.where(finite, cost, cost_bound) + xp.where(failed | ~reached, price, 0.0)
+        charged = xp.where(failed | ~reached, failure_cost, 0.0)
+        J = xp.where(finite, cost, cost_bound) + charged
 
     return {
         "cost": cost,
@@ -326,36 +328,34 @@ def problem_leaves(problem) -> dict:
     return leaves
 
 
-def price_of(problem, tf, cost_params=None, discount_rate=None):
-    """The price of a failed or missed run of length ``tf``: ``None`` (switch off), the bound (``True``), or the number.
+def failure_cost_of(problem, tf, cost_params=None, discount_rate=None):
+    """The cost a failed or missed run of length ``tf`` is charged: ``None`` with ``penalize_failure`` off, else the problem's ``failure_cost`` or its cost bound.
 
     ``cost_params`` are the cost's numbers the bound is taken at (an
     evaluation's overridden weights); ``None`` reads the cost's own.
     ``discount_rate`` is the evaluation's rate (``None``: the problem's).
     """
-    price = problem.infeasible_cost
-    if price is None:
+    if not problem.penalize_failure:
         return None
-    if price is True:
-        return problem.cost_bound(tf, discount_rate=discount_rate, params=cost_params)
 
-    return price
+    return problem.failure_cost_at(tf, discount_rate=discount_rate, params=cost_params)
 
 
-def diverged_cost_of(problem, tf, price, cost_params=None, discount_rate=None):
+def diverged_cost_of(problem, tf, failure_cost, cost_params=None, discount_rate=None):
     """
-    The cost a run that is not finite is charged with the price on: the problem's cost bound.
+    The cost a run that is not finite is charged with the failure charged: the problem's cost bound.
 
-    ``None`` with the price off. ``price`` is the one :func:`price_of` resolved
-    for the problem: when the problem prices a failure at its bound
-    (``infeasible_cost=True``) it is the bound itself; else the bound is computed
-    here, once, and its ``1e6`` fallback is not announced, the price being the
-    problem's own number. ``cost_params`` and ``discount_rate`` as :func:`price_of`.
+    ``None`` with ``penalize_failure`` off. ``failure_cost`` is the one
+    :func:`failure_cost_of` resolved for the problem: when the problem charges
+    a failure its bound (``failure_cost=None``) it is the bound itself; else the
+    bound is computed here, once, and its ``1e6`` fallback is not announced,
+    the failure cost being the problem's own number. ``cost_params`` and
+    ``discount_rate`` as :func:`failure_cost_of`.
     """
-    if price is None:
+    if failure_cost is None:
         return None
-    if problem.infeasible_cost is True:
-        return price
+    if problem.failure_cost is None:
+        return failure_cost
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

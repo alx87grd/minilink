@@ -167,7 +167,8 @@ def grid_world():
         x_start=[0.0, 0.0],
         X=walker.state.box,
         U=walker.input_box,
-        infeasible_cost=100.0,
+        penalize_failure=True,
+        failure_cost=100.0,
     )
 
 

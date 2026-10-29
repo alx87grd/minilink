@@ -102,14 +102,15 @@ class PlanningProblem:
         ``∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h``, applied by every consumer (value
         iteration's ``α`` and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
-    infeasible_cost : None, True or float, optional
-        The price switch: the finite stand-in for the infinite cost of a run that
-        fails (leaves ``X`` or ``U``, or stops being finite) or misses ``Xf``.
-        ``None`` (default): an evaluation reports the plain cost and the facts;
-        ``True``: the price is :meth:`cost_bound`; a number: that price. Value
-        iteration and the learners always price a failure: this number when it
-        is one, else :meth:`cost_bound`. A declared price should exceed the
-        cost-to-go of finishing the task from a typical start.
+    penalize_failure : bool, optional
+        Whether an evaluation charges a run that fails (leaves ``X`` or ``U``, or
+        stops being finite) or misses ``Xf``: ``False`` (default) reports the
+        plain cost and the facts; ``True`` adds the failure cost to its ``J``.
+    failure_cost : float, optional
+        The finite stand-in for the infinite cost of a failure; ``None``
+        (default) is :meth:`cost_bound`. Value iteration and the learners always
+        charge a failure this cost. A declared cost should exceed the cost-to-go
+        of finishing the task from a typical start.
     params : mapping, optional
         Laws over the problem's parameters, in the tree's own shape
         (``{"plant": {"m": Uniform([0.9], [1.1])}}``; a block inside a diagram
@@ -140,7 +141,8 @@ class PlanningProblem:
         "Xf",
         "tf",
         "t_start",
-        "infeasible_cost",
+        "penalize_failure",
+        "failure_cost",
         "discount_rate",
         "params",
         "disturbances",
@@ -171,7 +173,8 @@ class PlanningProblem:
         Xf: Set | None = None,
         tf: float | None = None,
         t_start: float = 0.0,
-        infeasible_cost: bool | float | None = None,
+        penalize_failure: bool = False,
+        failure_cost: float | None = None,
         discount_rate: float = 0.0,
         params: Mapping | None = None,
         disturbances: Mapping[str, System] | None = None,
@@ -195,14 +198,16 @@ class PlanningProblem:
         self.Xf = Xf
         self.tf = tf
         self.t_start = coerce_start_time(t_start)
-        self.infeasible_cost = infeasible_cost
+        self.penalize_failure = penalize_failure
+        self.failure_cost = failure_cost
         self.discount_rate = discount_rate
         n = int(self.sys.n)
 
-        # The horizon and the discount rate, and a scalar price of infeasibility as a float
+        # The horizon and the discount rate, and the failure's switch and cost
         tf = self.coerce_tf(self.tf)
         self.discount_rate = coerce_rate(self.discount_rate)
-        self.infeasible_cost = coerce_price(self.infeasible_cost)
+        self.penalize_failure = coerce_switch(self.penalize_failure)
+        self.failure_cost = coerce_failure_cost(self.failure_cost)
 
         # The representative start and goal
         x_start = self.coerce_state(
@@ -519,7 +524,7 @@ class PlanningProblem:
         ``dt``: the integral is then its sum ``Σ_{k<N} γᵏ dt``, ``γ = e^{−ρ dt}``,
         ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
         with ``ρ = 0``, or boxes with no finite bound, falls back to ``1e6`` with
-        a warning naming ``infeasible_cost``. ``params`` are the cost's numbers to
+        a warning naming ``failure_cost``. ``params`` are the cost's numbers to
         bound (an evaluation's overridden weights); ``None`` reads its own.
         """
         cost = self.require_cost()
@@ -560,13 +565,15 @@ class PlanningProblem:
 
         return float(bound)
 
-    def infeasibility_price(self, tf=None, *, discount_rate=None, dt=None):
-        """The price a planner charges a failure: ``infeasible_cost`` when a number, else :meth:`cost_bound`."""
-        price = self.infeasible_cost
-        if price is None or price is True:
-            return self.cost_bound(tf, discount_rate=discount_rate, dt=dt)
+    def failure_cost_at(self, tf=None, *, discount_rate=None, dt=None, params=None):
+        """The cost a failure is charged: :attr:`failure_cost` when a number, else :meth:`cost_bound` (its arguments)."""
+        failure_cost = self.failure_cost
+        if failure_cost is None:
+            return self.cost_bound(
+                tf, discount_rate=discount_rate, dt=dt, params=params
+            )
 
-        return price
+        return failure_cost
 
     def compile(
         self,
@@ -989,17 +996,32 @@ def moved_set(role, set_, entry):
     return set_.with_params(entry)
 
 
-def coerce_price(price):
-    """The price switch as ``None``, ``True`` or a float; refuse anything else."""
-    if price is None or price is True:
-        return price
-    if price is False or callable(price) or isinstance(price, str):
+def coerce_switch(penalize_failure) -> bool:
+    """The failure switch as a bool; refuse anything else (a cost goes in ``failure_cost``)."""
+    if not isinstance(penalize_failure, bool):
         raise TypeError(
-            "infeasible_cost must be None (no price), True (the cost bound) or a "
-            f"number, got {price!r}"
+            "penalize_failure is True or False; the cost a failure is charged is "
+            f"failure_cost (a number, None for the cost bound), got {penalize_failure!r}"
         )
 
-    return float(price)
+    return penalize_failure
+
+
+def coerce_failure_cost(failure_cost):
+    """The failure cost as ``None`` (the cost bound) or a float; refuse anything else."""
+    if failure_cost is None:
+        return None
+    if (
+        isinstance(failure_cost, bool)
+        or callable(failure_cost)
+        or isinstance(failure_cost, str)
+    ):
+        raise TypeError(
+            "failure_cost must be None (the cost bound) or a number, got "
+            f"{failure_cost!r}"
+        )
+
+    return float(failure_cost)
 
 
 def finite_box_or(box, fallback):
@@ -1012,10 +1034,9 @@ def finite_box_or(box, fallback):
 
 
 def fallback_bound(reason):
-    """``1e6``, announced with the reason and the line that sets a price."""
+    """``1e6``, announced with the reason and the line that sets the failure's cost."""
     warnings.warn(
-        f"{reason}: a failure is priced 1e6; set infeasible_cost on the problem to "
-        "choose the price",
+        f"{reason}: a failure costs 1e6; set failure_cost on the problem to choose it",
         stacklevel=4,
     )
 

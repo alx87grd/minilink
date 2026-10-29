@@ -100,7 +100,7 @@ def test_the_score_is_the_integral_plus_the_terminal_cost():
     assert not row["failed"] and row["reached"]
 
 
-def test_the_price_switch_charges_a_failed_or_missed_run():
+def test_the_failure_switch_charges_a_failed_or_missed_run():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     goal = BallSet(center=[np.pi, 0.0], radius=0.1)
@@ -116,17 +116,23 @@ def test_the_price_switch_charges_a_failed_or_missed_run():
     assert off["feasibility_margin"] == pytest.approx(-5.0)
     assert off["reachability_margin"] == pytest.approx(0.1 - np.pi)
 
-    # On: the price is added once
+    # On: the failure_cost is added once
     on = score_run(
         PlanningProblem(
-            sys, cost=cost, tf=1.0, Xf=goal, infeasible_cost=1000.0, U=sys.input_box
+            sys,
+            cost=cost,
+            tf=1.0,
+            Xf=goal,
+            penalize_failure=True,
+            failure_cost=1000.0,
+            U=sys.input_box,
         ),
         run,
     )
     assert on["J"] == pytest.approx(off["cost"] + 1000.0)
 
 
-def test_a_run_that_is_not_finite_costs_inf_or_the_price():
+def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     t = np.linspace(0.0, 1.0, 11)
@@ -138,7 +144,12 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_price():
     assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
 
     problem = PlanningProblem(
-        sys, cost=cost, tf=1.0, infeasible_cost=50.0, U=sys.input_box
+        sys,
+        cost=cost,
+        tf=1.0,
+        penalize_failure=True,
+        failure_cost=50.0,
+        U=sys.input_box,
     )
     on = score_run(problem, run)
     assert on["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
@@ -148,7 +159,13 @@ def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     problem = PlanningProblem(
-        sys, cost=cost, tf=1.0, infeasible_cost=50.0, X=sys.state.box, U=sys.input_box
+        sys,
+        cost=cost,
+        tf=1.0,
+        penalize_failure=True,
+        failure_cost=50.0,
+        X=sys.state.box,
+        U=sys.input_box,
     )
     t = np.linspace(0.0, 1.0, 11)
     diverged = np.zeros((2, t.size))
@@ -160,7 +177,7 @@ def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     nan_row = score_run(problem, Trajectory(t, diverged, u))
     out_row = score_run(problem, Trajectory(t, left, u))
 
-    # J = cost_bound + price for the run not finite, cost + price for the one that left
+    # J = cost_bound + failure_cost for the run not finite, cost + failure_cost for the one that left
     assert nan_row["failed"] and out_row["failed"]
     assert np.isfinite(nan_row["J"])
     assert nan_row["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
@@ -341,7 +358,12 @@ def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergen
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     problem = PlanningProblem(
-        sys, cost=cost, tf=1.0, U=sys.input_box, infeasible_cost=100.0
+        sys,
+        cost=cost,
+        tf=1.0,
+        U=sys.input_box,
+        penalize_failure=True,
+        failure_cost=100.0,
     )
     t = np.linspace(0.0, 1.0, 11)
     runs = {
@@ -605,16 +627,19 @@ def test_a_plant_input_left_unwired_reads_its_nominal_value():
 @pytest.mark.parametrize(
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
-def test_an_evaluator_reads_the_price_and_the_sets_the_problem_holds_now(backend):
+def test_an_evaluator_reads_the_failure_cost_and_the_sets_the_problem_holds_now(
+    backend,
+):
     problem = upright_problem(x_start=[0.0, 0.0], Xf=BallSet([np.pi, 0.0], 0.01))
     pe = problem.compile(PID(Kp=1.0, Kd=0.1), dt=0.05, backend=backend)
     before = pe.evaluate(UPRIGHT)
     assert not bool(before.reached[0])
 
-    # The price switched on, then the goal widened to hold the run's end
-    problem.infeasible_cost = 1000.0
-    priced = pe.evaluate(UPRIGHT)
-    np.testing.assert_allclose(priced.J, before.J + 1000.0)
+    # The failure charged, then the goal widened to hold the run's end
+    problem.penalize_failure = True
+    problem.failure_cost = 1000.0
+    charged = pe.evaluate(UPRIGHT)
+    np.testing.assert_allclose(charged.J, before.J + 1000.0)
     problem.Xf = BallSet([np.pi, 0.0], 10.0)
     widened = pe.evaluate(UPRIGHT)
     assert bool(widened.reached[0])
@@ -863,7 +888,7 @@ def test_a_start_set_that_cannot_draw_is_refused():
         PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), tf=1.0)
 
 
-def test_the_failure_price_follows_the_overridden_weights_once_per_value():
+def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     problem = PlanningProblem(
@@ -873,7 +898,7 @@ def test_the_failure_price_follows_the_overridden_weights_once_per_value():
         tf=1.0,
         X=sys.state.box,
         U=sys.input_box,
-        infeasible_cost=True,
+        penalize_failure=True,
     )
     pe = problem.compile(pid(), dt=0.01, backend="numpy")
 
@@ -885,10 +910,12 @@ def test_the_failure_price_follows_the_overridden_weights_once_per_value():
         return g_max(X, U, params)
 
     cost.g_max = counted
-    own_price, _ = pe.price_and_bound(pe.params)
+    own_cost, _ = pe.failure_cost_and_bound(pe.params)
     doubled = {"cost": {"Q": 2.0 * cost.params["Q"], "R": 2.0 * cost.params["R"]}}
-    price, _ = pe.price_and_bound(pe.merged(doubled))
-    assert price == pytest.approx(2.0 * own_price, rel=1e-12)  # the bound scales with g
+    doubled_cost, _ = pe.failure_cost_and_bound(pe.merged(doubled))
+    assert doubled_cost == pytest.approx(
+        2.0 * own_cost, rel=1e-12
+    )  # the bound scales with g
 
     # Cached by the value: the same weights again sample g no more
     n_calls = len(calls)
@@ -925,7 +952,7 @@ def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
         noisy.program(["disturbance.seed"], key=4, n_trials=2)
 
 
-def test_the_failure_price_follows_the_evaluations_discount_rate():
+def test_the_failure_cost_follows_the_evaluations_discount_rate():
     from minilink import Pendulum, PlanningProblem, QuadraticCost, StateFeedback
 
     plant = Pendulum()
@@ -936,10 +963,10 @@ def test_the_failure_price_follows_the_evaluations_discount_rate():
         tf=2.0,
         x_start=np.array([0.5, 0.0]),
         U=plant.input_box,
-        infeasible_cost=True,
+        penalize_failure=True,
     )
     pe = problem.compile(StateFeedback(np.array([[2.0, 0.5]])), dt=0.05)
-    price_own, _ = pe.price_and_bound(pe.params)
-    price_fast, _ = pe.price_and_bound({**pe.params, "discount_rate": 2.0})
-    assert price_fast == pytest.approx(problem.cost_bound(2.0, discount_rate=2.0))
-    assert price_fast < price_own
+    cost_own, _ = pe.failure_cost_and_bound(pe.params)
+    cost_fast, _ = pe.failure_cost_and_bound({**pe.params, "discount_rate": 2.0})
+    assert cost_fast == pytest.approx(problem.cost_bound(2.0, discount_rate=2.0))
+    assert cost_fast < cost_own

@@ -152,7 +152,7 @@ class Sys2Gym(gym.Env):
         problem's running cost, a finite horizon ends the episode at ``tf``
         with the terminal cost ``h``, leaving the constraint set ``X`` (read on
         the problem's set parameters) is a failure (*terminated*, charged the
-        price of infeasibility) and leaving the plant's state box, the training
+        cost of a failure) and leaving the plant's state box, the training
         zone, is a *truncation*.
         Parameter laws and disturbance sources are not applied by this view.
         A problem with a point start starts every episode at its ``x_start``.
@@ -164,7 +164,7 @@ class Sys2Gym(gym.Env):
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
-        env.infeasible_cost = problem.infeasibility_price(tf, dt=dt)
+        env.failure_cost = problem.failure_cost_at(tf, dt=dt)
         return env
 
     def reset(self, seed=None, options=None):
@@ -342,7 +342,7 @@ class ProblemEnv(Sys2Gym):
 
     problem = None
     finite_horizon = False
-    infeasible_cost = None
+    failure_cost = None
 
     def reset(self, seed=None, options=None):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
@@ -359,12 +359,12 @@ class ProblemEnv(Sys2Gym):
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
 
-        # A failure is charged its price; the end of a finite horizon its h, a
+        # A failure is charged its cost; the end of a finite horizon its h, a
         # failure on the last step both, as the evaluation scores the run
         failed = not problem.X.contains(x, t, None)
         ended = self.finite_horizon and t >= self.t_start + self.tf - 0.5 * self.dt
         if failed:
-            r -= float(self.infeasible_cost)
+            r -= float(self.failure_cost)
         if ended:
             r -= float(problem.require_cost().h(x, t))
         if failed or ended:

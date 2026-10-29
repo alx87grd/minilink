@@ -65,7 +65,8 @@ problem = StepPlanningProblem(
     x_start=[0.0, 8.0],
     X=walker.state.box,
     U=walker.input_box,
-    infeasible_cost=100.0,
+    penalize_failure=True,
+    failure_cost=100.0,
 )
 
 # Value iteration on the face's transition, one cell per grid node

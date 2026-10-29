@@ -49,7 +49,8 @@ class StepPlanningProblem:
         Xf=None,
         t_start=0,
         dt=None,
-        infeasible_cost=None,
+        penalize_failure=False,
+        failure_cost=None,
         params=None,
         criterion="expectation",
     ):
@@ -75,7 +76,8 @@ class StepPlanningProblem:
             U=U,
             X0=X0,
             Xf=Xf,
-            infeasible_cost=infeasible_cost,
+            penalize_failure=penalize_failure,
+            failure_cost=failure_cost,
             params=params,
             criterion=criterion,
         )
@@ -115,8 +117,12 @@ class StepPlanningProblem:
         return self.parts.laws
 
     @property
-    def infeasible_cost(self):
-        return self.parts.infeasible_cost
+    def penalize_failure(self):
+        return self.parts.penalize_failure
+
+    @property
+    def failure_cost(self):
+        return self.parts.failure_cost
 
     @property
     def criterion(self):
@@ -190,11 +196,17 @@ class StepPlanningProblem:
         sets', else the plant's ranges); the infinite horizon is
         ``c_max / (1 − γ)``. With ``γ = 1`` on an infinite horizon, or boxes
         with no finite bound, it falls back to ``1e6`` with a warning naming
-        ``infeasible_cost``.
+        ``failure_cost``. A discretized problem's bound is the continuous
+        problem's on its own sum at ``dt`` (the face's one number):
+        ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
         """
         cost = self.require_cost()
         gamma = self.gamma if gamma is None else float(gamma)
         N = self.N if N is None else N
+
+        # A discretized problem: the continuous problem's sum at dt, γ = e^{−ρ dt}
+        if self.origin is not None:
+            return sampled_cost_bound(self.origin, N, gamma, self.dt, params)
 
         # The boxes: the declared sets', else the plant's declared ranges
         X_box = finite_box_or(self.X.bounding_box(), self.sys.state.box)
@@ -224,13 +236,13 @@ class StepPlanningProblem:
 
         return float(bound)
 
-    def infeasibility_price(self, N=None, *, gamma=None):
-        """The price a planner charges a failure: ``infeasible_cost`` when a number, else :meth:`cost_bound`."""
-        price = self.infeasible_cost
-        if price is None or price is True:
-            return self.cost_bound(N, gamma=gamma)
+    def failure_cost_at(self, N=None, *, gamma=None, params=None):
+        """The cost a failure is charged: :attr:`failure_cost` when a number, else :meth:`cost_bound` (its arguments)."""
+        failure_cost = self.failure_cost
+        if failure_cost is None:
+            return self.cost_bound(N, gamma=gamma, params=params)
 
-        return price
+        return failure_cost
 
     def __str__(self):
         return inspect_text(self)
@@ -248,7 +260,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     integral of ``e^{−ρτ} g``), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
     ``(dt, t_start)`` in seconds; the start, the sets and the laws as
     they are. Its face equals ``problem.compile(dt=dt, solver=, substeps=)``'s
-    to the bit, its price of failure the continuous problem's rule. A problem
+    to the bit, its cost bound the continuous problem's on the same sum. A problem
     with disturbance sources is refused: the step problem feeds no source.
     """
     require_no_sources(problem)
@@ -286,12 +298,13 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
         Xf=problem.Xf,
         t_start=problem.t_start,
         dt=dt,
-        infeasible_cost=problem.infeasible_cost,
+        penalize_failure=problem.penalize_failure,
+        failure_cost=problem.failure_cost,
         params=problem.laws or None,
         criterion=problem.criterion,
     )
 
-    # The continuous description it samples: its price rule is the face's
+    # The continuous description it samples: its cost bound is the face's
     step.origin = problem
 
     return step
@@ -300,6 +313,27 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def sampled_cost_bound(problem, N, gamma, dt, params=None):
+    """
+    A continuous problem's cost bound on a stepped tool's sum: ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
+
+    ``N`` ticks of ``dt`` (``None``: the geometric limit ``g_max dt / (1 − γ)``,
+    no ``h``), the discount ``γ = e^{−ρ dt}`` per tick (``γ = 1`` undiscounted,
+    ``γ = 0`` one tick counts).
+    """
+    tf = np.inf if N is None else N * dt
+
+    # ρ = −ln(γ) / dt, so that e^{−ρ dt} = γ
+    if gamma >= 1.0:
+        rho = 0.0
+    elif gamma > 0.0:
+        rho = -np.log(gamma) / dt
+    else:
+        rho = np.inf
+
+    return problem.cost_bound(tf, discount_rate=rho, dt=dt, params=params)
 
 
 def coerce_horizon(N):

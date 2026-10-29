@@ -110,7 +110,7 @@ def running_cost_table(planner, t) -> np.ndarray:
     N = grid.nodes_n
     A = grid.actions_n
     verbose = planner.options.verbose
-    price = planner.options.out_of_bound_cost
+    failure_cost = planner.options.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
     inputs = jnp.asarray(grid.inputs)
@@ -140,15 +140,15 @@ def running_cost_table(planner, t) -> np.ndarray:
         ) from exc
 
     # Out of bound cost on the pairs that leave the admissible set: the scalar, or
-    # the price of each pair's successor
+    # the cost of each pair's successor
     x_next, action_ok, x_next_ok = grid.transition(t)
     inadmissible = ~(action_ok & x_next_ok)
-    if callable(price):
+    if callable(failure_cost):
         exits = jnp.asarray(x_next[inadmissible])
 
         # Price of leaving at one exit state
         def exit_state(k):
-            return price(exits[k], t)
+            return failure_cost(exits[k], t)
 
         try:
             G[inadmissible] = build_jax_node_chunks(
@@ -163,10 +163,10 @@ def running_cost_table(planner, t) -> np.ndarray:
         except Exception as exc:
             raise ValueError(
                 "JAX backend requires a JAX-traceable, scalar-valued "
-                "out_of_bound_cost(x, t); use a scalar price or the 'numpy' backend"
+                "out_of_bound_cost(x, t); use a scalar cost or the 'numpy' backend"
             ) from exc
     else:
-        G[inadmissible] = price
+        G[inadmissible] = failure_cost
 
     return G
 

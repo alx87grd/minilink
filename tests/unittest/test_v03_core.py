@@ -589,8 +589,9 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
 
-    # The RL environment's discounted return of the same law
-    env = RolloutEnvironment(problem, dt=dt, backend="numpy")
+    # The RL environment's discounted return of the same law, on the stage reward
+    # (the score's; its training default −g dt is a modified copy, R171)
+    env = RolloutEnvironment(problem, dt=dt, backend="numpy", reward="stage")
     x, t, J_env = problem.x_start, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
         x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)

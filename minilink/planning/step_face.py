@@ -7,7 +7,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.costs import SampledCost
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
-from minilink.planning.step_problems import StepPlanningProblem
+from minilink.planning.step_problems import StepPlanningProblem, sampled_cost_bound
 
 ###############################################################################
 # Public API
@@ -237,11 +237,49 @@ class StepFace:
 
         return gamma
 
-    def price(self, gamma=None):
-        """The price of a failure, over the horizon, at the discount ``gamma`` per tick (default the face's): :func:`price_at`."""
-        gamma = self.gamma if gamma is None else float(gamma)
+    @property
+    def cost_bound(self) -> float:
+        """
+        The face's one cost bound: its own sum with the maxima, ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
 
-        return price_at(self.problem, gamma, self.dt)
+        It bounds every stage, ``c_k ≤ g_max dt``; the infinite horizon is its
+        geometric limit ``g_max dt / (1 − γ)``, no ``h``; a native step
+        problem's is ``Σ γᵏ c_max + γᴺ h_max``. The judge on the face, the RL
+        environment and value iteration read it.
+        """
+        return self.cost_bound_over(self.N, self.gamma)
+
+    @property
+    def failure_cost(self) -> float:
+        """What a failure is charged on the face: the problem's ``failure_cost`` when a number, else :attr:`cost_bound`."""
+        return self.failure_cost_over(self.N, self.gamma)
+
+    def cost_bound_over(self, N, gamma) -> float:
+        """
+        The face's sum with the maxima over ``N`` ticks (``None``: its geometric limit) at the discount ``gamma`` per tick.
+
+        One formula, each tool over the horizon its own sum runs: the RL
+        environment over its episode, value iteration over its sweeps (to
+        convergence: the geometric limit), the face's own over :attr:`N`.
+        """
+        problem = self.problem
+
+        # A continuous problem, or a discretized one: the continuous cost's sum at dt
+        if is_continuous(problem):
+            return sampled_cost_bound(problem, N, gamma, self.dt)
+        if problem.origin is not None:
+            return sampled_cost_bound(problem.origin, N, gamma, self.dt)
+
+        # A native step problem: Σ_{k<N} γᵏ c_max + γᴺ h_max (N = None: its own horizon)
+        return problem.cost_bound(N, gamma=gamma)
+
+    def failure_cost_over(self, N, gamma) -> float:
+        """What a failure is charged over ``N`` ticks at ``gamma``: the problem's ``failure_cost`` when a number, else :meth:`cost_bound_over`."""
+        failure_cost = self.problem.failure_cost
+        if failure_cost is None:
+            return self.cost_bound_over(N, gamma)
+
+        return failure_cost
 
     def run(self, policy, x_start=None, params=None, n_steps=None):
         """
@@ -280,31 +318,6 @@ class StepFace:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def price_at(problem, gamma, dt):
-    """
-    The price of a failure at the discount ``gamma`` per step: ``infeasible_cost`` when a number, else the cost bound.
-
-    A native step problem's bound at ``γ``; a continuous problem's (and a
-    discretized one's, priced as the problem it samples) on the step tool's
-    own sum: with ``γ < 1`` the sweeps run to convergence,
-    ``Σ_{k≥0} γᵏ dt = dt / (1 − γ)``, the rate ``ρ = −ln(γ) / dt`` making
-    ``e^{−ρ dt} = γ``; with ``γ = 1``, the problem's horizon undiscounted.
-    """
-    # A discretized problem prices as the continuous problem it samples
-    origin = getattr(problem, "origin", None)
-    problem = problem if origin is None else origin
-
-    if not is_continuous(problem):
-        return problem.infeasibility_price(gamma=gamma)
-    if gamma >= 1.0:
-        return problem.infeasibility_price(discount_rate=0.0, dt=dt)
-
-    # γ = e^{−ρ dt} (γ = 0: one step counts, ρ = ∞)
-    rho = -np.log(gamma) / dt if gamma > 0.0 else np.inf
-
-    return problem.infeasibility_price(np.inf, discount_rate=rho, dt=dt)
 
 
 def is_continuous(problem) -> bool:

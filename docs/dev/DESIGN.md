@@ -279,7 +279,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **Path integral control:** `MPPIPlanner(problem, *, dt, n_samples, temperature, noise,
   control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
   JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
-  rolls each out on `RolloutEnvironment.step` (the one owner of the stage cost, the exit price
+  rolls each out on `RolloutEnvironment.step(reward="stage")` (the one owner of the stage cost, the exit cost
   and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
   weighted noise. Its compiled face (`n_z = N m + 1`, `shift` holding the last input,
   `command` the held input, `predicts = False`) is the trajectory face, so
@@ -777,7 +777,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   and `h_max(X)` its upper bounds over boxes (exact for a quadratic, sampled otherwise),
   `traj.with_cost(cost)` the plotting signals. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`); parameters nest by term id ('Parameters').
-  The horizon, the discount, the sets and the price are the problem's.
+  The horizon, the discount, the sets and the failure cost are the problem's.
 - Geometry (`geometry.py`; its planned package `core/geometry/` is in §3): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
@@ -1043,9 +1043,9 @@ iterations=K)` takes exactly `K` steps (R149): one `lax.scan` on a JAX program, 
 `iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
 jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
 the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
-iterates. The failure price of
+iterates. The failure cost of
 an evaluation follows its cost's numbers (R165): the bound is taken at the overridden weights,
-once per value (cached), and under a trace at the problem's own (a price is a step, with no
+once per value (cached), and under a trace at the problem's own (a failure cost is a step, with no
 gradient). One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
 (`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
@@ -1057,7 +1057,7 @@ owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box
 horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
 transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
-evaluator's tree, so `jax.grad` differentiates it), the discount rate and the price
+evaluator's tree, so `jax.grad` differentiates it), the discount rate and the failure cost
 switch (below). The planners pin the start from `x_start`; a singleton `X0` is derived from it. `X0`/`Xf` authoritative; `x_start`/`x_goal` are representative points,
 and `x_goal` never creates `Xf` (an exact terminal state is `Xf=SingletonSet(x_goal)`).
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
@@ -1106,17 +1106,21 @@ an infinite-horizon problem is a tool setting, `episode_length` on the evaluator
 the RL planner.
 The discount rate `rho` is the problem's, `problem.discount_rate`; planners convert it
 with `problem.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` and `U` are hard
-constraints in every tool: a run that leaves them is a failure. **The price switch**
-`infeasible_cost` is `None` (an evaluation reports the plain cost and the facts), `True`
-(the price is `problem.cost_bound()`) or a number. `cost_bound(tf=None, *,
-discount_rate=None, dt=None)` is `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max` over the declared boxes
-(with `dt`, a stepped tool's sum `Σ_{k<N} γᵏ dt = dt (1 − γᴺ)/(1 − γ)`, `γ = e^{−ρ dt}`, in place of the integral),
-else the plant's declared ranges; always finite (`1e6` with a warning naming
-`infeasible_cost` when no bound exists). Trajopt and RRT keep the sets exact; value
-iteration, tabular learning, the RL environment and the Gym bridge always price a failure
-by `problem.infeasibility_price()` (the number, else the bound on the tool's own
-discount and period; value iteration sweeps to convergence, so its sum is `Σₖ αᵏ dt = dt/(1 − α)`,
-the rate `ρ = −ln α / dt`), and DP treats
+constraints in every tool: a run that leaves them is a failure. **The failure switch**
+(R172) `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
+facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
+number, `None` for the cost bound). **The cost bound** is one formula owned by the problem,
+`cost_bound(tf=None, *, discount_rate=None, dt=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
+over the declared boxes for the continuous judge, and with a tool's `dt` the same maxima on its
+own sum, `g_max dt Σ_{k<N} γᵏ + γᴺ h_max`, `γ = e^{−ρ dt}` (it bounds every stage,
+`c_k ≤ g_max dt`), else the plant's declared ranges; always finite (`1e6` with a warning naming
+`failure_cost` when no bound exists). The step face reads it at its period
+(`face.cost_bound`, `face.cost_bound_over(N, γ)`), each tool over the horizon its own sum runs:
+the RL environment over its episode, value iteration over its sweeps (to convergence: the
+geometric limit `g_max dt/(1 − α)`), the face over its `N`; on a finite undiscounted problem
+the judge's integral and the three sums are one number. Trajopt and RRT keep the sets exact;
+value iteration, tabular learning, the RL environment and the Gym bridge always charge a
+failure the failure cost (`failure_cost`, else that bound), and DP treats
 leaving the *grid* as infeasible too (the table has no value off its domain). The learners also
 take a **training zone** (`ReinforcementLearningPlanner(training_zone=)`, the
 plant's state box by default): leaving it *truncates* the episode, the critic's
@@ -1134,8 +1138,8 @@ feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k,
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
 cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t_start)} g dt  (+inf when not finite; no h on an infinite horizon)
-J                   = cost, or with the price on cost + price · (failed or not reached),
-                      and cost_bound + price for a run not finite
+J                   = cost, or with penalize_failure on cost + failure_cost · (failed or not reached),
+                      and cost_bound + failure_cost for a run not finite
 ```
 
 **The stage cost is integrated with the state** (R142): the evaluator's run carries the running
@@ -1145,20 +1149,26 @@ scheme and substeps, read at the plant block's own state and input in the pass t
 the signal `"plant:running_cost"`; its last value is the run's running cost, the stage costs
 `c_k` of the step face summed with their discount. `evaluate_trajectory` reads that signal when
 the run carries it (one score) and scores a logged run, which has none, by the trapezoid on its
-samples. A run that is not finite is scored on zeros behind a safe `where`, and with the price on its cost
-term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach (its `1e6`
-fallback, unannounced, when the boxes bound no cost and the price is a number): its `J` stays
+samples. A run that is not finite is scored on zeros behind a safe `where`, and with the failure
+charged its cost term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach
+(its `1e6` fallback, unannounced, when the boxes bound no cost and the failure cost is a number): its `J` stays
 finite and above that of any finite run, failed or not. Its gradient is not defined (the rollout
 overflowed before the `where`). A run whose
-states stay finite while its cost overflows scores `+inf`, price or not. A trajectory is
+states stay finite while its cost overflows scores `+inf`, charged or not. A trajectory is
 scored on its `plant` role; one without roles is scored as the plant's run only when `x`
 has the plant's `n`, `u` its `m`, and it carries no recorded signals (a logged run), and a
 trajectory with recorded signals and no role is refused.
 `evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
-through its `plant` role; a logged plant run without signals). RL *trains* on the face's
-stage cost, `r_k = -c_k` with `c_k = ∫₀^dt e^{−ρτ} g dτ`, with per-step factor
-`gamma = exp(-rho dt)`; `exp(-rho t)` is not folded into the reward (that would discount
-twice); its plans report `evaluate`.
+through its `plant` role; a logged plant run without signals). **The planning problem defines
+the problem** (R171, R173): a tool may plan or train on a modified copy of it and its record names
+the modification, but the score is always the problem's. RL *trains* on `r_k = −g(x_k, u_k, t_k)
+dt`, one call of the cost's `g` at the period's start (`reward="stage"`: `−c_k`, the face's stage
+cost `∫₀^dt e^{−ρτ} g dτ`, the score's), with per-step factor `gamma`; `exp(-rho t)` is not folded
+into the reward (that would discount twice); its record says "trained on −g dt, scored on the
+problem's cost". A tool's own discount (value iteration's `alpha`, RL's `gamma` with the stage
+reward) is internal and consistent: the tool plans on the problem at `ρ_tool = −ln α / dt`, the
+stage integral and the step both, names it in its record, and its policy is scored at the
+problem's `ρ`.
 
 **A problem stochastic by its parts (R143):** there is no stochastic class; where a number
 goes, a law may go. `x_start=` takes a point, a `Set` (the uniform law on it, the set its
@@ -1223,7 +1233,7 @@ port bounds are information, and saturation lives inside the law or in a `Satura
 block. A stochastic problem needs `n_trials`; its draws are `problem.realize(key, n)`, one
 tree (above), one key per call, and each trial realizes the loop's random blocks under that
 key (trial `i` is `loop.realize(child_seed(key, "trial i"))`), the same noise on both
-backends for an integer key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the price on, the price is a step
+backends for an integer key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the failure charged, its cost is a step
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
@@ -1236,7 +1246,7 @@ states. `problem.compile(law)` called directly closes a continuous law as a cont
 substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
 -> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
 beside the state by the same scheme (`g·dt` to the last bit under one Euler step, R142),
-`N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `price(gamma)` and `run(policy)`
+`N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
 (`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
 cost, `x_start`, `t_start`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
@@ -1304,7 +1314,7 @@ attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JA
 Flax/Optax dependency. Training prints one line per update; `verbose=False` silences it.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
-step functions on either backend — the step face's `transition` with the reward `r = −c_k`,
+step functions on either backend — the step face's `transition` with the training reward `r = −g dt` (`reward="stage"`: `r = −c_k`),
 the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
 the first failure, a training device, R159) and the horizon — shared by the JAX collectors
 and the tabular learners, so one object owns what a training episode means (an evaluation
@@ -1414,14 +1424,14 @@ step face (`grid.face`, R141): the successors are one period of the step model, 
 Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
 step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
 `c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
-the discount `α` the face's `γ` and the price its rule; a `StepPlanningProblem` (a grid world)
+the discount `α` the face's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
 interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
 `planner.result`); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
-`cf.INF`), or, when it is a callable, its price `out_of_bound_cost(x_next, t)` at each
+`cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable
 backward-step backends share this workflow: `loop` (per-node Python, pyro's reference),
 `numpy` (vectorized over the precomputed lookup table, the default),

@@ -56,20 +56,24 @@ def test_problem_exit_rule_and_penalty():
     problem = PlanningProblem(
         plant, cost=quadratic(plant), tf=np.inf, U=plant.input_box
     )
-    assert problem.infeasible_cost is None
+    assert problem.penalize_failure is False and problem.failure_cost is None
     assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
-    scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50, U=plant.input_box)
-    assert scalar.infeasible_cost == 50.0
-    assert scalar.infeasibility_price() == 50.0
+    scalar = PlanningProblem(
+        plant, tf=2.0, penalize_failure=True, failure_cost=50, U=plant.input_box
+    )
+    assert scalar.failure_cost == 50.0
+    assert scalar.failure_cost_at() == 50.0
     assert scalar.horizon_kind() == "finite"
 
-    # The switch: None, True (the bound) or a number; a callable price is refused
-    assert PlanningProblem(plant, infeasible_cost=True).infeasible_cost is True
-    for refused in (lambda x, t: 1.0, False, "big"):
-        with pytest.raises(TypeError, match="infeasible_cost"):
-            PlanningProblem(plant, infeasible_cost=refused)
+    # The switch a bool, the cost a number (None: the bound); anything else is refused
+    assert PlanningProblem(plant, penalize_failure=True).failure_cost is None
+    for refused in (lambda x, t: 1.0, True, "big"):
+        with pytest.raises(TypeError, match="failure_cost"):
+            PlanningProblem(plant, failure_cost=refused)
+    with pytest.raises(TypeError, match="penalize_failure"):
+        PlanningProblem(plant, penalize_failure=50.0)
 
 
 def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
@@ -83,7 +87,7 @@ def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
         plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
     )
     assert finite.cost_bound() == pytest.approx(2.0 * g_max + h_max)
-    assert finite.infeasibility_price() == pytest.approx(2.0 * g_max + h_max)
+    assert finite.failure_cost_at() == pytest.approx(2.0 * g_max + h_max)
 
     # Discounted infinite horizon: g_max / ρ, no h
     discounted = PlanningProblem(
@@ -98,14 +102,18 @@ def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
 
     # Undiscounted infinite horizon: no bound, 1e6 announced
     undiscounted = PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box)
-    with pytest.warns(UserWarning, match="infeasible_cost"):
+    with pytest.warns(UserWarning, match="failure_cost"):
         assert undiscounted.cost_bound() == 1.0e6
 
 
-def test_dp_reads_the_problem_infeasible_cost():
+def test_dp_reads_the_problem_failure_cost():
     plant = pendulum()
     problem = PlanningProblem(
-        plant, cost=quadratic(plant), infeasible_cost=42.0, U=plant.input_box
+        plant,
+        cost=quadratic(plant),
+        penalize_failure=True,
+        failure_cost=42.0,
+        U=plant.input_box,
     )
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     assert planner.options.out_of_bound_cost == 42.0
@@ -131,6 +139,38 @@ def test_dp_reads_the_problem_discount_rate():
         problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, alpha=0.9
     )
     assert explicit.options.alpha == 0.9
+
+
+def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_periods():
+    class Unit(CostFunction):
+        def g(self, x, u, t=0.0, params=None):
+            return 1.0
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    plant = pendulum()
+    problem = PlanningProblem(plant, cost=Unit(), U=plant.input_box, discount_rate=1.0)
+    alpha, dt = 0.9, 0.05
+    planner = DynamicProgrammingPlanner(
+        problem,
+        x_grid=(5, 5),
+        u_grid=(3,),
+        dt=dt,
+        solver="rk4",
+        alpha=alpha,
+        tol=1e-12,
+        max_iterations=5000,
+        clean_infeasible=False,
+    )
+    solution = planner.solve()
+    rho = -np.log(alpha) / dt
+
+    # At rest at the bottom: J = c + α J, c = ∫₀^dt e^{−ρτ} dτ = (1 − α) / ρ, so J = 1 / ρ
+    J = planner.result.J[planner.grid.nearest_node(np.zeros(2))]
+    np.testing.assert_allclose(J, 1.0 / rho, rtol=1e-6)
+    assert solution.solver.discount_rate == pytest.approx(rho)
+    assert planner.problem.discount_rate == 1.0
 
 
 # --- R2: distributions and the stochastic problem ---
@@ -180,7 +220,8 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         tf=np.inf,
         x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         params={"plant": {"m": Uniform([0.8], [1.2])}},
-        infeasible_cost=100.0,
+        penalize_failure=True,
+        failure_cost=100.0,
         U=plant.input_box,
     )
     assert isinstance(problem, PlanningProblem)
@@ -196,7 +237,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     nominal = problem.nominal()
     assert type(nominal) is PlanningProblem and not nominal.is_stochastic
     np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])
-    assert nominal.infeasible_cost == 100.0
+    assert nominal.failure_cost == 100.0 and nominal.penalize_failure
 
     with pytest.raises(ValueError):
         PlanningProblem(plant, x_start=Gaussian([0.0], 1.0), U=plant.input_box)
@@ -218,7 +259,8 @@ def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
         x_start=[0.3, -0.1],
         cost=quadratic(plant),
         tf=5.0,
-        infeasible_cost=10.0,
+        penalize_failure=True,
+        failure_cost=10.0,
         U=plant.input_box,
     )
     assert not deterministic.is_stochastic and deterministic.criterion == "expectation"
@@ -254,7 +296,7 @@ def test_evaluate_trajectory_applies_the_discount_rate():
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
 
 
-def test_evaluate_trajectory_integrates_to_tf_and_prices_by_the_switch():
+def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
     from minilink.core.trajectory import Trajectory
     from minilink.planning import evaluate_trajectory
 
@@ -278,16 +320,20 @@ def test_evaluate_trajectory_integrates_to_tf_and_prices_by_the_switch():
     exits = Trajectory(t=t, x=x_exit, u=u)
 
     box = dict(X=plant.state.box, U=plant.input_box)
-    finite = PlanningProblem(plant, cost=Unit(), tf=1.0, infeasible_cost=50.0, **box)
+    finite = PlanningProblem(
+        plant, cost=Unit(), tf=1.0, penalize_failure=True, failure_cost=50.0, **box
+    )
     report = evaluate_trajectory(finite, inside)
     assert not report.failed[0] and np.isclose(report.J[0], 1.0 + 7.0)  # ∫ g + h
     report = evaluate_trajectory(finite, exits)
-    assert report.failed[0] and np.isclose(report.J[0], 1.0 + 7.0 + 50.0)  # + price
+    assert report.failed[0] and np.isclose(
+        report.J[0], 1.0 + 7.0 + 50.0
+    )  # + failure_cost
     assert np.isclose(report.feasibility_margin[0], -1.0)
 
     # The switch off: the plain cost, the failure reported beside it
-    unpriced = PlanningProblem(plant, cost=Unit(), tf=np.inf, **box)
-    report = evaluate_trajectory(unpriced, exits)
+    uncharged = PlanningProblem(plant, cost=Unit(), tf=np.inf, **box)
+    report = evaluate_trajectory(uncharged, exits)
     assert report.failed[0] and np.isclose(
         report.J[0], 1.0
     )  # no h on an infinite horizon
@@ -327,7 +373,8 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             cost=quadratic(plant),
             tf=1.0,
             X=Band(r),
-            infeasible_cost=1.0,
+            penalize_failure=True,
+            failure_cost=1.0,
         )
         reports = {
             run: evaluate(problem, ctl, dt=0.01, backend=run[0], solver=run[1])
@@ -362,7 +409,10 @@ def test_the_backends_share_the_score_on_identical_starts():
 
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)  # bounded by construction
     one_start = Particles([[2.5, 0.0]])
-    for kwargs in ({"tf": np.inf}, {"tf": 1.0, "infeasible_cost": 20.0}):
+    for kwargs in (
+        {"tf": np.inf},
+        {"tf": 1.0, "penalize_failure": True, "failure_cost": 20.0},
+    ):
         problem = PlanningProblem(
             plant,
             cost=Discounted(),
@@ -497,7 +547,8 @@ def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
         tf=1.0,
         X=plant.state.box,
         U=plant.input_box,
-        infeasible_cost=500.0,
+        penalize_failure=True,
+        failure_cost=500.0,
     )
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
@@ -562,7 +613,8 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     task = dict(
         tf=1.0,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        infeasible_cost=5.0,
+        penalize_failure=True,
+        failure_cost=5.0,
     )
     for X, cost in ((NumpyBand(), quadratic(plant)), (plant.state.box, NumpyEnergy())):
         problem = PlanningProblem(plant, cost=cost, X=X, **task)
@@ -631,7 +683,8 @@ def test_gymnasium_view_of_a_stochastic_problem():
         tf=1.0,
         X=plant.state.box,
         x_start=Particles([[0.3, 0.0], [-0.3, 0.0]]),
-        infeasible_cost=50.0,
+        penalize_failure=True,
+        failure_cost=50.0,
         U=plant.input_box,
     )
     env = Sys2Gym.from_problem(problem, dt=0.05)
@@ -640,7 +693,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
         for s in range(6)
     }
     assert starts <= {(0.3, 0.0), (-0.3, 0.0)} and len(starts) == 2
-    # a charged exit: terminated, the price on the reward
+    # a charged exit: terminated, the failure_cost on the reward
     env.x = np.array([2 * np.pi - 0.01, 9.9])
     _, r, terminated, truncated, _ = env.step(np.array([4.0]))
     assert terminated and not truncated and r < -49.0
@@ -816,3 +869,30 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
     traj = nominal_trajectory(problem, source, dt=0.1)
     np.testing.assert_allclose(traj.u[:, 0], [np.sin(1.5)])
+
+
+def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_value_iteration():
+    from minilink.planning.environment import RolloutEnvironment
+
+    plant = pendulum()
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), S=np.eye(2))
+    problem = PlanningProblem(
+        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
+    )
+    dt = 0.1
+    face = problem.compile(dt=dt)
+    env = RolloutEnvironment(problem, dt=dt, backend="numpy")
+    vi = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=dt)
+
+    # Undiscounted and finite: the integral g_max T and the sum g_max dt N agree
+    bound = problem.cost_bound()
+    np.testing.assert_allclose(
+        [face.cost_bound, env.failure_cost, vi.options.out_of_bound_cost],
+        bound,
+        rtol=1e-12,
+    )
+
+    # A failure cost given: every tool charges it
+    fixed = problem.replace(penalize_failure=True, failure_cost=7.0)
+    assert fixed.compile(dt=dt).failure_cost == 7.0
+    assert RolloutEnvironment(fixed, dt=dt, backend="numpy").failure_cost == 7.0

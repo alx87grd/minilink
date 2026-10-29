@@ -17,7 +17,6 @@ from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
-from minilink.planning.step_face import price_at
 from minilink.planning.step_problems import StepPlanningProblem
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
@@ -58,7 +57,11 @@ class DynamicProgrammingPlanner(Planner):
         Workflow options. The flat keyword arguments below overlay matching
         fields: ``backend``, ``alpha``, ``tol``, ``max_iterations``,
         ``interpolation``, ``out_of_bound_cost``, ``final_time``,
-        ``record_history``, ``verbose``, ``clean_infeasible``.
+        ``record_history``, ``verbose``, ``clean_infeasible``. ``alpha`` given
+        on a continuous problem is the planner's own discount per step: the
+        sweeps plan on a copy of the problem at ``ρ = −ln α / dt`` (the stage
+        integral and the backup both), the record names it, and the score of
+        the policy stays the problem's.
     """
 
     def __init__(
@@ -85,8 +88,11 @@ class DynamicProgrammingPlanner(Planner):
         super().__init__(problem)
         self.require_cost()
 
-        # Discretized state and input spaces
-        self.grid = grid_of(problem, grid, x_grid, u_grid, dt, solver)
+        # Discretized state and input spaces, on the planner's own discount when
+        # alpha overrides the problem's: one rate inside and between the periods
+        grid = grid_of(problem, grid, x_grid, u_grid, dt, solver)
+        self.discount_rate = tool_rate_of(problem, alpha, grid.dt)
+        self.grid = grid_on_rate(grid, self.discount_rate)
 
         # Workflow options: the flat keywords over the bag, then the problem's defaults
         self.options = options_of(
@@ -236,7 +242,7 @@ class DynamicProgrammingPlanner(Planner):
         X = self.problem.X
         U = self.problem.U
         alpha = self.options.alpha
-        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         # Interpolation of the cost-to-go one step ahead
         J_interpol = grid.build_interpolator(J_next, self.options.interpolation)
@@ -346,7 +352,7 @@ class DynamicProgrammingPlanner(Planner):
 
         Warning: on a precomputed grid the table is built once, at the first
         sweep's time, and reused for every sweep. A running cost ``g``, or a
-        price ``out_of_bound_cost(x_next, t)``, that depends on ``t`` is then
+        cost ``out_of_bound_cost(x_next, t)``, that depends on ``t`` is then
         frozen at that time. Use a grid with ``precompute=False`` for a
         time-varying cost.
         """
@@ -358,9 +364,9 @@ class DynamicProgrammingPlanner(Planner):
         params = grid.face.params
         N = grid.nodes_n
         A = grid.actions_n
-        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
-        # The grid's mask, and its successors when a callable price needs them
+        # The grid's mask, and its successors when a callable cost needs them
         if admissible is None or (x_next is None and callable(INF)):
             successors, action_ok, x_next_ok = grid.transition(t)
             admissible = action_ok & x_next_ok if admissible is None else admissible
@@ -387,7 +393,7 @@ class DynamicProgrammingPlanner(Planner):
                 G[s, a] = float(grid.stage_cost(x, u, t, params))
 
         # Out of bound cost on the pairs that leave the admissible set: the scalar,
-        # or the price of each pair's successor
+        # or the cost of each pair's successor
         if callable(INF):
             exits = x_next[~admissible]
             G[~admissible] = [infeasible_penalty(INF, x, t) for x in exits]
@@ -435,7 +441,7 @@ class DynamicProgrammingPlanner(Planner):
         result = self.result
         INF = self.options.out_of_bound_cost
 
-        # A price that varies with the exit state saturates at no single level
+        # A cost that varies with the exit state saturates at no single level
         if callable(INF):
             return result
 
@@ -518,6 +524,7 @@ class DynamicProgrammingPlanner(Planner):
             tol=tol,
             converged=fixed_horizon or result.delta <= tol,
             fixed_horizon=fixed_horizon,
+            discount_rate=self.discount_rate,
         )
 
         # Optionally, roll the law out from the problem's start and score it over
@@ -567,9 +574,9 @@ class DynamicProgrammingOptions:
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors: a scalar, or ``out_of_bound_cost(x_next, t)`` evaluated at
         each inadmissible pair's successor (the ``"jax"`` backend needs it
-        traceable and time-invariant). Unset (``None``), the problem's price:
-        its ``infeasible_cost`` when a number, else the bound of its cost on
-        this discount (:func:`grid_price`).
+        traceable and time-invariant). Unset (``None``), the cost of a failure:
+        the problem's ``failure_cost`` when a number, else the face's cost bound
+        on this discount (:func:`grid_failure_cost`).
     final_time : float
         Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
         at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
@@ -649,13 +656,14 @@ class DynamicProgrammingResult:
 
 @dataclass(frozen=True)
 class ValueIterationRecord:
-    """Sweeps run, the last cost-to-go change, and whether the sweeps converged to ``tol``."""
+    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, and the planner's own discount rate when ``alpha`` overrode the problem's (``None``: the problem's)."""
 
     iterations: int
     delta: float
     tol: float
     converged: bool
     fixed_horizon: bool
+    discount_rate: float | None = None
 
     @property
     def success(self) -> bool:
@@ -663,15 +671,22 @@ class ValueIterationRecord:
         return bool(self.converged)
 
     def __str__(self) -> str:
+        rate = (
+            ""
+            if self.discount_rate is None
+            else f"; planned at rho={self.discount_rate:.4g}/s (alpha), scored at the problem's"
+        )
         if self.fixed_horizon:
-            return f"{self.iterations} backward sweeps (fixed horizon)"
+            return f"{self.iterations} backward sweeps (fixed horizon){rate}"
 
         if self.converged:
-            return f"converged in {self.iterations} sweeps (delta={self.delta:.3g})"
+            return (
+                f"converged in {self.iterations} sweeps (delta={self.delta:.3g}){rate}"
+            )
 
         return (
             f"max_iterations={self.iterations} reached before tol={self.tol:g} "
-            f"(delta={self.delta:.3g})"
+            f"(delta={self.delta:.3g}){rate}"
         )
 
 
@@ -713,9 +728,9 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     if "alpha" not in given and face.gamma < 1.0:
         opt = replace(opt, alpha=face.gamma)
 
-    # The price of leaving the grid, unless set: the problem's, else the bound of its cost
+    # The cost of leaving the grid, unless set: the problem's, else the face's cost bound
     if opt.out_of_bound_cost is None:
-        opt = replace(opt, out_of_bound_cost=face.price(opt.alpha))
+        opt = replace(opt, out_of_bound_cost=grid_failure_cost(grid, opt.alpha))
 
     # The horizon's end (t_start + tf, or a step problem's last tick) is the
     # terminal time unless final_time is set
@@ -730,9 +745,58 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     return opt
 
 
-def grid_price(problem, alpha, dt):
-    """The price of an inadmissible pair at the discount ``alpha`` per step: the step face's rule, :func:`~minilink.planning.step_face.price_at`."""
-    return price_at(problem, alpha, dt)
+def tool_rate_of(problem, alpha, dt):
+    """
+    The planner's own discount rate ``ρ = −ln α / dt`` when ``alpha`` overrides a continuous problem's, else ``None``.
+
+    ``α = 1`` is ``ρ = 0``; ``α = 0`` (one step counts) keeps the problem's
+    rate, which an Euler step never reads inside its period.
+    """
+    if alpha is _UNSET or not isinstance(problem, PlanningProblem):
+        return None
+    alpha = float(alpha)
+    if alpha <= 0.0:
+        return None
+
+    # α = e^{−ρ dt}
+    rho = -np.log(alpha) / dt if alpha < 1.0 else 0.0
+    if rho == problem.discount_rate:
+        return None
+
+    return float(rho)
+
+
+def grid_on_rate(grid, rate):
+    """The grid itself, or the same grid on a copy of its problem at the rate ``rate`` (``None``: unchanged)."""
+    if rate is None:
+        return grid
+    problem = grid.problem.replace(discount_rate=rate)
+
+    return StateSpaceGrid(
+        problem,
+        x_grid_shape=grid.x_grid_shape,
+        u_grid_shape=grid.u_grid_shape,
+        dt=grid.dt,
+        solver=grid.solver,
+    )
+
+
+def grid_failure_cost(grid, alpha):
+    """
+    The cost of an inadmissible pair at the discount ``alpha`` per step: the face's failure cost over the sweeps' horizon.
+
+    With ``α < 1`` the sweeps of a continuous (or discretized) problem run to
+    convergence, so the face's sum is its geometric limit
+    ``g_max dt / (1 − α)``; with ``α = 1``, and on a native step problem, it is
+    over the problem's own horizon.
+    """
+    face = grid.face
+    native = (
+        isinstance(face.problem, StepPlanningProblem) and face.problem.origin is None
+    )
+    N = None if alpha < 1.0 and not native else face.N
+
+    return face.failure_cost_over(N, alpha)
 
 
 def cached_options_of(options) -> tuple:
@@ -746,9 +810,9 @@ def cached_options_of(options) -> tuple:
     )
 
 
-def infeasible_penalty(price, x_next, t):
-    """The penalty of one inadmissible pair: the scalar ``price``, or ``price(x_next, t)``."""
-    return float(price(x_next, t)) if callable(price) else price
+def infeasible_penalty(failure_cost, x_next, t):
+    """The penalty of one inadmissible pair: the scalar ``failure_cost``, or ``failure_cost(x_next, t)``."""
+    return float(failure_cost(x_next, t)) if callable(failure_cost) else failure_cost
 
 
 def require_tables(result):

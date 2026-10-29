@@ -363,18 +363,18 @@ def animate(
     return ani
 
 
-def cost_scale_limit(price):
+def cost_scale_limit(failure_cost):
     """
-    Default top of the cost-to-go colour scale: the price of leaving the grid.
+    Default top of the cost-to-go colour scale: the cost of leaving the grid.
 
-    States that must leave saturate at that price, so clipping there keeps the
-    feasible states readable. A callable ``price(x, t)`` has no single level and
+    States that must leave saturate at that cost, so clipping there keeps the
+    feasible states readable. A callable ``failure_cost(x, t)`` has no single level and
     an infinite one is no limit: both leave the scale to Matplotlib (``None``).
     """
-    if price is None or callable(price) or not np.isfinite(price):
+    if failure_cost is None or callable(failure_cost) or not np.isfinite(failure_cost):
         return None
 
-    return float(price)
+    return float(failure_cost)
 
 
 def get_controller(result, *, interpolation="linear"):

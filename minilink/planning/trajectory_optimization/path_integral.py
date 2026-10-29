@@ -28,7 +28,7 @@ class MPPIPlanner(Planner):
     ``dt`` over the problem's horizon. One solve samples ``K`` perturbed
     sequences ``V^k = U + ε^k``, rolls each out on the plant, scores it with
     the problem's cost (its stage cost ``c_k`` over each period, discounted,
-    the terminal cost, the price of leaving ``X``) plus the information term
+    the terminal cost, the cost of leaving ``X``) plus the information term
     ``λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t``, weighs the samples by the softmin
     ``w^k ∝ exp(−(S^k − S_min) / λ)`` and moves ``U`` by ``Σ_k w^k ε^k``.
     ``ModelPredictiveController(MPPIPlanner(...)) % dt`` is MPPI in the loop.
@@ -223,9 +223,9 @@ class CompiledMPPIPlanner:
         self.defaults = copy.deepcopy(planner.params)
 
         # The step and its cost: the problem sampled at dt, the one owner of the exit
-        # rule, the price and the terminal cost
+        # rule, the failure cost and the terminal cost; the plan scored on the stage cost
         self.env = RolloutEnvironment(
-            problem, dt=planner.dt, solver=planner.solver, backend="jax"
+            problem, dt=planner.dt, solver=planner.solver, backend="jax", reward="stage"
         )
 
         # One compiled function per face: the solve, and the nominal rollout
@@ -316,7 +316,7 @@ class CompiledMPPIPlanner:
             eps = jax.random.normal(jax.random.fold_in(key, i), (K, N, m)) @ L.T
             V = jnp.clip(U + eps, u_lower, u_upper)
 
-            # Roll out and score: S^k = Σ_t γ^t c_t + γ^N h(x_N) + the price of leaving X
+            # Roll out and score: S^k = Σ_t γ^t c_t + γ^N h(x_N) + the cost of leaving X
             S_path, left_X, X = jax.vmap(lambda V_k: path_cost(x0, t0, V_k, P))(V)
 
             # The information term: λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t

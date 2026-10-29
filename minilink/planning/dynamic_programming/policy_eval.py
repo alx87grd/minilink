@@ -7,7 +7,7 @@ import numpy as np
 from minilink.core.roles import block_roles
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
-    grid_price,
+    grid_failure_cost,
     infeasible_penalty,
     options_of,
 )
@@ -46,7 +46,7 @@ class PolicyEvaluator:
     options : DynamicProgrammingOptions, optional
         Shared workflow options (``alpha``, ``tol``, ``interpolation``, ...),
         used as given: pass the planner's resolved ``planner.options``. ``None``
-        takes the problem's discount, horizon and price, as the planner does.
+        takes the problem's discount, horizon and failure cost, as the planner does.
     """
 
     def __init__(
@@ -68,12 +68,12 @@ class PolicyEvaluator:
         self.policy = policy if callable(policy) else policy_from_block(policy)
 
         # Workflow options, shared with the dynamic-programming planner (its own
-        # options are resolved); unset, the problem's discount, horizon and price
+        # options are resolved); unset, the problem's discount, horizon and failure cost
         if options is None:
             options = options_of(problem, grid, None)
         if options.out_of_bound_cost is None:
-            price = grid_price(problem, options.alpha, grid.dt)
-            options = replace(options, out_of_bound_cost=price)
+            failure_cost = grid_failure_cost(grid, options.alpha)
+            options = replace(options, out_of_bound_cost=failure_cost)
         self.options = options
 
         # Memory
@@ -147,7 +147,7 @@ class PolicyEvaluator:
         set_params = None
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
-        INF = self.options.out_of_bound_cost  # The finite price (pyro's cf.INF)
+        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         successors = np.empty((N, n), dtype=float)
         G = np.empty(N, dtype=float)

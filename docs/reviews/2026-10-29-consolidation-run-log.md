@@ -120,16 +120,56 @@ they differ:
   An MPPI MPC on a traced loop (`problem.compile(mpc % dt, backend="jax")`) fails because the
   face's `initial(params)` is host-only; that is plan §6's traced first guess, landed there.
 
+- **C-11 (step 4) One cost-bound formula, each tool over its own sum's horizon.** The
+  amendment's formula is `problem.cost_bound(tf, dt=)`; the face reads it at its period
+  (`face.cost_bound` over its `N`, `face.cost_bound_over(N, γ)` for a tool). The RL
+  environment takes it over its episode (an infinite-horizon problem trains in episodes of
+  `episode_length`; the geometric limit does not exist undiscounted) and value iteration over
+  its sweeps (to convergence: the geometric limit when `α < 1`). So the plan's "three tools
+  give one number" holds where their horizons agree (a finite undiscounted problem: the test);
+  on one pendulum with a discount they still answer their own sums (the review's 193.8, 198.7,
+  314.3 stay three numbers: the judge's integral, the episode's sum, the sweeps' limit), and
+  the discretized problem now answers the face's number (its fourth number is gone). **To
+  raise:** whether value iteration should bound over the problem's horizon instead (it sweeps
+  to convergence, so its cost-to-go can exceed the finite sum).
+- **C-12 (step 4) The failure switch and cost** (the amendment): `penalize_failure` (bool) and
+  `failure_cost` (number or `None`); `infeasible_cost=True` became `penalize_failure=True`,
+  `infeasible_cost=x` became `penalize_failure=True, failure_cost=x` in every test, demo,
+  notebook and `docs/make_assets.py` (the old number charged both the judge and the tools, so
+  both keywords keep the behaviour). `failure_cost` is a field of the problem, not a leaf of
+  its tree (a failure cost is a step, with no gradient). The nouns: `failure_cost_at`,
+  `failure_cost_of`, `failure_cost_and_bound`, `grid_failure_cost`, the environment's
+  `failure_cost`; `price` is gone from `minilink/` (notebook prose keeps its own words).
+- **C-13 (step 4) The RL reward** `r_k = −g(x_k, u_k, t_k) dt`, one call of `self.cost.g` on the
+  plant's whole input, zero after a step that blew up (as `c_k` was); `reward="stage"` on the
+  environment and the RL planner gives `−c_k`. MPPI's environment and the tabular learner use
+  `reward="stage"` (MPPI scores its rollouts on the problem's stage cost; the tabular table
+  approaches value iteration's). The record and `describe()` say "trained on −g dt, scored on
+  the problem's cost". Acceptance script 6 builds its environment with `reward="stage"` (the
+  score's reward), so its "one J" still holds. A native step problem has no `g`: its reward is
+  `−c_k`.
+- **C-14 (step 4) A tool's own discount.** Value iteration with `alpha=` on a continuous
+  problem plans on `problem.replace(discount_rate=−ln α / dt)` (the grid rebuilt on it, a given
+  grid's shape kept); `ValueIterationRecord.discount_rate` names it and its `__str__` says
+  "planned at rho=…, scored at the problem's". The RL planner with `reward="stage"` and its own
+  `gamma` builds its environment at `ρ = −ln γ / dt` the same way (the default reward needs
+  none: `−g dt` carries no discount inside the period); its record's `scored_gamma` stays the
+  problem's.
+
 ## 3. Ledger of intended number changes
 
 | Row | What moved | Why |
 | --- | --- | --- |
+| Step 4, the RL reward | `rl.ppo.*` and `rl_env.*` of the v0.3 baseline (`rl_env` 1.5e-3 relative, the PPO history 1e-8 to 4e-3); re-pinned in `benchmarks/baselines/v03_core.json` (those keys only) | the training reward is `−g dt` (R171) |
+| Step 4, value iteration's `alpha` | no baseline entry moves (the baseline's value iteration runs Euler, where the two discounts agree); under RK4 the backed-up `J` is the consistent one (the new test) | R173 |
 
 ## 4. Textbook check
 
 Every math diff was read beside `planning/dynamic_programming/dp.py`.
 
 - Step 1: no equation line changed.
+- Step 4: the reward line (`g = cost.g(...)`, `reward = −g dt`), `sampled_cost_bound` (ρ from
+  γ), `tool_rate_of`, the score's charged term, read beside `dp.py`.
 - Step 2: the fields' margins and costs, the shapes' `sdf`, the paths' distance and arc
   lengths, the densities, the LTI matrices, `TimeCost`, `TrajectorySource` and the new
   `LookupPolicy.action` were read beside `dp.py`: bindings (`params`, then `xp`), the
@@ -139,7 +179,8 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 
 ## 5. Not done
 
-- The cart-pole RL demo's reliability (the maintainer's, §1 item 7).
+- The cart-pole RL demo's reliability (the maintainer's, §1 item 7): the reward change moves
+  every RL demo's training; none was re-run for its numbers.
 
 ## 6. Progress
 

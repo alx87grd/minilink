@@ -9,8 +9,8 @@ import numpy as np
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
+    grid_failure_cost,
     grid_of,
-    grid_price,
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
@@ -123,17 +123,19 @@ class TabularLearningPlanner(Planner):
         self.grid = grid
 
         # The world is the grid: leaving it is infeasible, at value iteration's
-        # price, so the learner approaches the same table
+        # failure cost, and the reward its stage cost, so the learner approaches the
+        # same table
         alpha_dp = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
-        price = grid_price(problem, alpha_dp, grid.dt)
+        failure_cost = grid_failure_cost(grid, alpha_dp)
         self.env = RolloutEnvironment(
-            problem.replace(X=problem.X & grid.X, infeasible_cost=price),
+            problem.replace(X=problem.X & grid.X, failure_cost=failure_cost),
             dt=grid.dt,
             episode_length=episode_length,
             solver=grid.solver if solver is None else solver,
             substeps=substeps,
             backend="numpy",
             training_zone=grid.X,
+            reward="stage",
         )
 
         # Learning: the rounding to a node, the target, the exploration, the step and
@@ -243,7 +245,7 @@ class TabularLearningPlanner(Planner):
                     x, t, u, rng, params
                 )
 
-                # What the learner sees: the stage cost c_k = g dt (plus a priced exit or a
+                # What the learner sees: the stage cost c_k (plus a charged exit or a
                 # terminal cost), the next node, and the action it will take there
                 c = -float(reward)
                 s_next = self.node(x_next)
@@ -322,7 +324,7 @@ class TabularLearningPlanner(Planner):
         )
 
     def plot_cost2go(self, **kwargs):
-        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.infeasible_cost))
+        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
         return plotting.plot_cost2go(self.result, **kwargs)
 
     def plot_policy(self, **kwargs):

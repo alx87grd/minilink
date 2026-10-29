@@ -30,7 +30,7 @@ from minilink.learning.reinforcement_learning.policy import (
     GaussianHead,
     SquashedGaussianHead,
 )
-from minilink.planning.environment import RolloutEnvironment
+from minilink.planning.environment import RolloutEnvironment, is_continuous
 from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
@@ -57,8 +57,11 @@ class ReinforcementLearningPlanner(Planner):
     Policy-family planner that learns ``u = pi(x)`` by reinforcement learning.
 
     The training objective is the expected discounted return on the control
-    grid, ``E[-Σ_k γᵏ c_k]``, ``c_k`` the stage cost of the problem's step face: a failure (leaving ``X`` or ``U``) pays the problem's price
-    of infeasibility, leaving the training zone truncates the episode. The
+    grid, ``E[Σ_k γᵏ r_k]``, the reward ``r_k = −g(x_k, u_k, t_k) dt`` the
+    running cost at each period's start (``reward="stage"``: ``−c_k``, the stage
+    cost of the problem's step face): a failure (leaving ``X`` or ``U``) is
+    charged the problem's failure cost, leaving the training zone truncates the
+    episode; the record says what it trained on, the score is the problem's. The
     discount ``γ`` is the problem's own per period unless ``gamma=`` overrides
     it, a training hyperparameter the record states beside the scored one.
     ``solve`` returns the learned law as a
@@ -101,6 +104,8 @@ class ReinforcementLearningPlanner(Planner):
         declares a rate, else 0.99 with a warning that states the effective horizon.
     log_std_init : float
         Initial exploration log-std on the normalized action (Gaussian head).
+    reward : {"running", "stage"}
+        The training reward: ``−g dt`` (default) or ``−c_k``.
     seed : int
         Seed of the weights, exploration and starts.
     verbose : bool
@@ -142,6 +147,7 @@ class ReinforcementLearningPlanner(Planner):
         solver="rk4",
         substeps=1,
         training_zone=None,
+        reward="running",
         seed=0,
         verbose=True,
         **algorithm_kwargs,
@@ -170,6 +176,7 @@ class ReinforcementLearningPlanner(Planner):
             solver=solver,
             substeps=substeps,
             training_zone=training_zone,
+            reward=reward,
         )
         self.require_expectation_criterion()
         if self.verbose:
@@ -196,6 +203,23 @@ class ReinforcementLearningPlanner(Planner):
         self.policy = ExplorationPolicy(self.controller, head)
         self.critic = self.build_critic(hidden, activation, seed)
         self.algorithm.bind(self.policy, self.critic, self.resolve_discount(gamma))
+
+        # Trained on the stage cost with a discount of its own: the stage integral at
+        # the same rate, ρ = −ln γ / dt, so one discount runs inside and between
+        # periods; the score's discount stays the problem's
+        self.scored_gamma = float(self.env.face.gamma)
+        stage_on_own_rate = self.env.reward == "stage" and is_continuous(problem)
+        if stage_on_own_rate and self.gamma != self.scored_gamma:
+            rate = -math.log(self.gamma) / self.dt if self.gamma > 0.0 else math.inf
+            self.env = RolloutEnvironment(
+                problem.replace(discount_rate=rate),
+                dt=dt,
+                episode_length=episode_length,
+                solver=solver,
+                substeps=substeps,
+                training_zone=training_zone,
+                reward=reward,
+            )
 
         # Train state and the parallel plants, from the seed's keys
         self.key = jax.random.PRNGKey(seed)
@@ -640,7 +664,8 @@ class ReinforcementLearningPlanner(Planner):
             weights_finite=weights_finite,
             history=history,
             gamma=float(self.gamma),
-            scored_gamma=float(self.env.face.gamma),
+            scored_gamma=self.scored_gamma,
+            reward=self.env.reward,
         )
 
     def critic_cost_to_go(self):
@@ -716,6 +741,8 @@ class ReinforcementLearningRecord:
     (``timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
     training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
+    ``reward`` is what the training rewarded: ``"running"`` (``−g dt``) or
+    ``"stage"`` (``−c_k``); the score is always the problem's cost.
     """
 
     algorithm: str
@@ -726,6 +753,7 @@ class ReinforcementLearningRecord:
     history: list
     gamma: float | None = None
     scored_gamma: float | None = None
+    reward: str = "running"
 
     @property
     def success(self) -> bool:
@@ -743,9 +771,11 @@ class ReinforcementLearningRecord:
         return self.gamma != self.scored_gamma
 
     def __str__(self) -> str:
+        trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
             f"{self.algorithm}: {self.timesteps} plant steps in "
-            f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}"
+            f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
+            f"{trained_on}, scored on the problem's cost"
         )
         if self.discount_differs:
             line += (

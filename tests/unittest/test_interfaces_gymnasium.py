@@ -246,7 +246,8 @@ class TestSys2Gym(unittest.TestCase):
                 cost=cost,
                 tf=np.inf,
                 X=Band(r),
-                infeasible_cost=50.0,
+                penalize_failure=True,
+                failure_cost=50.0,
                 U=plant.input_box,
             )
             env = Sys2Gym.from_problem(problem, backend="numpy")

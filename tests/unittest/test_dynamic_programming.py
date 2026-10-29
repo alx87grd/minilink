@@ -258,12 +258,13 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem, grid=result.grid, policy=controller.action, options=planner.options
         )
         J_pi = evaluator.solve()
-        price = planner.options.out_of_bound_cost
-        feasible = result.J < 0.5 * price  # The cells clear of the price
+        failure_cost = planner.options.out_of_bound_cost
+        feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
-    def test_the_price_covers_the_converged_sum_at_a_finite_horizon(self):
-        from minilink.planning.dynamic_programming.dp import grid_price
+    def test_the_failure_cost_covers_the_converged_sum_at_a_finite_horizon(self):
+        from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+        from minilink.planning.dynamic_programming.dp import grid_failure_cost
 
         # solve() sweeps to convergence: its sum is Σₖ αᵏ dt = dt / (1 − α), tf or not
         sys = DoubleIntegrator()
@@ -274,8 +275,13 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem = PlanningProblem(
                 sys, cost=cost, tf=tf, X=sys.state.box, U=sys.input_box
             )
-            price = grid_price(problem, 0.9, 0.1)
-            self.assertGreaterEqual(price, g_max * 0.1 / (1.0 - 0.9) * (1 - 1e-12))
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=(3, 3), u_grid_shape=(3,), dt=0.1
+            )
+            failure_cost = grid_failure_cost(grid, 0.9)
+            self.assertGreaterEqual(
+                failure_cost, g_max * 0.1 / (1.0 - 0.9) * (1 - 1e-12)
+            )
 
     def test_result_save_load_round_trip(self):
         import os
@@ -564,7 +570,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         controller = planner.get_controller()
         self.assertTrue(hasattr(controller, "action"))
 
-    def test_cost2go_colour_scale_tops_at_the_price_of_leaving(self):
+    def test_cost2go_colour_scale_tops_at_the_failure_cost_of_leaving(self):
         import matplotlib
 
         matplotlib.use("Agg")
@@ -615,8 +621,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertEqual(len(surfaces), 2)
         plt.close("all")
 
-    def test_cost2go_colour_scale_has_no_default_for_a_priced_exit(self):
-        self.assertIsNone(plotting.cost_scale_limit(exit_price))
+    def test_cost2go_colour_scale_has_no_default_for_a_charged_exit(self):
+        self.assertIsNone(plotting.cost_scale_limit(exit_failure_cost))
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
         self.assertEqual(plotting.cost_scale_limit(500), 500.0)
 
@@ -911,18 +917,18 @@ class TestCleanInfeasible(unittest.TestCase):
         cleanup.assert_called_once()
 
 
-def exit_price(x, t):
-    """A price of leaving that grows with the exit state: 200 + 50 |x|^2."""
+def exit_failure_cost(x, t):
+    """A failure_cost of leaving that grows with the exit state: 200 + 50 |x|^2."""
     return 200.0 + 50.0 * (x[0] ** 2 + x[1] ** 2)
 
 
 class TestInfeasibleCostPrice(unittest.TestCase):
-    """Value iteration's out_of_bound_cost(x, t) prices each inadmissible pair at its successor."""
+    """Value iteration's out_of_bound_cost(x, t) failure costs each inadmissible pair at its successor."""
 
-    def planner(self, price, backend="numpy", **kwargs):
+    def planner(self, failure_cost, backend="numpy", **kwargs):
         return DynamicProgrammingPlanner(
             make_pendulum_problem(),
-            out_of_bound_cost=price,
+            out_of_bound_cost=failure_cost,
             x_grid=(11, 11),
             u_grid=(5,),
             dt=0.1,
@@ -933,18 +939,18 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             **kwargs,
         )
 
-    def test_numpy_table_charges_the_price_of_each_successor(self):
-        planner = self.planner(exit_price)
-        self.assertIs(planner.options.out_of_bound_cost, exit_price)
+    def test_numpy_table_charges_the_failure_cost_of_each_successor(self):
+        planner = self.planner(exit_failure_cost)
+        self.assertIs(planner.options.out_of_bound_cost, exit_failure_cost)
         x_next, action_ok, x_next_ok = planner.grid.transition(0.0)
         inadmissible = ~(action_ok & x_next_ok)
         self.assertTrue(np.any(inadmissible))
 
         G = planner.running_cost_table(0.0)
-        expected = [exit_price(x, 0.0) for x in x_next[inadmissible]]
+        expected = [exit_failure_cost(x, 0.0) for x in x_next[inadmissible]]
         np.testing.assert_allclose(G[inadmissible], expected)
 
-        # A scalar price (an int like a float) keeps the scalar table
+        # A scalar failure_cost (an int like a float) keeps the scalar table
         scalar = self.planner(500)
         self.assertEqual(scalar.options.out_of_bound_cost, 500.0)
         G_scalar = scalar.running_cost_table(0.0)
@@ -952,9 +958,9 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
 
     def test_a_given_mask_is_charged_as_given(self):
-        for price in (300.0, exit_price):
-            with self.subTest(price=price):
-                planner = self.planner(price)
+        for failure_cost in (300.0, exit_failure_cost):
+            with self.subTest(failure_cost=failure_cost):
+                planner = self.planner(failure_cost)
                 grid = planner.grid
                 g, cost_params = planner.problem.cost.g, planner.problem.cost.params
                 x_next = grid.transition(0.0)[0]
@@ -964,15 +970,19 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 admissible[0, 0] = False
                 G = planner.running_cost_table(0.0, admissible)
 
-                # The running cost of every pair, and the price on the masked one only
+                # The running cost of every pair, and the failure_cost on the masked one only
                 expected = np.empty(admissible.shape)
                 for s, x in enumerate(grid.states):
                     for a, u in enumerate(grid.inputs):
                         expected[s, a] = float(g(x, u, 0.0, cost_params)) * grid.dt
-                expected[0, 0] = price(x_next[0, 0], 0.0) if callable(price) else price
+                expected[0, 0] = (
+                    failure_cost(x_next[0, 0], 0.0)
+                    if callable(failure_cost)
+                    else failure_cost
+                )
                 np.testing.assert_allclose(G, expected)
 
-    def test_a_constant_price_solves_like_the_scalar(self):
+    def test_a_constant_failure_cost_solves_like_the_scalar(self):
         for backend in ("numpy", "loop"):
             with self.subTest(backend=backend):
                 scalar = self.planner(500.0, backend, clean_infeasible=False)
@@ -984,13 +994,13 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 np.testing.assert_array_equal(constant.result.J, scalar.result.J)
                 np.testing.assert_array_equal(constant.result.pi, scalar.result.pi)
 
-    def test_loop_numpy_and_policy_evaluation_agree_on_the_price(self):
-        table = self.planner(exit_price)
-        loop = self.planner(exit_price, "loop")
+    def test_loop_numpy_and_policy_evaluation_agree_on_the_failure_cost(self):
+        table = self.planner(exit_failure_cost)
+        loop = self.planner(exit_failure_cost, "loop")
         table.solve()
         loop.solve_steps(table.result.iterations)
         np.testing.assert_allclose(loop.result.J, table.result.J)
-        # the priced exits, not the 1e6 default, bound the cost-to-go
+        # the charged exits, not the 1e6 default, bound the cost-to-go
         self.assertLess(np.max(table.result.J), 1.0e3)
 
         evaluator = PolicyEvaluator(
@@ -1002,12 +1012,12 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         J_pi = evaluator.solve()
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
 
-    def test_jax_table_charges_the_price(self):
+    def test_jax_table_charges_the_failure_cost(self):
         import pytest
 
         pytest.importorskip("jax")
-        numpy_planner = self.planner(exit_price)
-        jax_planner = self.planner(exit_price, "jax")
+        numpy_planner = self.planner(exit_failure_cost)
+        jax_planner = self.planner(exit_failure_cost, "jax")
         G_np = numpy_planner.running_cost_table(0.0)
         G_jax = dp_jax.running_cost_table(jax_planner, 0.0)
         np.testing.assert_allclose(G_jax, G_np)
@@ -1017,7 +1027,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         np.testing.assert_allclose(jax_planner.result.J, numpy_planner.result.J)
         self.assertLess(np.max(jax_planner.result.J), 1.0e3)
 
-    def test_jax_rejects_an_untraceable_price(self):
+    def test_jax_rejects_an_untraceable_failure_cost(self):
         import pytest
 
         pytest.importorskip("jax")

@@ -36,7 +36,7 @@ from minilink.planning.evaluation import (
     Evaluation,
     criterion_of,
     diverged_cost_of,
-    price_of,
+    failure_cost_of,
     problem_leaves,
     register_evaluation_pytree,
     score_run,
@@ -70,7 +70,7 @@ class ProblemEvaluator:
     Parameters
     ----------
     problem : PlanningProblem
-        The task: plant, cost, sets, horizon, price switch (and, for a stochastic
+        The task: plant, cost, sets, horizon, failure switch (and, for a stochastic
         problem, the draws and the criterion).
     controller : System or PlanningSolution
         A controller block (or a solution's policy) closed on the plant, a source
@@ -139,11 +139,11 @@ class ProblemEvaluator:
         require_free_names(self.free_inputs, self.block_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
-        # The forms generated once: the batched trial, jitted on JAX; the price
+        # The forms generated once: the batched trial, jitted on JAX; the failure
         # and bound of each value of the cost's numbers
         self.trials_fn = None
         self.run_fn = None
-        self.price_cache = {}
+        self.failure_cost_cache = {}
         self.on_device = DeviceTree()
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
@@ -213,12 +213,12 @@ class ProblemEvaluator:
         params = self.merged(params)
         n_trials = trials_of(self.draws, n_trials)
 
-        # The draws, the price of a failure and the cost bound of a run not finite,
+        # The draws, the cost of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
         x_starts, trial_params = self.realize(params, key, n_trials)
-        price, bound = self.price_and_bound(params)
+        failure_cost, bound = self.failure_cost_and_bound(params)
         rows, trajectories = self.run_trials(
-            trial_params, x_starts, record, price, bound
+            trial_params, x_starts, record, failure_cost, bound
         )
 
         return Evaluation(
@@ -242,10 +242,10 @@ class ProblemEvaluator:
         entries of :attr:`params` at the base point (the leaves not tuned keep
         these values; the start ``z0`` reads the tuned ones).
 
-        Three caveats of the price switch: the price is a step, with no gradient;
-        with sets declared it counts beside their rows; with the switch off, one
-        diverging trial makes ``J`` infinite and a line search fails, so a search
-        that may cross into unstable gains sets ``infeasible_cost=True``. A smooth
+        Three caveats of the failure switch: the failure cost is a step, with no
+        gradient; with sets declared it counts beside their rows; with the switch
+        off, one diverging trial makes ``J`` infinite and a line search fails, so a
+        search that may cross into unstable gains sets ``penalize_failure=True``. A smooth
         alternative for gradient tuning is a penalty term in the cost,
         ``cost + w * X.as_cost()``, with ``X`` left undeclared.
         """
@@ -264,12 +264,12 @@ class ProblemEvaluator:
         n_trials = trials_of(self.draws, n_trials)
         rows = declared_rows(self.problem)
 
-        # The draws, the price and the cost bound stay fixed when the start and
+        # The draws, the failure cost and the cost bound stay fixed when the start and
         # the cost are not among the tuned leaves
         freeze = not tunes(wrt, "x_start") and not tunes(wrt, "cost")
         if freeze:
             x_starts, trial_params = self.realize(base, key, n_trials)
-            price, bound = self.price_and_bound(base)
+            failure_cost, bound = self.failure_cost_and_bound(base)
             batched = isinstance(trial_params, Batched)
             frozen_tree = trial_params.tree if batched else trial_params
             frozen_axes = trial_params.axes if batched else None
@@ -280,7 +280,7 @@ class ProblemEvaluator:
 
             def report_of(z):
                 trial_rows, _ = self.run_trials(
-                    overlay(z), x_starts, False, price, bound
+                    overlay(z), x_starts, False, failure_cost, bound
                 )
                 return Evaluation(
                     **trial_rows,
@@ -377,15 +377,15 @@ class ProblemEvaluator:
 
         return run(self.device_tree(params), np.asarray(x_start, dtype=float))
 
-    def price_and_bound(self, params):
+    def failure_cost_and_bound(self, params):
         """
-        The price of a failure and the cost bound of a run not finite, at the cost's numbers of ``params``.
+        The cost of a failure and the cost bound of a run not finite, at the cost's numbers of ``params``.
 
         The bound follows the overridden weights: it is computed once per value
         of the cost's leaves and cached by it (and by the problem's parts and
-        price switch, which may be replaced after the compile), since each bound
+        failure switch, which may be replaced after the compile), since each bound
         samples ``g`` over the boxes. Under a trace the weights have no value, and the bound
-        is the problem's own (a price is a step: it carries no gradient).
+        is the problem's own (a failure cost is a step: it carries no gradient).
         """
         problem = self.problem
         cost_params = params.get("cost")
@@ -393,20 +393,20 @@ class ProblemEvaluator:
         if numbers is None:
             cost_params, numbers = None, "own"
 
-        # The evaluation's discount rate, when it has a value (a traced one prices at
+        # The evaluation's discount rate, when it has a value (a traced one bounds at
         # the problem's)
         rate = params.get("discount_rate", problem.discount_rate)
         rate = float(rate) if is_concrete_number(rate) else problem.discount_rate
 
-        # The key: the price switch, the rate and the numbers; the entry holds the
+        # The key: the failure switch and cost, the rate and the numbers; the entry holds the
         # parts it was taken on, so a part replaced since takes a new bound
         parts = problem_parts(problem)
-        key = (problem.infeasible_cost, rate, numbers)
-        cached = self.price_cache.get(key)
+        key = (problem.penalize_failure, problem.failure_cost, rate, numbers)
+        cached = self.failure_cost_cache.get(key)
         if cached is None or any(a is not b for a, b in zip(cached[0], parts)):
-            price = price_of(problem, self.tf, cost_params, rate)
-            bound = diverged_cost_of(problem, self.tf, price, cost_params, rate)
-            cached = self.price_cache[key] = (parts, price, bound)
+            failure_cost = failure_cost_of(problem, self.tf, cost_params, rate)
+            bound = diverged_cost_of(problem, self.tf, failure_cost, cost_params, rate)
+            cached = self.failure_cost_cache[key] = (parts, failure_cost, bound)
 
         return cached[1:]
 
@@ -557,10 +557,10 @@ class ProblemEvaluator:
 
         # An abstract trace of the run and its score: no compile, no numbers
         try:
-            price = price_of(self.problem, self.tf)
-            bound = diverged_cost_of(self.problem, self.tf, price)
+            failure_cost = failure_cost_of(self.problem, self.tf)
+            bound = diverged_cost_of(self.problem, self.tf, failure_cost)
             jax.eval_shape(
-                lambda p, x0: self.score(p, x0, False, price, bound)[0],
+                lambda p, x0: self.score(p, x0, False, failure_cost, bound)[0],
                 params,
                 x_start,
             )
@@ -578,7 +578,7 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x_start, record, price, bound):
+    def score(self, params, x_start, record, failure_cost, bound):
         """One trial's row of the record (and its trajectory when ``record``)."""
         traj = self.run(params, x_start)
         plant_run = traj.of("plant")
@@ -588,21 +588,21 @@ class ProblemEvaluator:
             plant_run,
             tf=self.tf,
             params=params,
-            price=price,
+            failure_cost=failure_cost,
             cost_bound=bound,
             running_cost=traj.signals[RUNNING_COST][0],
         )
 
         return row, (traj if record else None)
 
-    def run_trials(self, params, x_starts, record, price, bound):
+    def run_trials(self, params, x_starts, record, failure_cost, bound):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x_starts, record, price, bound)
+            return self.run_trials_jax(params, x_starts, record, failure_cost, bound)
 
-        return self.run_trials_numpy(params, x_starts, record, price, bound)
+        return self.run_trials_numpy(params, x_starts, record, failure_cost, bound)
 
-    def run_trials_jax(self, params, x_starts, record, price, bound):
+    def run_trials_jax(self, params, x_starts, record, failure_cost, bound):
         """The trials as one ``vmap`` of the run, jitted once per batch layout and problem parts."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
@@ -626,15 +626,17 @@ class ProblemEvaluator:
             self.trials_fn[layout] = (jax.jit(batched), parts)
 
         trials_fn, _ = self.trials_fn[layout]
-        rows, trajs = trials_fn(tree, x_starts, price, bound)
+        rows, trajs = trials_fn(tree, x_starts, failure_cost, bound)
 
         return rows, unbatch(trajs, x_starts.shape[0]) if record else None
 
-    def run_trials_numpy(self, params, x_starts, record, price, bound):
+    def run_trials_numpy(self, params, x_starts, record, failure_cost, bound):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
         for i, x_start in enumerate(x_starts):
-            row, traj = self.score(take_trial(params, i), x_start, record, price, bound)
+            row, traj = self.score(
+                take_trial(params, i), x_start, record, failure_cost, bound
+            )
             rows.append(row)
             trajs.append(traj)
 
@@ -1271,13 +1273,13 @@ def box_of(bounds, wrt, base):
 
 
 def warn_if_infinite(J0, problem):
-    """Warn once when the program's objective is infinite at its start (the price switch off)."""
+    """Warn once when the program's objective is infinite at its start (the failure switch off)."""
     if np.isfinite(float(J0)):
         return
 
     warnings.warn(
         "the program's objective is infinite at its start: a run diverged or left "
-        "the horizon unfinished. Set infeasible_cost=True on the problem to price it, "
+        "the horizon unfinished. Set penalize_failure=True on the problem to charge it, "
         "or start from a stabilizing point",
         stacklevel=3,
     )
