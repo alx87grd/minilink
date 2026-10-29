@@ -611,6 +611,13 @@ class SampledCost(StepCost):
         # Lazy import: the step model loads with the first stage
         from minilink.core.compile.evaluators.stepping import stage_cost
 
+        # One Euler step: c_k = dt · e^{−ρ·0} g(x_k, u, t_k) = dt · g(x_k, u, t_k), the
+        # discount at the period's own start being 1 (stage_cost's Euler line, to the bit)
+        if self.solver == "euler" and self.substeps == 1:
+            params = self.params if params is None else params
+            g = self.cost.g
+            return self.dt * g(x, u, t_k, params)
+
         dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
 
         return stage_cost(
