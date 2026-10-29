@@ -38,6 +38,9 @@ Planning
 .. automodule:: minilink.planning.trajectory_optimization.direct_collocation
    :members:
 
+.. automodule:: minilink.planning.trajectory_optimization.path_integral
+   :members:
+
 .. automodule:: minilink.planning.trajectory_optimization.multiple_shooting
    :members:
 
