@@ -196,6 +196,15 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     # Internal machinery
     ###########################################################################
 
+    def warm_parametric(self) -> None:
+        """Compile every parametric form now, at the sample: a program built to be solved on bound values (an online tick) pays no compile inside its first solve."""
+        z_sample = self.jnp.asarray(self.sample_z)
+
+        for name in self.raw_forms:
+            parametric = getattr(self, f"_jit_{name}", None)
+            if parametric is not None:
+                self.jax.block_until_ready(parametric(z_sample, self.params))
+
     def form(self, name):
         """The compiled ``name`` for the bound tree, a function of ``z``: frozen while the defaults are bound, else parametric."""
         if not self.frozen:

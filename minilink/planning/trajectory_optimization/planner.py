@@ -375,6 +375,7 @@ class TrajectoryOptimizationPlanner(Planner):
             self.program, BACKEND_JAX, sample_z=z0
         )
         self.program_evaluator.bind({"x_start": self.problem.x_start})
+        self.program_evaluator.warm_parametric()
 
         # The compiled plant that reads each tick's plan back, on the tick's numbers
         self._dynamics = compiled_of(self.problem.sys, backend).f
