@@ -40,13 +40,27 @@ is the progress record, one line per pushed row; a resumed session reads it to c
 | N-18 | 5 | `AdamLaw` (flat, projected, `safe_root` for its gradient) and `Adam` (pytree, RL) write the same moments (RULES 5.6) | Keep both | Merging changes the differentiable native kernel's path (its `safe_root` at zero) and its numbers; the two serve different domains | One owner with a projection flag | — |
 | N-19 | 5 | The fields' wrappers drop the tree they are given (the review's finding 4) | A design question in QUESTIONS.md, no code change | Threading the field's numbers adds leaves to every problem with a field cost, traced into the collocation programs: a design change, not a fix | Thread them tonight | — |
 | N-20 | 5 | The new `SampledDiagramEvaluator._jac_validate_params` (RULES 5.8) | Keep: it is the existing `_jac_*` protocol of four evaluator classes; renaming the protocol collides with the program evaluators' `jacobian_g`/`jacobian_h` | A half-renamed protocol is worse than an allowlisted one | Rename all `_jac_*` | — |
+| N-21 | 6 | `core/readme_examples` stays 6 % slower than before the run (10.45 against 9.85 s, median of 3) | Logged as an explained miss | Its sections: the JAX gradient and L-BFGS of the closed-loop cost +0.25 s (the one score's stage cost integrated by RK4 beside the state, R142: a bigger traced graph, the same 12 iterations and `J` to 1e-4), value iteration +0.11 s, collocation +0.04 s, the import +0.02 s; no overhead left to remove without changing the score | Chase the 0.2 s spread across the rest | — |
+| N-22 | 6 | The cart-pole RL demo's reliability at its new budget | No change tonight (the maintainer's call: 3M, no cost shaping); the evidence goes to the morning | Tonight's code, 8 seeds, J < 60 as success: 3/8 at 3M (seed 0, the demo's default, swings up, J 1.49), 2/8 at 4M; before the run 9/12 at 2M. More steps do not fix it: some seeds settle in a poor optimum under the integrated reward. A training reward `−g·dt` recorded beside the scored one (as `gamma` is), or tuning the demo, are the maintainer's | Tune the demo's constants (maintainer-owned) | — |
 
 ## 3. Ledger of intended number changes
 
 | Step | What changed | Problem and cost | Before | After | Relative difference |
 | --- | --- | --- | --- | --- | --- |
+| 5 | The Lyapunov certificate's `P` symmetrized after the solve | `benchmarks/v03_baseline.py`'s `lyapunov.level` (the pendulum's certificate) | 4.969173742168747 (its last bit) | the symmetric `P`'s | 1.8e-16 |
 
 ## 4. Speed and quality
+
+**Flagship demos, before the run (`8db211c4`) against tonight, median of 3, M4 Max (step 6's first
+measure, before its fixes):** the MPC demos faster (`mpc_car_circuit` 10.61 → 8.74 s,
+`mpc_racecar_dynamic` 22.93 → 17.46 s, `mpc_racecar_kinematic` 35.70 → 23.47 s, `mpc_car_minimal`
+1.70 → 1.73, `mpc_integrator_numpy` 0.71 → 0.73); RL throughput level (cart-pole 50 325 → 52 673
+steps/s, rocket 53 004 → 51 239); misses fixed in step 6: value iteration (`vi_quadratic` 6.45 →
+7.27 → **6.45**, `vi_minimum_time` 2.88 → 3.23 → **2.92**, `vi_pendulum_swingup` 18.46 → 20.18 →
+**18.9**: the one score's Euler stage cost in one line, `f1a3339b`), `trajopt_cartpole_collocation_jax`
+2.29 → 2.47 → **2.25** (the JAX program's frozen form, the commit after), `diagram_compiling` 3.15 →
+3.44 → **3.18** (the large-leaf check read once, `ab02eb65`); `readme_examples` 9.85 → 10.45
+(N-21). The rest within 3 %.
 
 The evening's first sweep (one rep, 72 demos × 0.2.0 / pre-run `8db211c4` / `7c21f63f`, M4 Max):
 every demo within about ±10 % except `mpc_car_circuit` 10.8 → 161 s and `mpc_racecar_dynamic`
@@ -88,3 +102,6 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 | 5 | `lookahead` in the zero-delay and pure MPC | `fd50c735` | test_mpc, test_mppi |
 | 5 | The MPC refuses a start set; the face keeps its compiled tree; the price follows the evaluation's rate | through `f45ce7ce` | test_mpc, test_engine, test_planning_*, test_v03_core |
 | 5 | Lyapunov `P`, the compile probe, a double discount, the exact-hold message, RULES 5.3 | `91039fb0` | test_dynamic_programming, test_analysis_lyapunov, test_costs_optimizer, test_mpc, test_fields, test_textbook_style, test_step_problems, test_v03_core |
+| 6 | One Euler step's stage cost in one line | `f1a3339b` | v0.3 baseline unchanged by it; vi demos timed |
+| 6 | The JAX program's frozen form | (after `f1a3339b`) | test_costs_optimizer (no retrace per value), test_mpc, test_jax_planning; baseline byte-identical |
+| 6 | The large-leaf check read once | `ab02eb65` | test_compile_once, test_simulation, test_engine |
