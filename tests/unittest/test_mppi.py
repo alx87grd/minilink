@@ -158,3 +158,80 @@ def test_mppi_refuses_an_unboxed_input_and_a_ragged_horizon():
     plant.inputs["u"].upper_bound = np.array([1.0])
     with pytest.raises(ValueError, match="whole number of periods"):
         MPPIPlanner(boxed, dt=0.05)
+
+
+# The fan of sampled futures, rebuilt from a run; the verbose line
+
+
+def zero_delay_run(tf=0.5, verbose=False):
+    planner = swing_up_planner()
+    mpc = ModelPredictiveController(planner, delay=False, verbose=verbose)
+    loop = (mpc % DT) @ discretize(planner.problem.sys, DT)
+    run = loop.compute_trajectory(tf=tf)
+    return mpc, loop, run
+
+
+def test_the_rebuilt_fans_are_the_solves_of_the_run():
+    from minilink.core.compile.plan import nested_layout
+    from minilink.planning.trajectory_optimization.mpc import mpc_sampled_futures
+
+    mpc, loop, run = zero_delay_run()
+    fans = mpc_sampled_futures(run, mpc, loop=loop, n_shown=4)
+    memory, _ = nested_layout(loop)[("controller", "memory")]
+    assert len(fans) == 10 and fans[0]["futures"].shape == (4, 41, 2)
+    for k, fan in enumerate(fans[:-1]):
+        # The memory holds z*_k at tick k + 1: the rebuilt solve's plan is it, bit for bit
+        np.testing.assert_array_equal(
+            fan["inputs"].reshape(-1), run.x[memory, k + 1][:-1]
+        )
+    assert np.all(np.diff(fans[0]["weights"]) <= 0)  # the heaviest first
+
+
+def test_reading_a_solves_inputs_back_runs_no_solve():
+    from unittest import mock
+
+    from minilink.planning.trajectory_optimization.path_integral import (
+        CompiledMPPIPlanner,
+    )
+
+    mpc, loop, run = zero_delay_run()
+    ev = loop.compile()
+    with mock.patch.object(CompiledMPPIPlanner, "solve", autospec=True) as solve:
+        u = ev.block_input(("controller", "solve"), run.x[:, 3], run.u[:, 3], 3)
+    assert solve.call_count == 0
+    np.testing.assert_array_equal(u[:2], run.of("plant").x[:, 3])
+
+
+def test_the_overlays_and_the_figure_draw_mppi():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from minilink.planning.trajectory_optimization.mpc import (
+        mpc_animation_overlays,
+        mpc_plans_from_rollout,
+        plot_sampled_futures,
+    )
+    from minilink.planning.trajectory_optimization.mpc.viz import SampledFutures
+
+    mpc, loop, run = zero_delay_run()
+    plans = mpc_plans_from_rollout(run, mpc, loop=loop)
+    assert len(plans) == 10 and plans[0][1].x.shape == (2, 41)
+    overlays = mpc_animation_overlays(run, mpc, loop=loop, samples=8)
+    fan = next(o for o in overlays if isinstance(o, SampledFutures))
+    assert len(next(iter(fan.get_dynamic_geometry(0.2).values()))) == 8 + 1
+    fig, ax = plot_sampled_futures(
+        run, mpc, loop=loop, ticks=[0, 5], axes=("t", 0), show=False
+    )
+    assert len(ax.lines) == 2 * (32 + 1) + 1
+
+
+def test_verbose_prints_mppis_account():
+    import contextlib
+    import io
+
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        zero_delay_run(tf=0.1, verbose=True)
+    line = out.getvalue().splitlines()[0]
+    assert line.startswith("MPC @ t=0.00s") and "S_min=" in line
+    assert "effective_samples=" in line and "/512" in line and "exit_rate=" in line

@@ -1,8 +1,9 @@
 # Path integral control (MPPI) in Minilink
 
 **Status:** MP-0 to MP-2 and the MPC on it landed in the night run of 2026-10-29
-(`planning/trajectory_optimization/path_integral.py`); the stochastic branch and the fan are
-TODO's S72 rest. Ruled 2026-10-25: `MPPIPlanner` (R106), `n_plant_samples=1` (R107), `RolloutEnvironment`
+(`planning/trajectory_optimization/path_integral.py`), the closed loop's fan of sampled futures
+and the verbose account after it (2026-10-29); the stochastic branch and an offline solve's fan
+are TODO's S72 rest. Ruled 2026-10-25: `MPPIPlanner` (R106), `n_plant_samples=1` (R107), `RolloutEnvironment`
 moving to `planning/environment.py` before MP-1 (R108). The planner contract (ask 2, D27) is
 answered by R148: MPPI implements the compiled planner face of
 [planner-and-mpc.md](planner-and-mpc.md), and `ModelPredictiveController` wraps it like any

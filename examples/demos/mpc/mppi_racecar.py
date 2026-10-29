@@ -5,6 +5,7 @@ import numpy as np
 from minilink import PlanningProblem, QuadraticCost, UdeSRacecar
 from minilink.analysis import discretize
 from minilink.control import ModelPredictiveController
+from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
     MPPIPlanner,
     ReferenceTrack,
@@ -16,6 +17,9 @@ from minilink.planning import (
     point_probe,
     quadratic_hinge,
 )
+from minilink.planning.trajectory_optimization.mpc import (
+    mpc_animation_overlays,
+)
 
 V_REF = 3.5  # [m/s]
 TF = 10.0  # closed-loop run, s
@@ -26,6 +30,9 @@ K = 1024  # sampled input sequences per tick
 LAMBDA = 0.05  # temperature of the softmin
 SIGMA = (0.5, 0.2)  # std of the input noise: speed [m/s], steer [rad]
 ALPHA = 1.0  # 1 turns the information-theoretic control term off
+FAN_TICKS = (5, 20, 40, 60)  # ticks whose sampled futures the track figure shows
+FAN_SAMPLES = 48  # samples drawn in each fan of the figure
+ANIMATION_SAMPLES = 32  # sampled futures drawn at every tick of the animation
 
 path = circuit_waypoints(length=6.0, width=4.0, radius=1.0)
 track = ReferenceTrack(from_waypoints(path), half_width=0.6)
@@ -64,8 +71,19 @@ planner = MPPIPlanner(
     noise=np.square(SIGMA),
     control_cost=ALPHA,
 )
-mpc = ModelPredictiveController(planner, delay=False)
+mpc = ModelPredictiveController(planner, delay=False, verbose=True)
 loop = (mpc % DT) @ discretize(car, DT, substeps=round(DT / SIM_DT))
-loop.compute_trajectory(tf=TF)
+run = loop.compute_trajectory(tf=TF)
 loop.plot_trajectory()
-loop.animate()
+# loop.animate()
+
+# The animation: at each tick, the sampled futures shaded by weight and the plan
+overlays = mpc_animation_overlays(
+    run, mpc, loop=loop, scene=scene, track=track, samples=ANIMATION_SAMPLES
+)
+loop.animate(run, overlays=overlays)
+
+# The 3-D look: the racecar skin, the camera on the body
+car.camera_follow_frame = "body"
+car.skin = racecar_skin_3d
+loop.animate(run, overlays=overlays, renderer="meshcat", native=False)

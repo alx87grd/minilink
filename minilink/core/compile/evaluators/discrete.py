@@ -22,6 +22,7 @@ from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
 from minilink.core.compile.evaluators.stepping import iterate, iterate_dense
 from minilink.core.compile.plan import (
+    INTERNAL_SIGNAL,
     PLANT_INPUT,
     SampledPortOperation,
     StepExecutionPlan,
@@ -624,15 +625,15 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
     # Internal machinery
     ###########################################################################
 
-    def port_signals(self, x, u, k, params, inject=None, *, t_start=0.0):
-        """Fill the signal buffer at tick ``k``; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire."""
+    def port_signals(self, x, u, k, params, inject=None, *, t_start=0.0, ops=None):
+        """Fill the signal buffer at tick ``k``; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire; ``ops`` the port operations to run (default all)."""
         xp = self.xp
         dtype = self.dtype
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
         x_arr = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
         params = self._frozen_params if params is None else params
         t_k = t_start + k * self.sample_period
-        for op in self.plan.port_ops:
+        for op in self.plan.port_ops if ops is None else ops:
             local_x = x_arr[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
             time = time_of(op, k, t_k)
@@ -690,6 +691,52 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             if op.hold_slice is not None:
                 x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
         return x_new
+
+    def block_input(self, path, x, u, k=0, params=None, *, t_start=0.0):
+        """
+        The input the loop feeds the block at ``path`` at tick ``k``: its gathered ``u``.
+
+        Only the block's ancestors are evaluated, the port operations whose
+        outputs it reads, then theirs: a block downstream of it (a solve fed by
+        the measurement it reads) is not run.
+        """
+        x, u = self.float_arrays(x, u)
+        params = self._frozen_params if params is None else params
+        op = self.operation_of(path)
+
+        signals = self.port_signals(
+            x, u, k, params, t_start=t_start, ops=self.ancestors_of(op)
+        )
+
+        return gather_u(op.gather_sources, op.u_dim, signals, u, self.xp, self.dtype)
+
+    def operation_of(self, path):
+        """The operation that gathers the input of the block at ``path``: its state advance, else its first output port."""
+        path = tuple(path)
+        for op in (*self.plan.step_ops, *self.plan.port_ops):
+            if tuple(op.params_path) == path:
+                return op
+
+        raise KeyError(f"no block {'/'.join(path)!r} in the loop")
+
+    def ancestors_of(self, op):
+        """The port operations ``op`` reads, and those they read, in the plan's order."""
+        by_slice = {
+            (port.out_slice.start, port.out_slice.stop): port
+            for port in self.plan.port_ops
+        }
+        needed = set()
+        frontier = [op]
+        while frontier:
+            for kind, where, _ in frontier.pop().gather_sources:
+                if kind != INTERNAL_SIGNAL:
+                    continue
+                source = by_slice[(where.start, where.stop)]
+                if id(source) not in needed:
+                    needed.add(id(source))
+                    frontier.append(source)
+
+        return tuple(port for port in self.plan.port_ops if id(port) in needed)
 
     def plant_input(self, x, u, k=0, params=None, *, t_start=0.0):
         """The input the loop feeds its plant at tick ``k``: the plant's gathered ``u``, held over the period."""

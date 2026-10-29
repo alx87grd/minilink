@@ -907,10 +907,10 @@ pillar names it.
   swing-up tests (`test_mppi.py`), the demos `examples/demos/mpc/mppi_pendulum.py` and
   `mppi_racecar.py`. Rest: MP-3 the stochastic branch (`n_plant_samples` realizations per
   control sample, mean or CVaR by the problem's criterion; today a stochastic problem plans on
-  its nominal with the deterministic planner's warning) and the fan of sampled futures as
-  `solution.plot_samples()` and `mpc_animation_overlays(samples=)`; the plan readers
-  (`mpc_plans_from_rollout`) for an input-only plan; MP-6 (the `loop` backend, DESIGN §6) with
-  V3.
+  its nominal with the deterministic planner's warning); the fan of an offline solve as
+  `solution.plot_samples()` (the closed loop's fans landed: `mpc_sampled_futures`,
+  `mpc_animation_overlays(samples=)`, `plot_sampled_futures`); MP-6 (the `loop` backend,
+  DESIGN §6) with V3.
 - [ ] **RL follow-ups** (C5):
   - [ ] **SAC actor step** (S50) **[ask]**: pre-update critic (today, kept for bit-identity) or
     updated critic (SB3, CleanRL). One line in `algorithms/sac.py`; re-measure

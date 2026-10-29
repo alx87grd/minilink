@@ -18,6 +18,9 @@ from minilink.core.system import System
 # The default binding: the measured state on the input port y is the plan's start
 DEFAULT_INPUTS = {"x_start": "y"}
 
+# The status keys every face's solve reports; a planner's own account comes after them
+STANDARD_STATUS = ("success", "iterations", "cost")
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -145,8 +148,28 @@ class DelayedPredictiveController(NativeSampledSystem):
             )
 
     def update(self, x, u, t, params=None):
-        params = self.params if params is None else params
         xp = array_module(x, u)
+
+        pv = self.pv
+        z = x
+
+        # P_k and the guess z0 = shift(z_k, t_k + lookahead)
+        P, z_guess = self.solve_inputs(x, u, t, params)
+
+        # z_{k+1} = solve(P_k, z0), z_k kept when the solve returns no usable plan
+        started = time.perf_counter()
+        z_new, status = pv.solve(P, z0=z_guess)
+        report_solve(self, t, status, started)
+        cost = status["cost"]
+        finite_cost = True if cost is None else xp.isfinite(cost)
+        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        z_next = xp.where(usable, z_new, z)
+
+        return z_next
+
+    def solve_inputs(self, x, u, t, params=None):
+        """``(P_k, z0)`` of the tick's solve: the tree with the bound leaves read from their ports, and the stored plan shifted to the plan's origin."""
+        params = self.params if params is None else params
 
         pv = self.pv
         lookahead = self.lookahead
@@ -159,18 +182,10 @@ class DelayedPredictiveController(NativeSampledSystem):
         P = bound_tree(self, params, u, t_plan)
         P = predicted_tree(pv, bindings, P, z, t, lookahead)
 
-        # z_{k+1} = solve(P_k, z0 = shift(z_k, t_k + lookahead)), z_k kept when the
-        # solve returns no usable plan
+        # z0 = shift(z_k, t_k + lookahead)
         z_guess = pv.shift(z, t_plan)
-        started = time.perf_counter()
-        z_new, status = pv.solve(P, z0=z_guess)
-        report_solve(self, t, status, started)
-        cost = status["cost"]
-        finite_cost = True if cost is None else xp.isfinite(cost)
-        usable = xp.all(xp.isfinite(z_new)) & finite_cost
-        z_next = xp.where(usable, z_new, z)
 
-        return z_next
+        return P, z_guess
 
     def compute_u(self, x, u, t=0, params=None):
         """The command: the stored plan read at the tick's time."""
@@ -296,8 +311,28 @@ class PlanSolver(System):
 
     def compute_z(self, x, u, t=0, params=None):
         """The plan solved at this tick."""
-        params = self.params if params is None else params
         xp = array_module(u)
+
+        pv = self.pv
+        z_prev = u[self.get_input_port_slice("z_prev")]
+
+        # P_k and the warm guess from the last plan
+        P, z_guess = self.solve_inputs(x, u, t, params)
+
+        # z*_k = solve(P_k, z0), z_prev kept when the solve returns no usable plan
+        started = time.perf_counter()
+        z_new, status = pv.solve(P, z0=z_guess)
+        report_solve(self, t, status, started)
+        cost = status["cost"]
+        finite_cost = True if cost is None else xp.isfinite(cost)
+        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        z_star = xp.where(usable, z_new, z_prev)
+
+        return z_star
+
+    def solve_inputs(self, x, u, t, params=None):
+        """``(P_k, z0)`` of the tick's solve: the tree with the bound leaves read from their ports, and the warm guess from the last plan on ``z_prev``."""
+        params = self.params if params is None else params
 
         pv = self.pv
         lookahead = self.lookahead
@@ -313,19 +348,11 @@ class PlanSolver(System):
         P = predicted_tree(pv, self.bindings, P, z_prev, t, lookahead)
         x_plan = P["x_start"] if x_hat is not None else None
 
-        # z*_k = solve(P_k, z0 = shift(z_prev, t_k + lookahead) with x_0 = x̂), from
-        # the default guess at P_k while z_prev is no plan yet; z_prev kept when the
-        # solve returns no usable plan
+        # z0 = shift(z_prev, t_k + lookahead) with x_0 = x̂, the default guess at P_k
+        # while z_prev is no plan yet
         z_guess = warm_guess(pv, z_prev, x_plan, P, z_default)
-        started = time.perf_counter()
-        z_new, status = pv.solve(P, z0=z_guess)
-        report_solve(self, t, status, started)
-        cost = status["cost"]
-        finite_cost = True if cost is None else xp.isfinite(cost)
-        usable = xp.all(xp.isfinite(z_new)) & finite_cost
-        z_star = xp.where(usable, z_new, z_prev)
 
-        return z_star
+        return P, z_guess
 
 
 class PurePredictiveController(System):
@@ -351,15 +378,10 @@ class PurePredictiveController(System):
 
     def compute_u(self, x, u, t=0, params=None):
         """The first action of a cold solve from the tick's bound leaves."""
-        params = self.params if params is None else params
-
         pv = self.pv
-        lookahead = self.lookahead
 
-        # z* = solve(P_k) from the default guess, read at the tick's time, its start
-        # predicted to the plan's origin under the default plan's command
-        P = bound_tree(self, params, u, t + lookahead)
-        P = predicted_tree(pv, self.bindings, P, pv.initial(P), t, lookahead)
+        # P_k, the solve from the default guess
+        P, _ = self.solve_inputs(x, u, t, params)
         started = time.perf_counter()
         z, status = pv.solve(P)
         report_solve(self, t, status, started)
@@ -369,6 +391,20 @@ class PurePredictiveController(System):
         u_k = pv.command(z, x_hat, t)
 
         return u_k
+
+    def solve_inputs(self, x, u, t, params=None):
+        """``(P_k, None)`` of the tick's solve: the tree with the bound leaves read from their ports (the solve starts from the default guess)."""
+        params = self.params if params is None else params
+
+        pv = self.pv
+        lookahead = self.lookahead
+
+        # P_k at the plan's origin t_k + lookahead, its start predicted to that time
+        # under the default plan's command
+        P = bound_tree(self, params, u, t + lookahead)
+        P = predicted_tree(pv, self.bindings, P, pv.initial(P), t, lookahead)
+
+        return P, None
 
 
 class PlanFollower(System):
@@ -510,16 +546,32 @@ def pinned_shift(pv, z, x, t):
 
 
 def report_solve(block, t, status, started):
-    """One line for a verbose block's solve: its tick's time, success, iterations, cost and wall time (host runs only)."""
+    """
+    One line for a verbose block's solve: its tick's time, success, iterations, cost and wall time (host runs only).
+
+    The planner's own account follows, any other number its status carries
+    (MPPI: ``S_min``, ``S_weighted``, ``effective_samples`` of ``K``, ``exit_rate``).
+    """
     if not block.verbose or not is_concrete(status["success"]):
         return
     elapsed = time.perf_counter() - started
     cost = status["cost"]
     cost_text = "n/a" if cost is None else f"{float(cost):.6g}"
 
+    # The planner's account beyond the four the face promises, the effective samples
+    # out of the K drawn
+    samples = getattr(block.pv, "K", None)
+    extras = []
+    for name, value in status.items():
+        if name in STANDARD_STATUS or value is None:
+            continue
+        of_K = f"/{samples}" if name == "effective_samples" and samples else ""
+        extras.append(f"{name}={float(value):.4g}{of_K}")
+
     print(
         f"MPC @ t={float(t):.2f}s  success={bool(status['success'])}  "
         f"iterations={status['iterations']}  J={cost_text}  solve={elapsed:.3f}s"
+        + "".join(f"  {extra}" for extra in extras)
     )
 
 

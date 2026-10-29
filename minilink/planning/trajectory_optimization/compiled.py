@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.params import merge_known
+from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.results import PlanningSolution
@@ -165,6 +166,19 @@ class CompiledTrajectoryPlanner:
         u = self.command(z, x, t, params)
 
         return x, u
+
+    def planned_trajectory(self, z, params=None) -> Trajectory:
+        """The plan as a trajectory: its state and input knots from its origin (collocation and multiple shooting carry them in ``z``)."""
+        if self.n_z - 1 != (self.n + self.m) * self.offsets.size:
+            raise NotImplementedError(
+                "the plan carries no state knots (single shooting): read "
+                "pv.solution(z).trajectory for its planned states"
+            )
+
+        rows = np.asarray(z[:-1], dtype=float).reshape(-1, self.offsets.size)
+        t = float(z[-1]) + self.offsets
+
+        return Trajectory(t=t, x=rows[: self.n], u=rows[-self.m :])
 
     def solution(self, z, params=None, status=None) -> PlanningSolution:
         """

@@ -220,6 +220,7 @@ class CompiledMPPIPlanner:
         # One compiled function per face: the solve, and the nominal rollout
         self.solve_fn = self.jax.jit(self.solve_body)
         self.nominal_fn = self.jax.jit(self.nominal_rollout)
+        self.samples_fns = {}
 
     @property
     def params(self) -> dict:
@@ -248,7 +249,35 @@ class CompiledMPPIPlanner:
         return self.solve_fn(P, self.jnp.asarray(z0, dtype=float))
 
     def solve_body(self, P, z0):
-        """One path-integral solve from ``P["x_start"]``: sample, roll out, weigh, update, ``n_iterations`` times."""
+        """One path-integral solve from ``P["x_start"]``: :meth:`passes`, then the plan's own rollout and the status."""
+        jnp = self.jnp
+        path_cost = self.path_cost
+
+        x0 = P["x_start"]
+        t0 = P["t_start"]
+
+        # U after n_iterations passes of sample, roll out, weigh, update
+        U, last = self.passes(P, z0)
+
+        # The plan's own rollout: its cost and whether it stays in X
+        cost, left, _ = path_cost(x0, t0, U, P)
+        S = last["S"]
+        w = last["w"]
+        status = {
+            "success": ~left,
+            "iterations": self.n_iterations,
+            "cost": cost,
+            "S_min": jnp.min(S),
+            "S_weighted": w @ S,
+            "effective_samples": 1.0 / jnp.sum(w**2),
+            "exit_rate": jnp.mean(last["left_X"]),
+        }
+        z = jnp.concatenate([jnp.reshape(U, (-1,)), jnp.reshape(t0, (1,))])
+
+        return z, status
+
+    def passes(self, P, z0):
+        """``(U, last)``: ``U`` after ``n_iterations`` passes from the plan ``z0``, and the last pass's samples (``S``, ``w``, ``X``, ``left_X``)."""
         jax = self.jax
         jnp = self.jnp
         N = self.N
@@ -277,7 +306,7 @@ class CompiledMPPIPlanner:
             V = jnp.clip(U + eps, u_lower, u_upper)
 
             # Roll out and score: S^k = Σ_t γ^t c_t + γ^N h(x_N) + the price of leaving X
-            S_path, left_X = jax.vmap(lambda V_k: path_cost(x0, t0, V_k, P))(V)
+            S_path, left_X, X = jax.vmap(lambda V_k: path_cost(x0, t0, V_k, P))(V)
 
             # The information term: λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t
             S = S_path + lam * (1.0 - alpha) * jnp.einsum(
@@ -292,20 +321,49 @@ class CompiledMPPIPlanner:
             # Update: U ← U + Σ_k w^k ε^k, kept in the input box
             U = jnp.clip(U + jnp.einsum("k,ktm->tm", w, eps), u_lower, u_upper)
 
-        # The plan's own rollout: its cost and whether it stays in X
-        cost, left = path_cost(x0, t0, U, P)
-        status = {
-            "success": ~left,
-            "iterations": self.n_iterations,
-            "cost": cost,
-            "S_min": S_min,
-            "S_weighted": w @ S,
-            "effective_samples": 1.0 / jnp.sum(w**2),
-            "exit_rate": jnp.mean(left_X),
-        }
-        z = jnp.concatenate([jnp.reshape(U, (-1,)), jnp.reshape(t0, (1,))])
+        last = {"S": S, "w": w, "X": X, "left_X": left_X}
 
-        return z, status
+        return U, last
+
+    def samples(self, params=None, z0=None, n_shown=32):
+        """
+        The fan of a solve: the ``n_shown`` heaviest sampled rollouts of its last pass, their weights, and the updated plan's rollout.
+
+        The same passes as :meth:`solve` on the same key (the seed and the
+        tick), so the fan is the solve's own: ``{"t", "futures" (n_shown,
+        N + 1, n), "weights" (n_shown,), "plan" (N + 1, n), "inputs" (N, m)}``,
+        the heaviest first. The MPC's overlays rebuild each tick's fan with it after a run.
+        """
+        P = self.merged(params)
+        z0 = self.initial(P) if z0 is None else z0
+        n_shown = min(int(n_shown), self.K)
+        if n_shown not in self.samples_fns:
+            self.samples_fns[n_shown] = self.jax.jit(
+                lambda P, z0: self.samples_body(P, z0, n_shown)
+            )
+
+        fan = self.samples_fns[n_shown](P, self.jnp.asarray(z0, dtype=float))
+
+        return {name: np.asarray(value) for name, value in fan.items()}
+
+    def samples_body(self, P, z0, n_shown):
+        """:meth:`samples` as a pure function of ``(P, z0)``."""
+        jax = self.jax
+
+        U, last = self.passes(P, z0)
+
+        # The heaviest samples of the last pass, and the plan they moved U to
+        weights, index = jax.lax.top_k(last["w"], n_shown)
+        futures = last["X"][index]
+        plan = self.nominal_rollout(P, U)
+
+        return {
+            "t": P["t_start"],
+            "futures": futures,
+            "weights": weights,
+            "plan": plan,
+            "inputs": U,
+        }
 
     def shift(self, z, t):
         """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated."""
@@ -337,16 +395,10 @@ class CompiledMPPIPlanner:
 
     def solution(self, z, params=None, status=None) -> PlanningSolution:
         """The host-side :class:`~minilink.planning.results.PlanningSolution` of ``z``: the held schedule, its nominal rollout, the record."""
-        P = self.merged(params)
         status = {} if status is None else status
-        U = np.asarray(self.sequence(np.asarray(z)), dtype=float)
-        t0 = float(z[-1])
 
         # The plan's nominal rollout on the grid, the last input held at the end
-        xs = np.asarray(self.nominal_fn(P, self.jnp.asarray(U)), dtype=float)
-        t = t0 + self.dt * np.arange(self.N + 1)
-        u = np.concatenate([U, U[-1:]], axis=0)
-        trajectory = Trajectory(t=t, x=xs.T, u=u.T)
+        trajectory = self.planned_trajectory(z, params)
 
         record = MPPIRecord(
             cost=float(status.get("cost", np.nan)),
@@ -360,6 +412,18 @@ class CompiledMPPIPlanner:
         policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
 
         return PlanningSolution(self.problem, policy, record, trajectory, None)
+
+    def planned_trajectory(self, z, params=None) -> Trajectory:
+        """The plan as a trajectory: ``U`` held from its origin, its states rolled out on the nominal plant from ``params["x_start"]``."""
+        P = self.merged(params)
+        U = np.asarray(self.sequence(np.asarray(z)), dtype=float)
+        t0 = float(z[-1])
+
+        xs = np.asarray(self.nominal_fn(P, self.jnp.asarray(U)), dtype=float)
+        t = t0 + self.dt * np.arange(self.N + 1)
+        u = np.concatenate([U, U[-1:]], axis=0)
+
+        return Trajectory(t=t, x=xs.T, u=u.T)
 
     def pack(self, guess, params=None):
         """A guess in ``z`` form: a trajectory or a solution's input read at the knots."""
@@ -392,7 +456,7 @@ class CompiledMPPIPlanner:
         return xp.reshape(z[:-1], (self.N, self.m))
 
     def path_cost(self, x0, t0, V, P):
-        """``(S, left_X)`` of one held sequence ``V`` from ``x0`` at ``t0``: the discounted cost, and whether it left ``X``."""
+        """``(S, left_X, x_path)`` of one held sequence ``V`` from ``x0`` at ``t0``: the discounted cost, whether it left ``X``, the states ``(N + 1, n)``."""
         jax = self.jax
         jnp = self.jnp
         env = self.env
@@ -408,16 +472,21 @@ class CompiledMPPIPlanner:
             S = S - jnp.where(alive, discount * reward, 0.0)
             ended = alive & terminated
             x_next = jnp.where(alive & ~terminated, x_next, x)
-            return (x_next, t_next, S, alive & ~ended, discount * gamma), ended
+            return (x_next, t_next, S, alive & ~ended, discount * gamma), (
+                ended,
+                x_next,
+            )
 
-        start = (jnp.asarray(x0, dtype=float), t0, 0.0, True, 1.0)
-        (x_N, t_N, S, _, _), ended = jax.lax.scan(period, start, V)
+        x_start = jnp.asarray(x0, dtype=float)
+        start = (x_start, t0, 0.0, True, 1.0)
+        (x_N, t_N, S, _, _), (ended, xs) = jax.lax.scan(period, start, V)
+        x_path = jnp.concatenate([x_start[None, :], xs], axis=0)
 
         # Left X: an end before the horizon's, or a last state outside X
         inside = jnp.all(env.X.margin(x_N, t_N, env.set_params) >= 0.0)
         left_X = jnp.any(ended[:-1]) | ~inside
 
-        return S, left_X
+        return S, left_X, x_path
 
     def nominal_rollout(self, P, U):
         """The states ``(N + 1, n)`` of the plan held from ``P["x_start"]``: the plan's evidence."""

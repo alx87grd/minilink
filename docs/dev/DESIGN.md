@@ -285,6 +285,13 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `command` the held input, `predicts = False`) is the trajectory face, so
   `ModelPredictiveController(MPPIPlanner(...))` runs in every form; `temperature`, `noise`,
   `control_cost` are `params["method"]`, `seed` is `params["seed"]` with the tick folded in.
+  `pv.samples(params, z0, n_shown)` redraws a solve's own samples on that key (one `passes`
+  owns the sampling for both), so after a run `mpc_sampled_futures(run, mpc, loop=)` rebuilds
+  every tick's fan from the solve inputs read back through the loop
+  (`SampledDiagramEvaluator.block_input`: the block's ancestors alone, the solve not run);
+  `mpc_animation_overlays(..., samples=n)` draws them and `plot_sampled_futures` gives the
+  static figure. Each face reads its plan as a trajectory (`planned_trajectory`), and the MPC's
+  verbose line appends a planner's own account (MPPI's `S_min`, `effective_samples` of `K`).
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
   delay=True, warm_start=True, lookahead=0.0, verbose=False)` closes a planner's compiled face `pv = planner.compile()` on the
   loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native
