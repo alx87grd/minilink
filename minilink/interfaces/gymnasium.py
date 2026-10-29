@@ -160,6 +160,7 @@ class Sys2Gym(gym.Env):
         finite = problem.horizon_kind() == "finite"
         tf = float(problem.tf) if finite else float(episode_length or 10.0)
 
+        kwargs.setdefault("t_start", float(problem.t_start))
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
@@ -216,7 +217,7 @@ class Sys2Gym(gym.Env):
         # Truncation of episodes at the horizon tf (within half a step) or out of
         # the state bounds
         truncated = bool(
-            (t_new >= self.tf - 0.5 * dt)
+            (t_new >= self.t_start + self.tf - 0.5 * dt)
             or np.any(x_new < self.x_lb)
             or np.any(x_new > self.x_ub)
         )
@@ -361,7 +362,7 @@ class ProblemEnv(Sys2Gym):
         # A failure is charged its price; the end of a finite horizon its h, a
         # failure on the last step both, as the evaluation scores the run
         failed = not problem.X.contains(x, t, None)
-        ended = self.finite_horizon and t >= self.tf - 0.5 * self.dt
+        ended = self.finite_horizon and t >= self.t_start + self.tf - 0.5 * self.dt
         if failed:
             r -= float(self.infeasible_cost)
         if ended:

@@ -1,5 +1,6 @@
 """Allowable sets: ``x(t) in X(t)``, ``u(t) in U(x, t)`` and boundary sets ``x(tf) in Xf``."""
 
+import copy
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, field, replace
@@ -77,11 +78,14 @@ class Set(ABC):
         return None
 
     def with_params(self, params):
-        """The set with its numbers replaced by ``params``: a new set for a library set (a value), else this one holding them."""
+        """The set with its numbers replaced by ``params``: a copy holding them (a set without numbers refuses any)."""
         if not params and not self.params:
             return self
-        self.params = params
-        return self
+        if not self.params:
+            raise TypeError(f"{type(self).__name__} holds no parameters")
+        moved = copy.copy(self)
+        moved.params = params
+        return moved
 
     def as_cost(self, *, weight: float = 1.0, shaping: Callable | None = None):
         """
@@ -162,8 +166,11 @@ class InputSet(ABC):
         """The input set with its numbers replaced by ``params`` (as :meth:`Set.with_params`)."""
         if not params and not self.params:
             return self
-        self.params = params
-        return self
+        if not self.params:
+            raise TypeError(f"{type(self).__name__} holds no parameters")
+        moved = copy.copy(self)
+        moved.params = params
+        return moved
 
     # Display
 
@@ -519,8 +526,14 @@ class IntersectionSet(Set):
         return margin
 
     def with_params(self, params):
+        """The intersection with its members moved by ``params``: a member left out keeps its numbers."""
+        ids = [str(i) for i in range(len(self.sets))]
+        unknown = sorted(set(params) - set(ids))
+        if unknown:
+            raise ValueError(f"unknown member(s) {unknown}; the members are {ids}")
         members = tuple(
-            set_.with_params(params[str(i)]) for i, set_ in enumerate(self.sets)
+            set_.with_params(params[str(i)]) if str(i) in params else set_
+            for i, set_ in enumerate(self.sets)
         )
         return replace(self, sets=members)
 

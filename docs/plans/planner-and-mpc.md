@@ -229,16 +229,17 @@ with how each lands.
 
 ## 9. What goes from today's code
 
-From `planning/trajectory_optimization/mpc/`: `dt_mpc`, `t0`, `warm_start`, `MPCTickLatch`, the
+From `planning/trajectory_optimization/mpc/`: `dt_mpc`, `t0`, `MPCTickLatch`, the
 pair `MPCStatelessController` / `MPCStatefulController`, `export_to_computer`, `dt_broadcast`,
 `Command`, `replan_divisor`, and the `hasattr` probing of the planner. From the planners:
-`last_solution` and the caches on the solve path; `initial_guess=` / `warm_start=` become `guess=`.
+`last_solution` on the solve path and the caches; `initial_guess=` / `warm_start=` on `solve` become
+`guess=`. The MPC's `warm_start=` stays as the zero-delay form's switch (§6.3).
 
 ## 10. What the core must provide
 
 1. Every planner implements the compiled face of §3: trajectory optimization first (the MPC's
-   consumer), then LQR and value iteration, the others as they are wrapped; MPPI with its v0.4
-   row (S72).
+   consumer), then LQR and value iteration, the others as they are wrapped; MPPI landed on it
+   in the night run of 2026-10-29 (S72's rest remains).
 2. Every policy keeps its tables in `params` (core §1: `TrajectorySource` and `LookupPolicy` keep
    them as attributes today).
 3. `t_start` on problems, the discount counted from it; integer leaves.

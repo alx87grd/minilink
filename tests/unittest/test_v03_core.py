@@ -231,7 +231,7 @@ def test_script_10_loop_a_multi_rate_computer_on_a_continuous_plant(backend):
 
     run = loop.compute_rollout(200, backend=backend)
 
-    # The same loop by hand, the filter read at the same tick (R125), the gain
+    # The same loop by hand, the filter read at the same tick, the gain
     # firing on k mod 10 = 0 and its command held in between
     x_f, x_p, u_held = 0.0, 0.0, 0.0
     states = []
@@ -586,7 +586,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     face = problem.compile(dt=dt, solver="rk4")
     J_face = face.run(policy)[3]
 
-    # The judge, the lookup law sampled at dt (R105) on the continuous plant
+    # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
 
     # The RL environment's discounted return of the same law
@@ -597,7 +597,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         J_env += face.gamma**k * -float(reward)
     assert bool(terminated)
 
-    # One J, the planner's own score among them (the law held over each period, R159)
+    # One J, the planner's own score among them (the law held over each period)
     J_planner = float(np.squeeze(solution.evaluation.J))
     assert J_judge == J_planner
     np.testing.assert_allclose([J_judge, J_env], J_face, rtol=1e-14, atol=0.0)

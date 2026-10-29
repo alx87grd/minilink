@@ -99,7 +99,7 @@ class Field(ABC):
 
 @dataclass(frozen=True)
 class FieldSet(Set):
-    """Feasible where ``lower <= V(x) <= upper``; the field reads its own parameters."""
+    """Feasible where ``lower <= V(x) <= upper``; the field's own numbers are not yet leaves of the set's tree."""
 
     field: Field
     lower: float | None = 0.0
@@ -164,7 +164,7 @@ class FieldCost(CostFunction):
     ``g = weight * shaping(V)``; ``shaping=None`` uses ``V`` directly.
 
     The weight is :attr:`params` (``{"weight": w}``, the System pattern); the
-    field reads its own parameters, never the cost's.
+    field's own numbers are not yet leaves of the cost's tree.
     """
 
     def __init__(self, field: Field, weight: float = 1.0, shaping=None):
@@ -283,7 +283,9 @@ class QuadraticField(Field):
         d = xp.atleast_2d(x - center)
         v_rows = xp.einsum("ij,jk,ik->i", d, P_t, d)
 
-        return v_rows if xp.ndim(x) > 1 else v_rows[0]
+        V = v_rows if xp.ndim(x) > 1 else v_rows[0]
+
+        return V
 
     def gradient(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -405,7 +407,9 @@ class EllipsoidSet(FieldSet):
         d = xp.sqrt(level) * solve(L.T, z.T, lower=False).T
         points = center + d
 
-        return points[0] if n is None else points
+        sample = points[0] if n is None else points
+
+        return sample
 
     @property
     def half_width(self) -> np.ndarray:

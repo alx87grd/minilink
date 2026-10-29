@@ -185,7 +185,7 @@ def restart_finished_episodes(env, carry, done, k_reset, k_params, k_seed):
     """
     The carry of the next control period, per plant.
 
-    A plant whose episode ended restarts from a fresh start, at time zero, with
+    A plant whose episode ended restarts from a fresh start, at ``t_start``, with
     a zero return, a fresh policy seed and, when the problem randomizes them,
     fresh parameters; the others continue.
     """

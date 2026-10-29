@@ -303,7 +303,8 @@ as the projection of a projected gradient method does; the gradient is noisy acr
 tuning averages it over the Monte Carlo evaluator's trials.
 
 **Which fixed-iteration tick comes first:** settled by the maintainer's direction of 2026-10-26,
-the gradient MPC's proof of concept in v0.3 and MPPI in v0.4 (TODO §1.8, §4).
+the gradient MPC's proof of concept first, in v0.3; MPPI followed in the night run of
+2026-10-29 (TODO §1.8, §4).
 
 ### 4.7 The long-term target: convergence as stability
 

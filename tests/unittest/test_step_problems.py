@@ -1,4 +1,4 @@
-"""The step problem and the compiled step face (R141, R142, R154)."""
+"""The step problem and the compiled step face."""
 
 import numpy as np
 import pytest

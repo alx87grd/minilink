@@ -472,6 +472,11 @@ def require_sampleable(source, solver, substeps) -> None:
     """Refuse a source that is not a system, a solver the clock does not have, or a bad substep count."""
     if not isinstance(source, System):
         raise TypeError(f"a clock applies to a System, got {type(source).__name__}")
+    if isinstance(source, SampledSystem) and source.sample_period is None:
+        raise TypeError(
+            f"{source.name} is a sampled law with no period yet; "
+            f"clock it with {source.name} % dt"
+        )
     if isinstance(source, SampledSystem):
         raise TypeError(
             f"{source.name} is already on a clock of {source.sample_period:g} s; "

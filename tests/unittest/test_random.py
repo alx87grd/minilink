@@ -474,6 +474,15 @@ def test_a_source_without_a_seed_is_its_mean_and_not_random():
     moved = dict(source.params, law={"mean": np.array([2.0]), "std": law.std})
     np.testing.assert_array_equal(source.h(None, None, 0.3, moved), [2.0])
 
+    # A law whose numbers are not a mean (a uniform law's bounds) is read at the tree too
+    from minilink.core.distributions import Uniform
+
+    uniform = NoiseSource(Uniform([-1.0], [1.0]), sample_period=0.1, seed=None)
+    moved = dict(
+        uniform.params, law={"lower": np.array([2.0]), "upper": np.array([4.0])}
+    )
+    np.testing.assert_array_equal(uniform.h(None, None, 0.3, moved), [3.0])
+
     policy = GaussianPolicy(Gain(np.array([[1.0]])), -1.0, sample_period=0.1)
     assert not policy.is_random
     policy.params["seed"] = 3

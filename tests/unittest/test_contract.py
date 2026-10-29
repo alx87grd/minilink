@@ -1,4 +1,4 @@
-"""One contract for every core math object (R140): its ``params``, ``params=None`` its defaults, a gradient through a float leaf, the same values twice.
+"""One contract for every core math object: its ``params``, ``params=None`` its defaults, a gradient through a float leaf, the same values twice.
 
 Each case is a public core object and one call of its mathematics, ``call(obj, params, xp)``,
 whose arguments are built on the array module ``xp``. The written exceptions are DESIGN §4's

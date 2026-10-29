@@ -201,15 +201,17 @@ class RolloutEnvironment:
         x_next, c = face.transition_at(x, u_full, t, tree)
         t_next = t + dt
 
+        # A step that blew up ends the episode; the last finite state stands in
+        # for the next one and its stage cost counts for nothing (the failure pays
+        # the price below), so rewards, values and the reset stay finite
+        finite = xp.all(xp.isfinite(x_next))
+        x_next = xp.where(finite, x_next, x)
+        c = xp.where(finite, c, 0.0)
+
         # Reward: r_k = −c_k, the stage cost on the plant's whole input with its
         # sign flipped; the discount enters the return once, through the
         # algorithm, never the reward
         reward = -c
-
-        # A step that blew up ends the episode; the last finite state stands in
-        # for the next one so rewards, values and the reset stay finite
-        finite = xp.all(xp.isfinite(x_next))
-        x_next = xp.where(finite, x_next, x)
 
         # Leaving X or U is a failure; leaving the training zone is not; the horizon ends
         out_of_U = ~xp.all(U.margin(u_full, x, t, set_params) >= 0.0)

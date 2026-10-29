@@ -302,8 +302,8 @@ def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
     its nominal value) and held over the period, so the run can be handed on as
     the plant's own (to a diagram's ``trajectory_of`` when the plant is itself
     a diagram). ``params`` is the tree the run was made with (``None``: the
-    loop's own). Reading ``u`` evaluates every block once per tick: a pure MPC
-    solves again.
+    loop's own). A dense run reads ``u`` from its record; a state-only run gathers
+    each tick's input through the plan (a zero-delay MPC solves again).
     """
     if loop is None:
         return rollout.of("plant")

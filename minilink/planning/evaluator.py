@@ -832,10 +832,11 @@ def time_law(source, t):
 
     # u_k = π(t_k): the source's output at each sample of the grid
     table = np.stack([np.asarray(source.h(empty, empty, float(t_k))) for t_k in t])
+    t_0 = float(t[0])
     dt = float(t[1] - t[0])
 
-    # u(t) = u_k at the nearest sample, k = round(t / dt)
-    return lambda x, t: table[int(round(t / dt))]
+    # u(t) = u_k at the nearest sample, k = round((t − t_0) / dt)
+    return lambda x, t: table[int(round((t - t_0) / dt))]
 
 
 def static_law(controller):

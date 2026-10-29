@@ -214,13 +214,14 @@ class StepEvaluator(DiscreteEvaluator):
         ks = self.indices(u_seq.shape[0])
 
         def period(x, k, u_k):
-            x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
             if not system.resolves:
+                x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
                 return x_next, x_next[None, :]
+            # The plant integrated once over the period: the path's last row is the tick
             t_k = t_start + k * system.sample_period
             path = system.update_path(x, u_k, t_k, params)
-            points = assigned(xp, path, -1, x_next)
-            return x_next, points
+            x_next = xp.reshape(path[-1], (n,))
+            return x_next, path
 
         x_samples = iterate_dense(self, period, x0, (ks, u_seq))
 
@@ -531,6 +532,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         if not layout:
             return iterate_dense(self, period, x0, (ks, u_seq))
+        require_one_period(ks)
         x_samples, records = iterate_dense(self, period, x0, (ks, u_seq))
 
         # Each tick's value over the S samples of its period, the end holding the last
@@ -835,6 +837,14 @@ def check_sampled_plan_traces(evaluator, plan, verbose):
         )
     if verbose:
         print("[compile] The sampled plan traces on JAX.")
+
+
+def require_one_period(ks):
+    """Refuse a recorded dense run of no period: a record needs one tick to hold at the end sample."""
+    if len(ks) < 1:
+        raise ValueError(
+            "a run that records signals needs at least one period: give tf > t_start"
+        )
 
 
 def require_one_plant_period(costs, plant):

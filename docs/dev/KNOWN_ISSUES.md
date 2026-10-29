@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-10-28.
+lands. Last checked against the code: 2026-10-29.
 
 ## Composition and control
 
@@ -17,22 +17,21 @@ lands. Last checked against the code: 2026-10-28.
 - **Fix:** the one-mechanical-family work (S32, postponed): a model-based law will refuse an
   underactuated plant at construction, with a clear message (R102).
 
-### Connecting an already-connected input replaces its source silently
-- **Symptom:** a second `diagram.connect(..., "i", "u")` onto the same input rewires it to the
-  new source with no warning (the old source is dropped).
-- **Workaround:** check `diagram.connections` or set `diagram.connection_verbose = True`.
-- **Fix:** S66 (`connect` refuses to rewire a connected input), an ask on the workboard (the v0.3
-  core's hardening, TODO §1.10).
-
-### An output that reads an input it does not declare reads a stale value
+### A port function that reads an input it does not declare reads a stale value
 - **Symptom:** a port whose `compute` reads an input missing from its `dependencies` is
   scheduled as if it did not, so the compiled diagram can evaluate it before its source and
-  hand it the empty buffer (zero), silently; in a loop it solves the wrong fixed point.
-- **Reproduce:** a static block `y = 2 u` declared with `dependencies=()`, added before a
-  `Step(final_value=[1.0])` that drives it: the compiled output at `t = 2` is `0`, not `2`
-  (declared `dependencies=("u",)`, it is `2`).
+  hand it the empty buffer (zero), silently; in a loop it solves the wrong fixed point. The
+  compile probe catches this on an output computed by the leaf's own `h` (the `DynamicSystem`
+  shortcut); a port added by `add_output_port` with its own function, or on a bare `System`,
+  is not probed.
+- **Reproduce:** a bare `System` with `add_output_port("y", dim=1, dependencies=())` whose `h`
+  is `y = 2 u`, added before a `Step(final_value=[1.0])` that drives it: the compiled output
+  at `t = 2` is `0`, not `2` (declared `dependencies=("u",)`, it is `2`; the same block as a
+  `DynamicSystem(n=0, …, y_dependencies=())` is refused at compile).
 - **Workaround:** declare every input a port reads (`dependencies=("u",)` or `"all"`).
-- **Fix:** S66 (the compile probe detects it and raises, R116).
+- **Fix:** none planned: the compile probe (S66, landed) covers the shortcut's `h`; probing
+  every port function is a design question for the maintainer
+  ([QUESTIONS.md](QUESTIONS.md)).
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own

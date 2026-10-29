@@ -259,7 +259,7 @@ class NoiseSource(Source):
 
         # Without a seed, the mean (the law's own number when it names one): no draw
         if seed is None:
-            w_mean = xp.asarray(law_params.get("mean", law.mean), dtype=float)
+            w_mean = xp.asarray(law.mean_at(law_params), dtype=float)
             return w_mean
 
         # The sample index of the held train: w(t) = w_k on [kΔ, (k+1)Δ)

@@ -61,6 +61,9 @@ def tick_on_the_host(ev, system, x, u, k, t_start, params, points, rtol, atol):
         # ẋ = f(x, u, t) over [t, t + Δ] from x_i, the input held
         f = block.source.f
         times = t + h * np.arange(1, points + 1) / points
+        times[-1] = (
+            t + h
+        )  # the period's end exactly (the division can land an ulp past it)
         solution = solve_ivp(
             lambda tau, z: f(z, u_i, tau, p),
             (float(t), float(t + h)),

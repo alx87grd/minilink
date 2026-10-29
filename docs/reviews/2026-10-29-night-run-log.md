@@ -165,6 +165,22 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 
 ## 6. Textbook check
 
+The run left this section empty. Filled by the independent review of 2026-10-29
+([the record](2026-10-29-independent-review-of-the-runs.md)), each math diff read beside
+`planning/dynamic_programming/dp.py`:
+
+| Commit | Math touched | Read beside `dp.py` |
+| --- | --- | --- |
+| `f39e1010`, `486adff4` (the sampled diagram, `box % dt`) | none in the library: the plan, the faces and the time table are compiler machinery (RULES 5.16); `t_k = t_start + k·Δ` formed once per tick | yes: the one new binding named above its uses; one ruling id in a docstring (removed by the review) |
+| `9ea45d66` (the record) | none: the record is plumbing | yes: nothing to read |
+| `8ed9ce00`, `3c34584b`, `ab02eb65`, `da27b503` (the cache's key, the program's frozen form) | none: compiler machinery | yes; the digest's docstrings said "by identity" where the code reads bytes (corrected by the review) |
+| `137e5290`, `383d7db9` (MPPI) | `ε = ξ Lᵀ`, `V = clip(U + ε)`, `S = S_path + λ(1 − α) Σ uᵀ Σ⁻¹ ε`, `w = exp(−(S − S_min)/λ)` normalized, `U ← clip(U + Σ wᵏ εᵏ)`, the shift repeating the last input; the horizon through `env.step(t_origin=)` | the equations match Williams et al. (2017) and keep the beats in `passes`, `path_cost` and `solve_body`; `shift`, `command`, `planned_trajectory` and `pack` carried `self.dt`, `self.N`, `self.offsets`, `self.m` in their math lines and an unexplained `1e-9` (bound and explained by the review); the status dict holds three equations (left as a nit) |
+| `fd50c735`, `288a265a`, `7f2a1080`, `44129d91` (the MPC) | the prediction `x̂(t + Δ)` under the held command (RK4 a quarter knot apart); no new equation otherwise | yes; the inline `time.perf_counter()` in the equation bodies is plumbing in the core-math beat (a nit left); `shift`, `command`, `prediction` of the trajectory-optimization face carried `self.offsets`, `self.m`, `self.n` (bound by the review) |
+| `f1a3339b` (one Euler step's stage cost) | `c_k = dt · g(x_k, u_k, t_k)` | equal to `stepping.stage_cost` and `step_with_cost` to the bit (200 random pairs); it put the equation on the `return` line with `self.dt` in it (RULES 5.3, 5.22: fixed by the review) and is a third copy of the Euler rule beside `stepping.py`'s two (RULES 5.6, left for the maintainer) |
+| `91039fb0` (Lyapunov's `P`, the exact-hold refusal, the fields' `with_params`) | `P = ½(P + Pᵀ)` after the solve | yes: one named line with its comment; the RoA baseline moved by one ulp (the ledger line) and the committed JSON was not re-pinned (host dependent, left to the maintainer's machine) |
+| `335b805e`, `f45ce7ce` (value iteration's `alpha`, the price's rate) | the backup unchanged; the price `Σ γᵏ c_max + γᴺ h_max` at the evaluation's rate | yes; the mixed discount under `alpha=` is a design question (QUESTIONS.md) |
+| `b45f9198` (the dense run's one integration) | `x_{k+1}` the path's last row | yes; the lone-plant evaluator still integrated twice (fixed by the review) |
+
 ## 7. Progress
 
 | Step | Row | Commit | Gates |

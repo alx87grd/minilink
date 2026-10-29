@@ -685,7 +685,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     assert int(source.m) == 0  # no input port: an open-loop policy
 
     # The source interpolates linearly: the plant's first-order-hold rollout, its
-    # running cost integrated with the state by the same RK4 step (R142),
+    # running cost integrated with the state by the same RK4 step,
     # ż = [f(x, u(τ)); g(x, u(τ))], plus h(x_N)
     from minilink.core.compile.evaluators.stepping import step_body
 
@@ -761,3 +761,58 @@ def test_a_disturbance_on_the_command_port_is_refused():
             x_start=Particles([[0.5, 0.0]]),
             disturbances={"u": WhiteNoise(1, psd=0.1)},
         )
+
+
+def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
+    from minilink.core.sets import BallSet, IntersectionSet
+
+    plant = Pendulum()
+    box = plant.state.box
+    ball = BallSet(center=np.zeros(2), radius=1.0)
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        tf=1.0,
+        x_start=np.zeros(2),
+        X=IntersectionSet([box, ball]),
+    )
+    problem.params = {"X": {"1": {"radius": 2.0}}}
+    assert problem.X.sets[1].radius == 2.0 and problem.X.sets[0] is box
+    with pytest.raises(ValueError, match="unknown member"):
+        IntersectionSet([box, ball]).with_params({"2": {"radius": 1.0}})
+
+
+def test_a_user_set_with_numbers_is_moved_on_a_copy():
+    from minilink.core.sets import Set
+
+    class Disk(Set):
+        def __init__(self):
+            self.params = {"r": 1.0}
+
+        @property
+        def dim(self):
+            return 2
+
+        def margin(self, z, t=0.0, params=None):
+            params = self.params if params is None else params
+            r = params["r"]
+            return r**2 - z @ z
+
+    disk = Disk()
+    moved = disk.with_params({"r": 2.0})
+    assert moved is not disk and disk.params["r"] == 1.0 and moved.params["r"] == 2.0
+
+
+def test_a_source_policy_is_held_from_the_problems_start_time():
+    from minilink.blocks.sources import TrajectorySource
+    from minilink.planning.evaluator import nominal_trajectory
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant, xbar=np.array([np.pi, 0.0]))
+    problem = PlanningProblem(
+        plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, tf=2.0, t_start=1.5
+    )
+    t_grid = 1.5 + 0.1 * np.arange(21)
+    source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
+    traj = nominal_trajectory(problem, source, dt=0.1)
+    np.testing.assert_allclose(traj.u[:, 0], [np.sin(1.5)])

@@ -1,4 +1,4 @@
-"""The seeded stochastic policy: a law plus its own counter-based noise, a pure block (R129)."""
+"""The seeded stochastic policy: a law plus its own counter-based noise, a pure block."""
 
 import numpy as np
 import pytest

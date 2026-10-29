@@ -40,7 +40,6 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your review of the overnight run's open decisions | OD-7 … OD-35 | v0.3 (the merge, §1.10) | review the number changes first, then the rest as a block |
-| Whether the course notebooks that run an MPC use the zero-delay form | §1.8, the MPC row | v0.3 | `racecar_toward_mpc`, the showcase and `mpc_spatial_stack` run the delayed default; `delay=False` is the old controller (the demos run it); your teaching call |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -403,7 +402,7 @@ Why: [core-architecture.md](core-architecture.md) §7. Design:
 
 Why: [core-architecture.md](core-architecture.md) §8. Design:
 [native-optimizers.md](native-optimizers.md), [planner-and-mpc.md](planner-and-mpc.md). Better
-solvers and MPPI are v0.4 (§4).
+solvers are v0.4 (§4); MPPI landed on the face in the night run of 2026-10-29 (its rest is S72).
 
 - [ ] **The planner's compiled face** (R148): `planner.compile()` gives `n_z`,
   `initial`, `solve(params, z0) -> (z, status)`, `shift(z, t)`, `command(z, x, t)`,
@@ -418,7 +417,7 @@ solvers and MPPI are v0.4 (§4).
   done-when checks pass (byte-identical on NumPy and JAX, a `vmap` of the native Adam planner
   over starts). At join 2: `planner.solve(params=None, *, guess=None, ...)`, no solve reading
   `last_solution` (the run log's RD-53). Rest: the `"method"` and `seed` leaves of
-  `planner.params` (v0.4 with MPPI, RD-54), `last_solution` with the plotting shortcuts (D1.4),
+  `planner.params` on the trajectory-optimization tree (MPPI carries them since the night run, N-3), `last_solution` with the plotting shortcuts (D1.4),
   the face of LQR and value iteration.
 - [ ] **The MPC rebuilt on the planner's face** (NS-8; R148, R123):
   `ModelPredictiveController(planner, *, inputs={"x_start": "y", "t_start": "t"}, delay=True)`;
@@ -443,9 +442,9 @@ solvers and MPPI are v0.4 (§4).
   The demos' regression is answered by the zero-delay, warm-started form
   (`ModelPredictiveController(planner, delay=False)`, three pure blocks: a solver, a command and a
   memory; merged into `dev-v0.3` 2026-10-29, [the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md)); every MPC demo runs it, the delayed form
-  stays the default. Rest: whether the course notebooks that run an MPC (GRO501
-  `racecar_toward_mpc`, the showcase, `mpc_spatial_stack`) move to `delay=False` **[ask —
-  teaching call]**.
+  stays the default; the course notebooks that run an MPC (GRO501 `racecar_toward_mpc`,
+  the showcase, `mpc_spatial_stack`) run `delay=False` too (the maintainer's call,
+  2026-10-29).
 - [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28; its two prerequisites,
   clocking a box and recording the signals, landed in the night run of 2026-10-29): the delayed and pure forms
   as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
@@ -457,8 +456,8 @@ solvers and MPPI are v0.4 (§4).
   record the ruling when it lands. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.3)
 - [ ] **Its closed loop in one scan, tuned by gradient** (NS-9): `problem.compile(mpc % Δ)`
   `.evaluate(p)` runs, `vmap`s over starts, and `jax.grad` with respect to `controller.cost.Q`
-  tunes a demo by `Optimizer`. The gradient MPC comes first, as the direction places it; MPPI is
-  v0.4. Landed at join 2: acceptance script 5, the `native_mpc_tuning` demo (the plan's
+  tunes a demo by `Optimizer`. The gradient MPC came first, as the direction places it; MPPI
+  followed in the night run. Landed at join 2: acceptance script 5, the `native_mpc_tuning` demo (the plan's
   weights tuned by L-BFGS through the closed loop).
 
 ### 1.9 Fields

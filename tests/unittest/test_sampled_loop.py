@@ -468,3 +468,57 @@ def test_the_zero_delay_mpc_has_no_clock_operator_of_its_own():
     )
 
     assert "__mod__" not in vars(WarmStartedPredictiveController)
+
+
+def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
+    # Δ = 0.05 with 3 substeps puts the last sample an ulp past the period's end in
+    # floating point; the runner's grid ends on the period exactly
+    plant = Pendulum()
+    plant.x0 = np.array([0.3, 0.0])
+    loop = (PID(Kp=8.0, Ki=1.0, Kd=2.0) % 0.05) @ discretize(plant, 0.05, substeps=3)
+    host = loop.compute_trajectory(tf=0.2, solver="scipy")
+    dense = loop.compute_trajectory(tf=0.2)
+    assert host.t.shape == dense.t.shape
+    np.testing.assert_allclose(host.x, dense.x, atol=1e-4)
+
+
+def test_a_lone_sampled_plant_is_integrated_once_per_period_in_the_dense_run():
+    class CountingPendulum(Pendulum):
+        calls = 0
+
+        def f(self, x, u, t=0, params=None):
+            type(self).calls += 1
+            return super().f(x, u, t, params)
+
+    sampled = discretize(CountingPendulum(), 0.1, substeps=4)
+    CountingPendulum.calls = 0
+    sampled.compute_rollout(10)
+    on_the_ticks = CountingPendulum.calls
+    CountingPendulum.calls = 0
+    sampled.compute_trajectory(tf=1.0)
+    assert CountingPendulum.calls == on_the_ticks
+
+
+def test_the_plant_run_of_a_ticks_run_reads_the_input_the_loop_fed_it():
+    from minilink.core.discrete.sampled_diagram import plant_run_of
+
+    loop = a_digital_pid_on_a_pendulum()
+    S = loop.subsystems["plant"].substeps
+    ticks = loop.compute_rollout(40)
+    dense = loop.compute_trajectory(tf=0.4)
+    _, on_ticks = plant_run_of(loop, ticks)
+    _, on_dense = plant_run_of(loop, dense)
+    np.testing.assert_allclose(on_ticks.u, on_dense.u[:, ::S], rtol=0, atol=1e-12)
+
+
+def test_a_recorded_run_of_no_period_is_refused():
+    loop = a_digital_pid_on_a_pendulum()
+    with pytest.raises(ValueError, match="at least one period"):
+        loop.compute_trajectory(tf=0.0)
+
+
+def test_discretize_refuses_a_sampled_law_with_no_period():
+    from minilink.core.discrete.sampled_system import NativeSampledSystem
+
+    with pytest.raises(TypeError, match="no period yet"):
+        discretize(NativeSampledSystem(n=0), 0.1)

@@ -615,8 +615,12 @@ class SampledCost(StepCost):
         # discount at the period's own start being 1 (stage_cost's Euler line, to the bit)
         if self.solver == "euler" and self.substeps == 1:
             params = self.params if params is None else params
+            dt = self.dt
             g = self.cost.g
-            return self.dt * g(x, u, t_k, params)
+
+            c = dt * g(x, u, t_k, params)
+
+            return c
 
         dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
 

@@ -128,10 +128,12 @@ class CompiledTrajectoryPlanner:
         """The plan rebased to the absolute time ``t``: each knot row re-read at ``t + offset``, the tail held."""
         xp = array_module(z, t)
 
+        offsets = self.offsets
+
         rows = self.rows(z)
         origin = z[-1]
-        knots = origin + self.offsets
-        moved = t + self.offsets
+        knots = origin + offsets
+        moved = t + offsets
 
         # r_new(t + offset_k) = r(origin + offset), linear between knots, held past the end
         shifted = xp.stack([xp.interp(moved, knots, row) for row in rows])
@@ -145,8 +147,11 @@ class CompiledTrajectoryPlanner:
         """The command the plan gives at time ``t``: its input knots read at ``t``, linear between knots (an open-loop plan ignores ``x``)."""
         xp = array_module(z, t)
 
-        u_rows = self.rows(z)[-self.m :]
-        knots = z[-1] + self.offsets
+        m = self.m
+        offsets = self.offsets
+
+        u_rows = self.rows(z)[-m:]
+        knots = z[-1] + offsets
 
         # u(t), each input interpolated on the knots, held past the end
         u = xp.stack([xp.interp(t, knots, row) for row in u_rows])
@@ -158,8 +163,11 @@ class CompiledTrajectoryPlanner:
         require_state_knots(self.transcription)
         xp = array_module(z, t)
 
-        x_rows = self.rows(z)[: self.n]
-        knots = z[-1] + self.offsets
+        n = self.n
+        offsets = self.offsets
+
+        x_rows = self.rows(z)[:n]
+        knots = z[-1] + offsets
 
         # x(t) on the state knots, linear between them, held past the end
         x = xp.stack([xp.interp(t, knots, row) for row in x_rows])
@@ -280,14 +288,14 @@ class CompiledTrajectoryPlanner:
         return z[:-1].reshape(-1, n_steps)
 
     def problem_at(self, params):
-        """The problem itself for no values, else a copy holding them (its parts copied)."""
+        """A copy of the problem holding the compiled tree with ``params`` merged over it (its parts copied): the face's values, never a later edit of the problem's."""
         # Lazy import: the planner module imports this one
         from minilink.planning.trajectory_optimization.planner import (
             host_tree,
             problem_with,
         )
 
-        return problem_with(self.problem, host_tree(params))
+        return problem_with(self.problem, host_tree(self.merged(params)))
 
 
 ###############################################################################

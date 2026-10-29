@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import ensure_jax_x64, require_jax, require_jax_numpy
+from minilink.core.params import tree_digest
 from minilink.optimization.evaluators.program_evaluator import (
     MathematicalProgramEvaluator,
 )
@@ -86,6 +87,7 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         self.raw_forms = {"J": J_raw, "h": h_raw, "g": g_raw}
         self.frozen_forms = {}
         self.default_tree = self.params
+        self.default_digest = tree_digest(self.params)
 
         # The compiled functions
         self._jit_J = jax.jit(J_raw)
@@ -236,8 +238,8 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
                 self.jax.block_until_ready(parametric(z_sample, self.params))
 
     def form(self, name):
-        """The compiled ``name`` for the bound tree, a function of ``z``: frozen while the defaults are bound, else parametric."""
-        if not self.frozen:
+        """The compiled ``name`` for the bound tree, a function of ``z``: frozen while the compiled defaults are bound (a later edit of the program's numbers goes parametric), else parametric."""
+        if not self.frozen or tree_digest(self.params) != self.default_digest:
             parametric = getattr(self, f"_jit_{name}")
             return lambda z: parametric(z, self.params)
 

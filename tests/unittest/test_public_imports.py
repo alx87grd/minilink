@@ -40,7 +40,7 @@ class TestPublicImports(unittest.TestCase):
         self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
         self.assertIn("ReinforcementLearningPlanner", minilink.__all__)
         self.assertIn("TabularLearningPlanner", minilink.__all__)
-        self.assertNotIn("StochasticPlanningProblem", minilink.__all__)  # R143
+        self.assertNotIn("StochasticPlanningProblem", minilink.__all__)
         self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
         self.assertNotIn("HybridDiagram", minilink.__all__)
 

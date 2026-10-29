@@ -248,9 +248,13 @@ def plant_run_of(loop, rollout, params=None):
     plant = getattr(op.system, "source", op.system)
     if "plant" in rollout.roles:
         return plant, rollout.of("plant")
-    S = ev.plan.dense_points
     t_start = float(rollout.t[0])
     n_samples = rollout.t.size
+
+    # S = the samples per period of this run: the dense run's substeps, a ticks run's one
+    period = float(loop.sample_period)
+    spacing = float(rollout.t[1] - rollout.t[0]) if n_samples > 1 else period
+    S = max(1, int(round(period / spacing)))
 
     # u_k = the plant's gathered input at tick k, held over the samples of its period
     # and, for the last tick, over the end sample

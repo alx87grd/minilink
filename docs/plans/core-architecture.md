@@ -101,18 +101,17 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   start (`x_start`, a leaf), and each stateful block's start is an `x0` leaf of the evaluator's
   tree; a realization is one tree (R144); a problem's tree gains `t_start` and a planner's tree is
   its problem's plus `"method"` and `seed` (R148).
-- **Today:** the sets and the distributions read their `params` (RN-2, the v0.3 run);
-  `LookupPolicy` keeps its table as an attribute (`TrajectorySource` holds its values in
-  `params` since the v0.3 run); the three owners of a
-  start landed in the v0.3 run (a diagram's `x0` a view of its blocks, each stateful block's
-  start a leaf of the evaluator's tree, no `refresh()` before a run); `Computer` blocks read `op.bound_params`, frozen at compile; the MPC's
-  `MPCTickLatch` is a hidden cache; `StepSystem.rollout` and `HybridDiagram.last_result` cache
-  runs (D13); the path lookup and merge of parameter trees are written four times
-  (`planning/evaluator.py`, `planning/problems.py`, `core/compile/evaluators/jacobian.py`,
-  `core/assembly.py`).
-- **Open:** the CONSTITUTION's amendments (invariants 1 and 3, §6's `%` sentence, §2's
-  disturbance sentence): their text is proposed in QUESTIONS.md, to rule before the loop lane
-  starts.
+- **Today:** landed in the v0.3 run: the sets, the distributions, `TrajectorySource` and the
+  fields read their `params` (RN-2); the three owners of a start (a diagram's `x0` a read-only
+  stack of its blocks', each stateful block's start a leaf of the evaluator's tree, no
+  `refresh()` before a run); one parameter-tree module, `core/params.py`, owns the path lookup,
+  the merge and the flatten; the legacy hybrid runtime and its caches are gone. Rest:
+  `LookupPolicy` keeps its table as an attribute; a model-based law reads its embedded plant's
+  live `params` outside its own tree (TODO §1.1's last row); the RL planner has no `params`
+  tree yet.
+- **Open:** the fields' numbers as leaves of the tree (QUESTIONS.md, from the night run's
+  review). The CONSTITUTION's amendments were taken on 2026-10-28 (`d56dd7a7`), their wording
+  open to the maintainer's review.
 - **Rows:** [TODO §1.1](TODO.md#11-every-object-pure-every-number-a-parameter). Design:
   [randomness.md](randomness.md) (RN-2), [differentiable-problem.md](differentiable-problem.md) §8.
 
@@ -132,14 +131,12 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     (native-optimizers.md §3.1); the step tools linearize at a fixed point and read eigenvalues
     against the unit circle (R122).
 - **Ruled:** R125, R126, R146, R147, R158.
-- **Today:** the discrete evaluators' `rollout` (`core/compile/evaluators/discrete.py`) returns
-  host NumPy, with no step `rollout_batch`; `compile_step_diagram(flatten=True)` raises, and step
-  diagrams refuse a continuous leaf; two same-tick semantics (`StepDiagramEvaluator` propagates
-  within a tick, `Computer.tick` reads the last tick's buffer); `@`, `>>`, `+` refuse step
-  systems; `jacobian` but no `linearize` or poles; the step evaluators compute the port signals
-  twice per tick (in `step` and in `outputs`); one step formula (`stepping.py`'s `step_body`)
-  under eight hand-written loops (`nominal_trajectory`, `RolloutEnvironment`, `Sys2Gym`, the
-  realtime simulator, `HybridSimulator`, shooting, multiple shooting, the DP discretizer).
+- **Today:** landed in the v0.3 run (the loop lane): one same-tick semantic; `>>`, `+` and `@`
+  on step and sampled operands (a continuous operand beside a step one refused, naming `%`);
+  step evaluators that trace and batch (`rollout` one `lax.scan`, `rollout_batch` one `vmap`);
+  one signal pass per tick; `compute_rollout` a `Trajectory`; `jacobian` on a step evaluator.
+  Rest: `linearize` and poles against the unit circle (R122) have no step tool yet; the loops
+  still written around the one-period formula are listed in the v0.3 run log §4.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.2](TODO.md#12-the-step-algebra-first-class).
 
@@ -158,12 +155,12 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   - Monte Carlo is the closed loop simulated on draws realized once from one key.
 - **Ruled:** RD-D1–RD-D24 (in part superseded by R10, R15, R19, R27, R44); each trial realizing
   the loop's blocks (R92, landed); R128, R143, R144.
-- **Today:** `StochasticPlanningProblem(sys, x0_distribution=, params_distribution=,
-  disturbances=)`; `problem.realize(key, n)` returns `(x0s, {"params", "disturbances"})`, the key
-  split by position, one held value per disturbance port; `evaluate` holds disturbances at
-  nominal and warns; one integer key draws different values on NumPy and JAX (`trial_key`;
-  KNOWN_ISSUES); `Sys2Gym.from_problem` applies no draw, although DESIGN §6 says it does; the free
-  loop inputs are constant over a run; there is no `NoiseSource`.
+- **Today:** landed in the v0.3 run (the objects lane): `PlanningProblem(x_start=` a point, a
+  law or a set, `params={…: law}`, `disturbances={"d": source}`, `criterion=)` and `nominal()`;
+  `realize(key, n)` one tree, a stream per consumer by its path and a seed per random source,
+  the same trials on NumPy and JAX for an integer key; the disturbance shortcut is the loop
+  `closed_loop` builds; `NoiseSource(law, *, sample_period, seed, hold)` with `WhiteNoise` its
+  subclass; `Sys2Gym(x_start=law)`. Rest: RN-6's docs.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.3](TODO.md#13-the-draws).
 
@@ -177,7 +174,9 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   convention, the sample index from the block's own period (R129). Its deterministic face is
   `NeuralPolicy` (renamed from `NeuralPolicyController` in the v0.3 sweep, R151).
 - **Ruled:** R129, R151.
-- **Today:** the RL Gaussian heads draw from their own keys.
+- **Today:** landed: `GaussianPolicy` and `SquashedGaussianPolicy` (`control/stochastic.py`);
+  the RL heads draw at `CounterKey(seed, k)` with one policy seed per episode, the RL baseline
+  re-pinned once (acceptance script 13).
 - **Open:** nothing; the heads are rebuilt in v0.3 with the block, training performance unchanged
   as the gate (R160).
 - **Rows:** [TODO §1.4](TODO.md#14-the-seeded-stochastic-policy).
@@ -222,14 +221,20 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   [the record](../reviews/2026-10-28-session-rulings.md)). R146 revises R120 and R127: the loop is
   a `System` of the step algebra; CONSTITUTION invariants 1 and 3 and §6's `%` sentence are
   amended when it lands (their text in QUESTIONS).
-- **Today:** `Computer` is mutable and NumPy-only; `HybridSimulator` is a Python tick loop with no
-  `params`, no roles and no problem; `StepRollout` is the computer's record; `problem.compile`
-  refuses a `StepSystem` controller but accepts the stateless MPC, whose latch then runs at the
-  RK4 stages (KNOWN_ISSUES); `%` refuses a law with continuous states.
-- **Open:** whether the host clock runner keeps the lazy `core` → `simulation` import once the
-  hybrid modules go (R100). Settled 2026-10-28: the realtime runner's re-base is a v0.4 feature
-  (R161); the left operand of `@` is `controller`, box or block (R162); the conventions' first
-  sampled-loop step is folded into this workstream (R163).
+- **Today:** landed in the v0.3 run and the night run: `SampledSystem` (`%`, `discretize`; the
+  exact hold a subclass), `SampledDiagramSystem` with periods on blocks, divisors and held
+  outputs, its plan handing `t_k` to the seconds faces and the count to the tick laws;
+  `box % dt` clocking each block with its face kept (a bare tick law in a slower nested box
+  refused, N-8); the two run verbs (`compute_rollout`; `compute_trajectory` on `rollout_dense`,
+  the plant integrated once per period); the host clock runner (`solver="scipy"`); the sampled
+  face of `problem.compile`; the signals recorded in the run (`record=`, N-1); the legacy
+  runtime gone. Rest: the realtime runner on the pure blocks (v0.4, R161); `compute_rollout`
+  takes no `record=` yet (a ticks run records nothing).
+- **Open:** the lazy `core` → `simulation` import is DESIGN §3's dependency-law exception.
+  Settled 2026-10-28: the realtime runner's re-base is a v0.4 feature (R161); the left operand
+  of `@` is `controller`, box or block (R162); the conventions' first sampled-loop step is folded
+  into this workstream (R163). From the night run's review: what marks the loop's plant (the
+  code reads a solver kind, the words a role), QUESTIONS.md.
 - **Rows:** [TODO §1.5](TODO.md#15-the-sampled-loop-a-step-diagram-two-runners).
 
 ## 6. One score (pillar)
@@ -316,15 +321,21 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
     default), `t_start` bound to the time its `update` receives, its tree the planner's `params`.
   - **In v0.3, a proof of concept** (the direction): a fixed-step solver, the planner's face on
     trajectory optimization, the gradient MPC on it, its closed loop in one scan tuned by
-    gradient. State-of-the-art solvers and MPPI are v0.4.
+    gradient. State-of-the-art solvers are v0.4; MPPI landed in the night run of 2026-10-29
+    (N-3, N-14) as the face's first gradient-free consumer.
 - **Ruled:** R132, R135 (answered by R148), R148, R149, R155, R158.
 - **Today:** the kernel is in (NS-1, NS-2's fixed `K`, the v0.3 run): `gd` and `adam` are pure
   laws (`init`, `update(grad, state)`) run by `Optimizer`, `iterations=K` one `lax.scan` that
   traces under `jit`, `vmap` and `grad`, `as_step_system()` the iterates as a step system;
   trajectory optimization has its compiled face (`planner.compile()`, R148: `solve`, `shift`,
-  `command`, `prediction`, `solution`, `pack`; a native method `vmap`s over starts); the RL learners already run their steps
-  in one `lax.scan`; the planners have no pure face, `solve` mutates them (`last_solution`); the
-  MPC is two classes with `dt_mpc`, `t0`, `warm_start` and a tick latch, probing the planner.
+  `command`, `prediction`, `solution`, `pack`; a native method `vmap`s over starts); the RL
+  learners run their steps in one `lax.scan`; `planner.solve(params=, guess=)` reads no last
+  solution (RD-53); the MPC is `ModelPredictiveController(planner, *, inputs=, delay=,
+  warm_start=, lookahead=)` on the face in three forms (the delayed form a `NativeSampledSystem`;
+  the zero-delay warm-started form, three pure blocks; the pure form), `PlanFollower` for dual
+  rate, its closed loop one scan tuned by gradient (acceptance script 5); `MPPIPlanner` is the
+  face's first gradient-free consumer, with the `"method"` and `seed` leaves (N-3). Rest: those
+  leaves on the trajectory-optimization and RL trees; one MPC architecture (TODO §1.8).
 - **Open:** nothing; the names are ruled (R164).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 
@@ -447,7 +458,7 @@ v0.4 reads the core and never changes it.
 
 | Feature (TODO §4 unless named) | Reads | Plan |
 | --- | --- | --- |
-| MPPI (S72, MP-1–MP-6), a planner under the compiled-face contract | §3, §5, §6, §8 | [mppi.md](mppi.md), [planner-and-mpc.md](planner-and-mpc.md) |
+| MPPI's rest (S72: the stochastic branch MP-3, the teaching form MP-6); the planner landed in v0.3 (the night run) | §3, §5, §6, §8 | [mppi.md](mppi.md), [planner-and-mpc.md](planner-and-mpc.md) |
 | Identification and trajectory generation (C4) | §7 (the export with a data cost) | [differentiable-problem.md](differentiable-problem.md) §1 |
 | `LQGPlanner` | §3 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5 |
 | Workspace geometry (A3), then the CBF safety filter (unscheduled; research lane until a course asks) | §9 | [geometry-module.md](geometry-module.md), [cbf-safety-filter.md](cbf-safety-filter.md) |

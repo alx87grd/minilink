@@ -209,7 +209,7 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
     )
     np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
-    # the step reward is −c_k, the face's stage cost in its stationary form (R142):
+    # the step reward is −c_k, the face's stage cost in its stationary form:
     # gamma carries the discount between ticks, never exp(−ρ t) in r
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
@@ -788,7 +788,7 @@ def test_angle_features_map_each_angle_to_its_cosine_and_sine():
 
 
 def test_the_heads_draw_at_a_counter_key_as_the_seeded_policy_block_does():
-    """R160: a head drawing at ``CounterKey(seed, k)`` makes the block's draw at that seed and sample."""
+    """A head drawing at ``CounterKey(seed, k)`` makes the block's draw at that seed and sample."""
     from minilink import Gain
     from minilink.control import GaussianPolicy
     from minilink.core.backends import require_jax
@@ -829,7 +829,7 @@ def test_the_collector_draws_each_episode_at_its_own_policy_seed():
 
 
 def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
-    """R150: the problem's discount by default; an override is a training choice the record names."""
+    """The problem's discount by default; an override is a training choice the record names."""
     kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16, verbose=0)
     prob = problem(tf=np.inf, discount_rate=0.5)
     derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).solver
@@ -840,3 +840,13 @@ def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
     record = override.solve(timesteps=16).solver
     assert record.gamma == 0.9 and record.discount_differs
     assert "trained at gamma=0.9" in str(record)
+
+
+def test_environment_reward_stays_finite_when_a_step_blows_up():
+    env = RolloutEnvironment(
+        problem(tf=0.2, infeasible_cost=50.0), dt=0.1, backend="numpy"
+    )
+    env.face.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
+    x = np.array([0.1, 0.0])
+    x_next, _, reward, terminated, _ = env.step(x, 0.0, np.array([0.0]), None)
+    assert np.all(np.isfinite(x_next)) and np.isfinite(reward) and bool(terminated)

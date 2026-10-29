@@ -903,7 +903,7 @@ def test_the_failure_price_follows_the_overridden_weights_once_per_value():
 def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
     from minilink.optimization import Optimizer
 
-    # The seed case (R131): the program is deterministic given its draws, one key
+    # The seed case: the program is deterministic given its draws, one key
     problem = stochastic_problem()
     pe = problem.compile(PID(Kp=10.0, Kd=1.0), dt=0.02, backend=backend)
     program = pe.program(

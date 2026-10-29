@@ -2375,7 +2375,7 @@ def test_a_field_set_in_an_intersection_survives_a_params_write():
     assert problem.X.contains(np.zeros(1))
 
 
-# --- the planner's compiled face (R148) ---
+# --- the planner's compiled face ---
 
 
 def face_swing_up():

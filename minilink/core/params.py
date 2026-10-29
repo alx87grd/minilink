@@ -152,8 +152,8 @@ class DeviceTree:
     """
     One tree kept on the device while its values repeat: a host loop's calls then transfer nothing.
 
-    The entry holds the leaves it was built from, so a JAX leaf's identity (what
-    the digest reads of it) cannot be reused by another array while the entry
+    The entry holds the leaves it was built from, so a tracer's identity (what
+    the digest reads of it) cannot be reused by another while the entry
     lives. A tree holding a tracer (a call under an outer ``jit``, ``grad`` or
     ``vmap``), or put on the device inside one, is returned, never kept: a tracer
     outlives its trace.
@@ -180,7 +180,7 @@ class DeviceTree:
 
 
 def tree_digest(tree) -> bytes:
-    """A digest of a tree's structure and values: JAX arrays by identity, host values by their bytes."""
+    """A digest of a tree's structure and values: every numeric leaf by its dtype, shape and bytes (a JAX array's too), a tracer by its identity."""
     digest = hashlib.blake2b(digest_size=16)
     for path, leaf in flatten_any(tree):
         digest.update(repr(path).encode())
@@ -203,6 +203,9 @@ def canonical_leaf(leaf, reference):
         return leaf
     if reference is None or isinstance(reference, bool):
         return leaf if is_jax_value(leaf) else np.asarray(leaf)
+    reference = (
+        np.asarray(reference) if isinstance(reference, (list, tuple)) else reference
+    )
     dtype = np.result_type(reference)
     shape = np.shape(reference)
 
@@ -262,6 +265,8 @@ def leaf_bytes(leaf) -> bytes:
         leaf = np.asarray(leaf)
     if leaf is None or isinstance(leaf, (bool, str)):
         return repr(leaf).encode()
+    if isinstance(leaf, (list, tuple)) and np.asarray(leaf).dtype.kind in "biufc":
+        leaf = np.asarray(leaf)
     if isinstance(leaf, (int, float, complex, np.ndarray, np.generic)):
         array = np.asarray(leaf)
         return f"{array.dtype}{array.shape}".encode() + array.tobytes()

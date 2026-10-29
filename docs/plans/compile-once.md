@@ -78,7 +78,10 @@ compiled object.
 ### 3.2 The reuse (`core/compile/cache.py`)
 
 - `compiled_of(system, backend, *, flatten=False)`: a module-level LRU (16 entries) of JAX
-  evaluators keyed by the structural fingerprint (C5); NumPy calls `compile`. Block identities
+  evaluators keyed by each block's identity and edit count (`System.edits`, bumped by every
+  attribute assignment that is not a value), its ports, the wiring, the numbers it holds by
+  their bytes, a held model and a plain-data helper by value, and the x64 flag (the night run,
+  N-2, which replaced the attribute fingerprint of C5); NumPy calls `compile`. Block identities
   in the key are safe because the cached evaluator keeps its blocks alive, so an `id()` cannot
   be reused while its entry exists; a loop rebuilt over the same blocks (`problem.compile`, an
   inline `ctl @ plant` held across calls) hits. `clear_compiled()` empties it, for a script that
@@ -203,7 +206,7 @@ baseline).
 | A repeated `jax.grad` or `vmap` through a compiled method met a dead tracer from the device cache | a tree holding a tracer is prepared and never kept (`DeviceTree`) |
 | A freed JAX leaf's identity reused by a new array returned the old values | the kept entry holds its leaves, so their identities stay theirs |
 | `2.5` given for an integer default was truncated to `2` | a value its default's dtype cannot hold promotes (one more trace) |
-| A model a block holds (a computed-torque law's plant) kept its old numbers | a system attribute is keyed by its fingerprint and its parameters' digest |
+| A model a block holds (a computed-torque law's plant) kept its old numbers | a held system is keyed by its identity, its edit count and its parameters' digest (N-2) |
 | A parameter edit crashed a diagram holding a sink | the compiled tree names every block |
 | Two blocks naming each other made the fingerprint recurse forever; a large attribute was copied into the key | a block seen again ends the walk; above 512 bytes an attribute is keyed by its digest |
 | The first solve traced the objective again inside its timer (the gates' trajopt rows) | the program's defaults are canonical from construction |

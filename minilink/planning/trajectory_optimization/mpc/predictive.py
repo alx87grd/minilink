@@ -552,7 +552,8 @@ def report_solve(block, t, status, started):
     The planner's own account follows, any other number its status carries
     (MPPI: ``S_min``, ``S_weighted``, ``effective_samples`` of ``K``, ``exit_rate``).
     """
-    if not block.verbose or not is_concrete(status["success"]):
+    values = [t, *(value for value in status.values() if value is not None)]
+    if not block.verbose or not all(is_concrete(value) for value in values):
         return
     elapsed = time.perf_counter() - started
     cost = status["cost"]

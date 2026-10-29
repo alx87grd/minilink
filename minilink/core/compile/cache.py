@@ -21,6 +21,7 @@ NOT_STRUCTURE = frozenset(
         "params",
         "params_override",
         "x0",
+        "own_x0",
         "hold_x0",
         "traj",
         "state",

@@ -211,6 +211,10 @@ class CompiledMPPIPlanner:
         self.m = int(self.u_lower.size)
         self.n_z = self.N * self.m + 1
 
+        # The tree the face is compiled with: a later edit of the problem is not the
+        # face's (compile again to take it)
+        self.defaults = copy.deepcopy(planner.params)
+
         # The step and its cost: the problem sampled at dt, the one owner of the exit
         # rule, the price and the terminal cost
         self.env = RolloutEnvironment(
@@ -224,8 +228,8 @@ class CompiledMPPIPlanner:
 
     @property
     def params(self) -> dict:
-        """The compiled defaults: the planner's tree."""
-        return self.planner.params
+        """The compiled defaults: the planner's tree at compile."""
+        return self.defaults
 
     def initial(self, params=None):
         """The default plan in ``z`` form: the action port's nominal input held over the horizon, at ``params["t_start"]``."""
@@ -369,12 +373,16 @@ class CompiledMPPIPlanner:
         """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated."""
         xp = array_module(z, t)
 
+        dt = self.dt
+        N = self.N
+
         U = self.sequence(z)
         origin = z[-1]
 
-        # u_new_j = U[⌊(t + j dt − origin) / dt⌋], clamped to the plan's last input
-        j = xp.floor((t - origin) / self.dt + 1e-9) + xp.arange(self.N)
-        U_new = U[xp.clip(j, 0, self.N - 1).astype(int)]
+        # u_new_j = U[⌊(t + j dt − origin) / dt⌋], clamped to the plan's last input; the
+        # 10⁻⁹ puts a time on a knot inside that knot's period
+        j = xp.floor((t - origin) / dt + 1e-9) + xp.arange(N)
+        U_new = U[xp.clip(j, 0, N - 1).astype(int)]
 
         return xp.concatenate(
             [xp.reshape(U_new, (-1,)), xp.reshape(xp.asarray(t, dtype=float), (1,))]
@@ -384,12 +392,16 @@ class CompiledMPPIPlanner:
         """The input the plan holds at ``t`` (an open-loop plan ignores ``x``)."""
         xp = array_module(z, t)
 
+        dt = self.dt
+        N = self.N
+
         U = self.sequence(z)
         origin = z[-1]
 
-        # u(t) = U[⌊(t − origin) / dt⌋], held, clamped to the plan's ends
-        j = xp.floor((t - origin) / self.dt + 1e-9)
-        u = U[xp.clip(j, 0, self.N - 1).astype(int)]
+        # u(t) = U[⌊(t − origin) / dt⌋], held, clamped to the plan's ends; the 10⁻⁹
+        # puts a time on a knot inside that knot's period
+        j = xp.floor((t - origin) / dt + 1e-9)
+        u = U[xp.clip(j, 0, N - 1).astype(int)]
 
         return u
 
@@ -416,11 +428,13 @@ class CompiledMPPIPlanner:
     def planned_trajectory(self, z, params=None) -> Trajectory:
         """The plan as a trajectory: ``U`` held from its origin, its states rolled out on the nominal plant from ``params["x_start"]``."""
         P = self.merged(params)
+        dt = self.dt
+        N = self.N
         U = np.asarray(self.sequence(np.asarray(z)), dtype=float)
         t0 = float(z[-1])
 
         xs = np.asarray(self.nominal_fn(P, self.jnp.asarray(U)), dtype=float)
-        t = t0 + self.dt * np.arange(self.N + 1)
+        t = t0 + dt * np.arange(N + 1)
         u = np.concatenate([U, U[-1:]], axis=0)
 
         return Trajectory(t=t, x=xs.T, u=u.T)
@@ -428,11 +442,13 @@ class CompiledMPPIPlanner:
     def pack(self, guess, params=None):
         """A guess in ``z`` form: a trajectory or a solution's input read at the knots."""
         P = self.merged(params)
+        offsets = self.offsets
+        m = self.m
         trajectory = getattr(guess, "trajectory", guess)
         t0 = float(P["t_start"])
-        knots = t0 + self.offsets
+        knots = t0 + offsets
 
-        u = np.asarray(trajectory.u, dtype=float)[: self.m]
+        u = np.asarray(trajectory.u, dtype=float)[:m]
         U = np.stack([np.interp(knots, trajectory.t, row) for row in u], axis=1)
         U = np.clip(U, self.u_lower, self.u_upper)
 

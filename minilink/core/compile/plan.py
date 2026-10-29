@@ -672,7 +672,7 @@ def require_tick_laws_on_their_box_clock(diagram, base, prefix=()):
     """
     Refuse a bare tick law in a nested box whose own clock is slower than the loop's base.
 
-    A bare tick law ticks on the base clock of the loop it runs in (R158): in a
+    A bare tick law ticks on the base clock of the loop it runs in: in a
     box clocked at ``Δ_box`` nested in a loop of finer base ``Δ``, it would tick
     ``Δ_box / Δ`` times faster than in its box alone. It takes its own clock
     instead (``law % Δ_box``).

@@ -473,3 +473,39 @@ def test_a_certificate_verifies_twice_on_one_compile():
     roa = region_of_attraction(plant)
     roa.verify(n=20)
     assert compiles(lambda: roa.verify(n=20).converged)[0] == 0
+
+
+def test_an_edit_of_the_programs_numbers_reaches_the_frozen_form():
+    from minilink.optimization import MathematicalProgram
+    from minilink.optimization.evaluators.compiler import compile_program_evaluator
+
+    program = MathematicalProgram(
+        n_z=2,
+        J=lambda z, p: (z[0] - p["a"]) ** 2 + (z[1] - p["b"]) ** 2,
+        params={"a": np.array(1.0), "b": np.array(2.0)},
+    )
+    evaluator = compile_program_evaluator(program, "jax")
+    z = np.zeros(2)
+    evaluator.bind(None)
+    assert float(evaluator.J(z)) == 5.0
+    program.params["a"] = np.array(5.0)
+    evaluator.bind(None)
+    assert float(evaluator.J(z)) == 29.0
+
+
+def test_a_list_leaf_runs_on_jax_like_an_array():
+    class Decay(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=0, output_dim=1)
+            self.params = {"k": [1.0]}
+            self.x0 = np.array([1.0])
+
+        def f(self, x, u, t=0.0, params=None):
+            params = self.params if params is None else params
+            k = params["k"]
+            dx = -k[0] * x
+            return dx
+
+    on_jax = Decay().compute_trajectory(tf=1.0, dt=0.1, backend="jax").x[0, -1]
+    on_numpy = Decay().compute_trajectory(tf=1.0, dt=0.1, backend="numpy").x[0, -1]
+    np.testing.assert_allclose(on_jax, on_numpy, rtol=1e-12)

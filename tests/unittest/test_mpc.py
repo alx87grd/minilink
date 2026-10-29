@@ -701,6 +701,13 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
     g = jax.grad(J_of)(params["x_start"])
     assert np.isfinite(J) and np.all(np.isfinite(g))
 
+    # A verbose block prints on the host only: the traced run stays silent and traceable
+    talkative = ModelPredictiveController(planner, delay=False, verbose=True)
+    pe_v = problem.compile(talkative % DT, backend="jax")
+    with contextlib.redirect_stdout(io.StringIO()) as out:
+        J_v = pe_v.evaluate(pe_v.params).objective
+    assert np.isclose(float(J_v), float(J)) and out.getvalue() == ""
+
 
 @pytest.mark.jax
 class TestThePureMPCAndTheFollower(unittest.TestCase):
@@ -765,6 +772,12 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         assert pv.params["t_start"] == 0.0 and pv.initial()[-1] == 0.0
         z, _ = pv.solve()
         assert z[-1] == 0.0
+
+        # A partial tree merges onto the compiled one, not onto the edited problem
+        partial = {"x_start": np.array([0.3])}
+        z_partial, _ = pv.solve(partial)
+        assert z_partial[-1] == 0.0 and pv.initial(partial)[-1] == 0.0
+        assert pv.solution(z_partial, partial).trajectory.t[0] == 0.0
 
     def test_the_numpy_program_is_rebuilt_each_tick(self):
         planner = integrator_planner(backend="numpy")

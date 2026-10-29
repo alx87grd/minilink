@@ -52,10 +52,10 @@ few screens implementing the compiled planner face the MPC block reads
 - **JAX first, the ladder later.** The prototype is JAX-only (one `jit(vmap(scan))` per
   tick). The three-backend ladder of `dp.py` (`loop` / `numpy` / `jax`) is the teaching
   form and comes with the teaching-surface decision, not before.
-- **No planner probing in the MPC block.** Today the block reads trajopt internals
-  (`planner.transcription`, `last_optimization_result.z`, `compile_parametric_program`). Under
-  R148 it reads only the compiled face (`n_z`, `initial`, `shift`, `solve`, `policy`), which
-  MPPI implements (§6).
+- **No planner probing in the MPC block.** The block reads the compiled face (`n_z`,
+  `initial`, `shift`, `solve`, `command`, R148), which MPPI implements (§6); the one probe left,
+  the delay compensation's `pinned_shift` and `predicted_start` reading inside a collocation
+  `z`, is the night run's review finding (QUESTIONS.md, the MPC's questions).
 
 ## 1. The code as it stands
 
@@ -92,13 +92,10 @@ also samples and weighs on device wants. Measured
 2026-09: 1000 rollouts × 1000 RK4 steps in 27 ms (ROADMAP §3); an MPPI tick is
 `K = 1024` × `N = 40`.
 
-**The stochastic problem and the episode semantics.** Today `StochasticPlanningProblem`
-(`minilink/planning/problems.py`; R143 removes the class, a problem being stochastic by its
-parts) owns `sample_x0(key)`, `sample_params(key)` (one
-`{name: value}` override of `sys.params`, dotted names into a diagram) and
-`sample_disturbances(key)` (one `{port: value}` draw held on the port), plus the
-`criterion` (`"expectation"` / `"worst_case"`). `RolloutEnvironment`
-(`minilink/learning/reinforcement_learning/environment.py`) is "a planning problem
+**The stochastic problem and the episode semantics.** A `PlanningProblem` is stochastic by its
+parts (R143, landed): `sample_x0(key)`, `sample_params(key)` (the laws in its tree drawn),
+its disturbance sources, and the `criterion` (`"expectation"` / `"worst_case"`).
+`RolloutEnvironment` (`minilink/planning/environment.py`, R108) is "a planning problem
 seen by a learner": `step(x, t, u, key, params)` integrates one control period with the
 input held (`ev.step` with `params`), scores it `-g dt`, charges `infeasible_cost` when the
 state leaves `X`, charges `h` at a finite horizon, and fills the disturbance ports from
@@ -151,10 +148,9 @@ time-correlated noise, is the second option; it is what the car demo needs befor
 teaching figure.
 
 **The MPC exemplar.** `examples/demos/mpc/mpc_car_minimal.py` is the whole user story:
-a `PlanningProblem` with a quadratic cost, a planner, `ModelPredictiveController(planner,
-dt_mpc=)`, `mpc @ sys`, `compute_trajectory`, `animate` with `mpc_animation_overlays`
-(today; under R148 the period comes from `%`, `(mpc % 0.05) @ sys`). MPPI should read the same
-with one line changed.
+a `PlanningProblem` with a quadratic cost, a planner, `ModelPredictiveController(planner)`,
+`(mpc % 0.05) @ sys`, `compute_trajectory`, `animate` with `mpc_animation_overlays`. MPPI reads
+the same with one line changed (`mppi_pendulum.py`, `mppi_racecar.py`).
 
 ## 2. The core math (what the planner body shows)
 
@@ -235,9 +231,9 @@ MPPIPlanner(
   evidence, as every planner), and the evaluation when asked. `guess` is a `Trajectory` or a
   `PlanningSolution`; default the nominal input of the ports.
 - **`planner.compile()`**, the pure face the MPC block reads (§6).
-- **`accepts_stochastic = True`**: a stochastic problem's draws are used (§4); a
-  deterministic problem is the textbook algorithm. A deterministic planner's warning
-  is not raised.
+- **`accepts_stochastic = False`** for now (N-15): a stochastic problem gets the deterministic
+  planner's warning and the nominal plan; the stochastic branch (§4, MP-3) flips the flag when
+  it lands.
 - **The picture.** The fan of sampled futures is the MPPI figure, so the record keeps
   the `n_shown` heaviest sampled rollouts of the tick with their weights (a bounded
   array, not the `K` paths), and `solution.plot_samples(signal=)` draws them shaded by
@@ -302,9 +298,9 @@ Later idea in TODO; the minimax consumer would be exactly this planner's
 trajectory-family planner (its output is a schedule, its policy an open-loop source),
 so it shelves with the transcription planner it is the gradient-free sibling of; the
 package name says what the verb does, not how (RULES 2.1). It is not an NLP, so it
-imports nothing from `optimization/`. Exports: `MPPIPlanner` and
-`MPPIRecord` on the `minilink.planning` facade once provisional (an [ask]:
-public names).
+imports nothing from `optimization/`. Exports: `MPPIPlanner` and `MPPIRecord` on the
+`minilink.planning` facade (N-14; which lane that facade is for them is a question in
+QUESTIONS.md until the teaching decision, MP-6).
 
 **Name (ruled 2026-10-25, R106):** `MPPIPlanner` and `MPPIRecord`, by the `LQRPlanner`
 precedent: the name students search for; the docstring's first line carries the long form,
