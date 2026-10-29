@@ -652,7 +652,7 @@ def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradien
     from minilink.control import ModelPredictiveController
 
     problem, planner = native_mpc_problem()
-    mpc = ModelPredictiveController(planner)
+    mpc = ModelPredictiveController(planner, delay=True)
     pe = problem.compile(mpc % 0.1, backend="jax")
     params = pe.params
 
@@ -672,12 +672,13 @@ def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradien
 
     # The gradient in the controller's effort weight R, against a central difference
     def J_of_R(r):
-        cost = {**params["controller"]["cost"], "R": r}
+        solve = params["controller"]["solve"]
+        solve = {**solve, "cost": {**solve["cost"], "R": r}}
         return objective(
-            {**params, "controller": {**params["controller"], "cost": cost}}
+            {**params, "controller": {**params["controller"], "solve": solve}}
         )
 
-    R = params["controller"]["cost"]["R"]
+    R = params["controller"]["solve"]["cost"]["R"]
     g = jax.grad(J_of_R)(R)
     eps = 1e-5
     central = (J_of_R(R + eps) - J_of_R(R - eps)) / (2 * eps)
@@ -690,11 +691,16 @@ def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradien
 @pytest.mark.optional
 @pytest.mark.jax
 def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late():
+    from minilink.blocks.step import UnitDelay
     from minilink.control import ModelPredictiveController, PlanFollower
 
     problem, planner = native_mpc_problem()
     mpc = ModelPredictiveController(planner)
-    computer = (mpc % 0.05) >> (PlanFollower(planner) % 0.01)
+    late = UnitDelay(dim=mpc.pv.n_z).rename_ports(
+        u="z"
+    )  # the plan one slow period late
+    late.x0 = mpc.pv.initial()
+    computer = (mpc % 0.05) >> (late % 0.05) >> (PlanFollower(planner) % 0.01)
     pe = problem.compile(computer, backend="jax")
     u = np.asarray(pe.trajectory().get_signal("plant:u"))[0]
 
@@ -767,7 +773,8 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
             iterations=40,
             optimizer_options={"learning_rate": 0.2},
         )
-        pe = problem.compile(ModelPredictiveController(planner) % 0.1, backend="jax")
+        mpc = ModelPredictiveController(planner, delay=True)
+        pe = problem.compile(mpc % 0.1, backend="jax")
         return float(pe.evaluate(pe.params).objective)
 
     # Three periods ahead the pendulum falls; ended by the LQR value it is held up

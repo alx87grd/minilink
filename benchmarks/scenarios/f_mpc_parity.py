@@ -17,6 +17,7 @@ from benchmarks.scenarios.common import (
 )
 from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
+from minilink.blocks.step import UnitDelay
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
@@ -121,7 +122,7 @@ def run_hybrid_zoh() -> list[MetricRecord]:
     """``(mpc % dt) @ plant``: the delayed MPC on its clock, its command held."""
     _require_jax()
     planner, sys, x0 = _bicycle_planner()
-    mpc = ModelPredictiveController(planner)
+    mpc = ModelPredictiveController(planner, delay=True)
     solves = TimedSolves(mpc.pv)
     loop = (mpc % MPC_DT) @ sys
 
@@ -192,7 +193,13 @@ def run_dual_rate() -> list[MetricRecord]:
     planner, sys, x0 = _bicycle_planner()
     mpc = ModelPredictiveController(planner)
     solves = TimedSolves(mpc.pv)
-    computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
+    late = UnitDelay(dim=mpc.pv.n_z).rename_ports(
+        u="z"
+    )  # the plan one slow period late
+    late.x0 = mpc.pv.initial()
+    computer = (
+        (mpc % MPC_DT) >> (late % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
+    )
     loop = computer @ sys
 
     t0 = time.perf_counter()

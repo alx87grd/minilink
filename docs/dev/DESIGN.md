@@ -204,7 +204,7 @@ points, never adaptive). `discretize(sys, Δ, solver=, substeps=)` is the textbo
 discrete-time model (kind `"model"`) for the discrete tools (the step face, value iteration,
 the RL environment, z-domain analysis), never needed to close a loop: a loop built on one is a
 loop of step systems, which has only its ticks. On a step diagram (a box
-of tick laws and static blocks, the zero-delay MPC among them) `box % dt` clocks each block with
+of tick laws and static blocks, the MPC box among them) `box % dt` clocks each block with
 its own face kept, a static block reading seconds and a tick law its count, and returns a
 `SampledDiagramSystem` of the same wiring and kind (`diagram_on_clock`); a box holding a clocked
 block is clocked once, block by block. The operators `>>`, `+`
@@ -324,35 +324,41 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   static figure. Each face reads its plan as a trajectory (`planned_trajectory`), and the MPC's
   verbose line appends a planner's own account (MPPI's `S_min`, `effective_samples` of `K`).
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
-  delay=True, warm_start=True, lookahead=0.0, verbose=False)` closes a planner's compiled face `pv = planner.compile()` on the
-  loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native
-  `SampledSystem` (`core.discrete.sampled_system.NativeSampledSystem`: no source, its seconds
-  face `update` and its port functions written in seconds, `%` setting the period on a copy)
-  whose state is the plan `z` (`n = pv.n_z`, `x0 = pv.initial()`): at tick `k` it applies the
-  plan solved at the previous tick, `u_k = pv.command(z_k, x̂_k, t_k)`, and solves the next,
-  `z_{k+1} = pv.solve(P_k, z0=pv.shift(z_k, t_k))`, keeping `z_k` on a failed solve: one
-  period of computation delay and no algebraic loop. `P_k` is the planner's tree (the block's
-  `params`, so `controller.cost.Q` tunes the plan) with each leaf named in `inputs` read from
-  its port (default `{"x_start": "y"}`) and `t_start` the tick's time; `lookahead=Δ` starts the
-  plan at `t_k + Δ` from the measured start predicted that far under the stored plan (the
-  planner's model, its commands linear between knots). `verbose=True` prints one line per solve on a host run (the tick's
-  time, success, iterations, cost, wall time). The zero-delay form (`delay=False`) is a small
-  sampled diagram of pure blocks, the textbook MPC's optimizer and memory: `PlanSolver`
-  (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0=warm)`, `warm` the last plan shifted one
-  period with its first state knot at the measurement, the default guess while there is no
-  plan yet), `PlanCommand` (`z*_k → u_k = pv.command(z*_k, t_k)`) and `PlanMemory` (a
-  `UnitDelay` holding the last plan); the command applies the plan solved at its own tick,
-  and the loop computes each signal once per tick, so a tick solves once with no cache (the
-  old MPC's numbers, the demos' form). With `warm_start=False` it is the pure form, a static
-  law, a cold solve per tick, refused without a clock. Ports out: `u`, `z`, and on the
-  delayed form `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
+  delay=False, warm_start=True, backend=None, verbose=False)` closes a planner's compiled face
+  `pv = planner.compile()` on the loop, one solve per tick, `(mpc % dt) @ plant` (R176). Every
+  MPC is one architecture, a box of pure blocks (`PredictiveController`, a
+  `SampledDiagramSystem`; `mpc % dt` clocks its blocks): `PlanSolver` under the id `solve`
+  (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0)`), `PlanCommand` under `command`
+  (`z → u_k = pv.command(z, t_k)`, and `x_ref`, `u_ref` from `pv.prediction` when the plan
+  carries states) and `PlanMemory` under `memory` (a `UnitDelay` holding the last plan, from
+  the default guess); the loop computes each signal once per tick, so a tick solves once. The
+  two switches are independent: `warm_start=True` starts each solve from the last plan shifted
+  to the tick, its first state knot at the measurement (`pv.shift(z_prev, t_k, x_start=x̂_k)`,
+  the default guess at `P_k` while there is no plan yet), `False` from the default guess at
+  every tick; `delay=True` adds a visible `UnitDelay` under `delay` between the solve and the
+  command, so tick `k` applies the plan solved at `k − 1` (one period of computation delay, as
+  on a real computer), `False` applies it at once (the textbook MPC). A failed solve (a
+  non-finite cost or plan) keeps the last plan. `P_k` is the planner's tree (the solve block's
+  `params`: the one tuning path is `controller.solve.cost.R`,
+  `pe.params["controller"]["solve"]["cost"]["R"]`) with each leaf named in `inputs` read from
+  its port (default `{"x_start": "y"}`) and `t_start` the tick's time. Delay compensation is
+  the user's predictor block on the port that binds `x_start`, on the face verb
+  `pv.predict_start(x, u, t, Δ, params)` (the planner's model, the command held). The face's
+  default guess `pv.initial(params)` traces: under a trace it follows the traced `x_start`
+  and `t_start` (the guess is affine in its start), so a traced loop's first plan equals the
+  host's. `verbose=True` prints one line per solve on a host run (the tick's time, success,
+  iterations, cost, wall time). Ports out: `u`, `z` (the plan solved at this tick) and
+  `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
   plan, `u = pv.command(z, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
-  fast)`, the plan one slow period late (at the slow tick itself with `delay=False`). A native fixed-iteration planner (single shooting,
+  fast)`, the plan read at the slow tick itself; the one-period-late plan is the user's
+  `UnitDelay(dim=n_z)` between them. A native fixed-iteration planner (single shooting,
   `method="adam"`, `iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is
   one scan on JAX, `vmap`s over starts and differentiates in the plan's weights. Post-run
   horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`
   (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
-  from the loop's state).
+  from the memory's state). A sampled-data law written in seconds whose equation needs its
+  period is a `NativeSampledSystem(n, sample_period=Δ)`: its period set at construction, `%`
+  on it refused.
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
   (`StateObserver`; later filters keep the ports, their state may be larger than the
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`
@@ -1245,8 +1251,8 @@ controller's kind decides the loop (R105): a continuous law runs the continuous 
 grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
 refused (D15), `solver` and `substeps` its plant's integration per base period (`None`, the
-automatic step; a continuous loop's `substeps` is 1 by default); a tick law with no clock and
-the stateless MPC are refused, naming the clock.
+automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
+them) with no clock is refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
 plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
 the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal

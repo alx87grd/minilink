@@ -12,6 +12,7 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.planning.trajectory_optimization.compiled import require_state_knots
 
 ###############################################################################
 # Public API
@@ -45,17 +46,16 @@ def mpc_animation_overlays(
     rollout : Trajectory
         A run of the loop ``mpc % dt @ plant`` (``compute_rollout``, or the
         evaluator's ``trajectory``), the MPC block's ``z`` among its signals.
-    mpc : DelayedPredictiveController
-        The MPC block (its compiled face reads the plans).
+    mpc : PredictiveController
+        The MPC box (its compiled face reads the plans).
     loop : SampledDiagramSystem, optional
         The loop the run is of, for a run that records its state only
         (``loop.compute_trajectory``): the plan and the plant's path are read
         from their state slices.
     block : str, optional
-        The MPC block's path in the loop (``"controller"`` for ``mpc % dt @ plant``,
-        ``"controller/DelayedPredictiveController"`` inside a dual-rate computer);
-        default: the block of ``loop`` that holds ``mpc``'s face, else the run's one
-        plan signal.
+        The path of the block holding the plan in the loop
+        (``"controller/memory"`` for ``mpc % dt @ plant``); default: the block
+        of ``loop`` that holds ``mpc``'s face, else the run's one plan signal.
     scene : Scene, optional
         Collision scene drawn via :meth:`~minilink.planning.spatial.scene.Scene.as_visualizer`.
     track : Track, optional
@@ -160,7 +160,7 @@ def mpc_plans_from_rollout(
 
     require_state_knots(pv)
     z_history = plan_history_of(rollout, mpc, loop, block)
-    guess = np.asarray(mpc.x0, dtype=float)
+    guess = np.asarray(pv.initial(), dtype=float)
 
     plans: list[tuple[float, Trajectory]] = []
     for col in range(z_history.shape[1]):
@@ -346,7 +346,7 @@ def tick_solves_of(rollout, mpc, loop):
 
 
 def solving_block_of(loop, pv):
-    """``(path, block)`` of the block of ``loop`` that solves on ``pv``: the delayed MPC, the zero-delay MPC's solve, the pure MPC."""
+    """``(path, block)`` of the block of ``loop`` that solves on ``pv``: the MPC's solve."""
     found = []
     for path, sys in blocks_of(loop):
         own = getattr(sys, "source", None) or sys
@@ -441,19 +441,10 @@ def blocks_of(diagram, prefix=()):
 
 
 def holds_plan_of(block, pv) -> bool:
-    """Whether ``block`` (or the block a clocked view wraps) is the one whose state is the plan of ``pv``: the delayed MPC, or the zero-delay MPC's memory."""
+    """Whether ``block`` (or the block a clocked view wraps) is the one whose state is the plan of ``pv``: the MPC's memory."""
     own = getattr(block, "source", None) or block
 
     return getattr(own, "pv", None) is pv and int(block.n) == pv.n_z
-
-
-def require_state_knots(pv):
-    """Refuse a plan without state knots: single shooting rolls its states out."""
-    if pv.n_z - 1 != (pv.n + pv.m) * pv.offsets.size:
-        raise NotImplementedError(
-            "the plan carries no state knots (single shooting): read "
-            "pv.solution(z).trajectory for its planned states"
-        )
 
 
 def require_one_block(found):

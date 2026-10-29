@@ -261,6 +261,41 @@ they differ:
   (ticks only). They are the maintainer's scratch (AGENTS.md: never without an ask).
   **To raise:** move them to `@ plant` with `dt=`?
 
+- **C-32 (step 7) One box, `PredictiveController`.** `ModelPredictiveController(planner, *,
+  inputs=, delay=False, warm_start=True, backend=, verbose=)` always builds the box `solve`,
+  `command`, `memory`, plus `delay` (a `UnitDelay` of `n_z` from the default guess, between
+  the solve and the command) when `delay=True`. `lookahead`, `DelayedPredictiveController`,
+  `PurePredictiveController`, `WarmStartedPredictiveController`, `predicted_tree`,
+  `predicted_start`, `pinned_shift` and the evaluator's stateless-MPC refusal are gone (the
+  box with no clock is a tick diagram, refused by name). Every caller of the old default
+  names `delay=True`: the two compile demos, `docs/make_assets.py`, `v03_baseline`,
+  `v03_budget`, `compile_once`, `f_mpc_parity`'s zero-order hold, `test_v03_core`'s script 5.
+- **C-33 (step 7) The `z` port is the plan solved at this tick**, in both forms (the old
+  delayed form's `z` was its stored, one-period-old plan). A dual-rate computer that wants the
+  plan one slow period late writes the unit delay itself:
+  `(mpc % slow) >> (UnitDelay(dim=n_z).rename_ports(u="z") % slow) >> (PlanFollower(planner) %
+  fast)` (`f_mpc_parity`'s dual rate and script 5's dual-rate test now do; the rename makes
+  `>>` take the plan, not the command). **To raise:** a `PlanDelay(planner)` block would read
+  better than the rename.
+- **C-34 (step 7) The delayed form's warm start is the box's.** The old delayed law warmed its
+  solve with the plain shift of the stored plan, and its tick 0 from the shift of the default
+  guess; the box pins the first state knot at the measurement (`pv.shift(z, t, x_start=)`)
+  and starts tick 0 from the default guess at the measured start. The plan expected this
+  ("the delayed-form demos move once"): `mpc.integrator.x` of the v0.3 baseline moved 4e-7
+  relative (re-pinned), the two compile demos and the delayed regression entries moved (§3).
+- **C-35 (step 7) `x_ref` and `u_ref` on every form**, from the applied plan
+  (`PlanCommand`, when the plan carries states); before, on the delayed form only.
+- **C-36 (step 7) The traced default guess** (the review's D-4): `pv.initial(params)` under a
+  trace is `z(x̄) + M (x̂ − x̄)` with the traced `t_start`, `M` the guess's derivative in the
+  start read once on the host by unit steps (exact: both default guesses, the straight line
+  and the cubic, are affine in their start); the tree's other numbers are the compiled
+  defaults. MPPI's `initial` concatenates a traced `t_start`. The test: a jitted `initial`
+  equals the host's at a moved start.
+- **C-37 (step 7) The tuning path** is `controller.solve.cost.R`: `native_mpc_tuning`'s
+  `wrt` and script 5's gradient read it there.
+- **C-38 (step 7) `NativeSampledSystem(n, sample_period=)`**: the period is required at
+  construction and `%` on it is refused (rule 1; C-27).
+
 ## 3. Ledger of intended number changes
 
 | Row | What moved | Why |
@@ -270,6 +305,8 @@ they differ:
 | Step 5, RRT's goal bias | an RRT problem with an `Xf` region and no `x_goal` draws its goal bias now (none of the demos: each had an `x_goal` at the region's centre) | C-17 |
 | Step 6, the loop's automatic step | a sampled loop on a plant that declares no time constant, run with no `dt`: before one RK4 step per period, now `⌈Δ / 0.1 ms⌉` (the showcase notebook's `(ctl % 0.1) @ plant`); every demo, project and baseline loop that named its step keeps its numbers (C-26) | R174, one rule |
 | Step 6, the judge on an undeclared plant | `problem.compile(law % dt)` and the planners' `evaluate` (value iteration, RL, MPPI evidence) on a plant that declares no time constant: the plant at the automatic step, not one RK4 step a period (script 6: 7e-5 relative) | C-30 |
+| Step 5, the default guess on a tracking cost | the MPC parity gates (`f.hybrid_zoh`, `f.hand_loop`, `f.dual_rate`: up to 0.36 in the bicycle's states) and `e4.bicycle_parametric` (0.12): the bicycle problems have no `Xf` and a cost target `x_ref`, so the first guess now aims at it (C-19); found by the step 6 regression run, re-pinned after step 7 | C-19 |
+| Step 7, the delayed MPC on the box | `mpc.integrator.x` (4e-7 relative, re-pinned), `f.hybrid_zoh` (the delayed zero-order hold), `native_mpc_tuning` and `terminal_field_mpc` | C-34 |
 | Step 4, value iteration's `alpha` | no baseline entry moves (the baseline's value iteration runs Euler, where the two discounts agree); under RK4 the backed-up `J` is the consistent one (the new test) | R173 |
 
 ## 4. Textbook check
@@ -303,3 +340,4 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 | 3 | `5bbf5058` | one tree per planner (R170) |
 | 4 | `0a79f9de` | the one score's edges (R171–R173) |
 | 5 | `fcd1da56` | the problem's boundary dials (R177) |
+| 6 | `52be6eb2` | the loop's grammar (R174, R175) |

@@ -224,13 +224,13 @@ def test_the_problem_refuses_the_pure_mpc_naming_its_clock():
         plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), tf=1.0
     )
     planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
-    mpc = ModelPredictiveController(planner, delay=False, warm_start=False)
-    with pytest.raises(TypeError, match="mpc % dt"):
+    mpc = ModelPredictiveController(planner, warm_start=False)
+    with pytest.raises(TypeError, match="% dt"):
         problem.compile(mpc, dt=0.1)
 
-    # The delayed form with no clock is a tick law with no clock: refused alike
+    # The delayed form with no clock is a tick diagram with no clock: refused alike
     with pytest.raises(TypeError, match="% dt"):
-        problem.compile(ModelPredictiveController(planner), dt=0.1)
+        problem.compile(ModelPredictiveController(planner, delay=True), dt=0.1)
 
 
 def test_a_tick_law_with_no_clock_is_refused_by_the_problem():
@@ -481,12 +481,12 @@ def test_a_bare_tick_law_is_refused_where_a_nested_box_would_speed_it_up():
         loop.compile()
 
 
-def test_the_zero_delay_mpc_has_no_clock_operator_of_its_own():
+def test_the_mpc_box_has_no_clock_operator_of_its_own():
     from minilink.planning.trajectory_optimization.mpc.predictive import (
-        WarmStartedPredictiveController,
+        PredictiveController,
     )
 
-    assert "__mod__" not in vars(WarmStartedPredictiveController)
+    assert "__mod__" not in vars(PredictiveController)
 
 
 def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
@@ -536,8 +536,13 @@ def test_a_recorded_run_of_no_period_is_refused():
         loop.compute_trajectory(tf=0.0)
 
 
-def test_discretize_refuses_a_sampled_law_with_no_period():
+def test_a_sampled_data_law_takes_its_period_at_construction():
     from minilink.core.discrete.sampled_system import NativeSampledSystem
 
-    with pytest.raises(TypeError, match="no period yet"):
-        discretize(NativeSampledSystem(n=0), 0.1)
+    with pytest.raises(TypeError, match="at construction"):
+        NativeSampledSystem(n=0)
+    law = NativeSampledSystem(n=0, sample_period=0.1)
+    with pytest.raises(TypeError, match="never by %"):
+        law % 0.2
+    with pytest.raises(TypeError, match="already on a clock"):
+        discretize(law, 0.1)

@@ -242,10 +242,12 @@ class CompiledMPPIPlanner:
         """The default plan in ``z`` form: the action port's nominal input held over the horizon, at ``params["t_start"]``."""
         P = self.merged(params)
         u_nominal = nominal_action(self.problem, self.u_lower, self.u_upper)
+        xp = array_module(P["t_start"])
 
         U = np.tile(u_nominal, (self.N, 1))
+        t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
 
-        return np.concatenate([U.reshape(-1), [float(P["t_start"])]])
+        return xp.concatenate([xp.asarray(U.reshape(-1)), t_start])
 
     def solve(self, params=None, z0=None):
         """
@@ -376,8 +378,8 @@ class CompiledMPPIPlanner:
             "inputs": U,
         }
 
-    def shift(self, z, t):
-        """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated."""
+    def shift(self, z, t, x_start=None):
+        """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated (it carries no state to pin at ``x_start``)."""
         xp = array_module(z, t)
 
         dt = self.dt
@@ -394,6 +396,15 @@ class CompiledMPPIPlanner:
         return xp.concatenate(
             [xp.reshape(U_new, (-1,)), xp.reshape(xp.asarray(t, dtype=float), (1,))]
         )
+
+    def predict_start(self, x, u, t, delta, params=None):
+        """``x̂(t + Δ)``: the planner's model from ``x`` at ``t``, the command ``u`` held over ``delta`` (RK4, a quarter of ``dt`` apart)."""
+        # Lazy import: the trajectory-optimization face holds the one prediction
+        from minilink.planning.trajectory_optimization.compiled import (
+            model_prediction,
+        )
+
+        return model_prediction(self, x, u, t, delta, params)
 
     def command(self, z, x, t, params=None):
         """The input the plan holds at ``t`` (an open-loop plan ignores ``x``)."""

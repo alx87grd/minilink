@@ -379,7 +379,7 @@ def racecar_mpc() -> None:
         method="scipy_slsqp",
         optimizer_options={"maxiter": 60, "ftol": 1.0},
     )
-    mpc = ModelPredictiveController(planner)
+    mpc = ModelPredictiveController(planner, delay=True)
 
     car = UdeSRacecarDyn(named_ports=False)
     car.params["mu"] = PLANT_MU

@@ -750,7 +750,6 @@ def closed_loop_of(problem, controller):
     controller = policy_of(controller)
 
     require_continuous_or_clocked(controller)
-    require_no_stateless_mpc(controller)
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
     if is_loop and "plant" in controller.subsystems:
         require_plant_block(controller, plant)
@@ -956,21 +955,6 @@ def require_continuous_or_clocked(controller):
         raise TypeError(
             f"{getattr(controller, 'name', controller)!r} is a tick law with no clock: "
             "put it on one (controller % dt) and the loop runs on that clock"
-        )
-
-
-def require_no_stateless_mpc(controller):
-    """Refuse the pure MPC with no clock: closed as a continuous law, it would re-solve at every integrator stage."""
-    # Lazy import: the MPC loads with the first one evaluated
-    from minilink.planning.trajectory_optimization.mpc.predictive import (
-        PurePredictiveController,
-    )
-
-    if isinstance(controller, PurePredictiveController):
-        raise TypeError(
-            "an MPC solves once per period on its clock: the pure MPC closed as a "
-            "continuous law would re-solve at every integrator stage; put it on its "
-            "clock (mpc % dt)"
         )
 
 

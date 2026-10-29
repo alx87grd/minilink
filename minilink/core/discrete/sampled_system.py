@@ -324,19 +324,18 @@ class NativeSampledSystem(SampledSystem):
     any system does (``add_output_port(id, function=…)``, each function in
     seconds); the tick face is the base class's, ``step(x, u, k) =
     update(x, u, k h)``. Its ``params``, ``x0`` and solver hints are its own.
-    ``sample_period`` is ``None`` until ``law % dt`` sets it, on a copy: the
-    equations never read the period, only the tick face does.
+    Its equation needs its period, so ``sample_period`` is set at
+    construction, and ``law % dt`` is refused: it is already on its clock
+    (rule 1 of the loop's grammar).
     """
 
     def __init__(self, n=0, sample_period=None):
-        # No source: the clock alone, unset until law % dt
+        # No source: the clock alone, set at construction
         self.source = None
         self.solver = None
         self.substeps = 1
         self.kind = "law"
-        self.sample_period = (
-            None if sample_period is None else positive_period(sample_period)
-        )
+        self.sample_period = positive_period(require_period(sample_period))
 
         # The System shell: its own state, ports, parameters and hints
         System.__init__(self, n)
@@ -410,16 +409,12 @@ class NativeSampledSystem(SampledSystem):
         return y
 
     def __mod__(self, dt: float):
-        """This law on a clock of period ``dt``: a copy with the period set and its own numbers and start (the equations unchanged)."""
-        require_no_clock(self)
-
-        sampled = copy.copy(self)
-        sampled.params = copy.deepcopy(self.params)
-        sampled.x0 = np.array(self.x0, dtype=float)
-        sampled.sample_period = positive_period(dt)
-        sampled.name = f"{self.name} % {float(dt):g}"
-
-        return sampled
+        """Refuse: a sampled-data law takes its period at construction, it is already on its clock."""
+        raise TypeError(
+            f"{self.name} is a sampled-data law on its own clock of "
+            f"{self.sample_period:g} s: its period is set at construction "
+            "(sample_period=), never by %"
+        )
 
     # Display: the System shell's
 
@@ -507,11 +502,6 @@ def require_sampleable(source, solver, substeps) -> None:
     """Refuse a source that is not a system, a solver the clock does not have, or a bad substep count."""
     if not isinstance(source, System):
         raise TypeError(f"a clock applies to a System, got {type(source).__name__}")
-    if isinstance(source, SampledSystem) and source.sample_period is None:
-        raise TypeError(
-            f"{source.name} is a sampled law with no period yet; "
-            f"clock it with {source.name} % dt"
-        )
     if isinstance(source, SampledSystem):
         raise TypeError(
             f"{source.name} is already on a clock of {source.sample_period:g} s; "
@@ -574,10 +564,12 @@ def positive_period(sample_period: float) -> float:
     return sample_period
 
 
-def require_no_clock(law) -> None:
-    """Refuse to clock a native law that already has a period."""
-    if law.sample_period is not None:
+def require_period(sample_period):
+    """Refuse a sampled-data law built with no period: its equation needs it."""
+    if sample_period is None:
         raise TypeError(
-            f"{law.name} is already on a clock of {law.sample_period:g} s: clock the "
-            "law itself, once"
+            "a sampled-data law takes its period at construction: "
+            "NativeSampledSystem(n, sample_period=dt)"
         )
+
+    return sample_period

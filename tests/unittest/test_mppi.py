@@ -20,9 +20,7 @@ from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
 )
 from minilink.planning import MPPIPlanner, MPPIRecord  # noqa: E402
 from minilink.planning.trajectory_optimization.mpc.predictive import (  # noqa: E402
-    DelayedPredictiveController,
-    PurePredictiveController,
-    WarmStartedPredictiveController,
+    PredictiveController,
 )
 
 DT = 0.05
@@ -118,17 +116,18 @@ def test_shift_holds_the_last_input_and_command_reads_the_held_one():
 
 
 @pytest.mark.parametrize(
-    "form, kind",
+    "form, blocks",
     [
-        (dict(delay=False), WarmStartedPredictiveController),
-        (dict(delay=True), DelayedPredictiveController),
-        (dict(delay=False, warm_start=False), PurePredictiveController),
+        (dict(), ["solve", "command", "memory"]),
+        (dict(delay=True), ["solve", "command", "memory", "delay"]),
+        (dict(warm_start=False), ["solve", "command", "memory"]),
+        (dict(delay=True, warm_start=False), ["solve", "command", "memory", "delay"]),
     ],
 )
-def test_the_mpc_runs_mppi_in_every_form(form, kind):
+def test_the_mpc_runs_mppi_in_every_form(form, blocks):
     planner = swing_up_planner()
     mpc = ModelPredictiveController(planner, **form)
-    assert isinstance(mpc, kind)
+    assert isinstance(mpc, PredictiveController) and list(mpc.subsystems) == blocks
     loop = (mpc % DT) @ planner.problem.sys
     run = loop.compute_trajectory(tf=0.5, dt=DT)
     assert np.all(np.isfinite(run.x)) and run.has_signal("plant:u")

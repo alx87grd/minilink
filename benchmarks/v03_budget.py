@@ -126,7 +126,7 @@ def mpc_entry():
     """60 ticks × 15 Adam iterations × a 20-step horizon, the closed loop one call."""
     plant, task = pendulum_task(3.0, np.array([0.5, 0.0]))
     _, plan = pendulum_task(1.0, np.array([0.5, 0.0]))
-    mpc = ModelPredictiveController(mpc_planner(plan, 20, 15))
+    mpc = ModelPredictiveController(mpc_planner(plan, 20, 15), delay=True)
     pe = task.compile(mpc % 0.05, substeps=1, backend="jax")
     params = pe.params
 

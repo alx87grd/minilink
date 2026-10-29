@@ -41,7 +41,7 @@ def mpc_ended_by(cost):
         iterations=ITERATIONS,
         optimizer_options={"learning_rate": 0.2},
     )
-    return ModelPredictiveController(planner)
+    return ModelPredictiveController(planner, delay=True)
 
 
 # The same short MPC, without and with the LQR value as its terminal cost

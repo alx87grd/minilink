@@ -104,20 +104,19 @@ pv.solution(zs[3]).plot_trajectory()                                     # look 
 ## 6. The MPC
 
 ```python
-mpc  = ModelPredictiveController(planner)                     # the delayed form (R123), the default
-mpc  = ModelPredictiveController(planner, delay=False)        # zero delay, warm-started (the old MPC)
-mpc  = ModelPredictiveController(planner, delay=False, warm_start=False)  # the pure law
+mpc  = ModelPredictiveController(planner)                     # zero delay, warm-started (the default)
+mpc  = ModelPredictiveController(planner, delay=True)         # one period of computation delay
+mpc  = ModelPredictiveController(planner, warm_start=False)   # a cold solve at every tick
 mpc  = ModelPredictiveController(planner, inputs={"x_start": "x_hat",
                                                   "plant.m": "m_hat", "plant.mu": "mu_hat"})
-mpc  = ModelPredictiveController(planner, lookahead=0.05)     # delay compensation, with a predictor on x_start
 mpc  = ModelPredictiveController(planner, verbose=True)       # one line per solve, for tuning
-loop = (mpc % 0.05) @ plant                                   # % sets the native law's period
+loop = (mpc % 0.05) @ plant                                   # % clocks the box's blocks
 ```
 
-The MPC uses five members of `pv`: `n_z`, `initial`, `shift`, `solve` and `policy`. The delayed
-form is a **native `SampledSystem`** (R158, [sampled-path.md](sampled-path.md) §8.1): its equations
-are `update(z, y, t)` in seconds and its output ports' functions (`u` first), its tick faces serve the step algebra, and
-`%` sets its period.
+Every MPC is one architecture (R176, the consolidation of 2026-10-29): three pure blocks on the
+computer, the planner's solve, the command and the plan's memory, with a visible unit delay
+before the command when `delay=True`. The MPC uses `pv`'s `n_z`, `initial`, `shift`, `solve`,
+`command` and `prediction`, and reads nothing inside `z`.
 
 ### 6.1 Inputs are bindings; time is the argument
 
@@ -135,77 +134,46 @@ are `update(z, y, t)` in seconds and its output ports' functions (`u` first), it
 - `x_start` must be a point in the planner's problem; a problem whose start is a set or a law is
   refused, naming why.
 
-### 6.2 The delayed form (the default, R123)
-
-One native `SampledSystem` whose state is `z` alone, `n = pv.n_z` (R155, R158): the plan carries
-its own origin, so the MPC keeps no time of its own and reads nothing inside `z`.
-
-```python
-class ModelPredictiveController(SampledSystem):          # no source: a native sampled law
-    def __init__(self, planner, *, inputs=None, delay=True, lookahead=0.0):
-        ...
-        self.add_output_port("u", dim=m, function=self.compute_u, dependencies=("y",))
-        self.add_output_port("z", dim=pv.n_z, function=self.compute_state)
-
-    def compute_u(self, z, y, t, params=None):           # u_k = π(z, x̂_k, t_k), the stored plan
-        return pv.command(z, y, t)
-
-    def update(self, z, y, t, params=None):              # one solve per tick, from the rebased plan
-        P = bind(params, self.inputs, y) | {"t_start": t + self.lookahead}
-        z_new, status = pv.solve(P, z0=pv.shift(z, t))
-        return where(status.success, z_new, z)
-```
-
-- **The plan is one period late; applying it is instantaneous.** `u_k` reads the plan solved at
-  `t_{k−1}` at `Δ` into it (an open-loop plan's second knot when the knots equal `Δ`); a feedback
-  plan also reads the fresh `x̂_k`.
-- **A failed solve keeps `z`** with its old origin; the next tick rebases it `2Δ` on and reads the
-  old plan `2Δ` in, with no special case.
-- **One solve per tick**, no cache; no algebraic loop (the discretized plant has no feedthrough,
-  `z` is state). Traced, `step` is a `lax.scan` body and the fallback a `where`. A fixed-count
-  native solve (R149) always reports success, so the fallback is live only on a host solver
-  (Ipopt, SLSQP): the traced tick has no branch.
-- **Tick 0:** `x0 = (pv.initial(planner.params), t_start)`, the default guess, no solve at
-  construction. The first period's command is the guess's first input (zero for a default
-  trajectory-optimization guess). `x0` is a leaf of the loop's tree (R124), so a solved first plan
-  is one assignment.
-
-### 6.3 The zero-delay forms (`delay=False`)
-
-**Warm-started (the default of `delay=False`).** The classic MPC and the legacy block's
-behaviour (the demos' form, the maintainer's ask of 2026-10-28), built as the textbook draws
-it, an optimizer and a memory:
+### 6.2 The box: solve, command, memory, and the delay
 
 ```
-y ──► [ PlanSolver: (y, z_prev) → z*_k ] ──► [ PlanCommand: z*_k → u_k ] ──► u
-                 ▲                       │
-                 └──── [ PlanMemory z⁻¹ ] ◄┘
+y ──► [ solve: (y, z_prev) → z*_k ] ──┬───────────────► [ command: z → u_k ] ──► u
+                ▲                      │  (delay=True: z⁻¹)
+                └──── [ memory: z⁻¹ ] ◄┘
 ```
 
-`z*_k = pv.solve(P_k, z0=pv.shift(z_prev, t_k)` with its first state knot at `x̂_k`), the
-default guess at `P_k` while `z_prev` is no plan yet; `u_k = pv.command(z*_k, t_k)`. Every
-block is pure and the step evaluators compute each signal once per tick (the dense run's
-substep points share the tick's signal pass), so a tick solves once with no cache: R123 holds
-(the maintainer's choice, 2026-10-28, over a stored solve in one block). A read-back after the
-run (the plant's input, the overlays) recomputes the signals, so it solves again.
+- **The solve** (`PlanSolver`, static): `z*_k = pv.solve(P_k, z0)`. With `warm_start=True`
+  (the default) `z0 = pv.shift(z_prev, t_k, x_start=x̂_k)`, the last plan rebased to the tick
+  with its first state knot at the measurement, and the default guess at `P_k` while `z_prev`
+  is no plan yet; with `warm_start=False` the default guess at every tick. A failed solve (a
+  non-finite cost or plan) keeps `z_prev`. A fixed-count native solve (R149) always reports
+  success, so the fallback is live only on a host solver (Ipopt, SLSQP): the traced tick has
+  no branch.
+- **The command** (`PlanCommand`): `u_k = pv.command(z, t_k)`, with `x_ref`, `u_ref` from
+  `pv.prediction` where the plan carries states.
+- **The memory** (`PlanMemory`, a `UnitDelay` of `n_z`): the last plan, from the default guess.
+- **The delay** (`delay=True`, a `UnitDelay` of `n_z` under `delay`, from the default guess):
+  the command reads the plan solved at `t_{k−1}`, one period of computation delay as on a real
+  computer; the first period applies the guess's first input. With `delay=False` the command
+  applies the plan of its own tick, the solve taking no time (the textbook MPC).
+- **One solve per tick**, no cache: every block is pure and the step evaluators compute each
+  signal once per tick (the dense run's substep points share the tick's signal pass). A
+  read-back that gathers the plant's input again (a state-only run) solves again.
+- **Tick 0, traced:** `pv.initial(params)` traces, the default guess a function of the traced
+  `x_start` and `t_start` (affine in the start), so a traced loop's first plan equals the host's.
 
-**Cold (`warm_start=False`).** One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
-solve from the default guess. It is the ideal law, a reference for studies; a cold start each tick
-is slow on Ipopt and weak for a fixed-iteration solver. It needs **one signal pass per tick** in
-the step evaluators: the sampled dense run computes the signals once per period (2026-10-28,
-`core/compile/evaluators/discrete.py`); a read-back after the run computes them again.
+### 6.3 Ports, the tree, dual rate, compensation
 
-### 6.4 Ports, the tree, dual rate, compensation
-
-- **Ports out:** `u`; `z` (the plan, for dual rate and logging); `x_ref` and `u_ref` from
-  `pv.prediction` where the planner predicts (an MPC feeding a reference to an inner loop).
-- **The tree:** `pe.params["controller"]` is `planner.params`: `controller.cost.Q` to tune,
-  `controller.plant.m` beside `plant.m` for a model-mismatch study, `controller.method.lr`.
-- **Dual rate:** `(mpc % 0.05) >> (PlanFollower(planner) % 0.01)`, the follower applying
-  `pv.command` to the `z` it receives. The plan solved from `y_j` reaches the follower at the next
-  slow tick: one slow period of delay, as on a real computer, not two.
-- **Delay compensation:** `lookahead=Δ` binds `t_start = t + Δ`, and `x_start` is bound to a
-  predictor block (`inputs={"x_start": "x_pred"}`); the keyword alone shifts only the time.
+- **Ports out:** `u`; `z` (the plan solved at this tick, for dual rate and logging); `x_ref` and
+  `u_ref` where the planner predicts (an MPC feeding a reference to an inner loop).
+- **The tree:** the planner's tree sits under the solve block: the one tuning path is
+  `controller.solve.cost.R` (`pe.params["controller"]["solve"]["cost"]["R"]`),
+  `controller.solve.plant.m` beside `plant.m` for a model-mismatch study.
+- **Dual rate:** `((mpc % 0.5) >> (PlanFollower(planner) % 0.01)) @ plant`, the follower
+  applying `pv.command` to the `z` it receives at the slow tick itself; the one-period-late
+  plan is the user's `UnitDelay(dim=n_z)` between them.
+- **Delay compensation** is the user's predictor block on the port that binds `x_start`, on
+  the face verb `pv.predict_start(x, u, t, Δ, params)` (the planner's model, the command held).
 
 ## 7. The cases it serves
 

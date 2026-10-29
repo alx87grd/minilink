@@ -5,6 +5,8 @@ import copy
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.compile.evaluators.base import assigned
+from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.params import merge_known
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
@@ -84,8 +86,33 @@ class CompiledTrajectoryPlanner:
         return float(self.offsets[1] - self.offsets[0])
 
     def initial(self, params=None):
-        """The default guess in ``z`` form (``default_initial_trajectory``, packed), at ``params`` when they have values, else at the defaults."""
-        problem = self.problem_at(params if has_values(params) else self.defaults)
+        """
+        The default guess in ``z`` form (``default_initial_trajectory``, packed), at ``params``.
+
+        On the host the guess is built at ``params`` (the defaults when none).
+        Under a trace it is a function of the traced ``x_start`` and
+        ``t_start``: the guess is affine in its start (a straight line or a
+        cubic from it), ``z(x̂) = z(x̄) + M (x̂ − x̄)``, ``M`` read once on the
+        host, so a traced loop's first plan starts from the same guess as the
+        host's; the tree's other numbers are taken at the compiled defaults.
+        """
+        if not params or has_values(params):
+            return self.host_initial(self.defaults if not params else params)
+
+        xp = array_module(params["x_start"], params["t_start"])
+        z_default, sensitivity, x_default = self.start_sensitivity
+
+        # z(x̂) = z(x̄) + M (x̂ − x̄), the origin t_start appended
+        x_hat = xp.reshape(xp.asarray(params["x_start"], dtype=float), (-1,))
+        z_dec = z_default[:-1] + sensitivity @ (x_hat - x_default)
+        t_start = xp.reshape(xp.asarray(params["t_start"], dtype=float), (1,))
+        z = xp.concatenate([z_dec, t_start])
+
+        return z
+
+    def host_initial(self, params):
+        """The default guess built on the host at ``params``."""
+        problem = self.problem_at(params)
 
         guess = default_initial_trajectory(
             problem, self.transcription.initial_guess_time_grid(problem)
@@ -93,6 +120,30 @@ class CompiledTrajectoryPlanner:
         z_dec = self.transcription.pack_initial_guess(problem, guess)
 
         return np.concatenate([z_dec, [problem.t_start]])
+
+    @property
+    def start_sensitivity(self):
+        """``(z(x̄), M, x̄)``: the default guess at the compiled start and its derivative in the start, one column per state (the guess is affine in it)."""
+        cached = self.__dict__.get("start_sensitivity_cache")
+        if cached is not None:
+            return cached
+
+        x_default = np.asarray(self.defaults["x_start"], dtype=float).reshape(-1)
+        z_default = self.host_initial(self.defaults)
+
+        # M e_i = z(x̄ + e_i) − z(x̄): exact for a guess affine in its start
+        columns = []
+        for i in range(x_default.size):
+            x_i = x_default.copy()
+            x_i[i] += 1.0
+            z_i = self.host_initial({**self.defaults, "x_start": x_i})
+            columns.append(z_i[:-1] - z_default[:-1])
+        sensitivity = np.stack(columns, axis=1) if columns else np.zeros((0, 0))
+
+        cached = (z_default, sensitivity, x_default)
+        self.__dict__["start_sensitivity_cache"] = cached
+
+        return cached
 
     def solve(self, params=None, z0=None):
         """
@@ -130,8 +181,13 @@ class CompiledTrajectoryPlanner:
 
         return z, status
 
-    def shift(self, z, t):
-        """The plan rebased to the absolute time ``t``: each knot row re-read at ``t + offset``, the tail held."""
+    def shift(self, z, t, x_start=None):
+        """
+        The plan rebased to the absolute time ``t``: each knot row re-read at ``t + offset``, the tail held.
+
+        With ``x_start`` (a plan that carries its states), the first state knot
+        is pinned at it: the warm start of a solve from that measured start.
+        """
         xp = array_module(z, t)
 
         offsets = self.offsets
@@ -146,8 +202,25 @@ class CompiledTrajectoryPlanner:
         z_shifted = xp.concatenate(
             [xp.reshape(shifted, (-1,)), xp.reshape(xp.asarray(t, dtype=float), (1,))]
         )
+        if x_start is None or not self.predicts:
+            return z_shifted
 
-        return z_shifted
+        # x_i(t) = x̂_i: the state rows come first in z, N knots each, x_i's first at i·N
+        first_knots = np.arange(self.n) * offsets.size
+        x_hat = xp.reshape(xp.asarray(x_start, dtype=float), (self.n,))
+        z_pinned = assigned(xp, z_shifted, first_knots, x_hat)
+
+        return z_pinned
+
+    def predict_start(self, x, u, t, delta, params=None):
+        """
+        ``x̂(t + Δ)``: the planner's model from ``x`` at ``t``, the command ``u`` held over ``delta``.
+
+        RK4 steps a quarter of a knot apart, on the plant numbers of ``params``
+        (the defaults when ``None``): a predictor block's equation, for a user
+        who compensates the computation delay on the start the plan binds.
+        """
+        return model_prediction(self, x, u, t, delta, params)
 
     def command(self, z, x, t, params=None):
         """The command the plan gives at time ``t``: its input knots read at ``t``, linear between knots (an open-loop plan ignores ``x``)."""
@@ -166,7 +239,7 @@ class CompiledTrajectoryPlanner:
 
     def prediction(self, z, t, params=None):
         """The planned ``(x, u)`` at ``t``: the state knots read at ``t`` (collocation and multiple shooting carry them in ``z``)."""
-        require_state_knots(self.transcription)
+        require_state_knots(self)
         xp = array_module(z, t)
 
         n = self.n
@@ -335,10 +408,28 @@ def has_values(tree) -> bool:
     return True
 
 
-def require_state_knots(transcription):
-    """Refuse a prediction from a transcription whose ``z`` holds no state knots (single shooting)."""
-    if not isinstance(transcription, DirectCollocationTranscription):
+def require_state_knots(pv):
+    """Refuse a plan whose ``z`` holds no state knots (single shooting, MPPI): its states are rolled out."""
+    if pv.n_z - 1 != (pv.n + pv.m) * pv.offsets.size:
         raise NotImplementedError(
-            f"{type(transcription).__name__} rolls its states out: read "
-            "pv.solution(z).trajectory for the planned states"
+            "the plan carries no state knots (single shooting): read "
+            "pv.solution(z).trajectory for its planned states"
         )
+
+
+def model_prediction(pv, x, u, t, delta, params=None):
+    """``x̂(t + Δ) = Φ(x, u, t)``: a face's plant model from ``x``, ``u`` held, RK4 steps a quarter of a knot apart."""
+    params = pv.params if params is None else params
+
+    f = pv.problem.sys.f
+    plant = params.get("plant") or None
+    spacing = pv.knot_spacing
+    substeps = max(1, int(np.ceil(4.0 * float(delta) / spacing)))
+
+    def dynamics(x, u, tau):
+        return f(x, u, tau, plant)
+
+    # x̂(t + Δ) = Φ(x, u, t), the command held over Δ as the plant sees it
+    x_ahead = step_body(dynamics, x, u, u, t, delta, "rk4", substeps)
+
+    return x_ahead

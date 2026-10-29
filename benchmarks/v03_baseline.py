@@ -193,7 +193,7 @@ def mpc_entries(out):
         optimizer_options={"maxiter": 80, "ftol": 1e-6},
         verbose=False,
     )
-    mpc = ModelPredictiveController(planner)
+    mpc = ModelPredictiveController(planner, delay=True)
     loop = (mpc % 0.2) @ plant
     traj = loop.compute_trajectory(tf=1.0, dt=0.01)
     start, end = loop.state_index["plant"]

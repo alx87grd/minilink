@@ -35,7 +35,7 @@ planner = TrajectoryOptimizationPlanner(
     iterations=ITERATIONS,
     optimizer_options={"learning_rate": 0.05},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=True)
 
 # The closed loop, one scan on JAX: J of the plan's weights
 pe = problem.compile(mpc % DT, substeps=1, backend="jax")
@@ -43,7 +43,7 @@ start = pe.params
 print(pe.evaluate(start))
 
 # The tuning program over the plan's weights, solved by the class default (L-BFGS)
-wrt = ["controller.cost.Q", "controller.cost.R"]
+wrt = ["controller.solve.cost.Q", "controller.solve.cost.R"]
 best = Optimizer(pe.program(wrt, params=start), method="auto").solve()
 print(best)
 
