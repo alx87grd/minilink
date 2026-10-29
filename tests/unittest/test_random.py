@@ -278,7 +278,7 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
     from minilink.blocks.sources import WhiteNoise
     from minilink.core.costs import QuadraticCost
     from minilink.core.distributions import Uniform
-    from minilink.learning.reinforcement_learning.environment import RolloutEnvironment
+    from minilink.planning.environment import RolloutEnvironment
     from minilink.planning.problems import PlanningProblem
 
     def problem(sys, **disturbances):
@@ -491,7 +491,7 @@ def test_the_rollout_refuses_a_source_it_cannot_feed():
     from minilink import Pendulum
     from minilink.blocks.sources import WhiteNoise
     from minilink.core.costs import QuadraticCost
-    from minilink.learning.reinforcement_learning.environment import (
+    from minilink.planning.environment import (
         RolloutEnvironment,
         episode_seed,
     )

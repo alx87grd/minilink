@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.distributions import CounterKey, sample_index
-from minilink.learning.reinforcement_learning.environment import MAX_SEED
+from minilink.planning.environment import MAX_SEED
 
 ###############################################################################
 # Public API

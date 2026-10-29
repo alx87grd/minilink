@@ -558,10 +558,10 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
 
 
 def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_one_j():
-    from minilink.learning.reinforcement_learning.environment import (
+    from minilink.planning import DynamicProgrammingPlanner
+    from minilink.planning.environment import (
         RolloutEnvironment,
     )
-    from minilink.planning import DynamicProgrammingPlanner
 
     plant = Pendulum()
     problem = PlanningProblem(
