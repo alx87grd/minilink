@@ -214,6 +214,10 @@ class StateSpaceGrid:
         """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
         return self.face.stage_cost_at(x, u, t, params)
 
+    def stage_cost_law(self, t, params=None):
+        """``c(x, u)``: :meth:`stage_cost` of the period starting at ``t`` as a function of the pair, built once for a table."""
+        return self.face.stage_cost_law(t, params)
+
     # The successor tables
 
     def compute_transition_numpy(self, t):

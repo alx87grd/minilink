@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 
@@ -73,7 +74,7 @@ class GaussianField(WorkspaceField):
         object.__setattr__(self, "amplitude", amplitude)
         object.__setattr__(self, "sigma", sigma)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"center", "amplitude", "sigma"}``, the peak's numbers."""
         return {"center": self.center, "amplitude": self.amplitude, "sigma": self.sigma}

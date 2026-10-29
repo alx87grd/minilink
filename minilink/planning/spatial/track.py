@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -48,7 +49,7 @@ class ReferenceTrack:
     def __post_init__(self) -> None:
         require_positive_half_width(self.half_width)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"path", "half_width"}``: the centerline's numbers and the corridor's radius."""
         return {"path": self.path.params, "half_width": self.half_width}

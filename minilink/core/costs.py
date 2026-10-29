@@ -607,16 +607,32 @@ class SampledCost(StepCost):
         self, x, u, t_k, params=None, plant_params=None, discount_rate=None
     ):
         """``c_k`` alone of the period starting at ``t_k``: :meth:`stage_at`'s cost, the plant not stepped where the scheme allows (one Euler step)."""
+        cost = self.stage_cost_law(t_k, params, plant_params, discount_rate)
+
+        return cost(x, u)
+
+    def stage_cost_law(self, t_k, params=None, plant_params=None, discount_rate=None):
+        """
+        ``c(x, u)``: the stage cost of the period starting at ``t_k`` as a function of the pair, its laws built once.
+
+        A table of the period's pairs (value iteration, policy evaluation) builds
+        it once and calls it on every pair; :meth:`stage_cost_at` is one call.
+        """
         # Lazy import: the step model loads with the first stage
         from minilink.core.compile.evaluators.stepping import stage_cost
+
+        dt = self.dt
+        solver = self.solver
+        substeps = self.substeps
 
         # One Euler step: c_k = dt · e^{−ρ·0} g(x_k, u, t_k), the plant not evaluated
         # (stage_cost's one rule)
         dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
 
-        return stage_cost(
-            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
-        )
+        def cost(x, u):
+            return stage_cost(dynamics, rate, x, u, t_k, dt, solver, substeps)
+
+        return cost
 
     def stage_at(self, x, u, t_k, params=None, plant_params=None, discount_rate=None):
         """
@@ -652,12 +668,24 @@ class SampledCost(StepCost):
             c_dot = xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
             return c_dot
 
-        return dynamics, rate
+        # ċ = g(x, u, τ) with no discount (ρ = 0), the factor e^{0} = 1 not computed
+        def undiscounted_rate(x, u, tau):
+            return g(x, u, tau, params)
+
+        return dynamics, undiscounted_rate if is_zero_number(rho) else rate
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def is_zero_number(value) -> bool:
+    """Whether ``value`` is the number 0 on the host (a traced rate is not: its value is unknown)."""
+    try:
+        return float(value) == 0.0
+    except TypeError:  # a tracer has no value
+        return False
 
 
 def term_id_of(cost) -> str:

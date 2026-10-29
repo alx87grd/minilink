@@ -5,6 +5,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 from scipy.linalg import solve_triangular
@@ -125,7 +126,7 @@ class FieldSet(Set):
     def __post_init__(self) -> None:
         require_a_bound(self.lower, self.upper)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"field", "lower", "upper"}``: the field's numbers and the bounds that are set."""
         return bounds_tree(self.field, self.lower, self.upper)
@@ -172,7 +173,7 @@ class FieldInputSet(InputSet):
     def __post_init__(self) -> None:
         require_a_bound(self.lower, self.upper)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"field", "lower", "upper"}``: the field's numbers and the bounds that are set."""
         return bounds_tree(self.field, self.lower, self.upper)
@@ -273,7 +274,7 @@ class MarginField(Field):
 
     set_: Set
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """The set's numbers: the field moves with them."""
         return self.set_.params
@@ -324,7 +325,7 @@ class QuadraticField(Field):
         object.__setattr__(self, "P", P)
         object.__setattr__(self, "t", t)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"center", "P"}``, and ``"t"`` for a schedule: the field's numbers."""
         if self.t is None:
@@ -406,7 +407,7 @@ class EllipsoidSet(FieldSet):
     def __post_init__(self) -> None:
         require_sublevel(self.lower, self.upper)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"center", "P", "level"}``, the ellipsoid's numbers."""
         field = self.field

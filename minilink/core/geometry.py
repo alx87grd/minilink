@@ -3,6 +3,7 @@
 import functools
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 
@@ -88,7 +89,7 @@ class Sphere(Shape):
     def dim(self) -> int:
         return int(self.center.size)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"center", "radius"}``, the ball's numbers."""
         return {"center": self.center, "radius": self.radius}
@@ -131,7 +132,7 @@ class Box(Shape):
     def dim(self) -> int:
         return int(self.lower.size)
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"lower", "upper"}``, the box's corners."""
         return {"lower": self.lower, "upper": self.upper}
@@ -175,7 +176,7 @@ class Union(Shape):
     def dim(self) -> int:
         return self.shapes[0].dim
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """The members' ``params`` by position: ``{"0": ..., "1": ...}``."""
         return {str(i): shape.params for i, shape in enumerate(self.shapes)}
@@ -221,7 +222,7 @@ class Inflated(Shape):
     def dim(self) -> int:
         return self.base.dim
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"base": the base shape's numbers, "radius"}``."""
         return {"base": self.base.params, "radius": self.radius}

@@ -152,6 +152,9 @@ class PolicyEvaluator:
         successors = np.empty((N, n), dtype=float)
         G = np.empty(N, dtype=float)
 
+        # The stage cost of the period at t, its laws built once for every node
+        stage_cost = grid.stage_cost_law(t, tree)
+
         # For all state nodes
         for s in range(N):
             x = grid.states[s]
@@ -173,7 +176,7 @@ class PolicyEvaluator:
 
             if valid:
                 # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the face
-                G[s] = float(grid.stage_cost(x, u, t, tree))
+                G[s] = float(stage_cost(x, u))
             else:
                 # The step leaves the admissible set: the penalty
                 G[s] = infeasible_penalty(INF, x_next, t)

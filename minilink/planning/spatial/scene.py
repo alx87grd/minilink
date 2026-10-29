@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -41,7 +42,7 @@ class Scene:
         object.__setattr__(self, "obstacles", tuple(self.obstacles))
         object.__setattr__(self, "workspace_fields", tuple(self.workspace_fields))
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"obstacles", "workspace_fields"}``: the obstacles' numbers by position, each field's."""
         return {

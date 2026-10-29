@@ -381,6 +381,9 @@ class DynamicProgrammingPlanner(Planner):
             per_item=A,
         )
 
+        # The stage cost of the period at t, its laws built once for every pair
+        stage_cost = grid.stage_cost_law(t, params)
+
         # For all state nodes
         for s in nodes:
             x = grid.states[s]
@@ -390,7 +393,7 @@ class DynamicProgrammingPlanner(Planner):
                 u = grid.inputs[a]
 
                 # The stage cost over one step, c = ∫₀^dt e^{−ρτ} g dτ (g dt under Euler)
-                G[s, a] = float(grid.stage_cost(x, u, t, params))
+                G[s, a] = float(stage_cost(x, u))
 
         # Out of bound cost on the pairs that leave the admissible set: the scalar,
         # or the cost of each pair's successor

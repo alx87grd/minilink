@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -32,7 +33,7 @@ class ClearanceField(Field):
     scene: Scene
     body: CollisionBody
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"scene"}``: the scene's numbers."""
         return {"scene": self.scene.params}
@@ -67,7 +68,7 @@ class CostDensityField(Field):
     scene: Scene
     body: CollisionBody
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"scene"}``: the scene's numbers."""
         return {"scene": self.scene.params}
@@ -102,7 +103,7 @@ class PathDistanceField(Field):
     track: ReferenceTrack
     body: CollisionBody
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"track"}``: the track's numbers."""
         return {"track": self.track.params}
@@ -137,7 +138,7 @@ class CorridorMarginField(Field):
     track: ReferenceTrack
     body: CollisionBody
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"track"}``: the track's numbers, its corridor's half-width among them."""
         return {"track": self.track.params}

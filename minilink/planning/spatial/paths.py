@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 
@@ -91,7 +92,7 @@ class PolylinePath(ReferencePath):
         _, s_knots = arc_lengths(self.waypoints, np)
         return float(s_knots[-1])
 
-    @property
+    @cached_property
     def params(self) -> dict:
         """``{"waypoints"}``, the path's vertices."""
         return {"waypoints": self.waypoints}

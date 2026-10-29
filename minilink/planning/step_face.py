@@ -204,6 +204,23 @@ class StepFace:
 
         return self.problem.cost.c(x, u, t, params["cost"])
 
+    def stage_cost_law(self, t, params=None):
+        """``c(x, u)``: :meth:`stage_cost_at` of the tick that starts at ``t`` as a function of the pair, its laws built once (a table's cost)."""
+        params = self.params if params is None else params
+        cost = self.problem.require_cost()
+
+        if self.stage is not None:
+            rho = params.get("discount_rate")
+            return self.stage.stage_cost_law(
+                t, params["cost"], params["plant"], discount_rate=rho
+            )
+
+        # A native step cost: c(x, u, t) on its own numbers
+        def native(x, u):
+            return cost.c(x, u, t, params["cost"])
+
+        return native
+
     def terminal(self, x, t=None, params=None):
         """The terminal cost ``h(x)`` at the horizon's end (or at ``t``); ``0`` on an infinite horizon."""
         params = self.params if params is None else params
