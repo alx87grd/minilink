@@ -1,6 +1,7 @@
 """The planner's compiled face and the MPC on it: one solve per tick, the plan one period late."""
 
 import unittest
+from unittest import mock
 
 import matplotlib
 import numpy as np
@@ -22,10 +23,16 @@ from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
     PlanFollower,
     mpc_plans_from_rollout,
+    plant_run,
 )
 from minilink.planning.trajectory_optimization.mpc.predictive import (
     DelayedPredictiveController,
     PurePredictiveController,
+    WarmStartedPredictiveController,
+    warm_guess,
+)
+from minilink.planning.trajectory_optimization.compiled import (
+    CompiledTrajectoryPlanner,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationOptions,
@@ -477,11 +484,166 @@ class TestTheDelayedMPC(unittest.TestCase):
             mpc_plans_from_rollout(run, mpc)
 
 
+def tree_at(pv, x_start, t_start):
+    """The planner's tree with the measured start and the plan's origin, as a tick binds them."""
+    return {**pv.params, "x_start": x_start, "t_start": t_start}
+
+
+@pytest.mark.jax
+class TestTheWarmStartedMPC(unittest.TestCase):
+    def setUp(self):
+        self.planner = integrator_planner()
+        self.mpc = ModelPredictiveController(self.planner, delay=False)
+        self.pv = self.mpc.pv
+
+    def test_it_is_a_solve_a_command_and_a_delay_holding_the_plan(self):
+        mpc, pv = self.mpc, self.pv
+        assert isinstance(mpc, WarmStartedPredictiveController)
+        assert list(mpc.subsystems) == ["solve", "command", "memory"]
+        assert list(mpc.inputs) == ["y"] and list(mpc.outputs) == ["u", "z"]
+        assert mpc.n == pv.n_z and mpc.sample_period is None
+        np.testing.assert_array_equal(mpc.x0, pv.initial())
+        clocked = mpc % DT
+        assert clocked.sample_period == DT and mpc.sample_period is None
+        np.testing.assert_array_equal(clocked.x0, pv.initial())
+        with pytest.raises(TypeError, match="clock"):
+            self.planner.problem.compile(mpc, dt=DT)
+
+    def test_the_warm_guess_is_the_last_plan_shifted_with_its_first_state_measured(
+        self,
+    ):
+        pv = self.pv
+        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
+        y = np.array([0.9])
+        guess = warm_guess(pv, z, y, tree_at(pv, y, DT), pv.initial())
+        shifted = pv.shift(z, DT)
+        assert guess[0] == 0.9 and guess[-1] == DT
+        np.testing.assert_array_equal(guess[1:], shifted[1:])
+
+    def test_the_first_guess_is_the_default_guess_from_the_measured_start(self):
+        pv = self.pv
+        y = np.array([1.7])
+        P = tree_at(pv, y, 0.0)
+        guess = warm_guess(pv, pv.initial(), y, P, pv.initial())
+        np.testing.assert_array_equal(guess, pv.initial(P))
+        assert guess[0] == 1.7
+
+    def test_the_solve_block_solves_from_the_measurement_warm_started(self):
+        pv = self.pv
+        solve = self.mpc.subsystems["solve"]
+        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.2})
+        y = np.array([0.8])
+        z_star = solve.compute_z(np.zeros(0), np.concatenate([y, z]), 0.4)
+        expected, _ = pv.solve(
+            {"x_start": y, "t_start": 0.4},
+            z0=warm_guess(pv, z, y, tree_at(pv, y, 0.4), pv.initial()),
+        )
+        np.testing.assert_allclose(z_star, expected, atol=1e-12)
+        assert z_star[-1] == 0.4
+
+    def test_the_loop_is_the_hand_loop_with_one_solve_per_tick(self):
+        pv = self.pv
+        plant = self.planner.problem.sys
+        loop = (self.mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop.subsystems["plant"].x0 = np.array([0.5])
+        ev = loop.compile()  # the compile's own checks solve; the run is counted
+        with mock.patch.object(
+            CompiledTrajectoryPlanner,
+            "solve",
+            autospec=True,
+            side_effect=pv.solve.__func__,
+        ) as solve:
+            run = loop.compute_trajectory(tf=1.0)
+            solves = solve.call_count
+        del ev
+
+        # The hand loop: solve from x_k warm-started, apply u_k = u*_0 over the period
+        x = np.array([0.5])
+        z = pv.initial()
+        for k in range(5):
+            t_k = k * DT
+            z, _ = pv.solve(
+                {"x_start": x, "t_start": t_k},
+                z0=warm_guess(pv, z, x, tree_at(pv, x, t_k), pv.initial()),
+            )
+            u_k = pv.command(z, x, t_k)
+            x = x + DT * u_k  # the integrator under a held input: exact
+        p0, p1 = loop.state_index["plant"]
+        np.testing.assert_allclose(run.x[p0:p1, -1], x, atol=1e-9)
+
+        # Five ticks, five solves: each signal once per tick, no second solve
+        assert solves == 5
+
+        # The plan readers find the boxed MPC; the plant's input is the command
+        plans = mpc_plans_from_rollout(run, self.mpc, loop=loop)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8]
+        assert plant_run(run, loop).u.shape == (1, run.t.size)
+
+    def test_a_failed_solve_keeps_the_last_plan(self):
+        pv = self.pv
+        solve = self.mpc.subsystems["solve"]
+        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
+
+        def failing(params=None, z0=None):
+            return z0 + 1.0, {"success": False, "iterations": 0, "cost": np.nan}
+
+        pv.solve = failing
+        z_star = solve.compute_z(np.zeros(0), np.concatenate([[0.8], z]), 0.2)
+        np.testing.assert_array_equal(z_star, z)
+
+    def test_the_dual_rate_follower_gets_the_plan_at_the_slow_tick(self):
+        follower = PlanFollower(self.planner)
+        computer = (self.mpc % DT) >> (follower % 0.05)
+        loop = computer @ discretize(self.planner.problem.sys, 0.05)
+        run = loop.compute_trajectory(tf=0.6)
+        plans = mpc_plans_from_rollout(run, self.mpc, loop=loop)
+        assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4]
+        assert plant_run(run, loop).u.shape == (1, run.t.size)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_the_zero_delay_form_traces_on_a_native_planner():
+    jax = pytest.importorskip("jax")
+    from minilink.planning.trajectory_optimization.shooting import (
+        ShootingOptions,
+        ShootingTranscription,
+    )
+
+    configure_jax(enable_x64=True)
+    sys = JaxSingleIntegrator()
+    cost = QuadraticCost.from_system(
+        sys, Q=np.eye(1), R=0.1 * np.eye(1), xbar=np.array([2.0])
+    )
+    problem = PlanningProblem(
+        sys=sys, tf=1.0, x_start=np.array([0.5]), cost=cost, U=sys.input_box
+    )
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=ShootingTranscription(ShootingOptions(n_steps=6)),
+        backend="jax",
+        method="adam",
+        iterations=20,
+        optimizer_options={"learning_rate": 0.05},
+    )
+    mpc = ModelPredictiveController(planner, delay=False)
+    pe = problem.compile(mpc % DT, backend="jax")
+    params = pe.params
+
+    # The closed loop is one traced scan: its J and its gradient in the start
+    def J_of(x_start):
+        return pe.evaluate({**params, "x_start": x_start}).objective
+
+    J = J_of(params["x_start"])
+    g = jax.grad(J_of)(params["x_start"])
+    assert np.isfinite(J) and np.all(np.isfinite(g))
+
+
 @pytest.mark.jax
 class TestThePureMPCAndTheFollower(unittest.TestCase):
     def test_the_pure_form_solves_cold_at_each_tick_and_needs_a_clock(self):
         planner = integrator_planner()
-        mpc = ModelPredictiveController(planner, delay=False)
+        mpc = ModelPredictiveController(planner, delay=False, warm_start=False)
         assert isinstance(mpc, PurePredictiveController) and mpc.n == 0
         pv = mpc.pv
         y = np.array([0.8])

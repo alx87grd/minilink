@@ -67,9 +67,9 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     method="scipy_slsqp",
-    optimizer_options={"maxiter": 40, "ftol": 0.05},
+    optimizer_options={"maxiter": 40, "ftol": 0.01},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 
 # --- closed loop ---
 diagram = (mpc % MPC_DT) @ discretize(car, MPC_DT, substeps=round(MPC_DT / 0.01))

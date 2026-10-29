@@ -244,9 +244,7 @@ def block_path_of(rollout, mpc, loop, block):
     if block is not None:
         return tuple(block.split("/"))
     if loop is not None:
-        paths = [
-            path for path, sys in blocks_of(loop) if getattr(sys, "pv", None) is mpc.pv
-        ]
+        paths = [path for path, sys in blocks_of(loop) if holds_plan_of(sys, mpc.pv)]
         require_one_block(paths)
         return paths[0]
 
@@ -266,6 +264,13 @@ def blocks_of(diagram, prefix=()):
             yield from blocks_of(sys, path)
         else:
             yield path, sys
+
+
+def holds_plan_of(block, pv) -> bool:
+    """Whether ``block`` (or the block a clocked view wraps) is the one whose state is the plan of ``pv``: the delayed MPC, or the zero-delay MPC's memory."""
+    own = getattr(block, "source", None) or block
+
+    return getattr(own, "pv", None) is pv and int(block.n) == pv.n_z
 
 
 def require_state_knots(pv):

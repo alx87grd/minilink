@@ -40,6 +40,7 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your review of the overnight run's open decisions | OD-7 … OD-35 | v0.3 (the merge, §1.10) | review the number changes first, then the rest as a block |
+| Whether the course notebooks that run an MPC use the zero-delay form | §1.8, the MPC row | v0.3 | `racecar_toward_mpc`, the showcase and `mpc_spatial_stack` run the delayed default; `delay=False` is the old controller (the demos run it); your teaching call |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -297,6 +298,20 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
   projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
+- [ ] **Clocking a box** (the maintainer's decision 5 of 2026-10-28, composition first):
+  `box % dt` clocks each of the box's blocks and keeps their faces (a block in seconds reads
+  seconds), instead of wrapping the box as a tick law (today a static block inside reads the
+  tick count `0, 1, 2` where seconds are `0, 0.1, 0.2`). Done when a step box holding a static
+  block reads `t_k` in seconds under `% dt`, the zero-delay MPC's own `__mod__` is deleted for
+  it, and the baselines stay byte-identical. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.1)
+- [ ] **Recording the signals, and reconstructing a few** (the maintainer's decision 6 of
+  2026-10-28): a run that records the signals it computes (the plant's input, a named port) in
+  the same scan, and a read-back that computes only the ancestors of the requested ports (today
+  `compute_internal_signals_dict` and the read-backs on it fill the whole buffer, so an
+  expensive block, a solve, runs again for every sample read back). Done when a zero-delay MPC
+  run with its overlays solves exactly once per tick, read-backs included, and the delayed
+  form's read-backs stay free. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.2)
+
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
 construction.
@@ -439,6 +454,21 @@ solvers and MPPI are v0.4 (§4).
   (delay compensation), `PlanFollower`, the legacy MPC and the hybrid runtime gone, every MPC
   demo and project swept, the MPC baselines re-pinned once. Rest: the MPC demos' retuning for
   the delay (RD-52, yours), `racecar_toward_mpc.ipynb` at step 7.
+  The demos' regression is answered by the zero-delay, warm-started form
+  (`ModelPredictiveController(planner, delay=False)`, three pure blocks: a solver, a command and a
+  memory; merged into `dev-v0.3` 2026-10-29, [the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md)); every MPC demo runs it, the delayed form
+  stays the default. Rest: whether the course notebooks that run an MPC (GRO501
+  `racecar_toward_mpc`, the showcase, `mpc_spatial_stack`) move to `delay=False` **[ask —
+  teaching call]**.
+- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, after the two core
+  rows of §1.5 below, "Clocking a box" and "Recording the signals"): the delayed and pure forms
+  as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
+  `lookahead`); one tuning path for every form (`controller.cost.R` or
+  `controller.solve.cost.R`, one of them); `DelayedPredictiveController` and
+  `PurePredictiveController` folded into the factory. Done when the delayed form's numbers are
+  byte-identical (the v0.3 baseline, acceptance script 5, the budget script) and the plan
+  readers find every form by role. It amends R148's wording ("the MPC one block in two forms"):
+  record the ruling when it lands. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.3)
 - [ ] **Its closed loop in one scan, tuned by gradient** (NS-9): `problem.compile(mpc % Δ)`
   `.evaluate(p)` runs, `vmap`s over starts, and `jax.grad` with respect to `controller.cost.Q`
   tunes a demo by `Optimizer`. The gradient MPC comes first, as the direction places it; MPPI is

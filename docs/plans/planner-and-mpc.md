@@ -105,7 +105,8 @@ pv.solution(zs[3]).plot_trajectory()                                     # look 
 
 ```python
 mpc  = ModelPredictiveController(planner)                     # the delayed form (R123), the default
-mpc  = ModelPredictiveController(planner, delay=False)        # the pure law
+mpc  = ModelPredictiveController(planner, delay=False)        # zero delay, warm-started (the old MPC)
+mpc  = ModelPredictiveController(planner, delay=False, warm_start=False)  # the pure law
 mpc  = ModelPredictiveController(planner, inputs={"x_start": "x_hat",
                                                   "plant.m": "m_hat", "plant.mu": "mu_hat"})
 mpc  = ModelPredictiveController(planner, lookahead=0.05)     # delay compensation, with a predictor on x_start
@@ -168,13 +169,30 @@ class ModelPredictiveController(SampledSystem):          # no source: a native s
   trajectory-optimization guess). `x0` is a leaf of the loop's tree (R124), so a solved first plan
   is one assignment.
 
-### 6.3 The pure form (`delay=False`)
+### 6.3 The zero-delay forms (`delay=False`)
 
-One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
+**Warm-started (the default of `delay=False`).** The classic MPC and the legacy block's
+behaviour (the demos' form, the maintainer's ask of 2026-10-28), built as the textbook draws
+it, an optimizer and a memory:
+
+```
+y ──► [ PlanSolver: (y, z_prev) → z*_k ] ──► [ PlanCommand: z*_k → u_k ] ──► u
+                 ▲                       │
+                 └──── [ PlanMemory z⁻¹ ] ◄┘
+```
+
+`z*_k = pv.solve(P_k, z0=pv.shift(z_prev, t_k)` with its first state knot at `x̂_k`), the
+default guess at `P_k` while `z_prev` is no plan yet; `u_k = pv.command(z*_k, t_k)`. Every
+block is pure and the step evaluators compute each signal once per tick (the dense run's
+substep points share the tick's signal pass), so a tick solves once with no cache: R123 holds
+(the maintainer's choice, 2026-10-28, over a stored solve in one block). A read-back after the
+run (the plant's input, the overlays) recomputes the signals, so it solves again.
+
+**Cold (`warm_start=False`).** One static block, no memory: `u_k = pv.command(pv.solve(P_k)[0], x̂_k, t_k)`, the first action of a
 solve from the default guess. It is the ideal law, a reference for studies; a cold start each tick
 is slow on Ipopt and weak for a fixed-iteration solver. It needs **one signal pass per tick** in
-the step evaluators (today they compute the signals in `step` and again in `outputs`,
-`core/compile/evaluators/discrete.py`), else it solves twice per tick, with the same result.
+the step evaluators: the sampled dense run computes the signals once per period (2026-10-28,
+`core/compile/evaluators/discrete.py`); a read-back after the run computes them again.
 
 ### 6.4 Ports, the tree, dual rate, compensation
 

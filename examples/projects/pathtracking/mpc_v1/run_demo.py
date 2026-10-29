@@ -105,7 +105,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 computer = dual_rate_computer_ahead(
     mpc, planner, dt_mpc=MPC_DT, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
 )
@@ -144,14 +144,14 @@ plant.connect("allocation", "delta", "vehicle", "delta")
 
 plant.add_input_port("x_nom", dim=8, nominal_value=np.zeros(8))
 plant.connect("input", "x_nom", "nominal_refs", "x_nom")
-plant.connect_new_output_port("plant_to_mpc", "y_mpc", "y_mpc")
+plant.connect_new_output_port("plant_to_mpc", "y_mpc", "y")
 
 plant.camera_follow_frame = "vehicle:body"
 plant.camera_scale = 15.0
 
 vehicle.x0[0] = 0.0
 vehicle.x0[1] = -20.0
-vehicle.x0[2] = 0.0
+vehicle.x0[2] = 1e-4  # off the exact axis: the solve is singular at a heading of 0
 vehicle.x0[3] = U_TARGET
 vehicle.x0[4] = 0.0
 vehicle.x0[5] = 0.0
@@ -170,7 +170,6 @@ hybrid.animate(
         result,
         mpc,
         loop=hybrid,
-        block="controller/DelayedPredictiveController",
         track=track,
     ),
     renderer="matplotlib",

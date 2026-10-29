@@ -195,7 +195,7 @@ planner = TrajectoryOptimizationPlanner(
     method="scipy_slsqp",
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner)
+mpc = ModelPredictiveController(planner, delay=False)
 
 sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]

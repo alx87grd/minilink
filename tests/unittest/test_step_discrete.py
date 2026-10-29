@@ -56,6 +56,14 @@ class TestStepSystem(unittest.TestCase):
         np.testing.assert_allclose(x1, [2.5])
         np.testing.assert_allclose(hold.h(np.array([1.0]), np.array([0.0]), k=1), [1.0])
 
+    def test_a_vector_unit_delay_holds_every_entry(self):
+        hold = UnitDelay(dim=3)
+        assert hold.n == hold.m == hold.p == 3
+        np.testing.assert_array_equal(hold.x0, np.zeros(3))
+        u = np.array([1.0, -2.0, 0.5])
+        np.testing.assert_array_equal(hold.step(np.zeros(3), u, k=0), u)
+        np.testing.assert_array_equal(hold.h(u, np.zeros(3), k=1), u)
+
     def test_n_must_be_positive(self):
         with self.assertRaises(ValueError):
             StepSystem(0)
