@@ -70,6 +70,10 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 
 ## 5. Not done, or blocked
 
+- **`e4.bicycle_parametric.total_s`** (an online tick's whole `solve_trajectory_from`, not
+  gated) reads 0.146–0.150 s against its baseline's 0.059 s; it read the same on `7c21f63f`,
+  the evening's starting point, so it predates tonight (the run's planner path).
+
 - **The review's latent findings left:** the traced first guess (under a trace `pv.initial(params)`
   falls back to the planner's own start; latent while only native single-shooting programs
   trace), and the delayed form's tick 0 when a run starts away from the problem's `t_start` (a
@@ -105,3 +109,5 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 | 6 | One Euler step's stage cost in one line | `f1a3339b` | v0.3 baseline unchanged by it; vi demos timed |
 | 6 | The JAX program's frozen form | (after `f1a3339b`) | test_costs_optimizer (no retrace per value), test_mpc, test_jax_planning; baseline byte-identical |
 | 6 | The large-leaf check read once | `ab02eb65` | test_compile_once, test_simulation, test_engine |
+| 6 | `compile_parametric_program` warms the parametric form (the regression gate's `e4.bicycle_parametric.solve_s`) | `2a40c65a` | the e4 suite green (0.0085 s) |
+| 7 | The gate on `2a40c65a`'s parent, then the regression gate again | — | ruff; full `pytest` green; regression gates with the CI flags green (after `2a40c65a`); flagship demos and catalog `--fast` green; notebook smoke 34/34; docs build `-W` green |
