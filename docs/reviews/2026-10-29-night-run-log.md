@@ -14,7 +14,48 @@ is the progress record, one line per pushed row; a resumed session reads it to c
 
 ## 1. Morning summary
 
-(Written at the end.)
+**The run is done** on `dev-v0.3-night` (pushed; merged into `dev-v0.3` at the end when the gate
+was green, §7). Every step of the brief landed; the gate is green: ruff, the full `pytest`, the
+regression gates with the CI flags, the flagship demos (17, one interactive skipped), the
+catalog (50), the notebook smoke check (34), the docs build.
+
+**What changed, in one paragraph each:**
+
+1. **The MPC demos are faster than before the run.** The 4–15× slowdown was the animation
+   re-solving a zero-delay MPC at every frame (`37c45da4`); the run now records the plant's input
+   in its own signal pass, so a run solves once per tick with its read-backs (`9ea45d66`). On the
+   M4 Max, median of 3: `mpc_car_circuit` 10.6 → 8.7 s, `mpc_racecar_dynamic` 22.9 → 17.5 s,
+   `mpc_racecar_kinematic` 35.7 → 23.5 s (before the run → tonight).
+2. **`box % dt` clocks each block with its own face** (`f39e1010`): a static block in a box reads
+   seconds, a tick law its count; the zero-delay MPC lost its own `%`.
+3. **Signals are recorded while simulating** (`compute_trajectory(record=...)`, the evaluators'
+   `record=`, `reconstruct_internal_signals(traj, ports=...)`): your decision 6 of 10-28.
+4. **The compile cache's key is exact** (`8ed9ce00`): each block by identity and an edit count
+   bumped by every assignment; the evening's stale JAX results (a function, a helper, an edit
+   inside a helper) are now correct, a test each. The frozen form is kept, measured worth it
+   (54 % on a rollout); a JAX optimization program now has one too, compiled for its consumer
+   (`da27b503`).
+5. **MPPI is on the compiled face** (`MPPIPlanner`, `137e5290`): the MPC runs it in every form;
+   on the UdeS circuit it laps 2.09 times in 10 s at 4.0 ms a tick (J 0.35).
+6. **The review's fixes:** `lookahead` with `delay=False`, the MPC refusing a start set, the face
+   keeping its compiled tree, the failure price at the evaluation's rate, Lyapunov's `P`, the
+   compile probe of a native law, the exact-hold message, the read-only start of the
+   `neural_controller_jax` demo.
+7. **Speed:** the misses the step-6 loop found (value iteration 9–13 %, the cart-pole
+   collocation 8 %, `diagram_compiling` 9 %) are fixed; `readme_examples` stays 6 % slower
+   (N-21). The final sweep's table is §4.
+
+**For your review, in this order:**
+1. N-7 and N-22, the cart-pole RL demo: tonight's evidence says the one-score reward, not the
+   seed system, makes it learn less reliably, and that 3M or 4M steps do not restore it (3/8,
+   2/8 seeds against 9/12 before the run); its default seed swings up.
+2. N-2 and N-13, the compile cache: kept and made exact, with the two blind spots left in
+   KNOWN_ISSUES.
+3. N-1, N-11, N-12, recording: the API, the end sample, the continuous path.
+4. N-3, N-14 to N-17, MPPI: the `method`/`seed` leaves, the names on `minilink.planning`, the
+   deterministic scope, the tick's key, `env.step(t_origin=)`.
+5. N-19, a new design question in QUESTIONS.md (the fields' parameters).
+6. The rest of §2 as a block.
 
 ## 2. Decisions taken without the maintainer
 
