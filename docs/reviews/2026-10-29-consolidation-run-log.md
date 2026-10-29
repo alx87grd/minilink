@@ -382,6 +382,27 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 
 - The cart-pole RL demo's reliability (the maintainer's, §1 item 7): the reward change moves
   every RL demo's training; none was re-run for its numbers.
+- The three loops in the top-level `experimental/` folder still close on `discretize(...)`
+  (C-31, yours to move).
+- The RL environment on a native step problem refuses (C-41); reading the face's `N`, `γ`
+  and bound is a later row.
+- The z-domain root locus and step response (C-28): `linearize`, `bode`, `margins`,
+  `nyquist` and `pzmap` read `z`; `root_locus` and `step_response` stay continuous.
+- ROADMAP §2 is not edited: the MPPI sentence and the breaking-changes entry are drafts (§7).
+
+## 6. Progress
+
+| Step | Commit | Row |
+| --- | --- | --- |
+| 1 | `dd7822d4` | the compile cache out (R168) |
+| 2 | `09bf4b71`, `c342acbb` | every number a parameter (R169) |
+| 3 | `5bbf5058` | one tree per planner (R170) |
+| 4 | `0a79f9de` | the one score's edges (R171–R173) |
+| 5 | `fcd1da56` | the problem's boundary dials (R177) |
+| 6 | `52be6eb2` | the loop's grammar (R174, R175) |
+| 7 | `a6c16fff`, `51b452b9` | one MPC architecture (R176); the moved gates re-pinned |
+| 8 | `920aeedb` | the details the review owns (R178, R179); the `>>` refusal removed |
+| 9 | this record's commit | the records: DESIGN, ROADMAP §3, TODO, core-architecture, the drafts of §7 |
 
 ## 7. Drafts for the maintainer (ROADMAP §2 is his)
 
@@ -407,15 +428,3 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 >   system is a `DiscreteLTISystem` (R174, R175); the MPC is one box, `delay=False,
 >   warm_start=True` by default, `lookahead` gone, its tuning path `controller.solve.cost`
 >   (R176).
-
-## 6. Progress
-
-| Step | Commit | Row |
-| --- | --- | --- |
-| 1 | `dd7822d4` | the compile cache out (R168) |
-| 2 | `09bf4b71`, `c342acbb` | every number a parameter (R169) |
-| 3 | `5bbf5058` | one tree per planner (R170) |
-| 4 | `0a79f9de` | the one score's edges (R171–R173) |
-| 5 | `fcd1da56` | the problem's boundary dials (R177) |
-| 6 | `52be6eb2` | the loop's grammar (R174, R175) |
-| 7 | `a6c16fff`, `51b452b9` | one MPC architecture (R176); the moved gates re-pinned |

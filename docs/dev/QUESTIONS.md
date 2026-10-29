@@ -19,7 +19,9 @@ TODO; the entry then leaves this file. The v0.3 core's rulings are the architect
 The v0.3 core's architecture is of record (2026-10-28, R166). The questions the independent
 review of the two runs raised were ruled on 2026-10-29 (R168–R179,
 [the record](../reviews/2026-10-29-consolidation-rulings.md)); their design is
-[the consolidation plan](../plans/consolidation-after-the-runs.md). Nothing is open here.
+[the consolidation plan](../plans/consolidation-after-the-runs.md), landed on `dev-v0.3` the same
+day. Its run's decisions taken without you, those marked "To raise" first, are in
+[its run log](../reviews/2026-10-29-consolidation-run-log.md) §2. Nothing else is open here.
 
 ## Toward v1.0
 

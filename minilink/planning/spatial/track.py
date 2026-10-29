@@ -30,6 +30,9 @@ class ReferenceTrack:
         X = bounds & track.corridor_field(body).as_set()
         cost = base + track.distance_field(body).as_cost(weight=5.0)
 
+    Its ``params`` are ``{"path", "half_width"}``: the path's numbers and the
+    corridor radius.
+
     Parameters
     ----------
     path : ReferencePath
@@ -37,7 +40,6 @@ class ReferenceTrack:
     half_width : float
         Corridor radius around the path (same units as ``path.distance``).
 
-    ``params`` is ``{"path": the path's numbers, "half_width"}``.
     """
 
     path: ReferencePath

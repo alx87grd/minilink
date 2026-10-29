@@ -53,6 +53,21 @@ class PlanningProblem:
     laws (the start at its law's mean, the parts at their own numbers), and
     :attr:`is_stochastic` is read off the parts.
 
+    The dials, in one table:
+
+    =========== =========================================== =====================================
+    dial        meaning                                     default
+    =========== =========================================== =====================================
+    ``X0``      the start constraint ``x(0) ∈ X0``          from ``x_start``, else ``sys.x0``
+    ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
+    ``x_start`` the evaluation start (a point or a law)     from ``X0``
+    ``xbar``    the objective's target, the cost's number   the cost's
+    =========== =========================================== =====================================
+
+    :meth:`goal_point` is the point a heuristic aims at (an initial guess's
+    end, RRT's goal bias, a plot's anchor): ``Xf``'s point, else the cost's
+    ``xbar`` inside ``X``, else the start.
+
     Parameters
     ----------
     sys : System
@@ -86,20 +101,6 @@ class PlanningProblem:
         (a hard terminal equality for collocation and shooting); ``None``
         (default) is a free end.
 
-    The dials, in one table:
-
-    =========== =========================================== =====================================
-    dial        meaning                                     default
-    =========== =========================================== =====================================
-    ``X0``      the start constraint ``x(0) ∈ X0``          from ``x_start``, else ``sys.x0``
-    ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
-    ``x_start`` the evaluation start (a point or a law)     from ``X0``
-    ``xbar``    the objective's target, the cost's number   the cost's
-    =========== =========================================== =====================================
-
-    :meth:`goal_point` is the point a heuristic aims at (an initial guess's
-    end, RRT's goal bias, a plot's anchor): ``Xf``'s point, else the cost's
-    ``xbar``, else the start.
     tf : float, optional
         Continuous planning horizon length in seconds. ``None`` means unset
         (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
