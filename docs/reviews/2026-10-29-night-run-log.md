@@ -29,6 +29,11 @@ is the progress record, one line per pushed row; a resumed session reads it to c
 | N-12 | 2 | A continuous diagram's `record=` | One selective pass over the output samples after the run (the named ports and the blocks they read), not a hook inside the integrator | The adaptive solver has no fixed samples inside the run; a continuous diagram holds no solve, so the pass is cheap; one path for every solver | Record the RK4 stage-1 buffer inside the fixed-step scan | `9ea45d66` |
 | N-2 | 3 | Is the compile-once cache sound (your "bad feeling") | Fragile as built, and the cause was the key, not the two forms. Kept: one global LRU of 16 JAX evaluators (a loop rebuilt over the same blocks by `closed_loop` or `problem.compile` must reuse one, which an instance-owned cache cannot do), the frozen and parametric forms, `call_params()`'s digest switch. Changed: the key reads each block's identity and an edit count that every attribute assignment bumps (values and run records aside), a plain-data helper and JAX arrays by value, functions by code. Remaining blind spots (a class's method replaced, a change deep in a rich held object) are in KNOWN_ISSUES | The evening's probe gave silently wrong JAX numbers for a function swapped on a block, a helper swapped and an edit inside a helper; all now match NumPy (a test per case). An explicit handle-only design (every convenience call compiles fresh, 0.35 s each) gives up the speed the maintainer asked for on 10-28 | An instance-owned cache with version counters; or handles only | `8ed9ce00` |
 | N-13 | 3 | Is the frozen form worth its second trace (RD-68's measurement was weak) | Keep the frozen form for the evaluators' runs; the planning evaluator stays parametric only | Measured on the M4 Max, median of 40 calls: a 2000-step JAX rollout frozen 6.8 ms against parametric 10.5 ms (54 %), a 100-tick evaluation 0.18 against 0.26 ms (42 %, 0.08 ms in absolute). The evaluator's calls vary their tree in practice (sweeps, gradients), and a frozen form there would need a second path for 0.08 ms | Parametric everywhere (simpler, 30–50 % slower runs) | `8ed9ce00` |
+| N-3 | 4 | When the `"method"` and `seed` leaves land (RD-54 deferred them to v0.4 with MPPI) | Now, on `MPPIPlanner.params`: MPPI is their first user and landed tonight; the trajectory-optimization face keeps its tree (its method is structure there) | RD-54's own condition (they come with MPPI) is met | Keep them for v0.4 | `137e5290` |
+| N-14 | 4 | MPPI's public names (mppi.md's [ask]) | `MPPIPlanner` and `MPPIRecord` on the `minilink.planning` facade (the provisional band), not on the root | R106 ruled the names; the root carries the teaching surface, and MPPI is research-lane until the teaching decision (V3) | The root facade | `137e5290` |
+| N-15 | 4 | What MPPI does with a stochastic problem tonight | The deterministic planner's warning and the nominal plan (`accepts_stochastic = False`); the stochastic branch (`n_plant_samples`, mean or CVaR) stays TODO S72's rest | A night's scope; the deterministic textbook algorithm is what the MPC and the demos need | The branch now | `137e5290` |
+| N-16 | 4 | How an MPPI solve at a later tick draws new noise (R104) | The key is the seed leaf with the tick `round((t0 − t_start) / dt)` folded in, so a solve is a function of its tree and its time, and every tick draws afresh | R104 (the seed and the tick); the zero-delay MPC binds `t_start` per tick | The MPC drawing a seed per tick into the tree | `137e5290` |
+| N-17 | 4 | Where an MPPI solve starts its receding horizon | `env.step(..., t_origin=t0)`: the environment's horizon counted from the solve's time, so the terminal cost comes at `t0 + tf`, the exit rule and the price keeping their one owner | Without it the environment counts the horizon from the problem's `t_start` and charges `h` at the wrong tick from the second solve on | A rollout of MPPI's own (a second owner of the exit rule) | `383d7db9` |
 
 ## 3. Ledger of intended number changes
 
@@ -45,6 +50,12 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 
 ## 5. Not done, or blocked
 
+- **The SLSQP collocation MPC on the racecar circuit of `mppi_racecar.py`** stalls at 0.18 laps
+  in 10 s (J 1.01, 1.2 ms a tick: its solves return at once). The circuit starts heading along
+  `+x`, the exact heading where SLSQP stops on a singular matrix (the zero-delay MPC record,
+  finding 4, for the pathtracking project); MPPI on the same problem laps 2.09 times. Not a
+  regression of tonight; not the flagship demos (they nudge their start heading).
+
 ## 6. Textbook check
 
 ## 7. Progress
@@ -58,3 +69,5 @@ after), `mpc_car_minimal` 1.9 → 3.2 s, the value-iteration demos 10–25 % slo
 | 1 | `SampledSystem`'s period is `dt`; viz reads the plant from the plan | `486adff4` | the same |
 | 2 | Recording signals in the run; selective reconstruction; the planning evaluator from its own pass | `9ea45d66` | ruff; test_mpc (read-backs solve nothing), test_sampled_loop, test_diagrams, test_graphics, test_engine, test_simulation, test_planning_*, test_compile_once, test_step_*; v0.3 baseline byte-identical; `mpc_car_circuit` 120 solves for 120 ticks; full `pytest` green |
 | 3 | The compile cache's exact key; stale-case tests; KNOWN_ISSUES and DESIGN | `8ed9ce00` | ruff; test_compile_once (every stale case, eviction, the remedy), test_mpc, test_sampled_loop; v0.3 baseline byte-identical |
+| 4 | `RolloutEnvironment` to `planning/environment.py` (R108); `env.step(t_origin=)` | `383d7db9` | ruff; test_rl_tabular, test_random, test_rl_planner |
+| 4 | `MPPIPlanner`, its face, the MPC on it, two demos | `137e5290` | ruff; test_mppi (10), test_mpc, test_textbook_style, test_public_names; both demos run (5.8 s, 1.8 s) |
