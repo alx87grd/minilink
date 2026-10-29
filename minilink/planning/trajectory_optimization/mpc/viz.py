@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.discrete.sampled_diagram import plant_run_of
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import (
@@ -175,10 +176,9 @@ def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
     if loop is None:
         return rollout.of("plant")
 
-    x = plant_states_of(rollout, loop)
-    u = plant_inputs_of(rollout, loop, params)
+    _, run = plant_run_of(loop, rollout, params)
 
-    return Trajectory(t=rollout.t, x=x, u=u)
+    return run
 
 
 ###############################################################################
@@ -199,27 +199,6 @@ def plant_states_of(rollout, loop):
     start, end = loop.state_index["plant"]
 
     return rollout.x[start:end]
-
-
-def plant_inputs_of(rollout, loop, params=None):
-    """The plant's input at each sample of a sampled loop's dense run: ``S`` samples per tick, the last the end."""
-    ev = loop.compile()
-    t_start = float(rollout.t[0])
-    S = ev.plan.dense_points
-    n_samples = rollout.t.size
-
-    # Sample i lies in the period of tick ⌊i / S⌋; the last sample is the end's tick
-    ticks = np.arange(n_samples) // S
-    u = np.zeros((int(ev.plan.plant_op.u_dim), n_samples))
-    for k in np.unique(ticks):
-        samples = np.flatnonzero(ticks == k)
-        first = samples[0]
-        u_k = ev.plant_input(
-            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
-        )
-        u[:, samples] = np.asarray(u_k).reshape(-1, 1)
-
-    return u
 
 
 def plan_history_of(rollout, mpc, loop, block):

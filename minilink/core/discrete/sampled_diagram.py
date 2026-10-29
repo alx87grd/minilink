@@ -109,6 +109,26 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return compile_sampled_diagram(self, backend=backend, verbose=verbose)
 
+    def animate(self, traj=None, **options):
+        """
+        Animate the loop's plant on its own run: its states, and the input the loop held on it each period.
+
+        The loop's blocks are evaluated once per tick to read the plant's input
+        (a pure MPC solves once per tick), never once per frame. A loop with no
+        plant (a computer alone) animates as any diagram. ``options`` are
+        :meth:`~minilink.core.facades.animation.SystemAnimation.animate`'s.
+        """
+        # The run passed, else the last one computed, else a fresh one
+        if traj is None:
+            traj = self.traj if self.traj is not None else self.compute_trajectory()
+
+        # The plant's own run, drawn by the continuous plant it samples
+        plant, plant_traj = plant_run_of(self, traj)
+        if plant is None:
+            return super().animate(traj, **options)
+
+        return plant.animate(plant_traj, **options)
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
@@ -159,6 +179,43 @@ class SampledDiagramSystem(StepDiagramSystem):
             [state.nominal_value, np.zeros(self.hold_dim)]
         )
         self.n = start
+
+
+def plant_run_of(loop, rollout, params=None):
+    """
+    ``(plant, run)``: the loop's plant and its run inside the loop's dense run, ``(None, None)`` with no plant.
+
+    ``run.x`` is the plant's state slice; ``run.u`` the input the loop fed it, as
+    the compiled plan gathers it at each tick and held over the period: ``S``
+    samples per tick (the plant's substeps), the last sample the end's tick.
+    ``params`` is the tree the run was made with (``None``: the loop's own).
+    """
+    # Lazy import: a real cycle, the trajectory module reads the systems
+    from minilink.core.trajectory import Trajectory
+
+    ev = loop.compile()
+    op = ev.plan.plant_op
+    if op is None:
+        return None, None
+    plant = getattr(op.system, "source", op.system)
+    S = ev.plan.dense_points
+    t_start = float(rollout.t[0])
+    n_samples = rollout.t.size
+
+    # u_k = the plant's gathered input at tick k, held over the samples of its period
+    ticks = np.arange(n_samples) // S
+    u = np.zeros((int(op.u_dim), n_samples))
+    for k in np.unique(ticks):
+        samples = np.flatnonzero(ticks == k)
+        first = samples[0]
+        u_k = ev.plant_input(
+            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
+        )
+        u[:, samples] = np.asarray(u_k).reshape(-1, 1)
+
+    x = rollout.x[op.local_x_slice]
+
+    return plant, Trajectory(t=rollout.t, x=x, u=u)
 
 
 def clock_periods(diagram):
