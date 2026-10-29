@@ -266,7 +266,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
-  delay=True, warm_start=True, lookahead=0.0)` closes a planner's compiled face `pv = planner.compile()` on the
+  delay=True, warm_start=True, lookahead=0.0, verbose=False)` closes a planner's compiled face `pv = planner.compile()` on the
   loop, one solve per tick, `(mpc % dt) @ plant`. The delayed form (the default) is a native
   `SampledSystem` (`core.discrete.sampled_system.NativeSampledSystem`: no source, its seconds
   face `update` and its port functions written in seconds, `%` setting the period on a copy)
@@ -277,7 +277,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `params`, so `controller.cost.Q` tunes the plan) with each leaf named in `inputs` read from
   its port (default `{"x_start": "y"}`) and `t_start` the tick's time; `lookahead=Δ` starts the
   plan at `t_k + Δ` from the measured start predicted that far under the stored plan (the
-  planner's model, its commands linear between knots). The zero-delay form (`delay=False`) is a small
+  planner's model, its commands linear between knots). `verbose=True` prints one line per solve on a host run (the tick's
+  time, success, iterations, cost, wall time). The zero-delay form (`delay=False`) is a small
   sampled diagram of pure blocks, the textbook MPC's optimizer and memory: `PlanSolver`
   (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0=warm)`, `warm` the last plan shifted one
   period with its first state knot at the measurement, the default guess while there is no

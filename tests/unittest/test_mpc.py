@@ -1,5 +1,7 @@
 """The planner's compiled face and the MPC on it: one solve per tick, the plan one period late."""
 
+import contextlib
+import io
 import unittest
 from unittest import mock
 
@@ -692,6 +694,28 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         run = loop.compute_rollout(5)
         p0, p1 = loop.state_index["plant"]
         assert abs(run.x[p0:p1, -1][0] - 2.0) < 0.6
+
+    def test_verbose_prints_one_line_per_solve_and_is_off_by_default(self):
+        def printed(verbose):
+            planner = integrator_planner(backend="numpy")
+            mpc = ModelPredictiveController(planner, delay=False, verbose=verbose)
+            loop = (mpc % DT) @ discretize(planner.problem.sys, DT, substeps=4)
+            loop.subsystems["plant"].x0 = np.array([0.5])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                loop.compute_trajectory(tf=1.0)
+            return [line for line in out.getvalue().splitlines() if "MPC @" in line]
+
+        # Five ticks, one line each, at the ticks' times
+        lines = printed(True)
+        assert [line.split()[2] for line in lines] == [
+            "t=0.00s",
+            "t=0.20s",
+            "t=0.40s",
+            "t=0.60s",
+            "t=0.80s",
+        ]
+        assert printed(False) == []
 
 
 @pytest.mark.jax

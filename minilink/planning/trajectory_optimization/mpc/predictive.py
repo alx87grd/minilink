@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 
 import numpy as np
 
@@ -33,6 +34,7 @@ def ModelPredictiveController(
     warm_start=True,
     lookahead=0.0,
     backend=None,
+    verbose=False,
 ):
     """
     Model predictive control on a planner's compiled face: re-plan from the measured state at each tick, apply the plan.
@@ -85,6 +87,11 @@ def ModelPredictiveController(
         the measurement at its own time.
     backend : str, optional
         The face's backend (default the planner's).
+    verbose : bool
+        Print one line per solve: the tick's time, success, iterations, cost
+        and the solve's wall time (default off; host runs only, a traced run
+        prints nothing). A read-back that solves again (the plant's input read
+        after a zero-delay run) prints again.
 
     Ports: inputs per ``inputs``; outputs ``u`` (the command), and on the
     delayed and zero-delay forms ``z`` (the plan, for dual rate and logging);
@@ -96,11 +103,11 @@ def ModelPredictiveController(
     bindings = bindings_of(inputs)
 
     if delay:
-        return DelayedPredictiveController(pv, bindings, lookahead)
+        return DelayedPredictiveController(pv, bindings, lookahead, verbose)
     if warm_start:
-        return WarmStartedPredictiveController(pv, bindings, lookahead)
+        return WarmStartedPredictiveController(pv, bindings, lookahead, verbose=verbose)
 
-    return PurePredictiveController(pv, bindings, lookahead)
+    return PurePredictiveController(pv, bindings, lookahead, verbose)
 
 
 class DelayedPredictiveController(NativeSampledSystem):
@@ -113,7 +120,7 @@ class DelayedPredictiveController(NativeSampledSystem):
     at the tick's time. Built by :func:`ModelPredictiveController`.
     """
 
-    def __init__(self, pv, bindings, lookahead=0.0):
+    def __init__(self, pv, bindings, lookahead=0.0, verbose=False):
         super().__init__(n=pv.n_z)
         self.name = "ModelPredictiveController"
 
@@ -121,6 +128,7 @@ class DelayedPredictiveController(NativeSampledSystem):
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
+        self.verbose = bool(verbose)
         self.params = copy.deepcopy(pv.params)
         self.x0 = np.asarray(pv.initial(), dtype=float)
         self.state.labels = [f"z[{i}]" for i in range(pv.n_z)]
@@ -160,7 +168,9 @@ class DelayedPredictiveController(NativeSampledSystem):
         # z_{k+1} = solve(P_k, z0 = shift(z_k, t_k + lookahead)), z_k kept when the
         # solve returns no usable plan
         z_guess = pv.shift(z, t_plan)
+        started = time.perf_counter()
         z_new, status = pv.solve(P, z0=z_guess)
+        report_solve(self, t, status, started)
         cost = status["cost"]
         finite_cost = True if cost is None else xp.isfinite(cost)
         usable = xp.all(xp.isfinite(z_new)) & finite_cost
@@ -216,7 +226,9 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
     plan solved at this tick, for dual rate and logging).
     """
 
-    def __init__(self, pv, bindings, lookahead=0.0, sample_period=None):
+    def __init__(
+        self, pv, bindings, lookahead=0.0, sample_period=None, *, verbose=False
+    ):
         super().__init__()
         self.name = "ModelPredictiveController"
 
@@ -224,10 +236,11 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
+        self.verbose = bool(verbose)
 
         # The blocks: the solve, the command and the plan's memory, which starts at
         # the default guess (no plan yet); on the clock when one is given
-        solve = PlanSolver(pv, bindings, lookahead)
+        solve = PlanSolver(pv, bindings, lookahead, verbose)
         command = PlanCommand(pv)
         memory = PlanMemory(pv)
         if sample_period is not None:
@@ -255,7 +268,11 @@ class WarmStartedPredictiveController(SampledDiagramSystem):
         require_no_clock(self)
 
         clocked = WarmStartedPredictiveController(
-            self.pv, self.bindings, self.lookahead, sample_period=dt
+            self.pv,
+            self.bindings,
+            self.lookahead,
+            sample_period=dt,
+            verbose=self.verbose,
         )
         clocked.subsystems["solve"].source.params = copy.deepcopy(
             self.subsystems["solve"].params
@@ -288,7 +305,7 @@ class PlanSolver(System):
     solve returns no usable plan.
     """
 
-    def __init__(self, pv, bindings, lookahead=0.0):
+    def __init__(self, pv, bindings, lookahead=0.0, verbose=False):
         super().__init__(0)
         self.name = "PlanSolver"
 
@@ -296,6 +313,7 @@ class PlanSolver(System):
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
+        self.verbose = bool(verbose)
         self.params = copy.deepcopy(pv.params)
         self.default_guess = np.asarray(pv.initial(), dtype=float)
 
@@ -327,7 +345,9 @@ class PlanSolver(System):
         # the default guess at P_k while z_prev is no plan yet; z_prev kept when the
         # solve returns no usable plan
         z_guess = warm_guess(pv, z_prev, x_hat, P, z_default)
+        started = time.perf_counter()
         z_new, status = pv.solve(P, z0=z_guess)
+        report_solve(self, t, status, started)
         cost = status["cost"]
         finite_cost = True if cost is None else xp.isfinite(cost)
         usable = xp.all(xp.isfinite(z_new)) & finite_cost
@@ -344,13 +364,14 @@ class PurePredictiveController(System):
     a clock (``mpc % dt``), one solve per tick.
     """
 
-    def __init__(self, pv, bindings, lookahead=0.0):
+    def __init__(self, pv, bindings, lookahead=0.0, verbose=False):
         super().__init__(0)
         self.name = "ModelPredictiveController"
 
         self.pv = pv
         self.bindings = bindings
         self.lookahead = float(lookahead)
+        self.verbose = bool(verbose)
         self.params = copy.deepcopy(pv.params)
 
         declare_bound_inputs(self, pv, bindings)
@@ -365,7 +386,9 @@ class PurePredictiveController(System):
 
         # z* = solve(P_k) from the default guess, read at the tick's time
         P = bound_tree(self, params, u, t + lookahead)
-        z, _ = pv.solve(P)
+        started = time.perf_counter()
+        z, status = pv.solve(P)
+        report_solve(self, t, status, started)
         x_hat = measured_start(self, u)
 
         # u_k = command(z*, x̂_k, t_k)
@@ -497,6 +520,20 @@ def pinned_shift(pv, z, x, t):
     z_guess = assigned(xp, z_shifted, first_knots, xp.reshape(x, (pv.n,)))
 
     return z_guess
+
+
+def report_solve(block, t, status, started):
+    """One line for a verbose block's solve: its tick's time, success, iterations, cost and wall time (host runs only)."""
+    if not block.verbose or not is_concrete(status["success"]):
+        return
+    elapsed = time.perf_counter() - started
+    cost = status["cost"]
+    cost_text = "n/a" if cost is None else f"{float(cost):.6g}"
+
+    print(
+        f"MPC @ t={float(t):.2f}s  success={bool(status['success'])}  "
+        f"iterations={status['iterations']}  J={cost_text}  solve={elapsed:.3f}s"
+    )
 
 
 def is_concrete(value) -> bool:
