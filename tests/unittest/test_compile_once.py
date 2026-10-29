@@ -345,11 +345,11 @@ def test_an_embedded_models_numbers_are_seen_by_the_next_call():
 
     plant = Pendulum()
     plant.x0 = np.array([0.5, 0.0])
-    model = copy.deepcopy(plant)
-    loop = ComputedTorque(model, tracking_ref=False) @ plant
+    law = ComputedTorque(plant, tracking_ref=False)
+    loop = law @ plant
     run = dict(tf=1.0, n_steps=101, solver="rk4_fixedsteps", verbose=False)
     loop.compute_trajectory(**run, backend="jax")
-    model.params["m"] = 3.0 * np.asarray(model.params["m"])
+    law.params["model"]["m"] = 3.0 * np.asarray(law.params["model"]["m"])
     np.testing.assert_allclose(
         loop.compute_trajectory(**run, backend="jax").x,
         loop.compute_trajectory(**run, backend="numpy").x,

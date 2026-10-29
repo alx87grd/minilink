@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
+from minilink.core.params import own_params
 from minilink.core.trajectory import Trajectory
 
 
@@ -51,7 +52,7 @@ class CostFunction(ABC):
     the cost's key in a sum (``None``: its class name).
     """
 
-    params = {}
+    params = own_params()
     id = None
 
     @abstractmethod
@@ -279,15 +280,18 @@ class TimeCost(CostFunction):
     The running cost is ``g = 1`` everywhere except within ``eps`` of the target
     ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
     Under dynamic programming the cost-to-go becomes the time-to-go and the
-    optimal policy is bang-bang. The target is :attr:`params` (``"xbar"``);
-    ``eps``, a threshold with no useful gradient, stays an attribute.
+    optimal policy is bang-bang. The target and the radius are :attr:`params`
+    (``{"xbar", "eps"}``).
     """
 
     def __init__(self, xbar, eps=1e-3):
-        self.params = {"xbar": np.asarray(xbar, dtype=float).reshape(-1).copy()}
-        self.eps = float(eps)
+        self.params = {
+            "xbar": np.asarray(xbar, dtype=float).reshape(-1).copy(),
+            "eps": float(eps),
+        }
 
     xbar = param_view("xbar")
+    eps = param_view("eps")
 
     @classmethod
     def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
@@ -302,7 +306,7 @@ class TimeCost(CostFunction):
         params = self.params if params is None else params
 
         xbar = xp.asarray(params["xbar"])
-        eps = self.eps
+        eps = params["eps"]
 
         on_target = xp.linalg.norm(x - xbar) < eps
 
@@ -504,14 +508,9 @@ class StepCost(ABC):
 
     id = None
 
-    @property
-    def params(self) -> dict:
-        """The cost's numbers: this instance's own (``{}`` until it sets some)."""
-        return self.__dict__.setdefault("own_params", {})
-
-    @params.setter
-    def params(self, value):
-        self.__dict__["own_params"] = value
+    params = own_params(
+        "The cost's numbers: this instance's own (``{}`` until it sets some)."
+    )
 
     @abstractmethod
     def c(self, x, u, k=0, params=None):

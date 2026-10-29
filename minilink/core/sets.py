@@ -14,6 +14,7 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.params import own_params
 
 ###############################################################################
 # Public API
@@ -38,7 +39,7 @@ class Set(ABC):
     box), so a set's numbers are parameters like a plant's.
     """
 
-    params = {}
+    params = own_params()
 
     @abstractmethod
     def margin(self, z, t=0.0, params=None):
@@ -127,7 +128,7 @@ class InputSet(ABC):
     :meth:`contains` and ``params`` follow the conventions of :class:`Set`.
     """
 
-    params = {}
+    params = own_params()
 
     @abstractmethod
     def margin(self, u, x=None, t=0.0, params=None):

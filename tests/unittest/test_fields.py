@@ -6,6 +6,7 @@ import pytest
 from minilink.control.design import lqr_gain_schedule
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, FieldSet, QuadraticField
+from minilink.core.sets import BoxSet
 
 P = np.array([[4.0, 1.0, 0.0], [1.0, 2.0, 0.5], [0.0, 0.5, 3.0]])
 CENTER = np.array([0.5, -1.0, 2.0])
@@ -153,8 +154,40 @@ def test_a_schedule_traces_in_t_and_differentiates_in_p():
 
     value = jax.jit(lambda t: V(x, t=t))(0.5)
     dV_dt = jax.grad(lambda t: V(x, t=t))(0.5)
-    dV_dP = jax.grad(lambda S_: V(x, t=0.5, params={"center": np.zeros(2), "P": S_}))(S)
+    dV_dP = jax.grad(
+        lambda S_: V(x, t=0.5, params={"center": np.zeros(2), "P": S_, "t": times})
+    )(S)
 
     np.testing.assert_allclose(float(value), 3.0, rtol=1e-14)
     np.testing.assert_allclose(float(dV_dt), 2.0, rtol=1e-14)
     np.testing.assert_allclose(np.asarray(dV_dP)[0], 0.5 * np.outer(x, x), rtol=1e-14)
+
+
+def test_a_fields_numbers_move_its_set_and_its_cost():
+    V = QuadraticField(np.zeros(2), np.eye(2))
+    x = np.array([1.0, 0.0])
+    moved = {"center": np.array([1.0, 0.0]), "P": np.eye(2)}
+    sublevel = V.as_set(lower=0.1, upper=2.0)
+    cost = V.as_cost(weight=3.0)
+
+    assert sublevel.params["field"]["center"] is V.params["center"]
+    np.testing.assert_allclose(sublevel.margin(x), [0.9, 1.0])
+    np.testing.assert_allclose(
+        sublevel.margin(x, params={**sublevel.params, "field": moved}), [-0.1, 2.0]
+    )
+    assert float(cost.g(x, np.zeros(1))) == 3.0
+    assert float(cost.g(x, np.zeros(1), params={"weight": 3.0, "field": moved})) == 0.0
+    assert sublevel.with_params({"field": moved}).field.center[0] == 1.0
+
+
+def test_a_set_seen_as_a_cost_carries_the_sets_numbers():
+    box = BoxSet([-1.0, -1.0], [1.0, 1.0])
+    cost = box.as_cost(weight=1.0)
+    x = np.array([1.5, 0.0])
+
+    assert float(cost.g(x, np.zeros(1))) == pytest.approx(0.25)
+    narrow = {
+        **cost.params,
+        "field": {"lower": -np.ones(2), "upper": np.array([2.0, 1.0])},
+    }
+    assert float(cost.g(x, np.zeros(1), params=narrow)) == 0.0

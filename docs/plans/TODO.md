@@ -177,16 +177,6 @@ Why: [core-architecture.md](core-architecture.md) §1.
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
 
   The row's old note that `TrajectorySource.h` cannot trace is stale: it traces since OD-30.
-- [ ] **A model-based law's internal model numbers in its own `params`** (the maintainer,
-  2026-10-28): `JointImpedance`, `TaskImpedance`, `ComputedTorque`, `SlidingMode`, the
-  robotic laws and `NeuralPolicy` read their embedded plant's live `params` today, outside
-  their own tree (DESIGN §5, "Embedded-model params rule"). Their model's numbers move into the
-  controller's standard `params` dict (for example `{"Kp": …, "Kd": …, "model": {…}}`), the
-  model hooks called with that subtree. Then a model mismatch is one parameter edit, the
-  model's numbers sweep, draw and differentiate like any other leaf, and the compiled reuse
-  traces the law once for every value of them. Done when DESIGN's rule says so, the law tests and the robotic
-  demos run.
-
 ### 1.2 The step algebra first-class
 
 Why: [core-architecture.md](core-architecture.md) §2.

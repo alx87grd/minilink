@@ -61,6 +61,7 @@ SYSTEM_FACTORIES = {
         np.array([[[1.0, 0.5]], [[2.0, 1.0]]]),
     ),
     "MLP": lambda: minilink.MLP(2, 1, hidden=(4,)),
+    "LookupPolicy": lambda: lookup_policy(),
     "NeuralPolicy": lambda: minilink.NeuralPolicy(minilink.Pendulum(), hidden=(4,)),
 }
 SYSTEM_EXCEPTIONS = {
@@ -70,9 +71,18 @@ SYSTEM_EXCEPTIONS = {
     "StepSystem",
     "DiagramSystem",
     "StepDiagramSystem",
-    # A policy table over a SciPy interpolator: a host-only lookup until join 1 rebuilds it
-    "LookupPolicy",
 }
+
+
+def lookup_policy():
+    """A dynamic-programming policy table on a small pendulum grid: its node ``i`` takes the action ``i mod 3``."""
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    plant = minilink.Pendulum()
+    problem = minilink.PlanningProblem(plant, x_start=np.zeros(2), U=plant.input_box)
+    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+
+    return minilink.LookupPolicy(grid, np.arange(25) % 3)
 
 
 def public_systems():
@@ -121,9 +131,11 @@ def system_call(sys, params, xp):
 
 
 def other_cases():
-    """``(name, object, call)`` for the costs, sets, distributions and fields."""
+    """``(name, object, call)`` for the costs, sets, distributions, fields, shapes and paths."""
     from minilink import Gaussian, Pendulum, QuadraticCost, TimeCost, Uniform
     from minilink.core.distributions import Particles
+    from minilink.core.fields import QuadraticField
+    from minilink.core.geometry import Box, Sphere
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -131,9 +143,17 @@ def other_cases():
         CallableSet,
         SingletonSet,
     )
+    from minilink.planning.spatial import ReferenceTrack, from_waypoints
 
     plant = Pendulum()
     quadratic = QuadraticCost.from_system(plant, xbar=np.array([1.0, 0.0]))
+    V = QuadraticField([0.1, -0.1], [[2.0, 0.3], [0.3, 1.0]])
+    schedule = QuadraticField(
+        [0.0, 0.0], np.stack([np.eye(2), 3.0 * np.eye(2)]), t=np.array([0.0, 1.0])
+    )
+    disc = Sphere([0.0, 1.0], 0.5)
+    wall = Box([1.0, -1.0], [2.0, 1.0])
+    path = from_waypoints([[0.0, 0.0], [1.0, 0.0], [2.0, 1.0]])
     box = BoxSet([-1.0, -2.0], [1.0, 2.0])
     ball = BallSet([0.0, 0.5], 1.5)
 
@@ -152,6 +172,15 @@ def other_cases():
     def input_set_call(set_, params, xp):
         return set_.margin(xp.asarray([0.4]), xp.asarray([0.3, -0.2]), 0.0, params)
 
+    def shape_call(shape, params, xp):
+        return xp.stack([shape.sdf(xp.asarray([0.3, -0.2]), 0.0, params)])
+
+    def path_call(path, params, xp):
+        return xp.stack([path.distance(xp.asarray([0.3, 0.2]), 0.0, params)])
+
+    def corridor_call(track, params, xp):
+        return xp.stack([track.corridor_margin(xp.asarray([0.3, 0.2]), 0.0, params)])
+
     def law_call(law, params, xp):
         if xp is np:
             return law.sample(7, 3, params)
@@ -164,6 +193,17 @@ def other_cases():
         ("TimeCost", TimeCost([1.0, 0.0], eps=0.5), cost_call),
         ("SumCost", quadratic + 2.0 * QuadraticCost.from_system(plant), cost_call),
         ("Set.as_cost", box.as_cost(weight=3.0), cost_call),
+        ("Field.as_cost", V.as_cost(weight=2.0), cost_call),
+        ("Field.as_terminal_cost", V.as_terminal_cost(weight=2.0), cost_call),
+        ("Field schedule.as_cost", schedule.as_cost(), cost_call),
+        ("Field.as_set", V.as_set(lower=0.1, upper=2.0), set_call),
+        ("Field.as_input_set", V.as_input_set(upper=2.0), input_set_call),
+        ("Sphere", disc, shape_call),
+        ("Box", wall, shape_call),
+        ("Union", disc | wall, shape_call),
+        ("Inflated", wall.inflate(0.2), shape_call),
+        ("PolylinePath", path, path_call),
+        ("ReferenceTrack", ReferenceTrack(path, half_width=0.4), corridor_call),
         ("BoxSet", box, set_call),
         ("BallSet", ball, set_call),
         ("SingletonSet", SingletonSet([0.3, 0.0]), set_call),

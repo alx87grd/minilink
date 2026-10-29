@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -28,6 +28,9 @@ class Scene:
 
         X = bounds & scene.clearance_field(body).as_set()
         cost = base + w * scene.cost_field(body).as_cost()
+
+    ``params`` is ``{"obstacles": the union's numbers, "workspace_fields": each
+    field's by position}``: ``params=None`` reads them.
     """
 
     obstacles: tuple = ()
@@ -38,29 +41,59 @@ class Scene:
         object.__setattr__(self, "obstacles", tuple(self.obstacles))
         object.__setattr__(self, "workspace_fields", tuple(self.workspace_fields))
 
+    @property
+    def params(self) -> dict:
+        """``{"obstacles", "workspace_fields"}``: the obstacles' numbers by position, each field's."""
+        return {
+            "obstacles": {
+                str(i): shape.params for i, shape in enumerate(self.obstacles)
+            },
+            "workspace_fields": {
+                str(i): field.params for i, field in enumerate(self.workspace_fields)
+            },
+        }
+
+    def with_params(self, params):
+        """The scene with each obstacle and field moved by its entry of ``params``."""
+        obstacles = tuple(
+            shape.with_params(params["obstacles"][str(i)])
+            for i, shape in enumerate(self.obstacles)
+        )
+        fields = tuple(
+            field.with_params(params["workspace_fields"][str(i)])
+            for i, field in enumerate(self.workspace_fields)
+        )
+
+        return replace(self, obstacles=obstacles, workspace_fields=fields)
+
     def clearance(self, p, t=0.0, params=None):
         """Signed distance from ``p`` to the nearest obstacle."""
+        params = self.params if params is None else params
+
         obstacles = self.obstacles
+        obstacle_params = params["obstacles"]
         require_obstacles_for_clearance(obstacles)
 
         # The signed distance to the union of the obstacles
-        clearance = Union(obstacles).sdf(p, t=t, params=params)
+        clearance = Union(obstacles).sdf(p, t=t, params=obstacle_params)
 
         return clearance
 
     def cost_density(self, p, t=0.0, params=None):
         """Sum of workspace penalty densities at ``p``."""
+        params = self.params if params is None else params
         xp = array_module(p)
 
         fields = self.workspace_fields
+        field_params = params["workspace_fields"]
 
         # density(p) = Σᵢ densityᵢ(p), summed in the fields' order; 0 with no field
         if not fields:
             density = xp.asarray(0.0)
         else:
-            density = fields[0].density(p, t=t, params=params)
-            for field in fields[1:]:
-                density = density + field.density(p, t=t, params=params)
+            density = fields[0].density(p, t=t, params=field_params["0"])
+            for i, field in enumerate(fields[1:], start=1):
+                density = density + field.density(p, t=t, params=field_params[str(i)])
 
         return density
 

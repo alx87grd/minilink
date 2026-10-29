@@ -2,11 +2,12 @@
 
 import functools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.params import own_params
 from minilink.core.sets import require_box_bounds, require_nonnegative_radius
 
 ###############################################################################
@@ -20,8 +21,16 @@ class Shape(ABC):
 
     A point ``p`` is inside the solid when :meth:`sdf` is negative. The solid
     may depend on time and optional parameters, so the generic signature is
-    ``sdf(p, t, params)``.
+    ``sdf(p, t, params)``. ``params`` is the shape's own numbers (``{}`` for a
+    shape with none): ``params=None`` reads them, a tree passed instead moves
+    the shape.
     """
+
+    params = own_params()
+
+    def with_params(self, params):
+        """The shape moved to ``params``: a copy holding them."""
+        return replace(self, **params)
 
     @property
     @abstractmethod
@@ -79,11 +88,17 @@ class Sphere(Shape):
     def dim(self) -> int:
         return int(self.center.size)
 
+    @property
+    def params(self) -> dict:
+        """``{"center", "radius"}``, the ball's numbers."""
+        return {"center": self.center, "radius": self.radius}
+
     def sdf(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        center = self.center
-        radius = self.radius
+        center = params["center"]
+        radius = params["radius"]
 
         sdf = xp.linalg.norm(p - center) - radius
 
@@ -116,11 +131,17 @@ class Box(Shape):
     def dim(self) -> int:
         return int(self.lower.size)
 
+    @property
+    def params(self) -> dict:
+        """``{"lower", "upper"}``, the box's corners."""
+        return {"lower": self.lower, "upper": self.upper}
+
     def sdf(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        lower = self.lower
-        upper = self.upper
+        lower = params["lower"]
+        upper = params["upper"]
 
         # dᵢ = max(lowerᵢ − pᵢ, pᵢ − upperᵢ), the signed gap to the faces of axis i
         d = xp.maximum(lower - p, p - upper)
@@ -154,7 +175,22 @@ class Union(Shape):
     def dim(self) -> int:
         return self.shapes[0].dim
 
+    @property
+    def params(self) -> dict:
+        """The members' ``params`` by position: ``{"0": ..., "1": ...}``."""
+        return {str(i): shape.params for i, shape in enumerate(self.shapes)}
+
+    def with_params(self, params):
+        """The union with each member moved by its entry of ``params``."""
+        shapes = self.shapes
+        moved = tuple(
+            shape.with_params(params[str(i)]) for i, shape in enumerate(shapes)
+        )
+
+        return replace(self, shapes=moved)
+
     def sdf(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
         shapes = self.shapes
@@ -162,7 +198,8 @@ class Union(Shape):
         # sdf = minᵢ sdfᵢ(p), the nearest member surface, reduced with xp.minimum so it
         # traces under JAX (Python min() would compare traced values and break jit)
         sdf = functools.reduce(
-            xp.minimum, (shape.sdf(p, t, params) for shape in shapes)
+            xp.minimum,
+            (shape.sdf(p, t, params[str(i)]) for i, shape in enumerate(shapes)),
         )
 
         return sdf
@@ -184,12 +221,26 @@ class Inflated(Shape):
     def dim(self) -> int:
         return self.base.dim
 
+    @property
+    def params(self) -> dict:
+        """``{"base": the base shape's numbers, "radius"}``."""
+        return {"base": self.base.params, "radius": self.radius}
+
+    def with_params(self, params):
+        """The inflated shape with its base and radius moved to ``params``."""
+        return replace(
+            self, base=self.base.with_params(params["base"]), radius=params["radius"]
+        )
+
     def sdf(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
+
         base = self.base
-        radius = self.radius
+        base_params = params["base"]
+        radius = params["radius"]
 
         # sdf = sdf_base(p) − r: every surface moves outward by r
-        sdf = base.sdf(p, t, params) - radius
+        sdf = base.sdf(p, t, base_params) - radius
 
         return sdf
 

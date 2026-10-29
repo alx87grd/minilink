@@ -105,13 +105,13 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   fields read their `params` (RN-2); the three owners of a start (a diagram's `x0` a read-only
   stack of its blocks', each stateful block's start a leaf of the evaluator's tree, no
   `refresh()` before a run); one parameter-tree module, `core/params.py`, owns the path lookup,
-  the merge and the flatten; the legacy hybrid runtime and its caches are gone. Rest:
-  `LookupPolicy` keeps its table as an attribute; a model-based law reads its embedded plant's
-  live `params` outside its own tree (TODO §1.1's last row); the RL planner has no `params`
-  tree yet.
-- **Open:** the fields' numbers as leaves of the tree (QUESTIONS.md, from the night run's
-  review). The CONSTITUTION's amendments were taken on 2026-10-28 (`d56dd7a7`), their wording
-  open to the maintainer's review.
+  the merge and the flatten; the legacy hybrid runtime and its caches are gone. In the
+  consolidation (R169): every number that is not structure is a leaf (DESIGN §4,
+  "Parameters"): the fields', the shapes', the paths', an LTI block's matrices, a lookup
+  policy's table, a replayed signal's times, a model-based law's model (`params["model"]`).
+  The RL planner's tree is the consolidation's §3.
+- **Open:** none. The CONSTITUTION's amendments were taken on 2026-10-28 (`d56dd7a7`), their
+  wording open to the maintainer's review.
 - **Rows:** [TODO §1.1](TODO.md#11-every-object-pure-every-number-a-parameter). Design:
   [randomness.md](randomness.md) (RN-2), [differentiable-problem.md](differentiable-problem.md) §8.
 

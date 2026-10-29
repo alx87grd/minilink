@@ -384,8 +384,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 Applies to every method CONSTITUTION §2 names ('One signature'), and also to port
 computes, transcriptions and the `MathematicalProgram` `J`/`h`/`g`.
 Native in, native out; no `np.asarray` / `float()` inside equation paths. Convert at
-boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Where an object does not
-read `params` yet, the gap is tracked below (the distributions and the sets read theirs).
+boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object reads its
+`params` (R169); the written exceptions are listed below.
 
 ### Parameters
 
@@ -398,13 +398,19 @@ read `params` yet, the gap is tracked below (the distributions and the sets read
   `wrt`; every function is deterministic given its parameters, the seed among them.
   `tests/unittest/test_contract.py` walks every public system, cost, set and law on both
   backends (`params=None` its defaults, the same values twice, the JAX numbers the NumPy ones,
-  a finite gradient through a float leaf). The written exceptions: the abstract shells and the
-  diagrams (their `params` are their blocks', walked as blocks); `LookupPolicy` (a table over a
-  SciPy interpolator, host-only); `Trajectory` (a record, not a function); a hand-written
-  `MathematicalProgram` without `params` (`J(z)` alone); the shapes and the workspace fields
-  (frozen geometry read from their fields, the geometry module's plan); a threshold with no
-  useful gradient kept as structure (`TimeCost.eps`); the RL planner, whose tree (`"method"`
-  with `gamma`, the policy seed) is TODO §1.6's rest; a student-written model (RULES 2.3).
+  a finite gradient through a float leaf). Every number that is not structure is a leaf
+  (R169): a field's numbers are leaves of the set's and the cost's tree (`{"field": …}`, a
+  shaping's under `"shaping"`), a shape's and a path's of the scene's and the track's, an LTI
+  block's matrices of its own (`{"A", "B", "C", "D"}`), a lookup policy's table and levels, a
+  replayed signal's times and values, a model-based law's model under `"model"`. A number
+  stays out only for a written structural reason: a size, a count, a choice of method, a
+  boolean switch, a clock's period (it decides the plan), a summing junction's signs, the
+  action box of a neural policy (the plant's input bounds), the drawn geometry of a skin
+  (link lengths drawn, wheel tracks), an LTI model's operating point (it never enters `f`).
+  The other written exceptions: the abstract shells and the diagrams (their `params` are their
+  blocks', walked as blocks); `Trajectory` (a record, not a function); a hand-written
+  `MathematicalProgram` without `params` (`J(z)` alone); a student-written model (RULES 2.3). A base class's
+  `params` is each instance's own dict (`{}` until it assigns one), never one shared dict.
 - **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
@@ -674,19 +680,15 @@ and kinematic laws default to regulation (`tracking_ref=False`,
 `SlidingMode`) default to tracking (`tracking_ref=True`,
 ``r = [q_d; dq_d]``).
 
-**Embedded-model params rule (frozen).** Model-based controllers
-(`JointImpedance`, `TaskImpedance`, `ComputedTorque`,
-`SlidingMode`) hold a reference to a plant object and call its model
-hooks (`g(q)`, `H(q)`, `inverse_dynamics`) with ``params=None`` — the embedded
-model always reads that plant object's **live** ``self.params``. The
-controller's own params dict carries gains only and is never forwarded to the
-embedded model. Consequences: mutating ``plant.params`` updates both the real
-plant and the controller model (they are usually the same object — nominal
-model-based control); diagram-level ``params={"plant": {...}}`` overrides, the
-evaluators' included, reach the plant subsystem but **not** the
-controller's embedded copy (which is exactly the model-mismatch semantics —
-override the plant to study robustness). No forwarded model-params channel is
-provided.
+**Embedded-model params rule.** Model-based controllers (`JointImpedance`,
+`TaskImpedance`, `ComputedTorque`, `SlidingMode`, `TaskKinematic`,
+`TaskKinematicNullspace`) hold the plant's equations and their own copy of its
+numbers, ``params["model"]``, taken at construction; the model hooks (`g(q)`,
+`H(q)`, `inverse_dynamics`, `forward_kinematics`, `J`) are called with that
+subtree. A model mismatch is one edit of it (``law.params["model"]["m"] = 2``),
+and the model's numbers sweep, draw and differentiate like any other leaf; an
+edit of the plant's own ``params`` after the law is built, or a diagram-level
+``params={"plant": {...}}`` override, moves the plant and not the model.
 
 ### `Trajectory`, sets, costs, geometry
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from collections.abc import Callable
 
@@ -52,10 +53,11 @@ class JointImpedance(System):
         n = self.dof
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the joint stiffness and damping
+        # Parameters: the joint stiffness and damping, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(10.0 if Kp is None else Kp, n),
             "Kd": as_dof_vector(1.0 if Kd is None else Kd, n),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the reference and the measurement [q; dq] in, the joint torque out.
@@ -106,7 +108,7 @@ class JointImpedance(System):
         ref_dim = self.inputs["r"].dim
         q = u[ref_dim : ref_dim + n]
         tau = self.ctl(x, u, t, params)
-        return tau + gravity_feedforward(self.plant, self.gravity, q)
+        return tau + gravity_feedforward(self.plant, self.gravity, q, params["model"])
 
 
 class TaskImpedance(System):
@@ -163,12 +165,13 @@ class TaskImpedance(System):
         n = self.task_dim
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the task stiffness and damping
+        # Parameters: the task stiffness and damping, and the model's numbers
         Kp = np.full(n, 10.0) if Kp is None else as_dof_vector(Kp, n)
         Kd = np.full(n, 1.0) if Kd is None else as_dof_vector(Kd, n)
         self.params = {
             "Kp": Kp,
             "Kd": Kd,
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference and the joint measurement [q; dq] in, the joint
@@ -194,6 +197,7 @@ class TaskImpedance(System):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         task_dim = self.task_dim
         dof = self.dof
         ref_dim = self.inputs["r"].dim
@@ -205,8 +209,8 @@ class TaskImpedance(System):
         dq = u[ref_dim + dof : ref_dim + 2 * dof]
 
         # Task position and velocity: p = f(q), ṗ = J(q) q̇
-        p = xp.asarray(plant.forward_kinematics(q))
-        J = xp.asarray(plant.J(q))
+        p = xp.asarray(plant.forward_kinematics(q, model))
+        J = xp.asarray(plant.J(q, model))
         pdot = J @ dq
 
         # Task spring-damper force f = Kp e_p + Kd e_v (regulation: ṗ_d = 0)
@@ -234,7 +238,7 @@ class TaskImpedance(System):
         params = self.params if params is None else params
         tau = self.ctl(x, u, t, params)
         q = u[self.inputs["r"].dim : self.inputs["r"].dim + self.dof]
-        return tau + gravity_feedforward(self.plant, self.gravity, q)
+        return tau + gravity_feedforward(self.plant, self.gravity, q, params["model"])
 
     def tf(self, x, u, t=0, params=None):
         if not self.show_task_force:
@@ -308,9 +312,10 @@ class TaskKinematic(System):
         self.dof = dof
         self.task_dim = task_dim
 
-        # Parameters: the task gain
+        # Parameters: the task gain, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference and the joint measurement q in, the joint rate out
@@ -328,14 +333,15 @@ class TaskKinematic(System):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         n = self.task_dim
         dof = self.dof
         Kp = xp.asarray(params["Kp"])
 
         p_d = u[:n]
         q = u[n : n + dof]
-        p = plant.forward_kinematics(q)
-        J = plant.J(q)
+        p = plant.forward_kinematics(q, model)
+        J = plant.J(q, model)
 
         # v = Kp (p_d − p): the task velocity command
         v_task = Kp * (p_d - p)
@@ -369,10 +375,11 @@ class TaskKinematicNullspace(TaskKinematic):
         self.dof = dof
         self.task_dim = task_dim
 
-        # Parameters: the task gain and the posture gain
+        # Parameters: the task gain, the posture gain, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
             "K_null": as_dof_vector(1.0 if K_null is None else K_null, dof),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference, the posture reference and the joint measurement q
@@ -392,6 +399,7 @@ class TaskKinematicNullspace(TaskKinematic):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         n = self.task_dim
         dof = self.dof
         Kp = xp.asarray(params["Kp"])
@@ -400,8 +408,8 @@ class TaskKinematicNullspace(TaskKinematic):
         p_d = u[:n]
         q_null = u[n : n + dof]
         q = u[n + dof : n + 2 * dof]
-        p = plant.forward_kinematics(q)
-        J = plant.J(q)
+        p = plant.forward_kinematics(q, model)
+        J = plant.J(q, model)
 
         # v = Kp (p_d − p): the task velocity command
         v_task = Kp * (p_d - p)
@@ -434,10 +442,8 @@ def require_gravity_model(plant, gravity_comp, gravity):
 def gravity_feedforward(plant, gravity, q, model_params=None):
     """Gravity feedforward ``g(q)`` from the controller's embedded model.
 
-    ``model_params=None`` (the default) means the embedded model reads the
-    referenced plant's **live** ``self.params`` — the controller's own params
-    dict (gains) is never forwarded. Diagram-level overrides of the plant
-    subsystem do not reach this embedded copy; see DESIGN §4
+    ``model_params`` is the controller's ``params["model"]``, its own copy of
+    the plant's numbers (``None``: the plant's own); see DESIGN §4
     (*Embedded-model params rule*).
 
     A custom hook is ``gravity(q)``, or ``gravity(q, params)`` when its

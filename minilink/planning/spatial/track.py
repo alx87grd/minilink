@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -36,6 +36,8 @@ class ReferenceTrack:
         Workspace centerline.
     half_width : float
         Corridor radius around the path (same units as ``path.distance``).
+
+    ``params`` is ``{"path": the path's numbers, "half_width"}``.
     """
 
     path: ReferencePath
@@ -44,19 +46,33 @@ class ReferenceTrack:
     def __post_init__(self) -> None:
         require_positive_half_width(self.half_width)
 
+    @property
+    def params(self) -> dict:
+        """``{"path", "half_width"}``: the centerline's numbers and the corridor's radius."""
+        return {"path": self.path.params, "half_width": self.half_width}
+
+    def with_params(self, params):
+        """The track with its centerline and half-width moved to ``params``."""
+        path = self.path.with_params(params["path"])
+
+        return replace(self, path=path, half_width=params["half_width"])
+
     def distance(self, p, t=0.0, params=None):
         """Distance from ``p`` to the centerline."""
-        return self.path.distance(p, t=t, params=params)
+        params = self.params if params is None else params
+        return self.path.distance(p, t=t, params=params["path"])
 
     def corridor_margin(self, p, t=0.0, params=None):
         """Positive when ``p`` lies inside the corridor: ``half_width - distance``."""
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        half_width = self.half_width
+        half_width = params["half_width"]
         path = self.path
+        path_params = params["path"]
 
         # m(p) = w − d(p), the room left to the corridor's edge
-        margin = xp.asarray(half_width) - path.distance(p, t=t, params=params)
+        margin = xp.asarray(half_width) - path.distance(p, t=t, params=path_params)
 
         return margin
 

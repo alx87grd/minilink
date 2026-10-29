@@ -20,6 +20,26 @@ class Batched:
     axes: dict
 
 
+def own_params(
+    doc="The object's numbers: this instance's own (``{}`` until it sets some).",
+):
+    """
+    The ``params`` of a base class: each instance's own dict, ``{}`` until it assigns one.
+
+    Read, it is the instance's own tree, or a new empty dict for an instance
+    that holds none (nothing is written on read, and no dict is shared between
+    instances); assigned, it becomes the instance's own.
+    """
+
+    def get(self):
+        return self.__dict__.get("params", {})
+
+    def set_(self, value):
+        self.__dict__["params"] = value
+
+    return property(get, set_, doc=doc)
+
+
 def split_path(path):
     """A dotted path (``"controller.Kp"``; a nested box ``"plant/motor.R"``) as its keys."""
     return path.replace("/", ".").split(".")

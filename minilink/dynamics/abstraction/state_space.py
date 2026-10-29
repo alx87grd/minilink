@@ -88,10 +88,11 @@ class LTISystem(StateSpaceSystem):
         dx = A @ x + B @ u
         y  = C @ x + D @ u
 
-    The matrices are stored exactly as passed so NumPy arrays, JAX arrays, or
-    other matrix objects can drive the same equation code. Access them through
-    the zero-argument method calls, e.g. ``sys.A()`` (useful for introspection
-    such as ``numpy.linalg.eigvals(sys.A())``). ``declare_ports=False`` leaves
+    The matrices are the block's ``params`` (``{"A", "B", "C", "D"}``), stored
+    exactly as passed so NumPy arrays, JAX arrays, or other matrix objects can
+    drive the same equation code; a tree passed to ``f`` or ``h`` moves them.
+    Access them through the zero-argument method calls, e.g. ``sys.A()``
+    (useful for introspection such as ``numpy.linalg.eigvals(sys.A())``). ``declare_ports=False`` leaves
     the ports ``u``, ``y`` and ``x`` undeclared, for a subclass that declares
     its own layout (a compensator ``TransferFunction``); ``expose_state=False``
     declares ``u`` and ``y`` only (a filter is not a plant).
@@ -118,11 +119,9 @@ class LTISystem(StateSpaceSystem):
         ybar=None,
     ):
         # The matrices, as passed: C = I and D = 0 when omitted
-        self._A = A
-        self._B = B
-        self._C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
-        self._D = (
-            zeros_on(B, (matrix_shape("C", self._C)[0], matrix_shape("B", B)[1]))
+        C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
+        D = (
+            zeros_on(B, (matrix_shape("C", C)[0], matrix_shape("B", B)[1]))
             if D is None
             else D
         )
@@ -130,8 +129,8 @@ class LTISystem(StateSpaceSystem):
         # The dimensions and the ports. Structural feedthrough only when D has a
         # nonzero entry: an explicit zero D must not create an algebraic y <- u
         # dependency
-        n, m, p = dimensions_of(self._A, self._B, self._C, self._D)
-        feedthrough = bool(np.any(np.asarray(self._D)))
+        n, m, p = dimensions_of(A, B, C, D)
+        feedthrough = bool(np.any(np.asarray(D)))
         super().__init__(
             n=n,
             m=m,
@@ -142,28 +141,35 @@ class LTISystem(StateSpaceSystem):
             expose_state=expose_state,
         )
 
+        # Parameters: the four matrices
+        self.params = {"A": A, "B": B, "C": C, "D": D}
+
         # The operating point the deviations are measured from (the origin by
         # default), its output ȳ = C x̄ + D ū unless given
         self.xbar = point_component(xbar, n, "xbar")
         self.ubar = point_component(ubar, m, "ubar")
         self.ybar = (
-            np.asarray(self._C, dtype=float) @ self.xbar
-            + np.asarray(self._D, dtype=float) @ self.ubar
+            np.asarray(C, dtype=float) @ self.xbar
+            + np.asarray(D, dtype=float) @ self.ubar
             if ybar is None
             else point_component(ybar, p, "ybar")
         )
 
     def A(self, t=0.0, params=None):
-        return self._A
+        params = self.params if params is None else params
+        return params["A"]
 
     def B(self, t=0.0, params=None):
-        return self._B
+        params = self.params if params is None else params
+        return params["B"]
 
     def C(self, t=0.0, params=None):
-        return self._C
+        params = self.params if params is None else params
+        return params["C"]
 
     def D(self, t=0.0, params=None):
-        return self._D
+        params = self.params if params is None else params
+        return params["D"]
 
     def __str__(self):
         return f"{super().__str__()}\n{matrices_text(self)}"

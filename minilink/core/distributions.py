@@ -15,6 +15,7 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.params import own_params
 from minilink.core.sets import BoxSet, Set
 
 ###############################################################################
@@ -43,7 +44,7 @@ class Distribution(ABC):
     def dim(self) -> int: ...
 
     # The law's numbers, by name (``{}`` for a law that exposes none)
-    params = {}
+    params = own_params()
 
     @property
     def cov(self) -> np.ndarray:

@@ -385,9 +385,9 @@ class TrajectorySource(Source):
     (``"previous"``, the zero-order hold of a sampled controller). Values
     outside ``[t[0], t[-1]]`` hold the nearest endpoint. ``values`` has shape
     ``(p, N)`` (or ``(N,)`` for a scalar signal) aligned with the ``N``
-    sample times in ``t``. The values are the block's ``params``
-    (``{"values": ...}``), so a planned input is a leaf of a problem's tree
-    (``controller.values``); the times and the rule are its structure.
+    sample times in ``t``. The times and the values are the block's ``params``
+    (``{"t": ..., "values": ...}``), so a planned input is a leaf of a problem's
+    tree (``controller.values``); the rule is its structure.
     """
 
     INTERPOLATIONS = ("linear", "previous")
@@ -403,10 +403,9 @@ class TrajectorySource(Source):
 
         Source.__init__(self, values.shape[0], port=port)
 
-        # The samples: the times and the rule are structure, the values parameters
-        self.sample_times = t
+        # The samples: the rule is structure, the times and the values parameters
         self.interpolation = interpolation
-        self.params = {"values": values}
+        self.params = {"t": t, "values": values}
 
     @classmethod
     def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
@@ -418,7 +417,7 @@ class TrajectorySource(Source):
         params = self.params if params is None else params
         xp = array_module(x, u, t, params["values"])
 
-        t_k = xp.asarray(self.sample_times)
+        t_k = xp.asarray(params["t"])
         y_k = xp.asarray(params["values"])
 
         # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
