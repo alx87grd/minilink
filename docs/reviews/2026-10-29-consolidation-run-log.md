@@ -10,7 +10,8 @@ continues.
 **How to read it.** §1 is the amendments of the session and the summary. §2 lists every decision
 taken without the maintainer (C-1…), each with the step, the choice, the reason and the
 alternative. §3 is the ledger of intended number changes. §4 is the textbook-check statement of
-every math diff. §5 is what was not done. §6 is the progress record, one line per pushed row.
+every math diff. §5 is what was not done. §6 is the progress record, one line per pushed row. §7 holds the
+drafts for the maintainer's own sections of ROADMAP §2.
 
 ## 1. The amendments of the session, and the summary
 
@@ -37,6 +38,16 @@ they differ:
    inside, else `sys.x0` when inside, else a refusal asking for `x_start`.
 7. **The cart-pole RL demo** (plan §4.1): its reliability is not re-measured and it is not
    retuned; the maintainer handles it.
+
+**The summary.** Steps 1 to 8 of the plan landed in order, one commit (or two) each, on
+`dev-v0.3` (§6); step 9 is these records. Every step kept the seeded v0.3 baseline
+byte-identical except the ledger's lines (§3): the RL reward (step 4), the shooting guess
+(step 5), the delayed MPC on the box (step 7). The regression gates moved twice, both
+intended and re-pinned with their reason: the bicycle problems' first guess (step 5, C-19) and
+the delayed MPC (step 7, C-34). Nothing of the cart-pole RL demo was re-run (§5). The
+decisions to raise first: C-30 (the judge's step on an undeclared plant), C-23 (the
+continuous simulator's held-signal grid), C-19 with §3's gate line (the guess aiming at a
+tracking target moves the MPC demos), C-33 (the dual rate's late plan), C-22, C-31.
 
 ## 2. Decisions taken without the maintainer
 
@@ -242,11 +253,10 @@ they differ:
   draws the unit circle. The root-locus and step-response tools stay continuous-only (not in
   the plan). The demo: `examples/demos/analysis/analysis_digital_pid_poles.py`.
 
-- **C-29 (step 6) The `>>` refusal reads the chain's left side.** The plan refuses
-  `(filt % 0.01) >> (ctl % 0.1) @ plant` (`@` binds first, so the filter feeds the loop from
-  outside). A source with no input driving the loop's reference, `Sine() >> (pid % dt) @
-  plant`, is the acceptance script 11 and says what it does: the refusal fires only when the
-  chain so far has an input (a law), never for a source.
+- **C-29 (step 6, then step 8) No `>>` refusal** (amendment 1). Step 6 first landed the
+  plan's refusal of a law chained into a closed loop; it contradicted the maintainer's
+  amendment and was removed in step 8: `>>` into a loop is always legal (it feeds the
+  reference), and DESIGN and `sampled-path.md` §8.4 say that `@` binds before `>>`.
 - **C-30 (step 6) The judge integrates at the continuous simulator's step.** A held law
   scored by `problem.compile(law % dt)` (and so every planner's `evaluate`, the evidence of
   value iteration, the RL and MPPI planners) integrates a plant that declares no time
@@ -296,6 +306,43 @@ they differ:
 - **C-38 (step 7) `NativeSampledSystem(n, sample_period=)`**: the period is required at
   construction and `%` on it is refused (rule 1; C-27).
 
+- **C-39 (step 8) `hold_x0` is a top-level leaf** of the evaluator's tree
+  (`pe.params["hold_x0"]`, present when the loop holds a slow block's output): the loop is the
+  tree's root, so the plan's `params["<loop>"]["hold_x0"]` has no `<loop>` key to live under.
+  A layout change under a start that is not zero is refused (the zero start of a fresh
+  layout is still reset silently, as every block's is). The slot reads `controller:u
+  (memory)`.
+- **C-40 (step 8) The compile probe on every port.** A port whose function is not the
+  shortcut's `h` is evaluated only when it has an undeclared input (once, then once per such
+  input), so an MPC's solve, which declares every input it reads, never runs at compile; a
+  function that raises at the probe point is not judged. The KNOWN_ISSUES entry is gone.
+- **C-41 (step 8) `RolloutEnvironment` on a step problem is refused by name** (the plan's
+  first option): a native step problem has no `dt` and is stepped on its face; a discretized
+  one names its origin and period (`RolloutEnvironment(origin, dt=0.1)`). Reading the face's
+  `N`, `γ` and bound instead is a larger change (the sets, laws and sources of a step
+  problem); not done.
+- **C-42 (step 8) The planners' evidence carries the face's running cost.**
+  `nominal_trajectory` (value iteration, LQR, the RL planners, tabular) steps the face's
+  `transition_at` and records `C_{k+1} = C_k + γᵏ c_k` with the plant role, so
+  `evaluate_trajectory(problem, evidence)` is the face's own `J`; the states are the same
+  bits as before (the face's `transition` is its `step`'s to the bit).
+- **C-43 (step 8) One Euler stage-cost rule** (`stepping.euler_stage_cost`), used by
+  `step_with_cost`, `stage_cost` and `SampledCost.stage_cost_at` (which had a copy of its
+  own reading `g` directly: `e^{−ρ·0} = 1` exactly, so the same bits; the v0.3 baseline
+  agrees at rtol 0).
+- **C-44 (step 8) A law's `with_params`** builds the law from its numbers,
+  `type(law)(**params)`: a library law's `params` name its constructor's arguments (its
+  `params` is a view of its attributes, not a stored dict, so the set pattern's copy cannot
+  hold them). `BoxSet.sample` already read `params`; `StepCost` and the shared class-level
+  dicts landed in step 2 (`own_params`, C-5).
+- **C-45 (step 8) MPPI's key on the solve's time.** The tick key stays
+  `fold_in(seed, round((t0 − t_origin)/dt))` on the planner's grid (so every run on that grid
+  keeps its draws); a solve between two knots folds in its offset in millionths of `dt`, so
+  an MPC faster than the planner's `dt` no longer reuses one key on two solves.
+- **C-46 (step 8) `randomness.md` §2** states the cipher's reach (uniforms on a 2⁻²⁴ grid,
+  normals bounded by `√(50 ln 2) ≈ 5.89`) and the CRC-32 stream names. `function_identity`
+  went with the cache in step 1.
+
 ## 3. Ledger of intended number changes
 
 | Row | What moved | Why |
@@ -314,6 +361,11 @@ they differ:
 Every math diff was read beside `planning/dynamic_programming/dp.py`.
 
 - Step 1: no equation line changed.
+- Step 7: `CompiledTrajectoryPlanner.initial`'s traced guess (`z(x̄) + M (x̂ − x̄)`), the
+  pinned `shift`, `model_prediction` (RK4 a quarter knot apart) and MPPI's `initial`, read
+  beside `dp.py`.
+- Step 8: `euler_stage_cost` (`c = dt ċ(x, u, t)`), the evidence's running sum
+  (`C_{k+1} = C_k + γᵏ c_k`), MPPI's `tick_key`, read beside `dp.py`.
 - Step 6: `steps_per_period` (`n = ⌈Δ / Δt⌉`), `rolled_steps` (the RK4 substep in a scan, the
   input line `u0 + (i/s)(u1 − u0)`), `DiscreteLTISystem.step`/`h`, the discrete response
   `z = e^{jωΔ}`, read beside `dp.py`.
@@ -331,6 +383,31 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 - The cart-pole RL demo's reliability (the maintainer's, §1 item 7): the reward change moves
   every RL demo's training; none was re-run for its numbers.
 
+## 7. Drafts for the maintainer (ROADMAP §2 is his)
+
+**MPPI's lane** (plan §8): beside the provisional spatial names, in ROADMAP §2:
+
+> **Provisional planning names:** `MPPIPlanner` and `MPPIRecord` sit on `minilink.planning`
+> as a research-lane planner with no stability promise, provisional until the teaching
+> decision (MP-6, V3) says whether a course uses it.
+
+**The breaking-changes entry** for the two runs and this consolidation:
+
+> - 2026-10-29 (on `dev-v0.3`, the consolidation of the two night runs; every demo, project,
+>   lesson and baseline migrated in the same commits): no compile cache, a held tool compiles
+>   once (R168); every number of a field, a shape, a path, a scene, an LTI block and a
+>   model-based law is a `params` leaf (R169); a planner's tree holds its method's numbers and
+>   its seed (R170); the RL training reward is `−g dt` and the stage reward its option, one
+>   cost bound `problem.cost_bound(tf, dt=None)`, `penalize_failure` and `failure_cost`
+>   replace `infeasible_cost` (R171–R173); `x_goal` is gone, `X0` and `Xf` are the sets,
+>   `x_start` the evaluation start, RRT's goal is an `Xf` region (`goal_tolerance` gone) and a
+>   guess aims at `Xf`'s point, else the cost's target (R177); `%` is the computer, the plant
+>   a loop closes on is integrated at the continuous simulator's step (`dt=` at the runs,
+>   `substeps=` at the compiles, no loop on `discretize`), `linearize` on a step or sampled
+>   system is a `DiscreteLTISystem` (R174, R175); the MPC is one box, `delay=False,
+>   warm_start=True` by default, `lookahead` gone, its tuning path `controller.solve.cost`
+>   (R176).
+
 ## 6. Progress
 
 | Step | Commit | Row |
@@ -341,3 +418,4 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 | 4 | `0a79f9de` | the one score's edges (R171–R173) |
 | 5 | `fcd1da56` | the problem's boundary dials (R177) |
 | 6 | `52be6eb2` | the loop's grammar (R174, R175) |
+| 7 | `a6c16fff`, `51b452b9` | one MPC architecture (R176); the moved gates re-pinned |

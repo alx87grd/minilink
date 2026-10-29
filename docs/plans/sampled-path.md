@@ -186,8 +186,9 @@ The plant's integration step is the continuous simulator's rule, no exception: R
 `Δt = AUTO_DT_SCALE·τ_min`, `substeps = ⌈Δ / Δt⌉`; `dt=` at the run verbs and `substeps=` at
 the compiles choose another. `>>`, `+` and `@` between step systems keep their continuous
 meaning on the same assembly code. The refusals: `pid @ (plant % Δ)`, two continuous systems in
-a sampled diagram, `UnitDelay() @ plant` with no clock, a closed loop on the right of `>>`
-(`a >> b @ plant` binds `@` first), a bare tick law in a nested box slower than the loop.
+a sampled diagram, `UnitDelay() @ plant` with no clock, a bare tick law in a nested box
+slower than the loop. `>>` into a closed loop is never refused (the maintainer, 2026-10-29): it
+feeds the loop's reference, and `@` binds first, which the docs say.
 **The step tools apply to the loop:** `jacobian`, `linearize` (a `DiscreteLTISystem` with its
 period: the poles against the unit circle, `pzmap` in `z`, the Bode at `G(e^{jωΔ})`; for a
 multi-rate loop over its base tick), `problem.compile`, `vmap`, `grad`.

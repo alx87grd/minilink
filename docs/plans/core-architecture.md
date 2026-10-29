@@ -330,12 +330,12 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   trajectory optimization has its compiled face (`planner.compile()`, R148: `solve`, `shift`,
   `command`, `prediction`, `solution`, `pack`; a native method `vmap`s over starts); the RL
   learners run their steps in one `lax.scan`; `planner.solve(params=, guess=)` reads no last
-  solution (RD-53); the MPC is `ModelPredictiveController(planner, *, inputs=, delay=,
-  warm_start=, lookahead=)` on the face in three forms (the delayed form a `NativeSampledSystem`;
-  the zero-delay warm-started form, three pure blocks; the pure form), `PlanFollower` for dual
-  rate, its closed loop one scan tuned by gradient (acceptance script 5); `MPPIPlanner` is the
-  face's first gradient-free consumer, with the `"method"` and `seed` leaves (N-3). Rest: those
-  leaves on the trajectory-optimization and RL trees; one MPC architecture (TODO §1.8).
+  solution (RD-53); the MPC is `ModelPredictiveController(planner, *, inputs=, delay=False,
+  warm_start=True)` on the face, one architecture (R176, the consolidation of 2026-10-29): the
+  box `solve`, `command`, `memory`, a visible `delay` when asked, `pv.initial` traced;
+  `PlanFollower` for dual rate, its closed loop one scan tuned by gradient (acceptance script
+  5); `MPPIPlanner` is the face's first gradient-free consumer; every planner's tree holds the
+  `"method"` and `seed` leaves (R170).
 - **Open:** nothing; the names are ruled (R164).
 - **Rows:** [TODO §1.8](TODO.md#18-the-native-proof-of-concept-the-planners-pure-face-and-an-mpc-on-it).
 

@@ -17,22 +17,6 @@ lands. Last checked against the code: 2026-10-29.
 - **Fix:** the one-mechanical-family work (S32, postponed): a model-based law will refuse an
   underactuated plant at construction, with a clear message (R102).
 
-### A port function that reads an input it does not declare reads a stale value
-- **Symptom:** a port whose `compute` reads an input missing from its `dependencies` is
-  scheduled as if it did not, so the compiled diagram can evaluate it before its source and
-  hand it the empty buffer (zero), silently; in a loop it solves the wrong fixed point. The
-  compile probe catches this on an output computed by the leaf's own `h` (the `DynamicSystem`
-  shortcut); a port added by `add_output_port` with its own function, or on a bare `System`,
-  is not probed.
-- **Reproduce:** a bare `System` with `add_output_port("y", dim=1, dependencies=())` whose `h`
-  is `y = 2 u`, added before a `Step(final_value=[1.0])` that drives it: the compiled output
-  at `t = 2` is `0`, not `2` (declared `dependencies=("u",)`, it is `2`; the same block as a
-  `DynamicSystem(n=0, …, y_dependencies=())` is refused at compile).
-- **Workaround:** declare every input a port reads (`dependencies=("u",)` or `"all"`).
-- **Fix:** none planned: the compile probe (S66, landed) covers the shortcut's `h`; probing
-  every port function is a design question for the maintainer
-  ([QUESTIONS.md](QUESTIONS.md)).
-
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
   keys, so the change has no effect and nothing says so. Diagram-level params check their

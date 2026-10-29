@@ -40,7 +40,7 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your review of the overnight run's open decisions | OD-7 … OD-35 | v0.3 (the merge, §1.10) | review the number changes first, then the rest as a block |
-| The consolidation after the two runs | [the plan](consolidation-after-the-runs.md) | v0.3 (before the merge) | ruled (R168–R179); an agent implements it in the plan's order; its three asks are in the plan's last paragraph |
+| The consolidation after the two runs | [the plan](consolidation-after-the-runs.md) | v0.3 (before the merge) | landed on `dev-v0.3` (2026-10-29); your review of [its run log](../reviews/2026-10-29-consolidation-run-log.md): the decisions marked "To raise", the ledger, the two ROADMAP §2 drafts (§7) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -434,15 +434,12 @@ solvers are v0.4 (§4); MPPI landed on the face in the night run of 2026-10-29 (
   stays the default; the course notebooks that run an MPC (GRO501 `racecar_toward_mpc`,
   the showcase, `mpc_spatial_stack`) run `delay=False` too (the maintainer's call,
   2026-10-29).
-- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28; its two prerequisites,
-  clocking a box and recording the signals, landed in the night run of 2026-10-29): the delayed and pure forms
-  as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
-  `lookahead`); one tuning path for every form (`controller.cost.R` or
-  `controller.solve.cost.R`, one of them); `DelayedPredictiveController` and
-  `PurePredictiveController` folded into the factory. Done when the delayed form's numbers are
-  byte-identical (the v0.3 baseline, acceptance script 5, the budget script) and the plan
-  readers find every form by role. It amends R148's wording ("the MPC one block in two forms"):
-  record the ruling when it lands. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.3)
+- [x] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, R176): landed in the
+  consolidation of 2026-10-29 (its run log, step 7): every MPC is the box `solve`, `command`,
+  `memory`, plus a visible `delay` when `delay=True`; `delay=False, warm_start=True` the default;
+  `lookahead` and the delayed and pure classes gone; one tuning path, `controller.solve.cost.R`;
+  `pv.initial` traces (the review's D-4). The delayed form's numbers moved once (the run log's
+  C-34, ledgered).
 - [ ] **Its closed loop in one scan, tuned by gradient** (NS-9): `problem.compile(mpc % Δ)`
   `.evaluate(p)` runs, `vmap`s over starts, and `jax.grad` with respect to `controller.cost.Q`
   tunes a demo by `Optimizer`. The gradient MPC came first, as the direction places it; MPPI

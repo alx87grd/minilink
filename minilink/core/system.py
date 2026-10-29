@@ -435,7 +435,10 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         Neither operand is modified: a diagram operand is laid out flat in the
         result, which shares its blocks, carries the left operand's ``x0`` and
-        camera settings, and is named after every operand. See
+        camera settings, and is named after every operand. Python binds ``@``
+        before ``>>``: ``filt >> ctl @ plant`` is ``filt >> (ctl @ plant)``, the
+        filter feeding the closed loop's reference; a filter on the measurement
+        takes the parentheses, ``(filt >> ctl) @ plant``. See
         :func:`~minilink.core.operators.series`.
         """
         # A real cycle: the operators import System from this module

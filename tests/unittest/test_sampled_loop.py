@@ -546,3 +546,38 @@ def test_a_sampled_data_law_takes_its_period_at_construction():
         law % 0.2
     with pytest.raises(TypeError, match="already on a clock"):
         discretize(law, 0.1)
+
+
+def test_the_held_outputs_start_is_a_leaf_of_the_run():
+    from minilink import PlanningProblem, QuadraticCost
+
+    loop = multi_rate_computer_on_an_integrator()
+    assert loop.state.labels[-1] == "controller:u (memory)"
+    plant = Integrator()
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(1), tf=0.2
+    )
+    built = closed_loop_with_holds()
+    pe = problem.compile(built)
+    np.testing.assert_array_equal(pe.params["hold_x0"], [0.0])
+    moved = pe.trajectory({"hold_x0": np.array([3.0])})
+
+    # The run's held slot (the last state row) starts at the leaf
+    assert moved.x[-1, 0] == 3.0
+
+
+def closed_loop_with_holds():
+    from minilink import closed_loop
+
+    return closed_loop(
+        P(10.0, ports="reference") % 0.1,
+        Integrator(),
+        filter=LowPass() % 0.01,
+    )
+
+
+def test_a_layout_change_under_a_held_start_is_refused():
+    loop = multi_rate_computer_on_an_integrator()
+    loop.x0 = np.array([0.0, 0.0, 2.0])
+    with pytest.raises(ValueError, match="set the start"):
+        loop.add_subsystem(P(1.0, ports="reference") % 0.2, "slow")

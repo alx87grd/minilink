@@ -187,6 +187,19 @@ over Δ on the measurement: the asymmetry students get wrong, and why the rule l
 time `τ`. The textbook handles it by augmenting the state with `z`; so does a diagram. Its state
 starts from `N(0, W / 2τ)` to be stationary from `t = 0` (RD-D23).
 
+**What the cipher's draws can reach** (the consolidation of 2026-10-29, review finding). A
+counter draw (`core/distributions.py`, `standard_uniform`, `standard_normal`) turns the top 24
+bits of a cipher word into a uniform on a grid inside `(0, 1)`: `u = (bits ≫ 8) 2⁻²⁴ + 2⁻²⁵`,
+so `u ∈ [2⁻²⁵, 1 − 2⁻²⁵]` in steps of `2⁻²⁴` (16.8 million values). A normal draw is the
+Box–Muller transform of two such uniforms, so its magnitude is bounded:
+`|z| ≤ √(−2 ln 2⁻²⁵) ≈ 5.89`; the tails beyond 5.89 σ (a probability of about 4·10⁻⁹ per draw)
+are never drawn. That is far outside any Monte-Carlo budget the library runs, and it is the
+same on NumPy and JAX; a study of rare events needs a JAX key (`jax.random.normal`), not a
+counter key. **A stream's name is hashed by CRC-32** (`stream_seed`: the stream's sample index
+is `zlib.crc32(name)`, one cipher word of the parent seed, 31 bits): two names collide with
+probability 2⁻³² per pair, a hash for separating streams, not a cryptographic one; the names a
+model gives its streams are a handful, so a collision is a curiosity, and it is reproducible.
+
 ## 3. The convention
 
 - **RD-R1. A `Distribution` is always the law of one draw.** `Gaussian(0, σ)` samples have

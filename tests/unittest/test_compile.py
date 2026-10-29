@@ -1550,3 +1550,25 @@ def test_compile_refuses_an_output_that_reads_an_undeclared_input():
     declared.outputs["y"].dependencies = ("u",)
     compile(declared)
     np.testing.assert_allclose(declared.h(np.ones(1), np.ones(1)), [2.0])
+
+
+def test_compile_probes_a_custom_port_function_for_an_undeclared_input():
+    from minilink.core.system import System
+
+    class Doubler(System):
+        def __init__(self, dependencies):
+            super().__init__(0)
+            self.add_input_port("u", dim=1)
+            self.add_output_port(
+                "y", dim=1, function=self.doubled, dependencies=dependencies
+            )
+
+        def doubled(self, x, u, t=0.0, params=None):
+            return 2.0 * u
+
+    # A port added with its own function is probed like the shortcut's h
+    with pytest.raises(
+        ValueError, match="output 'y' of 'Doubler' moves with input 'u'"
+    ):
+        compile(Doubler(dependencies=()))
+    compile(Doubler(dependencies=("u",)))

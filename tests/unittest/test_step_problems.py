@@ -282,3 +282,15 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
     assert problem.sample_params(None)["plant"]["m"] == 2.0
     face = problem.compile(dt=0.1)
     assert face.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]
+
+
+def test_the_rollout_environment_refuses_a_step_problem_naming_the_way():
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.planning.environment import RolloutEnvironment
+
+    with pytest.raises(TypeError, match="step its face"):
+        RolloutEnvironment(grid_world(), backend="numpy")
+    plant = Pendulum()
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
+    with pytest.raises(TypeError, match=r"RolloutEnvironment\(origin, dt=0.1\)"):
+        RolloutEnvironment(problem.discretize(0.1), backend="numpy")

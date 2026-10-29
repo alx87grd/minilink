@@ -193,9 +193,11 @@ def test_a_tick_law_meeting_a_continuous_plant_with_no_clock_is_refused():
         UnitDelay() @ Integrator()
 
 
-def test_a_closed_loop_on_the_right_of_a_chain_is_refused():
-    with pytest.raises(TypeError, match="the @ binds first"):
-        (DiscreteLowPass(0.6) % 0.01) >> (P(10.0) % 0.1) @ Integrator()
+def test_a_chain_into_a_closed_loop_feeds_its_reference():
+    # @ binds before >>: the chain drives the loop's reference, never refused
+    fed = (DiscreteLowPass(0.6) % 0.01) >> ((P(10.0) % 0.1) @ Integrator())
+    by_hand = (DiscreteLowPass(0.6) % 0.01) >> (P(10.0) % 0.1) @ Integrator()
+    assert by_hand.sample_period == fed.sample_period == 0.01
 
 
 def test_the_step_knobs_on_a_loop_with_no_plant_are_refused():

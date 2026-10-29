@@ -155,21 +155,23 @@ class SampledDiagramSystem(StepDiagramSystem):
         holds = held_ports(self)
 
         # The slots after the blocks' states, zero at the start (every block fires at
-        # k = 0); a start set on them stays while their size does
+        # k = 0); a start set on them stays while their size does, and a layout change
+        # under a start that is not zero is refused
         start = self.n
         self.hold_index = {}
         labels = []
         for path, port_id, dim in holds:
             self.hold_index[(path, port_id)] = (start, start + dim)
             labels.extend(
-                f"{'/'.join(path)}:{port_id}[{i}] (held)"
+                f"{'/'.join(path)}:{port_id}[{i}] (memory)"
                 if dim > 1
-                else f"{'/'.join(path)}:{port_id} (held)"
+                else f"{'/'.join(path)}:{port_id} (memory)"
                 for i in range(dim)
             )
             start += dim
         self.hold_dim = start - self.n
         if self.hold_x0.size != self.hold_dim:
+            require_no_hold_start(self, labels)
             self.hold_x0 = np.zeros(self.hold_dim)
         if not self.hold_dim:
             return
@@ -188,6 +190,16 @@ class SampledDiagramSystem(StepDiagramSystem):
             [state.nominal_value, np.zeros(self.hold_dim)]
         )
         self.n = start
+
+
+def require_no_hold_start(diagram, labels) -> None:
+    """Refuse a change of the held outputs' layout under a start set on them: it would be dropped."""
+    if np.any(diagram.hold_x0 != 0.0):
+        raise ValueError(
+            f"{diagram.name} holds a start on its held outputs "
+            f"({diagram.hold_x0.size} slots) and its layout changed to {labels}: set "
+            "the start (x0) again after adding blocks"
+        )
 
 
 def diagram_on_clock(diagram, dt):

@@ -46,6 +46,22 @@ class Distribution(ABC):
     # The law's numbers, by name (``{}`` for a law that exposes none)
     params = own_params()
 
+    def with_params(self, params):
+        """
+        The law at the numbers ``params``: a new law of the same kind built from them (the set pattern).
+
+        A library law's ``params`` name its constructor's arguments
+        (``Gaussian(mean=, std=)``, ``Uniform(lower=, upper=)``,
+        ``Particles(points=)``), so the law they name is ``type(law)(**params)``;
+        a law without numbers refuses any.
+        """
+        if not params and not self.params:
+            return self
+        if not self.params:
+            raise TypeError(f"{type(self).__name__} holds no parameters")
+
+        return type(self)(**params)
+
     @property
     def cov(self) -> np.ndarray:
         """The covariance of one draw, ``(dim, dim)``, for a law that states it."""

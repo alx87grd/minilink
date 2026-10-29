@@ -99,13 +99,14 @@ class CompiledTrajectoryPlanner:
         if not params or has_values(params):
             return self.host_initial(self.defaults if not params else params)
 
-        xp = array_module(params["x_start"], params["t_start"])
+        P = self.merged(params)
         z_default, sensitivity, x_default = self.start_sensitivity
+        xp = array_module(P["x_start"], P["t_start"])
 
         # z(x̂) = z(x̄) + M (x̂ − x̄), the origin t_start appended
-        x_hat = xp.reshape(xp.asarray(params["x_start"], dtype=float), (-1,))
+        x_hat = xp.reshape(xp.asarray(P["x_start"], dtype=float), (-1,))
         z_dec = z_default[:-1] + sensitivity @ (x_hat - x_default)
-        t_start = xp.reshape(xp.asarray(params["t_start"], dtype=float), (1,))
+        t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
         z = xp.concatenate([z_dec, t_start])
 
         return z
@@ -206,7 +207,7 @@ class CompiledTrajectoryPlanner:
             return z_shifted
 
         # x_i(t) = x̂_i: the state rows come first in z, N knots each, x_i's first at i·N
-        first_knots = np.arange(self.n) * offsets.size
+        first_knots = xp.arange(self.n) * offsets.size
         x_hat = xp.reshape(xp.asarray(x_start, dtype=float), (self.n,))
         z_pinned = assigned(xp, z_shifted, first_knots, x_hat)
 

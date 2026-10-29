@@ -15,6 +15,9 @@ from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import Planner
 from minilink.planning.results import PlanningSolution
 
+# A solve between two knots folds its offset in, in this many parts of dt
+SUB_TICKS = 1_000_000
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -244,10 +247,11 @@ class CompiledMPPIPlanner:
         u_nominal = nominal_action(self.problem, self.u_lower, self.u_upper)
         xp = array_module(P["t_start"])
 
-        U = np.tile(u_nominal, (self.N, 1))
+        # U: the nominal action held over the horizon, the origin t_start appended
+        U = xp.tile(xp.asarray(u_nominal), (self.N, 1))
         t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
 
-        return xp.concatenate([xp.asarray(U.reshape(-1)), t_start])
+        return xp.concatenate([xp.reshape(U, (-1,)), t_start])
 
     def solve(self, params=None, z0=None):
         """
@@ -608,10 +612,23 @@ def nominal_action(problem, lower, upper):
 
 
 def tick_key(jax, seed, t0, t_origin, dt):
-    """The draws' key of a solve at ``t0``: the seed with the tick ``round((t0 − t_origin) / dt)`` folded in."""
+    """
+    The draws' key of a solve at ``t0``: the seed with its tick folded in, keyed on the solve's own time.
+
+    The tick is ``j = round((t0 − t_origin) / dt)`` on the planner's grid; a
+    solve between two knots (an MPC whose period is not a multiple of ``dt``)
+    also folds in its offset from the knot in millionths of ``dt``, so two
+    solves at two times never share their draws.
+    """
     jnp = jax.numpy
 
-    tick = jnp.round((t0 - t_origin) / dt).astype(jnp.int32)
-    key = jax.random.PRNGKey(jnp.asarray(seed, dtype=jnp.int32))
+    # j = round((t0 − t_origin) / dt), and the offset from that knot in 10⁻⁶ dt
+    ticks = (t0 - t_origin) / dt
+    tick = jnp.round(ticks).astype(jnp.int32)
+    offset = jnp.round((ticks - tick) * SUB_TICKS).astype(jnp.int32)
 
-    return jax.random.fold_in(key, tick)
+    key = jax.random.PRNGKey(jnp.asarray(seed, dtype=jnp.int32))
+    on_knot = jax.random.fold_in(key, tick)
+    between = jax.random.fold_in(on_knot, offset)
+
+    return jnp.where(offset == 0, on_knot, between)

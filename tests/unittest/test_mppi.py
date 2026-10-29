@@ -290,3 +290,17 @@ def test_a_gradient_through_mppis_temperature_is_finite():
         return status["cost"]
 
     assert np.isfinite(float(jax.grad(cost)(0.01)))
+
+
+def test_two_solves_between_the_knots_draw_their_own_keys():
+    from minilink.planning.trajectory_optimization.path_integral import tick_key
+
+    jax = pytest.importorskip("jax")
+    on_knots = [tick_key(jax, 3, t, 0.0, 0.1) for t in (0.0, 0.1)]
+    halfway = tick_key(jax, 3, 0.05, 0.0, 0.1)
+
+    # A solve on a knot keeps the tick's key; one halfway draws its own
+    expected = jax.random.fold_in(jax.random.PRNGKey(3), 1)
+    np.testing.assert_array_equal(on_knots[1], expected)
+    assert not np.array_equal(halfway, on_knots[0])
+    assert not np.array_equal(halfway, on_knots[1])

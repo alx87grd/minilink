@@ -73,9 +73,9 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
 
     # One Euler step in its closed form: x + dt f(x, u, t) and c = dt rate(x, u, t),
     # the augmented step's own two rows (the state's is euler's, to the bit)
-    if solver == "euler" and substeps == 1:
+    if is_one_euler_step(solver, substeps):
         x_next = euler(f, x, u, u, t, dt)
-        c = dt * xp.reshape(rate(x, u, t), ())
+        c = euler_stage_cost(rate, x, u, t, dt)
         return x_next, c
 
     # ż = [f(x, u, τ); rate(x, u, τ)], the cost a state of its own
@@ -94,14 +94,27 @@ def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
 
 def stage_cost(f, rate, x, u, t, dt, solver, substeps):
     """The stage cost alone of :func:`step_with_cost`: under one Euler step ``dt · rate(x, u, t)``, the plant not evaluated."""
-    if solver == "euler" and substeps == 1:
-        xp = array_module(x, u)
-        c = dt * xp.reshape(rate(x, u, t), ())
-        return c
+    if is_one_euler_step(solver, substeps):
+        return euler_stage_cost(rate, x, u, t, dt)
 
     _, c = step_with_cost(f, rate, x, u, t, dt, solver, substeps)
 
     return c
+
+
+def euler_stage_cost(rate, x, u, t, dt):
+    """``c = dt · rate(x, u, t)``: the stage cost of one Euler step, the one rule every stage-cost path shares."""
+    xp = array_module(x, u)
+
+    # c = dt ċ(x, u, t), the rate at the period's start
+    c = dt * xp.reshape(rate(x, u, t), ())
+
+    return c
+
+
+def is_one_euler_step(solver, substeps) -> bool:
+    """Whether a period is one explicit Euler step, whose stage cost has the closed form."""
+    return solver == "euler" and int(substeps) == 1
 
 
 def step_path(f, x, u0, u1, t, dt, solver, substeps):

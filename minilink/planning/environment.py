@@ -87,6 +87,7 @@ class RolloutEnvironment:
         reward="running",
     ):
         # The task: the problem, its plant and its cost, on one control period
+        require_continuous_problem(problem)
         self.problem = problem
         self.sys = problem.sys
         self.cost = problem.require_cost()
@@ -355,6 +356,30 @@ def is_continuous(problem) -> bool:
     from minilink.planning.problems import PlanningProblem
 
     return isinstance(problem, PlanningProblem)
+
+
+def require_continuous_problem(problem) -> None:
+    """Refuse a native step problem: the environment samples a continuous problem at its ``dt``."""
+    if is_continuous(problem):
+        return
+    origin = getattr(problem, "origin", None)
+    hint = (
+        f"build it on the continuous problem it samples: RolloutEnvironment(origin, "
+        f"dt={origin_dt(problem)})"
+        if origin is not None
+        else "step its face (problem.compile().transition) directly"
+    )
+    raise TypeError(
+        f"{type(problem).__name__} is a step problem: the "
+        f"environment samples a continuous problem at its control period; {hint}"
+    )
+
+
+def origin_dt(problem):
+    """The period a discretized step problem samples its origin at, as text."""
+    dt = getattr(problem, "dt", None)
+
+    return "dt" if dt is None else f"{float(dt):g}"
 
 
 def require_reward(reward, supported):

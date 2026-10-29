@@ -225,12 +225,17 @@ dt=0.01)`) and `substeps=` at the compiles (`loop.compile(substeps=20)`,
 never by id: two are refused ("compose them into one continuous system first"). The refusals
 of the grammar, each naming the fix: a clocked plant under a continuous law
 (`pid @ (plant % Δ)`: write `(pid % Δ) @ plant`), a tick law meeting a continuous plant with no
-clock (`UnitDelay() @ plant`), a closed loop with its plant on the right of `>>`
-(`a >> b @ plant` binds `@` first: write `(a >> b) @ plant` or `closed_loop(b, plant, filter=a)`).
+clock (`UnitDelay() @ plant`). Composition stays simple: `>>` into a closed loop is always
+legal, it feeds the loop's reference, and `@` binds before `>>`, so `filt >> ctl @ plant` is
+the filter feeding the loop from outside; a filter on the measurement is `((filt % Δ) >> (ctl %
+Δ)) @ plant` with the parentheses, or `closed_loop(ctl, plant, filter=filt)`.
 A
 `SampledDiagramSystem`'s base period `Δ` is the greatest common divisor of its clocked blocks'
 periods (on a nanosecond grid); a block of divisor `d > 1` fires on `k mod d = 0`, its held
-outputs state slots after the blocks' states (`hold_index`); its compiled plan
+outputs state slots after the blocks' states (`hold_index`, labelled `controller:u (memory)`:
+the memory of the last firing, one period behind the signal a run records at the same tick),
+their start `hold_x0` a leaf of the evaluator's tree (`pe.params["hold_x0"]`, differentiable
+like every `x0`; a layout change under a start that is not zero is refused); its compiled plan
 (`build_sampled_execution_plan`, nested boxes inlined into one flat schedule) forms
 `t_k = t_start + k·Δ` once per tick and hands it to every block whose equations are in seconds
 (a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a

@@ -349,9 +349,12 @@ def validate_equation_shapes(system, label=None):
     ``f`` (continuous leaves), ``step`` (discrete leaves), and the standard
     output ports created by the constructor (``y`` -> ``h``, ``x`` -> state)
     are evaluated at ``(x0, u_nominal, t=0)``; a wrong-length result raises
-    ``ValueError`` naming the block, the hook, and both shapes. Custom port
-    computes and a native sampled law's update are not probed (they may be
-    expensive or stateful: a delayed MPC's update is a solve).
+    ``ValueError`` naming the block, the hook, and both shapes. Every output
+    port's function, the custom ones included, is probed for an input it
+    reads but does not declare (:func:`require_declared_inputs`): only a port
+    with an undeclared input is evaluated, once and once per such input (an
+    MPC's solve declares every input it reads, so it is never run here). A
+    native sampled law's update is not probed.
     """
     from minilink.core.diagram import DiagramSystem
     from minilink.core.discrete.sampled_system import NativeSampledSystem
@@ -377,20 +380,30 @@ def validate_equation_shapes(system, label=None):
 
     for port_id, port in system.outputs.items():
         function = port.compute
-        if getattr(function, "__self__", None) is not system:
+        own = getattr(function, "__self__", None) is system
+        hook = getattr(function, "__name__", "") if own else ""
+
+        # The standard hooks: their shape, then their dependencies
+        if hook in ("h", "compute_state"):
+            y0 = function(x0, u0, 0.0)
+            require_shape(
+                y0,
+                (port.dim,),
+                f"{hook}() of '{name}'",
+                f"for output port '{port_id}'",
+            )
+            if hook == "h":
+                require_declared_inputs(system, name, port_id, x0, u0, y0)
             continue
-        hook = getattr(function, "__name__", "")
-        if hook not in ("h", "compute_state"):
+
+        # Any other port: its dependencies, evaluated only with an undeclared input
+        if not undeclared_inputs(system, port):
             continue
-        y0 = function(x0, u0, 0.0)
-        require_shape(
-            y0,
-            (port.dim,),
-            f"{hook}() of '{name}'",
-            f"for output port '{port_id}'",
-        )
-        if hook == "h":
-            require_declared_inputs(system, name, port_id, x0, u0, y0)
+        try:
+            y0 = function(x0, u0, 0.0)
+        except Exception:
+            continue
+        require_declared_inputs(system, name, port_id, x0, u0, y0)
 
 
 ###############################################################################
@@ -435,6 +448,14 @@ def require_declared_inputs(system, name, port_id, x0, u0, y0):
                 f"add '{input_id}' to them (y_dependencies= in the constructor, or "
                 'dependencies= in add_output_port), or declare "all"'
             )
+
+
+def undeclared_inputs(system, port) -> list:
+    """The input ports ``port`` does not declare among its dependencies (none for ``"all"``)."""
+    if port.dependencies == "all":
+        return []
+
+    return [input_id for input_id in system.inputs if input_id not in port.dependencies]
 
 
 def input_rows(system):

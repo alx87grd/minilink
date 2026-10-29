@@ -781,3 +781,30 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     J_short = J_of(score)
     J_ended = J_of(score + V.as_terminal_cost())
     assert J_ended < 0.1 * J_short
+
+
+def test_a_planners_evidence_scores_on_the_faces_own_sum():
+    from minilink.planning import DynamicProgrammingPlanner
+    from minilink.planning.evaluation import evaluate_trajectory
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
+        x_start=np.array([0.5, 0.0]),
+        tf=3.0,
+        U=plant.input_box,
+        discount_rate=0.5,
+    )
+    vi = DynamicProgrammingPlanner(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
+    vi.solve()
+    law = vi.get_controller()
+
+    def policy(x, t):
+        return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
+
+    # The evidence carries the running cost: its score is J = Σ γᵏ c_k + γᴺ h
+    evidence = vi.nominal_trajectory()
+    J_face = problem.compile(dt=0.1).run(policy)[3]
+    J = float(np.squeeze(evaluate_trajectory(problem, evidence).cost))
+    np.testing.assert_allclose(J, J_face, rtol=1e-12)

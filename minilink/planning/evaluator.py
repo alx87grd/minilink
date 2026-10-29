@@ -162,8 +162,9 @@ class ProblemEvaluator:
         other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
         ``observer.x0``; the plant's start is the problem's ``x_start``); the
         problem's own leaves (``"cost"``, the parameters of the sets that hold any by
-        role, ``"x_start"``, ``"discount_rate"``); and each free input of the loop at
-        its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
+        role, ``"x_start"``, ``"discount_rate"``); a sampled loop's held outputs'
+        start ``"hold_x0"`` when a block fires slower than the base tick; and each
+        free input of the loop at its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
         the whole tree.
         """
         loop = self.loop
@@ -174,6 +175,8 @@ class ProblemEvaluator:
             block = loop.subsystems[sys_id]
             tree[sys_id] = {**(block.params or {}), "x0": block.x0}
         tree.update(problem_leaves(problem))
+        if getattr(loop, "hold_dim", 0):
+            tree["hold_x0"] = loop.hold_x0
         for port in self.free_inputs:
             tree[port] = loop.inputs[port].nominal_value
 
@@ -453,16 +456,15 @@ class ProblemEvaluator:
         return x_starts, Batched(merge_tree(params, overrides), axes)
 
     def loop_start(self, params, x_start, xp):
-        """The loop's start ``x(0)``: the plant at ``x_start``, every other stateful block at its ``x0`` leaf, a held output at its own."""
-        loop = self.loop
-
+        """The loop's start ``x(0)``: the plant at ``x_start``, every other stateful block at its ``x0`` leaf, the held outputs at the ``hold_x0`` leaf."""
         pieces = []
         for sys_id in self.block_ids:
             if sys_id == "plant":
                 pieces.append(xp.reshape(xp.asarray(x_start, dtype=float), (-1,)))
             elif sys_id in self.start_ids:
                 pieces.append(xp.reshape(params[sys_id]["x0"], (-1,)))
-        pieces.append(xp.asarray(getattr(loop, "hold_x0", np.zeros(0)), dtype=float))
+        if "hold_x0" in params:
+            pieces.append(xp.reshape(params["hold_x0"], (-1,)))
 
         x0 = xp.concatenate(pieces)
 
@@ -689,7 +691,10 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     parameters, on NumPy, from ``t_start``: the sampled loop a feedback planner
     designs for (its grid, its model), reported beside its policy; the
     planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
-    length for an infinite horizon. ``u`` is the plant's command port.
+    length for an infinite horizon. ``u`` is the plant's command port. The run
+    carries the face's running cost, ``C_{k+1} = C_k + γᵏ c_k``, and the plant
+    role, so :func:`~minilink.planning.evaluation.evaluate_trajectory` scores
+    it on the face's own sum, ``J = Σ γᵏ c_k + γᴺ h``, not by the trapezoid.
     """
     # Lazy import: the loop roles load with the first rollout
     from minilink.core.roles import command_port
@@ -701,25 +706,34 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
 
     # The face's step, the law on the grid, the command's slice of the plant input
     face = nominal.compile(dt=float(dt))
-    plant_params = face.params["plant"]
     t = nominal.t_start + float(dt) * np.arange(n_steps + 1)
     law = held_law(policy, t)
     command = plant.get_input_port_slice(command_port(plant))
     u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
 
-    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1}; the last sample
-    # takes its input only
+    face_params = face.params
+    gamma = float(face.gamma_at(face_params))
+
+    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1} with its stage cost
+    # c_k; C_{k+1} = C_k + γᵏ c_k; the last sample takes its input only
     xs = np.zeros((plant.n, n_steps + 1))
     us = np.zeros((command.stop - command.start, n_steps + 1))
+    running = np.zeros(n_steps + 1)
     xs[:, 0] = nominal.x_start
     for k in range(n_steps + 1):
         us[:, k] = law(xs[:, k], t[k])
         if k == n_steps:
             break
         u_full[command] = us[:, k]
-        xs[:, k + 1] = face.step_at(xs[:, k], u_full, t[k], plant_params)
+        x_next, c = face.transition_at(xs[:, k], u_full, t[k], face_params)
+        xs[:, k + 1] = x_next
+        running[k + 1] = running[k] + gamma**k * float(c)
 
-    return Trajectory(t=t, x=xs, u=us)
+    # The plant role and its running cost: the run scores on the face's own sum
+    roles = {"plant": {"x": (0, int(plant.n)), "u": PLANT_INPUT}}
+    signals = {PLANT_INPUT: us, RUNNING_COST: running.reshape(1, -1)}
+
+    return Trajectory(t=t, x=xs, u=us, signals=signals, roles=roles)
 
 
 def policy_of(controller):
@@ -1217,7 +1231,16 @@ def block_params_of(loop, params, sys_id):
 
 def require_free_names(free_inputs, block_ids):
     """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
-    reserved = {"cost", "X", "U", "Xf", "x_start", "t_start", "discount_rate"}
+    reserved = {
+        "cost",
+        "X",
+        "U",
+        "Xf",
+        "x_start",
+        "t_start",
+        "discount_rate",
+        "hold_x0",
+    }
     clash = sorted(
         (set(free_inputs) & set(block_ids))
         | ((set(free_inputs) | set(block_ids)) & reserved)
