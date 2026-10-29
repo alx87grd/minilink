@@ -603,6 +603,27 @@ class TestTheWarmStartedMPC(unittest.TestCase):
             solves = solve.call_count
         assert solves == 0
 
+    def test_lookahead_solves_from_the_start_predicted_ahead(self):
+        # The zero-delay form with lookahead: the plan starts at t + Δ from the
+        # measurement carried Δ ahead under the last plan's command
+        mpc = ModelPredictiveController(self.planner, delay=False, lookahead=0.1)
+        pv = mpc.pv
+        solve = mpc.subsystems["solve"]
+        z_prev, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
+        y = np.array([0.8])
+        seen = []
+
+        def recording(params=None, z0=None):
+            seen.append(params)
+            return z0, {"success": True, "iterations": 0, "cost": 0.0}
+
+        pv.solve = recording
+        solve.compute_z(np.zeros(0), np.concatenate([y, z_prev]), 0.2)
+        u_k = pv.command(z_prev, y, 0.2)
+        expected = y + 0.1 * u_k  # the integrator under a held input: exact
+        np.testing.assert_allclose(seen[0]["x_start"], expected, atol=1e-9)
+        assert float(seen[0]["t_start"]) == pytest.approx(0.3)
+
     def test_a_failed_solve_keeps_the_last_plan(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]

@@ -157,10 +157,7 @@ class DelayedPredictiveController(NativeSampledSystem):
         # P_k: the planner's tree with the bound leaves read from their ports, the
         # plan's origin t_start = t_k + lookahead, its start predicted to that time
         P = bound_tree(self, params, u, t_plan)
-        if lookahead > 0.0 and "x_start" in bindings:
-            u_k = pv.command(z, P["x_start"], t)
-            x_ahead = predicted_start(pv, P["x_start"], u_k, t, lookahead, P)
-            P = with_leaf(P, "x_start", x_ahead)
+        P = predicted_tree(pv, bindings, P, z, t, lookahead)
 
         # z_{k+1} = solve(P_k, z0 = shift(z_k, t_k + lookahead)), z_k kept when the
         # solve returns no usable plan
@@ -309,14 +306,17 @@ class PlanSolver(System):
         z_prev = u[self.get_input_port_slice("z_prev")]
         x_hat = measured_start(self, u)
 
-        # P_k: the planner's tree with the bound leaves read from their ports and
-        # the plan's origin t_start = t_k + lookahead
+        # P_k: the planner's tree with the bound leaves read from their ports, the
+        # plan's origin t_start = t_k + lookahead, its start predicted to that time
+        # under the last plan's command
         P = bound_tree(self, params, u, t + lookahead)
+        P = predicted_tree(pv, self.bindings, P, z_prev, t, lookahead)
+        x_plan = P["x_start"] if x_hat is not None else None
 
-        # z*_k = solve(P_k, z0 = shift(z_prev, t_k + lookahead) with x_0 = x̂_k), from
+        # z*_k = solve(P_k, z0 = shift(z_prev, t_k + lookahead) with x_0 = x̂), from
         # the default guess at P_k while z_prev is no plan yet; z_prev kept when the
         # solve returns no usable plan
-        z_guess = warm_guess(pv, z_prev, x_hat, P, z_default)
+        z_guess = warm_guess(pv, z_prev, x_plan, P, z_default)
         started = time.perf_counter()
         z_new, status = pv.solve(P, z0=z_guess)
         report_solve(self, t, status, started)
@@ -356,8 +356,10 @@ class PurePredictiveController(System):
         pv = self.pv
         lookahead = self.lookahead
 
-        # z* = solve(P_k) from the default guess, read at the tick's time
+        # z* = solve(P_k) from the default guess, read at the tick's time, its start
+        # predicted to the plan's origin under the default plan's command
         P = bound_tree(self, params, u, t + lookahead)
+        P = predicted_tree(pv, self.bindings, P, pv.initial(P), t, lookahead)
         started = time.perf_counter()
         z, status = pv.solve(P)
         report_solve(self, t, status, started)
@@ -441,6 +443,18 @@ def bound_tree(block, params, u, t_start):
     return P
 
 
+def predicted_tree(pv, bindings, P, z, t, lookahead):
+    """``P`` with its bound start predicted ``lookahead`` ahead under the command the plan ``z`` gives at ``t``; ``P`` itself with no lookahead."""
+    if lookahead <= 0.0 or "x_start" not in bindings:
+        return P
+
+    # x̂(t + Δ) = Φ(x̂(t), u_k, t), the command held over the lookahead
+    u_k = pv.command(z, P["x_start"], t)
+    x_ahead = predicted_start(pv, P["x_start"], u_k, t, lookahead, P)
+
+    return with_leaf(P, "x_start", x_ahead)
+
+
 def predicted_start(pv, x, u_k, t, lookahead, params):
     """``x̂(t + lookahead)``: the planner's model from ``x`` at ``t`` with the applied command ``u_k`` held, RK4 steps a quarter of a knot apart."""
     # Lazy import: the step model loads with the first prediction
@@ -488,6 +502,7 @@ def pinned_shift(pv, z, x, t):
 
     # The state rows come first in z, N knots each: x_i's first knot at i·N
     xp = array_module(z_shifted, x)
+    z_shifted = xp.asarray(z_shifted)
     first_knots = xp.arange(pv.n) * pv.offsets.size
     z_guess = assigned(xp, z_shifted, first_knots, xp.reshape(x, (pv.n,)))
 
