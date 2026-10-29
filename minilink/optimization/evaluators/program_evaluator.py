@@ -49,6 +49,7 @@ class MathematicalProgramEvaluator(ABC):
         # every bind then share one trace), the empty tree for none
         defaults = program.params or {}
         self.params = self.native_tree(canonical_tree(defaults, defaults))
+        self.frozen = True
 
         # The forms a solver compiles on this program once, by the solver's numbers
         self.compiled_forms = {}
@@ -103,6 +104,7 @@ class MathematicalProgramEvaluator(ABC):
         refuses any.
         """
         self.params = self.merged(params)
+        self.frozen = not params
 
     def merged(self, params=None):
         """The program's defaults with ``params`` merged over them, on the evaluator's backend: :meth:`bind`'s tree, bound to nothing (pure, so it traces)."""

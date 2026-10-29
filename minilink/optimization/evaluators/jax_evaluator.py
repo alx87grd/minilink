@@ -20,8 +20,11 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     JAX is imported lazily. The program evaluator JIT-compiles ``J`` / ``h`` /
     ``g``, auto-generates ``grad_J`` and constraint Jacobians when not supplied,
     and only auto-generates a dense objective Hessian when ``use_hessian=True``.
-    Each compiled function takes ``(z, params)``, the bound tree a traced
-    argument, so a new value of a parameter never recompiles; the derivatives
+    Each function has two compiled forms: the frozen one, the defaults
+    constants of the trace (the faster run of one fixed program, an offline
+    solve), used while the defaults are bound; the parametric one, ``(z,
+    params)`` with the bound tree a traced argument, used after a
+    :meth:`bind` of values, so a new value never recompiles. The derivatives
     are with respect to ``z``.
     """
 
@@ -79,6 +82,11 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
         if program.g is not None:
             self.require_traceable(g_raw, z_sample, "g")
 
+        # The raw functions of (z, params), each one's frozen form compiled on first use
+        self.raw_forms = {"J": J_raw, "h": h_raw, "g": g_raw}
+        self.frozen_forms = {}
+        self.default_tree = self.params
+
         # The compiled functions
         self._jit_J = jax.jit(J_raw)
         self._jit_h = jax.jit(h_raw)
@@ -86,36 +94,43 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
 
         # ∇J: the program's own, else by reverse-mode autodiff in z
         if program.grad_J is not None:
-            self._jit_grad_J = jax.jit(own(program.grad_J))
+            self.raw_forms["grad_J"] = own(program.grad_J)
         else:
-            self._jit_grad_J = jax.jit(jax.grad(J_raw))
+            self.raw_forms["grad_J"] = jax.grad(J_raw)
+        self._jit_grad_J = jax.jit(self.raw_forms["grad_J"])
 
         # ∇²J: the program's own, else by autodiff only when use_hessian asks for it
         self._jit_hess_J = None
         if program.hess_J is not None:
-            self._jit_hess_J = jax.jit(own(program.hess_J))
+            self.raw_forms["hess_J"] = own(program.hess_J)
         elif use_hessian:
-            self._jit_hess_J = jax.jit(jax.hessian(J_raw))
+            self.raw_forms["hess_J"] = jax.hessian(J_raw)
+        if "hess_J" in self.raw_forms:
+            self._jit_hess_J = jax.jit(self.raw_forms["hess_J"])
 
         # ∂h/∂z and ∂g/∂z: the program's own, else by forward-mode autodiff in z
         self._jit_jac_h = None
         if program.jac_h is not None:
-            self._jit_jac_h = jax.jit(own(program.jac_h))
+            self.raw_forms["jac_h"] = own(program.jac_h)
         elif program.h is not None:
-            self._jit_jac_h = jax.jit(jax.jacfwd(h_raw))
+            self.raw_forms["jac_h"] = jax.jacfwd(h_raw)
+        if "jac_h" in self.raw_forms:
+            self._jit_jac_h = jax.jit(self.raw_forms["jac_h"])
 
         self._jit_jac_g = None
         if program.jac_g is not None:
-            self._jit_jac_g = jax.jit(own(program.jac_g))
+            self.raw_forms["jac_g"] = own(program.jac_g)
         elif program.g is not None:
-            self._jit_jac_g = jax.jit(jax.jacfwd(g_raw))
+            self.raw_forms["jac_g"] = jax.jacfwd(g_raw)
+        if "jac_g" in self.raw_forms:
+            self._jit_jac_g = jax.jit(self.raw_forms["jac_g"])
 
         if verbose:
             print("[compile] Warm-starting JAX mathematical-program evaluator.")
 
         # The constraint sizes, then every available quantity once at the sample
-        self.n_h = int(np.asarray(self._jit_h(z_sample, self.params)).reshape(-1).size)
-        self.n_g = int(np.asarray(self._jit_g(z_sample, self.params)).reshape(-1).size)
+        self.n_h = int(np.asarray(self.form("h")(z_sample)).reshape(-1).size)
+        self.n_g = int(np.asarray(self.form("g")(z_sample)).reshape(-1).size)
         self.check_derivative_shapes(z_sample)
 
     @property
@@ -137,13 +152,13 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     # The compiled functions, on a checked decision vector
 
     def J(self, z):
-        return self._jit_J(self.jax_decision_vector(z), self.params)
+        return self.form("J")(self.jax_decision_vector(z))
 
     def h(self, z):
-        return self._jit_h(self.jax_decision_vector(z), self.params)
+        return self.form("h")(self.jax_decision_vector(z))
 
     def g(self, z):
-        return self._jit_g(self.jax_decision_vector(z), self.params)
+        return self.form("g")(self.jax_decision_vector(z))
 
     # The oracle of a traced solve: the compiled functions on JAX arrays, no conversion
 
@@ -156,30 +171,44 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
     # The compiled derivatives, as flat NumPy arrays
 
     def gradient(self, z) -> np.ndarray:
-        value = self._jit_grad_J(self.jax_decision_vector(z), self.params)
+        value = self.form("grad_J")(self.jax_decision_vector(z))
         return self.as_vector(value, self.n_z, "objective gradient")
 
     def hessian(self, z) -> np.ndarray:
         if self._jit_hess_J is None:
             return super().hessian(z)
-        value = self._jit_hess_J(self.jax_decision_vector(z), self.params)
+        value = self.form("hess_J")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_z, self.n_z), "objective Hessian")
 
     def jacobian_h(self, z) -> np.ndarray:
         if self.n_h == 0 or self._jit_jac_h is None:
             return super().jacobian_h(z)
-        value = self._jit_jac_h(self.jax_decision_vector(z), self.params)
+        value = self.form("jac_h")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_h, self.n_z), "equality Jacobian")
 
     def jacobian_g(self, z) -> np.ndarray:
         if self.n_g == 0 or self._jit_jac_g is None:
             return super().jacobian_g(z)
-        value = self._jit_jac_g(self.jax_decision_vector(z), self.params)
+        value = self.form("jac_g")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def form(self, name):
+        """The compiled ``name`` for the bound tree, a function of ``z``: frozen while the defaults are bound, else parametric."""
+        if not self.frozen:
+            parametric = getattr(self, f"_jit_{name}")
+            return lambda z: parametric(z, self.params)
+
+        # The defaults constants of the trace, compiled on first use
+        if name not in self.frozen_forms:
+            raw = self.raw_forms[name]
+            tree = self.default_tree
+            self.frozen_forms[name] = self.jax.jit(lambda z: raw(z, tree))
+
+        return self.frozen_forms[name]
 
     def raw_call(self, function, z, params):
         """A program callable on traced ``(z, params)``: ``function(z)`` for a program without parameters."""
