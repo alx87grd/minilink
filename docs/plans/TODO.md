@@ -298,14 +298,6 @@ Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27
   `hybrid_closed_loop`, `HybridSimulator`, the hybrid diagram drawings), the dual-rate MPC
   projects written as composition; rest: tutorial 06 and the other hybrid notebooks at step 7.
 
-- [ ] **Recording the signals, and reconstructing a few** (the maintainer's decision 6 of
-  2026-10-28): a run that records the signals it computes (the plant's input, a named port) in
-  the same scan, and a read-back that computes only the ancestors of the requested ports (today
-  `compute_internal_signals_dict` and the read-backs on it fill the whole buffer, so an
-  expensive block, a solve, runs again for every sample read back). Done when a zero-delay MPC
-  run with its overlays solves exactly once per tick, read-backs included, and the delayed
-  form's read-backs stay free. ([the zero-delay MPC record](../reviews/2026-10-28-zero-delay-mpc.md) §6.2)
-
 The conventions' first sampled-loop step (AC-8a: standard port names only, the MPC gives `u`,
 no port guessing) is folded into this section's rows (R163): it is what the rebuilt loop does by
 construction.
@@ -454,8 +446,8 @@ solvers and MPPI are v0.4 (§4).
   stays the default. Rest: whether the course notebooks that run an MPC (GRO501
   `racecar_toward_mpc`, the showcase, `mpc_spatial_stack`) move to `delay=False` **[ask —
   teaching call]**.
-- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28, after §1.5's row
-  "Recording the signals" below; clocking a box landed in the night run of 2026-10-29): the delayed and pure forms
+- [ ] **One MPC architecture** (the maintainer's decision 7 of 2026-10-28; its two prerequisites,
+  clocking a box and recording the signals, landed in the night run of 2026-10-29): the delayed and pure forms
   as wirings of `PlanSolver`, `PlanCommand`, `PlanMemory` (and a predictor block for
   `lookahead`); one tuning path for every form (`controller.cost.R` or
   `controller.solve.cost.R`, one of them); `DelayedPredictiveController` and

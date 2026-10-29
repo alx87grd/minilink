@@ -231,10 +231,12 @@ def plant_run_of(loop, rollout, params=None):
     """
     ``(plant, run)``: the loop's plant and its run inside the loop's dense run, ``(None, None)`` with no plant.
 
-    ``run.x`` is the plant's state slice; ``run.u`` the input the loop fed it, as
-    the compiled plan gathers it at each tick and held over the period: ``S``
-    samples per tick (the plant's substeps), the last sample the end's tick.
-    ``params`` is the tree the run was made with (``None``: the loop's own).
+    ``run.x`` is the plant's state slice; ``run.u`` the input the loop fed it,
+    held over each period: the run's recorded ``"plant:u"`` when it has one (a
+    dense run records it, nothing is computed again), else gathered by the
+    compiled plan at each tick; the end sample holds the last tick's input, as
+    the record does. ``params`` is the tree the run was made with (``None``:
+    the loop's own).
     """
     # Lazy import: a real cycle, the trajectory module reads the systems
     from minilink.core.trajectory import Trajectory
@@ -244,12 +246,15 @@ def plant_run_of(loop, rollout, params=None):
     if op is None:
         return None, None
     plant = getattr(op.system, "source", op.system)
+    if "plant" in rollout.roles:
+        return plant, rollout.of("plant")
     S = ev.plan.dense_points
     t_start = float(rollout.t[0])
     n_samples = rollout.t.size
 
     # u_k = the plant's gathered input at tick k, held over the samples of its period
-    ticks = np.arange(n_samples) // S
+    # and, for the last tick, over the end sample
+    ticks = np.minimum(np.arange(n_samples) // S, (n_samples - 1) // S - 1)
     u = np.zeros((int(op.u_dim), n_samples))
     for k in np.unique(ticks):
         samples = np.flatnonzero(ticks == k)

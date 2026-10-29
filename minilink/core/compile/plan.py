@@ -35,6 +35,10 @@ from minilink.core.wiring import WiredDiagramMixin
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
 
+
+# The name of the plant's input among a run's signals: the plant role's u
+PLANT_INPUT = "plant:u"
+
 ###############################################################################
 # Public API
 ###############################################################################

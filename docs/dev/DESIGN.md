@@ -212,7 +212,13 @@ for a rate names it (`filt % 0.01`); one inside a nested box clocked slower than
 is refused at compile, since it would tick faster there than in its box alone. The loop's plant, whose substeps the dense run keeps and
 the host runner integrates adaptively, is the block integrated inside every base period (the
 one named `plant` if several are). Signals propagate within the tick (R125): a delay is a
-block.
+block. A run records signals from its own signal pass: `compute_trajectory(record=("path/block:port",
+…))` keeps each tick's value held over its period (the end sample the last tick's) in the
+trajectory's `signals`, and a loop with a plant always records `"plant:u"` and its `plant` role,
+so `traj.of("plant")`, the plots, the animation and the MPC overlays compute nothing again; the
+planning evaluator's run takes its signals from the same pass (`rollout_with_cost(signals=True)`).
+A continuous diagram's `record=` and `reconstruct_internal_signals(traj, ports=…)` evaluate
+only the named ports and the blocks they read, once per sample after the run.
 
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`

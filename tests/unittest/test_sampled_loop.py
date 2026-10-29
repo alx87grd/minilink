@@ -359,7 +359,7 @@ def test_a_block_on_a_clock_reads_seconds_in_its_outputs():
     np.testing.assert_allclose(ev.outputs(x, u, 3)["y"], np.sin(0.3))
 
 
-def test_animating_a_loop_reads_the_plant_input_once_per_tick():
+def test_animating_a_loop_reads_the_recorded_plant_input():
     # A pure MPC solves at each read of its output: the frames must not read it again
     plant = Pendulum()
     plant.x0 = np.array([0.3, 0.0])
@@ -377,8 +377,8 @@ def test_animating_a_loop_reads_the_plant_input_once_per_tick():
     port.compute = counting
     loop.animate(run, show=False, html=False)
 
-    # 20 ticks and the end's
-    assert len(calls) == 21
+    # The run recorded the plant's input: the frames read it, evaluating nothing
+    assert len(calls) == 0
 
 
 # The time table: what each block reads as time on a clock (the night run's step 1)

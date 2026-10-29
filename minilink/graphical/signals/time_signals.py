@@ -114,8 +114,9 @@ def build_signal_plot_spec(
             traj = traj.with_signal(name, values)
             nested[name] = (labels, units)
 
-    # A block of this diagram: its internal signals, rebuilt once for all of them
+    # A block of this diagram: the signals the run did not record, and only those
     if isinstance(sys, DiagramSystem):
+        missing = []
         for name in requested:
             if ":" not in name or traj.has_signal(name):
                 continue
@@ -123,8 +124,9 @@ def build_signal_plot_spec(
             sys_id, port_id = name.split(":", 1)
             subsystem = sys.subsystems.get(sys_id)
             if subsystem is not None and port_id in subsystem.outputs:
-                traj = sys.reconstruct_internal_signals(traj)
-                break
+                missing.append(name)
+        if missing:
+            traj = sys.reconstruct_internal_signals(traj, ports=missing)
 
     # A named output port, input port, or state label of this system
     for name in requested:

@@ -125,14 +125,17 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return compile_diagram(self, backend=backend, verbose=verbose, flatten=flatten)
 
-    def reconstruct_internal_signals(self, traj: Trajectory) -> Trajectory:
+    def reconstruct_internal_signals(self, traj: Trajectory, ports=None) -> Trajectory:
         """
-        Reconstruct all subsystem output-port trajectories for this diagram.
+        Reconstruct subsystem output-port trajectories for this diagram.
 
         Parameters
         ----------
         traj : Trajectory
             State-input trajectory sampled on a time grid.
+        ports : sequence of str, optional
+            The signals to compute, ``"sys_id:port_id"``: only those ports and
+            the blocks they read are evaluated. ``None``: every port.
 
         Returns
         -------
@@ -140,6 +143,11 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             New trajectory enriched with one sampled signal per subsystem
             output port, keyed as ``"sys_id:port_id"``.
         """
+        if ports is not None:
+            return traj.with_signals(
+                {name: self.port_samples(traj, name) for name in ports}
+            )
+
         evaluator = self.compile(backend="numpy")
 
         # One table per subsystem output port, keyed "sys_id:port_id"
@@ -159,6 +167,21 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
                 internal_signals[key][:, i] = value
 
         return traj.with_signals(internal_signals)
+
+    def port_samples(self, traj: Trajectory, name: str) -> np.ndarray:
+        """One port's value at every sample of ``traj``, ``(dim, N)``: the port and the blocks it reads, nothing else."""
+        sys_id, port_id = signal_port_of(self, name)
+
+        values = [
+            self.compute_subsys_output_port(
+                traj.x[:, i], traj.u[:, i], t, sys_id, port_id
+            )
+            for i, t in enumerate(traj.t)
+        ]
+
+        return np.stack(
+            [np.asarray(v, dtype=float).reshape(-1) for v in values], axis=1
+        )
 
     def trajectory_of(self, subsystem, traj=None) -> Trajectory:
         """
@@ -238,3 +261,18 @@ if __name__ == "__main__":
 
     evaluator = diagram.compile()
     print(evaluator.f(x=np.array([0.5]), u=np.array([1.0]), t=0.0))
+
+
+def signal_port_of(diagram, name):
+    """``(sys_id, port_id)`` of a signal named ``"sys_id:port_id"``, refused unless the diagram has it."""
+    sys_id, _, port_id = name.partition(":")
+    subsystem = diagram.subsystems.get(sys_id)
+    if subsystem is None or port_id not in subsystem.outputs:
+        known = [
+            f"{block_id}:{port}"
+            for block_id, block in diagram.subsystems.items()
+            for port in block.outputs
+        ]
+        raise KeyError(f"no signal {name!r} in {diagram.name}; its signals are {known}")
+
+    return sys_id, port_id

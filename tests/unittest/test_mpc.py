@@ -24,6 +24,7 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
     PlanFollower,
+    mpc_animation_overlays,
     mpc_plans_from_rollout,
     plant_run,
 )
@@ -581,6 +582,27 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         assert [round(t, 9) for t, _ in plans] == [0.0, 0.2, 0.4, 0.6, 0.8]
         assert plant_run(run, loop).u.shape == (1, run.t.size)
 
+    def test_the_read_backs_solve_nothing_again(self):
+        # The run records the plant's input: the plant's run, the plan readers, the
+        # overlays and the animation read the record, so a run solves once per tick
+        plant = self.planner.problem.sys
+        loop = (self.mpc % DT) @ discretize(plant, DT, substeps=4)
+        loop.subsystems["plant"].x0 = np.array([0.5])
+        run = loop.compute_trajectory(tf=1.0)
+        assert run.has_signal("plant:u") and "plant" in run.roles
+        with mock.patch.object(
+            CompiledTrajectoryPlanner,
+            "solve",
+            autospec=True,
+            side_effect=self.pv.solve.__func__,
+        ) as solve:
+            plant_run(run, loop)
+            mpc_plans_from_rollout(run, self.mpc, loop=loop)
+            mpc_animation_overlays(run, self.mpc, loop=loop)
+            loop.animate(run, show=False, html=False)
+            solves = solve.call_count
+        assert solves == 0
+
     def test_a_failed_solve_keeps_the_last_plan(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]
@@ -793,10 +815,11 @@ def test_plant_run_carries_the_input_the_loop_fed_the_plant():
     run = loop.compute_trajectory(tf=0.5, u=np.array([1.0]))
     plant = plant_run(run, loop)
 
-    # u = 2 (r − y) at each tick, held over its period; x the plant's own slice
+    # u = 2 (r − y) at each tick, held over its period and the last over the end
+    # sample; x the plant's own slice
     p0, p1 = loop.state_index["plant"]
     np.testing.assert_array_equal(plant.x, run.x[p0:p1])
-    ticks = np.floor(run.t / 0.1 + 1e-9).astype(int)
+    ticks = np.minimum(np.floor(run.t / 0.1 + 1e-9).astype(int), 4)
     tick_y = {k: run.x[p0, np.flatnonzero(ticks == k)[0]] for k in set(ticks)}
     np.testing.assert_allclose(plant.u[0], [2.0 * (1.0 - tick_y[k]) for k in ticks])
 
@@ -815,10 +838,16 @@ def test_plant_run_reads_open_ports_boxes_and_a_late_clock():
     boxed = closed_loop((P(2.0) % 0.1) >> (Gain([3.0]) % 0.1), Integrator())
     run = boxed.compute_trajectory(tf=0.5, u=np.array([1.0]))
     plant = plant_run(run, boxed)
-    np.testing.assert_allclose(plant.u[0], 6.0 * (1.0 - plant.x[0]), atol=1e-12)
+    np.testing.assert_allclose(
+        plant.u[0, :-1], 6.0 * (1.0 - plant.x[0, :-1]), atol=1e-12
+    )
+    assert plant.u[0, -1] == plant.u[0, -2]  # the end sample holds the last tick's
 
     # A clock started late: the tick of a sample is its index
     late = (P(2.0) % 1e-3) @ Integrator()
     run = late.compute_trajectory(tf=1e5 + 0.01, u=np.array([1.0]), t_start=1e5)
     plant = plant_run(run, late)
-    np.testing.assert_allclose(plant.u[0], 2.0 * (1.0 - plant.x[0]), atol=1e-12)
+    np.testing.assert_allclose(
+        plant.u[0, :-1], 2.0 * (1.0 - plant.x[0, :-1]), atol=1e-12
+    )
+    assert plant.u[0, -1] == plant.u[0, -2]  # the end sample holds the last tick's

@@ -213,6 +213,7 @@ class DynamicSimulation:
         backend="numpy",
         verbose=True,
         solver_warnings="warn",
+        record=None,
     ):
         """
         Convenience shortcut to simulate the system and return a trajectory.
@@ -233,6 +234,11 @@ class DynamicSimulation:
         solver_warnings : str
             ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).
+        record : sequence of str, optional
+            A diagram's signals to keep in the trajectory's ``signals``,
+            ``"sys_id:port_id"``: each port and the blocks it reads, evaluated
+            once per sample after the run (the adaptive solver has no fixed
+            samples to record inside the run).
 
         Returns
         -------
@@ -255,6 +261,9 @@ class DynamicSimulation:
             solver_warnings=solver_warnings,
         )
         traj = sim.solve()
+        if record:
+            require_signals_to_record(self)
+            traj = self.reconstruct_internal_signals(traj, ports=tuple(record))
 
         if show:
             # A real cycle through minilink.core.system
@@ -361,6 +370,7 @@ class StepSimulation:
         t_start=0.0,
         solver=None,
         backend="numpy",
+        record=None,
         show=False,
         verbose=False,
     ):
@@ -386,8 +396,15 @@ class StepSimulation:
             The clock's origin.
         solver : None or "scipy"
             ``None``: the scan with its substeps; ``"scipy"``: the host clock runner.
+        record : sequence of str, optional
+            Signals kept from the run's own signal pass, in the trajectory's
+            ``signals``: ``"path/block:port"`` (a block's output) or ``"plant:u"``.
+            A loop with a plant always records ``"plant:u"`` and its ``plant`` role,
+            so ``traj.of("plant")`` and the read-backs (plots, animation, overlays)
+            compute nothing again. The scan only (``solver=None``).
         """
         # A real cycle through minilink.core.system
+        from minilink.core.compile.plan import PLANT_INPUT
         from minilink.core.trajectory import Trajectory
 
         require_continuous_underneath(self)
@@ -400,8 +417,26 @@ class StepSimulation:
         u_steps = u_samples[:, :n_steps].T
         S = dense_points_of(self, ev)
 
+        # What the run records: the named signals, and a loop's plant input
+        plant_op = getattr(getattr(ev, "plan", None), "plant_op", None)
+        record = recorded_names(record, plant_op, solver)
+        signals = {}
+        roles = {}
+
         # The scan with its substeps, or the host runner on the same blocks
-        if solver is None:
+        if solver is None and record:
+            xs, signals = ev.rollout_dense(
+                x0,
+                u_steps,
+                ev.call_params(),
+                n_steps=n_steps,
+                t_start=t_start,
+                record=record,
+            )
+            signals = {
+                name: np.asarray(v, dtype=float).T for name, v in signals.items()
+            }
+        elif solver is None:
             xs = ev.rollout_dense(
                 x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
             )
@@ -416,7 +451,21 @@ class StepSimulation:
         u_dense = np.repeat(u_samples[:, :n_steps], S, axis=1)
         u_dense = np.concatenate([u_dense, u_samples[:, -1:]], axis=1)
 
-        traj = Trajectory(t=t, x=np.asarray(xs, dtype=float).T, u=u_dense)
+        # The plant role: its state slice and its recorded input
+        if PLANT_INPUT in signals:
+            plant_slice = plant_op.local_x_slice
+            roles["plant"] = {
+                "x": (plant_slice.start, plant_slice.stop),
+                "u": PLANT_INPUT,
+            }
+
+        traj = Trajectory(
+            t=t,
+            x=np.asarray(xs, dtype=float).T,
+            u=u_dense,
+            signals=signals,
+            roles=roles,
+        )
         self.traj = traj
 
         if show:
@@ -539,6 +588,39 @@ def require_run_solver(solver):
         raise ValueError(
             f"solver must be None (the scan with its substeps) or 'scipy' (the host "
             f"clock runner with an adaptive plant), got {solver!r}"
+        )
+
+
+def require_signals_to_record(system):
+    """Refuse a record on a leaf: its signals are its state and input, already in the trajectory."""
+    if not hasattr(system, "reconstruct_internal_signals"):
+        raise TypeError(
+            f"{system.name} is a leaf: its trajectory already holds its x and u; "
+            "record= names the internal signals of a diagram"
+        )
+
+
+def recorded_names(record, plant_op, solver) -> tuple:
+    """The signals a dense run records: the names asked, and a loop's plant input first; none on the host runner."""
+    # A real cycle: the plan imports the diagrams, which import these facades
+    from minilink.core.compile.plan import PLANT_INPUT
+
+    names = tuple(record or ())
+    if solver is not None:
+        require_no_record(names)
+        return ()
+    if plant_op is not None and PLANT_INPUT not in names:
+        names = (PLANT_INPUT, *names)
+
+    return names
+
+
+def require_no_record(names):
+    """Refuse a record on the host clock runner: it ticks the blocks on the host, outside the scan."""
+    if names:
+        raise ValueError(
+            "record= keeps signals from the scan's own signal pass; the host clock "
+            "runner (solver='scipy') has none: run the scan (solver=None)"
         )
 
 

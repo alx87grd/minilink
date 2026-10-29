@@ -946,3 +946,37 @@ def test_a_block_id_holding_a_path_separator_is_refused():
     for sys_id in ("motor.v2", "g:1", "a/b"):
         with pytest.raises(ValueError, match="block id"):
             diagram.add_subsystem(Integrator(), sys_id)
+
+
+def test_record_keeps_a_diagrams_signals_equal_to_the_reconstruction():
+    from minilink import PID, Pendulum
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.4, 0.0])
+    loop = PID(Kp=8.0, Ki=1.0, Kd=2.0) @ plant
+    traj = loop.compute_trajectory(tf=1.0, record=("controller:u",), verbose=False)
+    full = loop.reconstruct_internal_signals(traj)
+    np.testing.assert_array_equal(
+        traj.get_signal("controller:u"), full.get_signal("controller:u")
+    )
+
+
+def test_a_selective_reconstruction_evaluates_only_what_the_port_reads():
+    from minilink import PID, Pendulum
+
+    plant = Pendulum()
+    loop = PID(Kp=8.0, Ki=1.0, Kd=2.0) @ plant
+    traj = loop.compute_trajectory(tf=0.2, verbose=False)
+    calls = []
+    port = loop.subsystems["controller"].outputs["u"]
+    original = port.compute
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    port.compute = counting
+    loop.reconstruct_internal_signals(traj, ports=["plant:y"])
+    assert calls == []  # the plant's output reads its state, not the controller
+    with pytest.raises(KeyError, match="no signal"):
+        loop.reconstruct_internal_signals(traj, ports=["controller:nope"])
