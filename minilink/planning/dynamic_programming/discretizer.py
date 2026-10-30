@@ -501,7 +501,7 @@ class StateSpaceGrid:
 
     def print_mesh_summary(self):
         """Print grid size summary (mirrors pyro ``GridDynamicSystem.compute``)."""
-        name = getattr(self.sys, "name", "system")
+        name = self.sys.name
         print(f"\nGenerating mesh for: {name}")
         print("---------------------------------------------------")
         print(f"State space dimensions: {self.n}  Input space dimension: {self.m}")

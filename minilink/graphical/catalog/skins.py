@@ -131,7 +131,7 @@ def plane_skin_3d(plant, color="#2f6fed"):
     """
     # The drawing attributes, then the aerodynamic parameters, with the defaults
     # of a bare plant
-    params = getattr(plant, "params", {}) or {}
+    params = plant.params or {}
     length = float(getattr(plant, "length", params.get("length", 2.0)))
     width = float(getattr(plant, "width", length / 10.0))
     l_cg = float(getattr(plant, "l_cg", 0.6 * length))
@@ -228,7 +228,7 @@ def axle_offsets(plant):
     """
     if hasattr(plant, "a") and hasattr(plant, "b"):
         return float(plant.a), float(plant.b)
-    params = getattr(plant, "params", {}) or {}
+    params = plant.params or {}
     if "a" in params and "b" in params:
         return float(params["a"]), float(params["b"])
     length = float(params.get("length", 2.0))

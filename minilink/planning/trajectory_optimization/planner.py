@@ -535,7 +535,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_MAIN)
         print("===          Trajectory Optimization Program             ===")
         print(DISP_RULE_MAIN)
-        print("system:", getattr(sys, "name", type(sys).__name__))
+        print("system:", sys.name)
         print(f"dimensions: n={int(sys.n)}, m={int(sys.m)}, p={int(sys.p)}")
         print("x_start:", preview_vector(problem.x_start))
         print("goal point:", preview_vector(problem.goal_point()))
