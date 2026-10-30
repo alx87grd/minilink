@@ -84,14 +84,15 @@ class StepFace:
     def params(self) -> dict:
         """The numbers every call reads: ``plant`` (a random plant at its mean), ``cost``, ``x_start``, ``t_start``, and the discount."""
         problem = self.problem
-        plant = nominal_plant_params(problem) if is_continuous(problem) else None
+        continuous = is_continuous(problem)
+        plant = nominal_plant_params(problem) if continuous else None
         tree = {
             "plant": problem.sys.params if plant is None else plant,
             "cost": None if problem.cost is None else problem.cost.params,
             "x_start": np.asarray(problem.x_start, dtype=float),
             "t_start": problem.t_start,
         }
-        if is_continuous(problem):
+        if continuous:
             tree["discount_rate"] = problem.discount_rate
 
         return tree
@@ -117,12 +118,11 @@ class StepFace:
         t_start = self.t_start if params is None else params["t_start"]
         dt = self.dt
 
-        # A native problem's tick: t_k = t_start + k
+        # A native problem counts ticks
         if dt is None:
             t_k = t_start + k
             return t_k
 
-        # t_k = t_start + k dt
         t_k = t_start + k * dt
 
         return t_k
@@ -181,7 +181,6 @@ class StepFace:
             return None
         t_start = self.t_start
 
-        # t_end = t_start + tf
         if is_continuous(self.problem):
             tf = self.problem.tf
             t_end = t_start + tf
