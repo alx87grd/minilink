@@ -4,27 +4,38 @@ from __future__ import annotations
 
 import time
 import warnings
-from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.assembly import flatten_diagram
 from minilink.core.backends import (
+    BACKEND_JAX,
     BACKEND_NUMPY,
+    jax_installed,
     normalize_backend,
     require_jax_numpy,
 )
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
+from minilink.core.compile.evaluators.discrete import (
+    SampledDiagramEvaluator,
+    StepDiagramEvaluator,
+    StepEvaluator,
+)
+from minilink.core.compile.evaluators.dynamic import DynamicEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
 from minilink.core.compile.plan import (
+    build_sampled_execution_plan,
     execution_plan_from_order,
     step_execution_plan_from_order,
 )
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+from minilink.core.discrete.sampled_system import NativeSampledSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
 from minilink.core.topology import evaluation_order_of
 from minilink.core.wiring import iter_subsystems
-
-if TYPE_CHECKING:
-    from minilink.core.diagram import DiagramSystem
-    from minilink.core.discrete.step_diagram import StepDiagramSystem
 
 # How far the compile probe moves an input an output does not declare
 DEPENDENCY_PROBE = 0.5
@@ -52,11 +63,6 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
     verbose : bool
         If ``True``, print timed compilation steps.
     """
-    from minilink.core.diagram import DiagramSystem
-    from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
-    from minilink.core.discrete.step_diagram import StepDiagramSystem
-    from minilink.core.discrete.step_system import StepSystem
-    from minilink.core.system import DynamicSystem
 
     if isinstance(system, DiagramSystem):
         return compile_diagram(
@@ -78,16 +84,16 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
 
     # One evaluator class per system kind, on either backend
     if isinstance(system, StepSystem):
-        from minilink.core.compile.evaluators.discrete import StepEvaluator as kind
+        kind = StepEvaluator
     elif isinstance(system, DynamicSystem):
-        from minilink.core.compile.evaluators.dynamic import DynamicEvaluator as kind
+        kind = DynamicEvaluator
     elif system.n > 0:
         raise TypeError(
             f"Cannot compile {type(system).__name__} with n={system.n}; "
             "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
         )
     else:
-        from minilink.core.compile.evaluators.static import StaticEvaluator as kind
+        kind = StaticEvaluator
 
     t_total = time.perf_counter()
     evaluator = kind(system, backend=key, verbose=verbose)
@@ -104,7 +110,6 @@ def compile_auto(system, verbose=False):
     JAX cannot be imported, or the system is "not JAX-traceable"; any other
     error from the JAX compile surfaces.
     """
-    from minilink.core.backends import BACKEND_JAX, jax_installed
 
     if jax_installed():
         try:
@@ -158,9 +163,6 @@ def compile_diagram(
     implementations pure if they still read or mutate other instance state; see
     :class:`minilink.core.system.System`.
     """
-    from minilink.core.assembly import flatten_diagram
-    from minilink.core.discrete.step_diagram import StepDiagramSystem
-    from minilink.core.discrete.step_system import StepSystem
 
     if isinstance(diagram, StepDiagramSystem):
         raise TypeError(
@@ -225,7 +227,6 @@ def compile_diagram(
     key = normalize_backend(backend)
     if key != BACKEND_NUMPY:
         require_jax_numpy()
-    from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 
     evaluator = DiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
@@ -247,11 +248,7 @@ def compile_step_diagram(
     The step twin of :func:`compile_diagram`: same arguments, a
     :class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator` back.
     """
-    from minilink.core.discrete.step_diagram import (
-        StepDiagramSystem as StepDiagramSystemType,
-    )
-
-    if not isinstance(diagram, StepDiagramSystemType):
+    if not isinstance(diagram, StepDiagramSystem):
         raise TypeError(
             f"compile_step_diagram requires StepDiagramSystem, got {type(diagram).__name__}"
         )
@@ -302,7 +299,6 @@ def compile_step_diagram(
     key = normalize_backend(backend)
     if key != BACKEND_NUMPY:
         require_jax_numpy()
-    from minilink.core.compile.evaluators.discrete import StepDiagramEvaluator
 
     evaluator = StepDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
@@ -320,9 +316,6 @@ def compile_sampled_diagram(
     The plan inlines nested boxes into one flat schedule on the base clock:
     each block's divisor, its held outputs and what it reads as time.
     """
-    from minilink.core.compile.evaluators.discrete import SampledDiagramEvaluator
-    from minilink.core.compile.plan import build_sampled_execution_plan
-    from minilink.core.wiring import iter_subsystems
 
     for path, subsystem in iter_subsystems(diagram):
         validate_equation_shapes(
@@ -356,11 +349,6 @@ def validate_equation_shapes(system, label=None):
     MPC's solve declares every input it reads, so it is never run here). A
     native sampled law's update is not probed.
     """
-    from minilink.core.diagram import DiagramSystem
-    from minilink.core.discrete.sampled_system import NativeSampledSystem
-    from minilink.core.discrete.step_diagram import StepDiagramSystem
-    from minilink.core.discrete.step_system import StepSystem
-    from minilink.core.system import DynamicSystem
 
     if isinstance(system, (DiagramSystem, StepDiagramSystem)):
         return
