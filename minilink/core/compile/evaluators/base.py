@@ -372,7 +372,7 @@ def every_block(frozen, diagram):
     """``frozen`` naming every block of ``diagram``: one with no operation (a sink) its parameters copied."""
     for sys_id, sub in diagram.subsystems.items():
         if sys_id not in frozen:
-            frozen[sys_id] = copy.deepcopy(getattr(sub, "params", {}))
+            frozen[sys_id] = copy.deepcopy(sub.params)
 
     return frozen
 
