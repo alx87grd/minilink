@@ -43,8 +43,8 @@
 
 Minilink is an open-source Python framework for dynamical systems, control, and optimization.
 Engineers, students, and researchers write a physical model once as a continuous `DynamicSystem`.
-The same model powers simulation, classical and modern control, trajectory optimization, and reinforcement learning.
-NumPy and SciPy provide a zero-friction default for courses; the identical equations compile, batch, and differentiate under JAX for research.
+The same model powers simulation, classical and modern control, optimal control (MPC, MPPI, etc.), machine learning (neural nets, reinforcement learning), and parameter optimization.
+NumPy and SciPy provide a zero-friction default for courses; the identical equations compile, batch, and differentiate under JAX for high performance.
 
 ---
 
@@ -72,7 +72,7 @@ $$y = h(x, u, t; p) \quad \text{(outputs, default } y = x\text{)}$$
 $$T = \mathrm{tf}(x, u, t; p) \quad \text{(body poses for 3D animation)}$$
 
 **Functional purity** means equations are stateless: arrays in, arrays out. No simulation time or state is mutated on `self`.
-This purity guarantees exact numerical stepping, arbitrary block nesting, parallel GPU rollouts, and automatic differentiation.
+This purity allows precise numerical integration, reproducible experiments, exact linear analysis, arbitrary composition into nested systems, parallel GPU rollouts, and automatic differentiation.
 
 ```python
 import numpy as np
@@ -98,15 +98,11 @@ plant.x0[0] = 1.0
 plant.compute_trajectory(tf=10.0)
 plant.plot_trajectory()
 ```
-
-- **Classroom Default:** Pure NumPy and SciPy out of the box with zero compilation steps or license hurdles.
-- **Extensible Leaves:** Easily wrap external C/Python physics simulators, hardware sensors, or custom dynamics as a `System` leaf.
-
 ---
 
 ## 3. Compositional Closure: Diagrams as Code
 
-Code is the single source of truth. Minilink replaces Simulink's mouse-driven wiring and opaque binary `.slx` files with pure, version-controlled Python expressions:
+Code is the single source of truth. Minilink replaces GUI wiring and opaque binary files with pure, version-controlled Python expressions:
 
 - **Algebraic Shortcuts:** `ctrl @ plant` (feedback loop), `a >> b` (series), `a + b` (parallel), `sys % Δ` (zero-order hold digital clock sampling).
 - **Explicit 1-Line Wiring:** `diag.connect("controller", "u", "plant", "u")` connects arbitrary multi-loop networks with immediate port checks.
@@ -121,25 +117,21 @@ ctrl = PID(kp=10.0, ki=1.0, kd=2.0)
 # Feedback composition: loop is itself a pure DynamicSystem
 loop = ctrl @ plant
 
-loop.compute_trajectory(tf=10.0)
 loop.plot_diagram()
-loop.plot_trajectory()
 ```
 
 ![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
 
-Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**:
-- `loop.linearize()`, `loop.bode()`, `loop.nyquist()`, `loop.root_locus()`, `loop.pzmap()`, `loop.step_response()`, and `loop.kalman()`.
-- Runs headlessly in automated Linux Docker containers and CI/CD pipelines with zero display servers or seat license fees.
+Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**: `loop.linearize()`, `loop.bode()`, `loop.nyquist()`, `loop.root_locus()`, `loop.pzmap()`, `loop.step_response()`, and `loop.kalman()`.
 
 ---
 
 ## 4. Interactive Play & 3D Visualization
 
-- **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame). Paces hardware-in-the-loop testbeds at up to 1 kHz.
+- **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
 - **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
 - **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` opens an interactive 3D browser viewer with orbit, pan, and playback controls.
-- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for industrial manipulators (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), quadrotors (`Drone2D`, `Drone3D`), and aerospace vehicles (`Rocket`).
+- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), quadrotors (`Drone2D`, `Drone3D`), and aerospace vehicles (`Rocket`).
 
 ```python
 from minilink import UR5Manipulator
@@ -157,7 +149,7 @@ robot.animate(traj, renderer="meshcat")  # interactive 3D WebGL in browser
 
 The exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physics:
 
-- **Exact Machine-Precision Sensitivities:** Analytical Jacobians eliminate finite-difference approximation noise:
+- **Exact Machine-Precision Sensitivities:** Analytical Jacobians:
   $$A = \frac{\partial f}{\partial x}, \quad B = \frac{\partial f}{\partial u}, \quad S_p = \frac{\partial f}{\partial p}$$
 - **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 27 ms vs. 32 s in pure Python).
 - **Plant & Controller Co-Design:** Compute closed-loop objective gradients $\nabla_\theta J$ to optimize control gains and physical parameters simultaneously.
@@ -257,23 +249,21 @@ print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 
 ---
 
-## 8. Honest Boundaries: What Minilink is NOT
-
-Minilink maintains rigorous scope boundaries to protect simplicity and textbook readability:
-
-1. **Not a Heavy Multibody Contact Engine:** Minilink is not MuJoCo, Bullet, or Isaac Sim. For complex contact or high-DoF meshes, wrap external simulators as a `System` leaf. Minilink focuses on control architecture, analytical derivatives, and trajectory optimization.
-2. **Not a 100+ Knot Sparse NLP Modeling Language:** CasADi remains the gold standard for massive, sparse NLP collocation problems. Minilink treats NLP solvers as execution backends rather than rewriting a symbolic AD graph engine.
-3. **Continuous-Time is Primary:** Dynamics $f$ represent instantaneous rates ($\dot{x} = dx/dt$), not discrete next-step maps. Discrete and hybrid clocks (`% Δ`) sit cleanly beside the continuous core without compromising it.
-
+## 8. What Minilink is NOT
+ 
+1. **Not a Heavy Multibody Contact Engine:** For complex contact or high-DoF meshes, wrap external simulators (such as Drake or MuJoCo) as a `System` leaf. Minilink focuses on control architecture, analytical derivatives, and trajectory optimization.
+2. **Not a 100+ Knot Sparse NLP Modeling Language:** Minilink programs and solvers do not exploit sparse Jacobian structure, unlike specialized modeling packages such as CasADi.
+3. **Continuous-Time is Primary:** Dynamics $f$ represent instantaneous rates ($\dot{x} = dx/dt$), not discrete next-step maps.
+ 
 ---
-
+ 
 ## 9. Key Advantages
-
+ 
 | Advantage | What It Solves |
 | --- | --- |
 | **One Model Across All Domains** | Define physics once ($\dot{x} = f$); seamlessly move between frequency analysis, LQR, TrajOpt, and RL without rewriting models. |
-| **Zero-Friction Classroom Adoption** | Pure NumPy/SciPy baseline; runs immediately in 1-click Google Colab with zero compiler or license setup on student laptops. |
-| **Git-Native Diagrams as Code** | Pure Python operators (`>>`, `+`, `@`, `%`) replace opaque binary `.slx` files with clear, reviewable pull request diffs. |
+| **Zero-Friction Install** | Pure NumPy/SciPy baseline; runs immediately in 1-click Google Colab with zero compilation. |
+| **Git-Native Diagrams as Code** | Pure Python operators (`>>`, `+`, `@`, `%`) replace opaque binary files with clear, reviewable pull request diffs. |
 | **Hardware-Accelerated with JAX** | Machine-precision autodiff sensitivities, GPU `vmap` rollouts, and exact plant-controller co-design ($\nabla_\theta J$). |
 | **Unified Optimization Boundary** | Standardized `MathematicalProgram` and `PlanningProblem` decouple formulations from plug-and-play numerical solvers. |
 
@@ -314,12 +304,5 @@ import sys; sys.path.insert(0, "/content/minilink")
 - [From RL to Bode Showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) — 6-axis robot, impedance loop, neural policy, and frequency response.
 - [Tutorial Series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) — 12 guided notebooks covering core dynamics through reinforcement learning.
 - [Teaching Notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching) — swing-up control, dynamic programming, and PPO.
-- [Interactive 3D WebGL Showcases](https://alx87grd.github.io/minilink/):
-  - [UR-5 Robot Impedance Control](https://alx87grd.github.io/minilink/_static/showcase/ur5_impedance.html)
-  - [Racecar Model Predictive Control](https://alx87grd.github.io/minilink/_static/showcase/racecar_mpc.html)
-  - [ANCF Dynamic Tire Ring Prototype](https://alx87grd.github.io/minilink/_static/showcase/ancf_tire.html)
-- [Examples Index](https://github.com/alx87grd/minilink/blob/main/examples/README.md) — complete catalog of scripts and demos.
-- [API Reference](https://alx87grd.github.io/minilink/) — full documentation.
-- [Developer Contracts](https://github.com/alx87grd/minilink/tree/main/docs/dev) — architectural constitution, rules, and design documents.
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).
