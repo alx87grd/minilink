@@ -137,14 +137,14 @@ class TestUR5NativeArrayJax(unittest.TestCase):
         arm, x0, _ = _scenario_arm(manifest)
         kwargs = dict(
             x0=x0,
-            t0=0.0,
+            t_start=0.0,
             tf=manifest["tf"],
             dt=manifest["dt"],
             solver=manifest["solver"],
             verbose=False,
         )
-        sim_np = Simulator(arm, compile_backend="numpy", **kwargs)
-        sim_jx = Simulator(arm, compile_backend="jax", **kwargs)
+        sim_np = Simulator(arm, backend="numpy", **kwargs)
+        sim_jx = Simulator(arm, backend="jax", **kwargs)
         sim_jx.solve()  # warmup / JIT
 
         t0 = time.perf_counter()
@@ -167,14 +167,14 @@ class TestUR5NativeArrayJax(unittest.TestCase):
         arm, x0, _ = _scenario_arm(manifest)
         kwargs = dict(
             x0=x0,
-            t0=0.0,
+            t_start=0.0,
             tf=manifest["tf"],
             dt=manifest["dt"],
             solver=manifest["solver"],
             verbose=False,
         )
-        traj_np = Simulator(arm, compile_backend="numpy", **kwargs).solve()
-        traj_jx = Simulator(arm, compile_backend="jax", **kwargs).solve()
+        traj_np = Simulator(arm, backend="numpy", **kwargs).solve()
+        traj_jx = Simulator(arm, backend="jax", **kwargs).solve()
 
         np.testing.assert_allclose(traj_np.t, data["t"])
         np.testing.assert_allclose(traj_np.x, data["x"], rtol=1e-12, atol=1e-12)

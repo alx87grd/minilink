@@ -101,7 +101,7 @@ def run_simulation_scenario(
     traj = _simulate_once(
         system,
         solver=candidate.solver,
-        compile_backend=candidate.compile_backend,
+        backend=candidate.backend,
         t0=t0,
         tf=tf,
         dt=dt,
@@ -122,18 +122,18 @@ def _simulate_once(
     system: Any,
     *,
     solver: str,
-    compile_backend: str,
+    backend: str,
     t0: float,
     tf: float,
     dt: float,
 ):
     sim = Simulator(
         system,
-        t0=t0,
+        t_start=t0,
         tf=tf,
         dt=dt,
         solver=solver,
-        compile_backend=compile_backend,
+        backend=backend,
         verbose=False,
     )
     t_start = time.perf_counter()

@@ -116,9 +116,7 @@ def test_quadratic_cost_numpy_math_and_reporting_helpers():
     traj = Trajectory(
         t=np.array([0.0, 1.0]), x=np.column_stack((x, x)), u=np.column_stack((u, u))
     )
-    evaluated = cost.evaluate_trajectory(traj)
-    assert isinstance(cost.terminal_cost(traj), float)
-    assert isinstance(cost.total_cost(traj), float)
+    evaluated = traj.with_cost(cost)
     np.testing.assert_allclose(evaluated.signals["cost_rate"], [[6.0, 6.0]])
     np.testing.assert_allclose(evaluated.signals["cost"], [[0.0, 6.0]])
 
@@ -237,10 +235,10 @@ from minilink.planning.trajectory_optimization.planner import TrajectoryOptimiza
 p = Pendulum()
 p.inputs["u"].lower_bound = np.array([-20.0]); p.inputs["u"].upper_bound = np.array([20.0])
 goal = np.array([np.pi, 0.0])
-problem = PlanningProblem(p, x_start=np.zeros(2), x_goal=goal, tf=3.0,
+problem = PlanningProblem(p, x_start=np.zeros(2), tf=3.0,
     cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), xbar=goal))
 plan = TrajectoryOptimizationPlanner(problem, n_steps=30, transcription="direct_collocation",
-    compile_backend="jax").solve()
+    backend="jax").solve()
 print(plan.success)
 """
 
@@ -336,3 +334,13 @@ def test_disjoint_members_make_an_empty_intersection():
     touch = BoxSet(lower=np.array([1.0, -1.0]), upper=np.array([2.0, 1.0]))
     np.testing.assert_allclose((box & touch).bounding_box().lower, [1.0, -1.0])
     np.testing.assert_allclose((box & touch).bounding_box().upper, [1.0, 1.0])
+
+
+@pytest.mark.jax
+def test_the_default_output_stub_is_on_the_arrays_module():
+    jnp = pytest.importorskip("jax.numpy")
+    from minilink.core.system import DynamicSystem
+
+    sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+    y = sys.h(jnp.zeros(2), jnp.zeros(1))
+    assert type(y).__module__.startswith("jax") and y.shape == (1,)

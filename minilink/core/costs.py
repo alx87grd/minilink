@@ -1,13 +1,26 @@
 """Cost functions: the running cost ``g(x, u, t)`` and the terminal cost ``h(x, t)`` of ``J``."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
+from minilink.core.params import own_params
 from minilink.core.trajectory import Trajectory
+
+
+def param_view(key):
+    """An attribute that reads and writes ``self.params[key]``: a view, so in-place writes reach the cost."""
+
+    def read(self):
+        return self.params[key]
+
+    def write(self, value):
+        self.params[key] = value
+
+    return property(read, write, doc=f"View of ``params[{key!r}]``.")
+
 
 ###############################################################################
 # Public API
@@ -19,29 +32,28 @@ class CostFunction(ABC):
     Mother class for deterministic planning cost functions.
 
     Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
-    ``h(x, t)`` of the objective ``J = ∫ exp(-rho t) g dt + h(x(tf), tf)``.
+    ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
     The horizon is the planning problem's: a finite ``tf`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
-    set is priced by the problem (``infeasible_cost``), not by the cost.
+    set is charged by the problem (``failure_cost``), not by the cost.
 
     ``g`` and ``h`` are native-array equation paths: NumPy in, NumPy out;
-    JAX in, JAX out. Reporting helpers such as :meth:`total_cost` convert to
-    Python floats at the boundary. A cost lives in :mod:`minilink.core`, not
+    JAX in, JAX out. :meth:`integrate` gives the running cost along a
+    trajectory on its array module. A cost lives in :mod:`minilink.core`, not
     on a :class:`~minilink.core.system.System`, so one model serves many
     planning problems.
 
-    Class attribute (override it in the body of a subclass):
+    The discount rate ``rho`` is the problem's (``PlanningProblem.discount_rate``):
+    the cost is the integrand only, and :meth:`integrate` takes the rate.
 
-    - ``discount_rate``: continuous rate ``rho >= 0``; ``0`` is undiscounted.
-      Planners convert it with :meth:`discount_factor` (value iteration's
-      ``alpha`` and reinforcement learning's ``gamma`` are both ``exp(-rho dt)``).
-      The library costs are frozen dataclasses, so assigning it on one of their
-      instances raises. ``weight * cost`` keeps the cost's rate and ``a + b``
-      requires equal rates. No constructor field or ``params`` entry sets
-      the rate; a subclass does.
+    Class attributes: ``params``, the cost's parameters (``{}`` for a cost
+    that hard-codes its constants; the library costs hold a dictionary, the
+    System pattern: ``params=None`` in ``g`` and ``h`` reads them), and ``id``,
+    the cost's key in a sum (``None``: its class name).
     """
 
-    discount_rate = 0.0
+    params = own_params()
+    id = None
 
     @abstractmethod
     def g(self, x, u, t=0.0, params=None):
@@ -53,76 +65,65 @@ class CostFunction(ABC):
         """Return the native scalar terminal cost ``h(x, t)``."""
         ...
 
-    def discount_factor(self, dt) -> float:
-        """Per-step factor ``exp(-rho dt)`` for a planner with time step ``dt``."""
-        rho = float(self.discount_rate)
-        dt = float(dt)
-
-        # γ = exp(−ρ dt)
-        gamma = np.exp(-rho * dt)
-
-        return float(gamma)
-
-    def evaluate_trajectory(
-        self,
-        traj: Trajectory,
-        params=None,
-    ) -> Trajectory:
+    def g_max(self, X, U, params=None):
         """
-        Return ``traj`` with sampled running and cumulative costs.
+        The largest ``g`` over the boxes ``X × U`` (two :class:`~minilink.core.sets.BoxSet`).
 
-        The added signals are ``"cost_rate"`` and ``"cost"`` with shape
-        ``(1, N)``. ``cost_rate`` is the discounted integrand
-        ``exp(-rho t) g(x, u, t)``; the cumulative integral uses the
-        trapezoidal rule and excludes the terminal cost; callers can add
-        ``h(x(tf), tf)`` when they need the full objective scalar.
+        The largest ``g`` on a quasi-random sample of the boxes at ``t = 0``: a
+        sampled estimate, which may fall short of the maximum between the samples;
+        a subclass replaces it by its exact maximum or a bound.
         """
+        xs, us = box_samples(X, U)
         g = self.g
-        rho = float(self.discount_rate)
-        N = traj.n_samples
 
-        # dJ_k = exp(−ρ t_k) g(x_k, u_k, t_k), each sample's discounted running cost
-        dJ = np.zeros(N, dtype=float)
-        for i, t in enumerate(traj.t):
-            g_i = float(g(traj.x[:, i], traj.u[:, i], float(t), params=params))
-            dJ[i] = np.exp(-rho * float(t)) * g_i
+        # g_max ≈ max over the samples of g(x, u, 0)
+        values = [float(g(x, u, 0.0, params)) for x, u in zip(xs, us)]
+        g_max = max(values)
 
-        # J(t_k) = ∫ dJ dt from t_0 to t_k by the trapezoidal rule, J(t_0) = 0
-        J = np.zeros(N, dtype=float)
-        if N > 1:
-            dt = np.diff(traj.t)
-            increments = 0.5 * (dJ[:-1] + dJ[1:]) * dt
-            J[1:] = np.cumsum(increments)
+        return g_max
 
-        return traj.with_signals(
-            {
-                "cost_rate": dJ.reshape(1, -1),
-                "cost": J.reshape(1, -1),
-            }
-        )
+    def h_max(self, X, params=None):
+        """The largest ``h`` over the box ``X``: a sampled estimate, as :meth:`g_max`."""
+        xs, _ = box_samples(X, None)
+        h = self.h
 
-    def terminal_cost(
-        self,
-        traj: Trajectory,
-        params=None,
-    ) -> float:
-        """Return ``h`` evaluated at the final state of ``traj``."""
-        return float(self.h(traj.x[:, -1], traj.tf, params=params))
+        # h_max ≈ max over the samples of h(x, 0)
+        values = [float(h(x, 0.0, params)) for x in xs]
+        h_max = max(values)
 
-    def total_cost(
-        self,
-        traj: Trajectory,
-        params=None,
-    ) -> float:
-        """Return the trapezoidal running cost plus terminal cost."""
-        evaluated = self.evaluate_trajectory(traj, params=params)
-        running = evaluated.signals["cost"][0, -1]
-        terminal = self.terminal_cost(traj, params)
+        return h_max
 
-        # J = ∫ exp(−ρ t) g dt + h(x(t_f), t_f)
-        J = running + terminal
+    def integrate(
+        self, traj: Trajectory, *, discount_rate=0.0, params=None, t_start=0.0
+    ):
+        """
+        The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
 
-        return float(J)
+        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t_start)} g(x_k, u_k, t_k)``
+        at each sample, the discount counted from the horizon's start,
+        and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
+        ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
+        trajectory's array module, so it traces under JAX.
+        """
+        xp = array_module(traj.x)
+
+        g = self.g
+        rho = discount_rate
+        t = traj.t
+        x = traj.x
+        u = traj.u
+
+        # g_k = g(x_k, u_k, t_k), every sample (a vmap on JAX, a loop on NumPy)
+        g_k = per_sample(g, x.T, u.T, t, params)
+
+        # dJ_k = e^{−ρ (t_k − t_start)} g_k
+        cost_rate = xp.exp(-rho * (t - t_start)) * g_k
+
+        # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
+        increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])
+        cost = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
+
+        return cost_rate, cost
 
     # Cost algebra
 
@@ -152,7 +153,6 @@ class CostFunction(ABC):
         repr_pretty(self, p, cycle)
 
 
-@dataclass(frozen=True)
 class QuadraticCost(CostFunction):
     """
     Quadratic running and terminal cost.
@@ -160,32 +160,34 @@ class QuadraticCost(CostFunction):
     The running cost is
     ``(x - xbar).T @ Q @ (x - xbar) + (u - ubar).T @ R @ (u - ubar)``.
     The terminal cost is ``(x - xbar).T @ S @ (x - xbar)``.
+
+    The weights and the targets are :attr:`params` (``"Q"``, ``"R"``, ``"S"``,
+    ``"xbar"``, ``"ubar"``), the System pattern: ``params=None`` in :meth:`g`
+    and :meth:`h` reads them, a dictionary replaces them, so ``jax.grad``
+    reaches ``Q``. The attributes ``cost.Q`` … are views of the dictionary.
     """
 
-    Q: np.ndarray
-    R: np.ndarray
-    S: np.ndarray
-    xbar: np.ndarray
-    ubar: np.ndarray
-
-    def __post_init__(self) -> None:
+    def __init__(self, Q, R, S, xbar, ubar):
         # The weights and the targets as float copies, the targets flat
-        Q = np.asarray(self.Q, dtype=float).copy()
-        R = np.asarray(self.R, dtype=float).copy()
-        S = np.asarray(self.S, dtype=float).copy()
-        xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
-        ubar = np.asarray(self.ubar, dtype=float).reshape(-1).copy()
+        Q = np.asarray(Q, dtype=float).copy()
+        R = np.asarray(R, dtype=float).copy()
+        S = np.asarray(S, dtype=float).copy()
+        xbar = np.asarray(xbar, dtype=float).reshape(-1).copy()
+        ubar = np.asarray(ubar, dtype=float).reshape(-1).copy()
 
         # The weights sized by the targets: Q and S are n × n, R is m × m
-        n = xbar.size
-        m = ubar.size
-        check_weights(Q, R, S, n, m)
+        check_weights(Q, R, S, xbar.size, ubar.size)
 
-        object.__setattr__(self, "Q", Q)
-        object.__setattr__(self, "R", R)
-        object.__setattr__(self, "S", S)
-        object.__setattr__(self, "xbar", xbar)
-        object.__setattr__(self, "ubar", ubar)
+        self.params = {"Q": Q, "R": R, "S": S, "xbar": xbar, "ubar": ubar}
+
+    Q = param_view("Q")
+    R = param_view("R")
+    S = param_view("S")
+    xbar = param_view("xbar")
+    ubar = param_view("ubar")
+
+    def _repr_latex_(self):
+        return latex_inspect(self)
 
     @classmethod
     def from_system(
@@ -224,33 +226,53 @@ class QuadraticCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
-        Q = self.Q
-        R = self.R
-        xbar = self.xbar
-        ubar = self.ubar
+        params = self.params if params is None else params
+
+        Q = params["Q"]
+        R = params["R"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
 
         dx = x - xbar
         du = u - ubar
 
-        # g = (x − x̄)ᵀ Q (x − x̄) + (u − ū)ᵀ R (u − ū)
         g = dx.T @ Q @ dx + du.T @ R @ du
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
-        S = self.S
-        xbar = self.xbar
+        params = self.params if params is None else params
+
+        S = params["S"]
+        xbar = params["xbar"]
 
         dx = x - xbar
 
-        # h = (x − x̄)ᵀ S (x − x̄)
         h = dx.T @ S @ dx
 
         return h
 
+    def g_max(self, X, U, params=None):
+        """The exact maximum of ``g`` over the boxes: each quadratic at its farthest vertex."""
+        params = self.params if params is None else params
+        Q = params["Q"]
+        R = params["R"]
+        xbar = params["xbar"]
+        ubar = params["ubar"]
 
-@dataclass(frozen=True)
+        # max g = max (x − x̄)ᵀ Q (x − x̄) + max (u − ū)ᵀ R (u − ū), the two independent
+        g_max = quadratic_max(Q, xbar, X) + quadratic_max(R, ubar, U)
+
+        return g_max
+
+    def h_max(self, X, params=None):
+        """The exact maximum of ``h`` over the box ``X``."""
+        params = self.params if params is None else params
+
+        return quadratic_max(params["S"], params["xbar"], X)
+
+
 class TimeCost(CostFunction):
     """
     Minimum-time cost ``J = T``.
@@ -258,16 +280,18 @@ class TimeCost(CostFunction):
     The running cost is ``g = 1`` everywhere except within ``eps`` of the target
     ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
     Under dynamic programming the cost-to-go becomes the time-to-go and the
-    optimal policy is bang-bang.
+    optimal policy is bang-bang. The target and the radius are :attr:`params`
+    (``{"xbar", "eps"}``).
     """
 
-    xbar: np.ndarray
-    eps: float = 1e-3
+    def __init__(self, xbar, eps=1e-3):
+        self.params = {
+            "xbar": np.asarray(xbar, dtype=float).reshape(-1).copy(),
+            "eps": float(eps),
+        }
 
-    def __post_init__(self) -> None:
-        xbar = np.asarray(self.xbar, dtype=float).reshape(-1).copy()
-        object.__setattr__(self, "xbar", xbar)
-        object.__setattr__(self, "eps", float(self.eps))
+    xbar = param_view("xbar")
+    eps = param_view("eps")
 
     @classmethod
     def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
@@ -278,10 +302,11 @@ class TimeCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
+        params = self.params if params is None else params
         xp = array_module(x)
 
-        xbar = xp.asarray(self.xbar)
-        eps = self.eps
+        xbar = xp.asarray(params["xbar"])
+        eps = params["eps"]
 
         on_target = xp.linalg.norm(x - xbar) < eps
 
@@ -294,103 +319,455 @@ class TimeCost(CostFunction):
         """Return zero terminal cost."""
         return 0.0
 
+    def g_max(self, X, U, params=None):
+        """``g`` is at most 1."""
+        return 1.0
 
-@dataclass(frozen=True)
+    def h_max(self, X, params=None):
+        """``h`` is 0."""
+        return 0.0
+
+
 class SumCost(CostFunction):
     """
     Additive cost ``J = sum_i J_i`` over several cost functions.
 
     Built by the ``+`` operator on :class:`CostFunction`; use it to add an
-    obstacle or traversability term to a base objective. The terms share one
-    ``discount_rate``; terms whose rates differ raise ``ValueError``.
+    obstacle or traversability term to a base objective. The terms are keyed
+    by id, as a diagram keys its blocks (:meth:`of`): ``terms`` is
+    ``{term_id: cost}`` and :attr:`params` the live view
+    ``{term_id: cost.params}``, its setter routing each entry to its term, so
+    a partial dictionary changes only the terms it names. A sum holds each cost
+    object once: ``q + 10 * q`` is refused, ``11 * q`` is the same cost.
     """
 
-    terms: tuple
-
-    def __post_init__(self) -> None:
-        # One objective, one discount rate ρ
-        rates = sorted({float(cost.discount_rate) for cost in self.terms})
-        require_common_rate(rates)
-
-    @property
-    def discount_rate(self) -> float:
-        """The terms' common rate ``rho`` (``0`` for an empty sum)."""
-        terms = self.terms
-        return terms[0].discount_rate if terms else 0.0
+    def __init__(self, terms):
+        self.terms = dict(terms)
+        require_distinct_terms(self.terms)
 
     @classmethod
-    def of(cls, *costs: CostFunction) -> "SumCost":
-        """Build a sum cost, flattening nested sums into a single term list."""
-        terms: list[CostFunction] = []
-        for cost in costs:
-            if isinstance(cost, SumCost):
-                terms.extend(cost.terms)
-            else:
-                terms.append(cost)
+    def of(cls, *costs: CostFunction, **named: CostFunction) -> "SumCost":
+        """
+        Build a sum cost: anonymous terms keyed by their id, named ones by their name.
 
-        return cls(tuple(terms))
+        An anonymous sum (``a + b + c``, ``sum([...])``) is flattened into one level,
+        so the dictionary does not depend on the order Python adds; a term's id is
+        its ``id``, else its class name verbatim, with ``2``, ``3``, … for repeats
+        (a scaled cost takes the id of the cost it scales). A sum with an ``id``,
+        and every term passed by name, stays nested.
+        """
+        terms = {}
+        for cost in costs:
+            if isinstance(cost, SumCost) and cost.id is None:
+                for term_id, term in cost.terms.items():
+                    base = term_id if is_named_term(term_id, term) else term_id_of(term)
+                    terms[unique_term_id(base, terms)] = term
+            else:
+                terms[unique_term_id(term_id_of(cost), terms)] = cost
+        for name, cost in named.items():
+            require_new_term(name, terms)
+            terms[name] = cost
+
+        return cls(terms)
+
+    @property
+    def params(self):
+        """Nested live view ``{term_id: cost.params}``."""
+        return {term_id: cost.params for term_id, cost in self.terms.items()}
+
+    @params.setter
+    def params(self, value):
+        validate_cost_params(value, self.terms)
+        for term_id, term_params in (value or {}).items():
+            self.terms[term_id].params = term_params
 
     def g(self, x, u, t=0.0, params=None):
-        """Return the summed running cost."""
-        terms = self.terms
+        """Return the summed running cost, each term on its own entry of ``params``."""
+        validate_cost_params(params, self.terms)
+        params = params or {}
 
         # g = Σᵢ gᵢ(x, u, t)
-        g = sum(cost.g(x, u, t, params) for cost in terms)
+        g = sum(
+            cost.g(x, u, t, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
 
         return g
 
     def h(self, x, t=0.0, params=None):
-        """Return the summed terminal cost."""
-        terms = self.terms
+        """Return the summed terminal cost, each term on its own entry of ``params``."""
+        validate_cost_params(params, self.terms)
+        params = params or {}
 
         # h = Σᵢ hᵢ(x, t)
-        h = sum(cost.h(x, t, params) for cost in terms)
+        h = sum(
+            cost.h(x, t, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
 
         return h
 
+    def g_max(self, X, U, params=None):
+        """The sum of the terms' bounds: ``max Σ gᵢ ≤ Σ max gᵢ``."""
+        params = params or {}
 
-@dataclass(frozen=True)
+        return sum(
+            cost.g_max(X, U, params.get(term_id))
+            for term_id, cost in self.terms.items()
+        )
+
+    def h_max(self, X, params=None):
+        """The sum of the terms' bounds."""
+        params = params or {}
+
+        return sum(
+            cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
+        )
+
+
 class ScaledCost(CostFunction):
     """
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``. The weight leaves the
-    ``discount_rate`` of ``J0`` unchanged.
+    reads as ``base + weight * obstacle_cost``. Its :attr:`params` nest the
+    scaled cost's, ``{"weight": w, "cost": cost.params}``; in a sum it takes
+    the id of the cost it scales.
     """
 
-    cost: CostFunction
-    weight: float
+    def __init__(self, cost, weight):
+        self.cost = cost
+        self.weight = float(weight)
 
     @property
-    def discount_rate(self) -> float:
-        """The scaled cost's rate ``rho``."""
-        return self.cost.discount_rate
+    def params(self):
+        """Live view ``{"weight": w, "cost": cost.params}``."""
+        return {"weight": self.weight, "cost": self.cost.params}
+
+    @params.setter
+    def params(self, value):
+        require_known_keys(value, ("weight", "cost"), "ScaledCost")
+        if value is None:
+            return
+        if "weight" in value:
+            self.weight = value["weight"]
+        if "cost" in value:
+            self.cost.params = value["cost"]
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
+        weight, inner = self.split(params)
         cost = self.cost
-        weight = self.weight
 
         # g = w g₀(x, u, t)
-        g = weight * cost.g(x, u, t, params)
+        g = weight * cost.g(x, u, t, inner)
 
         return g
 
     def h(self, x, t=0.0, params=None):
         """Return the weighted terminal cost."""
+        weight, inner = self.split(params)
         cost = self.cost
-        weight = self.weight
 
         # h = w h₀(x, t)
-        h = weight * cost.h(x, t, params)
+        h = weight * cost.h(x, t, inner)
 
         return h
+
+    def g_max(self, X, U, params=None):
+        """``w · max g₀`` for a nonnegative weight; sampled for a negative one."""
+        weight, inner = self.split(params)
+        if weight < 0.0:
+            return super().g_max(X, U, params)
+
+        return weight * self.cost.g_max(X, U, inner)
+
+    def h_max(self, X, params=None):
+        """``w · max h₀`` for a nonnegative weight; sampled for a negative one."""
+        weight, inner = self.split(params)
+        if weight < 0.0:
+            return super().h_max(X, params)
+
+        return weight * self.cost.h_max(X, inner)
+
+    def split(self, params):
+        """``(weight, the scaled cost's params)``: the entries given, else the cost's own."""
+        require_known_keys(params, ("weight", "cost"), "ScaledCost")
+        params = params or {}
+
+        return params.get("weight", self.weight), params.get("cost")
+
+
+class StepCost(ABC):
+    """
+    The cost of a step problem: a stage cost ``c(x, u, k)`` and a terminal cost ``h(x, k)``.
+
+    ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``: the stage cost is
+    paid per tick, already integrated over its period, and the discount is the
+    problem's ``γ`` per tick. ``params`` holds the cost's numbers (``{}`` for
+    none), the System pattern: ``params=None`` reads them.
+    """
+
+    id = None
+
+    params = own_params(
+        "The cost's numbers: this instance's own (``{}`` until it sets some)."
+    )
+
+    @abstractmethod
+    def c(self, x, u, k=0, params=None):
+        """Return the native scalar stage cost ``c(x, u, k)`` of one tick."""
+        ...
+
+    @abstractmethod
+    def h(self, x, k=0, params=None):
+        """Return the native scalar terminal cost ``h(x, k)``."""
+        ...
+
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
+
+class SampledCost(StepCost):
+    """
+    The stage cost of a continuous cost on a plant sampled at ``dt``: ``c_k = ∫₀^dt e^{−ρτ} g dτ``.
+
+    ``c(x, u, k)`` integrates ``e^{−ρ(τ − t_k)} g(x(τ), u, τ)`` over one period
+    from ``x`` at ``t_k = t_start + k dt``, the input held, with the plant's
+    solver and substeps (the plant evaluated beside the cost: a direct call is
+    the second plant evaluation a compiled face fuses away); ``h(x, k)`` is
+    the terminal cost at ``t_k``. The stationary form: ``c_k`` does not
+    depend on ``k`` except through the time the cost reads, and under one
+    Euler step it is ``g(x_k, u_k, t_k) dt`` to the last bit. ``params`` are
+    the cost's; the plant's numbers are the plant's own.
+    """
+
+    def __init__(
+        self,
+        cost,
+        plant,
+        dt,
+        *,
+        solver="rk4",
+        substeps=1,
+        discount_rate=0.0,
+        t_start=0.0,
+    ):
+        self.cost = cost
+        self.plant = plant
+        self.dt = float(dt)
+        self.solver = solver
+        self.substeps = int(substeps)
+        self.discount_rate = float(discount_rate)
+        self.t_start = float(t_start)
+        self.id = cost.id
+
+    @property
+    def params(self):
+        """The cost's numbers."""
+        return self.cost.params
+
+    @params.setter
+    def params(self, value):
+        self.cost.params = value
+
+    def c(self, x, u, k=0, params=None):
+        t_start = self.t_start
+        dt = self.dt
+
+        # t_k = t_start + k dt, the period's start
+        t_k = t_start + k * dt
+        c = self.stage_cost_at(x, u, t_k, params)
+
+        return c
+
+    def h(self, x, k=0, params=None):
+        params = self.params if params is None else params
+        t_start = self.t_start
+        dt = self.dt
+        h = self.cost.h
+
+        # h(x_k, t_k), t_k = t_start + k dt
+        t_k = t_start + k * dt
+        h_k = h(x, t_k, params)
+
+        return h_k
+
+    def terminal_at(self, x, t, params=None):
+        """The terminal cost at the absolute time ``t`` (seconds): the continuous cost's ``h(x, t)``."""
+        params = self.params if params is None else params
+        h = self.cost.h
+
+        h_t = h(x, t, params)
+
+        return h_t
+
+    def stage_cost_at(
+        self, x, u, t_k, params=None, plant_params=None, discount_rate=None
+    ):
+        """``c_k`` alone of the period starting at ``t_k``: :meth:`stage_at`'s cost, the plant not stepped where the scheme allows (one Euler step)."""
+        cost = self.stage_cost_law(t_k, params, plant_params, discount_rate)
+
+        return cost(x, u)
+
+    def stage_cost_law(self, t_k, params=None, plant_params=None, discount_rate=None):
+        """
+        ``c(x, u)``: the stage cost of the period starting at ``t_k`` as a function of the pair, its laws built once.
+
+        A table of the period's pairs (value iteration, policy evaluation) builds
+        it once and calls it on every pair; :meth:`stage_cost_at` is one call.
+        """
+        # Lazy import: the step model loads with the first stage
+        from minilink.core.compile.evaluators.stepping import stage_cost
+
+        dt = self.dt
+        solver = self.solver
+        substeps = self.substeps
+
+        # One Euler step: c_k = dt · e^{−ρ·0} g(x_k, u, t_k), the plant not evaluated
+        # (stage_cost's one rule)
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+
+        def cost(x, u):
+            return stage_cost(dynamics, rate, x, u, t_k, dt, solver, substeps)
+
+        return cost
+
+    def stage_at(self, x, u, t_k, params=None, plant_params=None, discount_rate=None):
+        """
+        ``(x_{k+1}, c_k)`` of the period starting at ``t_k``: the plant and its stage cost in one step.
+
+        ``params`` are the cost's, ``plant_params`` the plant's (``None``: their
+        own), ``discount_rate`` the rate ``ρ`` (``None``: this cost's).
+        """
+        # Lazy import: the step model loads with the first stage
+        from minilink.core.compile.evaluators.stepping import step_with_cost
+
+        dynamics, rate = self.laws_at(t_k, params, plant_params, discount_rate)
+        x_next, c = step_with_cost(
+            dynamics, rate, x, u, t_k, self.dt, self.solver, self.substeps
+        )
+
+        return x_next, c
+
+    def laws_at(self, t_k, params, plant_params, discount_rate):
+        """``(ẋ, ċ)`` of the period starting at ``t_k``: the plant on its numbers, the discounted cost rate."""
+        params = self.params if params is None else params
+        rho = self.discount_rate if discount_rate is None else discount_rate
+        g = self.cost.g
+        f = self.plant.f
+
+        # ẋ = f(x, u, τ) on the plant's numbers
+        def dynamics(x, u, tau):
+            return f(x, u, tau, plant_params)
+
+        # ċ = e^{−ρ(τ − t_k)} g(x, u, τ): the discount counted from the period's start
+        def rate(x, u, tau):
+            xp = array_module(x, u, tau)
+            c_dot = xp.exp(-rho * (tau - t_k)) * g(x, u, tau, params)
+            return c_dot
+
+        # ċ = g(x, u, τ) with no discount (ρ = 0), the factor e^{0} = 1 not computed
+        def undiscounted_rate(x, u, tau):
+            return g(x, u, tau, params)
+
+        return dynamics, undiscounted_rate if is_zero_number(rho) else rate
 
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def is_zero_number(value) -> bool:
+    """Whether ``value`` is the number 0 on the host (a traced rate is not: its value is unknown)."""
+    try:
+        return float(value) == 0.0
+    except TypeError:  # a tracer has no value
+        return False
+
+
+def term_id_of(cost) -> str:
+    """A term's id in a sum: its ``id``, else (a scaled cost) its scaled cost's, else its class name verbatim."""
+    if cost.id is not None:
+        return str(cost.id)
+    if isinstance(cost, ScaledCost):
+        return term_id_of(cost.cost)
+
+    return type(cost).__name__
+
+
+def require_distinct_terms(terms):
+    """Refuse a sum holding one cost object twice: its parameters would sit twice in the tree."""
+    seen = set()
+    for cost in leaf_costs_of(terms.values()):
+        if id(cost) in seen:
+            name = term_id_of(cost)
+            raise ValueError(
+                f"the sum holds the cost {name!r} twice, so its parameters would sit "
+                "twice in the parameter tree; write one weighted term (11 * q for "
+                "q + 10 * q, 2 * cost for cost + cost), or add a copy "
+                "(copy.deepcopy(cost))"
+            )
+        seen.add(id(cost))
+
+
+def leaf_costs_of(costs):
+    """The cost objects under ``costs``, through nested sums and scalings, in order."""
+    for cost in costs:
+        if isinstance(cost, SumCost):
+            yield from leaf_costs_of(cost.terms.values())
+        elif isinstance(cost, ScaledCost):
+            yield from leaf_costs_of([cost.cost])
+        else:
+            yield cost
+
+
+def is_named_term(term_id, term) -> bool:
+    """Whether a sum's key was given by name: not the term's own id, nor that id with a repeat count."""
+    base = term_id_of(term)
+    count = term_id[len(base) :]
+
+    return not (term_id.startswith(base) and (count == "" or count.isdigit()))
+
+
+def unique_term_id(base, existing) -> str:
+    """``base``, else the first of ``base2``, ``base3``, … not in ``existing``."""
+    if base not in existing:
+        return base
+
+    i = 2
+    while f"{base}{i}" in existing:
+        i += 1
+
+    return f"{base}{i}"
+
+
+def require_new_term(name, terms):
+    """Refuse a named term whose name another term already holds."""
+    if name in terms:
+        raise ValueError(f"the sum already has a term {name!r}; name the terms apart")
+
+
+def validate_cost_params(params, terms):
+    """Refuse a sum's params with an id that names no term."""
+    if params is None:
+        return
+    unknown = sorted(set(params) - set(terms))
+    if unknown:
+        raise ValueError(
+            f"unknown cost term id(s) {unknown}; the sum's terms are {list(terms)}"
+        )
+
+
+def require_known_keys(params, keys, owner):
+    """Refuse a params dictionary with a key the owner does not have."""
+    if params is None:
+        return
+    unknown = sorted(set(params) - set(keys))
+    if unknown:
+        raise ValueError(f"{owner} params take {list(keys)}, got {unknown}")
 
 
 def check_weights(Q, R, S, n, m):
@@ -403,11 +780,91 @@ def check_weights(Q, R, S, n, m):
         raise ValueError("R must have shape (m, m)")
 
 
-def require_common_rate(rates):
-    """Refuse terms whose discount rates differ."""
-    if len(rates) > 1:
-        raise ValueError(
-            f"SumCost terms have different discount rates {rates}; "
-            "one objective has one rate rho, so give every term the same "
-            "discount_rate"
+def quadratic_max(W, center, box):
+    """
+    ``max (z − c)ᵀ W (z − c)`` over a box, for ``W ⪰ 0``: at a vertex (a convex function).
+
+    Exact for a diagonal ``W`` and for up to 12 coupled entries (every vertex);
+    beyond, the bound ``λ_max(W) Σ max(dᵢ²)``. An indefinite ``W`` takes the bound
+    ``dᵀ |W| d``. Entries ``W`` does not weigh may be unbounded; a weighed
+    unbounded entry gives ``+inf``.
+    """
+    W = np.asarray(W, dtype=float)
+    center = np.asarray(center, dtype=float)
+
+    # The entries W weighs, and their farthest offsets from the center
+    weighed = np.flatnonzero(np.any(W != 0.0, axis=0) | np.any(W != 0.0, axis=1))
+    if weighed.size == 0:
+        return 0.0
+    lo = box.lower[weighed] - center[weighed]
+    hi = box.upper[weighed] - center[weighed]
+    W = W[np.ix_(weighed, weighed)]
+    if not (np.all(np.isfinite(lo)) and np.all(np.isfinite(hi))):
+        return float(np.inf)
+
+    # Indefinite: |zᵢ − cᵢ| ≤ dᵢ bounds every term, (z − c)ᵀ W (z − c) ≤ dᵀ |W| d
+    eigenvalues = np.linalg.eigvalsh(0.5 * (W + W.T))
+    if eigenvalues[0] < -1e-12 * max(1.0, abs(eigenvalues[-1])):
+        d = np.maximum(np.abs(lo), np.abs(hi))
+        bound = d @ np.abs(W) @ d
+        return float(bound)
+
+    # Diagonal: Σ wᵢᵢ max(loᵢ², hiᵢ²)
+    if np.all(W == np.diag(np.diag(W))):
+        return float(np.sum(np.diag(W) * np.maximum(lo**2, hi**2)))
+
+    # Coupled, small: the largest value at the 2^k vertices
+    if weighed.size <= 12:
+        vertices = np.array(np.meshgrid(*zip(lo, hi), indexing="ij")).reshape(
+            weighed.size, -1
         )
+        return float(np.max(np.einsum("ik,ij,jk->k", vertices, W, vertices)))
+
+    # Coupled, large: λ_max(W) ‖d‖², d the farthest offset of each entry
+    lam_max = float(eigenvalues[-1])
+
+    return lam_max * float(np.sum(np.maximum(lo**2, hi**2)))
+
+
+def box_samples(X, U, n_samples=4096):
+    """A Halton set of ``(x, u)`` over the finite boxes ``X × U`` (``U=None``: ``x`` only)."""
+    # Lazy import: SciPy's quasi-Monte Carlo loads with the first sampled bound
+    from scipy.stats import qmc
+
+    boxes = [X] if U is None else [X, U]
+    lower = np.concatenate([box.lower for box in boxes])
+    upper = np.concatenate([box.upper for box in boxes])
+    require_finite_bounds(lower, upper)
+
+    # The Halton points mapped on the box, the origin of the sequence skipped
+    unit = qmc.Halton(d=lower.size, scramble=False).random(int(n_samples) + 1)[1:]
+    points = lower + unit * (upper - lower)
+    n = X.dim
+
+    return points[:, :n], (None if U is None else points[:, n:])
+
+
+def require_finite_bounds(lower, upper):
+    """Refuse a sampled bound over an unbounded box."""
+    if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+        raise ValueError(
+            "a sampled bound of the cost needs finite boxes: declare X and U on the "
+            "problem (X=plant.state.box, U=plant.input_box), or give the problem "
+            "failure_cost as a number"
+        )
+
+
+def per_sample(g, xs, us, ts, params):
+    """``g(x_k, u_k, t_k, params)`` for every sample, as an ``(N,)`` array (vmap on JAX)."""
+    xp = array_module(xs)
+    if xp is np:
+        return xp.array(
+            [float(g(x, u, t, params=params)) for x, u, t in zip(xs, us, ts)]
+        )
+
+    # The float width is the caller's trace: no change to the JAX config here
+    g_vectorized = xp.vectorize(
+        lambda x, u, t: g(x, u, t, params=params), signature="(n),(m),()->()"
+    )
+
+    return g_vectorized(xs, us, ts)

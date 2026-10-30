@@ -17,7 +17,7 @@ from minilink.core.system import DynamicSystem, System
 ###############################################################################
 
 
-class ImpedanceController(System):
+class Impedance(System):
     """Virtual spring-damper ``u = Kp (q_d − q) + Kd (dq_d − dq)`` on a measured ``[q; dq]``.
 
     The measurement port ``y`` carries ``[q; dq]`` (dim ``2·dof``). The reference
@@ -66,7 +66,6 @@ class ImpedanceController(System):
 
         super().__init__()
         self.dof = n
-        self.name = "Impedance Controller"
 
         # Parameters: stiffness and damping as (n, n) matrices, the limits per axis
         self.params = {
@@ -101,17 +100,17 @@ class ImpedanceController(System):
         return u
 
 
-class ImpedanceIntegralController(DynamicSystem):
+class IntegralImpedance(DynamicSystem):
     """Spring-damper with integral action, ``u = Kp e + Ki ∫e + Kd ė``, on a measured ``[q; dq]``.
 
-    :class:`ImpedanceController` plus one integral state per axis on the
+    :class:`Impedance` plus one integral state per axis on the
     position error ``e = q_d − q``, held while the command or the integral
     state sits on a limit (the anti-windup of
     :class:`~minilink.control.siso.PID`). Same ports and references.
 
     Parameters
     ----------
-    dof, tracking_ref, Kp, Kd, u_min, u_max : as :class:`ImpedanceController`.
+    dof, tracking_ref, Kp, Kd, u_min, u_max : as :class:`Impedance`.
     Ki : float or vector
         Integral gain per axis, never a matrix: the anti-windup hold pairs a
         command with its own error.
@@ -145,7 +144,6 @@ class ImpedanceIntegralController(DynamicSystem):
 
         super().__init__(n=n)
         self.dof = n
-        self.name = "Impedance Integral Controller"
 
         # Parameters: stiffness and damping as (n, n) matrices, the integral gain,
         # the limits and the end stops per axis

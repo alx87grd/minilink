@@ -6,10 +6,10 @@ from scipy.linalg import solve_continuous_are
 
 from minilink.analysis.linearization import linearize
 from minilink.control.design import lqg, lqr, lqr_gain, place_gain
-from minilink.control.state import StateFeedbackController
-from minilink.core.composition import closed_loop
+from minilink.control.state import StateFeedback
+from minilink.core.closed_loop import closed_loop
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import roles
+from minilink.core.roles import roles
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
@@ -89,7 +89,7 @@ def test_traces_under_jax():
 
 def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
     plant = LTISystem(A, B, C)
-    obs, gain = observer(), StateFeedbackController(np.array([[2.0, 3.0]]))
+    obs, gain = observer(), StateFeedback(np.array([[2.0, 3.0]]))
     box = DiagramSystem()
     box.add_subsystem(obs, "observer")
     box.add_subsystem(gain, "gain")
@@ -109,7 +109,7 @@ def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
 
 
 def test_an_observer_is_not_a_controller():
-    from minilink.core.system import StepSystem
+    from minilink.core.discrete.step_system import StepSystem
 
     plant = LTISystem(A, B, C)
     obs = observer()
@@ -126,7 +126,7 @@ def test_an_observer_is_not_a_controller():
             self.add_output_port("x", dim=2, function=self.compute_state)
 
     with pytest.raises(ValueError, match="an observer, not a controller"):
-        SampledObserver() % 0.01
+        SampledObserver() % 0.01 @ plant
 
 
 def test_print_shows_the_gain_and_the_poles():

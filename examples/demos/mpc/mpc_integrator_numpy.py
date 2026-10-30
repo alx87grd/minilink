@@ -1,4 +1,4 @@
-"""Minimal hybrid MPC without JAX — NumPy rebuild each replan tick."""
+"""Minimal sampled MPC without JAX — the NumPy program rebuilt each tick."""
 
 import numpy as np
 
@@ -6,9 +6,10 @@ from minilink import (
     DynamicSystem,
     PlanningProblem,
     QuadraticCost,
+    SingletonSet,
     TrajectoryOptimizationPlanner,
 )
-from minilink.control.mpc import ModelPredictiveController
+from minilink.control import ModelPredictiveController
 
 
 class SingleIntegrator(DynamicSystem):
@@ -41,7 +42,7 @@ planner = TrajectoryOptimizationPlanner(
         sys=sys,
         tf=1.0,
         x_start=x0,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             sys,
             Q=np.eye(1),
@@ -49,23 +50,22 @@ planner = TrajectoryOptimizationPlanner(
             xbar=x_goal,
         ),
         X=sys.state.box,
+        U=sys.input_box,
     ),
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="numpy",
+    backend="numpy",
     optimizer_options={"maxiter": 80, "ftol": 1e-6},
 )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=VERBOSE
-)
-hybrid = mpc @ sys
+mpc = ModelPredictiveController(planner, delay=False)
+
+# The MPC on its clock, the plant sampled at it with SIM_DT steps inside each period
+hybrid = (mpc % MPC_DT) @ sys
 
 hybrid.plot_diagram()
-hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    compile_backend="numpy",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
+if VERBOSE:
+    start, end = hybrid.state_index["plant"]
+    print(f"x(tf) = {result.x[start:end, -1]}, the goal {x_goal}")
 hybrid.plot_trajectory()

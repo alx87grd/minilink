@@ -1,4 +1,4 @@
-"""Diagram export: a system's block topology in Graphviz or Mermaid form."""
+"""Diagram export: a system's block topology in Graphviz form."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ def export_diagram_topology(
 
 
 def resolve_topology_exporter(backend):
-    """The exporter ``backend`` names: an exporter passed as is, or ``"graphviz"`` or ``"mermaid"``."""
+    """The exporter ``backend`` names: an exporter passed as is, or ``"graphviz"``."""
     # An exporter, or any other object with an export method, is used as given
     if isinstance(backend, TopologyExporter):
         return backend
@@ -54,14 +54,9 @@ def resolve_topology_exporter(backend):
         from minilink.graphical.diagrams.dot import GraphvizTopologyExporter
 
         return GraphvizTopologyExporter()
-    if key == "mermaid":
-        # A real cycle: mermaid imports TopologyExporter from this module
-        from minilink.graphical.diagrams.mermaid import MermaidTopologyExporter
-
-        return MermaidTopologyExporter()
 
     raise ValueError(
-        f"Unknown topology backend {backend!r}. Expected 'graphviz' or 'mermaid'."
+        f"Unknown topology backend {backend!r}. Expected 'graphviz' or an exporter."
     )
 
 
@@ -69,6 +64,6 @@ def require_exporter(backend):
     """Refuse an object that is neither a backend name nor an exporter with an ``export`` method."""
     if not callable(getattr(backend, "export", None)):
         raise TypeError(
-            "backend must be 'graphviz', 'mermaid' or an exporter with an "
+            "backend must be 'graphviz' or an exporter with an "
             f"export(topology) method, got {type(backend).__name__}"
         )

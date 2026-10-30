@@ -18,7 +18,7 @@ sys.inputs["u"].upper_bound[0] = +20.0
 rt_sim = RealtimeSimulator(
     sys,
     frame_dt=1 / 30,
-    # compile_backend="jax",
+    # backend="jax",
     # renderer="pygame",
     # renderer="meshcat",
     renderer="matplotlib",

@@ -83,17 +83,12 @@ class KinodynamicExtender(TrajectoryExtender):
         dt = self.dt
         T = self.horizon
 
-        # x_{k+1} = RK4(x_k, u, dt), the control held over every step
-        x = np.asarray(from_state, dtype=float)
-        xs = [x]
-        for _ in range(N):
-            x = np.asarray(evaluator.rk4_step(x, u, 0.0, dt), dtype=float)
-            xs.append(x)
+        # x_{k+1} = RK4(x_k, u, t_k), the control held over every step
+        inputs = np.tile(u, (N, 1))
+        states = np.asarray(evaluator.rollout(from_state, inputs, 0.0, dt), dtype=float)
 
         # The knots, the held input on each step, the knot times, and the
         # minimum-time cost: the duration T
-        states = np.asarray(xs)
-        inputs = np.tile(u, (N, 1))
         times = np.arange(N + 1) * dt
         cost = T
 
@@ -224,4 +219,7 @@ def require_box_input_set(U):
 def require_finite_input_bounds(lower, upper):
     """Refuse an input box with an infinite bound."""
     if not np.all(np.isfinite(lower)) or not np.all(np.isfinite(upper)):
-        raise ValueError("the 'bang-bang' preset needs finite input bounds")
+        raise ValueError(
+            "the 'bang-bang' preset needs finite input bounds: declare U on the "
+            "problem (U=plant.input_box, the plant's declared range)"
+        )

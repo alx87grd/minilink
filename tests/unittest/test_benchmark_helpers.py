@@ -36,7 +36,8 @@ from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
 )
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 from minilink.planning.search.rrt import RRTPlanner
 
 
@@ -107,7 +108,7 @@ class TestBenchmarkSmoke(unittest.TestCase):
         variant = TrajectoryOptimizationBenchmarkVariant(
             name="unit-numpy-collocation",
             transcription="collocation",
-            compile_backend="numpy",
+            backend="numpy",
             derivative="finite-diff",
             start="cold",
         )

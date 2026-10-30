@@ -13,9 +13,12 @@ class SolverBackend(ABC):
     """
     Integrate ``ẋ = f(x, u, t)`` through an evaluator of the dynamics primitives.
 
-    The evaluator provides ``f(x, u, t)`` for a forced input and
-    ``f_ivp(x, t) = f(x, u_nom, t)`` for the nominal one.
+    The evaluator provides ``f(x, u, t)`` and its ``nominal_input``.
     """
+
+    #: Whether a forced input given as a function of time is read at the solver's
+    #: stage times (:meth:`integrate_input`) rather than sampled on the grid.
+    reads_input_at_stages = False
 
     @abstractmethod
     def integrate(
@@ -24,14 +27,15 @@ class SolverBackend(ABC):
         times: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         """
-        Nominal input: ``x(t) = x₀ + ∫ f_ivp(x(s), s) ds`` with ``f_ivp(x, t) = f(x, u_nom, t)``.
+        Nominal input: ``x(t) = x₀ + ∫ f(x(s), u_nom, s) ds``.
 
         Parameters
         ----------
         evaluator : evaluator
-            Provides ``f_ivp(x, t)``.
+            Provides ``f(x, u, t)`` and ``nominal_input``.
         times : ndarray
             1D time grid, shape ``(n_pts,)``.
         x0 : ndarray
@@ -54,6 +58,7 @@ class SolverBackend(ABC):
         u: np.ndarray,
         x0: np.ndarray,
         args=None,
+        params=None,
     ) -> np.ndarray:
         """
         Forced input: ``x(t) = x₀ + ∫ f(x(s), u(s), s) ds``.

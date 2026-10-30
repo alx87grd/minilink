@@ -4,7 +4,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from minilink import DiagramSystem, DynamicSystem, System
+from minilink import (
+    DiagramSystem,
+    DynamicSystem,
+    MathematicalProgram,
+    Optimizer,
+    System,
+)
 from minilink.core.backends import array_module
 
 
@@ -95,43 +101,29 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.rk4_integrate_linear(x0, rs, 0.0, dt)
+xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="foh")
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).
 f_true = true_evaluator.f
 dxs = jax.vmap(f_true, in_axes=(0, 0, 0))(xs, rs, ts)
 
-# Equation-error identification: only the plant entry of the nested params
-# dict is supplied; the controller keeps its live defaults.
-f_p = true_evaluator.f_p
+# Equation-error identification: copy the compiled snapshot and replace the plant.
+f = true_evaluator.f
+compiled_params = true_evaluator.params
 
 
 def loss(theta):
     plant_params = {"m": 1.0, "l": 1.0, "gravity": theta[0], "d": theta[1]}
-    dx_hat = jax.vmap(f_p, in_axes=(0, 0, 0, None))(xs, rs, ts, {"plant": plant_params})
+    p = {**compiled_params, "plant": plant_params}
+    dx_hat = jax.vmap(f, in_axes=(0, 0, 0, None))(xs, rs, ts, p)
     return jnp.mean((dx_hat - dxs) ** 2)
 
 
-loss_and_grad = jax.jit(jax.value_and_grad(loss))
+program = MathematicalProgram(n_z=2, J=loss, backend="jax")
+result = Optimizer(program, z0=jnp.array([7.0, 1.0]), method="l-bfgs").solve()
+print(result)  # z* = (gravity, damping), from the guess (7.0, 1.0); true (9.81, 0.20)
 
-theta = jnp.array([7.0, 1.0])  # initial guess: gravity=7.0, d=1.0
-learning_rate = 2.0
-
-print(f"{'iter':>6} {'loss':>14} {'gravity':>10} {'damping':>10}")
-for i in range(151):
-    value, grad = loss_and_grad(theta)
-    if i % 25 == 0:
-        print(
-            f"{i:>6} {float(value):>14.3e} {float(theta[0]):>10.4f} "
-            f"{float(theta[1]):>10.4f}"
-        )
-    theta = theta - learning_rate * grad
-
-print()
-print(f"Identified gravity = {float(theta[0]):.4f}  (true: 9.81)")
-print(f"Identified damping = {float(theta[1]):.4f}  (true: 0.20)")
-
+theta = result.z
 assert abs(float(theta[0]) - 9.81) < 1e-2, "gravity did not converge"
 assert abs(float(theta[1]) - 0.20) < 1e-2, "damping did not converge"
-print("Identification converged.")

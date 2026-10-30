@@ -22,9 +22,9 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.sets import BallSet
 from minilink.dynamics.catalog.pendulum.double_pendulum import DoublePendulum
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-from minilink.planning.policy_synthesis import plotting
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming import plotting
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )
@@ -93,7 +93,9 @@ class EulerKinodynamicExtender(KinodynamicExtender):
         x = np.asarray(from_state, dtype=float)
         states = [x]
         for _ in range(self.n_substeps):
-            x = np.asarray(evaluator.euler_step(x, u, 0.0, self.dt), dtype=float)
+            x = np.asarray(
+                evaluator.step(x, u, 0.0, dt=self.dt, solver="euler"), dtype=float
+            )
             states.append(x)
         return Edge(
             states=np.asarray(states),
@@ -128,7 +130,7 @@ def _pendulum_problem(*, bounds=10.0):
         R=np.array([[1.0]]),
         S=np.diag([10.0, 10.0]),
     )
-    return PlanningProblem(sys, x_goal=UPRIGHT_PYRO, cost=cost, X=sys.state.box)
+    return PlanningProblem(sys, cost=cost, X=sys.state.box, U=sys.input_box)
 
 
 def _double_pendulum_problem():
@@ -140,7 +142,7 @@ def _double_pendulum_problem():
     Q = np.diag([1.0, 0.5, 0.1, 0.05])
     R = np.diag([0.05, 0.05])
     cost = QuadraticCost.from_system(plant, xbar=GOAL_DOUBLE, Q=Q, R=R, S=Q)
-    return PlanningProblem(plant, x_goal=GOAL_DOUBLE, cost=cost, X=plant.state.box)
+    return PlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box)
 
 
 def _sample_j_on_grid(grid, J: np.ndarray, n_sample: int = 200, rng=None):
@@ -314,9 +316,9 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
     problem = PlanningProblem(
         sys=sys,
         x_start=x_start,
-        x_goal=x_goal,
         Xf=BallSet(x_goal, 0.2),
         X=sys.state.box,
+        U=sys.input_box,
     )
     extender = EulerKinodynamicExtender(controls=torques, horizon=0.1, n_substeps=1)
 
@@ -328,7 +330,6 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
             seed=seed,
             goal_bias=0.1,
             max_nodes=max_nodes,
-            goal_tolerance=0.2,
             nearest_backend="kd_tree",
         ),
     )

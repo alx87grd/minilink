@@ -11,14 +11,14 @@ import os
 import sys
 
 
-def format_benchmark_backend_label(compile_backend: str) -> str:
+def format_benchmark_backend_label(backend: str) -> str:
     """Human-readable backend label for benchmark tables and result structs.
 
-    For ``compile_backend="jax"``, returns ``jax(cpu)``, ``jax(gpu)``, etc., from the
+    For ``backend="jax"``, returns ``jax(cpu)``, ``jax(gpu)``, etc., from the
     active JAX default device. Any other value is returned unchanged.
     """
-    if compile_backend != "jax":
-        return compile_backend
+    if backend != "jax":
+        return backend
     try:
         import jax
     except ImportError:

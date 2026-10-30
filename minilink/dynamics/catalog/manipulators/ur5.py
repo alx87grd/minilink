@@ -29,7 +29,10 @@ class UR5Manipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=6, actuators=6, task_dim=3)
-        self.name = "UR5 Manipulator"
+
+        # The plant's own range: angles and rates within ±2π
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
 
         # Parameters: the DH chain, the published masses and centers of mass, and
         # cylinder inertias
@@ -589,12 +592,6 @@ def spatial_inertia(mass, com, inertia):
     return I
 
 
-def as_params(params, *keys, like):
-    """Cast selected parameter values to the backend of *like*."""
-    xp = array_module(like)
-    return tuple(xp.asarray(params[key]) for key in keys)
-
-
 if __name__ == "__main__":
     sys = UR5Manipulator()
     q0 = np.array([0.0, -np.pi / 2 + 0.2, 0.0, -np.pi / 2, 0.0, 0.0])
@@ -603,6 +600,6 @@ if __name__ == "__main__":
         lambda t: np.zeros(6),
         tf=3.0,
         n_steps=120,
-        compile_backend="jax",
+        backend="jax",
     )
     sys.animate(renderer="meshcat", is_3d=True)

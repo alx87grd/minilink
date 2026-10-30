@@ -1,9 +1,9 @@
 """Tests for the compilation pipeline.
 
 Validates that:
-- ``compile_diagram()`` produces a working ``NumpyDiagramEvaluator``
+- ``compile_diagram()`` produces a working ``DiagramEvaluator``
 - ``f()`` matches ``diagram.f()`` (the slow recursive reference)
-- ``compute_internal_signals()`` / ``compute_internal_signals_dict()`` expose the buffer
+- ``signals()`` / ``compute_internal_signals_dict()`` expose the buffer
 - ``check_algebraic_loops()`` detects loops and ``evaluation_order_of()`` returns a valid order
 - ``build_execution_plan()`` produces a valid ``ExecutionPlan``
 """
@@ -15,12 +15,15 @@ import pytest
 from minilink.blocks.basic import Integrator
 from minilink.control.siso import P
 from minilink.core.backends import array_module
-from minilink.core.compile.compiler import build_execution_plan, compile_diagram
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyDiagramEvaluator
-from minilink.core.compile.execution_plan import ExecutionPlan
+from minilink.core.compile.compiler import compile_diagram
+from minilink.core.compile.plan import build_execution_plan
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
+from minilink.core.compile.plan import ExecutionPlan
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem, System
-from minilink.core.wiring import check_algebraic_loops, evaluation_order_of
+from minilink.core.topology import check_algebraic_loops, evaluation_order_of
 
 
 class _JAXFriendlyPController(System):
@@ -201,7 +204,7 @@ class TestCompileDiagram(unittest.TestCase):
     def test_returns_numpy_evaluator(self):
         diag = _build_small_closed_loop()
         evaluator = compile_diagram(diag, backend="numpy")
-        self.assertIsInstance(evaluator, NumpyDiagramEvaluator)
+        self.assertIsInstance(evaluator, DiagramEvaluator)
 
     def test_invalid_backend_raises(self):
         diag = _build_small_closed_loop()
@@ -209,8 +212,8 @@ class TestCompileDiagram(unittest.TestCase):
             compile_diagram(diag, backend="unknown")
 
 
-class TestNumpyDiagramEvaluator(unittest.TestCase):
-    """Test NumpyDiagramEvaluator against the reference diagram.f()."""
+class TestDiagramEvaluatorNumPy(unittest.TestCase):
+    """Test the NumPy DiagramEvaluator against the reference diagram.f()."""
 
     def setUp(self):
         self.diag = _build_small_closed_loop()
@@ -249,7 +252,7 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
     def test_compute_internal_signals_non_empty(self):
         x = np.array([0.5])
         u = np.array([1.0])
-        buf = self.evaluator.compute_internal_signals(x, u, 0.0)
+        buf = self.evaluator.signals(x, u, 0.0)
         self.assertGreater(buf.size, 0)
 
     def test_compute_internal_signals_dict_plant_y(self):
@@ -258,10 +261,10 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         d = self.evaluator.compute_internal_signals_dict(x, u, 0.0)
         np.testing.assert_allclose(d["plant:y"], np.array([0.5]), atol=1e-10)
 
-    def test_compute_internal_signals(self):
+    def test_signals_buffer(self):
         x = np.array([0.5])
         u = np.array([1.0])
-        signals = self.evaluator.compute_internal_signals(x, u, 0.0)
+        signals = self.evaluator.signals(x, u, 0.0)
         self.assertEqual(signals.shape[0], self.evaluator.plan.signal_dim)
 
     def test_f_zero_state(self):
@@ -311,31 +314,19 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         self.assertIn("y_meas", y)
         np.testing.assert_allclose(y["y_meas"], np.array([0.5]), atol=1e-10)
 
-    def test_bind_params_freezes_snapshot(self):
-        """bound_params in plan: mutating subsystem.params does not change dx."""
+    def test_params_none_reads_the_snapshot_taken_at_compile(self):
+        """An edit of a block's params after compile leaves dx unchanged; a recompile sees it."""
         diag = _build_small_closed_loop()
         plant = diag.subsystems["plant"]
         x = np.array([0.3])
         u = np.array([1.0])
         t = 0.0
-        ev = compile_diagram(diag, bind_params=True)
+        ev = compile_diagram(diag)
         dx1 = ev.f(x, u, t)
         plant.params["k"] = 99.0
-        dx2 = ev.f(x, u, t)
-        np.testing.assert_allclose(dx1, dx2, atol=1e-10)
-
-    def test_bind_params_false_follows_live_params(self):
-        """Default compile: dx changes when subsystem.params changes (no recompile)."""
-        diag = _build_small_closed_loop()
-        plant = diag.subsystems["plant"]
-        x = np.array([0.3])
-        u = np.array([1.0])
-        t = 0.0
-        ev = compile_diagram(diag, bind_params=False)
-        dx1 = ev.f(x, u, t)
-        plant.params["k"] = 99.0
-        dx2 = ev.f(x, u, t)
-        self.assertGreater(np.abs(dx2 - dx1).max(), 1e-06)
+        np.testing.assert_allclose(ev.f(x, u, t), dx1, atol=1e-10)
+        dx_recompiled = compile_diagram(diag).f(x, u, t)
+        self.assertGreater(np.abs(dx_recompiled - dx1).max(), 1e-06)
 
     def test_f_as_callable(self):
         fn = self.evaluator.f
@@ -344,26 +335,125 @@ class TestNumpyDiagramEvaluator(unittest.TestCase):
         t = 0.05
         np.testing.assert_allclose(fn(x, u, t), self.evaluator.f(x, u, t), atol=1e-10)
 
-    def test_as_scipy_rhs(self):
+    def test_nominal_input_is_the_held_input(self):
         x = np.array([0.4])
         t = 0.15
-        rhs = self.evaluator.as_scipy_rhs()
         np.testing.assert_allclose(
-            rhs(t, x), self.evaluator.f(x, self.evaluator._u_nominal, t), atol=1e-10
+            self.evaluator.f(x, self.evaluator.nominal_input, t),
+            self.evaluator.f(x, self.evaluator._u_nominal, t),
+            atol=1e-10,
         )
 
-    def test_build_execution_plan_bind_params_sets_bound_params(self):
+    def test_every_plan_operation_carries_a_copy_of_its_blocks_params(self):
         diag = _build_small_closed_loop()
-        plan_free = build_execution_plan(diag, bind_params=False)
-        plan_bound = build_execution_plan(diag, bind_params=True)
-        self.assertIsNone(plan_free.port_ops[0].bound_params)
-        self.assertIsNotNone(plan_bound.port_ops[0].bound_params)
+        plan = build_execution_plan(diag)
+        for op in (*plan.port_ops, *plan.state_ops):
+            params = diag.subsystems[op.sys_id].params
+            np.testing.assert_equal(op.bound_params, params)
+            self.assertIsNot(op.bound_params, params)
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_a_params_edit_after_compile_is_not_seen_and_explicit_params_override(backend):
+    """Both backends read the params as compiled, whether the edit comes before or after the first call."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    diag = _build_small_closed_loop_jax()
+    plant = diag.subsystems["plant"]
+    ctl = diag.subsystems["controller"]
+    x = np.array([0.3])
+    u = np.array([1.0])
+
+    # dx = k Kp (r − y) = 1 · 2.5 · 0.7, the edit made before the first call
+    ev = diag.compile(backend=backend)
+    plant.params["k"] = 99.0
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+
+    # Explicit params override the snapshot for that call only
+    explicit = {"controller": dict(ctl.params), "plant": {"k": 2.0}}
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, explicit)), [3.5])
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0)), [1.75])
+
+    # A recompile reads the edit
+    np.testing.assert_allclose(
+        np.asarray(diag.compile(backend=backend).f(x, u, 0.0)), [99.0 * 1.75]
+    )
+
+
+class _JAXFriendlyStepIntegrator(StepSystem):
+    """``x_{k+1} = x_k + k u_k``; the step twin of :class:`_JAXFriendlyIntegrator`."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        self.params = {"k": 1.0}
+        self.x0 = np.zeros(1)
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+        return xp.array([x[0] + params["k"] * u[0]])
+
+    def h(self, x, u, k=0, params=None):
+        xp = array_module(x)
+        return xp.array([x[0]])
+
+
+def _build_step_loop_jax():
+    """r → P → step integrator → feedback to the controller, its command a boundary output."""
+    diag = StepDiagramSystem()
+    diag.connection_verbose = False
+    ctl = _JAXFriendlyPController()
+    ctl.params["Kp"] = 2.5
+    diag.add_subsystem(ctl, "controller")
+    diag.add_subsystem(_JAXFriendlyStepIntegrator(), "plant")
+    diag.add_input_port("r")
+    diag.connect("input", "r", "controller", "r")
+    diag.connect("plant", "y", "controller", "y")
+    diag.connect("controller", "u", "plant", "u")
+    diag.connect_new_output_port("controller", "u", "u_cmd")
+    return diag
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_a_missing_block_in_params_raises(backend):
+    """A tree that omits a block is refused, on both backends."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    x = np.array([0.3])
+    u = np.array([1.0])
+    plant_only = {"plant": {"k": 2.0}}
+
+    flow = _build_small_closed_loop_jax()
+    flow.connect_new_output_port("controller", "u", "u_cmd")
+    ev = flow.compile(backend=backend)
+    with pytest.raises(ValueError, match="missing"):
+        ev.f(x, u, 0.0, plant_only)
+
+    # A copy of the snapshot with the plant replaced: the compiled gain stays
+    p = {**ev.params, "plant": {"k": 2.0}}
+    flow.subsystems["controller"].params["Kp"] = 100.0
+    np.testing.assert_allclose(np.asarray(ev.f(x, u, 0.0, p)), [3.5])
+    signals = ev.compute_internal_signals_dict(x, u, 0.0, p)
+    np.testing.assert_allclose(np.asarray(signals["controller:u"]), [1.75])
+    outputs = ev.outputs(x, u, 0.0, p)
+    np.testing.assert_allclose(np.asarray(outputs["u_cmd"]), [1.75])
+
+    loop = _build_step_loop_jax()
+    step_ev = loop.compile(backend=backend)
+    with pytest.raises(ValueError, match="missing"):
+        step_ev.step(x, u, 0, plant_only)
+    p_step = {**step_ev.params, "plant": {"k": 2.0}}
+    loop.subsystems["controller"].params["Kp"] = 100.0
+    np.testing.assert_allclose(np.asarray(step_ev.step(x, u, 0, p_step)), [3.8])
+    step_outputs = step_ev.outputs(x, u, 0, p_step)
+    np.testing.assert_allclose(np.asarray(step_outputs["u_cmd"]), [1.75])
 
 
 try:
     import jax
     import jax.numpy as jnp
-    from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
+    from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
@@ -373,8 +463,8 @@ except ImportError:
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
-    """JaxDiagramEvaluator boundary outputs are JIT-compiled and match NumPy."""
+class TestDiagramEvaluatorOutputsJax(unittest.TestCase):
+    """The JAX DiagramEvaluator's boundary outputs are compiled and match NumPy."""
 
     def test_outputs_match_numpy_for_boundary_configurations(self):
         for diag in [
@@ -383,7 +473,7 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         ]:
             ev_np = compile_diagram(diag, backend="numpy")
             ev_jax = compile_diagram(diag, backend="jax")
-            self.assertIsInstance(ev_jax, JaxDiagramEvaluator)
+            self.assertIsInstance(ev_jax, DiagramEvaluator)
             x_np, u_np = (np.array([0.5]), np.array([1.0]))
             x_j = jnp.array([0.5], dtype=jnp.float32)
             u_j = jnp.array([1.0], dtype=jnp.float32)
@@ -413,8 +503,8 @@ class TestJaxDiagramEvaluatorOutputs(unittest.TestCase):
         x_j = jnp.array(x_np, dtype=jnp.float32)
         u_j = jnp.array(u_np, dtype=jnp.float32)
         t = 0.1
-        buf_np = ev_np.compute_internal_signals(x_np, u_np, t)
-        buf_jx = ev_jax.compute_internal_signals(x_j, u_j, t)
+        buf_np = ev_np.signals(x_np, u_np, t)
+        buf_jx = ev_jax.signals(x_j, u_j, t)
         np.testing.assert_allclose(np.asarray(buf_jx), buf_np, atol=1e-05)
 
     def test_reference_diagram_f_is_jittable(self):
@@ -466,7 +556,7 @@ class TestDiagramParamsContract(unittest.TestCase):
         self.assertIs(params["plant"], self.diag.subsystems["plant"].params)
 
     def test_params_setter_distributes_by_sys_id(self):
-        self.diag.params = {"plant": {"k": 3.0}}
+        self.diag.params = {**self.diag.params, "plant": {"k": 3.0}}
         self.assertEqual(self.diag.subsystems["plant"].params["k"], 3.0)
         np.testing.assert_allclose(self.diag.f(self.x, self.u), [11.25], atol=1e-10)
 
@@ -478,9 +568,9 @@ class TestDiagramParamsContract(unittest.TestCase):
         self.diag.params["plant"]["k"] = 5.0
         np.testing.assert_allclose(self.diag.f(self.x, self.u), [18.75], atol=1e-10)
 
-    def test_partial_params_fall_back_to_defaults(self):
-        dx = self.diag.f(self.x, self.u, 0.0, params={"plant": {"k": 3.0}})
-        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
+    def test_a_missing_block_raises(self):
+        with self.assertRaises(ValueError):
+            self.diag.f(self.x, self.u, 0.0, params={"plant": {"k": 3.0}})
 
     def test_unknown_sys_id_raises(self):
         with self.assertRaises(ValueError):
@@ -499,7 +589,7 @@ class TestDiagramParamsContract(unittest.TestCase):
 
 
 class TestNumpyDiagramParametricTier(unittest.TestCase):
-    """NumpyDiagramEvaluator ``f_p`` / ``h_p`` / ``outputs_p`` with nested params."""
+    """DiagramEvaluator ``f`` / ``outputs`` with nested params."""
 
     def setUp(self):
         self.diag = _build_closed_loop_with_external_output()
@@ -507,7 +597,7 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         self.x = np.array([0.5])
         self.u = np.array([2.0])
 
-    def test_f_p_matches_recursive_reference(self):
+    def test_f_with_params_matches_recursive_reference(self):
         params = {
             "controller": {
                 "Kp": np.array([4.0]),
@@ -519,35 +609,36 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
         for x_val, u_val, t in [(0.3, 1.2, 0.1), (0.0, 0.0, 0.0), (-5.0, 10.0, 0.0)]:
             x, u = (np.array([x_val]), np.array([u_val]))
             np.testing.assert_allclose(
-                self.evaluator.f_p(x, u, t, params),
+                self.evaluator.f(x, u, t, params),
                 self.diag.f(x, u, t, params=params),
                 atol=1e-10,
             )
 
-    def test_f_p_none_matches_f(self):
+    def test_params_none_matches_the_compiled_parameters(self):
         np.testing.assert_allclose(
-            self.evaluator.f_p(self.x, self.u, 0.0, None),
+            self.evaluator.f(self.x, self.u, 0.0, None),
             self.evaluator.f(self.x, self.u, 0.0),
             atol=1e-10,
         )
 
-    def test_f_p_partial_params(self):
-        dx = self.evaluator.f_p(self.x, self.u, 0.0, {"plant": {"k": 3.0}})
-        np.testing.assert_allclose(dx, [11.25], atol=1e-10)
-
-    def test_f_p_unknown_sys_id_raises(self):
+    def test_a_missing_block_raises(self):
         with self.assertRaises(ValueError):
-            self.evaluator.f_p(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
+            self.evaluator.f(self.x, self.u, 0.0, {"plant": {"k": 3.0}})
 
-    def test_outputs_p_single_boundary(self):
+    def test_unknown_sys_id_raises(self):
+        with self.assertRaises(ValueError):
+            self.evaluator.f(self.x, self.u, 0.0, {"plnt": {"k": 3.0}})
+
+    def test_outputs_with_params_single_boundary(self):
         params = {
+            **self.evaluator.params,
             "controller": {
                 "Kp": np.array([4.0]),
                 "u_min": np.array([-np.inf]),
                 "u_max": np.array([np.inf]),
-            }
+            },
         }
-        out = self.evaluator.outputs_p(self.x, self.u, 0.0, params)
+        out = self.evaluator.outputs(self.x, self.u, 0.0, params)
         self.assertEqual(set(out), {"y_meas"})
         np.testing.assert_allclose(out["y_meas"], [0.5], atol=1e-10)
 
@@ -555,8 +646,8 @@ class TestNumpyDiagramParametricTier(unittest.TestCase):
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestJaxDiagramParametricTier(unittest.TestCase):
-    """JAX parametric tier: ``f_p``, ``outputs_p``, gradients w.r.t. params."""
+class TestDiagramEvaluatorParamsJax(unittest.TestCase):
+    """JAX evaluator with params: ``f``, ``outputs``, gradients w.r.t. params."""
 
     def setUp(self):
         self.diag = _build_closed_loop_with_external_output_jax()
@@ -567,18 +658,18 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
         self.x_np = np.array([0.5])
         self.u_np = np.array([2.0])
 
-    def test_f_p_matches_numpy(self):
+    def test_f_with_params_matches_numpy(self):
         params = {"controller": {"Kp": 4.0}, "plant": {"k": 3.0}}
         np.testing.assert_allclose(
-            np.asarray(self.ev.f_p(self.x_j, self.u_j, 0.0, params)),
-            self.ev_np.f_p(self.x_np, self.u_np, 0.0, params),
+            np.asarray(self.ev.f(self.x_j, self.u_j, 0.0, params)),
+            self.ev_np.f(self.x_np, self.u_np, 0.0, params),
             atol=1e-05,
         )
 
     def test_outputs_p_matches_numpy(self):
-        params = {"plant": {"k": 3.0}}
-        out_j = self.ev.outputs_p(self.x_j, self.u_j, 0.0, params)
-        out_n = self.ev_np.outputs_p(self.x_np, self.u_np, 0.0, params)
+        params = {**self.ev.params, "plant": {"k": 3.0}}
+        out_j = self.ev.outputs(self.x_j, self.u_j, 0.0, params)
+        out_n = self.ev_np.outputs(self.x_np, self.u_np, 0.0, params)
         self.assertEqual(set(out_j), set(out_n))
         for key in out_n:
             np.testing.assert_allclose(np.asarray(out_j[key]), out_n[key], atol=1e-05)
@@ -593,13 +684,13 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
             np.asarray(jac["controller"]["Kp"]), [1.5], atol=1e-05
         )
 
-    def test_grad_flows_through_f_p(self):
-        f_p = self.ev.f_p
+    def test_grad_flows_through_f_with_params(self):
+        f = self.ev.f
 
         def dx0(params):
-            return f_p(self.x_j, self.u_j, 0.0, params)[0]
+            return f(self.x_j, self.u_j, 0.0, params)[0]
 
-        g = jax.grad(dx0)({"plant": {"k": 1.0}})
+        g = jax.grad(dx0)({**self.ev.params, "plant": {"k": 1.0}})
         self.assertAlmostEqual(float(g["plant"]["k"]), 2.5 * 1.5, places=4)
 
     def test_jacobian_wrt_params_requires_params(self):
@@ -609,16 +700,14 @@ class TestJaxDiagramParametricTier(unittest.TestCase):
 
 from minilink.blocks.routing import Gain
 from minilink.core.compile.compiler import compile
-from minilink.core.compile.evaluators.evaluators import DynamicsEvaluator
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStaticEvaluator
+from minilink.core.compile.evaluators.base import ContinuousEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
 
 try:
     import jax
-    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
 
     _JAX_AVAILABLE = True
 except ImportError:
-    JaxStaticEvaluator = None
     _JAX_AVAILABLE = False
 
 
@@ -626,8 +715,8 @@ class TestCompileStatic(unittest.TestCase):
     def test_compile_gain_returns_numpy_static_evaluator(self):
         gain = Gain(K=3.0, dim=1)
         ev = compile(gain)
-        self.assertIsInstance(ev, NumpyStaticEvaluator)
-        self.assertFalse(isinstance(ev, DynamicsEvaluator))
+        self.assertIsInstance(ev, StaticEvaluator)
+        self.assertFalse(isinstance(ev, ContinuousEvaluator))
         self.assertFalse(hasattr(ev, "f") or callable(getattr(ev, "f", None)))
 
     def test_static_outputs_match_block(self):
@@ -646,15 +735,15 @@ class TestCompileStaticJax(unittest.TestCase):
         gain = Gain(K=2.5, dim=1)
         ev_np = compile(gain, backend="numpy")
         ev_jx = compile(gain, backend="jax")
-        self.assertIsInstance(ev_jx, JaxStaticEvaluator)
+        self.assertIsInstance(ev_jx, StaticEvaluator)
         u = np.array([2.0])
         out_np = ev_np.outputs(np.array([]), u, 0.0)
         out_jx = ev_jx.outputs(np.array([]), u, 0.0)
         np.testing.assert_allclose(np.asarray(out_jx["y"]), out_np["y"], atol=1e-05)
 
 
-from minilink.core.compile.evaluators.numpy_evaluators import NumpyStepEvaluator
-from minilink.core.system import StepSystem
+from minilink.core.compile.evaluators.discrete import StepEvaluator
+from minilink.core.discrete.step_system import StepSystem
 
 
 class LinearStep(StepSystem):
@@ -671,7 +760,7 @@ class LinearStep(StepSystem):
 class TestCompileStepLeaf(unittest.TestCase):
     def test_compile_returns_numpy_step_evaluator(self):
         ev = compile(LinearStep())
-        self.assertIsInstance(ev, NumpyStepEvaluator)
+        self.assertIsInstance(ev, StepEvaluator)
 
     def test_frozen_params_step_parity(self):
         plant = LinearStep()
@@ -680,7 +769,7 @@ class TestCompileStepLeaf(unittest.TestCase):
         u = np.array([1.0])
         np.testing.assert_allclose(ev.step(x, u, 0), plant.step(x, u, 0))
         np.testing.assert_allclose(
-            ev.step_p(x, u, 0, {"a": 0.25}), plant.step(x, u, 0, {"a": 0.25})
+            ev.step(x, u, 0, {"a": 0.25}), plant.step(x, u, 0, {"a": 0.25})
         )
 
 
@@ -723,12 +812,12 @@ class TestEvaluatorApi(unittest.TestCase):
                 return x
 
         ev = compile(IdentityStep())
-        self.assertIsInstance(ev, NumpyStepEvaluator)
+        self.assertIsInstance(ev, StepEvaluator)
         self.assertTrue(hasattr(ev, "rollout"))
         self.assertFalse(hasattr(ev, "f"))
         self.assertFalse(hasattr(ev, "integrate"))
         self.assertFalse(hasattr(ev, "h"))
-        self.assertFalse(isinstance(ev, DynamicsEvaluator))
+        self.assertFalse(isinstance(ev, ContinuousEvaluator))
 
 
 @pytest.mark.optional
@@ -746,8 +835,6 @@ class TestEvaluatorApiJax(unittest.TestCase):
         )
 
 
-from minilink.core.compile.evaluators.tiers import TRACE_TIER_MSG
-
 try:
     import jax
     import jax.numpy as jnp
@@ -760,7 +847,7 @@ except ImportError:
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestEvaluatorTiersJax(unittest.TestCase):
+class TestCompiledMethodsJax(unittest.TestCase):
     def setUp(self):
         self.plant = Integrator()
         self.ev = compile(self.plant, backend="jax")
@@ -768,134 +855,86 @@ class TestEvaluatorTiersJax(unittest.TestCase):
         self.u = jnp.array([1.0])
         self.t = 0.0
 
-    def test_f_trace_parity_with_f(self):
-        np.testing.assert_allclose(
-            np.asarray(self.ev.f_trace(self.x, self.u, self.t)),
-            np.asarray(self.ev.f(self.x, self.u, self.t)),
-            atol=1e-06,
-        )
-
-    def test_f_jit_alias_identity(self):
-        from minilink.core.compile.evaluators.jax_evaluators import JaxDynamicEvaluator
-
-        self.assertIs(JaxDynamicEvaluator.f_jit, JaxDynamicEvaluator.f)
-        self.assertIs(JaxDynamicEvaluator.f_jit_p, JaxDynamicEvaluator.f_p)
-
-    def test_has_trace_tier(self):
-        self.assertTrue(self.ev.has_trace_tier)
-
-    def test_f_trace_p_with_frozen_params(self):
+    def test_params_none_reads_the_compiled_parameters(self):
         frozen = self.ev._frozen_params
-        np.testing.assert_allclose(
-            np.asarray(self.ev.f_trace_p(self.x, self.u, self.t, frozen)),
+        np.testing.assert_array_equal(
             np.asarray(self.ev.f(self.x, self.u, self.t)),
-            atol=1e-06,
+            np.asarray(self.ev.f(self.x, self.u, self.t, frozen)),
         )
 
-    def test_trace_tier_composable_in_outer_jit(self):
+    def test_each_method_is_compiled_once_per_evaluator(self):
+        # The jitted form, built on first use and cached: the same object each time
+        self.assertIs(self.ev.f, self.ev.f)
+        self.assertEqual(self.ev.f.__name__, "f")
+        other = compile(Integrator(), backend="jax")
+        self.assertIsNot(other.f, self.ev.f)
+
+    def test_a_compiled_method_composes_inside_jit_and_grad(self):
         x, u, t = (self.x, self.u, self.t)
 
         @jax.jit
         def loss(theta):
             p = {"k": theta[0]}
-            return jnp.sum((self.ev.f_trace_p(x, u, t, p) - jnp.array([1.0])) ** 2)
+            return jnp.sum((self.ev.f(x, u, t, p) - jnp.array([1.0])) ** 2)
 
         grad = jax.jit(jax.grad(loss))(jnp.array([1.0]))
         self.assertEqual(grad.shape, (1,))
 
+    def test_a_compiled_impedance_loop_traces_with_its_params_tree(self):
+        from minilink import JointImpedance, Pendulum
 
-class TestEvaluatorTiersNumPy(unittest.TestCase):
-    def test_numpy_f_trace_raises(self):
-        ev = compile(Integrator(), backend="numpy")
-        with self.assertRaises(AttributeError) as ctx:
-            _ = ev.f_trace
-        self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
+        plant = Pendulum()
+        loop = JointImpedance(plant) @ plant
+        ev = compile(loop, backend="jax")
+        x = jnp.full(ev.n, 0.1)
+        u = jnp.zeros(ev.m)
+        np.testing.assert_array_equal(
+            np.asarray(ev.f(x, u, 0.0, ev.params)), np.asarray(ev.f(x, u, 0.0))
+        )
+        steps = jax.vmap(lambda xx: ev.step(xx, u, 0.0, ev.params, dt=0.01))(
+            jnp.stack([x, x])
+        )
+        self.assertEqual(steps.shape, (2, ev.n))
 
-    def test_numpy_rk4_step_trace_raises(self):
+    def test_the_step_model_composes_inside_vmap(self):
+        x0s = jnp.stack([self.x, 2.0 * self.x])
+        steps = jax.vmap(lambda x: self.ev.step(x, self.u, 0.0, dt=0.1))(x0s)
+        np.testing.assert_allclose(
+            np.asarray(steps[1]),
+            np.asarray(self.ev.step(2.0 * self.x, self.u, 0.0, dt=0.1)),
+            rtol=1e-12,
+        )
+
+
+class TestCompiledMethodsNumPy(unittest.TestCase):
+    def test_numpy_methods_are_the_plain_bodies(self):
         ev = compile(Integrator(), backend="numpy")
-        with self.assertRaises(AttributeError) as ctx:
-            _ = ev.rk4_step_trace
-        self.assertIn(TRACE_TIER_MSG, str(ctx.exception))
+        self.assertEqual(ev.f.__func__.__name__, "f")
+        self.assertEqual(ev.compiled_forms, {})
 
 
 @pytest.mark.optional
 @pytest.mark.jax
 @unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestIntegrationTiersJax(unittest.TestCase):
-    def setUp(self):
-        self.ev = compile(Integrator(), backend="jax")
-        self.x = jnp.array([0.2])
-        self.u = jnp.array([1.0])
-        self.t = 0.0
-        self.dt = 0.01
-        self.params = {"k": 1.0}
+class TestStepEvaluatorJax(unittest.TestCase):
+    def test_step_composes_in_a_trace_and_takes_params(self):
 
-    def test_rk4_step_trace_parity(self):
-        np.testing.assert_allclose(
-            np.asarray(self.ev.rk4_step_trace(self.x, self.u, self.t, self.dt)),
-            np.asarray(self.ev.rk4_step(self.x, self.u, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_rk4_integrate_zoh_trace_parity(self):
-        u_seq = jnp.array([[1.0], [0.5], [0.0]])
-        np.testing.assert_allclose(
-            np.asarray(self.ev.rk4_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)),
-            np.asarray(self.ev.rk4_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_rk4_integrate_linear_p_fast_tier(self):
-        u_knots = jnp.array([[1.0], [0.5], [0.0]])
-        out = self.ev.rk4_integrate_linear_p(
-            self.x, u_knots, self.t, self.dt, self.params
-        )
-        self.assertEqual(out.shape, (3, 1))
-
-    def test_euler_integrate_zoh_trace_parity(self):
-        u_seq = jnp.array([[1.0], [0.5], [0.0]])
-        np.testing.assert_allclose(
-            np.asarray(
-                self.ev.euler_integrate_zoh_trace(self.x, u_seq, self.t, self.dt)
-            ),
-            np.asarray(self.ev.euler_integrate_zoh(self.x, u_seq, self.t, self.dt)),
-            atol=1e-06,
-        )
-
-    def test_f_ivp_p_matches_f_ivp_with_frozen(self):
-        np.testing.assert_allclose(
-            np.asarray(self.ev.f_ivp_p(self.x, self.t, self.params)),
-            np.asarray(self.ev.f_ivp(self.x, self.t)),
-            atol=1e-06,
-        )
-
-    def test_euler_step_p(self):
-        out = self.ev.euler_step_p(self.x, self.u, self.t, self.dt, self.params)
-        self.assertEqual(out.shape, (1,))
-
-
-@pytest.mark.optional
-@pytest.mark.jax
-@unittest.skipUnless(_JAX_AVAILABLE, "JAX not installed")
-class TestStepEvaluatorTiersJax(unittest.TestCase):
-    def test_step_trace_parity(self):
-
-        class IdentityStep(StepSystem):
+        class ScaleStep(StepSystem):
             def __init__(self):
                 super().__init__(n=1)
+                self.params = {"a": 2.0}
 
             def step(self, x, u, k=0, params=None):
-                return x
+                params = self.params if params is None else params
+                return params["a"] * x
 
-        ev = compile(IdentityStep(), backend="jax")
+        ev = compile(ScaleStep(), backend="jax")
         x = jnp.array([1.0])
         u = jnp.array([0.0])
-        from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
-
-        np.testing.assert_allclose(
-            np.asarray(ev.step_trace(x, u, 0)), np.asarray(ev.step(x, u, 0)), atol=1e-06
-        )
-        self.assertIs(JaxStepEvaluator.step_jit, JaxStepEvaluator.step)
+        np.testing.assert_allclose(np.asarray(ev.step(x, u, 0)), [2.0])
+        np.testing.assert_allclose(np.asarray(ev.step(x, u, 0, {"a": 3.0})), [3.0])
+        traced = jax.jit(lambda xx: ev.step(xx, u, 0, {"a": 3.0}))(x)
+        np.testing.assert_allclose(np.asarray(traced), [3.0])
 
 
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -1069,8 +1108,8 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("expected (2,)", str(ctx.exception))
 
     def test_wrong_step_shape_inside_a_step_diagram_raises(self):
-        from minilink.core.diagram import StepDiagramSystem
-        from minilink.core.system import StepSystem
+        from minilink.core.discrete.step_diagram import StepDiagramSystem
+        from minilink.core.discrete.step_system import StepSystem
 
         class BadStep(StepSystem):
             def __init__(self):
@@ -1088,9 +1127,11 @@ class TestEquationShapeValidation(unittest.TestCase):
         self.assertIn("step() of", str(ctx.exception))
         self.assertIn("(plant)", str(ctx.exception))
 
-    def test_step_diagram_compile_probes_each_hook_once(self):
-        from minilink.core.diagram import StepDiagramSystem
-        from minilink.core.system import StepSystem
+    def test_step_diagram_compile_probes_each_hook_once_and_each_undeclared_input_once(
+        self,
+    ):
+        from minilink.core.discrete.step_diagram import StepDiagramSystem
+        from minilink.core.discrete.step_system import StepSystem
 
         class CountingStep(StepSystem):
             def __init__(self):
@@ -1111,7 +1152,8 @@ class TestEquationShapeValidation(unittest.TestCase):
         diagram.add_input_port("u")
         diagram.connect("input", "u", "plant", "u")
         diagram.compile()
-        self.assertEqual(block.calls, {"step": 1, "h": 1})
+        # h once for its shape, once more with the undeclared u moved
+        self.assertEqual(block.calls, {"step": 1, "h": 2})
 
     def test_wrong_f_shape_raises_from_compute_trajectory(self):
         with self.assertRaises(ValueError):
@@ -1160,9 +1202,7 @@ class TestRolloutBatch(unittest.TestCase):
         )
         self.assertEqual(xs.shape, (4, self.n_steps + 1, 2))
         for i in range(4):
-            single = self.ev.rk4_integrate_zoh(
-                self.x0s[i], self.u_nominal, 0.0, self.dt
-            )
+            single = self.ev.rollout(self.x0s[i], self.u_nominal, 0.0, self.dt)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )
@@ -1171,7 +1211,7 @@ class TestRolloutBatch(unittest.TestCase):
         u_seqs = 0.5 * self.rng.standard_normal((4, self.n_steps, 1))
         xs = np.asarray(self.ev.rollout_batch(self.x0s, u_seqs, dt=self.dt))
         for i in range(4):
-            single = self.ev.rk4_integrate_zoh(self.x0s[i], u_seqs[i], 0.0, self.dt)
+            single = self.ev.rollout(self.x0s[i], u_seqs[i], 0.0, self.dt)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )
@@ -1186,9 +1226,7 @@ class TestRolloutBatch(unittest.TestCase):
         )
         for i in range(4):
             p_i = dict(self.sys.params, l=float(lengths[i]))
-            single = self.ev.rk4_integrate_zoh_p(
-                self.x0s[i], self.u_nominal, 0.0, self.dt, p_i
-            )
+            single = self.ev.rollout(self.x0s[i], self.u_nominal, 0.0, self.dt, p_i)
             np.testing.assert_allclose(
                 xs[i], np.asarray(single), rtol=1e-12, atol=1e-12
             )
@@ -1201,3 +1239,336 @@ class TestRolloutBatch(unittest.TestCase):
             self.ev.rollout_batch(self.x0s[:, :1], n_steps=3, dt=self.dt)
         with self.assertRaises(ValueError):
             self.ev.rollout_batch(self.x0s, np.zeros((3, 5, 1)), dt=self.dt)
+
+
+# The step model: one step body and one rollout body per backend
+
+
+def step_model_plants():
+    from minilink import PID, Pendulum
+
+    return [Pendulum(), PID(Kp=5.0, Ki=1.0, Kd=1.0) @ Pendulum()]
+
+
+def held_inputs_of(ev, n_steps=12):
+    k = np.arange(n_steps)[:, None]
+    return 0.3 * np.sin(0.4 * k + np.arange(ev.m)[None, :])
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+@pytest.mark.parametrize("index", [0, 1], ids=["leaf", "diagram"])
+def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
+    """``rollout`` is ``step`` repeated at ``t_k = t₀ + k dt``, and RK4 is the four-stage formula."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    ev = step_model_plants()[index].compile(backend)
+    x0 = np.linspace(0.1, 0.3, ev.n)
+    us = held_inputs_of(ev)
+    dt = 0.05
+
+    xs = np.asarray(ev.rollout(x0, us, 0.2, dt))
+    x = x0
+    for k, u in enumerate(us):
+        t = 0.2 + k * dt
+        k1 = np.asarray(ev.f(x, u, t))
+        k2 = np.asarray(ev.f(x + 0.5 * dt * k1, u, t + 0.5 * dt))
+        k3 = np.asarray(ev.f(x + 0.5 * dt * k2, u, t + 0.5 * dt))
+        k4 = np.asarray(ev.f(x + dt * k3, u, t + dt))
+        x = x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+        np.testing.assert_allclose(xs[k + 1], x, rtol=1e-12, atol=1e-14)
+        np.testing.assert_allclose(
+            np.asarray(ev.step(xs[k], u, t, dt=dt)), x, rtol=1e-12, atol=1e-14
+        )
+
+
+@pytest.mark.jax
+def test_the_two_backends_agree_on_every_knob():
+    pytest.importorskip("jax")
+    for plant in step_model_plants():
+        ev_np, ev_jax = plant.compile("numpy"), plant.compile("jax")
+        x0 = np.linspace(0.1, 0.3, ev_np.n)
+        us = held_inputs_of(ev_np)
+        for solver in ("rk4", "euler"):
+            for substeps in (1, 3):
+                for hold in ("zoh", "foh"):
+                    seq = us if hold == "zoh" else np.vstack([us, us[-1:]])
+                    a = ev_np.rollout(
+                        x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
+                    )
+                    b = ev_jax.rollout(
+                        x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
+                    )
+                    np.testing.assert_allclose(np.asarray(b), a, rtol=1e-12, atol=1e-14)
+
+
+def test_substeps_converge_to_the_fine_step():
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("numpy")
+    x0, u = np.array([1.0, 0.0]), np.array([0.2])
+    fine = ev.step(x0, u, 0.0, dt=0.4, substeps=40)
+    errors = [
+        np.max(np.abs(ev.step(x0, u, 0.0, dt=0.4, substeps=s) - fine))
+        for s in (1, 2, 4)
+    ]
+    assert errors[0] > errors[1] > errors[2]
+
+
+def test_params_reach_the_step_and_none_reads_the_compiled_ones():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    ev = plant.compile("numpy")
+    x0, u = np.array([0.5, 0.0]), np.array([0.0])
+    heavy = {**plant.params, "m": 2.0 * plant.params["m"]}
+    np.testing.assert_array_equal(
+        ev.step(x0, u, 0.0, dt=0.1), ev.step(x0, u, 0.0, plant.params, dt=0.1)
+    )
+    assert not np.allclose(
+        ev.step(x0, u, 0.0, heavy, dt=0.1), ev.step(x0, u, 0.0, dt=0.1)
+    )
+
+
+def test_a_rollout_without_inputs_holds_the_nominal_input():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.inputs["u"].nominal_value = np.array([0.7])
+    ev = plant.compile("numpy")
+    us = np.full((5, 1), 0.7)
+    np.testing.assert_array_equal(
+        ev.rollout(np.ones(2), None, 0.0, 0.1, n_steps=5),
+        ev.rollout(np.ones(2), us, 0.0, 0.1),
+    )
+
+
+@pytest.mark.jax
+def test_the_compiled_forms_are_built_once():
+    pytest.importorskip("jax")
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("jax")
+    first = ev.rollout
+    ev.rollout(np.ones(2), np.zeros((3, 1)), 0.0, 0.1)
+    assert ev.rollout is first and ev.step is ev.step
+
+
+def test_the_step_refuses_an_unknown_solver():
+    from minilink import Pendulum
+
+    ev = Pendulum().compile("numpy")
+    with pytest.raises(ValueError, match="solver"):
+        ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
+
+
+def test_a_step_returning_a_bare_number_rolls_out():
+    class HalfStep(StepSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+
+        def step(self, x, u, k=0, params=None):
+            x_next = 0.5 * x[0] + u[0]
+            return x_next
+
+    xs = compile(HalfStep()).rollout(np.zeros(1), np.ones((3, 1)))
+
+    np.testing.assert_allclose(xs, [[0.0], [1.0], [1.5], [1.75]])
+
+
+def test_a_diagram_hands_its_blocks_float_inputs():
+    class Reciprocal(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+
+        def f(self, x, u, t=0.0, params=None):
+            dx = -x + u**-1
+            return dx
+
+    diagram = DiagramSystem()
+    diagram.add_subsystem(Reciprocal(), "plant")
+    diagram.add_input_port("u", dim=1)
+    diagram.connect("input", "u", "plant", "u")
+    ev = diagram.compile()
+
+    np.testing.assert_allclose(ev.f(np.zeros(1), np.array([2])), [0.5])
+
+
+class TestCompileFlatten(unittest.TestCase):
+    """Optional compile-time flatten matches nested reference dynamics.
+
+    Global state stack order for ``flatten_diagram`` is covered in
+    ``tests/unittest/test_flatten_diagram.py``.
+    """
+
+    def test_nested_compile_flatten_matches_nested_and_hand_flat(self):
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev_nested = compile_diagram(nested, backend="numpy")
+        ev_flatten = compile_diagram(nested, backend="numpy", flatten=True)
+        ev_hand_flat = compile_diagram(flat, backend="numpy")
+        np.testing.assert_allclose(ev_nested.f(x, u, 0.0), ev_flatten.f(x, u, 0.0))
+        np.testing.assert_allclose(ev_hand_flat.f(x, u, 0.0), ev_flatten.f(x, u, 0.0))
+
+    def test_nested_compile_flatten_jax(self):
+        pytest.importorskip("jax")
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, flat = _nested_and_flat_outer_loops()
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev_flatten = compile_diagram(nested, backend="jax", flatten=True)
+        ev_hand_flat = compile_diagram(flat, backend="jax")
+        np.testing.assert_allclose(
+            ev_hand_flat.f(x, u, 0.0), ev_flatten.f(x, u, 0.0), atol=1e-12
+        )
+
+    def test_flatten_with_nested_params(self):
+        from minilink.core.assembly import remap_params_nested_to_flat
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, _flat = _nested_and_flat_outer_loops()
+        nested_params = nested.params
+        flat_params = remap_params_nested_to_flat(nested, nested_params)
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        ev = compile_diagram(nested, flatten=True)
+        np.testing.assert_allclose(
+            ev.f(x, u, 0.0, params=flat_params),
+            nested.f(x, u, 0.0, params=nested_params),
+            atol=1e-10,
+        )
+
+    def test_deep_nest_flatten_compile(self):
+        from minilink.blocks.routing import Gain
+        from minilink.control.siso import PID
+        from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
+
+        pid = PID(Kp=1.0, Ki=0.0, Kd=0.0, ports="reference")
+        mass = SingleMass()
+        inner = DiagramSystem()
+        inner.add_subsystem(pid, "controller")
+        inner.add_subsystem(mass, "plant")
+        inner.add_input_port("r")
+        inner.connect("input", "r", "controller", "r")
+        inner.connect("plant", "y", "controller", "y")
+        inner.connect("controller", "u", "plant", "u")
+        inner.connect_new_output_port("plant", "y", "y")
+
+        mid = DiagramSystem()
+        mid.add_subsystem(Gain([1.0]), "gain")
+        mid.add_subsystem(inner, "loop")
+        mid.connect("loop", "y", "gain", "u")
+        mid.connect_new_output_port("gain", "y", "y")
+        mid.add_input_port("r")
+        mid.connect("input", "r", "loop", "r")
+
+        outer = DiagramSystem()
+        outer.add_subsystem(Gain([0.5]), "scale")
+        outer.add_subsystem(mid, "box")
+        outer.connect("box", "y", "scale", "u")
+        outer.connect("scale", "y", "box", "r")
+
+        x = np.array([0.2, 0.1, 0.0, 0.0])
+        u = np.zeros(0)
+        np.testing.assert_allclose(
+            compile_diagram(outer, flatten=True).f(x, u, 0.0),
+            outer.f(x, u, 0.0),
+            atol=1e-10,
+        )
+
+    def test_flatten_jacobian_wire_ids(self):
+        from tests.unittest.test_diagrams import _nested_and_flat_outer_loops
+
+        nested, _flat = _nested_and_flat_outer_loops()
+        ev = compile_diagram(nested, flatten=True)
+        x = np.array([0.3, -0.2, 0.5, 0.1])
+        u = np.zeros(0)
+        jac = ev.jacobian("f", "inner__controller:u")(x, u, 0.0, None)
+        self.assertEqual(jac.shape[0], nested.n)
+
+
+@pytest.mark.jax
+def test_every_jax_evaluator_applies_the_float64_policy():
+    jax = pytest.importorskip("jax")
+    from minilink import Pendulum
+
+    Pendulum().compile("jax")
+    jax.config.update("jax_enable_x64", False)
+    try:
+        ev = Pendulum().compile("jax")
+        dx = ev.f(np.ones(2), np.zeros(1))
+    finally:
+        jax.config.update("jax_enable_x64", True)
+
+    assert dx.dtype == np.float64
+
+
+# Wiring mistakes fail at wiring time
+
+
+def test_connect_refuses_to_rewire_a_connected_input_and_disconnect_opens_it():
+    diagram = DiagramSystem()
+    diagram.add_subsystem(P(), "controller")
+    diagram.add_subsystem(Integrator(), "plant")
+    diagram.connect("controller", "u", "plant", "u")
+
+    with pytest.raises(
+        ValueError, match="plant:u is already connected to controller:u"
+    ):
+        diagram.connect("plant", "y", "plant", "u")
+    assert diagram.disconnect("plant", "u") == ("controller", "u")
+    assert diagram.disconnect("plant", "u") is None
+    diagram.connect("plant", "y", "plant", "u")
+    assert diagram.connections["plant"]["u"] == ("plant", "y")
+    diagram.connect_new_output_port("plant", "y", "y")
+    with pytest.raises(ValueError, match="diagram output"):
+        diagram.disconnect("output", "y")
+
+
+def test_compile_refuses_an_output_that_reads_an_undeclared_input():
+    class HiddenFeedthrough(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+        def f(self, x, u, t=0.0, params=None):
+            return -x
+
+        def h(self, x, u, t=0.0, params=None):
+            return x + u
+
+    with pytest.raises(
+        ValueError, match="output 'y' of 'HiddenFeedthrough' moves with input 'u'"
+    ):
+        compile(HiddenFeedthrough())
+
+    declared = HiddenFeedthrough()
+    declared.outputs["y"].dependencies = ("u",)
+    compile(declared)
+    np.testing.assert_allclose(declared.h(np.ones(1), np.ones(1)), [2.0])
+
+
+def test_compile_probes_a_custom_port_function_for_an_undeclared_input():
+    from minilink.core.system import System
+
+    class Doubler(System):
+        def __init__(self, dependencies):
+            super().__init__(0)
+            self.add_input_port("u", dim=1)
+            self.add_output_port(
+                "y", dim=1, function=self.doubled, dependencies=dependencies
+            )
+
+        def doubled(self, x, u, t=0.0, params=None):
+            return 2.0 * u
+
+    # A port added with its own function is probed like the shortcut's h
+    with pytest.raises(
+        ValueError, match="output 'y' of 'Doubler' moves with input 'u'"
+    ):
+        compile(Doubler(dependencies=()))
+    compile(Doubler(dependencies=("u",)))

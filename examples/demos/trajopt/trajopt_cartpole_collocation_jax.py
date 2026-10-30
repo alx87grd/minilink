@@ -8,6 +8,7 @@ from minilink import (
     CartPole,
     PlanningProblem,
     QuadraticCost,
+    SingletonSet,
     TrajectoryOptimizationPlanner,
 )
 
@@ -32,18 +33,19 @@ problem = PlanningProblem(
     sys=sys,
     tf=4.0,
     x_start=x_start,
-    x_goal=x_goal,
+    Xf=SingletonSet(x_goal),
     cost=cost,
     X=sys.state.box,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=40,
     transcription="direct_collocation",
-    compile_backend="jax",
-    optimizer_method=OPTIMIZER,
-    # optimizer_method="scipy_slsqp",
+    backend="jax",
+    method=OPTIMIZER,
+    # method="scipy_slsqp",
     # optimizer_options={"maxiter": 500, "ftol": 1e-2},
     verbose=PRINT_SOLVE_REPORT,
     live_plot=LIVE_PLOT,

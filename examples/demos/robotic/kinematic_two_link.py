@@ -2,12 +2,12 @@
 
 import numpy as np
 
-from minilink import Source, SpeedControlledManipulator, TwoLinkManipulator
+from minilink import KinematicManipulator, Source, TwoLinkManipulator
 from minilink.control import TaskKinematic
 
 p_d = np.array([0.5, 0.5])
 
-arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+arm = KinematicManipulator.from_manipulator(TwoLinkManipulator())
 arm.x0 = np.array([-0.5, 0.2])
 
 ref = Source(2)

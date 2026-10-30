@@ -7,19 +7,19 @@ import numpy as np
 from minilink.core.costs import QuadraticCost, TimeCost
 from minilink.core.diagram import DiagramSystem
 from minilink.core.system import DynamicSystem
-from minilink.planning.policy_synthesis import dp_jax, plotting
-from minilink.planning.policy_synthesis.approximation import (
+from minilink.planning.dynamic_programming import dp_jax, plotting
+from minilink.planning.dynamic_programming.approximation import (
     LinearApproximator,
     QuadraticFeatures,
     RadialBasisFeatures,
 )
-from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-from minilink.planning.policy_synthesis.dp import (
+from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
     DynamicProgrammingResult,
 )
-from minilink.planning.policy_synthesis.policy_eval import PolicyEvaluator
+from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 from minilink.planning.problems import PlanningProblem
 
 
@@ -40,7 +40,7 @@ class DoubleIntegrator(DynamicSystem):
 def make_problem():
     sys = DoubleIntegrator()
     cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-    return PlanningProblem(sys, x_goal=np.zeros(2), cost=cost)
+    return PlanningProblem(sys, cost=cost, U=sys.input_box)
 
 
 def make_pendulum_problem():
@@ -51,7 +51,7 @@ def make_pendulum_problem():
     sys.state.upper_bound = np.array([2.0, 2.0])
     sys.inputs["u"].lower_bound = np.array([-1.0])
     sys.inputs["u"].upper_bound = np.array([1.0])
-    return PlanningProblem(sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys))
+    return PlanningProblem(sys, cost=QuadraticCost.from_system(sys), U=sys.input_box)
 
 
 def solve(problem, *, precompute=True, **opt_kwargs):
@@ -96,7 +96,9 @@ class TestStateSpaceGrid(unittest.TestCase):
         sys.inputs["u"].lower_bound = np.array([-1.0])
         sys.inputs["u"].upper_bound = np.array([1.0])
         problem = PlanningProblem(
-            sys, x_goal=np.zeros(2), cost=QuadraticCost.from_system(sys)
+            sys,
+            cost=QuadraticCost.from_system(sys),
+            U=sys.input_box,
         )
         grid_np = StateSpaceGrid(
             problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
@@ -134,7 +136,7 @@ class TestStateSpaceGrid(unittest.TestCase):
     def test_infinite_bounds_raise(self):
         sys = DoubleIntegrator()
         sys.state.upper_bound = np.array([np.inf, 3.0])
-        problem = PlanningProblem(sys, x_goal=np.zeros(2))
+        problem = PlanningProblem(sys, U=sys.input_box)
         with self.assertRaises(ValueError):
             StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
 
@@ -253,8 +255,30 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem, grid=result.grid, policy=controller.action, options=planner.options
         )
         J_pi = evaluator.solve()
-        feasible = result.J < planner.options.out_of_bound_cost - 1.0
+        failure_cost = planner.options.out_of_bound_cost
+        feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
+
+    def test_the_failure_cost_covers_the_converged_sum_at_a_finite_horizon(self):
+        from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+        from minilink.planning.dynamic_programming.dp import grid_failure_cost
+
+        # solve() sweeps to convergence: its sum is Σₖ αᵏ dt = dt / (1 − α), tf or not
+        sys = DoubleIntegrator()
+        X, U = sys.state.box, sys.input_box.box
+        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        g_max = cost.g_max(X, U)
+        for tf in (np.inf, 2.0):
+            problem = PlanningProblem(
+                sys, cost=cost, tf=tf, X=sys.state.box, U=sys.input_box
+            )
+            grid = StateSpaceGrid(
+                problem, x_grid_shape=(3, 3), u_grid_shape=(3,), dt=0.1
+            )
+            failure_cost = grid_failure_cost(grid, 0.9)
+            self.assertGreaterEqual(
+                failure_cost, g_max * 0.1 / (1.0 - 0.9) * (1 - 1e-12)
+            )
 
     def test_result_save_load_round_trip(self):
         import os
@@ -313,7 +337,9 @@ class TestJaxPrecompute(unittest.TestCase):
         sys.inputs["u"].lower_bound = np.array([-1.0])
         sys.inputs["u"].upper_bound = np.array([1.0])
         problem = PlanningProblem(
-            sys, x_goal=np.zeros(2), cost=TimeCost.from_system(sys, eps=0.1)
+            sys,
+            cost=TimeCost.from_system(sys, eps=0.1),
+            U=sys.input_box,
         )
         grid = StateSpaceGrid(
             problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
@@ -485,7 +511,7 @@ class TestBackends(unittest.TestCase):
 
         sys = DrivenIntegrator()
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-        problem = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost)
+        problem = PlanningProblem(sys, cost=cost, U=sys.input_box)
 
         def fixed_horizon(backend, final_time):
             grid = StateSpaceGrid(
@@ -540,7 +566,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         controller = planner.get_controller()
         self.assertTrue(hasattr(controller, "action"))
 
-    def test_cost2go_colour_scale_tops_at_the_price_of_leaving(self):
+    def test_cost2go_colour_scale_tops_at_the_failure_cost_of_leaving(self):
         import matplotlib
 
         matplotlib.use("Agg")
@@ -591,8 +617,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertEqual(len(surfaces), 2)
         plt.close("all")
 
-    def test_cost2go_colour_scale_has_no_default_for_a_priced_exit(self):
-        self.assertIsNone(plotting.cost_scale_limit(exit_price))
+    def test_cost2go_colour_scale_has_no_default_for_a_charged_exit(self):
+        self.assertIsNone(plotting.cost_scale_limit(exit_failure_cost))
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
         self.assertEqual(plotting.cost_scale_limit(500), 500.0)
 
@@ -764,12 +790,12 @@ class TestDpOneObjectSetup(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         return PlanningProblem(
             plant,
-            x_goal=goal,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
 
     def test_shapes_and_dt_build_the_grid(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         planner = DynamicProgrammingPlanner(
             self._problem(), x_grid=(11, 11), u_grid=(3,), dt=0.05
@@ -779,7 +805,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertAlmostEqual(planner.grid.dt, 0.05)
 
     def test_success_reports_convergence(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = make_problem()
         capped = DynamicProgrammingPlanner(
@@ -815,11 +841,11 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
 
     def test_final_time_reads_the_problem_horizon(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         sys = DoubleIntegrator()
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
-        timed = PlanningProblem(sys, x_goal=np.zeros(2), cost=cost, tf=2.0)
+        timed = PlanningProblem(sys, cost=cost, tf=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         self.assertEqual(planner.options.final_time, 2.0)
         explicit = DynamicProgrammingPlanner(
@@ -832,8 +858,8 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertEqual(untimed.options.final_time, 0.0)
 
     def test_grid_and_shapes_are_exclusive(self):
-        from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = self._problem()
         grid = StateSpaceGrid(
@@ -856,7 +882,7 @@ class TestCleanInfeasible(unittest.TestCase):
         self.assertTrue(np.all(result.J[saturated] == penalty))
 
     def test_dp_clean_infeasible_can_be_disabled(self):
-        from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
+        from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = make_problem()
         planner = DynamicProgrammingPlanner(
@@ -884,20 +910,18 @@ class TestCleanInfeasible(unittest.TestCase):
         cleanup.assert_called_once()
 
 
-def exit_price(x, t):
-    """A price of leaving that grows with the exit state: 200 + 50 |x|^2."""
+def exit_failure_cost(x, t):
+    """A failure_cost of leaving that grows with the exit state: 200 + 50 |x|^2."""
     return 200.0 + 50.0 * (x[0] ** 2 + x[1] ** 2)
 
 
 class TestInfeasibleCostPrice(unittest.TestCase):
-    """The problem's infeasible_cost(x, t) prices each inadmissible pair at its successor."""
+    """Value iteration's out_of_bound_cost(x, t) failure costs each inadmissible pair at its successor."""
 
-    def planner(self, price, backend="numpy", **kwargs):
-        from dataclasses import replace
-
-        problem = replace(make_pendulum_problem(), infeasible_cost=price)
+    def planner(self, failure_cost, backend="numpy", **kwargs):
         return DynamicProgrammingPlanner(
-            problem,
+            make_pendulum_problem(),
+            out_of_bound_cost=failure_cost,
             x_grid=(11, 11),
             u_grid=(5,),
             dt=0.1,
@@ -908,18 +932,18 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             **kwargs,
         )
 
-    def test_numpy_table_charges_the_price_of_each_successor(self):
-        planner = self.planner(exit_price)
-        self.assertIs(planner.options.out_of_bound_cost, exit_price)
+    def test_numpy_table_charges_the_failure_cost_of_each_successor(self):
+        planner = self.planner(exit_failure_cost)
+        self.assertIs(planner.options.out_of_bound_cost, exit_failure_cost)
         x_next, action_ok, x_next_ok = planner.grid.transition(0.0)
         inadmissible = ~(action_ok & x_next_ok)
         self.assertTrue(np.any(inadmissible))
 
         G = planner.running_cost_table(0.0)
-        expected = [exit_price(x, 0.0) for x in x_next[inadmissible]]
+        expected = [exit_failure_cost(x, 0.0) for x in x_next[inadmissible]]
         np.testing.assert_allclose(G[inadmissible], expected)
 
-        # A scalar price (an int like a float) keeps the scalar table
+        # A scalar failure_cost (an int like a float) keeps the scalar table
         scalar = self.planner(500)
         self.assertEqual(scalar.options.out_of_bound_cost, 500.0)
         G_scalar = scalar.running_cost_table(0.0)
@@ -927,11 +951,11 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
 
     def test_a_given_mask_is_charged_as_given(self):
-        for price in (300.0, exit_price):
-            with self.subTest(price=price):
-                planner = self.planner(price)
+        for failure_cost in (300.0, exit_failure_cost):
+            with self.subTest(failure_cost=failure_cost):
+                planner = self.planner(failure_cost)
                 grid = planner.grid
-                g, cost_params = planner.problem.cost.g, planner.problem.params.cost
+                g, cost_params = planner.problem.cost.g, planner.problem.cost.params
                 x_next = grid.transition(0.0)[0]
 
                 # Only the first pair is inadmissible, whatever the grid's own mask
@@ -939,15 +963,19 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 admissible[0, 0] = False
                 G = planner.running_cost_table(0.0, admissible)
 
-                # The running cost of every pair, and the price on the masked one only
+                # The running cost of every pair, and the failure_cost on the masked one only
                 expected = np.empty(admissible.shape)
                 for s, x in enumerate(grid.states):
                     for a, u in enumerate(grid.inputs):
                         expected[s, a] = float(g(x, u, 0.0, cost_params)) * grid.dt
-                expected[0, 0] = price(x_next[0, 0], 0.0) if callable(price) else price
+                expected[0, 0] = (
+                    failure_cost(x_next[0, 0], 0.0)
+                    if callable(failure_cost)
+                    else failure_cost
+                )
                 np.testing.assert_allclose(G, expected)
 
-    def test_a_constant_price_solves_like_the_scalar(self):
+    def test_a_constant_failure_cost_solves_like_the_scalar(self):
         for backend in ("numpy", "loop"):
             with self.subTest(backend=backend):
                 scalar = self.planner(500.0, backend, clean_infeasible=False)
@@ -959,13 +987,13 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 np.testing.assert_array_equal(constant.result.J, scalar.result.J)
                 np.testing.assert_array_equal(constant.result.pi, scalar.result.pi)
 
-    def test_loop_numpy_and_policy_evaluation_agree_on_the_price(self):
-        table = self.planner(exit_price)
-        loop = self.planner(exit_price, "loop")
+    def test_loop_numpy_and_policy_evaluation_agree_on_the_failure_cost(self):
+        table = self.planner(exit_failure_cost)
+        loop = self.planner(exit_failure_cost, "loop")
         table.solve()
         loop.solve_steps(table.result.iterations)
         np.testing.assert_allclose(loop.result.J, table.result.J)
-        # the priced exits, not the 1e6 default, bound the cost-to-go
+        # the charged exits, not the 1e6 default, bound the cost-to-go
         self.assertLess(np.max(table.result.J), 1.0e3)
 
         evaluator = PolicyEvaluator(
@@ -977,12 +1005,12 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         J_pi = evaluator.solve()
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
 
-    def test_jax_table_charges_the_price(self):
+    def test_jax_table_charges_the_failure_cost(self):
         import pytest
 
         pytest.importorskip("jax")
-        numpy_planner = self.planner(exit_price)
-        jax_planner = self.planner(exit_price, "jax")
+        numpy_planner = self.planner(exit_failure_cost)
+        jax_planner = self.planner(exit_failure_cost, "jax")
         G_np = numpy_planner.running_cost_table(0.0)
         G_jax = dp_jax.running_cost_table(jax_planner, 0.0)
         np.testing.assert_allclose(G_jax, G_np)
@@ -992,7 +1020,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         np.testing.assert_allclose(jax_planner.result.J, numpy_planner.result.J)
         self.assertLess(np.max(jax_planner.result.J), 1.0e3)
 
-    def test_jax_rejects_an_untraceable_price(self):
+    def test_jax_rejects_an_untraceable_failure_cost(self):
         import pytest
 
         pytest.importorskip("jax")
@@ -1005,7 +1033,10 @@ class TestDpFlatConstructor(unittest.TestCase):
     def test_flat_matches_options(self):
         sys = DoubleIntegrator()
         problem = PlanningProblem(
-            sys=sys, x_start=np.array([0.0, 0.0]), cost=QuadraticCost.from_system(sys)
+            sys=sys,
+            x_start=np.array([0.0, 0.0]),
+            cost=QuadraticCost.from_system(sys),
+            U=sys.input_box,
         )
         grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
         nested = DynamicProgrammingPlanner(
@@ -1022,7 +1053,7 @@ class TestDpFlatConstructor(unittest.TestCase):
 
 
 def test_grid_exposes_the_boxes_it_spans():
-    from minilink.planning.policy_synthesis.discretizer import StateSpaceGrid
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
@@ -1035,10 +1066,39 @@ def test_grid_exposes_the_boxes_it_spans():
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])
 
-    problem = PlanningProblem(DoubleIntegrator(), x_goal=np.zeros(2))
+    plant = DoubleIntegrator()
+    problem = PlanningProblem(plant, U=plant.input_box)
     grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
     np.testing.assert_allclose(grid.X.lower, [-2.0, -3.0])
     np.testing.assert_allclose(grid.X.upper, [2.0, 3.0])
     np.testing.assert_allclose(grid.U.box.lower, [-1.0])
     assert all(grid.X.contains(x) for x in grid.states)
     assert all(grid.U.contains(u) for u in grid.inputs)
+
+
+def test_the_grid_steps_through_the_step_model_euler_by_default():
+    """The successor map is the step model of one period: Euler by default, RK4 on request."""
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.analysis import discretize
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant, cost=QuadraticCost.from_system(plant), U=plant.input_box
+    )
+    x, u = np.array([0.4, -0.3]), np.array([0.5])
+    for solver in ("euler", "rk4"):
+        grid = StateSpaceGrid(
+            problem,
+            x_grid_shape=(5, 5),
+            u_grid_shape=(3,),
+            dt=0.1,
+            solver=solver,
+            precompute=False,
+        )
+        expected = discretize(plant, 0.1, solver=solver).step(x, u)
+        np.testing.assert_allclose(grid.successor(x, u, 0.0), expected, rtol=1e-14)
+    euler = StateSpaceGrid(
+        problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1, precompute=False
+    )
+    np.testing.assert_allclose(euler.successor(x, u, 0.0), x + 0.1 * plant.f(x, u))

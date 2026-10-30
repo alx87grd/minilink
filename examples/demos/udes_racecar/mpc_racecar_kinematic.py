@@ -8,18 +8,19 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
-from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
 from minilink.planning import (
     ReferenceTrack,
     Scene,
     Sphere,
-    bind,
     circuit_waypoints,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_hinge,
 )
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
 V_REF = 3.5  # [m/s]
 TF = 10.0
@@ -48,7 +49,7 @@ x0 = np.array(
 car.x0 = x0
 
 # --- cost: cruise, stay in the lane, miss the cone ---
-probe = bind(car, point_probe())
+probe = mount(point_probe(), on=car)
 quad = QuadraticCost.from_system(
     car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
 )
@@ -60,22 +61,20 @@ cost = quad + corridor + obstacle
 
 # --- MPC: receding-horizon collocation on that cost ---
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(sys=car, x_start=x0, cost=cost, tf=MPC_HORIZON),
+    PlanningProblem(sys=car, x_start=x0, cost=cost, tf=MPC_HORIZON, U=car.input_box),
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="jax",
-    optimizer_method="scipy_slsqp",
-    optimizer_options={"maxiter": 40, "ftol": 0.05},
+    backend="jax",
+    method="scipy_slsqp",
+    optimizer_options={"maxiter": 40, "ftol": 0.01},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner, delay=False)
 
 # --- closed loop ---
-diagram = mpc @ car
+diagram = (mpc % MPC_DT) @ car
 
 # diagram.plot_diagram()
-result = diagram.compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=0.01, compile_backend="jax"
-)
+result = diagram.compute_trajectory(tf=TF, dt=0.01)
 # diagram.plot_trajectory()
 
 # --- 3-D look: same lap ---
@@ -83,7 +82,9 @@ car.camera_follow_frame = "body"
 car.skin = racecar_skin_3d
 
 diagram.animate(
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+    overlays=mpc_animation_overlays(
+        result, mpc, loop=diagram, scene=scene, track=track
+    ),
     renderer="meshcat",
     native=False,
 )

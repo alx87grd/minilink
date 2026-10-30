@@ -26,7 +26,7 @@ ctl.task_force_scale = 0.005
 
 diagram = ref >> ctl @ arm
 diagram.plot_diagram()
-diagram.compute_trajectory(tf=TF, n_steps=180, compile_backend="jax")
+diagram.compute_trajectory(tf=TF, n_steps=180, backend="jax")
 # diagram.plot_trajectory()
 diagram.plot_trajectory(signals=((ref, "y"), (arm, "p")))
 

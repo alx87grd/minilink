@@ -100,9 +100,8 @@ def linear_initial_trajectory(
     """
     Return a linear state interpolation with nominal input.
 
-    This generic guess works for any state-space system. It uses singleton
-    boundary sets when present and falls back to ``problem.x_start`` /
-    ``problem.x_goal`` shortcuts.
+    This generic guess works for any state-space system: from the start to
+    :meth:`~minilink.planning.problems.PlanningProblem.goal_point`.
     """
     t_arr = np.asarray(t, dtype=float).reshape(-1)
     x0, xf = boundary_states_of(problem)
@@ -123,16 +122,15 @@ def boundary_states_of(problem):
     """
     The start and goal states of ``problem``.
 
-    Each is the point of a singleton boundary set, else the ``x_start`` /
-    ``x_goal`` shortcut; with no goal at all, the goal is the start.
+    The start is the point of a singleton ``X0``, else ``x_start``; the goal is
+    the problem's :meth:`~minilink.planning.problems.PlanningProblem.goal_point`
+    (``Xf``'s point, else the cost's ``xbar``, else the start).
     """
     x0 = boundary_point(problem.X0)
     if x0 is None:
         x0 = problem.x_start
 
-    xf = boundary_point(problem.Xf)
-    if xf is None:
-        xf = x0 if problem.x_goal is None else problem.x_goal
+    xf = problem.goal_point()
 
     return x0, xf
 

@@ -7,6 +7,7 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
     normalize_backend,
 )
+from minilink.core.compile.evaluators.stepping import step_body
 from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -18,7 +19,6 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
-    rk4_step_between_knots,
     stack_constraints,
     trajectory_cost,
 )
@@ -55,15 +55,15 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Build the multiple-shooting nonlinear program."""
         # The JAX backend builds the same program, vectorized over the knots
-        if normalize_backend(compile_backend, allow_direct=True) == BACKEND_JAX:
-            return self.transcribe_jax(problem, compile_backend=compile_backend)
+        if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
+            return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        step = self.make_step(problem, compile_backend)
+        step = self.make_step(problem, backend)
 
         # Dynamics: the shooting defect of every interval vanishes
         equalities: list[ConstraintFunction] = [
@@ -87,10 +87,10 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             g=stack_constraints(inequalities),
             lower=lower,
             upper=upper,
-            backend=program_backend_for_compile(compile_backend),
+            backend=program_backend_for_compile(backend),
             metadata={
                 "transcription": "multiple_shooting",
-                "compile_backend": compile_backend,
+                "backend": backend,
             },
         )
 
@@ -106,7 +106,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     ###########################################################################
 
     def jax_objective_and_defects(self, problem: PlanningProblem, jax):
-        """The objective and the RK4 shooting defects as traceable JAX closures.
+        """The objective and the RK4 shooting defects as traceable JAX closures of ``(z, params)``.
 
         Returns ``(unpack_jax, J, dynamics_residual)`` as the collocation's does,
         the defect of each interval the RK4 step between its knots.
@@ -114,54 +114,55 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         jnp = jax.numpy
 
         cost = problem.require_cost()
-        t = jnp.asarray(self.options.t(problem))
+        grid = self.knot_offsets(problem, jnp)
         dt = jnp.asarray(self.options.dt(problem))
-        n = int(problem.sys.n)
-        m = int(problem.sys.m)
-        n_steps = int(self.options.n_steps)
-        system_params = problem.params.system
-        cost_params = problem.params.cost
-
-        # The knots packed in z: the states row by row, then the inputs
-        def unpack_jax(z):
-            split = n * n_steps
-            x = z[:split].reshape(n, n_steps)
-            u = z[split:].reshape(m, n_steps)
-            return x, u
+        unpack_jax = self.jax_unpacker(problem)
 
         # One RK4 step between neighbouring knots, the input linear in between
-        def f(x, u, t_k):
-            return problem.sys.f(x, u, t_k, system_params)
+        def rk4_step(x_k, u0, u1, t_k, plant):
+            def f(x, u, t):
+                return problem.sys.f(x, u, t, plant)
 
-        def rk4_step(x_k, u0, u1, t_k):
-            return rk4_step_between_knots(f, x_k, u0, u1, t_k, dt)
+            return step_body(f, x_k, u0, u1, t_k, dt, "rk4", 1)
 
-        # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-        def J(z):
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t_start + k dt
+        def J(z, params):
             x, u = unpack_jax(z)
-            return trajectory_cost(cost, x, u, t, dt, cost_params)
+            t = params["t_start"] + grid
+            return trajectory_cost(
+                cost,
+                x,
+                u,
+                t,
+                dt,
+                params["cost"],
+                discount_rate=params["discount_rate"],
+                t_start=params["t_start"],
+            )
 
         # d_k = x_{k+1} − RK4(x_k, u_k, u_{k+1}), every interval at once
-        def dynamics_residual(z):
+        def dynamics_residual(z, params):
             x, u = unpack_jax(z)
-            x_next = jax.vmap(rk4_step, in_axes=(1, 1, 1, 0), out_axes=1)(
+            t = params["t_start"] + grid
+            x_next = jax.vmap(rk4_step, in_axes=(1, 1, 1, 0, None), out_axes=1)(
                 x[:, :-1],
                 u[:, :-1],
                 u[:, 1:],
                 t[:-1],
+                params["plant"],
             )
             defect = x[:, 1:] - x_next
             return defect.reshape(-1)
 
         return unpack_jax, J, dynamics_residual
 
-    def make_step(self, problem: PlanningProblem, compile_backend: str):
+    def make_step(self, problem: PlanningProblem, backend: str):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""
-        f = dynamics_function(problem, compile_backend)
+        f = dynamics_function(problem, backend, self.plant_evaluator(problem, backend))
         dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):
-            return rk4_step_between_knots(f, x, u0, u1, t, dt)
+            return step_body(f, x, u0, u1, t, dt, "rk4", 1)
 
         return step
 

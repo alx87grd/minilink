@@ -6,6 +6,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
+from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
@@ -23,7 +24,7 @@ class PlanningSolution:
 
     Everything here is the solver's own claim under its own model — the table
     on its grid, the Riccati form on the linear model, the critic's fit. A
-    measurement of the law comes from the evaluators (``MonteCarloEvaluator``,
+    measurement of the law comes from the evaluators (:func:`~minilink.planning.evaluator.evaluate`,
     ``PolicyEvaluator``) as its own object and is never written back here.
 
     Parameters
@@ -93,7 +94,7 @@ class PlanningSolution:
         """
         Draw the feedback law over the problem's state box.
 
-        The policy's own :meth:`~minilink.core.facades.SharedSystemFacades.plot_control_law`,
+        The policy's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
         with ``bounds`` filled from the problem's constraint set (or the
         plant's state box) and the colour limits from its input set, so that
         laws of one problem share one scale. Every keyword passes through
@@ -145,28 +146,10 @@ class PlanningSolution:
     # Display
 
     def __str__(self) -> str:
-        # The law's kind, the rollout's extent, the evaluation, the solver's record
-        law = "u = pi(t), open loop" if self.open_loop else "u = pi(x), feedback"
-        if self.trajectory is None:
-            trajectory = "not rolled out (solve with evaluate=True)"
-        else:
-            trajectory = (
-                f"{self.trajectory.n_samples} samples over "
-                f"{self.trajectory.time_duration:.3g} s"
-            )
-        evaluation = "none" if self.evaluation is None else str(self.evaluation)
-
-        return "\n".join(
-            [
-                f"policy: {self.policy.name} ({law})",
-                f"trajectory: {trajectory}",
-                f"evaluation: {evaluation}",
-                f"solver: {self.solver}",
-            ]
-        )
+        return inspect_text(self)
 
     def _repr_pretty_(self, p, cycle):
-        p.text("..." if cycle else str(self))
+        repr_pretty(self, p, cycle)
 
     ###########################################################################
     # Internal machinery

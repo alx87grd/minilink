@@ -10,10 +10,10 @@ from minilink.analysis.lyapunov import (
     LyapunovCertificate,
     plot_region_of_attraction,
     region_of_attraction,
-    sample_in_ellipsoid,
 )
 from minilink.control.design import lqr
 from minilink.core.backends import array_module
+from minilink.core.fields import QuadraticField
 from minilink.core.system import DynamicSystem
 
 
@@ -203,13 +203,28 @@ class TestQuadraticCertificate(unittest.TestCase):
         drawn = region_of_attraction(sys, search="random", samples=4000)
         self.assertAlmostEqual(grid.level, drawn.level, delta=0.4 * grid.level)
 
-    def test_sample_in_ellipsoid_respects_the_level(self):
+    def test_the_region_draws_inside_the_level_and_repeats_on_a_seed(self):
         P = np.array([[4.0, 1.0], [1.0, 2.0]])
-        d = sample_in_ellipsoid(P, level=3.0, n=500)
+        region = QuadraticField(np.zeros(2), P).as_set(upper=3.0)
+        d = region.sample(0, 500)
         self.assertTrue(np.all(np.einsum("ij,jk,ik->i", d, P, d) <= 3.0 + 1e-9))
-        np.testing.assert_allclose(
-            sample_in_ellipsoid(P, 3.0, 5), sample_in_ellipsoid(P, 3.0, 5)
-        )
+        np.testing.assert_allclose(region.sample(0, 5), region.sample(0, 5))
+
+    def test_the_certificate_speaks_the_field(self):
+        sys = VanderPol()
+        sys.params["mu"] = -1.0
+        roa = region_of_attraction(sys)
+        x = roa.x_bar + np.array([0.1, -0.2])
+        self.assertIsInstance(roa.V, QuadraticField)
+        self.assertEqual(roa.V(x), roa.V.value(x))
+        np.testing.assert_allclose(roa.V.gradient(x), 2.0 * roa.P @ (x - roa.x_bar))
+        np.testing.assert_array_equal(roa.extent, roa.region.half_width)
+        self.assertEqual(roa.region.level, roa.level)
+        self.assertTrue(roa.region.contains(roa.x_bar))
+        self.assertEqual(roa.V(list(x)), roa.V(x))
+        self.assertEqual(roa.contains(list(x)), roa.contains(x))
+        self.assertEqual(roa.V(list(x)), roa.V(x))
+        self.assertEqual(roa.contains(list(x)), roa.contains(x))
 
 
 @pytest.mark.optional
@@ -244,7 +259,7 @@ def test_plot_draws_the_slice_and_the_basin():
     roa = region_of_attraction(loop)
 
     fig, ax = roa.plot(basin=True, n=41, show=False)
-    self_titled = ax.get_title()
+    self_titled = " ".join(ax.get_title().split())
     assert "region of attraction" in self_titled
     assert len(ax.collections) >= 1  # the shaded basin
     assert ax.get_xlabel() == loop.state.labels[0]
@@ -267,3 +282,15 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
+
+
+def test_a_verification_reports_every_trial_and_no_counterexample_when_it_holds():
+    from minilink.analysis import VerificationReport
+
+    report = region_of_attraction(StableLinear()).verify(n=20)
+
+    # One verdict and one final distance per trial; a counterexample only on failure
+    assert isinstance(report, VerificationReport)
+    assert report.converged.shape == (20,) and report.final_distance.shape == (20,)
+    assert report.holds and bool(np.all(report.converged))
+    assert report.counterexample is None

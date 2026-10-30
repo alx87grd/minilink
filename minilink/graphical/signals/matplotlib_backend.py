@@ -7,6 +7,7 @@ from minilink.graphical.signals.time_signals import (
     PlotResult,
     SignalPlotSpec,
     coerce_signal_plot_spec,
+    require_same_trace_count,
 )
 
 ###############################################################################
@@ -171,11 +172,3 @@ def ylabel_with_unit(label: str, unit: str) -> str:
     if unit.startswith("[") and unit.endswith("]"):
         return f"{label}\n{unit}"
     return f"{label}\n[{unit}]"
-
-
-def require_same_trace_count(spec, lines):
-    """Refuse an update whose spec has another number of traces than the plot."""
-    if len(spec.traces) != len(lines):
-        raise ValueError(
-            "Live plot update changed the number of traces; open a new plot."
-        )

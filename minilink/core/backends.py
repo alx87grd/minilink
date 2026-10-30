@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import importlib.util
 import os
 import types
 
@@ -105,6 +106,9 @@ def array_module(*values) -> types.ModuleType:
         if type(value).__module__.startswith("jax"):
             import jax.numpy as jnp
 
+            # The core records are pytrees from the first JAX array on, traced or not
+            register_jax_pytrees()
+
             return jnp
 
     return np
@@ -116,7 +120,6 @@ def array_module(*values) -> types.ModuleType:
 @functools.lru_cache(maxsize=1)
 def jax_installed() -> bool:
     """Return True when the ``jax`` package is importable (without importing it)."""
-    import importlib.util
 
     return importlib.util.find_spec("jax") is not None
 
@@ -176,6 +179,8 @@ def ensure_jax_x64() -> types.ModuleType:
     if jax_x64_policy():
         jax.config.update("jax_enable_x64", True)
 
+    register_jax_pytrees()
+
     return jax
 
 
@@ -206,3 +211,15 @@ def numpy_generator(key) -> np.random.Generator:
         return key
 
     return np.random.default_rng(key)
+
+
+@functools.lru_cache(maxsize=1)
+def register_jax_pytrees() -> None:
+    """Register the core records (:class:`~minilink.core.trajectory.Trajectory`) as JAX pytrees, once."""
+    # JAX imported here, not through require_jax: this runs inside its first call
+    import jax
+
+    # A real cycle: the trajectory module imports this one
+    from minilink.core.trajectory import register_trajectory_pytree
+
+    register_trajectory_pytree(jax)

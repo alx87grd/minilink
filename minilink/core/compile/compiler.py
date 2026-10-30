@@ -1,108 +1,58 @@
-"""
-Diagram compiler: topology analysis and execution plan construction.
-
-This module provides the complete compilation pipeline:
-
-1. :func:`~minilink.core.wiring.evaluation_order_of` — Depth-first search over
-   the port dependencies (implemented in ``wiring.py``): the topological
-   execution order of the output ports, an algebraic loop refused. The
-   standalone check after manual wiring is
-   :func:`~minilink.core.wiring.check_algebraic_loops`.
-
-2. :func:`build_execution_plan` — Constructs an immutable
-   :class:`~minilink.core.compile.execution_plan.ExecutionPlan` from a diagram.
-   Calls :func:`~minilink.core.wiring.evaluation_order_of` internally.
-
-3. :func:`compile_diagram` — Top-level entry point that builds the plan and
-   wraps it in a backend evaluator.
-"""
+"""The compiler: a system turned into its evaluator, a diagram through its execution plan."""
 
 from __future__ import annotations
 
-import copy
 import time
 import warnings
-from typing import TYPE_CHECKING
 
 import numpy as np
 
+from minilink.core.assembly import flatten_diagram
 from minilink.core.backends import (
+    BACKEND_JAX,
     BACKEND_NUMPY,
+    jax_installed,
     normalize_backend,
     require_jax_numpy,
 )
-from minilink.core.compile.execution_plan import (
-    EXTERNAL_INPUT,
-    INTERNAL_SIGNAL,
-    NOMINAL,
-    ExecutionPlan,
-    PortOperation,
-    StateOperation,
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
+from minilink.core.compile.evaluators.discrete import (
+    SampledDiagramEvaluator,
+    StepDiagramEvaluator,
+    StepEvaluator,
 )
+from minilink.core.compile.evaluators.dynamic import DynamicEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
+from minilink.core.compile.plan import (
+    build_sampled_execution_plan,
+    execution_plan_from_order,
+    step_execution_plan_from_order,
+)
+from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+from minilink.core.discrete.sampled_system import NativeSampledSystem
+from minilink.core.discrete.step_diagram import StepDiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
-from minilink.core.wiring import evaluation_order_of, iter_subsystems
+from minilink.core.topology import evaluation_order_of
+from minilink.core.wiring import iter_subsystems
 
-if TYPE_CHECKING:
-    from minilink.core.diagram import DiagramSystem
+# How far the compile probe moves an input an output does not declare
+DEPENDENCY_PROBE = 0.5
 
 
+###############################################################################
 # Public API
-def validate_equation_shapes(system, label=None):
-    """Probe the textbook hooks once and check their declared shapes.
-
-    ``f`` (continuous leaves), ``step`` (discrete leaves), and the standard
-    output ports created by the constructor (``y`` -> ``h``, ``x`` -> state)
-    are evaluated at ``(x0, u_nominal, t=0)``; a wrong-length result raises
-    ``ValueError`` naming the block, the hook, and both shapes. Custom port
-    computes are not probed (they may be expensive or stateful).
-    """
-    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-    from minilink.core.system import DynamicSystem, StepSystem
-
-    if isinstance(system, (DiagramSystem, StepDiagramSystem)):
-        return
-    name = label or getattr(system, "name", type(system).__name__)
-    n = int(system.n)
-    x0 = np.asarray(system.x0, dtype=float).reshape(-1)
-    if x0.shape != (n,):
-        raise ValueError(
-            f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
-        )
-    u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
-
-    if isinstance(system, DynamicSystem) and n > 0:
-        _check_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")
-    elif isinstance(system, StepSystem):
-        _check_shape(system.step(x0, u0, 0), (n,), f"step() of '{name}'", f"for n={n}")
-
-    for port_id, port in system.outputs.items():
-        function = port.compute
-        if getattr(function, "__self__", None) is not system:
-            continue
-        hook = getattr(function, "__name__", "")
-        if hook not in ("h", "compute_state"):
-            continue
-        _check_shape(
-            function(x0, u0, 0.0),
-            (port.dim,),
-            f"{hook}() of '{name}'",
-            f"for output port '{port_id}'",
-        )
+###############################################################################
 
 
-def _check_shape(value, expected, what, context):
-    shape = np.shape(value)
-    if shape == expected or (shape == () and expected == (1,)):
-        return  # a bare scalar is fine for a one-dimensional equation
-    raise ValueError(f"{what} returned shape {shape}; expected {expected} {context}")
-
-
-def compile(system, backend=BACKEND_NUMPY, verbose=False):
+def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
     """Compile a system into a typed evaluator.
 
-    Returns :class:`StaticEvaluator` for static ``System`` leaves (``n=0``),
-    :class:`StepEvaluator` for :class:`StepSystem` leaves,
-    :class:`DynamicsEvaluator` for :class:`DynamicSystem` leaves and diagrams.
+    Returns a :class:`DynamicEvaluator` for a :class:`DynamicSystem`, a
+    :class:`DiagramEvaluator` for a diagram, a :class:`StepEvaluator` for a
+    :class:`StepSystem`, a :class:`StepDiagramEvaluator` for a step diagram and a
+    :class:`StaticEvaluator` for a static ``System`` (``n=0``).
 
     Parameters
     ----------
@@ -113,71 +63,43 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False):
     verbose : bool
         If ``True``, print timed compilation steps.
     """
-    from minilink.core.diagram import DiagramSystem, StepDiagramSystem
-    from minilink.core.system import DynamicSystem, StepSystem
 
     if isinstance(system, DiagramSystem):
-        return compile_diagram(system, backend=backend, verbose=verbose)
+        return compile_diagram(
+            system, backend=backend, verbose=verbose, flatten=flatten
+        )
+
+    if isinstance(system, SampledDiagramSystem):
+        return compile_sampled_diagram(system, backend=backend, verbose=verbose)
 
     if isinstance(system, StepDiagramSystem):
-        from minilink.core.compile.step_compiler import compile_step_diagram
-
-        return compile_step_diagram(system, backend=backend, verbose=verbose)
+        return compile_step_diagram(
+            system, backend=backend, verbose=verbose, flatten=flatten
+        )
 
     key = normalize_backend(backend)
     validate_equation_shapes(system)
+    if key != BACKEND_NUMPY:
+        require_jax_numpy()
 
+    # One evaluator class per system kind, on either backend
     if isinstance(system, StepSystem):
-        if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.numpy_evaluators import (
-                NumpyStepEvaluator,
-            )
-
-            return NumpyStepEvaluator(system)
-        require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxStepEvaluator
-
-        t_total = time.perf_counter()
-        evaluator = JaxStepEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-
-    if isinstance(system, DynamicSystem):
-        if key == BACKEND_NUMPY:
-            from minilink.core.compile.evaluators.numpy_evaluators import (
-                NumpyDynamicEvaluator,
-            )
-
-            return NumpyDynamicEvaluator(system)
-        require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxDynamicEvaluator
-
-        t_total = time.perf_counter()
-        evaluator = JaxDynamicEvaluator(system, verbose=verbose)
-        if verbose:
-            print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
-        return evaluator
-
-    if system.n > 0:
+        kind = StepEvaluator
+    elif isinstance(system, DynamicSystem):
+        kind = DynamicEvaluator
+    elif system.n > 0:
         raise TypeError(
             f"Cannot compile {type(system).__name__} with n={system.n}; "
             "subclass DynamicSystem and implement f(), or StepSystem for discrete evolution."
         )
-
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluators import (
-            NumpyStaticEvaluator,
-        )
-
-        return NumpyStaticEvaluator(system)
-    require_jax_numpy()
-    from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
+    else:
+        kind = StaticEvaluator
 
     t_total = time.perf_counter()
-    evaluator = JaxStaticEvaluator(system, verbose=verbose)
+    evaluator = kind(system, backend=key, verbose=verbose)
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
     return evaluator
 
 
@@ -188,7 +110,6 @@ def compile_auto(system, verbose=False):
     JAX cannot be imported, or the system is "not JAX-traceable"; any other
     error from the JAX compile surfaces.
     """
-    from minilink.core.backends import BACKEND_JAX, jax_installed
 
     if jax_installed():
         try:
@@ -205,7 +126,7 @@ def compile_diagram(
     diagram: DiagramSystem,
     backend: str = BACKEND_NUMPY,
     *,
-    bind_params: bool = False,
+    flatten: bool = False,
     verbose: bool = False,
 ):
     """Compile a DiagramSystem into a backend evaluator.
@@ -216,16 +137,15 @@ def compile_diagram(
         The wired diagram to compile.
     backend : str
         ``'numpy'`` or ``'jax'``.
-    bind_params : bool, optional
-        If ``True``, each plan operation stores a deep copy of that subsystem's
-        ``params`` and evaluators pass it into ``f`` / port ``compute``. If
-        ``False`` (default), ``None`` is passed and blocks use live ``self.params``.
+    flatten : bool
+        If ``True``, inline nested diagram blocks into one level (``parent__child``
+        ids) before building the execution plan. Default ``False``.
     verbose : bool
         If ``True``, print timed compilation steps.
 
     Returns
     -------
-    NumpyDiagramEvaluator or JaxDiagramEvaluator
+    DiagramEvaluator
         A stateless evaluator that can compute state derivatives and outputs.
 
     Examples
@@ -236,12 +156,13 @@ def compile_diagram(
 
     Notes
     -----
-    ``bind_params=True`` snapshots only each subsystem's ``params`` dict into the plan.
-    It does **not** make user ``f`` / port ``compute`` implementations pure if they still
-    read or mutate other instance state; see :class:`minilink.core.system.System`.
+    Each plan operation carries a deep copy of its subsystem's ``params``, taken
+    here, so ``params=None`` reads the parameters as compiled on both backends; an
+    edit after compile needs a recompile or an explicit ``params``. Only the
+    ``params`` dicts are copied: it does **not** make user ``f`` / port ``compute``
+    implementations pure if they still read or mutate other instance state; see
+    :class:`minilink.core.system.System`.
     """
-    from minilink.core.diagram import StepDiagramSystem
-    from minilink.core.system import StepSystem
 
     if isinstance(diagram, StepDiagramSystem):
         raise TypeError(
@@ -257,6 +178,18 @@ def compile_diagram(
             )
 
     t_total = time.perf_counter() if verbose else None
+
+    if flatten:
+        if verbose:
+            t0 = time.perf_counter()
+            n_before = len(diagram.subsystems)
+            print("[compile] Step 0: Flattening nested diagrams...", end="", flush=True)
+        diagram, _flatten_report = flatten_diagram(diagram)
+        if verbose:
+            print(
+                f"  ({n_before} → {len(diagram.subsystems)} blocks, "
+                f"{time.perf_counter() - t0:.3f}s)"
+            )
 
     # Step 1: Algebraic loop detection
     if verbose:
@@ -285,27 +218,17 @@ def compile_diagram(
             flush=True,
         )
 
-    plan = _build_execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+    plan = execution_plan_from_order(diagram, port_execution_order)
 
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
     # Create evaluator (steps 0, 3, 4 handled inside for JAX)
     key = normalize_backend(backend)
-    if key == BACKEND_NUMPY:
-        from minilink.core.compile.evaluators.numpy_evaluators import (
-            NumpyDiagramEvaluator,
-        )
-
-        evaluator = NumpyDiagramEvaluator(plan, diagram)
-    else:
-        # key == BACKEND_JAX (normalize_backend already validated)
+    if key != BACKEND_NUMPY:
         require_jax_numpy()
-        from minilink.core.compile.evaluators.jax_evaluators import JaxDiagramEvaluator
 
-        evaluator = JaxDiagramEvaluator(plan, diagram, verbose=verbose)
+    evaluator = DiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
 
     if verbose:
         print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
@@ -313,39 +236,227 @@ def compile_diagram(
     return evaluator
 
 
-def build_execution_plan(
-    diagram: DiagramSystem, *, bind_params: bool = False
-) -> ExecutionPlan:
-    """Build an immutable ExecutionPlan from a DiagramSystem.
+def compile_step_diagram(
+    diagram: StepDiagramSystem,
+    backend: str = BACKEND_NUMPY,
+    *,
+    flatten: bool = False,
+    verbose: bool = False,
+):
+    """Compile a :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem` into an evaluator.
 
-    This is the core compilation step.  It:
-
-    1. Orders the output ports, refusing an algebraic loop, via
-       :func:`~minilink.core.wiring.evaluation_order_of`.
-    2. Assigns each output port a slice in the flat signal buffer.
-    3. Builds the gather-source recipes for each port and state operation.
-    4. Returns a frozen :class:`ExecutionPlan`.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        Must have subsystems added and connections wired.
-    bind_params : bool, optional
-        When ``True``, set :attr:`~minilink.core.compile.execution_plan.PortOperation.bound_params`
-        / :attr:`~minilink.core.compile.execution_plan.StateOperation.bound_params` on each row
-        (deep copy of ``subsystem.params`` only; see :func:`compile_diagram` Notes).
-
-    Returns
-    -------
-    ExecutionPlan
+    The step twin of :func:`compile_diagram`: same arguments, a
+    :class:`~minilink.core.compile.evaluators.discrete.StepDiagramEvaluator` back.
     """
+    if not isinstance(diagram, StepDiagramSystem):
+        raise TypeError(
+            f"compile_step_diagram requires StepDiagramSystem, got {type(diagram).__name__}"
+        )
+
+    if flatten:
+        raise NotImplementedError(
+            "compile_step_diagram(flatten=True) is not supported yet; "
+            "use a flow DiagramSystem or flatten=False."
+        )
+
+    for sys_id, subsystem in diagram.subsystems.items():
+        if isinstance(subsystem, DynamicSystem):
+            raise TypeError(
+                f"DynamicSystem leaf '{sys_id}' cannot be compiled inside a step "
+                "diagram; use DiagramSystem for continuous subsystems."
+            )
+        validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
+
+    t_total = time.perf_counter() if verbose else None
+
+    if verbose:
+        t0 = time.perf_counter()
+        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+
     port_execution_order = evaluation_order_of(diagram)
-    return _build_execution_plan_from_order(
-        diagram, port_execution_order, bind_params=bind_params
-    )
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    if verbose:
+        t0 = time.perf_counter()
+        n_ports = len(port_execution_order)
+        n_states = sum(
+            1 for s in diagram.subsystems.values() if isinstance(s, StepSystem)
+        )
+        print(
+            f"[compile] Step 2: Building step execution plan "
+            f"({n_ports} ports, {n_states} step states)...",
+            end="",
+            flush=True,
+        )
+
+    plan = step_execution_plan_from_order(diagram, port_execution_order)
+
+    if verbose:
+        print(f"  ({time.perf_counter() - t0:.3f}s)")
+
+    key = normalize_backend(backend)
+    if key != BACKEND_NUMPY:
+        require_jax_numpy()
+
+    evaluator = StepDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
+
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
+    return evaluator
 
 
-# Private helpers
+def compile_sampled_diagram(
+    diagram, backend: str = BACKEND_NUMPY, *, verbose: bool = False
+):
+    """Compile a :class:`~minilink.core.discrete.sampled_diagram.SampledDiagramSystem` into its evaluator.
+
+    The plan inlines nested boxes into one flat schedule on the base clock:
+    each block's divisor, its held outputs and what it reads as time.
+    """
+
+    for path, subsystem in iter_subsystems(diagram):
+        validate_equation_shapes(
+            subsystem, label=f"{subsystem.name} ({'/'.join(path)})"
+        )
+
+    t_total = time.perf_counter()
+    plan = build_sampled_execution_plan(diagram)
+
+    key = normalize_backend(backend)
+    if key != BACKEND_NUMPY:
+        require_jax_numpy()
+    evaluator = SampledDiagramEvaluator(plan, diagram, backend=key, verbose=verbose)
+
+    if verbose:
+        print(f"[compile] Done.  ({time.perf_counter() - t_total:.3f}s total)")
+
+    return evaluator
+
+
+def validate_equation_shapes(system, label=None):
+    """Probe the textbook hooks once and check their declared shapes.
+
+    ``f`` (continuous leaves), ``step`` (discrete leaves), and the standard
+    output ports created by the constructor (``y`` -> ``h``, ``x`` -> state)
+    are evaluated at ``(x0, u_nominal, t=0)``; a wrong-length result raises
+    ``ValueError`` naming the block, the hook, and both shapes. Every output
+    port's function, the custom ones included, is probed for an input it
+    reads but does not declare (:func:`require_declared_inputs`): only a port
+    with an undeclared input is evaluated, once and once per such input (an
+    MPC's solve declares every input it reads, so it is never run here). A
+    native sampled law's update is not probed.
+    """
+
+    if isinstance(system, (DiagramSystem, StepDiagramSystem)):
+        return
+    name = label or getattr(system, "name", type(system).__name__)
+    n = int(system.n)
+    x0 = np.asarray(system.x0, dtype=float).reshape(-1)
+    if x0.shape != (n,):
+        raise ValueError(
+            f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
+        )
+    u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
+
+    if isinstance(system, DynamicSystem) and n > 0:
+        require_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")
+    elif isinstance(system, StepSystem) and not isinstance(system, NativeSampledSystem):
+        require_shape(system.step(x0, u0, 0), (n,), f"step() of '{name}'", f"for n={n}")
+
+    for port_id, port in system.outputs.items():
+        function = port.compute
+        own = getattr(function, "__self__", None) is system
+        hook = getattr(function, "__name__", "") if own else ""
+
+        # The standard hooks: their shape, then their dependencies
+        if hook in ("h", "compute_state"):
+            y0 = function(x0, u0, 0.0)
+            require_shape(
+                y0,
+                (port.dim,),
+                f"{hook}() of '{name}'",
+                f"for output port '{port_id}'",
+            )
+            if hook == "h":
+                require_declared_inputs(system, name, port_id, x0, u0, y0)
+            continue
+
+        # Any other port: its dependencies, evaluated only with an undeclared input
+        if not undeclared_inputs(system, port):
+            continue
+        try:
+            y0 = function(x0, u0, 0.0)
+        except Exception:
+            continue
+        require_declared_inputs(system, name, port_id, x0, u0, y0)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_shape(value, expected, what, context):
+    """Refuse a hook's result whose shape is not the declared one (a bare scalar passes for ``(1,)``)."""
+    shape = np.shape(value)
+    if shape == expected or (shape == () and expected == (1,)):
+        return
+    raise ValueError(f"{what} returned shape {shape}; expected {expected} {context}")
+
+
+def require_declared_inputs(system, name, port_id, x0, u0, y0):
+    """Refuse an output ``y = h(x, u, t)`` that moves with an input its dependencies do not declare.
+
+    The undeclared input is a hidden feedthrough: the diagram orders the blocks
+    without it, so the output would read the input's previous value or none.
+    Each undeclared input is moved by :data:`DEPENDENCY_PROBE` at ``(x0, u0, 0)``
+    and ``h`` evaluated once more; a hook that raises there is not judged.
+    """
+    port = system.outputs[port_id]
+    if port.dependencies == "all":
+        return
+    y0 = np.asarray(y0, dtype=float)
+
+    for input_id, rows in input_rows(system).items():
+        if input_id in port.dependencies:
+            continue
+        u_moved = u0.copy()
+        u_moved[rows] += DEPENDENCY_PROBE
+        try:
+            y_moved = np.asarray(port.compute(x0, u_moved, 0.0), dtype=float)
+        except Exception:
+            continue
+        if not np.allclose(y_moved, y0, rtol=1e-12, atol=1e-12, equal_nan=True):
+            raise ValueError(
+                f"output '{port_id}' of '{name}' moves with input '{input_id}', "
+                f"which its dependencies {tuple(port.dependencies)} do not declare; "
+                f"add '{input_id}' to them (y_dependencies= in the constructor, or "
+                'dependencies= in add_output_port), or declare "all"'
+            )
+
+
+def undeclared_inputs(system, port) -> list:
+    """The input ports ``port`` does not declare among its dependencies (none for ``"all"``)."""
+    if port.dependencies == "all":
+        return []
+
+    return [input_id for input_id in system.inputs if input_id not in port.dependencies]
+
+
+def input_rows(system):
+    """Each input port's rows in the stacked input vector ``u``, in port order."""
+    rows = {}
+    start = 0
+    for input_id, port in system.inputs.items():
+        rows[input_id] = slice(start, start + int(port.dim))
+        start += int(port.dim)
+
+    return rows
+
+
 def warn_shared_seeds(diagram):
     """Warn when two random blocks hold one seed: they would draw the same signal."""
     blocks_by_seed = {}
@@ -360,171 +471,3 @@ def warn_shared_seeds(diagram):
                 "signal; give each its own seed, or realize the diagram under one key",
                 stacklevel=2,
             )
-
-
-def _build_execution_plan_from_order(
-    diagram: DiagramSystem,
-    port_execution_order: list[tuple[str, str]],
-    *,
-    bind_params: bool = False,
-) -> ExecutionPlan:
-    """Build the execution plan given a pre-computed topological order.
-
-    This is the inner implementation of :func:`build_execution_plan`,
-    split out so that :func:`compile_diagram` can time each step
-    individually.
-    """
-    # 1. Map all output ports to slices in the flat signal buffer
-    output_slices: dict[tuple[str, str], slice] = {}
-    current_idx = 0
-    for sys_id, sys in diagram.subsystems.items():
-        for port_id, port in sys.outputs.items():
-            dim = port.dim
-            output_slices[(sys_id, port_id)] = slice(current_idx, current_idx + dim)
-            current_idx += dim
-    signal_dim = current_idx
-
-    # 2. Build PortOperation list (output ports, topological order)
-    port_ops: list[PortOperation] = []
-    for sys_id, port_id in port_execution_order:
-        sys = diagram.subsystems[sys_id]
-        port = sys.outputs[port_id]
-
-        gather_sources, u_dim = _build_gather_sources(
-            diagram, sys_id, output_slices, dependencies=port.dependencies
-        )
-
-        out_slice = output_slices[(sys_id, port_id)]
-        local_x_slice = _state_slice(diagram, sys_id)
-
-        bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-
-        port_ops.append(
-            PortOperation(
-                compute_func=port.compute,
-                local_x_slice=local_x_slice,
-                gather_sources=tuple(gather_sources),
-                out_slice=out_slice,
-                u_dim=u_dim,
-                bound_params=bound,
-                label=f"{sys_id}:{port_id}",
-                sys_id=sys_id,
-            )
-        )
-
-    # 3. Build StateOperation list (subsystems with state)
-    state_ops: list[StateOperation] = []
-    for sys_id, sys in diagram.subsystems.items():
-        if isinstance(sys, DynamicSystem):
-            gather_sources, u_dim = _build_gather_sources(
-                diagram, sys_id, output_slices, dependencies="all"
-            )
-            local_x_slice = _state_slice(diagram, sys_id)
-            bound = copy.deepcopy(getattr(sys, "params", {})) if bind_params else None
-            state_ops.append(
-                StateOperation(
-                    f_func=sys.f,
-                    local_x_slice=local_x_slice,
-                    gather_sources=tuple(gather_sources),
-                    u_dim=u_dim,
-                    bound_params=bound,
-                    label=sys_id,
-                    sys_id=sys_id,
-                )
-            )
-
-    external_output_slices: dict[str, slice] = {}
-    out_conns = diagram.connections.get("output", {})
-    for out_port_id in diagram.outputs:
-        src = out_conns.get(out_port_id)
-        if src is None:
-            continue
-        source_sys_id, source_port_id = src
-        key = (source_sys_id, source_port_id)
-        if key not in output_slices:
-            raise RuntimeError(
-                f"Diagram output {out_port_id!r} source {key} missing from output_slices"
-            )
-        external_output_slices[out_port_id] = output_slices[key]
-
-    return ExecutionPlan(
-        state_dim=diagram.n,
-        signal_dim=signal_dim,
-        port_ops=tuple(port_ops),
-        state_ops=tuple(state_ops),
-        output_slices=output_slices,
-        external_output_slices=external_output_slices,
-    )
-
-
-def _build_gather_sources(
-    diagram: DiagramSystem,
-    sys_id: str,
-    output_slices: dict[tuple[str, str], slice],
-    dependencies="all",
-) -> tuple[list[tuple[int, object, int]], int]:
-    """Build the gather-source recipe for a subsystem's input ports.
-
-    This is the **single implementation** of the signal-gathering logic that
-    was previously duplicated across the codebase.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-    sys_id : str
-        The subsystem whose inputs to gather.
-    output_slices : dict
-        Pre-computed ``(sys_id, port_id) → slice`` map.
-    dependencies : list or ``"all"``
-        Which input ports are required.  ``"all"`` means every input port.
-
-    Returns
-    -------
-    gather_sources : list[tuple[int, Any, int]]
-        List of ``(source_type, source_value, dim)`` entries.
-    u_dim : int
-        Total dimension of the assembled local input vector.
-    """
-    sys = diagram.subsystems[sys_id]
-    gather_sources: list[tuple[int, object, int]] = []
-    u_dim = 0
-
-    for in_port_id, in_port in sys.inputs.items():
-        # If this input port is not a dependency, use the nominal value
-        if dependencies != "all" and in_port_id not in dependencies:
-            source_type = NOMINAL
-            source_val = in_port.nominal_value
-        else:
-            source = diagram.connections[sys_id].get(in_port_id)
-            if source is None:
-                # Not connected → use nominal value
-                source_type = NOMINAL
-                source_val = in_port.nominal_value
-            else:
-                src_sys_id, src_port_id = source
-                if src_sys_id == "input":
-                    source_type = EXTERNAL_INPUT
-                    u_idx = 0
-                    for input_port_id, input_port in diagram.inputs.items():
-                        if input_port_id == src_port_id:
-                            source_val = slice(u_idx, u_idx + input_port.dim)
-                            break
-                        u_idx += input_port.dim
-                else:
-                    source_type = INTERNAL_SIGNAL
-                    source_val = output_slices[(src_sys_id, src_port_id)]
-
-        dim = in_port.dim
-        gather_sources.append((source_type, source_val, dim))
-        u_dim += dim
-
-    return gather_sources, u_dim
-
-
-def _state_slice(diagram: DiagramSystem, sys_id: str) -> slice:
-    """Return the global state-vector slice for a subsystem."""
-    sys = diagram.subsystems[sys_id]
-    if isinstance(sys, DynamicSystem):
-        start, end = diagram.state_index[sys_id]
-        return slice(start, end)
-    return slice(0, 0)

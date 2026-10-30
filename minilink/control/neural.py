@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import array_module
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.system import System
 
 ###############################################################################
@@ -12,7 +12,7 @@ from minilink.core.system import System
 ###############################################################################
 
 
-class NeuralPolicyController(System):
+class NeuralPolicy(System):
     """
     State feedback ``u = u_mid + u_half * clip(MLP(z(x)), -1, 1)``.
 
@@ -78,7 +78,7 @@ class NeuralPolicyController(System):
         normalize=True,
         squash="clip",
         seed=0,
-        name="Neural Policy Controller",
+        name=None,
         show_setpoint=False,
         setpoint_plant=None,
         setpoint_radius=0.04,
@@ -86,7 +86,8 @@ class NeuralPolicyController(System):
         task_target_radius=0.04,
     ):
         super().__init__()
-        self.name = name
+        if name is not None:
+            self.name = name
         self.sys = sys
 
         # Graphics: the set-point ball and the fixed task ball
@@ -311,9 +312,7 @@ def require_squash(squash):
 def require_finite_action_bounds(u_lb, u_ub):
     """Refuse an action port without finite bounds: the normalized action spans them."""
     if not (np.all(np.isfinite(u_lb)) and np.all(np.isfinite(u_ub))):
-        raise ValueError(
-            "NeuralPolicyController needs finite bounds on the plant's action port"
-        )
+        raise ValueError("NeuralPolicy needs finite bounds on the plant's action port")
 
 
 def setpoint_plant_of(ctl):

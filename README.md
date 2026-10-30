@@ -51,13 +51,23 @@ optimization, model predictive control and reinforcement learning. NumPy, SciPy 
 Matplotlib are enough for a course; the same equations compile and differentiate
 under JAX for research.
 
+## Minilink on one page
+
+Everything starts from one definition, a `System`: `ẋ = f(x, u, t; p)`, `y = h(x, u, t; p)`.
+A diagram of systems is a `System` too, and so is every controller a tool returns. Each tool
+is a lane from the system, or from a `PlanningProblem` built on it, to what it gives back;
+the map is read in
+[docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).
+
+![Minilink on one page: where a System comes from, the System, the PlanningProblem and the optimizer, seven tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+
 ## Write a model
 
 A model is dynamics `f`, outputs `h` and body poses `tf`, functions of the state
 `x`, the input `u`, the time `t` and the parameters `params`:
 
     dx/dt = f(x, u, t; params)      dynamics
-    y     = h(x, u, t; params)      one per output port, default y = x
+    y     = h(x, u, t; params)      outputs, default y = x
     T     = tf(x, u, t; params)     body poses, for animation
 
 Write `f`, and the model simulates and plots. Write `h` to choose what the sensor
@@ -120,9 +130,9 @@ The operator inserts the error junction, names the two sides `controller` and `p
 and the loop linearizes, animates and nests like any other model. The catalog has
 the plants a course needs, with their parameters and start as data (`Pendulum`,
 `CartPole`, `DoublePendulum`, `UR5Manipulator`, `KinematicBicycle`, `UdeSRacecar`,
-`Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `ImpedanceController`,
-`StateFeedbackController`, `ComputedTorqueController`, `SlidingModeController`,
-`ModelPredictiveController`, `NeuralPolicyController`):
+`Drone2D`, `Rocket`, `Boat2D`, …) and the control laws (`PID`, `Impedance`,
+`StateFeedback`, `ComputedTorque`, `SlidingMode`, `NeuralPolicy`, all importable from
+`minilink`; `ModelPredictiveController` from `minilink.control`):
 
 ```python
 from minilink import Pendulum
@@ -136,17 +146,17 @@ pendulum.animate()
 
 ## One toolbox, every System
 
-Every tool is a verb on a `System`, a leaf or a whole diagram alike. One pendulum, six
-tools:
-
-![one pendulum through six tools](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/tool_montage.png)
+Every tool is a verb on a `System`, a leaf or a whole diagram alike: simulate, analyze and
+design straight from the system; plan, learn and evaluate from a `PlanningProblem` built on
+it. Every controller a tool returns is a `System` again, and the same equations run on NumPy
+or trace under JAX.
 
 | | |
 | --- | --- |
 | Simulate, plot, animate, play | `compute_trajectory`, `plot_trajectory`, `plot_phase_plane`, `animate`, `game` |
 | Analyze | `linearize`, `bode`, `pzmap`, `margins`, `root_locus`, `step_response` |
-| Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `ImpedanceController` |
-| Plan and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController`, `ReinforcementLearningPlanner` |
+| Design | `lqr`, `place`, `kalman`, `lqg`, `PID`, `Impedance` |
+| Plan, evaluate, optimize and learn | `DynamicProgrammingPlanner`, `RRTPlanner`, `TrajectoryOptimizationPlanner`, `ModelPredictiveController` (`minilink.control`), `ReinforcementLearningPlanner`, `evaluate`, `compare`, `Optimizer` |
 
 ## One problem, every planner
 
@@ -157,34 +167,39 @@ reinforcement learning, and returns a `PlanningSolution` whose policy is a contr
 ```python
 from minilink import (
     BallSet, DynamicProgrammingPlanner, PlanningProblem, QuadraticCost,
-    RRTPlanner, TrajectoryOptimizationPlanner,
+    RRTPlanner, TrajectoryOptimizationPlanner, compare,
 )
 
 plant = Pendulum()
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
-    sys=plant, x_start=x_down, x_goal=x_up, Xf=BallSet(x_up, 0.2), tf=4.0,
+    sys=plant, x_start=x_down, Xf=BallSet(x_up, 0.2), tf=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
-    X=plant.state.box,
+    X=plant.state.box, U=plant.input_box,
 )
 
 vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
 
-policy = vi.solve().policy            # value iteration: the policy is a controller
-tree_traj = rrt.solve().trajectory    # kinodynamic tree search, bang-bang inputs
-plan = opt.solve().trajectory         # direct collocation
+vi_sol = vi.solve()                   # value iteration: the policy is a controller
+rrt_sol = rrt.solve()                 # kinodynamic tree search, bang-bang inputs
+opt_sol = opt.solve()                 # direct collocation
 
-loop = policy @ plant                 # the script closes the loop
+loop = vi_sol.policy @ plant          # the script closes the loop
+print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 ```
 
 ## Fast and differentiable with JAX, optional
 
 The same `f` traces under JAX. One compiled evaluator gives exact derivatives,
-batched rollouts and gradients through a whole simulation:
+batched rollouts, and gradients of a closed-loop cost with respect to any gain or
+physical parameter:
 
 ```python
+import jax
+from minilink import Optimizer
+
 ev = plant.compile(backend="jax")
 x0s = np.tile([1.0, 0.0], (1000, 1))              # 1000 rollouts released at 1 rad
 lengths = np.linspace(0.5, 2.0, 1000)             # one rod length per rollout
@@ -193,6 +208,12 @@ A = plant.jacobian("f", "x", x_up)                # exact linearization
 S = plant.jacobian("f", "params", x_up)           # sensitivity to each physical parameter
 xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005,
                       params=dict(plant.params, l=lengths))   # a family of rod lengths, one call
+
+tuning = PlanningProblem(plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), tf=4.0)
+pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
+dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)  # gradient w.r.t. every gain and plant param
+program = pe.program(wrt=["controller.Kp", "controller.Ki", "controller.Kd"])
+result = Optimizer(program, method="auto").solve()            # L-BFGS on the closed-loop cost
 ```
 
 1000 rollouts of 1000 RK4 steps take 27 ms as a compiled batch, against about
@@ -233,7 +254,7 @@ sympy and gymnasium. Two optional tools need a system install pip cannot do:
 - [JAX showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb), write `f` once, get every gradient
 - [From RL to Bode showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb), six-axis robot, impedance loop, neural policy, frequency response and Lyapunov certificates
 - [Tutorial series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial), one notebook per package (core dynamics to reinforcement learning)
-- [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO, robot equations of motion
+- [Teaching notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching), swing-up, DP, PPO
 - [Examples index](https://github.com/alx87grd/minilink/blob/main/examples/README.md), demos and projects by chapter
 - [API reference](https://alx87grd.github.io/minilink/)
 - Contributors: [tests/README.md](https://github.com/alx87grd/minilink/blob/main/tests/README.md) and the contracts under [docs/dev](https://github.com/alx87grd/minilink/tree/main/docs/dev)

@@ -20,12 +20,12 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import inverse_barrier
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, point_probe
+from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.plotting import plot_cost_field
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import inverse_barrier
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -78,7 +78,7 @@ tracking_cost = QuadraticCost.from_system(
     ubar=ubar,
 )
 scene = Scene(obstacles=[Sphere(OBSTACLE_CENTER, keepout_radius)])
-obstacle_cost = scene.clearance_field(bind(sys, point_probe())).as_cost(
+obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),
 )
@@ -89,7 +89,7 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     verbose=True,
     optimizer_options={
         "maxiter": 500,

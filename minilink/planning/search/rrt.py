@@ -7,9 +7,9 @@ from typing import Callable
 
 import numpy as np
 
-from minilink.core.sets import BallSet, SingletonSet, is_finite_box
+from minilink.core.sets import SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender
@@ -35,7 +35,7 @@ class RRTPlanner(Planner):
 
     The planner owns the loop (sample, nearest, propose, select, add, goal
     test, extract) and reads every concern from the problem: collision from
-    ``problem.X``, the goal region from ``problem.Xf`` / ``x_goal``, sampling
+    ``problem.X``, the goal region from ``problem.Xf`` (a region: a ball written as one, ``Xf=BallSet(goal, tol)``), sampling
     from ``problem.X`` (by rejection when needed), dynamics from
     ``problem.sys``. Only the ``extender`` (how two states connect) and the
     ``metric`` (the nearest-neighbour distance) are swappable.
@@ -43,7 +43,7 @@ class RRTPlanner(Planner):
     Parameters
     ----------
     problem : PlanningProblem
-        Supplies dynamics, free space (``X``), goal (``Xf``/``x_goal``), and bounds.
+        Supplies dynamics, free space (``X``), the goal region (``Xf``), and bounds.
     extender : TrajectoryExtender
         Proposes candidate edges; the orchestrator selects the best collision-free one.
     metric : callable
@@ -54,7 +54,7 @@ class RRTPlanner(Planner):
     Notes
     -----
     Flat keyword arguments overlay :class:`RRTOptions`: ``max_nodes``,
-    ``goal_bias``, ``goal_tolerance``, ``seed``, ``edge_resolution``,
+    ``goal_bias``, ``seed``, ``edge_resolution``,
     ``max_sample_attempts``, ``return_best_effort``, ``callback``,
     ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
     ``live_plot_after_goal_only``, ``live_plot_ax``, ``nearest_backend``.
@@ -78,7 +78,6 @@ class RRTPlanner(Planner):
         options: RRTOptions | None = None,
         max_nodes=_UNSET,
         goal_bias=_UNSET,
-        goal_tolerance=_UNSET,
         seed=_UNSET,
         edge_resolution=_UNSET,
         max_sample_attempts=_UNSET,
@@ -105,7 +104,6 @@ class RRTPlanner(Planner):
             options,
             max_nodes=max_nodes,
             goal_bias=goal_bias,
-            goal_tolerance=goal_tolerance,
             seed=seed,
             edge_resolution=edge_resolution,
             max_sample_attempts=max_sample_attempts,
@@ -252,13 +250,15 @@ class RRTPlanner(Planner):
             )
 
     def goal_region(self):
-        """The goal region: ``problem.Xf``, or a ball of ``goal_tolerance`` about ``x_goal``."""
+        """The goal region: ``problem.Xf``, refused unless a region."""
         Xf = self.problem.Xf
-        if Xf is not None and not isinstance(Xf, SingletonSet):
-            return Xf
-        if self.problem.x_goal is None:
-            raise ValueError("RRT requires a goal: set x_goal or a region Xf")
-        return BallSet(self.problem.x_goal, self.options.goal_tolerance)
+        if Xf is None or isinstance(Xf, SingletonSet):
+            raise ValueError(
+                "RRT reaches a goal region: give the problem Xf as a region, a ball "
+                "written as one (Xf=BallSet(goal, tolerance))"
+            )
+
+        return Xf
 
     def resolve_search_callback(self):
         """The solve's step callback: the option's, a live plot, or ``None``."""
@@ -279,25 +279,24 @@ class RRTPlanner(Planner):
         )
 
     def sample_state(self, rng):
-        """The goal with probability ``goal_bias``, otherwise a free state."""
-        x_goal = self.problem.x_goal
+        """The goal region's point with probability ``goal_bias``, otherwise a free state."""
+        x_goal = self.problem.goal_point()
         goal_bias = self.options.goal_bias
 
-        if x_goal is not None and rng.random() < goal_bias:
-            return np.asarray(x_goal, dtype=float)
+        if rng.random() < goal_bias:
+            return x_goal
 
         return self.sample_free_state(rng)
 
     def sample_free_state(self, rng):
         """A state of ``X``: drawn from ``X`` itself, or by rejection from the sampling box."""
         problem = self.problem
-        set_params = problem.params.sets
         X = problem.X
 
         # A set that samples itself, when its draw lands in it
         try:
-            sample = X.sample(rng, params=set_params)
-            if X.contains(sample, params=set_params):
+            sample = X.sample(rng)
+            if X.contains(sample):
                 return np.asarray(sample, dtype=float)
         except NotImplementedError:
             pass
@@ -305,7 +304,7 @@ class RRTPlanner(Planner):
         # Otherwise by rejection: at most max_sample_attempts draws from the box
         for _ in range(self.options.max_sample_attempts):
             candidate = self.sample_box.sample(rng)
-            if X.contains(candidate, params=set_params):
+            if X.contains(candidate):
                 return np.asarray(candidate, dtype=float)
 
         raise RuntimeError(
@@ -339,20 +338,15 @@ class RRTPlanner(Planner):
     def edge_is_free(self, edge) -> bool:
         """Every state of the edge in ``X`` and every input in ``U``."""
         problem = self.problem
-        set_params = problem.params.sets
 
         if problem.X is not None:
-            if not all(
-                problem.X.contains(state, params=set_params)
-                for state in self.edge_states(edge)
-            ):
+            if not all(problem.X.contains(state) for state in self.edge_states(edge)):
                 return False
 
         # Each input at the state it is applied from: u_k ∈ U(x_k)
         if problem.U is not None:
             if not all(
-                problem.U.contains(u, x, params=set_params)
-                for x, u in zip(edge.states[:-1], edge.inputs)
+                problem.U.contains(u, x) for x, u in zip(edge.states[:-1], edge.inputs)
             ):
                 return False
 
@@ -421,8 +415,8 @@ class RRTPlanner(Planner):
         evaluation = None
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
-            evaluation = self.evaluate(
-                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+            evaluation = planner_evidence(
+                self, policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
 
         solution = PlanningSolution(
@@ -432,15 +426,8 @@ class RRTPlanner(Planner):
         return self.store_solution(solution)
 
     def goal_point(self, goal_region):
-        """The goal state the best effort aims at: ``x_goal``, or the region's center."""
-        if self.problem.x_goal is not None:
-            return np.asarray(self.problem.x_goal, dtype=float)
-        center = getattr(goal_region, "center", None)
-        if center is None:
-            raise ValueError(
-                "RRT goal has no representative point for best-effort fallback"
-            )
-        return np.asarray(center, dtype=float)
+        """The goal state the best effort aims at: the problem's goal point (``Xf``'s)."""
+        return self.problem.goal_point()
 
     def path_states(self, node: Node) -> np.ndarray:
         """The state samples of every edge from the root to ``node``, shape ``(k+1, n)``."""
@@ -468,7 +455,6 @@ class RRTOptions:
 
     max_nodes: int = 5000
     goal_bias: float = 0.1
-    goal_tolerance: float = 0.5
     seed: int | None = None
     edge_resolution: float | None = None
     max_sample_attempts: int = 100
@@ -486,7 +472,6 @@ class RRTOptions:
 _RRT_OPTION_KEYS = (
     "max_nodes",
     "goal_bias",
-    "goal_tolerance",
     "seed",
     "edge_resolution",
     "max_sample_attempts",

@@ -1,4 +1,4 @@
-"""Build every README figure: the showcase GIFs and their 3-D pages, the diagram PNG, the tool montage."""
+"""Build every README figure: the library map, the showcase GIFs and their 3-D pages, the diagram PNG, the tool montage."""
 
 from __future__ import annotations
 
@@ -14,9 +14,10 @@ STATIC = ROOT / "docs" / "_static"
 SHOWCASE = STATIC / "showcase"  # interactive 3-D pages, served by the docs site
 
 import numpy as np  # noqa: E402
-from asset_export import html_to_gif, montage_png, shrink_gif  # noqa: E402
+from asset_export import html_to_gif, montage_png, shrink_gif, svg_to_png  # noqa: E402
 
 from minilink import DynamicSystem  # noqa: E402
+from minilink.core.sets import SingletonSet  # noqa: E402
 
 
 def save_gif(
@@ -121,11 +122,11 @@ def tool_montage() -> None:
     problem = PlanningProblem(
         sys=plant,
         x_start=np.zeros(2),
-        x_goal=x_up,
         Xf=BallSet(x_up, 0.2),
         tf=4.0,
         cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
         X=plant.state.box,
+        U=plant.input_box,
     )
 
     # Each verb draws its own figure; the montage pastes the six side by side
@@ -182,7 +183,7 @@ def gif_cartpole() -> None:
         QuadraticCost,
         TrajectoryOptimizationPlanner,
     )
-    from minilink.graphical.animation.camera import fixed_camera
+    from minilink.graphical.catalog import camera_matrix
 
     plant = CartPole()
     plant.inputs["u"].lower_bound[0] = -10.0
@@ -192,21 +193,24 @@ def gif_cartpole() -> None:
         sys=plant,
         tf=4.0,
         x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=x_goal
         ),
+        U=plant.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
         n_steps=40,
         transcription="direct_collocation",
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
+        backend="jax",
+        method="scipy_slsqp",
         verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
-    camera = fixed_camera((-1.0, 0.75, 0.0), scale=3.6)  # the cart's run and the pole
+    camera = camera_matrix(
+        target=(-1.0, 0.75, 0.0), scale=3.6
+    )  # the cart's run and the pole
     save_gif(plant, traj, "cartpole_swingup.gif", time_factor_video=1.0, camera=camera)
 
 
@@ -264,19 +268,23 @@ def ur5_impedance() -> None:
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
     from minilink.catalog import UdeSRacecarDyn
-    from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
         ReferenceTrack,
         Scene,
         Sphere,
-        bind,
         car_outline,
         circuit_waypoints,
         from_waypoints,
+        mount,
         point_probe,
         quadratic_excess,
         quadratic_hinge,
+    )
+    from minilink.planning.trajectory_optimization.mpc import (
+        ModelPredictiveController,
+        mpc_animation_overlays,
+        plant_run,
     )
 
     # examples/demos/udes_racecar/mpc_racecar_dynamic.py: a lap past two cones,
@@ -309,9 +317,10 @@ def racecar_mpc() -> None:
     design.state.lower_bound[8] = -design.params["P_max"]
     design.state.upper_bound[8] = design.params["P_max"]
 
-    centre = bind(design, point_probe())
-    body = bind(
-        design, car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN)
+    centre = mount(point_probe(), on=design)
+    body = mount(
+        car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN),
+        on=design,
     )
     x_cruise = np.zeros(design.n)
     x_cruise[3] = V_TARGET
@@ -357,15 +366,20 @@ def racecar_mpc() -> None:
 
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
-            sys=design, x_start=x0, cost=cost, tf=MPC_HORIZON, X=design.state.box
+            sys=design,
+            x_start=x0,
+            cost=cost,
+            tf=MPC_HORIZON,
+            X=design.state.box,
+            U=design.input_box,
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
+        backend="jax",
+        method="scipy_slsqp",
         optimizer_options={"maxiter": 60, "ftol": 1.0},
     )
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
+    mpc = ModelPredictiveController(planner, delay=True)
 
     car = UdeSRacecarDyn(named_ports=False)
     car.params["mu"] = PLANT_MU
@@ -373,18 +387,17 @@ def racecar_mpc() -> None:
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d
 
-    lap = mpc @ car
-    result = lap.compute_trajectory(
-        tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
-    )
+    lap = (mpc % MPC_DT) @ car
+    result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
     # one sample per video frame: the trail's pages stay small
-    traj = result.plant.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
+    frames = result.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
+    traj = plant_run(frames, lap)
     overlays = mpc_animation_overlays(
-        result, planner, scene=scene, track=track, traj=traj
+        result, mpc, loop=lap, scene=scene, track=track, traj=traj
     )
     save_meshcat(
         lap,
-        traj,
+        frames,
         "racecar_mpc.html",
         "racecar_mpc.gif",
         time_factor_video=PLAYBACK,
@@ -396,11 +409,11 @@ def gif_rocket() -> None:
     from minilink import (
         CostFunction,
         Gaussian,
+        PlanningProblem,
         ReinforcementLearningPlanner,
         Rocket,
-        StochasticPlanningProblem,
     )
-    from minilink.graphical.animation.camera import fixed_camera
+    from minilink.graphical.catalog import camera_matrix
 
     # examples/demos/rl/rocket_landing_rl.py: PPO learns to land from 20 m.
     TRAINING_TIMESTEPS = 4_000_000
@@ -430,15 +443,17 @@ def gif_rocket() -> None:
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=LandingCost(),
         tf=TF,
-        x0_distribution=Gaussian(
+        x_start=Gaussian(
             [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
         ),
-        infeasible_cost=100.0,
+        penalize_failure=True,
+        failure_cost=100.0,
         X=plant.state.box,
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         problem,
@@ -459,12 +474,25 @@ def gif_rocket() -> None:
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
     cl_sys = planner.get_controller() @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
-    camera = fixed_camera((3.0, 7.0, 0.0), scale=8.0)  # the whole descent, still
+    camera = camera_matrix(
+        target=(3.0, 7.0, 0.0), scale=8.0
+    )  # the whole descent, still
     save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
+
+
+def pipeline_map() -> None:
+    """The library on one page: its SVG from docs/pipeline_figures.py, and a PNG for PyPI."""
+    from pipeline_figures import library_map
+
+    svg = STATIC / "pipeline_map.svg"
+    svg.write_text(library_map())
+    svg_to_png(svg, STATIC / "pipeline_map.png")
+    print("pipeline_map.png")
 
 
 # name: (builder, the files it writes under docs/_static)
 ASSETS = {
+    "map": (pipeline_map, ["pipeline_map.png"]),
     "diagram": (diagram_png, ["diagram_closed_loop.png"]),
     "montage": (tool_montage, ["tool_montage.png"]),
     "cartpole": (gif_cartpole, ["cartpole_swingup.gif"]),

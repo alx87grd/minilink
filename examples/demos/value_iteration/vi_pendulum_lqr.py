@@ -27,7 +27,7 @@ plant.inputs["u"].lower_bound = np.array([-TORQUE])
 plant.inputs["u"].upper_bound = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(plant, xbar=UPRIGHT, Q=Q, R=R)
-problem = PlanningProblem(plant, x_start=X0, x_goal=UPRIGHT, cost=cost)
+problem = PlanningProblem(plant, x_start=X0, cost=cost, U=plant.input_box)
 
 # Two planners on one problem
 planner = DynamicProgrammingPlanner(

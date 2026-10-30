@@ -17,12 +17,11 @@ from minilink.graphical.animation.primitives import (
 ###############################################################################
 
 
-class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
+class LongitudinalSlipCar(DynamicSystem):
     """Longitudinal front-wheel-drive car with wheel slip as input."""
 
     def __init__(self):
         super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
-        self.name = "Front Wheel Drive Car With Slip Input"
 
         # Parameters
         self.params = {
@@ -148,9 +147,7 @@ class LongitudinalFrontWheelDriveCarWithWheelSlipInput(DynamicSystem):
         }
 
 
-class LongitudinalFrontWheelDriveCarWithTorqueInput(
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput
-):
+class LongitudinalTorqueCar(LongitudinalSlipCar):
     """Longitudinal front-wheel-drive car with wheel torque input."""
 
     def __init__(self):
@@ -162,7 +159,6 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
             expose_state=True,
             y_dependencies=(),
         )
-        self.name = "Front Wheel Drive Car With Torque Input"
 
         # Parameters: the slip-input car's, plus the driven wheel's radius and inertia
         self.params = {
@@ -258,7 +254,7 @@ class LongitudinalFrontWheelDriveCarWithTorqueInput(
 
 
 if __name__ == "__main__":
-    sys = LongitudinalFrontWheelDriveCarWithWheelSlipInput()
+    sys = LongitudinalSlipCar()
     sys.x0 = np.array([0.0, 20.0])
     sys.inputs["u"].nominal_value = np.array([-0.1])
     sys.compute_trajectory(tf=10.0)

@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.analysis.frequency import transfer_function
 from minilink.analysis.linearization import output_selectors
-from minilink.core.feedback import free_inputs
+from minilink.core.roles import free_inputs
 
 ###############################################################################
 # Public API

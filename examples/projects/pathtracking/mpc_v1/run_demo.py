@@ -5,7 +5,7 @@ PathTracking is replaced by MPC on ``BicycleDynRate``; the cascade
 
 Run from repo root::
 
-    PYTHONPATH=. python examples/projects/bicycle_los_v3/run_demo.py
+    PYTHONPATH=. python examples/projects/pathtracking/mpc_v1/run_demo.py
 """
 
 import numpy as np
@@ -21,20 +21,18 @@ from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
 from minilink import BicycleDynRate
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-    mpc_default_computer_x0,
-)
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
-from minilink.core.hybrid_composition import hybrid_closed_loop
+from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline
+from minilink.planning.spatial.collision import car_outline, mount
 from minilink.planning.spatial.paths import from_waypoints
-from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.spatial.track import ReferenceTrack
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -70,7 +68,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )
@@ -92,18 +90,23 @@ cost = (
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
-        sys=sys_mpc, x_start=x_mpc0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+        sys=sys_mpc,
+        x_start=x_mpc0,
+        cost=cost,
+        tf=MPC_HORIZON,
+        X=sys_mpc.state.box,
+        U=sys_mpc.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner, delay=False)
 computer = dual_rate_computer_ahead(
-    mpc, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
+    mpc, planner, dt_mpc=MPC_DT, dt_broadcast=DT_BROADCAST, dt_project=DT_PROJECT
 )
 
 plant_to_mpc = PlantToMpcState()
@@ -140,43 +143,31 @@ plant.connect("allocation", "delta", "vehicle", "delta")
 
 plant.add_input_port("x_nom", dim=8, nominal_value=np.zeros(8))
 plant.connect("input", "x_nom", "nominal_refs", "x_nom")
-plant.connect_new_output_port("plant_to_mpc", "y_mpc", "y_mpc")
+plant.connect_new_output_port("plant_to_mpc", "y_mpc", "y")
 
 plant.camera_follow_frame = "vehicle:body"
 plant.camera_scale = 15.0
 
 vehicle.x0[0] = 0.0
 vehicle.x0[1] = -20.0
-vehicle.x0[2] = 0.0
+vehicle.x0[2] = 1e-4  # off the exact axis: the solve is singular at a heading of 0
 vehicle.x0[3] = U_TARGET
 vehicle.x0[4] = 0.0
 vehicle.x0[5] = 0.0
 vehicle.x0[6] = U_TARGET / r_r
 vehicle.x0[7] = 0.0
 
-x0_plant = np.concatenate([vehicle.x0, servos.x0])
-hybrid = hybrid_closed_loop(
-    computer.diagram,
-    plant,
-    schedule=computer.schedule,
-    computer=computer,
-    computer_out="x_nom",
-    plant_in="x_nom",
-    plant_out="y_mpc",
-    computer_in="y",
-)
+hybrid = computer @ plant
 
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0_plant,
-    x0_computer=mpc_default_computer_x0(planner),
-    plant_dt_inner=SIM_DT,
-    compile_backend="numpy",
-    verbose=True,
-)
+result = hybrid.compute_trajectory(tf=TF_SIM, verbose=True, dt=SIM_DT)
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, track=track),
+    overlays=mpc_animation_overlays(
+        result,
+        mpc,
+        loop=hybrid,
+        track=track,
+    ),
     renderer="matplotlib",
 )

@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.params import own_params
 
 ###############################################################################
 # Public API
@@ -20,8 +22,16 @@ class ReferencePath(ABC):
 
     Build one from waypoints with :func:`from_waypoints` (default
     ``kind="polyline"``) and pass it to
-    :class:`~minilink.planning.spatial.track.ReferenceTrack`.
+    :class:`~minilink.planning.spatial.track.ReferenceTrack`. ``params`` is
+    the path's own numbers: ``params=None`` reads them, a tree passed instead
+    moves the path.
     """
+
+    params = own_params()
+
+    def with_params(self, params):
+        """The path moved to ``params``: a copy holding them."""
+        return replace(self, **params)
 
     @property
     @abstractmethod
@@ -62,7 +72,7 @@ class PolylinePath(ReferencePath):
     Parameters
     ----------
     waypoints : array_like, shape (N, d)
-        Vertices with ``N >= 2``.
+        Vertices with ``N >= 2``; ``params`` is ``{"waypoints"}``.
     """
 
     waypoints: np.ndarray
@@ -73,25 +83,25 @@ class PolylinePath(ReferencePath):
         require_polyline(wp)
         object.__setattr__(self, "waypoints", wp)
 
-        # Arc length at each vertex: s₀ = 0, s_{i+1} = sᵢ + ℓᵢ, ℓᵢ = |w_{i+1} − wᵢ|
-        seg = np.linalg.norm(np.diff(wp, axis=0), axis=1)
-        s_knots = np.concatenate([[0.0], np.cumsum(seg)])
-        object.__setattr__(self, "_seg_lengths", seg)
-        object.__setattr__(self, "_s_knots", s_knots)
-        object.__setattr__(self, "_total_length", float(s_knots[-1]))
-
     @property
     def workspace_dim(self) -> int:
         return int(self.waypoints.shape[1])
 
     @property
     def total_length(self) -> float:
-        return self._total_length
+        _, s_knots = arc_lengths(self.waypoints, np)
+        return float(s_knots[-1])
+
+    @cached_property
+    def params(self) -> dict:
+        """``{"waypoints"}``, the path's vertices."""
+        return {"waypoints": self.waypoints}
 
     def distance(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        verts = xp.asarray(self.waypoints, dtype=float)
+        verts = xp.asarray(params["waypoints"], dtype=float)
 
         p = xp.asarray(p, dtype=float).reshape(-1)
         a = verts[:-1]
@@ -112,11 +122,11 @@ class PolylinePath(ReferencePath):
         return d
 
     def project(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        verts = xp.asarray(self.waypoints, dtype=float)
-        s_knots = xp.asarray(self._s_knots, dtype=float)
-        seg = xp.asarray(self._seg_lengths, dtype=float)
+        verts = xp.asarray(params["waypoints"], dtype=float)
+        seg, s_knots = arc_lengths(verts, xp)
 
         p = xp.asarray(p, dtype=float).reshape(-1)
         a = verts[:-1]
@@ -139,14 +149,13 @@ class PolylinePath(ReferencePath):
         return s, c
 
     def sample(self, s, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(s)
 
-        total_length = self._total_length
-        s_knots = xp.asarray(self._s_knots, dtype=float)
-        seg = xp.asarray(self._seg_lengths, dtype=float)
-        verts = xp.asarray(self.waypoints, dtype=float)
+        verts = xp.asarray(params["waypoints"], dtype=float)
+        seg, s_knots = arc_lengths(verts, xp)
 
-        s = xp.clip(xp.asarray(s, dtype=float), 0.0, total_length)
+        s = xp.clip(xp.asarray(s, dtype=float), 0.0, s_knots[-1])
         n_seg = verts.shape[0] - 1
 
         # The segment i with sᵢ ≤ s < s_{i+1}, and τ = (s − sᵢ) / max(ℓᵢ, 10⁻¹²)
@@ -159,14 +168,14 @@ class PolylinePath(ReferencePath):
         return w
 
     def tangent(self, s, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(s)
 
-        total_length = self._total_length
-        s_knots = xp.asarray(self._s_knots, dtype=float)
-        verts = xp.asarray(self.waypoints, dtype=float)
+        verts = xp.asarray(params["waypoints"], dtype=float)
+        _, s_knots = arc_lengths(verts, xp)
         dim = self.workspace_dim
 
-        s = xp.clip(xp.asarray(s, dtype=float), 0.0, total_length)
+        s = xp.clip(xp.asarray(s, dtype=float), 0.0, s_knots[-1])
         n_seg = verts.shape[0] - 1
 
         # The segment i with sᵢ ≤ s < s_{i+1}
@@ -256,6 +265,14 @@ def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def arc_lengths(verts, xp):
+    """``(ℓ, s)``: each segment's length ``ℓᵢ = |w_{i+1} − wᵢ|`` and the arc length at each vertex, ``s₀ = 0``, ``s_{i+1} = sᵢ + ℓᵢ``."""
+    seg = xp.linalg.norm(xp.diff(verts, axis=0), axis=1)
+    s_knots = xp.concatenate([xp.zeros(1), xp.cumsum(seg)])
+
+    return seg, s_knots
 
 
 def require_path_kind(kind):

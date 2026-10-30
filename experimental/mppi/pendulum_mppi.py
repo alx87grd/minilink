@@ -38,7 +38,9 @@ class SwingUpCost(CostFunction):
         return 0.0
 
 
-problem = PlanningProblem(plant, cost=SwingUpCost(), tf=N * DT, x_start=[0.0, 0.0])
+problem = PlanningProblem(
+    plant, cost=SwingUpCost(), tf=N * DT, x_start=[0.0, 0.0], U=plant.input_box
+)
 
 # The pieces the planner reads: the plant's held-input RK4 step, the cost, the input box
 ev = plant.compile(backend="jax")
@@ -64,9 +66,7 @@ def mppi_tick(U, x0, key):
     V = jnp.clip(U + eps, u_lower, u_upper)
 
     # Roll out: x^k_{t+1} = Phi(x^k_t, v^k_t) over dt, input held, from x0
-    X = jax.vmap(ev.rk4_integrate_zoh_trace, in_axes=(None, 0, None, None))(
-        x0, V, 0.0, DT
-    )
+    X = jax.vmap(lambda v: ev.rollout(x0, v, 0.0, DT))(V)
 
     # Score: the path cost plus lam (1 - alpha) sum_t u_t^T Sigma^-1 eps^k_t
     S = jax.vmap(path_cost)(X, V)
@@ -81,7 +81,7 @@ def mppi_tick(U, x0, key):
     U_new = U + jnp.einsum("k,ktm->tm", w, eps)
 
     # The planner's evidence: the nominal rollout of U_new, and the tick's diagnostics
-    x_plan = ev.rk4_integrate_zoh_trace(x0, U_new, 0.0, DT)
+    x_plan = ev.rollout(x0, U_new, 0.0, DT)
     effective_samples = 1.0 / jnp.sum(w**2)
     return U_new, x_plan, X, S, w, effective_samples
 
@@ -106,7 +106,7 @@ for k in range(n_ticks):
     ts.append(k * DT)
     xs.append(np.asarray(x))
     us.append(np.asarray(u))
-    x = ev.rk4_step(x, u, k * DT, DT)
+    x = ev.step(x, u, k * DT, dt=DT)
     U = jnp.concatenate([U[1:], U[-1:]])  # shift: (u_1, ..., u_{N-1}, u_{N-1})
 traj = Trajectory(np.array(ts), np.array(xs).T, np.array(us).T)
 

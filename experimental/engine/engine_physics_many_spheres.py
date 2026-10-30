@@ -62,7 +62,7 @@ sys.compute_trajectory(
     solver="rk4_fixedsteps",
     dt=0.001,
     verbose=True,
-    compile_backend="jax",
+    backend="jax",
 )
 sys.animate(renderer="meshcat")
 

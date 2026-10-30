@@ -5,10 +5,11 @@ from abc import ABC
 
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.costs import CostFunction
-from minilink.core.feedback import command_port
+from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
-from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+from minilink.planning.evaluation import Evaluation
+from minilink.planning.evaluator import evaluate, policy_of
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -22,7 +23,7 @@ class Planner(ABC):
     Base class for planners.
 
     Concrete planners live in family subpackages: ``trajectory_optimization/``,
-    ``search/`` (RRT family), ``policy_synthesis/`` (dynamic programming) and
+    ``search/`` (RRT family), ``dynamic_programming/`` (dynamic programming) and
     ``reinforcement_learning/``. Every ``solve`` returns a
     :class:`~minilink.planning.results.PlanningSolution` and stores it as
     :attr:`last_solution`; the :class:`~minilink.planning.problems.PlanningProblem`
@@ -46,6 +47,11 @@ class Planner(ABC):
     #: the others read its start set ``X0`` and its ``x_start``, and warn.
     accepts_stochastic = False
 
+    #: Planners whose feedback law runs on the grid of its ``dt`` (value
+    #: iteration, the learners) score it held over each period; a planner whose
+    #: law is continuous (the LQR) clears this and scores the continuous loop.
+    holds_policy = True
+
     def __init__(self, problem: PlanningProblem) -> None:
         # The declarative problem
         self.problem = problem
@@ -57,9 +63,10 @@ class Planner(ABC):
         if problem.is_stochastic and not self.accepts_stochastic:
             warnings.warn(
                 f"{type(self).__name__} is a deterministic planner: it reads the "
-                "start set X0 of this StochasticPlanningProblem (the support of "
-                "its start law) and its x_start, and ignores its distributions. "
-                "Pass problem.nominal() to plan from the mean start alone.",
+                "start set X0 of this stochastic problem (the support of its start "
+                "law) and its x_start, and plans on its parameters' means with its "
+                "random sources at their mean. Pass problem.nominal() to plan from "
+                "the mean start alone.",
                 stacklevel=2,
             )
 
@@ -168,33 +175,67 @@ class Planner(ABC):
 
         return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
-    def evaluate(
-        self, policy, *, dt, n_trials=50, tf=None, backend="numpy"
-    ) -> Evaluation | None:
-        """
-        The standalone evaluator on this planner's problem.
-
-        One trial when nothing is random; ``None`` when the problem declares no
-        cost (a search without one).
-        """
-        # A problem without a cost has nothing to score
-        if self.problem.cost is None:
-            return None
-
-        # One trial when nothing is random, n_trials draws otherwise
-        trials = int(n_trials) if self.problem.is_stochastic else 1
-        evaluator = MonteCarloEvaluator(
-            self.problem,
-            dt=dt,
-            n_trials=trials,
-            episode_length=tf,
-            backend=backend,
-            seed=0,
-        )
-
-        return evaluator.evaluate(policy)
-
     def store_solution(self, solution: PlanningSolution) -> PlanningSolution:
         """Keep ``solution`` as :attr:`last_solution`, and return it."""
         self.last_solution = solution
         return solution
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def planner_evidence(
+    planner, policy, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
+) -> Evaluation | None:
+    """
+    The evidence a planner's ``solve(evaluate=True)`` records: its law scored on the real plant.
+
+    The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on the
+    planner's problem (or ``problem``): one run when nothing is random,
+    ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
+    no cost (a search without one). A feedback law with no clock of its own
+    is held over each period of ``dt`` (``policy % dt``), the loop its planner
+    designs for, and the plant is integrated at the automatic step; an
+    open-loop source keeps the interpolation its planner states. The public
+    way to score a law is the problem's evaluator,
+    ``problem.compile(ctl % dt).evaluate()``, with ``substeps=`` for the
+    planner's own physics.
+    """
+    problem = planner.problem if problem is None else problem
+
+    # A problem without a cost has nothing to score
+    if problem.cost is None:
+        return None
+
+    # One run when nothing is random, n_trials draws otherwise
+    trials = int(n_trials) if problem.is_stochastic else None
+
+    # The law the run holds: a feedback law on the clock of dt, when the
+    # planner designs it on that grid
+    law = held_feedback(policy, dt) if planner.holds_policy else policy
+
+    return evaluate(
+        problem,
+        law,
+        dt=dt,
+        n_trials=trials,
+        key=0,
+        backend=backend,
+        episode_length=tf,
+    )
+
+
+def held_feedback(policy, dt):
+    """A feedback law with no clock of its own on the clock of ``dt`` (``policy % dt``); a source, a tick law or a clocked law as given."""
+    # Lazy import: the step system loads with the compile chain
+    from minilink.core.discrete.step_system import StepSystem
+
+    policy = policy_of(policy)
+    reads_input = int(policy.m) > 0
+    tick_or_clocked = isinstance(policy, StepSystem)
+    if reads_input and not tick_or_clocked:
+        return policy % float(dt)
+
+    return policy

@@ -16,13 +16,16 @@ from parking import (
 )
 
 from minilink import (
-    NeuralPolicyController,
+    NeuralPolicy,
     PlanningProblem,
     Trajectory,
     TrajectoryOptimizationPlanner,
 )
-from minilink.control.mpc import ModelPredictiveController
-from minilink.planning.evaluation import score_trajectory
+from minilink.planning import evaluate_trajectory
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    plant_run,
+)
 
 TF = 60.0  # [s]
 DT = 0.05  # [s] plant step
@@ -33,12 +36,17 @@ runs = {}
 for water, current in WATERS.items():
     boat = ParkingBoat(current)
     problem = PlanningProblem(
-        sys=boat, x_start=X_START, cost=parking_cost(boat), tf=TF, X=boat.state.box
+        sys=boat,
+        x_start=X_START,
+        cost=parking_cost(boat),
+        tf=TF,
+        X=boat.state.box,
+        U=boat.input_box,
     )
 
     # The two state-feedback laws: the cascade, and PPO's weights from parking_ppo.py
     cascade = CascadeParkingController(boat)
-    ppo = NeuralPolicyController(boat, features=dock_features, hidden=POLICY_HIDDEN)
+    ppo = NeuralPolicy(boat, features=dock_features, hidden=POLICY_HIDDEN)
     ppo.params["mlp"] = dict(np.load(POLICY_WEIGHTS))
     for name, ctl in (("Cascade", cascade), ("PPO", ppo)):
         loop = ctl @ boat
@@ -53,23 +61,23 @@ for water, current in WATERS.items():
             cost=parking_cost(boat, terminal=MPC_TERMINAL),
             tf=MPC_HORIZON,
             X=boat.state.box,
+            U=boat.input_box,
         ),
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
-        compile_backend="jax",
-        optimizer_method="scipy_slsqp",
+        backend="jax",
+        method="scipy_slsqp",
         optimizer_options={"maxiter": 40, "ftol": 1e-3},
     )
-    mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True)
-    result = (mpc @ boat).compute_trajectory(
-        tf=TF, x0_plant=X_START, plant_dt_inner=DT, compile_backend="jax"
-    )
-    runs["MPC", water] = result.plant
+    mpc = ModelPredictiveController(planner)
+    boat.x0 = X_START
+    loop = (mpc % MPC_DT) @ boat
+    runs["MPC", water] = plant_run(loop.compute_trajectory(tf=TF, dt=DT), loop)
 
     for name in ("Cascade", "MPC", "PPO"):
         runs[name, water] = (
             runs[name, water],
-            score_trajectory(problem, runs[name, water])[0],
+            float(evaluate_trajectory(problem, runs[name, water]).J[0]),
         )
 
 # --- the comparison: paths over the water, distance and heading to the dock, thrust ---

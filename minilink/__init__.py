@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 from minilink.catalog import __all__ as _CATALOG_NAMES
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The root package exports the teaching surface (ROADMAP §2): every name a student
 # meets, so a script or notebook needs one import line, e.g.
 #
-#     from minilink import Pendulum, ImpedanceController, lqr
+#     from minilink import Pendulum, Impedance, lqr
 #     from minilink import QuadraticCost, PlanningProblem, DynamicProgrammingPlanner
-#     from minilink import ReinforcementLearningPlanner, StochasticPlanningProblem
+#     from minilink import ReinforcementLearningPlanner, Uniform
 #
 # The band facades organise the same names by role (``minilink.catalog``,
-# ``minilink.blocks``, ``minilink.control``, ``minilink.analysis``,
-# ``minilink.simulation``, ``minilink.planning``, ``minilink.optimization``,
+# ``minilink.blocks``, ``minilink.dynamics``, ``minilink.control``,
+# ``minilink.estimation``, ``minilink.analysis``, ``minilink.simulation``,
+# ``minilink.planning``, ``minilink.learning``, ``minilink.optimization``,
 # ``minilink.core``); the defining modules stay importable. The surface is tested as a
 # set in ``tests/unittest/test_teaching_surface.py``; research-lane names never appear
 # here. Each exported name maps to its (module path, attribute); the catalog plants
@@ -23,7 +24,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Core
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
@@ -41,36 +42,32 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gain": ("minilink.blocks.routing", "Gain"),
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Demux": ("minilink.blocks.routing", "Demux"),
-    "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
-    "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
-    "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
-    "NotchFilter": ("minilink.blocks.filters", "NotchFilter"),
-    "Washout": ("minilink.blocks.filters", "Washout"),
     "MLP": ("minilink.blocks.neural", "MLP"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
-    "Lag": ("minilink.blocks.transfer_function", "Lag"),
     # Control
     "P": ("minilink.control.siso", "P"),
-    "StateFeedbackController": ("minilink.control.state", "StateFeedbackController"),
-    "OutputReferenceController": (
+    "StateFeedback": ("minilink.control.state", "StateFeedback"),
+    "OutputReference": (
         "minilink.control.state",
-        "OutputReferenceController",
+        "OutputReference",
     ),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
-    "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
+    "Impedance": ("minilink.control.impedance", "Impedance"),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
+    "TaskKinematic": ("minilink.control.robotic", "TaskKinematic"),
+    "TaskKinematicNullspace": ("minilink.control.robotic", "TaskKinematicNullspace"),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
-    "ComputedTorqueController": (
+    "ComputedTorque": (
         "minilink.control.modelbased",
-        "ComputedTorqueController",
+        "ComputedTorque",
     ),
-    "SlidingModeController": ("minilink.control.modelbased", "SlidingModeController"),
+    "SlidingMode": ("minilink.control.modelbased", "SlidingMode"),
     "lqr": ("minilink.control.design", "lqr"),
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
@@ -84,15 +81,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "kalman_gain": ("minilink.estimation.design", "kalman_gain"),
     "luenberger": ("minilink.estimation.design", "luenberger"),
     "luenberger_gain": ("minilink.estimation.design", "luenberger_gain"),
-    "TimeVaryingStateFeedbackController": (
+    "TimeVaryingFeedback": (
         "minilink.control.state",
-        "TimeVaryingStateFeedbackController",
+        "TimeVaryingFeedback",
     ),
-    "TrajectoryFeedbackController": (
+    "TrajectoryFeedback": (
         "minilink.control.state",
-        "TrajectoryFeedbackController",
+        "TrajectoryFeedback",
     ),
-    "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
+    "NeuralPolicy": ("minilink.control.neural", "NeuralPolicy"),
     # Analysis
     "jacobian": ("minilink.analysis.derivatives", "jacobian"),
     "linearize": ("minilink.analysis.linearization", "linearize"),
@@ -118,55 +115,51 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
-    "LQRPlanner": ("minilink.planning.policy_synthesis.lqr", "LQRPlanner"),
+    "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     "compare": ("minilink.planning.comparison", "compare"),
+    "evaluate": ("minilink.planning.evaluator", "evaluate"),
     "TrajectoryOptimizationPlanner": (
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
     ),
     "StateSpaceGrid": (
-        "minilink.planning.policy_synthesis.discretizer",
+        "minilink.planning.dynamic_programming.discretizer",
         "StateSpaceGrid",
     ),
     "DynamicProgrammingPlanner": (
-        "minilink.planning.policy_synthesis.dp",
+        "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingPlanner",
     ),
-    "LookupTableController": (
-        "minilink.planning.policy_synthesis.lookup_policy",
-        "LookupTableController",
+    "LookupPolicy": (
+        "minilink.planning.dynamic_programming.lookup_policy",
+        "LookupPolicy",
     ),
     "QuadraticFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "QuadraticFeatures",
     ),
     "RadialBasisFeatures": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "RadialBasisFeatures",
     ),
     "LinearApproximator": (
-        "minilink.planning.policy_synthesis.approximation",
+        "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
     "PolicyEvaluator": (
-        "minilink.planning.policy_synthesis.policy_eval",
+        "minilink.planning.dynamic_programming.policy_eval",
         "PolicyEvaluator",
-    ),
-    "StochasticPlanningProblem": (
-        "minilink.planning.problems",
-        "StochasticPlanningProblem",
     ),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "ReinforcementLearningPlanner": (
-        "minilink.planning.reinforcement_learning.planner",
+        "minilink.learning.reinforcement_learning.planner",
         "ReinforcementLearningPlanner",
     ),
     "TabularLearningPlanner": (
-        "minilink.planning.reinforcement_learning.tabular",
+        "minilink.learning.reinforcement_learning.tabular",
         "TabularLearningPlanner",
     ),
-    "MonteCarloEvaluator": ("minilink.planning.evaluation", "MonteCarloEvaluator"),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
@@ -182,15 +175,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     # Band names the teaching demos use
     "TimeCost": ("minilink.core.costs", "TimeCost"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     "BallSet": ("minilink.core.sets", "BallSet"),
-    "closed_loop": ("minilink.core.composition", "closed_loop"),
-    "feedback": ("minilink.core.composition", "feedback"),
-    "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
+    "SingletonSet": ("minilink.core.sets", "SingletonSet"),
+    "closed_loop": ("minilink.core.closed_loop", "closed_loop"),
+    "feedback": ("minilink.core.closed_loop", "feedback"),
     "Source": ("minilink.blocks.sources", "Source"),
-    "ImpedanceIntegralController": (
+    "IntegralImpedance": (
         "minilink.control.impedance",
-        "ImpedanceIntegralController",
+        "IntegralImpedance",
     ),
     "discretize": ("minilink.analysis.discretization", "discretize"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),

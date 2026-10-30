@@ -33,7 +33,7 @@ traj = sys.compute_trajectory(
     tf=1.0,
     dt=0.0001,
     solver="rk4_fixedsteps",
-    compile_backend="jax",
+    backend="jax",
 )
 
 # sys.plot_trajectory(signals=("x"))

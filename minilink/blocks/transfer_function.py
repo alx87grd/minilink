@@ -1,11 +1,11 @@
-"""Transfer-function blocks: a SISO ``TransferFunction`` in state space, and ``Lead`` / ``Lag``."""
+"""Transfer-function blocks: a SISO ``TransferFunction`` in state space, and the ``Lead`` compensator."""
 
 import numpy as np
 from scipy import signal
 
-from minilink.core.feedback import ErrorDriven
 from minilink.core.inspect import inspect_text
 from minilink.core.kinematics import translation
+from minilink.core.roles import ErrorDriven
 from minilink.dynamics.abstraction.state_space import LTISystem
 from minilink.graphical.animation.primitives import (
     Arrow,
@@ -34,7 +34,7 @@ class TransferFunction(ErrorDriven, LTISystem):
         denominator,
         *,
         ports=None,
-        name="Transfer Function",
+        name=None,
         expose_state=True,
     ):
         require_tf_ports(ports)
@@ -98,7 +98,7 @@ class TransferFunction(ErrorDriven, LTISystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        y = self.h(x, u, t)
+        y = self.h(x, u, t, params)
 
         # The body slides along the ground by the output
         output = float(np.asarray(y).reshape(-1)[0])
@@ -134,17 +134,7 @@ class Lead(TransferFunction):
         require_lead_corners(z, p)
 
         # C(s) = (K s + K z) / (s + p)
-        super().__init__([K, K * z], [1.0, p], ports=ports, name="Lead")
-
-
-class Lag(TransferFunction):
-    """Lag compensator ``C(s) = K (s + z) / (s + p)`` with ``p < z``: gain at low frequency."""
-
-    def __init__(self, K=1.0, z=1.0, p=0.1, *, ports="error"):
-        require_lag_corners(z, p)
-
-        # C(s) = (K s + K z) / (s + p)
-        super().__init__([K, K * z], [1.0, p], ports=ports, name="Lag")
+        super().__init__([K, K * z], [1.0, p], ports=ports)
 
 
 ###############################################################################
@@ -197,12 +187,6 @@ def require_lead_corners(z, p):
     """Refuse a lead compensator without ``0 < z < p``."""
     if not 0.0 < z < p:
         raise ValueError(f"a lead compensator has 0 < z < p, got z={z}, p={p}")
-
-
-def require_lag_corners(z, p):
-    """Refuse a lag compensator without ``0 < p < z``."""
-    if not 0.0 < p < z:
-        raise ValueError(f"a lag compensator has 0 < p < z, got z={z}, p={p}")
 
 
 if __name__ == "__main__":

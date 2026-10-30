@@ -3,9 +3,9 @@ name: CI
 
 on:
   push:
-    branches: [main, dev-alex, dev]
+    branches: [main, dev-alex, dev, dev-v0.3]
   pull_request:
-    branches: [main, dev-alex, dev]
+    branches: [main, dev-alex, dev, dev-v0.3]
 
 jobs:
   test:

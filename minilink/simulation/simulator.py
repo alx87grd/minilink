@@ -9,7 +9,8 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
+from minilink.core.inspect import inspect_text
+from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
@@ -22,7 +23,7 @@ from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
-from minilink.simulation.time_grid import AUTO_DT_SCALE, build_time_grid
+from minilink.simulation.time_grid import build_time_grid
 
 # User-facing solver labels: (solver backend key, options)
 _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
@@ -83,11 +84,7 @@ FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
 
-# Steps per sample period of a held signal on a smooth loop with no declared time
-# constant: the period is the resolution the user chose; ``dt`` buys a finer one
-HELD_SIGNAL_STEPS_PER_SAMPLE = 1
-
-# Pass ``compile_backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
+# Pass ``backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
 # Re-exported from :mod:`minilink.core.backends` so legacy callers
 # importing it from the simulator keep working.
 COMPILE_BACKEND_AUTO = BACKEND_AUTO
@@ -112,16 +109,16 @@ class Simulator:
     Parameters
     ----------
     sys : System
-        Model to simulate; compiled with ``compile_backend`` as below.
+        Model to simulate; compiled with ``backend`` as below.
     x0 : array_like, optional
         Initial state in :math:`\\mathbb{R}^n`. If ``None``, uses ``sys.x0``.
-    t0, tf : float
+    t_start, tf : float
         Start and end time.
     n_steps : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
         Step size when ``n_steps`` is not set. The grid ends at ``tf`` when
-        ``dt`` divides ``tf - t0``; otherwise its last sample is the first
+        ``dt`` divides ``tf - t_start``; otherwise its last sample is the first
         step past ``tf``.
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
@@ -130,7 +127,7 @@ class Simulator:
         (same pattern as ``"rk4_fixedsteps"``).
     verbose : bool
         Print setup information (default quiet).
-    compile_backend : str
+    backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
         Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
         (the string ``auto``) to try JAX if importable, then fall back to NumPy.
@@ -143,13 +140,13 @@ class Simulator:
         self,
         sys,
         x0=None,  # Initial state; sys.x0 when None
-        t0=0,
+        t_start=0,
         tf=10,
         n_steps=None,
         dt=None,
         solver=None,
         verbose=False,
-        compile_backend=BACKEND_NUMPY,
+        backend=BACKEND_NUMPY,
         solver_warnings="warn",
     ):
         require_dynamic_system(sys)
@@ -157,12 +154,11 @@ class Simulator:
         # The model and the options as given
         self.verbose = verbose
         self.sys = sys
-        self.sys.refresh()
         self.user_solver = solver
         self.user_specified_dt = dt is not None
         self.auto_time_grid = n_steps is None and dt is None
         self.solver_warnings = solver_warnings
-        self.t0 = float(t0)
+        self.t_start = float(t_start)
         self.tf = float(tf)
 
         # The latest run, filled by solve and solve_forced
@@ -173,10 +169,10 @@ class Simulator:
         # The initial state, checked
         self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
-        # Compile the system
-        self.compile_backend, self.evaluator = self.resolve_and_build_evaluator(
-            sys, compile_backend
-        )
+        # Compile the system; the parameters it runs on
+        # (None while they are the compiled ones)
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
+        self.params = self.evaluator.call_params()
 
         # Solver and time grid. With an automatic grid the solver is chosen
         # first and the grid is sized to it; with an explicit grid the solver
@@ -187,11 +183,11 @@ class Simulator:
         if self.auto_time_grid:
             self.solver_mode = self.select_solver(sys, solver)
             self.t, dt, n_steps = self.select_time_vector(
-                t0, tf, None, None, sys, solver_mode=self.solver_mode
+                t_start, tf, None, None, sys, solver_mode=self.solver_mode
             )
             self.n_pts = len(self.t)
         else:
-            self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
+            self.t, dt, n_steps = self.select_time_vector(t_start, tf, n_steps, dt, sys)
             self.n_pts = len(self.t)
             self.solver_mode = self.select_solver(sys, solver)
 
@@ -217,6 +213,9 @@ class Simulator:
         if self.verbose:
             print_setup_panel(self, setup_notes)
 
+    def __str__(self):
+        return inspect_text(self)
+
     def solve(self):
         """
         Run the simulation over ``self.t`` with the **nominal** input.
@@ -234,7 +233,11 @@ class Simulator:
             t_start = time.perf_counter()
 
         x_traj = self.solver_backend.integrate(
-            self.evaluator, self.t, self.x0, args=self.solver_backend_options
+            self.evaluator,
+            self.t,
+            self.x0,
+            args=self.solver_backend_options,
+            params=self.params,
         )
 
         if time_solve:
@@ -273,13 +276,26 @@ class Simulator:
         if time_solve:
             t_start = time.perf_counter()
 
-        x_traj = self.solver_backend.integrate_forced(
-            self.evaluator,
-            self.t,
-            u_traj,
-            self.x0,
-            args=self.solver_backend_options,
-        )
+        # A function of time read where the solver needs it (RK4: at its stage times);
+        # a sampled input held over each sample period
+        if callable(u) and self.solver_backend.reads_input_at_stages:
+            sys = self.sys
+
+            def u_of_t(t):
+                return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
+
+            x_traj = self.solver_backend.integrate_input(
+                self.evaluator, self.t, u_of_t, self.x0, params=self.params
+            )
+        else:
+            x_traj = self.solver_backend.integrate_forced(
+                self.evaluator,
+                self.t,
+                u_traj,
+                self.x0,
+                args=self.solver_backend_options,
+                params=self.params,
+            )
 
         if time_solve:
             self.last_solve_time_s = time.perf_counter() - t_start
@@ -289,41 +305,30 @@ class Simulator:
 
     # Solver and time-grid selection
 
-    def select_time_vector(self, t0, tf, n_steps, dt, sys, solver_mode=None):
+    def select_time_vector(self, t_start, tf, n_steps, dt, sys, solver_mode=None):
         """
-        Build time samples on [t0, tf] and return (time_vector, dt, len).
+        Build time samples on [t_start, tf] and return (time_vector, dt, len).
 
         Explicit ``n_steps`` or ``dt`` win (``n_steps`` if both are set, with a
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
-        the grid, so ``dt`` comes from the system's smallest time constant
-        scaled by :data:`~minilink.simulation.time_grid.AUTO_DT_SCALE`, rounded
-        down to a divisor of the sample period when a block holds a signal; adaptive solvers pick
+        the grid, so ``dt`` is :func:`~minilink.core.system.automatic_step_of`:
+        the system's smallest time constant scaled by
+        :data:`~minilink.core.system.AUTO_DT_SCALE`, rounded down to a divisor
+        of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
         # An adaptive solver picks its own steps: the DEFAULT_N_STEPS reporting grid
         default_dt = None
 
-        # A fixed-step solver steps on the grid: Δt = τ_min × AUTO_DT_SCALE
+        # A fixed-step solver steps on the grid: Δt = 0.1 τ_min, dividing the hold period
         if solver_mode in FIXED_STEP_SOLVERS:
-            discontinuous = sys.solver_info.get("discontinuous_behavior", False)
-            tau = sys.solver_info["smallest_time_constant"]
-            default_dt = tau * AUTO_DT_SCALE
-            period = sys.solver_info.get("sample_period")
-            if period is not None:
-                # A held signal steps on a divisor of its period, Δt = T_s / n, at or
-                # under the policy's step; on a smooth loop with no declared time
-                # constant the period itself is the resolution:
-                # HELD_SIGNAL_STEPS_PER_SAMPLE steps per sample
-                undeclared = tau == DEFAULT_SMALLEST_TIME_CONSTANT and not discontinuous
-                if undeclared:
-                    n = HELD_SIGNAL_STEPS_PER_SAMPLE
-                else:
-                    n = int(np.ceil(period / default_dt))
-                default_dt = period / n
+            default_dt = automatic_step_of(sys.solver_info)
 
-        return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
+        return build_time_grid(
+            t_start, tf, n_steps=n_steps, dt=dt, default_dt=default_dt
+        )
 
     def select_solver(self, sys, user_solver=None):
         """
@@ -334,7 +339,7 @@ class Simulator:
         - If a block holds a signal over a sample period (``solver_info
           ["sample_period"]``, a noise source), return ``"rk4_fixedsteps"``:
           the automatic grid then steps at a divisor of that period.
-        - If the time grid was given explicitly, ``compile_backend`` is
+        - If the time grid was given explicitly, ``backend`` is
           ``"jax"``, the grid is uniform, and it has at least
           :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
           (fast JIT rollout). The automatic grid never triggers this rule.
@@ -348,7 +353,7 @@ class Simulator:
             return "rk4_fixedsteps"
         if (
             not self.auto_time_grid
-            and self.compile_backend == BACKEND_JAX
+            and self.backend == BACKEND_JAX
             and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
             and time_grid_is_uniform(self.t)
         ):
@@ -359,15 +364,15 @@ class Simulator:
     # Internal machinery
     ###########################################################################
 
-    def resolve_and_build_evaluator(self, sys, compile_backend):
-        """``(backend, evaluator)``: ``sys`` compiled with ``compile_backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
+    def resolve_and_build_evaluator(self, sys, backend):
+        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
         return resolve_auto_backend(
-            lambda backend: self.build_evaluator(sys, backend), compile_backend
+            lambda backend: self.build_evaluator(sys, backend), backend
         )
 
-    def build_evaluator(self, sys, compile_backend):
-        """Compile ``sys`` with ``compile_backend``; subclasses wrap it (timings, caches)."""
-        return sys.compile(backend=compile_backend)
+    def build_evaluator(self, sys, backend):
+        """``sys`` compiled with ``backend``."""
+        return sys.compile(backend=backend)
 
     def parse_solver(self, solver):
         """``(backend key, options)`` of a solver label."""
@@ -450,13 +455,13 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         n=sim.sys.n,
         m=sim.sys.m,
         x0=sim.x0,
-        t0=sim.t0,
+        t_start=sim.t_start,
         tf=sim.tf,
         n_pts=sim.n_pts,
         dt=sim.dt,
         solver_mode=sim.solver_mode,
         user_solver=sim.user_solver,
-        compile_backend=sim.compile_backend,
+        backend=sim.backend,
         auto_time_grid=sim.auto_time_grid,
         solver_options=sim.solver_backend_options or None,
         notes=notes or None,

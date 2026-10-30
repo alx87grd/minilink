@@ -5,10 +5,10 @@ import numpy as np
 from minilink import (
     CostFunction,
     Gaussian,
-    MonteCarloEvaluator,
+    PlanningProblem,
     ReinforcementLearningPlanner,
     Rocket,
-    StochasticPlanningProblem,
+    evaluate,
 )
 
 TRAINING_TIMESTEPS = 4_000_000  # about 80 s on a laptop CPU
@@ -47,15 +47,15 @@ class LandingCost(CostFunction):
 
 # The problem: starts around 20 m altitude; touching the ground (y < 0)
 # terminates the episode and costs 100, more than a gentle landing does.
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=LandingCost(),
     tf=TF,
-    x0_distribution=Gaussian(
-        [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
-    ),
-    infeasible_cost=100.0,
+    x_start=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
+    penalize_failure=True,
+    failure_cost=100.0,
     X=plant.state.box,
+    U=plant.input_box,
 )
 
 # Policy features: the error to the landed state, metres scaled by 0.25
@@ -81,7 +81,7 @@ planner.plot_learning_curve()
 ppo_ctl = planner.get_controller()
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
-report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
+report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 plant.x0 = np.array([10.0, 30.0, 0.0, 0.0, 0.0, 0.0])

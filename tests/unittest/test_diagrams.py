@@ -218,17 +218,8 @@ class TestDiagrams(unittest.TestCase):
         self.assertEqual(inputs["r"], ("controller", "r"))
         self.assertEqual(outputs["y_meas"], ("plant", "y"))
 
-    def test_mermaid_exporter_returns_deterministic_source(self):
-        source = export_diagram_topology(self._make_diagram(), backend="mermaid")
-        self.assertIn("flowchart LR", source)
-        self.assertIn('controller["P::controller"]', source)
-        self.assertIn('input -- "r -> r" --> controller', source)
-        self.assertIn('plant -- "y -> y_meas" --> output', source)
-
     def test_exporters_refuse_keywords_they_do_not_take(self):
         diagram = self._make_diagram()
-        with self.assertRaisesRegex(TypeError, "direction"):
-            export_diagram_topology(diagram, backend="mermaid", direction="TB")
         pytest.importorskip("graphviz")
         with self.assertRaisesRegex(TypeError, "rank_dir"):
             export_diagram_topology(diagram, backend="graphviz", rank_dir="TB")
@@ -242,7 +233,7 @@ class TestDiagrams(unittest.TestCase):
         diagram = self._make_diagram()
         for backend in (3, object()):
             with self.subTest(backend=backend):
-                with self.assertRaisesRegex(TypeError, "'graphviz', 'mermaid'"):
+                with self.assertRaisesRegex(TypeError, "'graphviz' or an exporter"):
                     export_diagram_topology(diagram, backend=backend)
 
         class NodeLister:
@@ -491,29 +482,11 @@ class TestNestedDiagramPlot(unittest.TestCase):
             get_diagram(diagram, expand=False).source,
         )
 
-    def test_mermaid_exporter_nests_subgraphs(self):
-        loop = _build_nested_speed_loop()
-        source = export_diagram_topology(loop, backend="mermaid")
-        self.assertIn('  subgraph controller["Controller::controller"]', source)
-        self.assertIn('    controller__pi["PI::pi"]', source)
-        self.assertIn('    subgraph controller__limiter["Limiter::limiter"]', source)
-        self.assertIn('      controller__limiter__sat["Saturation::sat"]', source)
-        self.assertEqual(source.count("  end"), 2)
-        self.assertIn('ref -- "y -> r" --> controller__pi', source)
-        self.assertIn('controller__limiter__sat -- "y -> u" --> plant', source)
-        collapsed = export_diagram_topology(loop, backend="mermaid", expand=False)
-        self.assertNotIn("subgraph", collapsed)
-        self.assertIn('controller["Controller::controller"]', collapsed)
-
 
 import numpy as np
 from minilink.core.system import System
-from minilink.core.wiring import (
-    WiredDiagramMixin,
-    check_algebraic_loops,
-    check_diagram_params,
-    evaluation_order_of,
-)
+from minilink.core.wiring import WiredDiagramMixin, check_diagram_params
+from minilink.core.topology import check_algebraic_loops, evaluation_order_of
 from minilink.graphical.diagrams import build_diagram_topology
 
 
@@ -791,17 +764,17 @@ class TestWiringMixin(unittest.TestCase):
 
 
 from minilink.blocks.routing import Gain
-from minilink.core.compile.evaluators.numpy_evaluators import (
-    NumpyDiagramEvaluator,
-    NumpyDynamicEvaluator,
-    NumpyStaticEvaluator,
+from minilink.core.compile.evaluators.diagram import DiagramEvaluator
+from minilink.core.compile.evaluators.dynamic import DynamicEvaluator
+from minilink.core.compile.evaluators.static import StaticEvaluator
+from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
+from minilink.core.facades.simulation import (
+    DynamicSimulation,
+    StepSimulation,
+    SystemSimulation,
 )
-from minilink.core.facades import (
-    DynamicSystemFacades,
-    SharedSystemFacades,
-    StepSystemFacades,
-)
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.system import DynamicSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.simulation.simulator import Simulator
 from minilink.simulation.static_simulator import StaticSimulator
 
@@ -827,9 +800,11 @@ def _unity_feedback_diagram():
 class TestFacadeMixinMRO(unittest.TestCase):
     def test_gain_shared_facades_only(self):
         gain = Gain(K=1.0, dim=1)
-        self.assertIsInstance(gain, SharedSystemFacades)
-        self.assertNotIsInstance(gain, DynamicSystemFacades)
-        self.assertNotIsInstance(gain, StepSystemFacades)
+        self.assertIsInstance(gain, SystemSimulation)
+        self.assertIsInstance(gain, SystemAnimation)
+        self.assertNotIsInstance(gain, DynamicSimulation)
+        self.assertNotIsInstance(gain, DynamicAnimation)
+        self.assertNotIsInstance(gain, StepSimulation)
         self.assertTrue(hasattr(gain, "compute_trajectory"))
         self.assertTrue(hasattr(gain, "animate"))
         self.assertFalse(hasattr(type(gain), "plot_phase_plane"))
@@ -838,53 +813,53 @@ class TestFacadeMixinMRO(unittest.TestCase):
 
     def test_integrator_dynamic_facades(self):
         plant = Integrator()
-        self.assertIsInstance(plant, DynamicSystemFacades)
-        self.assertIsInstance(plant, SharedSystemFacades)
+        self.assertIsInstance(plant, DynamicSimulation)
+        self.assertIsInstance(plant, SystemSimulation)
         self.assertTrue(hasattr(plant, "plot_phase_plane"))
         self.assertTrue(hasattr(plant, "game"))
         self.assertFalse(hasattr(type(plant), "compute_rollout"))
 
     def test_step_system_rollout_facade(self):
         counter = _Counter()
-        self.assertIsInstance(counter, StepSystemFacades)
+        self.assertIsInstance(counter, StepSimulation)
         self.assertTrue(hasattr(counter, "compute_rollout"))
         self.assertFalse(hasattr(type(counter), "plot_phase_plane"))
 
     def test_diagram_is_dynamic_system(self):
         diagram = _unity_feedback_diagram()
         self.assertIsInstance(diagram, DynamicSystem)
-        self.assertIsInstance(diagram, DynamicSystemFacades)
+        self.assertIsInstance(diagram, DynamicSimulation)
 
 
 class TestSimBoundaries(unittest.TestCase):
     def test_static_leaf_rejects_simulator(self):
         gain = Gain(K=1.0, dim=1)
         with self.assertRaises(TypeError):
-            Simulator(gain, t0=0, tf=1, n_steps=3)
+            Simulator(gain, t_start=0, tf=1, n_steps=3)
 
     def test_static_simulator_accepts_gain(self):
         gain = Gain(K=1.0, dim=1)
-        sim = StaticSimulator(gain, t0=0, tf=1, n_steps=3)
+        sim = StaticSimulator(gain, t_start=0, tf=1, n_steps=3)
         self.assertIsInstance(sim, StaticSimulator)
 
     def test_static_simulator_rejects_diagram(self):
         diagram = _unity_feedback_diagram()
         with self.assertRaises(TypeError):
-            StaticSimulator(diagram, t0=0, tf=1, n_steps=3)
+            StaticSimulator(diagram, t_start=0, tf=1, n_steps=3)
 
 
 class TestCompileTypes(unittest.TestCase):
     def test_compile_gain_static_evaluator(self):
         gain = Gain(K=2.0, dim=1)
-        self.assertIsInstance(gain.compile(), NumpyStaticEvaluator)
+        self.assertIsInstance(gain.compile(), StaticEvaluator)
 
     def test_compile_integrator_dynamic_evaluator(self):
         plant = Integrator()
-        self.assertIsInstance(plant.compile(), NumpyDynamicEvaluator)
+        self.assertIsInstance(plant.compile(), DynamicEvaluator)
 
     def test_compile_diagram_diagram_evaluator(self):
         diagram = _unity_feedback_diagram()
-        self.assertIsInstance(diagram.compile(), NumpyDiagramEvaluator)
+        self.assertIsInstance(diagram.compile(), DiagramEvaluator)
 
 
 class TestSubsystemEvolutionKind(unittest.TestCase):
@@ -929,11 +904,11 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         import warnings
         from unittest import mock
 
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
         from minilink.graphical.diagrams import dot as dot_module
 
-        graph = (ImpedanceController() @ Pendulum()).get_diagram()
+        graph = (Impedance() @ Pendulum()).get_diagram()
         if graph is None:
             self.skipTest("graphviz Python package not installed")
 
@@ -953,10 +928,10 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         from unittest import mock
 
         graphviz = pytest.importorskip("graphviz")
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        loop = ImpedanceController() @ Pendulum()
+        loop = Impedance() @ Pendulum()
         missing_dot = RuntimeError("failed to execute PosixPath('dot')")
         with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
             with warnings.catch_warnings(record=True) as caught:
@@ -964,3 +939,44 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
                 graph = loop.plot_diagram(show=True, show_inline=True)
         self.assertIsNone(graph)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
+
+
+def test_a_block_id_holding_a_path_separator_is_refused():
+    diagram = DiagramSystem()
+    for sys_id in ("motor.v2", "g:1", "a/b"):
+        with pytest.raises(ValueError, match="block id"):
+            diagram.add_subsystem(Integrator(), sys_id)
+
+
+def test_record_keeps_a_diagrams_signals_equal_to_the_reconstruction():
+    from minilink import PID, Pendulum
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.4, 0.0])
+    loop = PID(Kp=8.0, Ki=1.0, Kd=2.0) @ plant
+    traj = loop.compute_trajectory(tf=1.0, record=("controller:u",), verbose=False)
+    full = loop.reconstruct_internal_signals(traj)
+    np.testing.assert_array_equal(
+        traj.get_signal("controller:u"), full.get_signal("controller:u")
+    )
+
+
+def test_a_selective_reconstruction_evaluates_only_what_the_port_reads():
+    from minilink import PID, Pendulum
+
+    plant = Pendulum()
+    loop = PID(Kp=8.0, Ki=1.0, Kd=2.0) @ plant
+    traj = loop.compute_trajectory(tf=0.2, verbose=False)
+    calls = []
+    port = loop.subsystems["controller"].outputs["u"]
+    original = port.compute
+
+    def counting(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    port.compute = counting
+    loop.reconstruct_internal_signals(traj, ports=["plant:y"])
+    assert calls == []  # the plant's output reads its state, not the controller
+    with pytest.raises(KeyError, match="no signal"):
+        loop.reconstruct_internal_signals(traj, ports=["controller:nope"])

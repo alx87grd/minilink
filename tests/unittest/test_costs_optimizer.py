@@ -1,3 +1,5 @@
+import copy
+
 import numpy as np
 import pytest
 from minilink.core.costs import (
@@ -74,10 +76,48 @@ def test_sum_cost_is_additive():
 
 
 def test_add_flattens_nested_sums():
-    c = make_quadratic()
-    s = c + c + c
+    a, b, c = make_quadratic(), make_quadratic(), make_quadratic()
+    s = a + b + c
     assert isinstance(s, SumCost)
     assert len(s.terms) == 3
+
+
+def test_a_sum_holding_one_cost_object_twice_is_refused():
+    q = make_quadratic()
+    for twice in (lambda: q + 10 * q, lambda: q + q, lambda: 2 * q + 3 * q):
+        with pytest.raises(ValueError, match="11 \\* q"):
+            twice()
+    with pytest.raises(ValueError, match="twice"):
+        SumCost.of(q, obstacle=q)
+    with pytest.raises(ValueError, match="twice"):
+        (q + make_quadratic()) + q
+
+    # One weighted term, or a copy, is the same cost
+    x = np.array([1.0, 2.0])
+    u = np.array([3.0])
+    assert (11 * q).g(x, u) == pytest.approx(11.0 * q.g(x, u))
+    assert (q + 10 * copy.deepcopy(q)).g(x, u) == pytest.approx(11.0 * q.g(x, u))
+
+
+def test_a_sums_keys_do_not_depend_on_the_bracketing():
+    a, b, c = make_quadratic(), make_quadratic(), make_quadratic()
+    assert list(((a + b) + c).terms) == list((a + (b + c)).terms)
+    assert list(SumCost.of(a, SumCost.of(b, obstacle=c)).terms) == [
+        "QuadraticCost",
+        "QuadraticCost2",
+        "obstacle",
+    ]
+
+
+def test_the_quadratic_bound_holds_for_an_indefinite_weight():
+    from minilink.core.costs import quadratic_max
+    from minilink.core.sets import BoxSet
+
+    box = BoxSet([-1.0, -1.0], [1.0, 1.0])
+    grid = np.stack(np.meshgrid(*[np.linspace(-1.0, 1.0, 41)] * 2), -1).reshape(-1, 2)
+    for W in (np.diag([1.0, -1.0]), np.array([[1.0, 2.0], [2.0, -1.0]])):
+        largest = np.max(np.einsum("ki,ij,kj->k", grid, W, grid))
+        assert quadratic_max(W, [0.0, 0.0], box) >= largest - 1e-12
 
 
 def test_sum_builtin_uses_radd_zero_seed():
@@ -96,43 +136,97 @@ def test_scaled_cost_weights():
     weighted = 2.5 * c
     assert isinstance(weighted, ScaledCost)
     assert weighted.g(x, u) == pytest.approx(2.5 * c.g(x, u))
-    combo = c + 2.0 * c
+    combo = c + 2.0 * make_quadratic()
     assert combo.g(x, u) == pytest.approx(3.0 * c.g(x, u))
 
 
-def test_scaled_and_summed_costs_keep_the_members_discount_rate():
-    class Discounted(QuadraticCost):
-        discount_rate = 0.5
+def total(cost, traj, discount_rate=0.0):
+    """J = ∫ e^{−ρt} g dt + h(x(t_N)) along ``traj``."""
+    _, running = cost.integrate(traj, discount_rate=discount_rate)
+    return float(running[-1]) + float(cost.h(traj.x[:, -1], traj.t[-1]))
 
-    d = Discounted(
+
+def test_scaled_and_summed_costs_take_the_discount_as_an_argument():
+    d = QuadraticCost(
         Q=np.eye(2), R=np.eye(1), S=np.zeros((2, 2)), xbar=np.zeros(2), ubar=np.zeros(1)
     )
-    assert (2.0 * d).discount_rate == 0.5
-    assert (d + d).discount_rate == 0.5
-    assert sum([d, 2.0 * d]).discount_rate == 0.5
-    assert (d + 2.0 * d).discount_factor(0.1) == pytest.approx(np.exp(-0.05))
     t = np.linspace(0.0, 2.0, 21)
     traj = Trajectory(t=t, x=np.ones((2, t.size)), u=np.ones((1, t.size)))
-    assert (2.0 * d).total_cost(traj) == pytest.approx(2.0 * d.total_cost(traj))
-    with pytest.raises(ValueError, match=r"0\.5"):
-        d + make_quadratic()
+    assert total(2.0 * d, traj) == pytest.approx(2.0 * total(d, traj))
+    pair = d + copy.deepcopy(d)
+    discounted = total(pair, traj, discount_rate=0.5)
+    assert discounted == pytest.approx(2.0 * total(d, traj, discount_rate=0.5))
+    assert discounted < total(pair, traj)
+    assert not hasattr(pair, "discount_rate")
 
 
-def test_params_forwarded_to_terms():
+def test_params_reach_each_term_by_its_id():
     s = make_quadratic() + _ParamCost()
     x = np.array([1.0, 2.0])
     u = np.array([3.0])
     base = make_quadratic().g(x, u)
-    assert s.g(x, u, params={"w": 5.0}) == pytest.approx(base + 5.0)
-    assert (3.0 * _ParamCost()).g(x, u, params={"w": 2.0}) == pytest.approx(6.0)
+    assert list(s.terms) == ["QuadraticCost", "_ParamCost"]
+    assert s.g(x, u, params={"_ParamCost": {"w": 5.0}}) == pytest.approx(base + 5.0)
+    scaled = 3.0 * _ParamCost()
+    assert scaled.g(x, u, params={"cost": {"w": 2.0}}) == pytest.approx(6.0)
+    with pytest.raises(ValueError, match="unknown cost term"):
+        s.g(x, u, params={"w": 5.0})  # a flat dictionary names no term
 
 
-def test_total_cost_on_trajectory():
+def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
+    q = make_quadratic()
+    other = make_quadratic()
+    obstacle = 5.0 * TimeCost(xbar=np.zeros(2))
+    cost = q + obstacle + other
+    x, u = np.array([1.0, 2.0]), np.array([1.0])
+
+    # Ids from the class names, verbatim, a repeat suffixed; a scaled term takes its cost's
+    assert list(cost.terms) == ["QuadraticCost", "TimeCost", "QuadraticCost2"]
+    assert cost.params["TimeCost"] == {
+        "weight": 5.0,
+        "cost": {"xbar": obstacle.cost.xbar, "eps": obstacle.cost.eps},
+    }
+
+    # A partial override changes its term only; the attributes are views
+    assert cost.g(x, u, params={"TimeCost": {"weight": 0.0}}) == pytest.approx(
+        q.g(x, u) + other.g(x, u)
+    )
+    q.R[0, 0] = 3.0
+    assert cost.g(x, u) == pytest.approx(q.g(x, u) + 5.0 + other.g(x, u))
+    cost.params = {"TimeCost": {"weight": 2.0}}
+    assert obstacle.weight == 2.0
+
+    # Named terms keep their names; sum() flattens like +
+    named = SumCost.of(tracking=q, effort=other)
+    assert list(named.terms) == ["tracking", "effort"]
+    assert list(sum([q, other, make_quadratic()]).terms) == [
+        "QuadraticCost",
+        "QuadraticCost2",
+        "QuadraticCost3",
+    ]
+
+
+@pytest.mark.jax
+def test_the_gradient_reaches_every_cost_weight():
+    import jax
+    import jax.numpy as jnp
+
+    cost = make_quadratic() + 5.0 * TimeCost(xbar=np.zeros(2))
+    x, u = jnp.array([1.0, 2.0]), jnp.array([1.0])
+    params = jax.tree_util.tree_map(jnp.asarray, cost.params)
+    grad = jax.grad(lambda p: cost.g(x, u, params=p))(params)
+
+    # ∂g/∂Q = (x − x̄)(x − x̄)ᵀ, ∂g/∂w = g₀ = 1 off the target
+    np.testing.assert_allclose(grad["QuadraticCost"]["Q"], np.outer(x, x))
+    assert float(grad["TimeCost"]["weight"]) == pytest.approx(1.0)
+
+
+def test_the_running_cost_of_a_sum_on_a_trajectory():
     c = make_quadratic()
-    s = c + c
+    s = c + copy.deepcopy(c)
     t = np.linspace(0.0, 1.0, 5)
     traj = Trajectory(t=t, x=np.ones((2, 5)), u=np.ones((1, 5)))
-    assert s.total_cost(traj) == pytest.approx(2.0 * c.total_cost(traj))
+    assert total(s, traj) == pytest.approx(2.0 * total(c, traj))
 
 
 def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
@@ -140,7 +234,7 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     matplotlib.use("Agg", force=True)
     from minilink import Pendulum
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
 
     plant = Pendulum()
     plant.x0 = np.array([0.5, 0.0])
@@ -148,20 +242,18 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     # Open loop: the plant's own trajectory
     traj = plant.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    assert plant.compute_cost(cost) == pytest.approx(cost.total_cost(traj))
+    assert plant.compute_cost(cost) == pytest.approx(total(cost, traj))
 
     # Closed loop: the plant as it ran inside the loop, last or given trajectory
-    loop = StateFeedbackController(K=[[5.0, 1.0]]) @ plant
+    loop = StateFeedback(K=[[5.0, 1.0]]) @ plant
     loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    J = cost.total_cost(loop.trajectory_of(plant, loop_traj))
+    J = total(cost, loop.trajectory_of(plant, loop_traj))
     assert loop.compute_cost(cost, of=plant) == pytest.approx(J)
     assert loop.compute_cost(cost, of=plant, traj=loop_traj) == pytest.approx(J)
 
     # of=None scores the loop in its own (x, u): here x = plant state, u = r
     loop_cost = QuadraticCost.from_system(loop, S=np.eye(2))
-    assert loop.compute_cost(loop_cost) == pytest.approx(
-        loop_cost.total_cost(loop_traj)
-    )
+    assert loop.compute_cost(loop_cost) == pytest.approx(total(loop_cost, loop_traj))
 
     result = loop.plot_cost(cost, of=plant, show=False)
     assert result is not None
@@ -259,8 +351,8 @@ def test_scipy_minimize_disp_prints_report(capsys):
     assert "Optimization Program" in captured.out
     assert "method=" in captured.out
     assert "Running solver" in captured.out
-    assert "success:" in captured.out
-    assert "Completed in" in captured.out
+    assert "OptimizationResult, success=" in captured.out
+    assert "solve_time_s:" in captured.out
     assert out.solve_time_s is not None
     assert out.success
 
@@ -447,3 +539,337 @@ def test_ipopt_solve_callback_not_supported():
 
     with pytest.raises(NotImplementedError, match="does not support solve\\(callback"):
         opt.solve(callback=_cb)
+
+
+# --- the method table: the program's class, "auto", and the first-order backend ---
+
+
+def quadratic_program(**fields):
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    target = np.array([1.0, -2.0])
+    return MathematicalProgram(
+        n_z=2,
+        J=lambda z: (z - target) @ (z - target),
+        grad_J=lambda z: 2.0 * (z - target),
+        **fields,
+    )
+
+
+def test_the_program_class_is_read_from_its_fields():
+    from minilink.optimization.optimizer import program_class
+
+    assert program_class(quadratic_program()) == "unconstrained"
+    assert program_class(quadratic_program(lower=[0.0, -np.inf])) == "bounded"
+    assert program_class(quadratic_program(lower=[-np.inf] * 2)) == "unconstrained"
+    assert program_class(quadratic_program(g=lambda z: z)) == "constrained"
+
+
+def test_auto_picks_by_class_and_a_method_the_class_refuses_is_refused():
+    from minilink.optimization.optimizer import Optimizer
+
+    assert (
+        Optimizer(quadratic_program(), z0=np.zeros(2), method="auto").method == "l-bfgs"
+    )
+    constrained = quadratic_program(g=lambda z: z)
+    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "scipy_slsqp"
+    with pytest.raises(ValueError, match="constrained"):
+        Optimizer(constrained, z0=np.zeros(2), method="gd")
+    with pytest.raises(ValueError, match="Unknown optimizer method"):
+        Optimizer(quadratic_program(), z0=np.zeros(2), method="newton")
+
+
+@pytest.mark.parametrize(
+    "method", ["gd", "l-bfgs", pytest.param("adam", marks=pytest.mark.jax)]
+)
+def test_each_method_reaches_the_minimum(method):
+    from minilink.optimization.optimizer import Optimizer
+
+    options = (
+        {"learning_rate": 0.1, "maxiter": 2000} if method in ("gd", "adam") else {}
+    )
+    result = Optimizer(
+        quadratic_program(), z0=np.zeros(2), method=method, options=options
+    ).solve()
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-4)
+
+
+def test_gradient_descent_is_projected_on_the_box():
+    from minilink.optimization.optimizer import Optimizer
+
+    program = quadratic_program(lower=[-np.inf, 0.0])
+    result = Optimizer(
+        program, z0=np.ones(2), method="gd", options={"learning_rate": 0.1}
+    ).solve()
+    np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
+    assert result.stats["algorithm"] == "gd"
+
+    # The optimum on the face z₂ = 0: stationary on the box, though ∇J ≠ 0 there
+    assert result.success and result.stats["nit"] < 1000
+
+
+def test_gradient_descent_at_its_floating_point_fixed_point_is_a_success():
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 3000},
+    ).solve()
+    assert result.success and result.stats["nit"] < 3000
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-12)
+
+
+def test_gradient_descent_out_of_steps_is_not_a_success():
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 5},
+    ).solve()
+    assert not result.success
+    np.testing.assert_allclose(
+        result.stats["grad_norm"], np.linalg.norm(2.0 * (result.z - [1.0, -2.0]))
+    )
+
+
+def test_gradient_descent_steps_like_the_hand_loop():
+    from minilink.optimization.optimizer import Optimizer
+
+    target = np.array([1.0, -2.0])
+    z = np.zeros(2)
+    for _ in range(5):
+        z = z - 0.1 * 2.0 * (z - target)
+
+    result = Optimizer(
+        quadratic_program(),
+        z0=np.zeros(2),
+        method="gd",
+        options={"learning_rate": 0.1, "maxiter": 5},
+    ).solve()
+    np.testing.assert_allclose(result.z, z, rtol=1e-12)
+
+
+def test_a_first_order_method_needs_a_gradient():
+    from minilink.optimization.mathematical_program import MathematicalProgram
+    from minilink.optimization.optimizer import Optimizer
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
+    with pytest.raises(ValueError, match="gradient"):
+        Optimizer(program, z0=np.ones(1), method="gd").solve()
+
+
+def test_the_start_defaults_to_the_programs_own():
+    from minilink.optimization.optimizer import Optimizer
+
+    program = quadratic_program(metadata={"z0": np.array([3.0, 3.0])})
+    assert Optimizer(program).z0.tolist() == [3.0, 3.0]
+    with pytest.raises(ValueError, match="z0"):
+        Optimizer(quadratic_program())
+
+
+def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
+    from minilink.optimization import OptimizationResult
+    from minilink.optimization.optimizer import Optimizer
+
+    result = Optimizer(quadratic_program(), z0=np.zeros(2), method="l-bfgs").solve()
+
+    # z*, J(z*), the verdict and the solver's own record
+    assert isinstance(result, OptimizationResult)
+    np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
+    assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
+    assert isinstance(result.message, str) and isinstance(result.stats, dict)
+
+
+def test_one_method_table_builds_every_solve_paths_adapter():
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
+    from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
+
+    slsqp = make_optimizer_backend("scipy_slsqp", options={"maxiter": 7})
+    assert isinstance(slsqp, ScipyMinimizeOptimizer)
+    assert slsqp.options == {
+        "disp": False,
+        "maxiter": 7,
+    }  # the preset's, the caller's over it
+    assert isinstance(make_optimizer_backend("adam"), FirstOrderOptimizer)
+
+    with pytest.raises(ValueError, match="Unknown optimizer method"):
+        make_optimizer_backend("newton")
+    with pytest.raises(ValueError, match="name the method"):
+        make_optimizer_backend("auto")
+
+
+def test_the_method_table_gives_ipopt():
+    pytest.importorskip("cyipopt")
+    from minilink.optimization.optimizer import make_optimizer_backend
+    from minilink.optimization.optimizers.ipopt import IpoptOptimizer
+
+    assert isinstance(make_optimizer_backend("ipopt"), IpoptOptimizer)
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_one_program_with_parameters_solves_for_each_value(backend):
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    traces = []
+
+    # J(z; c) = ‖z − c‖², its minimum at c
+    def J(z, params):
+        traces.append(1)
+        c = params["target"]["c"]
+        return (z - c) @ (z - c)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend=backend, params={"target": {"c": np.array([1.0, 2.0])}}
+    )
+    opt = Optimizer(program, z0=[0.0, 0.0], method="l-bfgs")
+
+    np.testing.assert_allclose(opt.solve().z, [1.0, 2.0], atol=1e-6)
+    moved = opt.solve(params={"target": {"c": np.array([-3.0, 0.5])}})
+    np.testing.assert_allclose(moved.z, [-3.0, 0.5], atol=1e-6)
+    n_traces = len(traces)  # the frozen form and the parametric one, each traced once
+    again = opt.solve(params={"target": {"c": np.array([0.5, -1.0])}})
+    np.testing.assert_allclose(again.z, [0.5, -1.0], atol=1e-6)
+    np.testing.assert_allclose(
+        opt.solve().z, [1.0, 2.0], atol=1e-6
+    )  # the defaults again
+    if backend == "jax":
+        assert len(traces) == n_traces  # a new value never retraces
+
+    # The one merge at the boundary: an unknown path, a new shape
+    with pytest.raises(ValueError, match="known entries are"):
+        opt.solve(params={"target": {"d": 1.0}})
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(params={"target": {"c": np.zeros(3)}})
+
+
+def test_a_program_without_parameters_refuses_values():
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
+    opt = Optimizer(program, z0=[1.0], method="l-bfgs")
+    assert abs(opt.solve(params={}).z[0]) < 1e-6
+    with pytest.raises(ValueError, match="declares no parameters"):
+        opt.solve(params={"c": 1.0})
+    with pytest.raises(TypeError, match="must be a dict"):
+        MathematicalProgram(n_z=1, J=lambda z, p: z @ z, params=[1.0])
+
+
+def parametric_quadratic(backend):
+    """``J(z; c, a) = ½ a ‖z − c‖² + ¼ ‖z‖⁴`` on a box: its minimizer a smooth function of ``c`` and ``a``."""
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        c = params["c"]
+        a = params["a"]
+        return 0.5 * a * xp.sum((z - c) ** 2) + 0.25 * xp.sum(z**2) ** 2
+
+    return MathematicalProgram(
+        n_z=2,
+        J=J,
+        backend=backend,
+        lower=np.array([-3.0, -3.0]),
+        upper=np.array([3.0, 3.0]),
+        params={"c": np.array([1.0, -0.5]), "a": 2.0},
+    )
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
+    import jax
+    import jax.numpy as jnp
+
+    program = parametric_quadratic("jax")
+    options = {"learning_rate": 0.05}
+    opt = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=40
+    )
+
+    # Exactly K steps: the iterates of the step-system view end where the solve does
+    result = opt.solve()
+    assert result.stats["nit"] == 40 and result.success
+    rollout = opt.as_step_system().compute_rollout(40)
+    np.testing.assert_allclose(
+        rollout.x[:2, -1], result.z, rtol=1e-12
+    )  # z leads the state
+
+    # d z_K / d c through the K steps, against a central difference
+    def z_of(c):
+        return opt.solve(params={"c": c}).z
+
+    c = jnp.asarray([1.0, -0.5])
+    jacobian = np.asarray(jax.jacobian(z_of)(c))
+    h = 1e-6
+    for i in range(2):
+        dc = np.zeros(2)
+        dc[i] = h
+        central = (np.asarray(z_of(c + dc)) - np.asarray(z_of(c - dc))) / (2 * h)
+        np.testing.assert_allclose(jacobian[:, i], central, rtol=1e-5, atol=1e-8)
+
+    # A batch of starts in one vmap, each the solve from its start
+    starts = jnp.asarray([[0.0, 0.0], [1.0, 1.0], [-2.0, 0.5]])
+    batch = jax.vmap(lambda z0: opt.solve(z0=z0).z)(starts)
+    for z0, z in zip(starts, batch):
+        np.testing.assert_allclose(z, opt.solve(z0=np.asarray(z0)).z, rtol=1e-12)
+
+
+@pytest.mark.parametrize("method", ["gd", "adam"])
+def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
+    def grad(z, params):
+        a = params["a"]
+        return a * (z - params["c"]) + np.sum(z**2) * z
+
+    program = parametric_quadratic("numpy")
+    program = type(program)(**{**program.__dict__, "grad_J": grad})
+    options = {"learning_rate": 0.05, "maxiter": 25}
+    fixed = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, iterations=25
+    )
+    loop = Optimizer(program, z0=[0.0, 0.0], method=method, options=options)
+    np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
+
+    # A count is for the native methods, and a whole number
+    with pytest.raises(ValueError, match="native methods"):
+        Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", iterations=10)
+    with pytest.raises(ValueError, match="positive whole number"):
+        Optimizer(program, z0=[0.0, 0.0], method=method, iterations=0)
+
+
+@pytest.mark.jax
+def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink.core.backends import array_module
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    def J(z, params):
+        xp = array_module(z)
+        return xp.sum((z - params["c"]) ** 2)
+
+    program = MathematicalProgram(
+        n_z=2, J=J, backend="jax", params={"c": np.array([0.0, 2.0])}
+    )
+    for max_grad_norm in (None, 1.0):
+        opt = Optimizer(
+            program,
+            z0=[0.0, 0.0],  # a list: the start is checked as on the host path
+            method="adam",
+            iterations=20,
+            options={"max_grad_norm": max_grad_norm},
+        )
+        jacobian = jax.jacobian(lambda c: opt.solve(params={"c": c}).z)(
+            jnp.asarray([0.0, 2.0])
+        )
+        assert np.all(np.isfinite(np.asarray(jacobian)))
+    with pytest.raises(ValueError, match="shape"):
+        opt.solve(z0=[0.0, 0.0, 0.0])

@@ -1,62 +1,50 @@
 # Plans index
 
-Three backlog homes (do not invent a fourth); audits live separately:
+Three backlog homes (do not invent a fourth). Two indexes point into
+them without holding work of their own: [QUESTIONS.md](../dev/QUESTIONS.md), the design
+questions that wait for the maintainer (architecture, API and naming, vision, performance; a
+detail waits in its TODO row instead), and [KNOWN_ISSUES.md](../dev/KNOWN_ISSUES.md), the defects a
+user can hit today, each with the row that fixes it.
 
 | Home | Use for |
 | --- | --- |
 | [ROADMAP.md](../dev/ROADMAP.md) | Plan of record: releases, two lanes, TRL ledger, course checklists, the path to v1.0, open decisions, out-of-scope |
 | [TODO.md](TODO.md) | The workboard: every open step, by rung, with files and "done when" |
 | **This folder** (other docs) | Design writeups for steps that need one — multi-step architecture / tradeoff docs |
-| [../reviews/](../reviews/) | Dated architecture audits and decision records (read-only history) |
 
 **One fact, one home.** What to build lives in the plan doc; the order of work and each
-step's "done when" in TODO; milestones, maturity, course goals and *open* questions in
-ROADMAP; how and why a decision was taken in a dated record under `docs/reviews/`; landed
-contracts in DESIGN. Other docs link to the home instead of restating it. A ruling goes to
-the plan doc it shapes and to its dated record; it leaves ROADMAP §6 when it is taken.
+step's "done when" in TODO; milestones, maturity and course goals in ROADMAP; *open* design questions
+in QUESTIONS.md, and the details waiting for the maintainer in their TODO row; landed
+contracts in DESIGN. Other docs link to the home instead of restating it. A ruling the
+maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan doc it shapes)
+in the same change; the commit message carries its why. It then leaves QUESTIONS.md.
 
 Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
-(v0.3; open rows plus the landed name map). Landed contracts move into
+(v0.4; open rows plus the landed name map). Landed contracts move into
 [DESIGN.md](../dev/DESIGN.md) and the plan doc is deleted; one-line ideas go
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
-Step ids (`R1`, `A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only. A
-plan doc numbers its own steps locally (fields.md's 4.1–4.8, cited as "steps 4.1–4.8 of
-fields.md") or with a prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare
-workboard-style id. The prefix also marks a plan's rulings and the ids it cites from an
-audit, so they never collide with a workboard id: randomness.md's rules, rulings and
-amendments (`RD-R5`, `RD-D13`, `RD-A2`), the 2026-09-07 GRO501 audit's findings (`GRO-C1`,
-`GRO-G1`, `GRO-F1`), the 2026-09-15 foundations review's findings and comments (`FD-F9`,
-`FD-C6`). Workboard ids (`A5`, `P4`, `G1`, …) stay bare.
+Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only. A plan doc numbers
+its own steps locally (geometry-module.md's steps 1–6, cited as "steps 1–6 of geometry-module.md") or with a
+prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare workboard-style id. The prefix
+also marks a plan's rulings and the ids it cites from an audit, so they never collide with a
+workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
+`P4`, `G1`, …) stay bare. The decision ids `D13`–`D30`, kept inside the plan docs that hold them,
+are anchors only; TODO and QUESTIONS cite them by their heading. In prose, an id never opens a
+sentence: the plain title comes first.
 
-## Scheduled (a rung of ROADMAP §5 names them)
+## The plan docs
 
-| Doc | Scope | Rung | Status |
-| --- | --- | --- | --- |
-| [automation-by-convention.md](automation-by-convention.md) | Port names drive the wiring; three reserved names (`plant`, `controller`, `observer`) are the roles every tool reads; the operators; the cost scored on the plant; steps AC-0–AC-8 in build order. History: [the decision record](../reviews/2026-10-11-automation-by-convention.md) and [the 2026-10-13 second opinion](../reviews/2026-10-13-automation-by-convention-second-opinion.md) | v0.2 B (P10), later steps to v0.3 and v0.9 | decided 2026-10-11, amended 2026-10-13, ready to build |
-| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and state estimation as duals: gains on arrays, blocks, designs on a model or a plant (`lqr`, `place`, `kalman`, `luenberger`, `lqg`), the estimation problem and tools to come, where the EKF fits. History: [the rulings](../reviews/2026-10-14-state-space-design-rulings.md) | v0.2 B (P4, landed 2026-10-14), later rows to v0.3 and v0.9 | decided 2026-10-13; P4 landed, the long view open |
-| [randomness.md](randomness.md) | One convention for randomness: a `Distribution` has no time, a noise signal is a law held over a period, spectral density is the dt-free number; `NoiseSource` / `WhiteNoise`, counter-based draws, one key per experiment (`realize`) | wave A carry-over (RN-2, before V1's step 7), v0.4 (RN-3 to RN-5, with V1's steps 7–9) | decided (RD-D1–RD-D24, its evaluator rows superseded in part by R10, R15, R27); RN-1 landed, RN-2 to RN-6 open |
-| [fields.md](fields.md) | The `Field` object on `(x, u, t)`: `QuadraticField`, `GridField`, `CallableField`; the Lyapunov certificate, DP and the approximator speaking it | v0.4 (A1) | agreed, not started |
-| [cost-params.md](cost-params.md) | Cost parameters as a dictionary like a system's; composite costs nested like diagram params | v0.3, V1's step 6 (A2); the cost surface in V1's steps 1–2 | ruled (2026-09-13, R9, R20); aligned 2026-10-23; not started |
-| [differentiable-problem.md](differentiable-problem.md) | One path from any parameter the problem holds to any traceable metric, through the native optimizer: `problem.compile(controller)` → an evaluator (the trajectory, the cost, the smallest margin, the mean over the draws), one scoring kernel on the native `Trajectory`, the program bridge `program(wrt=)`, the optimizer's program classes and first-order backend (S74), traceable analysis (S73); the guardrails, the bottom-up steps, the asks. History: [the core-objects review](../reviews/2026-10-18-core-objects-review.md) (the nouns are right, the verbs are duplicated) and [the consolidation record](../reviews/2026-10-18-differentiable-problem-consolidation.md) (three analyses compared, the probes) | v0.3, V1 steps 1–6; v0.4, steps 7–9 and 7b; S73 any time; S74 deferred (R25) | ruled (R9–R11, R15–R29); aligned 2026-10-23 to continuous-core.md; steps 1–6 rows in TODO §4 |
-| [geometry-module.md](geometry-module.md) | Workspace geometry home `core/geometry/` (Shape, Path, Track, Scene, bind, spatial Fields, course catalog); `planning.spatial` retires | v0.4 (A3) | agreed, not started |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity — open rows + name map | v0.4 (C1; moved from v0.3 by R48) | open |
-| [mppi.md](mppi.md) | Path integral control (MPPI): a planner beside trajopt (working name `PathIntegralPlanner`), wrapped by `ModelPredictiveController`; steps MP-1–MP-6 | v0.4 (S72, on the sampled kernel), v0.9 (MP-4, MP-5) | proposed; asks in its §10 |
-| [parametric-program.md](parametric-program.md) | The compiled MPC program binds every problem parameter at solve time (the start, the plant, the cost, the sets; the scene with A3): one program family whose frozen form is the plain `MathematicalProgram` (recommended), one evaluator, direct collocation and the MPC block first, steps PP-0–PP-5; and one optimizer backend table for the offline and the compiled paths (OPW-1–OPW-5) | v0.4 (S76, after S74, deferred by R25) | draft; its names ruled (`ParametricProgram`, the key `plant`, D19); the binding and D25 open for v0.4 |
-| [sampled-path.md](sampled-path.md) | The sampled path: one step model from a continuous plant to a step map (the eight discretizations in the code today, one contract with four knobs, `discretize` as the verb, one compiled step taking `params`, steps SM-0–SM-6) and the sampled loop as a tool on one kernel in two faces (§8) | v0.3: S75 (SM-0 to SM-7); S31 after the continuous core | the step model ruled (R6–R8, R12, R17, R18), the loop a tool with ticks (R13, R14), its details parked (D13–D15); aligned 2026-10-23 |
-| [core-consolidation.md](core-consolidation.md) | The convergence pass: the vision as one spine (the differentiable path) and six pillars (classical and modern, nonlinear, trajectory and MPC, RL, identification and imitation, estimation); every module sorted as spine, pillar, content or side feature, with the usage inventory as evidence and the places the two lenses disagree; the tiers (side features out now · content between terms · pillar seeds kept and finished · the core that remains); the seeds the planned pillars grow on; the exit rule for the lane contract | v0.3 wave K (K7, with K1–K4) | analysis 2026-10-20, second pass by the vision; every item an ask, maintainer-owned |
-| [continuous-core.md](continuous-core.md) | The design of the continuous-core phase as ruled 2026-10-22/23: the architecture (three foundations, six pillars, one compiled step), every public name by level, the objects (the four-body system evaluator, `discretize`, the cost, the problem's fields with one meaning each, the one `Evaluation` record, the engine and its facades), the pipelines as code, deterministic vs stochastic, the conventions; what the phase does not cover | v0.3 (the continuous core), its implementation | design of record for the phase (R1–R29); the plan docs aligned to it and its rows written 2026-10-23 |
-| [end-state-api.md](end-state-api.md) | The end state on paper: the architecture and the API after v0.4 as the code a user writes, and every open decision of ROADMAP §6 that shapes a public name or a core contract (D1–D30) with the code as it stands, the options and the recommended answer as a snippet; the agenda of the two rulings sessions | v0.3 (the rulings sessions), v0.4 names | the ledger of the alternatives; the continuous phase ruled, D13–D15 parked, D25–D30 open for v0.4; deleted once those are ruled |
-| [repository-structure.md](repository-structure.md) | The long-term shape of the repository: the package split (keep the four bands, fix the hot spots), the examples tree (one folder per textbook chapter plus `courses/` and `research/`), where the teaching material lives (pinned Colab cells now, a course repo at v1.0); options, a recommendation, the asks | v0.9 (K5, K6), between terms | ideas to review 2026-10-20; serves K5 / K6 (ROADMAP §6), maintainer-owned |
-
-## Research lane, unscheduled (a design exists; no rung yet)
-
-| Doc | Scope | Status |
+| Doc | Scope | Where it sits |
 | --- | --- | --- |
-| [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for `ReinforcementLearningPlanner`: raw costs throttle PPO through the joint policy / critic gradient clip; `reward_scale="auto"` = `1 / (g_max dt)` from the failure-price sampling; evidence, options, steps RS-1–RS-4 | proposal 2026-09-27; rung for the maintainer (moves every RL demo's numbers once: between cohorts) |
-| [cbf-safety-filter.md](cbf-safety-filter.md) | Control Barrier Functions: bicubic SDF interpolation in JAX, DCBF with slacks, HOCBF relative degree, `CBFSafetyFilter` block; the barrier becomes a `Field` once A1 lands | design draft 2026-09-11 |
-| [future-policies.md](future-policies.md) | The current proposals projected onto MPPI, behavior cloning and diffusion policy: what fits, the gaps (controller memory per tick in the sampled loop, one standard stochastic policy built as a seeded block like the noise block; a `fit` verb for recorded data noted, not critical), six points to absorb and when | ideas to review 2026-10-21; feeds S31, V1's names, C4 and the behavior-cloning row; maintainer-owned |
+| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.4 (the proof of concept landed in v0.3) |
+| [future-policies.md](future-policies.md) | The API projected onto MPPI, behavior cloning and diffusion policy; the seeded policy (D29, §5.1); questions for discussion (§7) | after v1.0 |
+| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.4; v0.9 |
+| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.4 (A3) |
+| [cbf-safety-filter.md](cbf-safety-filter.md) | Control barrier functions: SDF interpolation, DCBF with slacks, HOCBF, the safety-filter block; the barrier a `Field` | unscheduled (TODO §6) |
+| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.4 (C1) |
+| [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
+| [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |
 
-Landed or superseded plan docs are deleted; their history is git, and the rulings they carried
-are in the dated records (for example [P11 dropped](../reviews/2026-10-15-gro501-app-notebooks-dropped.md)).
+Landed or superseded plan docs are deleted. Their history is git.

@@ -96,7 +96,7 @@ def sample_field_costs(
     Rasterize shaped ``FieldCost`` terms on a workspace XY grid.
 
     Each cell is the cost of a **workspace point** ``p = (x, y)`` using a
-    **point probe** — build costs with ``bind(sys, point_probe())`` so the
+    **point probe** — build costs with ``mount(point_probe(), on=sys)`` so the
     field does not depend on robot heading or body extent. ``state_dim`` must
     match the planner plant state size (``sys.n``). The MPC tuning plots of
     :mod:`minilink.planning.spatial.plotting` draw the result.

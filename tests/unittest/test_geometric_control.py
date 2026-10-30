@@ -3,7 +3,6 @@
 import numpy as np
 import pytest
 
-from minilink.blocks import RateLimiter
 from minilink.control import PurePursuit
 from minilink.control.geometric import is_closed
 from minilink.planning.spatial.paths import circuit_waypoints
@@ -317,84 +316,4 @@ def test_the_law_traces_under_jax(where):
     on_jax = np.asarray(jax.jit(tracker.ctl)(jnp.zeros(0), jnp.asarray(poses[where])))
 
     assert np.isfinite(on_numpy[0])
-    assert on_jax == pytest.approx(on_numpy, rel=1e-6)
-
-
-# The rate limiter
-
-
-def test_a_large_step_leaves_at_the_rate_limit():
-    """Far from its target the block ramps at ``rate_max``, to within a percent."""
-    block = RateLimiter(rate_max=2.0, tau=0.05)
-
-    dx = block.f(np.zeros(1), np.array([10.0]))
-
-    assert dx[0] == pytest.approx(2.0, rel=1e-2)
-
-
-def test_a_small_step_is_a_first_order_lag():
-    """Inside the knee the block is ``dx = (u - x) / tau``, the ordinary lag."""
-    block = RateLimiter(rate_max=2.0, tau=0.05)
-    step = 1e-3  # much smaller than the knee tau * rate_max = 0.1
-
-    dx = block.f(np.zeros(1), np.array([step]))
-
-    assert dx[0] == pytest.approx(step / 0.05, rel=1e-4)
-
-
-def test_the_output_never_passes_an_end_stop():
-    """A command beyond the stop is clipped, and the state is pushed back inside."""
-    block = RateLimiter(rate_max=2.0, tau=0.05, lower=-1.0, upper=1.0)
-
-    assert block.f(np.array([1.0]), np.array([5.0]))[0] == pytest.approx(0.0)
-    assert block.f(np.array([-1.0]), np.array([-5.0]))[0] == pytest.approx(0.0)
-    assert block.f(np.array([1.5]), np.array([5.0]))[0] < 0.0
-    assert block.f(np.array([-1.5]), np.array([-5.0]))[0] > 0.0
-
-
-def test_the_ramp_takes_the_time_the_rate_asks_for():
-    """A step of 10 units at 2 units/s is followed in 5 s, not sooner."""
-    block = RateLimiter(rate_max=2.0, tau=0.05)
-
-    traj = block.compute_forced(np.array([10.0]), tf=6.0, n_steps=601, verbose=False)
-
-    reached = traj.t[np.argmax(traj.x[0] > 9.9)]
-    assert traj.x[0].max() == pytest.approx(10.0, abs=1e-2)
-    assert reached == pytest.approx(5.0, abs=0.2)
-    assert np.diff(traj.x[0]).max() / np.diff(traj.t).max() <= 2.0 + 1e-3
-
-
-def test_channels_run_independently():
-    """Each channel carries its own state and sees its own command."""
-    block = RateLimiter(rate_max=1.0, tau=0.05, dim=3, x0=[0.0, 1.0, -1.0])
-
-    dx = block.f(block.x0, np.array([5.0, 1.0, 5.0]))
-
-    assert block.x0 == pytest.approx([0.0, 1.0, -1.0])
-    assert dx[0] == pytest.approx(1.0, rel=1e-2)
-    assert dx[1] == pytest.approx(0.0, abs=1e-12)
-    assert dx[2] > 0.0
-
-
-def test_an_impossible_rate_limiter_is_refused():
-    """A zero rate or a negative time constant has no dynamics to write."""
-    with pytest.raises(ValueError):
-        RateLimiter(rate_max=0.0)
-    with pytest.raises(ValueError):
-        RateLimiter(tau=-0.1)
-    with pytest.raises(ValueError):
-        RateLimiter(lower=1.0, upper=-1.0)
-
-
-@pytest.mark.jax
-def test_the_rate_limiter_traces_under_jax():
-    """Same equation on both backends, inside a compiled step."""
-    jax = pytest.importorskip("jax")
-    jnp = jax.numpy
-    block = RateLimiter(rate_max=2.0, tau=0.05, lower=-1.0, upper=1.0)
-    x, u = np.array([0.3]), np.array([4.0])
-
-    on_numpy = block.f(x, u)
-    on_jax = np.asarray(jax.jit(block.f)(jnp.asarray(x), jnp.asarray(u)))
-
     assert on_jax == pytest.approx(on_numpy, rel=1e-6)

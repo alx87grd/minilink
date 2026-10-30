@@ -7,6 +7,7 @@ import pytest
 pytest.importorskip("jax")
 import jax
 import jax.numpy as jnp
+from minilink.core.sets import SingletonSet
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet
@@ -63,9 +64,10 @@ class TestJaxDirectCollocation(unittest.TestCase):
             sys=sys,
             tf=1.0,
             x_start=np.array([0.0]),
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
+            U=sys.input_box,
         )
 
     def test_jax_cartpole_matches_numpy_dynamics(self):
@@ -86,13 +88,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -110,13 +112,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
             problem,
             transcription=ShootingTranscription(ShootingOptions(n_steps=5)),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -138,13 +140,13 @@ class TestJaxDirectCollocation(unittest.TestCase):
                 MultipleShootingOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
         )
-        program = planner.transcription.transcribe(problem, compile_backend="jax")
+        program = planner.transcription.transcribe(problem, backend="jax")
         z0 = planner.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -165,10 +167,11 @@ class TestJaxDirectCollocation(unittest.TestCase):
             x_start=np.array([0.0]),
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
+            U=base.sys.input_box,
         )
         tr = DirectCollocationTranscription(DirectCollocationOptions(n_steps=5))
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
-        program = tr.transcribe(problem, compile_backend="jax")
+        program = tr.transcribe(problem, backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
@@ -179,7 +182,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
     def test_jax_evaluator_forced_rk4_rollout_smoke(self):
         sys = JaxSingleIntegrator()
         evaluator = sys.compile(backend="jax", verbose=False)
-        x = evaluator.rk4_integrate_linear(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25)
+        x = evaluator.rollout(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh")
         np.testing.assert_allclose(np.asarray(x).reshape(-1), np.linspace(0.0, 1.0, 5))
 
 

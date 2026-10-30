@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import CartPoleWithNoisePort, WhiteNoise, closed_loop, kalman, lqr
+from minilink import NoisyCartPole, WhiteNoise, closed_loop, kalman, lqr
 
 X_UP = np.array([0.0, np.pi, 0.0, 0.0])  # pole inverted, cart at origin
 Q = np.diag([1.0, 10.0, 1.0, 1.0])  # LQR weights
@@ -10,7 +10,7 @@ R = np.array([[0.1]])
 W = 1e-2  # intensity of the disturbance force on the cart
 V = 1e-4  # intensity of the measurement noise on each state
 
-plant = CartPoleWithNoisePort()
+plant = NoisyCartPole()
 plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])  # a disturbed start
 
 # The noise the filter is designed for: Q_n = B_w W B_wᵀ with B_w = ∂f/∂d, R_n = V I

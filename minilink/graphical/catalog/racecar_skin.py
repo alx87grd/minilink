@@ -477,8 +477,7 @@ def racecar_skin_2d(
 def frame_axes_skin(plant=None, length=0.04, links=None):
     """Debug look: an RGB triad (x red, y green, z blue) at every link frame.
 
-    Stack it on a look with ``merge_skins(racecar_skin_3d, frame_axes_skin)`` to
-    check that meshes sit in their joint frames.
+    Set it as the plant's skin to check that the meshes sit in their joint frames.
     """
     geometry = {}
     for link in links or LINKS:

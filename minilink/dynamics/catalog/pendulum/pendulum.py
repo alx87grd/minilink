@@ -4,6 +4,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2
+from minilink.core.system import fastest_time_constant
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -21,7 +22,12 @@ class Pendulum(MechanicalSystem):
 
     def __init__(self, length=1.0, mass=1.0):
         super().__init__(dof=1, actuators=1)
-        self.name = "Pendulum"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -43,6 +49,40 @@ class Pendulum(MechanicalSystem):
         # Graphics: no camera_scale, so the view follows params["l"]
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: the time constant of the swing about the hanging rest, in seconds.
+
+        With no damping the swing's modes are ``±i √(m g l / (m l² + I))``, so
+        ``τ = √((m l² + I) / (m g l))``, ``√(l/g)`` for a point mass; the damping
+        ``d`` moves them, and the upright's modes have the same magnitude.
+        """
+        params = self.params
+
+        m = params["m"]
+        l = params["l"]
+        I = params["I"]
+        gravity = params["gravity"]
+        d = params["d"]
+
+        # (m l² + I) θ̈ = −m g l θ − d θ̇, linearized about θ = 0 on the state [θ, θ̇]
+        H = m * l**2 + I
+        A = np.array([[0.0, 1.0], [-m * gravity * l / H, -d / H]])
+        tau = fastest_time_constant(np.linalg.eigvals(A))
+
+        return tau
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -112,7 +152,7 @@ class Pendulum(MechanicalSystem):
         return {"link": [arc]}
 
 
-class PendulumWithNoisePort(Pendulum):
+class NoisyPendulum(Pendulum):
     """Single actuated pendulum with process and measurement noise ports.
 
     ``d`` injects disturbance torque into the dynamics; ``n`` corrupts the
@@ -121,7 +161,6 @@ class PendulumWithNoisePort(Pendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Pendulum"
 
         # Ports: the disturbance torque d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
@@ -175,7 +214,6 @@ class InvertedPendulum(Pendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Inverted Pendulum"
 
     def g(self, q, params=None):
         # The upright zero angle flips the sign of the hanging pendulum's gravity term
@@ -198,7 +236,12 @@ class TwoIndependentPendulums(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Two Independent Pendulums"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {

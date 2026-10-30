@@ -18,14 +18,12 @@ here; homegrown plants — whatever their implementation technology — live in
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # name -> (module path, attribute)
 _EXPORTS: dict[str, tuple[str, str]] = {
     "Sys2Gym": ("minilink.interfaces.gymnasium", "Sys2Gym"),
     "SB3Controller": ("minilink.interfaces.gymnasium", "SB3Controller"),
-    "ProblemEnv": ("minilink.interfaces.gymnasium", "ProblemEnv"),
-    "to_gymnasium": ("minilink.interfaces.gymnasium", "to_gymnasium"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

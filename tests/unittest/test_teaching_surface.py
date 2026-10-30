@@ -30,7 +30,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Pendulum",
         "InvertedPendulum",
         "CartPole",
-        "ImpedanceController",
+        "Impedance",
         "lqr",
         "lqr_gain",
         "place",
@@ -39,12 +39,12 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "kalman",
         "Step",
         "feedback",
-        "StochasticPlanningProblem",
         "LQRPlanner",
         "ReinforcementLearningPlanner",
         "TabularLearningPlanner",
-        "NeuralPolicyController",
-        "MonteCarloEvaluator",
+        "NeuralPolicy",
+        "evaluate",
+        "compare",
         "Evaluation",
         "Gaussian",
         "Uniform",
@@ -75,36 +75,35 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Gain",
         "Mux",
         "Demux",
-        "RateLimiter",
         "Saturation",
-        "DeadZone",
-        "Relay",
         "LowPassFilter",
-        "NotchFilter",
-        "Washout",
         "TransferFunction",
         "Lead",
-        "Lag",
         "Source",
-        "ZOHHold",
+        "UnitDelay",
         "MLP",
     ),
     "minilink.control": (
         "P",
-        "StateFeedbackController",
-        "TimeVaryingStateFeedbackController",
-        "TrajectoryFeedbackController",
+        "StateFeedback",
+        "TimeVaryingFeedback",
+        "TrajectoryFeedback",
         "PID",
         "PurePursuit",
         "PI",
         "PD",
-        "ImpedanceController",
+        "Impedance",
         "JointImpedance",
         "TaskImpedance",
-        "ComputedTorqueController",
-        "SlidingModeController",
-        "ImpedanceIntegralController",
-        "NeuralPolicyController",
+        "TaskKinematic",
+        "TaskKinematicNullspace",
+        "ComputedTorque",
+        "SlidingMode",
+        "ModelPredictiveController",
+        "IntegralImpedance",
+        "NeuralPolicy",
+        "closed_loop",
+        "feedback",
     ),
     "minilink.analysis": (
         "jacobian",
@@ -137,23 +136,35 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "TrajectoryOptimizationPlanner",
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",
-        "LookupTableController",
+        "LookupPolicy",
         "PolicyEvaluator",
         "QuadraticFeatures",
         "RadialBasisFeatures",
         "LinearApproximator",
-        "StochasticPlanningProblem",
         "Gaussian",
         "Uniform",
-        "ReinforcementLearningPlanner",
-        "TabularLearningPlanner",
-        "MonteCarloEvaluator",
+        "evaluate",
+        "evaluate_trajectory",
         "Evaluation",
+        "ProblemEvaluator",
         "RRTPlanner",
         "RRTStarPlanner",
         "RRTOptions",
         "KinodynamicExtender",
         "SteeringExtender",
+    ),
+    "minilink.dynamics": (
+        "MechanicalSystem",
+        "GeneralizedMechanicalSystem",
+        "Manipulator",
+        "StateSpaceSystem",
+        "LTISystem",
+    ),
+    "minilink.learning": (
+        "ReinforcementLearningPlanner",
+        "TabularLearningPlanner",
+        "EpsilonGreedy",
+        "UCB",
     ),
 }
 
@@ -184,14 +195,12 @@ TEACHING_LANE_PREFIXES = (
     "minilink.simulation.simulator",
     "minilink.simulation.static_simulator",
     "minilink.planning.",
+    "minilink.learning.",
     "minilink.optimization.",
 )
 RESEARCH_LANE_PREFIXES = (
-    "minilink.control.mpc",
+    "minilink.planning.trajectory_optimization.mpc.viz",
     "minilink.simulation.realtime",
-    "minilink.simulation.computer",
-    "minilink.simulation.hybrid_simulator",
-    "minilink.core.hybrid",
     "minilink.experimental",
 )
 
@@ -203,17 +212,10 @@ BAND_FACADES = (
 )
 
 # Research-lane names a band facade re-exports beside the teaching tool they
-# extend (the sibling hybrid algebra and the real-time loop next to
-# `Simulator`). They carry a docstring and an API page, never reach the root
-# prelude, and this list only shrinks.
+# extend (the real-time loop next to `Simulator`). They carry a docstring and an
+# API page, never reach the root prelude, and this list only shrinks.
 BAND_RESEARCH_NAMES = {
-    "minilink.simulation": (
-        "Computer",
-        "StepSchedule",
-        "HybridSimulator",
-        "HybridSimResult",
-        "RealtimeSimulator",
-    ),
+    "minilink.simulation": ("RealtimeSimulator",),
 }
 
 # Facades whose every exported name must have an API page under docs/api.
@@ -278,6 +280,21 @@ class TestTeachingSurface(unittest.TestCase):
                 f"minilink.{name} lives in the research lane ({home})",
             )
 
+    def test_the_step_problem_names_live_on_their_bands_not_the_root(self):
+        """``StepPlanningProblem``, ``StepCost`` and ``SampledCost`` stay off the root until a lesson uses them."""
+        root = importlib.import_module("minilink")
+        bands = {
+            "StepCost": "minilink.core",
+            "SampledCost": "minilink.core",
+            "StepPlanningProblem": "minilink.planning",
+        }
+        for name, band in bands.items():
+            with self.subTest(name=name):
+                self.assertNotIn(name, root.__all__)
+                self.assertFalse(hasattr(root, name))
+                self.assertIn(name, importlib.import_module(band).__all__)
+        self.assertIn("StepSystem", root.__all__)
+
     def test_every_band_facade_is_checked_like_the_root(self):
         """Each band's ``__all__`` in full, not only its registry row.
 
@@ -292,7 +309,7 @@ class TestTeachingSurface(unittest.TestCase):
             for name in module.__all__:
                 value = getattr(module, name)
                 if isinstance(value, types.ModuleType):
-                    continue  # a subpackage the band exposes, e.g. control.mpc
+                    continue  # a subpackage the band exposes, e.g. planning.trajectory_optimization
                 self.assertTrue(
                     (getattr(value, "__doc__", None) or "").strip(),
                     f"{band}.{name} is exported to students with no docstring",
@@ -356,14 +373,14 @@ for mod in list(sys.modules):
         del sys.modules[mod]
 
 import numpy as np
-from minilink import ImpedanceController, Pendulum, lqr
+from minilink import Impedance, Pendulum, lqr
 from minilink.analysis import linearize
 from minilink.core import QuadraticCost
 from minilink.planning import DynamicProgrammingPlanner, PlanningProblem, StateSpaceGrid
 
 plant = Pendulum()
 plant.x0[0] = 1.0
-loop = ImpedanceController() @ plant
+loop = Impedance() @ plant
 traj = loop.compute_trajectory(tf=2.0, verbose=False)
 loop.plot_trajectory(show=False)
 loop.plot_phase_plane(show=False)
@@ -372,7 +389,7 @@ loop.plot_diagram(show=False)          # degrades without graphviz
 lti = linearize(plant, x_bar=[0.0, 0.0])
 lqr(lti, np.eye(2), np.eye(1))
 goal = np.array([np.pi, 0.0])
-problem = PlanningProblem(plant, x_goal=goal,
+problem = PlanningProblem(plant, U=plant.input_box,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal))
 grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(3,), dt=0.05)
 DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20, verbose=False).solve()
@@ -403,13 +420,16 @@ class TestRootPrelude(unittest.TestCase):
     def test_every_surface_name_is_the_same_object_at_the_root(self):
         import minilink
 
+        # The root prelude is the course set, a subset of the band facades:
+        # a band name need not be on the root, but where it is, it is the same object
         for band, names in TEACHING_SURFACE.items():
             module = importlib.import_module(band)
             for name in names:
-                self.assertIn(
-                    name, minilink.__all__, f"{name} missing from the root prelude"
-                )
-                self.assertIs(getattr(minilink, name), getattr(module, name), name)
+                if band == "minilink" or name in minilink.__all__:
+                    self.assertIn(
+                        name, minilink.__all__, f"{name} missing from the root"
+                    )
+                    self.assertIs(getattr(minilink, name), getattr(module, name), name)
         for module_path, name in TEACHING_MODULE_FUNCTIONS:
             self.assertIs(
                 getattr(minilink, name),

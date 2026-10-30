@@ -1,8 +1,8 @@
 """Frozen step vs params-as-argument vs bound params, in the situations that matter.
 
 Run: ``PYTHONPATH=. python benchmarks/params_binding.py`` (needs JAX). The numbers it
-prints are the evidence of docs/plans/sampled-path.md §3.5 (the step model, D10 of
-docs/plans/end-state-api.md): one step called from Python, one scan, a vmapped batch, a
+prints are the evidence for docs/dev/DESIGN.md §5, 'One body per method' (``params=None``
+costs what a frozen form would): one step called from Python, one scan, a vmapped batch, a
 parameter family, and a gradient through the rollout, for the pendulum and the cart-pole.
 """
 
@@ -38,17 +38,17 @@ def bench(plant):
     dt = 0.01
     N, B = 1000, 1000
 
-    step_frozen = jax.jit(lambda x, u, t: ev.rk4_step_trace(x, u, t, dt))
-    step_p = jax.jit(lambda x, u, t, p: ev.rk4_step_trace_p(x, u, t, dt, p))
+    step_frozen = jax.jit(lambda x, u, t: ev.step(x, u, t, dt=dt))
+    step_p = jax.jit(lambda x, u, t, p: ev.step(x, u, t, p, dt=dt))
     step_bound = jax.jit(
-        partial(lambda x, u, t, p: ev.rk4_step_trace_p(x, u, t, dt, p), p=params)
+        partial(lambda x, u, t, p: ev.step(x, u, t, p, dt=dt), p=params)
     )
     # params as one flat vector (what a pytree flatten costs vs what a dict costs)
     keys = list(params)
     flat = jnp.stack([params[k] for k in keys])
 
     def step_flat_fn(x, u, t, pv):
-        return ev.rk4_step_trace_p(x, u, t, dt, dict(zip(keys, pv)))
+        return ev.step(x, u, t, dict(zip(keys, pv)), dt=dt)
 
     step_flat = jax.jit(step_flat_fn)
 
@@ -74,13 +74,13 @@ def bench(plant):
     # -- one rollout of N steps inside a scan
     def rollout_frozen(x0):
         def body(x, t):
-            return ev.rk4_step_trace(x, u0, t, dt), x
+            return ev.step(x, u0, t, dt=dt), x
 
         return jax.lax.scan(body, x0, jnp.arange(N) * dt)[1]
 
     def rollout_p(x0, p):
         def body(x, t):
-            return ev.rk4_step_trace_p(x, u0, t, dt, p), x
+            return ev.step(x, u0, t, p, dt=dt), x
 
         return jax.lax.scan(body, x0, jnp.arange(N) * dt)[1]
 

@@ -1,7 +1,7 @@
-"""Hybrid MPC slalom: straight lane + staggered keepout spheres.
+"""Sampled MPC slalom: straight lane + staggered keepout spheres.
 
 Tracking cost on ``y=0`` plus soft clearance from a ``Scene`` of four
-obstacles. Closed loop via ``ModelPredictiveController`` and ``mpc @ plant``.
+obstacles. Closed loop via ``ModelPredictiveController`` and ``(mpc % dt) @ plant``.
 
 Run from repo root::
 
@@ -11,17 +11,17 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import inverse_barrier
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, point_probe
+from minilink.planning.spatial.collision import mount, point_probe
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import inverse_barrier
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    mpc_animation_overlays,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -63,7 +63,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 r_r = sys_mpc.params["r_r"]
 x_ref = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 x0 = np.array([0.0, 3.0, 0.0, VX0, 0.0, 0.0, VX0 / r_r, 0.0])
-body = bind(sys_mpc, point_probe())
+body = mount(point_probe(), on=sys_mpc)
 cost = QuadraticCost.from_system(
     sys_mpc,
     Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
@@ -78,16 +78,21 @@ cost = QuadraticCost.from_system(
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
-        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+        sys=sys_mpc,
+        x_start=x0,
+        cost=cost,
+        tf=MPC_HORIZON,
+        X=sys_mpc.state.box,
+        U=sys_mpc.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner, delay=False)
 
 sys_sim = BicycleDynRate()
 sys_sim.params["mass"] = 1.03 * sys_mpc.params["mass"]
@@ -95,17 +100,12 @@ sys_sim.params["inertia"] = 1.02 * sys_mpc.params["inertia"]
 sys_sim.camera_scale = 12.0
 sys_sim.x0 = x0.copy()
 
-hybrid = mpc @ sys_sim
+hybrid = (mpc % MPC_DT) @ sys_sim
 hybrid.plot_diagram()
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    compile_backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 hybrid.plot_trajectory()
 hybrid.animate(
     overlays=mpc_animation_overlays(
-        result, planner, scene=scene, reference_pad=REF_X_PAD
+        result, mpc, loop=hybrid, scene=scene, reference_pad=REF_X_PAD
     )
 )

@@ -73,7 +73,6 @@ class PurePursuit(System):
         state_dim: int = 9,
     ):
         super().__init__()
-        self.name = "Pure Pursuit"
 
         # Parameters. ``waypoints`` and ``closed`` are not gains: they say what the
         # block tracks. They live in ``params`` all the same, because the search reads
@@ -113,7 +112,7 @@ class PurePursuit(System):
         rear_offset = params["rear_offset"]
         path = xp.asarray(params["waypoints"])
         # The point count stays a static Python int under JAX tracing
-        n_points = np.shape(params["waypoints"])[0]
+        n_points = xp.shape(params["waypoints"])[0]
 
         # The pose, moved back from the state's point to the rear axle
         X = u[0]

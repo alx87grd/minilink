@@ -27,7 +27,12 @@ class Plane2D(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
-        self.name = "Planar Aircraft"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -423,7 +428,12 @@ class Plane3D(GeneralizedMechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=6, pos=6, actuators=4)
-        self.name = "Aircraft 3D"
+
+        # The plant's own range: positions and velocities within ±10, forces within ±5
+        self.state.lower_bound = np.full(self.n, -10.0)
+        self.state.upper_bound = np.full(self.n, 10.0)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {

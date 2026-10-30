@@ -12,10 +12,10 @@ from parking import (
 )
 
 from minilink import (
-    MonteCarloEvaluator,
+    PlanningProblem,
     ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
     Uniform,
+    evaluate,
 )
 
 TRAINING_TIMESTEPS = 2_000_000  # about six minutes on a laptop CPU
@@ -29,16 +29,17 @@ GAMMA = 0.99  # a 10 s discount horizon at DT
 
 boat = ParkingBoat(CURRENT)
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     boat,
     cost=parking_cost(boat, terminal=TERMINAL, well=DOCK_WELL),
     tf=TF,
-    x0_distribution=Uniform(
+    x_start=Uniform(
         [-START_RADIUS, -START_RADIUS, -np.pi, -0.5, -0.5, -0.2],
         [START_RADIUS, START_RADIUS, np.pi, 0.5, 0.5, 0.2],
     ),
     X=boat.state.box,
     infeasible_cost=INFEASIBLE_COST,
+    U=boat.input_box,
 )
 
 planner = ReinforcementLearningPlanner(
@@ -64,7 +65,7 @@ np.savez(
 )  # parking_compare.py rebuilds the law from these
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # surge thrust vs (x, y)
 
-report = MonteCarloEvaluator(problem, dt=DT, n_trials=100, seed=1).evaluate(ppo_ctl)
+report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)
 print(report)
 
 boat.x0 = X_START.copy()

@@ -6,15 +6,20 @@ import textwrap
 from dataclasses import dataclass, field
 
 import numpy as np
-from scipy.linalg import solve_continuous_lyapunov, solve_triangular
+from scipy.linalg import solve_continuous_lyapunov
 
 from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
+from minilink.core.fields import EllipsoidSet, QuadraticField
+from minilink.core.params import tree_digest
 from minilink.core.sets import BoxSet, Set
 
 #: Families of Lyapunov function this tool can build.
 METHODS = ("quadratic", "sos")
+
+#: The seed of the states a certificate tests: it must read the same twice.
+CERTIFICATE_SEED = 0
 
 
 ###############################################################################
@@ -101,10 +106,12 @@ def region_of_attraction(
     poles = np.linalg.eigvals(A)
     require_hurwitz(poles)
 
-    # AᵀP + PA = −Q, with Q = I unless given
+    # AᵀP + PA = −Q, with Q = I unless given; P = (P + Pᵀ) / 2 drops the solver's
+    # rounding off the symmetric solution
     n = int(sys.n)
     Q = np.eye(n) if Q is None else np.asarray(Q, dtype=float)
     P = solve_continuous_lyapunov(A.T, -Q)
+    P = 0.5 * (P + P.T)
 
     # V̇ needs f on many states at once: compile once for the whole certificate
     backend, evaluator = compiled(sys)
@@ -208,17 +215,15 @@ class LyapunovCertificate:
 
     # The certificate itself
 
-    def V(self, x):
-        """Lyapunov function at one state ``(n,)`` or a stack of states ``(N, n)``."""
-        x_bar = self.x_bar
-        P = self.P
+    @property
+    def V(self) -> QuadraticField:
+        """The Lyapunov function ``V(x) = (x − x̄)ᵀ P (x − x̄)``, one state ``(n,)`` or a stack ``(N, n)``."""
+        return QuadraticField(self.x_bar, self.P)
 
-        d = np.atleast_2d(np.asarray(x, dtype=float)) - x_bar
-
-        # V = dᵀ P d, one value per row
-        v = np.einsum("ij,jk,ik->i", d, P, d)
-
-        return v if np.ndim(x) > 1 else float(v[0])
+    @property
+    def region(self) -> EllipsoidSet:
+        """The certified region ``{x : V(x) ≤ c}``, which draws and bounds itself."""
+        return self.V.as_set(upper=self.level)
 
     def V_dot(self, x):
         """Derivative of ``V`` along the nonlinear dynamics, same shapes as :meth:`V`."""
@@ -247,14 +252,8 @@ class LyapunovCertificate:
 
     @property
     def extent(self) -> np.ndarray:
-        """Half-width of the certified region along each state."""
-        P = self.P
-        level = self.level
-
-        # The shadow of the ellipsoid on axis i: √(c (P⁻¹)ᵢᵢ)
-        extent = np.sqrt(level * np.diag(np.linalg.inv(P)))
-
-        return extent
+        """Half-width of the certified region along each state: its shadow on each axis."""
+        return self.region.half_width
 
     def slice_extent(self, x_axis: int = 0, y_axis: int = 1) -> np.ndarray:
         """
@@ -323,15 +322,14 @@ class LyapunovCertificate:
         and the report carries the offending state.
         """
         x_bar = self.x_bar
-        P = self.P
-        level = self.level
+        region = self.region
 
         # Ten time constants of the slowest mode, a hundredth of the certified extent
         tf = horizon_of(self) if tf is None else float(tf)
         tol = 0.01 * float(np.max(self.extent)) if tol is None else float(tol)
 
         # Initial states drawn uniformly in {V ≤ c}, each integrated for tf
-        x0 = x_bar + sample_in_ellipsoid(P, level, n)
+        x0 = region.sample(CERTIFICATE_SEED, n)
         x_final = self.rollout(tf)(x0)
 
         # Every trial must end within tol of the equilibrium
@@ -523,18 +521,16 @@ def dynamics_on(backend, evaluator, u_bar, t, params):
         jax = require_jax()
         jnp = require_jax_numpy()
 
-        if params is None:
-            batch = jax.jit(jax.vmap(lambda x: evaluator.f_trace(x, u_bar, t)))
-        else:
-            batch = jax.jit(
-                jax.vmap(lambda x: evaluator.f_trace_p(x, u_bar, t, params))
-            )
+        # One jitted batch per evaluator and point, kept for every later call
+        key = ("certificate dynamics", tree_digest({"u": u_bar, "t": t, "p": params}))
+        forms = evaluator.compiled_forms
+        if key not in forms:
+            forms[key] = jax.jit(jax.vmap(lambda x: evaluator.f(x, u_bar, t, params)))
+        batch = forms[key]
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
     # NumPy: f state by state
-    if params is None:
-        return lambda states: np.stack([evaluator.f(x, u_bar, t) for x in states])
-    return lambda states: np.stack([evaluator.f_p(x, u_bar, t, params) for x in states])
+    return lambda states: np.stack([evaluator.f(x, u_bar, t, params) for x in states])
 
 
 def natural_window(x_bar, P, domain: BoxSet) -> BoxSet:
@@ -688,48 +684,33 @@ def horizon_of(cert):
     return horizon
 
 
-def sample_in_ellipsoid(P, level, n: int) -> np.ndarray:
-    """``n`` offsets drawn uniformly inside ``{d : dᵀ P d <= level}``."""
-    # A fixed seed: a certificate must read the same twice
-    rng = np.random.default_rng(0)
-    dim = int(P.shape[0])
-
-    # z uniform in the unit ball: a Gaussian direction, a radius drawn as r^(1/dim)
-    z = rng.standard_normal((n, dim))
-    z *= (rng.random((n, 1)) ** (1.0 / dim)) / np.linalg.norm(z, axis=1, keepdims=True)
-
-    # P = L Lᵀ, so d = √c L⁻ᵀ z satisfies dᵀ P d ≤ c
-    L = np.linalg.cholesky(P)
-    d = np.sqrt(level) * solve_triangular(L.T, z.T, lower=False).T
-
-    return d
-
-
 def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
     """Return ``rollout(X0) -> X_final`` integrating each state for ``tf``."""
     n_steps = max(1, int(round(tf / dt)))
 
-    # JAX: the RK4 steps scanned, vectorized over the stack and jitted
+    u_seq = np.tile(np.asarray(u_bar, dtype=float), (n_steps, 1))
+
+    # JAX: the step model's rollout, vectorized over the stack and jitted
     if backend == BACKEND_JAX:
         jax = require_jax()
         jnp = require_jax_numpy()
 
         def one(x0):
-            def step(x, _):
-                return evaluator.rk4_step_trace(x, u_bar, t, dt), None
+            return evaluator.rollout(x0, u_seq, t, dt)[-1]
 
-            return jax.lax.scan(step, x0, None, length=n_steps)[0]
-
-        batch = jax.jit(jax.vmap(one))
+        # One jitted batch per evaluator, point and horizon, kept for every later call
+        key = ("certificate rollout", tree_digest({"u": u_seq, "t": t, "dt": dt}))
+        forms = evaluator.compiled_forms
+        if key not in forms:
+            forms[key] = jax.jit(jax.vmap(one))
+        batch = forms[key]
         return lambda states: np.asarray(batch(jnp.asarray(states)))
 
-    # NumPy: x_{k+1} = RK4(x_k), n_steps times, state by state
+    # NumPy: x_{k+1} = RK4(x_k, ū, t_k), n_steps times, state by state
     def rollout_numpy(states):
         final = np.empty_like(states)
         for i, x in enumerate(states):
-            for _ in range(n_steps):
-                x = evaluator.rk4_step(x, u_bar, t, dt)
-            final[i] = x
+            final[i] = evaluator.rollout(x, u_seq, t, dt)[-1]
         return final
 
     return rollout_numpy
@@ -847,7 +828,7 @@ def draw_region(
     # The states verify() would test, marked by whether they converged; the draw
     # lies on the plane only in a two-state loop
     if verified and int(cert.sys.n) == 2:
-        x0 = cert.x_bar + sample_in_ellipsoid(cert.P, cert.level, int(verified))
+        x0 = cert.region.sample(CERTIFICATE_SEED, int(verified))
         final = cert.rollout(horizon)(x0)
         distance = np.linalg.norm(final - cert.x_bar, axis=1)
         converged = distance < 0.01 * np.max(cert.extent)

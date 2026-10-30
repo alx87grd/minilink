@@ -5,14 +5,15 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
+from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, disc
+from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.scene import Scene
 
 X_START = np.array([-4.0, -4.0])
 X_GOAL = np.array([4.0, 4.0])
+GOAL_TOLERANCE = 0.5  # The goal region's radius
 
 
 def make_holonomic_obstacle_problem():
@@ -24,6 +25,7 @@ def make_holonomic_obstacle_problem():
     sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
-    body = bind(sys, disc(0.2))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
-    return PlanningProblem(sys=sys, x_start=X_START, x_goal=X_GOAL, X=X), X
+    body = mount(disc(0.2), on=sys)
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
+    Xf = BallSet(X_GOAL, GOAL_TOLERANCE)
+    return PlanningProblem(sys=sys, x_start=X_START, Xf=Xf, X=X, U=sys.input_box), X

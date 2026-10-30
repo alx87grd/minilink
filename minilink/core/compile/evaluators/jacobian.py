@@ -10,23 +10,25 @@ means an additive perturbation of that signal.
 
 The mixin resolves the two names once and hands a *probe*
 ``(x, u, t, params, delta) -> vector`` to the backend, which returns the
-Jacobian as a callable with the signature of the parametric tier:
+Jacobian as a callable with the signature of the evaluator's methods:
 ``(x, u, t, params)`` on continuous and static evaluators, ``(x, u, k, params)``
-on step evaluators. JAX evaluators run ``jax.jacfwd`` eagerly on the trace
-tier; NumPy evaluators use central finite differences.
+on step evaluators. JAX evaluators run ``jax.jacfwd`` eagerly on the uncompiled
+body; NumPy evaluators use central finite differences.
 """
 
 from __future__ import annotations
 
 import numpy as np
 
-# =============================================================================
-# Public API — JacobianMixin
-# =============================================================================
+from minilink.core.params import flatten, set_leaf, with_leaf
+
+###############################################################################
+# Public API
+###############################################################################
 
 
 class JacobianMixin:
-    """Name resolution shared by every evaluator; backends supply ``_jac_build``."""
+    """Name resolution shared by every evaluator, and the Jacobian on its backend."""
 
     def jacobian(self, of, wrt, *, eps=1e-6):
         """Return ``d(of)/d(wrt)`` as a callable ``(x, u, t, params) -> J``.
@@ -40,13 +42,20 @@ class JacobianMixin:
         variable = self._jac_resolve_wrt(wrt)
         return self._jac_build(target, variable, float(eps))
 
+    def _jac_build(self, target, variable, eps):
+        """The Jacobian callable: ``jax.jacfwd`` on JAX, central differences on NumPy."""
+        if self.backend == "jax":
+            return forward_mode_jacobian(self, target, variable, eps)
+
+        return finite_difference_jacobian(self, target, variable, eps)
+
     # --- layout registered by each evaluator constructor ---
 
     def _jac_setup(self, system, kind, *, state_fn, outputs_fn, plan=None):
         """Record the port layout the resolver needs.
 
         ``kind`` is ``"dynamic"``, ``"static"`` or ``"step"``; ``state_fn`` is
-        the parametric evolution (``f_p`` / ``step_p`` or ``None``) and
+        the evolution (``f`` / ``step``, taking ``params``, or ``None``) and
         ``outputs_fn`` the parametric output map returning a dict by port id.
         Diagrams pass their execution ``plan`` so wires become addressable.
         """
@@ -167,69 +176,62 @@ class JacobianMixin:
         return None
 
 
-# =============================================================================
-# Public API — backend builders
-# =============================================================================
+# The two builders
 
 
-class NumpyJacobianMixin(JacobianMixin):
-    """Central finite differences on the parametric tier."""
+def finite_difference_jacobian(evaluator, target, variable, eps):
+    """The Jacobian by central finite differences on the body (NumPy)."""
+    wire = variable[1] if variable[0] == "wire" else None
+    probe = evaluator._jac_probe(target, wire)
+    vkind, vsel = variable
+    wire_dim = _slice_dim(wire)
+    validate = evaluator._jac_validate_params
 
-    def _jac_build(self, target, variable, eps):
-        wire = variable[1] if variable[0] == "wire" else None
-        probe = self._jac_probe(target, wire)
-        vkind, vsel = variable
-        wire_dim = _slice_dim(wire)
-        validate = self._jac_validate_params
+    def jac(x, u, t, params):
+        validate(params)
+        x = np.asarray(x, dtype=float).reshape(-1)
+        u = np.asarray(u, dtype=float).reshape(-1)
+        zero = np.zeros(wire_dim)
+        if vkind == "x":
+            return central_difference(lambda z: probe(z, u, t, params, zero), x, eps)
+        if vkind == "u" and vsel is None:
+            return central_difference(lambda z: probe(x, z, t, params, zero), u, eps)
+        if vkind == "u":
 
-        def jac(x, u, t, params):
-            validate(params)
-            x = np.asarray(x, dtype=float).reshape(-1)
-            u = np.asarray(u, dtype=float).reshape(-1)
-            zero = np.zeros(wire_dim)
-            if vkind == "x":
-                return central_difference(
-                    lambda z: probe(z, u, t, params, zero), x, eps
-                )
-            if vkind == "u" and vsel is None:
-                return central_difference(
-                    lambda z: probe(x, z, t, params, zero), u, eps
-                )
-            if vkind == "u":
+            def embedded(z):
+                full = u.copy()
+                full[vsel] = z
+                return probe(x, full, t, params, zero)
 
-                def embedded(z):
-                    full = u.copy()
-                    full[vsel] = z
-                    return probe(x, full, t, params, zero)
+            return central_difference(embedded, u[vsel], eps)
+        if vkind == "wire":
+            return central_difference(lambda z: probe(x, u, t, params, z), zero, eps)
+        if vkind == "t":
+            t = float(t)
+            plus = probe(x, u, t + eps, params, zero)
+            minus = probe(x, u, t - eps, params, zero)
+            # ∂g/∂t ≈ (g(t + ε) − g(t − ε)) / 2ε
+            dg_dt = (plus - minus) / (2.0 * eps)
+            return dg_dt
+        # params: one column per element of every float leaf
+        result = {}
+        for path, leaf in _float_leaves(params):
+            leaf = np.asarray(leaf, dtype=float)
 
-                return central_difference(embedded, u[vsel], eps)
-            if vkind == "wire":
-                return central_difference(
-                    lambda z: probe(x, u, t, params, z), zero, eps
-                )
-            if vkind == "t":
-                t = float(t)
-                plus = probe(x, u, t + eps, params, zero)
-                minus = probe(x, u, t - eps, params, zero)
-                return (plus - minus) / (2.0 * eps)
-            # params: one column per element of every float leaf
-            result = {}
-            for path, leaf in _float_leaves(params):
-                leaf = np.asarray(leaf, dtype=float)
+            def perturbed(z, path=path, leaf=leaf):
+                value = z.reshape(leaf.shape) if leaf.shape else float(z[0])
+                return probe(x, u, t, with_leaf(params, path, value), zero)
 
-                def perturbed(z, path=path, leaf=leaf):
-                    value = z.reshape(leaf.shape) if leaf.shape else float(z[0])
-                    return probe(x, u, t, replace_leaf(params, path, value), zero)
+            columns = central_difference(perturbed, leaf.reshape(-1), eps)
+            set_leaf(result, path, columns.reshape(columns.shape[0], *leaf.shape))
+        return result
 
-                columns = central_difference(perturbed, leaf.reshape(-1), eps)
-                set_leaf(result, path, columns.reshape(columns.shape[0], *leaf.shape))
-            return result
-
-        return jac
+    return jac
 
 
-class JaxJacobianMixin(JacobianMixin):
-    """``jax.jacfwd`` on the trace tier, evaluated eagerly.
+def forward_mode_jacobian(evaluator, target, variable, eps):
+    """
+    The Jacobian by ``jax.jacfwd`` on the uncompiled body, evaluated eagerly (JAX).
 
     The returned callable is not jitted: ``params`` stay concrete Python
     values, so blocks that build constant matrices from them (``np.array``
@@ -238,62 +240,60 @@ class JaxJacobianMixin(JacobianMixin):
     Wrap the callable in ``jax.jit`` yourself for hot loops over a block
     written with ``xp = array_module(...)`` all the way through.
     """
+    jax = evaluator.jax
+    jnp = evaluator.jnp
+    wire = variable[1] if variable[0] == "wire" else None
+    probe = evaluator._jac_probe(target, wire)
+    vkind, vsel = variable
+    wire_dim = _slice_dim(wire)
+    continuous = evaluator._jac_kind != "step"
+    validate = evaluator._jac_validate_params
 
-    def _jac_build(self, target, variable, eps):
-        jax = self.jax
-        jnp = self.jnp
-        wire = variable[1] if variable[0] == "wire" else None
-        probe = self._jac_probe(target, wire)
-        vkind, vsel = variable
-        wire_dim = _slice_dim(wire)
-        continuous = self._jac_kind != "step"
-        validate = self._jac_validate_params
+    def jac(x, u, t, params):
+        x = jnp.asarray(x, dtype=float).reshape(-1)
+        u = jnp.asarray(u, dtype=float).reshape(-1)
+        if continuous:
+            t = jnp.asarray(t, dtype=float)
+        zero = jnp.zeros(wire_dim)
+        if vkind == "x":
+            return jax.jacfwd(lambda z: probe(z, u, t, params, zero))(x)
+        if vkind == "u" and vsel is None:
+            return jax.jacfwd(lambda z: probe(x, z, t, params, zero))(u)
+        if vkind == "u":
+            return jax.jacfwd(lambda z: probe(x, u.at[vsel].set(z), t, params, zero))(
+                u[vsel]
+            )
+        if vkind == "wire":
+            return jax.jacfwd(lambda z: probe(x, u, t, params, z))(zero)
+        if vkind == "t":
+            return jax.jacfwd(lambda z: probe(x, u, z, params, zero))(t)
+        # params: differentiate the float leaves as one list, keep the rest fixed
+        leaves = _float_leaves(params)
+        paths = [path for path, leaf in leaves]
+        values = [jnp.asarray(leaf, dtype=float) for path, leaf in leaves]
 
-        def jac(x, u, t, params):
-            x = jnp.asarray(x, dtype=float).reshape(-1)
-            u = jnp.asarray(u, dtype=float).reshape(-1)
-            if continuous:
-                t = jnp.asarray(t, dtype=float)
-            zero = jnp.zeros(wire_dim)
-            if vkind == "x":
-                return jax.jacfwd(lambda z: probe(z, u, t, params, zero))(x)
-            if vkind == "u" and vsel is None:
-                return jax.jacfwd(lambda z: probe(x, z, t, params, zero))(u)
-            if vkind == "u":
-                return jax.jacfwd(
-                    lambda z: probe(x, u.at[vsel].set(z), t, params, zero)
-                )(u[vsel])
-            if vkind == "wire":
-                return jax.jacfwd(lambda z: probe(x, u, t, params, z))(zero)
-            if vkind == "t":
-                return jax.jacfwd(lambda z: probe(x, u, z, params, zero))(t)
-            # params: differentiate the float leaves as one list, keep the rest fixed
-            leaves = _float_leaves(params)
-            paths = [path for path, leaf in leaves]
-            values = [jnp.asarray(leaf, dtype=float) for path, leaf in leaves]
+        def with_leaves(new_values):
+            tree = params
+            for path, value in zip(paths, new_values):
+                tree = with_leaf(tree, path, value)
+            return probe(x, u, t, tree, zero)
 
-            def with_leaves(new_values):
-                tree = params
-                for path, value in zip(paths, new_values):
-                    tree = replace_leaf(tree, path, value)
-                return probe(x, u, t, tree, zero)
+        blocks = jax.jacfwd(with_leaves)(values)
+        result = {}
+        for path, block in zip(paths, blocks):
+            set_leaf(result, path, block)
+        return result
 
-            blocks = jax.jacfwd(with_leaves)(values)
-            result = {}
-            for path, block in zip(paths, blocks):
-                set_leaf(result, path, block)
-            return result
+    def call(x, u, t, params):
+        validate(params)
+        return jac(x, u, t, params)
 
-        def call(x, u, t, params):
-            validate(params)
-            return jac(x, u, t, params)
-
-        return call
+    return call
 
 
-# =============================================================================
+###############################################################################
 # Internal machinery
-# =============================================================================
+###############################################################################
 
 
 def central_difference(g, z, eps):
@@ -306,47 +306,17 @@ def central_difference(g, z, eps):
         dz[i] = eps
         plus = np.asarray(g(z + dz), dtype=float).reshape(-1)
         minus = np.asarray(g(z - dz), dtype=float).reshape(-1)
-        columns.append((plus - minus) / (2.0 * eps))
+        # ∂g/∂zᵢ ≈ (g(z + ε eᵢ) − g(z − ε eᵢ)) / 2ε
+        dg_dzi = (plus - minus) / (2.0 * eps)
+        columns.append(dg_dzi)
     if not columns:  # nothing to perturb: only the row count is needed
         return np.zeros((np.asarray(g(z), dtype=float).reshape(-1).size, 0))
     return np.column_stack(columns)
 
 
-def flatten_params(params, prefix=()):
-    """Yield ``(path, leaf)`` pairs of a nested parameter dict (depth-first)."""
-    if params is None:
-        return
-    if not isinstance(params, dict):
-        raise TypeError(
-            f"params must be a dict (nested for diagrams), got {type(params).__name__}"
-        )
-    for key, value in params.items():
-        if isinstance(value, dict):
-            yield from flatten_params(value, prefix + (key,))
-        else:
-            yield prefix + (key,), value
-
-
-def replace_leaf(params, path, value):
-    """Copy of ``params`` with the leaf at ``path`` replaced (containers copied on the path)."""
-    key, *rest = path
-    tree = dict(params)
-    tree[key] = value if not rest else replace_leaf(params[key], rest, value)
-    return tree
-
-
-def set_leaf(tree, path, value):
-    """Insert ``value`` at ``path`` in ``tree``, creating nested dicts."""
-    for key in path[:-1]:
-        tree = tree.setdefault(key, {})
-    tree[path[-1]] = value
-
-
 def _float_leaves(params):
     """``(path, leaf)`` pairs of the float leaves; raise when there is nothing to differentiate."""
-    leaves = [
-        (path, leaf) for path, leaf in flatten_params(params) if _is_float_leaf(leaf)
-    ]
+    leaves = [(path, leaf) for path, leaf in flatten(params) if _is_float_leaf(leaf)]
     if not leaves:
         raise ValueError(
             f"wrt='params' needs a params dict with float leaves; got {params!r}"

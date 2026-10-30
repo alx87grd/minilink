@@ -17,9 +17,9 @@ x_goal = np.array([np.pi, 0.0])  # inverted, at rest
 problem = PlanningProblem(
     sys=sys,
     x_start=x_start,
-    x_goal=x_goal,
     Xf=BallSet(x_goal, 0.2),
     X=sys.state.box,
+    U=sys.input_box,
 )
 
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]

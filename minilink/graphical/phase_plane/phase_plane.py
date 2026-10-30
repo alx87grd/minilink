@@ -480,7 +480,7 @@ def require_grid_shape(grid_shape) -> tuple[int, int]:
 def x_ref_of(sys, x_ref) -> np.ndarray:
     """The held state: ``x_ref``, else the state's nominal value, else zero."""
     if x_ref is None:
-        value = getattr(getattr(sys, "state", None), "nominal_value", None)
+        value = sys.state.nominal_value
         if value is None:
             value = np.zeros(sys.n)
     else:
@@ -538,9 +538,8 @@ def phase_bounds_of(
         y_bounds = require_ordered_bounds(arr[1], "y bounds")
         return x_bounds, y_bounds
 
-    state = getattr(sys, "state", None)
-    lower = getattr(state, "lower_bound", None)
-    upper = getattr(state, "upper_bound", None)
+    lower = sys.state.lower_bound
+    upper = sys.state.upper_bound
 
     x_bounds = bounds_from_state_or_overlay(
         lower,
@@ -614,7 +613,7 @@ def require_field_shape(dx, n):
 
 def label_for_axis(sys, axis: int) -> str:
     """The state's label of ``axis``, else ``x[axis]``."""
-    labels = list(getattr(getattr(sys, "state", None), "labels", []))
+    labels = list(sys.state.labels)
     if len(labels) > axis:
         return str(labels[axis])
     return f"x[{axis}]"
@@ -622,7 +621,7 @@ def label_for_axis(sys, axis: int) -> str:
 
 def unit_for_axis(sys, axis: int) -> str:
     """The state's unit of ``axis``, else none."""
-    units = list(getattr(getattr(sys, "state", None), "units", []))
+    units = list(sys.state.units)
     if len(units) > axis:
         return str(units[axis])
     return ""

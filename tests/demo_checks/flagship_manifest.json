@@ -76,5 +76,50 @@
     "requires": [
       "jax"
     ]
+  },
+  {
+    "id": "digital_pid_tuning",
+    "path": "examples/demos/compile/digital_pid_tuning.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "native_mpc_tuning",
+    "path": "examples/demos/compile/native_mpc_tuning.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "differentiable_double_loop",
+    "path": "examples/demos/compile/differentiable_double_loop.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "terminal_field_mpc",
+    "path": "examples/demos/compile/terminal_field_mpc.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
+    "id": "grid_world_step_problem",
+    "path": "examples/demos/compile/grid_world_step_problem.py",
+    "requires": []
+  },
+  {
+    "id": "multi_rate_computer",
+    "path": "examples/demos/compile/multi_rate_computer.py",
+    "requires": []
+  },
+  {
+    "id": "lqg_monte_carlo",
+    "path": "examples/demos/compile/lqg_monte_carlo.py",
+    "requires": [
+      "jax"
+    ]
   }
 ]

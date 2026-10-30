@@ -19,6 +19,7 @@ import gymnasium as gym
 import numpy as np
 from gymnasium import spaces
 
+from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.sets import BoxInputSet
 from minilink.core.system import System
 
@@ -55,29 +56,29 @@ class Sys2Gym(gym.Env):
         Time step of one env step (zero-order hold on the action).
     tf : float
         Maximum duration of an episode (truncation).
-    t0 : float
+    t_start : float
         Initial time (only relevant if the system is time dependent).
-    reset_mode : {"uniform", "gaussian", "determinist"}
-        Distribution of the initial state on :meth:`reset`: uniform between
-        :attr:`x0_lb` and :attr:`x0_ub`, Gaussian around ``x0`` with
-        :attr:`x0_std`, or ``x0`` itself. The two random modes spread the start
-        over a tenth of the state bounds, so they need finite bounds (or the
-        spread set by hand); :meth:`reset` raises ``ValueError`` otherwise.
+    x_start : Distribution, optional
+        The law of the initial state on :meth:`reset`, drawn with the
+        environment's ``np_random`` (``Uniform(lower, upper)``,
+        ``Gaussian(mean, std)``, any :class:`~minilink.core.distributions.Distribution`);
+        ``None`` starts every episode at ``sys.x0``.
     render_mode : None or "human"
         ``"human"`` renders the system with the matplotlib animator.
-    integrator : {"rk4", "euler"}
-        Integration scheme of one env step on the compiled plant. ``"euler"``
-        reproduces ``x + f(x, u, t) * dt`` exactly (the historical path).
-    compile_backend : {None, "numpy", "jax"}
+    solver : {"rk4", "euler"}
+        Integration scheme of the step model on the compiled plant.
+    substeps : int
+        Integration steps per env step, the action held over them.
+    backend : {None, "numpy", "jax"}
         Evaluator used for the step. ``None`` picks JAX when it is installed
         and the plant traces (one jitted step per env step), NumPy otherwise;
-        :attr:`compile_backend` records the choice.
+        :attr:`backend` records the choice.
 
     Attributes
     ----------
-    compile_backend : str
+    backend : str
         Backend actually used for the step (``"numpy"`` or ``"jax"``).
-    evaluator : DynamicsEvaluator
+    evaluator : DynamicEvaluator or DiagramEvaluator
         Compiled plant the step runs on.
     clipping_inputs : bool
         Clip the actions to the input-port bounds (default ``True``).
@@ -85,10 +86,8 @@ class Sys2Gym(gym.Env):
         Clip the states to the state bounds after integration (default
         ``False``; some classic gym envs do this, but it is a very artificial
         behaviour — use with caution).
-    x0_lb, x0_ub : arrays
-        Initial-state bounds for ``reset_mode="uniform"``.
-    x0_std : array
-        Initial-state standard deviation for ``reset_mode="gaussian"``.
+    x_start : Distribution or None
+        The start's law, as given (it may be replaced between episodes).
     """
 
     metadata = {"render_modes": ["human"]}
@@ -99,24 +98,24 @@ class Sys2Gym(gym.Env):
         cost,
         dt=0.05,
         tf=10.0,
-        t0=0.0,
+        t_start=0.0,
         render_mode=None,
-        reset_mode="uniform",
-        integrator="rk4",
-        compile_backend=None,
+        x_start=None,
+        solver="rk4",
+        substeps=1,
+        backend=None,
     ):
         self.sys = sys
         self.cost = cost
         self.dt = dt
-        self.t0 = t0
+        self.t_start = t_start
         self.tf = tf  # for truncation of episodes
 
-        # One compiled step for the whole training run (RK4 by default; a
-        # single jitted call per env step when the plant traces under JAX)
-        self.integrator = integrator
-        self.compile_backend, self.evaluator, self._step_fn = _compiled_step(
-            sys, integrator, compile_backend
-        )
+        # The step model of one env step, compiled once for the whole run
+        require_step_knobs(solver, substeps)
+        self.solver = solver
+        self.substeps = int(substeps)
+        self.backend, self.evaluator = _compiled_step(sys, backend)
 
         # Boundaries
         self.x_lb, self.x_ub = _state_bounds(sys)
@@ -133,16 +132,13 @@ class Sys2Gym(gym.Env):
         self._animator = None
         self._render_backend = None
 
-        # Reset parameters (stochasticity of the initial state)
-        self.reset_mode = reset_mode
-        self.x0_lb = sys.x0 + 0.1 * self.x_lb
-        self.x0_ub = sys.x0 + 0.1 * self.x_ub
-        self.x0_std = 0.1 * (self.x_ub - self.x_lb)
+        # The start's law (None: sys.x0 every episode)
+        self.x_start = x_start
 
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
         self.u = sys.get_u_from_input_ports()
-        self.t = t0
+        self.t = t_start
 
         if self.render_mode == "human":
             self._init_render()
@@ -150,57 +146,38 @@ class Sys2Gym(gym.Env):
     @classmethod
     def from_problem(cls, problem, dt=0.05, episode_length=None, **kwargs):
         """
-        The Gymnasium view of a :class:`~minilink.planning.problems.StochasticPlanningProblem`.
+        The Gymnasium view of a :class:`~minilink.planning.problems.PlanningProblem`.
 
         ``reset`` draws the initial state from the problem, the reward is the
         problem's running cost, a finite horizon ends the episode at ``tf``
         with the terminal cost ``h``, leaving the constraint set ``X`` (read on
         the problem's set parameters) is a failure (*terminated*, charged the
-        price of infeasibility) and leaving the plant's state box, the training
+        cost of a failure) and leaving the plant's state box, the training
         zone, is a *truncation*.
-        Parameter and disturbance draws are not applied by this view. A
-        deterministic :class:`~minilink.planning.problems.PlanningProblem`
-        starts every episode at its ``x_start``.
+        Parameter laws and disturbance sources are not applied by this view.
+        A problem with a point start starts every episode at its ``x_start``.
         """
-        from minilink.core.feedback import command_port
-        from minilink.planning.problems import as_stochastic
-        from minilink.planning.reinforcement_learning.environment import (
-            feasible_cost_bound,
-        )
-
-        problem = as_stochastic(problem)
         finite = problem.horizon_kind() == "finite"
         tf = float(problem.tf) if finite else float(episode_length or 10.0)
 
+        kwargs.setdefault("t_start", float(problem.t_start))
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
-        env.infeasible_cost = problem.infeasible_cost
-        if env.infeasible_cost is None:
-            env.infeasible_cost = feasible_cost_bound(
-                problem,
-                problem.sys.state.box,
-                command_port(problem.sys),
-                dt,
-                int(round(tf / dt)),
-                float(problem.require_cost().discount_rate),
-            )
+        env.failure_cost = problem.failure_cost_at(tf, dt=dt)
         return env
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
 
-        if self.reset_mode == "uniform":
-            _require_finite_start(self.sys, self.reset_mode, self.x0_lb, self.x0_ub)
-            self.x = self.np_random.uniform(self.x0_lb, self.x0_ub)
-        elif self.reset_mode == "gaussian":
-            _require_finite_start(self.sys, self.reset_mode, self.x0_std)
-            self.x = self.np_random.normal(self.sys.x0, self.x0_std)
-        else:  # deterministic
+        # x(0) ~ the start's law, drawn with the environment's generator, else sys.x0
+        if self.x_start is None:
             self.x = np.asarray(self.sys.x0, dtype=float).copy()
+        else:
+            self.x = np.asarray(self.x_start.sample(self.np_random), dtype=float)
 
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t0
+        self.t = self.t_start
 
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
@@ -216,8 +193,13 @@ class Sys2Gym(gym.Env):
         # State and time at the beginning of the step
         x, t, dt = self.x, self.t, self.dt
 
-        # One integration step on the compiled plant, action held (ZOH)
-        x_new = np.asarray(self._step_fn(x, u, t, dt), dtype=float)
+        # One step of the plant's step model, the action held
+        x_new = np.asarray(
+            self.evaluator.step(
+                x, u, t, dt=dt, solver=self.solver, substeps=self.substeps
+            ),
+            dtype=float,
+        )
         t_new = t + dt
 
         if self.clipping_states:
@@ -232,9 +214,12 @@ class Sys2Gym(gym.Env):
         else:
             r = -float(self.cost.g(x, u, t)) * dt  # running cost over the step
 
-        # Truncation of episodes if out of space-time bounds
+        # Truncation of episodes at the horizon tf (within half a step) or out of
+        # the state bounds
         truncated = bool(
-            (t_new > self.tf) or np.any(x_new < self.x_lb) or np.any(x_new > self.x_ub)
+            (t_new >= self.t_start + self.tf - 0.5 * dt)
+            or np.any(x_new < self.x_lb)
+            or np.any(x_new > self.x_ub)
         )
 
         # Memory update
@@ -274,6 +259,7 @@ class Sys2Gym(gym.Env):
     # Internal machinery
 
     def _init_render(self):
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.animator import Animator, make_renderer
 
         self._animator = Animator(self.sys)
@@ -299,9 +285,10 @@ class SB3Controller(System):
     ports (sweep domain and axis names for ``plot_control_law``).
     """
 
-    def __init__(self, model, sys=None, name="RL Policy Controller"):
+    def __init__(self, model, sys=None, name=None):
         super().__init__()
-        self.name = name
+        if name is not None:
+            self.name = name
         self.model = model
 
         n = int(model.observation_space.shape[0])
@@ -348,18 +335,21 @@ class SB3Controller(System):
         return self.action(u)
 
 
+# Internal machinery
+
+
 class ProblemEnv(Sys2Gym):
     """:class:`Sys2Gym` whose starts and episode ends follow a planning problem."""
 
     problem = None
     finite_horizon = False
-    infeasible_cost = None
+    failure_cost = None
 
     def reset(self, seed=None, options=None):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t0
+        self.t = self.t_start
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
         )
@@ -369,66 +359,37 @@ class ProblemEnv(Sys2Gym):
         problem = self.problem
         y, r, terminated, truncated, info = super().step(u)
         x, t = self.x, self.t
-        if not problem.X.contains(x, t, problem.params.sets):
-            price = self.infeasible_cost
-            r -= float(price(x, t) if callable(price) else price)
-            terminated, truncated = True, False
-        elif self.finite_horizon and t >= self.tf - 0.5 * self.dt:
+
+        # A failure is charged its cost; the end of a finite horizon its h, a
+        # failure on the last step both, as the evaluation scores the run
+        failed = not problem.X.contains(x, t, None)
+        ended = self.finite_horizon and t >= self.t_start + self.tf - 0.5 * self.dt
+        if failed:
+            r -= float(self.failure_cost)
+        if ended:
             r -= float(problem.require_cost().h(x, t))
+        if failed or ended:
             terminated, truncated = True, False
+
         return y, r, terminated, truncated, info
 
 
-def to_gymnasium(sys, cost, **kwargs) -> Sys2Gym:
-    """Convenience factory returning a :class:`Sys2Gym` environment."""
-    return Sys2Gym(sys, cost, **kwargs)
+def _compiled_step(sys, backend):
+    """Return ``(backend, evaluator)``; the env steps through ``evaluator.step``.
 
-
-# Internal machinery
-
-
-def _compiled_step(sys, integrator, compile_backend):
-    """Return ``(backend, evaluator, step)`` with ``step(x, u, t, dt) -> x_next``.
-
-    ``compile_backend=None`` tries JAX when it is installed and falls back to
+    ``backend=None`` tries JAX when it is installed and falls back to
     NumPy for plants that do not trace (catalog plants written with NumPy
-    branches). Under JAX the whole RK4 / Euler step is one jitted call.
+    branches). Under JAX the whole step is one jitted call.
     """
-    if integrator not in ("rk4", "euler"):
-        raise ValueError(f"integrator must be 'rk4' or 'euler', got {integrator!r}")
-    if compile_backend is None:
+    if backend is None:
+        # Lazy import: the compiler loads on first use, not with the interface
         from minilink.core.compile.compiler import compile_auto
 
         backend, evaluator = compile_auto(sys)
     else:
-        backend = compile_backend
         evaluator = sys.compile(backend=backend, verbose=False)
 
-    if backend == "jax":
-        import jax
-
-        trace = (
-            evaluator.rk4_step_trace
-            if integrator == "rk4"
-            else evaluator.euler_step_trace
-        )
-        step = jax.jit(trace)
-    else:
-        step = evaluator.rk4_step if integrator == "rk4" else evaluator.euler_step
-    return backend, evaluator, step
-
-
-def _require_finite_start(sys, reset_mode, *spread):
-    """Raise when a random reset would spread the start over an unbounded range."""
-    finite = np.all(np.isfinite(spread), axis=0)
-    if not np.all(finite):
-        unbounded = [label for label, ok in zip(sys.state.labels, finite) if not ok]
-        raise ValueError(
-            f"reset_mode={reset_mode!r} spreads the start over a tenth of the state "
-            f"bounds, and {unbounded} have none: bound sys.state, set x0_lb / x0_ub "
-            "(uniform) or x0_std (gaussian), pass reset_mode='determinist', or use "
-            "Sys2Gym.from_problem with a start distribution"
-        )
+    return backend, evaluator
 
 
 def _box_bounds(space):

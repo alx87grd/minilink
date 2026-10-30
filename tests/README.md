@@ -33,7 +33,9 @@ tests/
   run/                   ← human IDE launchers (click Run)
   demo_checks/           ← catalog + demo check scripts
   unittest/              ← contract tests (pytest)
+  experimental/          ← the experimental tier's tests (nightly only, off the merge gate)
   fixtures/              ← graphics/regression fixtures
+  interfaces/            ← test_c_harness.c, a C harness no test or workflow references
 
 benchmarks/
   run_regression_check.py   ← regression gates (+ host speed context)
@@ -200,7 +202,7 @@ SDL_VIDEODRIVER=dummy pytest
 
 
 `SDL_VIDEODRIVER=dummy` lets pygame tests initialize in headless CI or
-Cursor Cloud sessions.
+cloud agent sessions.
 
 ## Marker policy
 

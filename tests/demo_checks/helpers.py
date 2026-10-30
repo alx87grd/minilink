@@ -49,7 +49,7 @@ def check_short_simulation(system, *, tf: float = 0.03, dt: float = 0.01) -> Non
     """Three-step Euler integration (continuous plants only)."""
     from minilink.simulation.simulator import Simulator
 
-    traj = Simulator(system, t0=0.0, tf=tf, solver="euler", dt=dt).solve()
+    traj = Simulator(system, t_start=0.0, tf=tf, solver="euler", dt=dt).solve()
     if not np.all(np.isfinite(traj.x)):
         raise ValueError(f"{system.name}: simulation state non-finite")
 

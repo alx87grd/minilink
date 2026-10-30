@@ -20,7 +20,7 @@ plant.inputs["u"].upper_bound = np.array([5.0])
 cost = QuadraticCost.from_system(
     plant, xbar=np.zeros(2), R=np.array([[10.0]]), S=np.diag([10.0, 10.0])
 )
-problem = PlanningProblem(plant, x_goal=np.zeros(2), cost=cost)
+problem = PlanningProblem(plant, cost=cost, U=plant.input_box)
 
 planner = DynamicProgrammingPlanner(
     problem,

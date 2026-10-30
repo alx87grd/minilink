@@ -1,6 +1,6 @@
 """Regression-gate value-iteration suite: backward-sweep wall times per backend.
 
-Catches regressions in the :class:`~minilink.planning.policy_synthesis.dp.DynamicProgrammingPlanner`
+Catches regressions in the :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
 backward step — a lost table cache, a de-vectorized NumPy backup, or a JAX path
 that silently stops being jitted — and checks that the fast backend still agrees
 with the NumPy reference on the cost-to-go and the greedy policy.

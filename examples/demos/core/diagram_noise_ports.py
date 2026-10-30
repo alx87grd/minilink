@@ -2,14 +2,14 @@
 
 from minilink import (
     DiagramSystem,
-    ImpedanceController,
-    PendulumWithNoisePort,
+    Impedance,
+    NoisyPendulum,
     Step,
     WhiteNoise,
 )
 
 # Plant system
-sys = PendulumWithNoisePort()
+sys = NoisyPendulum()
 
 sys.params["m"] = 1.0
 sys.params["l"] = 5.0
@@ -26,7 +26,7 @@ noise = WhiteNoise(seed=1)
 noise2 = WhiteNoise(seed=2)
 
 # Closed loop system
-ctl = ImpedanceController(Kp=100.0, Kd=50.0)
+ctl = Impedance(Kp=100.0, Kd=50.0)
 
 # Diagram
 diagram = DiagramSystem()

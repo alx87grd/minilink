@@ -68,13 +68,14 @@ problem = PlanningProblem(
     tf=TF,
     x_start=x_start,
     cost=cost,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     verbose=PRINT_SOLVE_REPORT,
     optimizer_options={
         "disp": SCIPY_DISP,

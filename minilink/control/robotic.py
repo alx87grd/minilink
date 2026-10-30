@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 import inspect
 from collections.abc import Callable
 
 import numpy as np
 
-from minilink.control.impedance import ImpedanceController
 from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
@@ -22,7 +22,7 @@ GravityHook = Callable[..., np.ndarray]
 ###############################################################################
 
 
-class ModelJointImpedance(System):
+class JointImpedance(System):
     """Joint-space impedance on a mechanical plant with optional gravity feedforward.
 
     Law: ``τ = Kp e + Kd ė + g(q)`` when ``gravity_comp`` is enabled.
@@ -44,7 +44,6 @@ class ModelJointImpedance(System):
         require_gravity_model(plant, gravity_comp, gravity)
 
         super().__init__()
-        self.name = "Joint Impedance"
 
         # The embedded plant model, and its custom gravity hook
         self.plant = plant
@@ -54,14 +53,15 @@ class ModelJointImpedance(System):
         n = self.dof
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the joint stiffness and damping, and the feedforward switch
+        # Parameters: the joint stiffness and damping, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(10.0 if Kp is None else Kp, n),
             "Kd": as_dof_vector(1.0 if Kd is None else Kd, n),
-            "gravity_comp": bool(gravity_comp),
+            "model": copy.deepcopy(plant.params),
         }
 
-        # Ports: the reference and the measurement [q; dq] in, the joint torque out
+        # Ports: the reference and the measurement [q; dq] in, the joint torque out.
+        # Gravity feedforward is a second law, bound here, not a flag in params.
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
         self.add_input_port(
             "y",
@@ -72,16 +72,15 @@ class ModelJointImpedance(System):
         self.add_output_port(
             "u",
             dim=n,
-            function=self.ctl,
+            function=self.ctl_with_gravity if gravity_comp else self.ctl,
             dependencies=("r", "y"),
         )
 
     def ctl(self, x, u, t=0, params=None):
+        """τ = Kp e + Kd ė."""
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant
-        gravity = self.gravity
         n = self.dof
         ref_dim = self.inputs["r"].dim
         Kp = xp.asarray(params["Kp"])
@@ -100,53 +99,16 @@ class ModelJointImpedance(System):
             dq_d = r[n:]
             tau = Kp * (q_d - q) + Kd * (dq_d - dq)
 
-        # τ ← τ + g(q), when the gravity feedforward is on
-        if params.get("gravity_comp", False):
-            tau = tau + gravity_feedforward(plant, gravity, q)
-
         return tau.reshape(-1)
 
-
-def JointImpedance(
-    plant_or_dof=1,
-    *,
-    dof=None,
-    tracking_ref: bool = False,
-    gravity_comp: bool = False,
-    gravity: GravityHook | None = None,
-    Kp=None,
-    Kd=None,
-    **impedance_kwargs,
-):
-    """Joint-space impedance: generic (``dof`` only) or plant-aware.
-
-    ``JointImpedance(dof=n)`` returns a domain-neutral
-    :class:`~minilink.control.impedance.ImpedanceController`.
-
-    ``JointImpedance(plant, gravity_comp=True)`` returns
-    :class:`ModelJointImpedance` with optional ``τ += g(q)`` (or a custom
-    ``gravity(q)`` hook).
-    """
-    # A mechanical plant: the model-based law, with its optional gravity feedforward
-    if isinstance(plant_or_dof, MechanicalSystem):
-        require_plant_alone(dof, impedance_kwargs)
-        return ModelJointImpedance(
-            plant_or_dof,
-            tracking_ref=tracking_ref,
-            gravity_comp=gravity_comp,
-            gravity=gravity,
-            Kp=Kp,
-            Kd=Kd,
-        )
-
-    # A number of axes: the domain-neutral spring-damper
-    require_plant_for_gravity(gravity_comp, gravity)
-    n = int(dof if dof is not None else plant_or_dof)
-    return ImpedanceController(
-        dof=n,
-        tracking_ref=tracking_ref,
-        **impedance_kwargs,
-    )
+    def ctl_with_gravity(self, x, u, t=0, params=None):
+        """τ = Kp e + Kd ė + g(q)."""
+        params = self.params if params is None else params
+        n = self.dof
+        ref_dim = self.inputs["r"].dim
+        q = u[ref_dim : ref_dim + n]
+        tau = self.ctl(x, u, t, params)
+        return tau + gravity_feedforward(self.plant, self.gravity, q, params["model"])
 
 
 class TaskImpedance(System):
@@ -188,7 +150,6 @@ class TaskImpedance(System):
         task_target_radius: float = 0.04,
     ):
         super().__init__()
-        self.name = "Task Impedance"
 
         # The embedded kinematic model, and its custom gravity hook
         self.plant = plant
@@ -204,17 +165,17 @@ class TaskImpedance(System):
         n = self.task_dim
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the task stiffness and damping, and the feedforward switch
+        # Parameters: the task stiffness and damping, and the model's numbers
         Kp = np.full(n, 10.0) if Kp is None else as_dof_vector(Kp, n)
         Kd = np.full(n, 1.0) if Kd is None else as_dof_vector(Kd, n)
         self.params = {
             "Kp": Kp,
             "Kd": Kd,
-            "gravity_comp": bool(gravity_comp),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference and the joint measurement [q; dq] in, the joint
-        # torque out
+        # torque out. Gravity feedforward is a second law, bound here.
         self.add_input_port("r", dim=ref_dim, nominal_value=np.zeros(ref_dim))
         self.add_input_port(
             "y",
@@ -226,7 +187,7 @@ class TaskImpedance(System):
         self.add_output_port(
             "u",
             dim=self.dof,
-            function=self.ctl,
+            function=self.ctl_with_gravity if gravity_comp else self.ctl,
             dependencies=("r", "y"),
         )
 
@@ -236,6 +197,7 @@ class TaskImpedance(System):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         task_dim = self.task_dim
         dof = self.dof
         ref_dim = self.inputs["r"].dim
@@ -247,8 +209,8 @@ class TaskImpedance(System):
         dq = u[ref_dim + dof : ref_dim + 2 * dof]
 
         # Task position and velocity: p = f(q), ṗ = J(q) q̇
-        p = xp.asarray(plant.forward_kinematics(q))
-        J = xp.asarray(plant.J(q))
+        p = xp.asarray(plant.forward_kinematics(q, model))
+        J = xp.asarray(plant.J(q, model))
         pdot = J @ dq
 
         # Task spring-damper force f = Kp e_p + Kd e_v (regulation: ṗ_d = 0)
@@ -263,21 +225,20 @@ class TaskImpedance(System):
         return q, p, p_d, J, f_task
 
     def ctl(self, x, u, t=0, params=None):
+        """τ = J(q)ᵀ (Kp e_p + Kd e_v)."""
         params = self.params if params is None else params
-
-        plant = self.plant
-        gravity = self.gravity
-
-        q, _, _, J, f_task = self.task_quantities(u, params)
+        _, _, _, J, f_task = self.task_quantities(u, params)
 
         # τ = Jᵀ f_task
         tau = J.T @ f_task
-
-        # τ ← τ + g(q), when the gravity feedforward is on
-        if params.get("gravity_comp", False):
-            tau = tau + gravity_feedforward(plant, gravity, q)
-
         return tau.reshape(-1)
+
+    def ctl_with_gravity(self, x, u, t=0, params=None):
+        """τ = J(q)ᵀ (Kp e_p + Kd e_v) + g(q)."""
+        params = self.params if params is None else params
+        tau = self.ctl(x, u, t, params)
+        q = u[self.inputs["r"].dim : self.inputs["r"].dim + self.dof]
+        return tau + gravity_feedforward(self.plant, self.gravity, q, params["model"])
 
     def tf(self, x, u, t=0, params=None):
         if not self.show_task_force:
@@ -331,7 +292,7 @@ class TaskKinematic(System):
     """Task-space kinematic controller for velocity-controlled manipulators.
 
     Joint measurements ``y = q``; output ``u = dq`` drives a
-    :class:`~minilink.dynamics.catalog.manipulators.arms.SpeedControlledManipulator`.
+    :class:`~minilink.dynamics.catalog.manipulators.arms.KinematicManipulator`.
 
         v_task = Kp (p_d − p)
         dq = J(q)⁺ v_task
@@ -345,16 +306,16 @@ class TaskKinematic(System):
         dof, task_dim = kinematic_dims_of(plant)
 
         super().__init__()
-        self.name = "Task Kinematic"
 
         # The embedded kinematic model
         self.plant = plant
         self.dof = dof
         self.task_dim = task_dim
 
-        # Parameters: the task gain
+        # Parameters: the task gain, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference and the joint measurement q in, the joint rate out
@@ -372,14 +333,15 @@ class TaskKinematic(System):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         n = self.task_dim
         dof = self.dof
         Kp = xp.asarray(params["Kp"])
 
         p_d = u[:n]
         q = u[n : n + dof]
-        p = plant.forward_kinematics(q)
-        J = plant.J(q)
+        p = plant.forward_kinematics(q, model)
+        J = plant.J(q, model)
 
         # v = Kp (p_d − p): the task velocity command
         v_task = Kp * (p_d - p)
@@ -407,17 +369,17 @@ class TaskKinematicNullspace(TaskKinematic):
 
         # System's constructor, not TaskKinematic's: this block declares its own ports
         super(TaskKinematic, self).__init__()
-        self.name = "Task Kinematic Nullspace"
 
         # The embedded kinematic model
         self.plant = plant
         self.dof = dof
         self.task_dim = task_dim
 
-        # Parameters: the task gain and the posture gain
+        # Parameters: the task gain, the posture gain, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
             "K_null": as_dof_vector(1.0 if K_null is None else K_null, dof),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the task reference, the posture reference and the joint measurement q
@@ -437,6 +399,7 @@ class TaskKinematicNullspace(TaskKinematic):
         xp = array_module(u)
 
         plant = self.plant
+        model = params["model"]
         n = self.task_dim
         dof = self.dof
         Kp = xp.asarray(params["Kp"])
@@ -445,8 +408,8 @@ class TaskKinematicNullspace(TaskKinematic):
         p_d = u[:n]
         q_null = u[n : n + dof]
         q = u[n + dof : n + 2 * dof]
-        p = plant.forward_kinematics(q)
-        J = plant.J(q)
+        p = plant.forward_kinematics(q, model)
+        J = plant.J(q, model)
 
         # v = Kp (p_d − p): the task velocity command
         v_task = Kp * (p_d - p)
@@ -467,7 +430,7 @@ class TaskKinematicNullspace(TaskKinematic):
 def require_mechanical_plant(plant):
     """Refuse a plant without the mechanical structure the joint law reads."""
     if not isinstance(plant, MechanicalSystem):
-        raise TypeError("ModelJointImpedance requires a MechanicalSystem plant")
+        raise TypeError("JointImpedance requires a MechanicalSystem plant")
 
 
 def require_gravity_model(plant, gravity_comp, gravity):
@@ -479,10 +442,8 @@ def require_gravity_model(plant, gravity_comp, gravity):
 def gravity_feedforward(plant, gravity, q, model_params=None):
     """Gravity feedforward ``g(q)`` from the controller's embedded model.
 
-    ``model_params=None`` (the default) means the embedded model reads the
-    referenced plant's **live** ``self.params`` — the controller's own params
-    dict (gains) is never forwarded. Diagram-level overrides of the plant
-    subsystem do not reach this embedded copy; see DESIGN §4
+    ``model_params`` is the controller's ``params["model"]``, its own copy of
+    the plant's numbers (``None``: the plant's own); see DESIGN §4
     (*Embedded-model params rule*).
 
     A custom hook is ``gravity(q)``, or ``gravity(q, params)`` when its
@@ -513,22 +474,6 @@ def gravity_feedforward(plant, gravity, q, model_params=None):
     g = xp.asarray(g, dtype=float).reshape(-1)
 
     return g
-
-
-def require_plant_alone(dof, impedance_kwargs):
-    """Refuse a number of axes, or ``ImpedanceController`` keywords, given with a plant."""
-    if dof is not None:
-        raise ValueError("pass either a plant or dof=, not both")
-    if impedance_kwargs:
-        raise ValueError(
-            "plant-based JointImpedance does not accept ImpedanceController kwargs"
-        )
-
-
-def require_plant_for_gravity(gravity_comp, gravity):
-    """Refuse a gravity feedforward without a mechanical plant to read it from."""
-    if gravity_comp or gravity is not None:
-        raise ValueError("gravity_comp and gravity require a MechanicalSystem plant")
 
 
 def kinematic_dims_of(plant):

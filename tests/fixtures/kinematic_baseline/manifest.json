@@ -372,7 +372,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "rest",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.0,
@@ -399,7 +399,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "pose_a",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.38213459565024244,
@@ -426,7 +426,7 @@
     "plant": "five_link_planar_manipulator",
     "sample": "pose_b",
     "module": "minilink.dynamics.catalog.manipulators.arms",
-    "class": "FiveLinkPlanarManipulator",
+    "class": "FiveLinkManipulator",
     "requires": [],
     "x": [
       0.7129658880491484,
@@ -506,48 +506,6 @@
     "u": [
       0.3916634548137417,
       0.49272486499423007
-    ],
-    "t": 1.4
-  },
-  {
-    "plant": "simple_integrator",
-    "sample": "rest",
-    "module": "minilink.dynamics.catalog.equations.integrators",
-    "class": "SimpleIntegrator",
-    "requires": [],
-    "x": [
-      0.0
-    ],
-    "u": [
-      0.0
-    ],
-    "t": 0.0
-  },
-  {
-    "plant": "simple_integrator",
-    "sample": "pose_a",
-    "module": "minilink.dynamics.catalog.equations.integrators",
-    "class": "SimpleIntegrator",
-    "requires": [],
-    "x": [
-      0.38213459565024244
-    ],
-    "u": [
-      0.2450166444603104
-    ],
-    "t": 0.7
-  },
-  {
-    "plant": "simple_integrator",
-    "sample": "pose_b",
-    "module": "minilink.dynamics.catalog.equations.integrators",
-    "class": "SimpleIntegrator",
-    "requires": [],
-    "x": [
-      0.7129658880491484
-    ],
-    "u": [
-      0.3916634548137417
     ],
     "t": 1.4
   },

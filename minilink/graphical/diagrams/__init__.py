@@ -1,4 +1,4 @@
-"""Block diagrams: a system's topology, flat or hybrid, exported to Graphviz or Mermaid and drawn."""
+"""Block diagrams: a system's topology, exported to Graphviz and drawn."""
 
 from minilink.graphical.diagrams.dot import (
     get_diagram,
@@ -6,10 +6,6 @@ from minilink.graphical.diagrams.dot import (
     plot_diagram,
 )
 from minilink.graphical.diagrams.export import export_diagram_topology
-from minilink.graphical.diagrams.hybrid_topology import (
-    build_hybrid_topology,
-    export_hybrid_topology,
-)
 from minilink.graphical.diagrams.topology import (
     abstract_boundary_ports,
     build_diagram_topology,
@@ -18,9 +14,7 @@ from minilink.graphical.diagrams.topology import (
 __all__ = [
     "abstract_boundary_ports",
     "build_diagram_topology",
-    "build_hybrid_topology",
     "export_diagram_topology",
-    "export_hybrid_topology",
     "get_diagram",
     "get_system_block_html",
     "plot_diagram",

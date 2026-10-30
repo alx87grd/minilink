@@ -32,7 +32,6 @@ def resolve_camera_from_hints(source, frames, x=None, u=None, t=0.0, *, override
       (following a frame when ``camera_follow_frame`` is set).
     - **Layer 3, the override**: an explicit ``animate(camera=…)``, a constant
       4x4 ``ndarray`` or a callable ``camera(frames, x, u, t) -> 4x4``;
-      :func:`follow_frame_camera` and :func:`fixed_camera` build such callables.
 
     Layer 1 (the ``camera_*`` attributes on ``System``) and Layer 4 (multi-source
     selection) live elsewhere.
@@ -119,39 +118,3 @@ def fit_camera_to_frames(
     scale = max(min_scale, margin * half)
 
     return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
-
-
-def follow_frame_camera(
-    frame_key,
-    *,
-    scale=_DEFAULT_SCALE,
-    plot_axes=_DEFAULT_PLOT_AXES,
-    target_offset=(0.0, 0.0, 0.0),
-):
-    """Return a callable camera that re-centers on ``frames[frame_key]`` each frame.
-
-    The callable is the whole Layer-3 contract — pass it to ``animate(camera=…)``.
-    *target_offset* shifts the look-at relative to the followed frame's origin.
-    """
-    offset = np.asarray(target_offset, dtype=float).reshape(3)
-
-    def camera(frames, x, u, t):
-        target = np.asarray(frames[frame_key], dtype=float)[:3, 3] + offset
-
-        return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
-
-    return camera
-
-
-def fixed_camera(target, *, scale=_DEFAULT_SCALE, plot_axes=_DEFAULT_PLOT_AXES):
-    """Return a callable camera fixed at *target* (a constant look-at).
-
-    Like :func:`follow_frame_camera` but frame-independent; pass it to
-    ``animate(camera=…)``.
-    """
-    target = np.asarray(target, dtype=float).reshape(3)
-
-    def camera(frames, x, u, t):
-        return camera_matrix(target=target, plot_axes=plot_axes, scale=scale)
-
-    return camera

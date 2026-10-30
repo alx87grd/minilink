@@ -127,27 +127,6 @@ class TestMechanicalSystem(unittest.TestCase):
         )
 
 
-class TestJaxMechanicalInheritance(unittest.TestCase):
-    def test_jax_mechanical_subclasses_numpy_mechanical(self):
-        from minilink.dynamics.abstraction.mechanical import (
-            JaxMechanicalSystem,
-            MechanicalSystem,
-        )
-
-        self.assertTrue(issubclass(JaxMechanicalSystem, MechanicalSystem))
-
-    def test_jax_mechanical_init_matches_numpy_layout(self):
-        from minilink.dynamics.abstraction.mechanical import (
-            JaxMechanicalSystem,
-            MechanicalSystem,
-        )
-
-        a = MechanicalSystem(dof=3, actuators=2)
-        b = JaxMechanicalSystem(dof=3, actuators=2)
-        self.assertEqual((a.n, a.m, a.p), (b.n, b.m, b.p))
-        self.assertEqual(a.state.labels, b.state.labels)
-
-
 from minilink.dynamics.abstraction.generalized_mechanical import (
     GeneralizedMechanicalSystem,
 )
@@ -272,10 +251,7 @@ class TestGeneralizedMechanicalSystem(unittest.TestCase):
 
 
 from minilink.core.backends import configure_jax
-from minilink.dynamics.abstraction.mechanical import (
-    JaxMechanicalSystem,
-    MechanicalSystem,
-)
+from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 
 
 @pytest.mark.optional
@@ -287,14 +263,14 @@ class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_is_jaxpr_traceable(self):
         jax = pytest.importorskip("jax")
         jnp = pytest.importorskip("jax.numpy")
-        sys = JaxMechanicalSystem(dof=2)
+        sys = MechanicalSystem(dof=2)
         x = jnp.zeros(4)
         u = jnp.zeros(2)
         jax.make_jaxpr(lambda xx, uu: sys.f(xx, uu))(x, u)
 
     def test_f_matches_numpy_1dof_linear_regime(self):
         jnp = pytest.importorskip("jax.numpy")
-        sys_j = JaxMechanicalSystem(dof=1)
+        sys_j = MechanicalSystem(dof=1)
         sys_n = MechanicalSystem(dof=1)
         x = jnp.array([0.2, -0.1])
         u = jnp.zeros(1)
@@ -334,7 +310,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
             def d(self, q, dq, u=None, t=0.0, params=None):
                 return 0.05 * np.asarray(dq)
 
-        class _JaxTwoLink(JaxMechanicalSystem):
+        class _JaxTwoLink(MechanicalSystem):
             def H(self, q, params=None):
                 m1, m2, l = (1.5, 0.7, 0.4)
                 c2 = jnp.cos(q[1])
@@ -372,7 +348,7 @@ class TestMechanicalSystemJax(unittest.TestCase):
     def test_f_uses_explicit_params_in_matrix_hooks(self):
         jnp = pytest.importorskip("jax.numpy")
 
-        class MassSystem(JaxMechanicalSystem):
+        class MassSystem(MechanicalSystem):
             def __init__(self):
                 super().__init__(dof=1)
                 self.params = {"mass": 2.0}
@@ -450,18 +426,19 @@ class TestManipulator(unittest.TestCase):
 
 
 from minilink.blocks.sources import Source
+from minilink.blocks.basic import Integrator
+from minilink.control.impedance import Impedance
 from minilink.control.robotic import (
     JointImpedance,
-    ModelJointImpedance,
     TaskImpedance,
     TaskKinematic,
     TaskKinematicNullspace,
 )
-from minilink.core.composition import closed_loop
+from minilink.core.closed_loop import closed_loop
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
+    KinematicManipulator,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.manipulators import UR5Manipulator
@@ -486,7 +463,7 @@ class TestManipulatorPorts(unittest.TestCase):
 
 class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop(self):
-        diagram = closed_loop(JointImpedance(dof=2), TwoLinkManipulator())
+        diagram = closed_loop(Impedance(dof=2), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
@@ -495,8 +472,11 @@ class TestRoboticWrappers(unittest.TestCase):
         ctl = JointImpedance(arm, gravity_comp=True)
         q = np.array([0.8, -0.5])
         r = q.copy()
-        u = ctl.ctl(None, np.concatenate([r, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([r, q, np.zeros(2)]))
         np.testing.assert_allclose(u, arm.g(q))
+        self.assertIs(
+            ctl.outputs["u"].compute.__func__, JointImpedance.ctl_with_gravity
+        )
 
     def test_model_joint_impedance_no_gravity_by_default(self):
         arm = TwoLinkManipulator()
@@ -507,11 +487,11 @@ class TestRoboticWrappers(unittest.TestCase):
 
     def test_model_joint_impedance_custom_gravity_hook(self):
         arm = TwoLinkManipulator()
-        ctl = ModelJointImpedance(
+        ctl = JointImpedance(
             arm, gravity_comp=True, gravity=lambda q: np.array([1.0, 2.0])
         )
         q = np.array([0.2, 0.3])
-        u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
         np.testing.assert_allclose(u, [1.0, 2.0])
 
     def test_gravity_hook_type_error_reaches_the_caller(self):
@@ -525,9 +505,9 @@ class TestRoboticWrappers(unittest.TestCase):
         q = np.array([0.2, 0.3])
         for hook in (hook_q, hook_q_params):
             with self.subTest(hook=hook.__name__):
-                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
+                ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
                 with self.assertRaisesRegex(TypeError, "bug inside the hook"):
-                    ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                    ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
 
     def test_gravity_hook_with_an_optional_second_argument_is_called_as_g_of_q(self):
         from scipy.interpolate import CubicSpline
@@ -544,13 +524,13 @@ class TestRoboticWrappers(unittest.TestCase):
         q = np.array([0.2, 0.3])
         for name, hook in (("*args wrapper", wrapper), ("CubicSpline", spline)):
             with self.subTest(hook=name):
-                ctl = ModelJointImpedance(arm, gravity_comp=True, gravity=hook)
-                u = ctl.ctl(None, np.concatenate([q, q, np.zeros(2)]))
+                ctl = JointImpedance(arm, gravity_comp=True, gravity=hook)
+                u = ctl.ctl_with_gravity(None, np.concatenate([q, q, np.zeros(2)]))
                 np.testing.assert_allclose(u, hook(q))
 
-    def test_joint_impedance_gravity_requires_plant(self):
-        with self.assertRaises(ValueError):
-            JointImpedance(dof=2, gravity_comp=True)
+    def test_joint_impedance_requires_a_mechanical_plant(self):
+        with self.assertRaises(TypeError):
+            JointImpedance(Integrator(), gravity_comp=True)
 
     def test_task_impedance_uses_internal_kinematics(self):
         arm = TwoLinkManipulator()
@@ -572,8 +552,9 @@ class TestRoboticWrappers(unittest.TestCase):
         ctl = TaskImpedance(arm, gravity_comp=True)
         q = np.array([0.8, -0.5])
         p_d = arm.forward_kinematics(q)
-        u = ctl.ctl(None, np.concatenate([p_d, q, np.zeros(2)]))
+        u = ctl.ctl_with_gravity(None, np.concatenate([p_d, q, np.zeros(2)]))
         np.testing.assert_allclose(u, arm.g(q))
+        self.assertIs(ctl.outputs["u"].compute.__func__, TaskImpedance.ctl_with_gravity)
 
     def test_task_impedance_closed_loop(self):
         diagram = closed_loop(TaskImpedance(TwoLinkManipulator()), TwoLinkManipulator())
@@ -603,7 +584,7 @@ class TestRoboticWrappers(unittest.TestCase):
         J = arm.J(q)
         pdot = J @ dq
         f_task = ctl.params["Kp"] * (p_d - p) - ctl.params["Kd"] * pdot
-        tau = ctl.ctl(None, u)
+        tau = ctl.ctl_with_gravity(None, u)
         np.testing.assert_allclose(tau, J.T @ f_task + arm.g(q))
 
         frames = ctl.tf(None, u)
@@ -676,14 +657,14 @@ class TestRoboticWrappers(unittest.TestCase):
         )
 
     def test_neural_setpoint_ball_on_joint_reference(self):
-        from minilink.control.neural import NeuralPolicyController
+        from minilink.control.neural import NeuralPolicy
 
         arm = TwoLinkManipulator()
         inner = JointImpedance(arm) @ arm
         inner.inputs["r"].lower_bound = -np.ones(2)
         inner.inputs["r"].upper_bound = np.ones(2)
         x = inner.x0
-        ctl = NeuralPolicyController(inner, hidden=(4,), seed=0)
+        ctl = NeuralPolicy(inner, hidden=(4,), seed=0)
         self.assertEqual(ctl.tf(None, x), {})
         self.assertEqual(ctl.get_dynamic_geometry(None, x), {})
 
@@ -705,7 +686,7 @@ class TestRoboticWrappers(unittest.TestCase):
         self.assertEqual(geom["task"][0].color, "gold")
 
     def test_task_kinematic_law(self):
-        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        arm = KinematicManipulator.from_manipulator(TwoLinkManipulator())
         ctl = TaskKinematic(arm, Kp=[1.0, 1.0])
         q = np.array([0.2, -0.1])
         p_d = np.array([0.5, 0.5])
@@ -724,13 +705,31 @@ class TestRoboticWrappers(unittest.TestCase):
                 self.assertEqual(ctl.inputs["r"].dim, arm.task_dim)
 
     def test_task_kinematic_closed_loop_y(self):
-        arm = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        arm = KinematicManipulator.from_manipulator(TwoLinkManipulator())
         diagram = closed_loop(TaskKinematic(arm), arm)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         self.assertNotIn("mux", diagram.subsystems)
 
+    def test_kinematic_plant_carries_the_arm_params_into_a_compiled_loop(self):
+        two_link = TwoLinkManipulator()
+        arm = KinematicManipulator.from_manipulator(two_link)
+        self.assertEqual(set(arm.params), set(two_link.params))
+
+        # The compiled loop hands the plant its own branch; the effector port reads it
+        diagram = closed_loop(TaskKinematic(arm, Kp=[1.0, 1.0]), arm)
+        ev = diagram.compile()
+        x = np.array([0.2, -0.1])
+        r = np.array([0.5, 0.5])
+        np.testing.assert_allclose(ev.f(x, r, 0.0), diagram.f(x, r, 0.0))
+
+        # A tuned link length reaches the kinematics through the plant's branch
+        params = {**ev.params, "plant": {**ev.params["plant"], "l1": 2.0}}
+        q = np.zeros(2)
+        p = arm.forward_kinematics(q, params["plant"])
+        self.assertAlmostEqual(np.linalg.norm(p), 2.0 + two_link.params["l2"])
+
     def test_task_kinematic_nullspace_projection(self):
-        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
         ctl = TaskKinematicNullspace(arm, Kp=[1.0, 1.0], K_null=[10.0] * 5)
         q = np.array([0.1, 0.1, 0.1, 0.1, 0.1])
         p_d = np.array([1.0, 1.0])
@@ -746,7 +745,7 @@ class TestRoboticWrappers(unittest.TestCase):
         np.testing.assert_allclose(dq, dq_task + dq_null_only)
 
     def test_task_kinematic_nullspace_dual_ref_autowire(self):
-        arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+        arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
         ref_p = Source(2)
         ref_p.params["value"] = np.array([1.0, 1.0])
         ref_q = Source(5, port="r_null")
@@ -802,14 +801,14 @@ class TestInverseKinematics(unittest.TestCase):
 
 
 from minilink.blocks.sources import Step
-from minilink.control.modelbased import ComputedTorqueController, SlidingModeController
+from minilink.control.modelbased import ComputedTorque, SlidingMode
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 
 class TestModelBasedControllers(unittest.TestCase):
     def test_computed_torque_pd_plus_inverse_dynamics(self):
         plant = Pendulum()
-        ctl = ComputedTorqueController(plant, Kp=[30.0], Kd=[6.0])
+        ctl = ComputedTorque(plant, Kp=[30.0], Kd=[6.0])
         q = np.array([0.2])
         dq = np.array([0.1])
         r = np.array([0.5, 0.0])
@@ -822,7 +821,7 @@ class TestModelBasedControllers(unittest.TestCase):
         lam = np.array([2.0])
         gain = np.array([3.0])
         nab = np.array([0.2])
-        ctl = SlidingModeController(plant, lam=lam, gain=gain, nab=nab)
+        ctl = SlidingMode(plant, lam=lam, gain=gain, nab=nab)
         q = np.array([0.3])
         dq = np.array([-0.15])
         q_d = np.array([0.0])
@@ -840,19 +839,19 @@ class TestModelBasedControllers(unittest.TestCase):
 
     def test_sliding_mode_ports_match_computed_torque(self):
         plant = Pendulum()
-        ctl = SlidingModeController(plant)
+        ctl = SlidingMode(plant)
         self.assertIn("r", ctl.inputs)
         self.assertIn("y", ctl.inputs)
         self.assertIn("u", ctl.outputs)
         self.assertEqual(ctl.inputs["y"].dim, 2)
 
     def test_sliding_mode_sets_discontinuous_behavior(self):
-        ctl = SlidingModeController(Pendulum())
+        ctl = SlidingMode(Pendulum())
         self.assertTrue(ctl.solver_info["discontinuous_behavior"])
 
     def test_closed_loop_aggregates_discontinuous_behavior(self):
         plant = Pendulum()
-        smc = SlidingModeController(plant)
+        smc = SlidingMode(plant)
         ref = Step(initial_value=np.zeros(2), final_value=np.zeros(2), step_time=1.0)
         diagram = ref >> closed_loop(smc, plant)
         self.assertTrue(diagram.solver_info["discontinuous_behavior"])

@@ -15,7 +15,6 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
-from minilink.control.mpc import ModelPredictiveController
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
@@ -25,13 +24,17 @@ from minilink.planning import (
     Scene,
     Sphere,
     TrackCorridorOverlay,
-    bind,
     circuit_waypoints,
+    evaluate_trajectory,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_hinge,
 )
-from minilink.planning.evaluation import score_trajectory
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    plant_run,
+)
 
 V_REF = 3.5  # [m/s]
 TF = 10.0  # closed-loop run, s
@@ -67,7 +70,7 @@ x0 = np.array(
 )
 car.x0 = x0
 
-probe = bind(car, point_probe())
+probe = mount(point_probe(), on=car)
 quad = QuadraticCost.from_system(
     car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
 )
@@ -76,7 +79,7 @@ obstacle = scene.clearance_field(probe).as_cost(
     weight=40.0, shaping=quadratic_hinge(threshold=0.2)
 )
 cost = quad + corridor + obstacle
-problem = PlanningProblem(sys=car, x_start=x0, cost=cost, tf=N * DT)
+problem = PlanningProblem(sys=car, x_start=x0, cost=cost, tf=N * DT, U=car.input_box)
 
 # --- MPPI: the pieces it reads, and one jitted tick ---
 ev = car.compile(backend="jax")
@@ -102,9 +105,7 @@ def mppi_tick(U, x0, key):
     V = jnp.clip(U + eps, u_lower, u_upper)
 
     # Roll out: x^k_{t+1} = Phi(x^k_t, v^k_t) over dt, input held, from x0
-    X = jax.vmap(ev.rk4_integrate_zoh_trace, in_axes=(None, 0, None, None))(
-        x0, V, 0.0, DT
-    )
+    X = jax.vmap(lambda v: ev.rollout(x0, v, 0.0, DT))(V)
 
     # Score: the path cost plus lam (1 - alpha) sum_t u_t^T Sigma^-1 eps^k_t
     S = jax.vmap(path_cost)(X, V)
@@ -118,7 +119,7 @@ def mppi_tick(U, x0, key):
     # Update: U <- U + sum_k w^k eps^k
     U_new = U + jnp.einsum("k,ktm->tm", w, eps)
 
-    x_plan = ev.rk4_integrate_zoh_trace(x0, U_new, 0.0, DT)
+    x_plan = ev.rollout(x0, U_new, 0.0, DT)
     return U_new, x_plan, X, S, w, 1.0 / jnp.sum(w**2)
 
 
@@ -126,7 +127,7 @@ def mppi_tick(U, x0, key):
 def plant_period(x, u, t):
     """The true plant over one control period: RK4 at SIM_DT with the input held."""
     for i in range(sub_steps):
-        x = ev.rk4_step_trace(x, u, t + i * SIM_DT, SIM_DT)
+        x = ev.step(x, u, t + i * SIM_DT, dt=SIM_DT)
     return x
 
 
@@ -165,22 +166,21 @@ planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=8,
     transcription="direct_collocation",
-    compile_backend="jax",
-    optimizer_method="scipy_slsqp",
+    backend="jax",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=DT, warm_start=True)
+mpc = ModelPredictiveController(planner)
+loop = (mpc % DT) @ car
 t0 = time.perf_counter()
-result = (mpc @ car).compute_trajectory(
-    tf=TF, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
-)
+result = loop.compute_trajectory(tf=TF, dt=SIM_DT)
 mpc_wall = time.perf_counter() - t0
-traj_mpc = result.plant
+traj_mpc = plant_run(result, loop)
 
 
 # --- the benchmark: closed-loop cost, clearance to the cone, corridor margin, tick time ---
 def report(name, traj, tick_ms):
-    J, _ = score_trajectory(problem, traj)
+    J = float(evaluate_trajectory(problem, traj).J[0])
     xy = traj.x[:2].T
     clearance = np.min(np.linalg.norm(xy - cone.center, axis=1)) - cone.radius
     margin = min(float(track.corridor_field(probe).value(xk)) for xk in traj.x.T)

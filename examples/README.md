@@ -16,8 +16,8 @@ examples/
   teaching/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
-  demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
-  demos/udes_racecar/          # Plant folder: MPC and keyboard game on the 1/10 car
+  demos/<chapter>/             # Canonical single-file textbook scripts, by topic (the chapters' areas)
+  demos/udes_racecar/          # Plant folder: MPC on the 1/10 car (kinematic and dynamic models)
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
@@ -33,7 +33,7 @@ untested by default (ROADMAP §2).
 | [`teaching/topics/`](teaching/topics/) | teaching, smoked unless long | Learn a **subject** — course-agnostic textbook page |
 | [`teaching/courses/<id>/`](teaching/courses/) | teaching, smoked unless long | Homework cited by a live course — do not rename without the notes |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
-| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC, keyboard game) |
+| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC on the kinematic and dynamic models) |
 | [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
 | [`../experimental/<topic>/`](../experimental/) | experimental tier | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks; outside `examples/` |
 
@@ -100,7 +100,7 @@ folders on GitHub, then open a notebook badge.
 
 ### Teaching — topics
 
-Course-agnostic textbook pages. Long notebooks (UR5 EoM, DP grids, PPO training) are skipped in fast CI smoke checks.
+Course-agnostic textbook pages. Long notebooks are skipped in fast CI smoke checks (`"smoke": false` in `tests/demo_checks/notebook_overrides.json`).
 
 #### Classical control
 | Notebook | Colab |
@@ -165,8 +165,9 @@ use the `minilink` conda env (the [README's Install](../README.md#install)).
 
 ## By chapter
 
-One demo folder per tutorial chapter (the tutorial notebooks are the Colab table above); the
-research lane sits apart.
+The demo folders grouped by tutorial chapter (a chapter may span several folders, and the
+simulation chapter's demos sit in `demos/graphical/`; the tutorial notebooks are the Colab table
+above); the research lane sits apart.
 
 | Chapter | Demos | Teaching notebooks / projects |
 | --- | --- | --- |
@@ -177,13 +178,14 @@ research lane sits apart.
 | Analysis | [`demos/analysis/`](demos/analysis/) | [frequency_response](teaching/topics/classical_control/frequency_response.ipynb) (Bode, margins, Nyquist, root locus, step response) |
 | Simulation | [`demos/graphical/`](demos/graphical/) | |
 | Hybrid / step | [`demos/hybrid/`](demos/hybrid/), [`demos/mpc/`](demos/mpc/) | [`projects/mpc/`](projects/mpc/) (spatial MPC stack, dual-rate `mpc_dual_rate.py`), [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
-| Compile / autodiff | [`demos/compile/`](demos/compile/) | [cartpole_rollout_gradients](teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb) |
+| Compile / autodiff | [`demos/compile/`](demos/compile/) (`pid_autotuning_jax.py`: a PID tuned by a hand gradient loop, then by the pipeline problem → `problem.compile` → `pe.program` → `Optimizer`, the one hand loop; `cartpole_rollout_gradients.py`, `neural_controller_jax.py`, `params_gradient.py`: a loss through a rollout, a batch of closed loops or the equation error, wrapped in a `MathematicalProgram` and solved by `Optimizer`; `digital_pid_tuning.py`: the same pipeline on a digital PID, `problem.compile(pid % dt)`; `multi_rate_computer.py`: a 100 Hz filter and a 10 Hz gain on a continuous plant, one sampled loop; `differentiable_double_loop.py`: the core in one script, a neural inner loop on the pendulum and an MPC around it solved by five Adam steps a tick, the whole double loop one pure JAX function: one gradient over a plant parameter, a network weight and an MPC weight, their co-design by `Optimizer`, and the Bode plot of the closed loop in `z`, network and solver included; `native_mpc_tuning.py`: an MPC on a native fixed-iteration planner, its closed loop compiled once and its plan's weights tuned by L-BFGS through it; `terminal_field_mpc.py`: a three-period MPC on the inverted pendulum ended by the LQR value, `QuadraticField(x̄, S).as_terminal_cost()`, against the same MPC without it; `grid_world_step_problem.py`: a grid world as a `StepPlanningProblem` (a native step system, a cost per tick) solved by value iteration on its step face; `lqg_monte_carlo.py`: an LQG loop with a white noise on the torque and a datasheet sensor, its Monte Carlo mean against the covariance prediction) | [cartpole_rollout_gradients](teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb) |
 | Optimization | [`demos/optimization/`](demos/optimization/) | |
 | Planning | [`demos/trajopt/`](demos/trajopt/), [`demos/rrt/`](demos/rrt/), [`demos/value_iteration/`](demos/value_iteration/) | [cost+VI](teaching/courses/udes_gro860/pendulum_value_iteration.ipynb), [VI vs LQR](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb), [grid world DP](teaching/courses/udes_gro860/grid_world_dynamic_programming.ipynb), [minimum-time VI](teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb), [policy evaluation](teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb), [cart-pole LQR](teaching/courses/udes_gro860/cartpole_lqr.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
 | Reinforcement learning | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](../experimental/rl/) |
-| Graphical | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard/gamepad game mode: `game_cartpole.py`, `game_car.py`) | |
+| Graphical | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard/gamepad game mode: `game_cartpole.py`, `game_car.py`, `game_ur5_setpoint.py`) | |
 | UdeS racecar | [`demos/udes_racecar/`](demos/udes_racecar/) (MPC on the kinematic model, MPC on the dynamic model) | [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5: kinematic MPC, then the same MPC on the dynamic car) |
-| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `c_export.py` (repo root) |
+| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `compile/` diagram flattening, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO, `mppi/` pendulum and racecar MPPI, `rl/` Lyapunov check, `random/` noise and seeds) | not nightly-swept; C export demos: `experimental/c_export/c_export_proportional.py`, `experimental/c_export/c_export.py` |
+
 Run demos from the repo root, e.g.
 `PYTHONPATH=. python examples/demos/core/readme_examples.py`.
 

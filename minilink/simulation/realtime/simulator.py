@@ -10,9 +10,8 @@ an optional :class:`~minilink.simulation.realtime.io.RealtimeOutput`, and
 return a :class:`~minilink.core.trajectory.Trajectory` when the session stops.
 
 Sibling orchestrators: :class:`~minilink.simulation.simulator.Simulator`
-(offline time grid) and
-:class:`~minilink.simulation.hybrid_simulator.HybridSimulator` (computer
-ticks). The stepping math lives in the evaluators; this module owns only the
+(offline time grid) and the sampled loop's run verbs (``compute_rollout``,
+``compute_trajectory``: its ticks). The stepping math lives in the evaluators; this module owns only the
 loop, the clock policy, and the recording.
 
 TODO: User Architectural Review — first realtime slice (game-mode parity);
@@ -28,10 +27,15 @@ import warnings
 import numpy as np
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
-from minilink.core.system import DynamicSystem
+from minilink.core.compile.evaluators.stepping import substeps_of
+from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
+from minilink.simulation.sim_reporting import (
+    print_realtime_preamble,
+    print_realtime_report,
+)
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.
@@ -57,7 +61,7 @@ class RealtimeSimulator:
     Advance a continuous system live, one rendered frame at a time.
 
     Each frame: ``u, stop = input.poll(t, x)`` (nominal ``u`` when no input),
-    then ``x = evaluator.integrate_zoh(x, u, t, dt_hold, dt_inner=sim_dt)``,
+    then ``x = evaluator.step(x, u, t, dt=dt_hold, substeps=…)`` (steps of about ``sim_dt``),
     live draw, optional external publish, then sleep out the frame budget.
 
     Parameters
@@ -103,7 +107,7 @@ class RealtimeSimulator:
     plot_backend : str
         Signal plotting backend of the live plot (``"matplotlib"`` or
         ``"plotly"``), as on every plotting verb.
-    compile_backend : str or None
+    backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
         when available and the system is JAX-compatible, otherwise NumPy.
         Pass ``"numpy"`` or ``"jax"`` to force a backend.
@@ -141,7 +145,7 @@ class RealtimeSimulator:
         output=None,
         plot=False,
         plot_backend="matplotlib",
-        compile_backend=None,
+        backend=None,
         max_steps=None,
         tf=None,
         verbose=False,
@@ -181,9 +185,7 @@ class RealtimeSimulator:
         self._compile_s = 0.0
 
         t_compile = time.perf_counter()
-        self.compile_backend, self.evaluator = self._resolve_and_build_evaluator(
-            compile_backend
-        )
+        self.backend, self.evaluator = self._resolve_and_build_evaluator(backend)
         self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
@@ -192,6 +194,7 @@ class RealtimeSimulator:
         self._animator = None
         self._backend = None
         if renderer is not None:
+            # Lazy import: the graphics load on first use, not with the core
             from minilink.graphical.animation.animator import Animator, make_renderer
 
             self._animator = Animator(sys)
@@ -204,7 +207,7 @@ class RealtimeSimulator:
 
     # Public API
 
-    def run(self, x0=None, t0=0.0):
+    def run(self, x0=None, t_start=0.0):
         """
         Run the live loop until stop; return the recorded :class:`Trajectory`.
 
@@ -215,7 +218,7 @@ class RealtimeSimulator:
         ----------
         x0 : np.ndarray, optional
             Initial state (defaults to ``sys.x0``).
-        t0 : float
+        t_start : float
             Initial simulation time.
         """
         sys = self.sys
@@ -223,7 +226,7 @@ class RealtimeSimulator:
         frame_dt = self.frame_dt
 
         x = np.asarray(sys.x0 if x0 is None else x0, dtype=float).reshape(evaluator.n)
-        t = float(t0)
+        t = float(t_start)
         u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
 
         t_warm = time.perf_counter()
@@ -232,19 +235,17 @@ class RealtimeSimulator:
         self._warm_up(x, u, t)
         warm_up_s = time.perf_counter() - t_warm
         if self.verbose:
-            from minilink.simulation.sim_reporting import print_realtime_preamble
-
             print_realtime_preamble(
                 system_name=sys.name,
                 n=evaluator.n,
                 m=evaluator.m,
                 x0=x,
-                t0=t,
+                t_start=t,
                 frame_dt=frame_dt,
                 sim_dt=self.sim_dt,
                 sim_dt_auto=self._auto_sim_dt,
                 sync=self.sync,
-                compile_backend=self.compile_backend,
+                backend=self.backend,
                 renderer=self.renderer,
                 compile_s=self._compile_s,
                 warm_up_s=warm_up_s,
@@ -302,7 +303,9 @@ class RealtimeSimulator:
                     u, should_stop = self.input.poll(t, x)
                     u = np.asarray(u, dtype=float).reshape(evaluator.m)
 
-                x = evaluator.integrate_zoh(x, u, t, dt_hold, dt_inner=sim_dt)
+                x = evaluator.step(
+                    x, u, t, dt=dt_hold, substeps=substeps_of(dt_hold, sim_dt)
+                )
                 x = np.asarray(x, dtype=float)  # native array → NumPy boundary
                 t += dt_hold
                 step_idx += 1
@@ -367,8 +370,6 @@ class RealtimeSimulator:
                 self.output.close()
 
         if self.verbose:
-            from minilink.simulation.sim_reporting import print_realtime_report
-
             wall_s = time.perf_counter() - run_wall_start
             print_realtime_report(
                 elapsed_s=wall_s,
@@ -386,13 +387,13 @@ class RealtimeSimulator:
 
     # Internal machinery
 
-    def _resolve_and_build_evaluator(self, compile_backend):
+    def _resolve_and_build_evaluator(self, backend):
         """Compile with an explicit backend, or auto-try JAX then NumPy.
 
         ``None`` and ``"auto"`` share the same policy: prefer JAX when the
         package is installed and the system is JAX-compatible.
         """
-        if compile_backend is None or compile_backend == BACKEND_AUTO:
+        if backend is None or backend == BACKEND_AUTO:
             try:
                 import jax  # noqa: F401
             except ImportError:
@@ -404,12 +405,7 @@ class RealtimeSimulator:
                     "JAX compile failed, falling back to numpy", exc_info=True
                 )
                 return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-        return compile_backend, self.sys.compile(backend=compile_backend)
-
-    def _offline_auto_dt(self):
-        """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
-        info = self.sys.solver_info
-        return float(info["smallest_time_constant"]) * AUTO_DT_SCALE
+        return backend, self.sys.compile(backend=backend)
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
@@ -417,7 +413,7 @@ class RealtimeSimulator:
         Never refine past the offline Simulator auto-``dt``, and never take
         more than ``DEFAULT_SIM_STEPS_PER_FRAME`` substeps (prefer not lagging).
         """
-        offline_dt = max(self._offline_auto_dt(), np.finfo(float).eps)
+        offline_dt = max(automatic_step_of(self.sys.solver_info), np.finfo(float).eps)
         n_from_offline = max(1, int(self.frame_dt // offline_dt))
         return max(1, min(DEFAULT_SIM_STEPS_PER_FRAME, n_from_offline))
 
@@ -444,7 +440,9 @@ class RealtimeSimulator:
         evaluator = self.evaluator
 
         def _one_frame():
-            x_out = evaluator.integrate_zoh(x, u, t, frame_dt, dt_inner=sim_dt_probe)
+            x_out = evaluator.step(
+                x, u, t, dt=frame_dt, substeps=substeps_of(frame_dt, sim_dt_probe)
+            )
             if getattr(evaluator, "backend", "numpy") == "jax":
                 import jax
 
@@ -490,8 +488,8 @@ class RealtimeSimulator:
         fps_budget = 1.0 / self.frame_dt
         fps_actual = 1.0 / wall_frame_s if wall_frame_s > 0.0 else float("inf")
         tip = (
-            "try compile_backend='jax' or a larger frame_dt / sim_dt"
-            if self.compile_backend == BACKEND_NUMPY
+            "try backend='jax' or a larger frame_dt / sim_dt"
+            if self.backend == BACKEND_NUMPY
             else "try a larger frame_dt / sim_dt, or a lighter renderer"
         )
         warnings.warn(
@@ -500,7 +498,7 @@ class RealtimeSimulator:
                 f"{wall_frame_s * 1000:.1f} ms "
                 f"(budget {self.frame_dt * 1000:.1f} ms, "
                 f"~{fps_actual:.1f} Hz vs {fps_budget:.1f} Hz target, "
-                f"backend={self.compile_backend!r}, overruns={self.n_overruns}). "
+                f"backend={self.backend!r}, overruns={self.n_overruns}). "
                 f"Suggestion: {tip}."
             ),
             UserWarning,
@@ -515,8 +513,8 @@ class RealtimeSimulator:
         inside the loop would stall the first frame. The warm result is
         discarded.
         """
-        x_warm = self.evaluator.integrate_zoh(
-            x, u, t, self.frame_dt, dt_inner=self.sim_dt
+        x_warm = self.evaluator.step(
+            x, u, t, dt=self.frame_dt, substeps=substeps_of(self.frame_dt, self.sim_dt)
         )
         outputs_warm = None
         if self.output is not None and self.output.needs_boundary_outputs:
@@ -570,8 +568,6 @@ def realtime_output_of(output, plot, *, plot_backend: str = "matplotlib"):
     """The user's ``RealtimeOutput``, with a ``LiveSignalPlotOutput`` beside it when ``plot`` asks for one."""
     if plot is False or plot is None:
         return output
-
-    from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
 
     signals = None if plot is True else tuple(plot)
     plot_out = LiveSignalPlotOutput(signals=signals, backend=plot_backend)

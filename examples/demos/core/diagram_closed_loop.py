@@ -1,6 +1,6 @@
 """Wire a pendulum loop by hand: unconnected, open loop, closed loop."""
 
-from minilink import DiagramSystem, ImpedanceController, Pendulum, Step
+from minilink import DiagramSystem, Impedance, Pendulum, Step
 
 # Plant system
 sys = Pendulum()
@@ -12,7 +12,7 @@ sys.x0[0] = -2.0
 step = Step(final_value=1.0, step_time=10.0)
 
 # Closed loop system
-ctl = ImpedanceController(Kp=1000.0, Kd=100.0)
+ctl = Impedance(Kp=1000.0, Kd=100.0)
 
 # Diagram
 diagram = DiagramSystem()

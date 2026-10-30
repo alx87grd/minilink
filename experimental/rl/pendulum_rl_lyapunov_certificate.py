@@ -8,11 +8,8 @@ from scipy.linalg import solve_continuous_lyapunov
 
 from minilink import CostFunction, Pendulum
 from minilink.control import angle_features
-from minilink.planning import (
-    ReinforcementLearningPlanner,
-    StochasticPlanningProblem,
-    Uniform,
-)
+from minilink.learning import ReinforcementLearningPlanner
+from minilink.planning import PlanningProblem, Uniform
 
 TORQUE = 4.0  # Nm, below m g l = 9.81 Nm: the pendulum must pump to get up
 DT = 0.05
@@ -35,11 +32,12 @@ class SwingUpCost(CostFunction):
         return 0.0
 
 
-problem = StochasticPlanningProblem(
+problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
     tf=np.inf,
-    x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+    x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+    U=plant.input_box,
 )
 planner = ReinforcementLearningPlanner(
     problem,
@@ -103,7 +101,7 @@ def V(x):
 
 
 def V_dot(x):
-    return jax.grad(V)(x) @ evaluator.f_trace(x, u_none, 0.0)
+    return jax.grad(V)(x) @ evaluator.f(x, u_none, 0.0)
 
 
 # Sweep the phase plane: the certified region is the largest sublevel set
@@ -151,7 +149,7 @@ print(
 @jax.jit
 def converges(x0):
     def step(x, _):
-        return evaluator.rk4_step_trace(x, u_none, 0.0, 0.02), None
+        return evaluator.step(x, u_none, 0.0, dt=0.02), None
 
     x_final = jax.lax.scan(step, x0, None, length=300)[0]  # 6 s
     return (jnp.abs(x_final[0] - x_eq[0]) < 0.05) & (jnp.abs(x_final[1]) < 0.2)

@@ -10,14 +10,14 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
+from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
-from minilink.planning.spatial.collision import bind, disc
+from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.scene import Scene
 
 GOAL_TOLERANCE = 0.4
@@ -74,14 +74,15 @@ def holonomic_problem():
             Sphere([-3.5, -2.0], 0.55),
         )
     )
-    body = bind(sys, disc(0.25))
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_constraint()
+    body = mount(disc(0.25), on=sys)
+    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
     x_goal = np.array([4.0, 4.0])
     problem = PlanningProblem(
         sys=sys,
         x_start=np.array([-4.0, -4.0]),
-        x_goal=x_goal,
+        Xf=BallSet(x_goal, GOAL_TOLERANCE),
         X=X,
+        U=sys.input_box,
     )
     extender = SteeringExtender(
         StraightLineSteering(speed=1.0),
@@ -95,7 +96,6 @@ def _make_options(planner_cls, seed, nearest_backend):
     if planner_cls is RRTStarPlanner:
         return RRTStarOptions(
             seed=seed,
-            goal_tolerance=GOAL_TOLERANCE,
             goal_bias=GOAL_BIAS,
             max_nodes=MAX_NODES,
             nearest_backend=nearest_backend,
@@ -105,7 +105,6 @@ def _make_options(planner_cls, seed, nearest_backend):
         )
     return RRTOptions(
         seed=seed,
-        goal_tolerance=GOAL_TOLERANCE,
         goal_bias=GOAL_BIAS,
         max_nodes=MAX_NODES,
         nearest_backend=nearest_backend,

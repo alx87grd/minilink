@@ -2,7 +2,7 @@
 
 import matplotlib.pyplot as plt
 
-from minilink import PD, PI, PID, ImpedanceController, P, Pendulum, Step, pzmap
+from minilink import PD, PI, PID, Impedance, P, Pendulum, Step, pzmap
 from minilink.analysis import step_info
 
 plant = Pendulum()
@@ -16,7 +16,7 @@ family = {
     "PI": PI(Kp=20.0, Ki=10.0),
     "PD": PD(Kp=20.0, Kd=2.0, tau=0.05),
     "PID": PID(Kp=20.0, Ki=10.0, Kd=2.0, tau=0.05),
-    "Impedance": ImpedanceController(Kp=20.0, Kd=2.0),
+    "Impedance": Impedance(Kp=20.0, Kd=2.0),
 }
 
 print(f"{'law':<10}{'closed-loop poles':>19}{'static error':>14}{'overshoot %':>13}")
