@@ -227,6 +227,7 @@ class QuadraticCost(CostFunction):
     def g(self, x, u, t=0.0, params=None):
         """Return the quadratic running cost."""
         params = self.params if params is None else params
+
         Q = params["Q"]
         R = params["R"]
         xbar = params["xbar"]
@@ -235,7 +236,6 @@ class QuadraticCost(CostFunction):
         dx = x - xbar
         du = u - ubar
 
-        # g = (x − x̄)ᵀ Q (x − x̄) + (u − ū)ᵀ R (u − ū)
         g = dx.T @ Q @ dx + du.T @ R @ du
 
         return g
@@ -243,12 +243,12 @@ class QuadraticCost(CostFunction):
     def h(self, x, t=0.0, params=None):
         """Return the quadratic terminal cost."""
         params = self.params if params is None else params
+
         S = params["S"]
         xbar = params["xbar"]
 
         dx = x - xbar
 
-        # h = (x − x̄)ᵀ S (x − x̄)
         h = dx.T @ S @ dx
 
         return h
@@ -302,8 +302,8 @@ class TimeCost(CostFunction):
 
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
-        xp = array_module(x)
         params = self.params if params is None else params
+        xp = array_module(x)
 
         xbar = xp.asarray(params["xbar"])
         eps = params["eps"]

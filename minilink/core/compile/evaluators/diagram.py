@@ -357,7 +357,7 @@ def check_blocks_trace(evaluator, diagram, verbose):
     for sys_id, sys in diagram.subsystems.items():
         dummy_x = jnp.zeros(sys.n)
         dummy_u = jnp.zeros(sys.m)
-        params = getattr(sys, "params", {})
+        params = sys.params
         if isinstance(sys, DynamicSystem):
             label = f"{sys_id} ({sys.name})"
             check_jax_compatible(sys.f, label, dummy_x, dummy_u, 0.0, params, jax)

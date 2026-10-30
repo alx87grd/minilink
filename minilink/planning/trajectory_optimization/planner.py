@@ -535,7 +535,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_MAIN)
         print("===          Trajectory Optimization Program             ===")
         print(DISP_RULE_MAIN)
-        print("system:", getattr(sys, "name", type(sys).__name__))
+        print("system:", sys.name)
         print(f"dimensions: n={int(sys.n)}, m={int(sys.m)}, p={int(sys.p)}")
         print("x_start:", preview_vector(problem.x_start))
         print("goal point:", preview_vector(problem.goal_point()))
@@ -1133,7 +1133,7 @@ def type_name(value: object | None) -> str | None:
 
 def require_parametric_transcription(transcription):
     """Refuse a transcription that cannot build a parametric program."""
-    if not getattr(transcription, "supports_parametric", False):
+    if not transcription.supports_parametric:
         raise TypeError(
             f"{type(transcription).__name__} does not support a "
             "parametric program; use transcription='direct_collocation'."

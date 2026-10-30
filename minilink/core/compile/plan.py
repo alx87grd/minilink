@@ -337,8 +337,7 @@ def signal_layout(diagram):
 def params_snapshot(diagram):
     """Every block's ``params`` as compiled: one deep copy per block, by block id."""
     return {
-        sys_id: copy.deepcopy(getattr(sys, "params", {}))
-        for sys_id, sys in diagram.subsystems.items()
+        sys_id: copy.deepcopy(sys.params) for sys_id, sys in diagram.subsystems.items()
     }
 
 

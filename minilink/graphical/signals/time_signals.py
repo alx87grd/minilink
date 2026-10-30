@@ -296,9 +296,7 @@ def open_time_signal_plot(
 def normalize_plot_signals(sys, signals) -> tuple[str, ...]:
     """Expand plot signal specs to ``'sys_id:port'`` / boundary names."""
     # One name, one (subsystem, port) pair, or a sequence of them
-    if isinstance(signals, str):
-        items = (signals,)
-    elif is_subsystem_port_pair(signals):
+    if isinstance(signals, str) or is_subsystem_port_pair(signals):
         items = (signals,)
     else:
         items = tuple(signals)
