@@ -92,6 +92,13 @@
     ]
   },
   {
+    "id": "differentiable_double_loop",
+    "path": "examples/demos/compile/differentiable_double_loop.py",
+    "requires": [
+      "jax"
+    ]
+  },
+  {
     "id": "terminal_field_mpc",
     "path": "examples/demos/compile/terminal_field_mpc.py",
     "requires": [
