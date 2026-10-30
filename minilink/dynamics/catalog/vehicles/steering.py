@@ -25,7 +25,6 @@ class KinematicBicycle(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
-        self.name = "Kinematic Bicycle"
 
         # Parameters: a CG-centered wheelbase, ``length = a + b`` (the frame
         # convention of
@@ -78,12 +77,12 @@ class KinematicBicycle(DynamicSystem):
         a = params["a"]
 
         steering = u[1]
-        T_wb = SE2(x[0], x[1], x[2])
 
-        return {
-            "body": T_wb,
-            "axle_front": T_wb @ SE2(a, 0.0, steering),
-        }
+        # The body, and the front axle steered at its distance a ahead
+        T_wb = SE2(x[0], x[1], x[2])
+        T_front = T_wb @ SE2(a, 0.0, steering)
+
+        return {"body": T_wb, "axle_front": T_front}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         return {}
@@ -94,7 +93,6 @@ class KinematicCar(KinematicBicycle):
 
     def __init__(self):
         super().__init__()
-        self.name = "Kinematic Car"
 
         # Parameters: a full-size wheelbase
         self.a = 2.0
@@ -160,12 +158,10 @@ class KinematicCar(KinematicBicycle):
         half_track = 0.5 * width - 0.5 * tire_width
         T_body = SE2(x[0], x[1], x[2])
         R_steer = SE2(0.0, 0.0, steering)
+        T_fl = T_body @ SE2(axle, half_track, 0.0) @ R_steer
+        T_fr = T_body @ SE2(axle, -half_track, 0.0) @ R_steer
 
-        return {
-            "body": T_body,
-            "wheel_fl": T_body @ SE2(axle, half_track, 0.0) @ R_steer,
-            "wheel_fr": T_body @ SE2(axle, -half_track, 0.0) @ R_steer,
-        }
+        return {"body": T_body, "wheel_fl": T_fl, "wheel_fr": T_fr}
 
 
 class HolonomicMobileRobot(DynamicSystem):
@@ -173,7 +169,6 @@ class HolonomicMobileRobot(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
-        self.name = "Holonomic Mobile Robot"
 
         # Signal labels and units
         self.state.labels = ["x", "y"]

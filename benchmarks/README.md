@@ -3,14 +3,16 @@
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/benchmarks/ode_solver_benchmark.ipynb)
 
 Performance tracking and end-to-end numerical regression for minilink — not
-collected by default pytest (pytest only guards benchmark helper imports) and not
+collected by default pytest (pytest only guards the helpers and runs the public-name
+inventory) and not
 shipped in the pip package. Helpers are grouped by what they measure;
 `common.py` holds shared plumbing, `systems/` holds synthetic fixture systems,
 and `scenarios/` holds canonical integration-check setups.
 
 The modules import minilink exactly like an external user. Nothing inside
-`minilink/` may import from here (the unittest helper guards in
-`tests/unittest/test_benchmark_helpers.py` may).
+`minilink/` may import from here (the unit tests may: the helper guards in
+`tests/unittest/test_benchmark_helpers.py`, the inventory in `test_public_names.py`, the
+fixture systems in `test_mechanical_robotics.py`).
 
 Benchmark fixtures intentionally differ from unittest planning fixtures: e.g.
 `planning_rrt.holonomic_problem()` uses a dense 18-sphere scene for timing
@@ -33,6 +35,11 @@ scene for fast RRT contract tests.
 | [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | Thin wrapper → `--suite e4` (capture/compare) |
 | [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
 | [`baselines/*.json`](baselines/) | Committed golden metrics |
+| [`step_model_baseline.py`](step_model_baseline.py) | Captures every sampled consumer of the step model to JSON for a behaviour-preserving refactor check (no timings, so two captures are byte-identical); `--compare REF.json --rtol` against a capture (AGENTS' refactor recipe) |
+| [`v03_budget.py`](v03_budget.py) | The v0.3 core's budget, a report and not a gate: the one score (1000 starts × 200 RK4 steps), the sampled loop (100 starts × 3000 ticks), the native MPC's closed loop (60 ticks × 15 iterations × 20 steps), the parametric solve against the frozen one, a parameter family against the plain batch, each against 2× its bar; `OUT.json` keeps the numbers |
+| [`v03_baseline.py`](v03_baseline.py) | Captures the v0.3 core's numbers to JSON for a behaviour-preserving refactor check: the step model's entries plus the sampled loop, the problem evaluator, the draws, the optimizer, RL and the fields, to JSON with no timings; `--compare REF.json [--rtol R]` against [`baselines/v03_core.json`](baselines/v03_core.json) (byte-identical by default) |
+| [`params_binding.py`](params_binding.py) | Frozen step vs `params` as an argument vs bound parameters, on JAX: the evidence of the step model's parameter binding |
+| [`public_names.py`](public_names.py) | The public-name inventory: every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
 
 ## Running
 
@@ -62,6 +69,10 @@ python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC 
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
 python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
+python benchmarks/run_nested_flatten_study.py                  # nested PID-loop flatten parity + speed (informational)
+python benchmarks/run_nested_dense_flatten_study.py            # dense / deep-chain nested subnets (informational)
+python benchmarks/run_nested_dense_flatten_study.py --quick    # smaller workload
+
 python benchmarks/run_regression_check.py --update             # refresh committed JSON
 python benchmarks/run_e4_trajopt_parity.py --capture           # same as --suite e4 --update
 python benchmarks/run_f_mpc_parity.py --capture                # same as --suite f_mpc --update
@@ -80,7 +91,7 @@ Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI*
 | `solve_speed` | [`baselines/solve_speed.json`](baselines/solve_speed.json) | **`Optimizer.solve_s`** on textbook NLPs + **NumPy pendulum trajopt `solve_s`** |
 | `dp_speed` | [`baselines/dp_speed.json`](baselines/dp_speed.json) | Value-iteration **`solve_s`** (numpy table + jax device loop), jax **`speedup`**, and jax-vs-numpy `J` / policy agreement |
 | `e4` | [`baselines/e4_trajopt_parity.json`](baselines/e4_trajopt_parity.json) | TOP rebuild + MPC parametric JAX trajopt trajectories + **`solve_s` / `total_s`** |
-| `f_mpc` | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | `control/mpc` hybrid/hand-loop/dual-rate trajectories + **`nlp_s`** (factor **2×** locally) |
+| `f_mpc` | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | MPC trajectories (the sampled loop `(mpc % dt) @ plant`, a host loop on the planner's face, dual rate) + **`nlp_s`** (factor **2×** locally) |
 
 **Speed** metrics use a multiplicative factor (default **4×** per baseline JSON, override
 with `--factor` or `MINILINK_BENCH_REGRESSION_FACTOR`). A **4×** ceiling catches a **10×**

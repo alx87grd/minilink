@@ -17,7 +17,7 @@ from minilink.core.backends import configure_jax
 
 # Plants that need constructor arguments.
 FACTORIES = {
-    "SpeedControlledManipulator": lambda: catalog.SpeedControlledManipulator(2, 2),
+    "KinematicManipulator": lambda: catalog.KinematicManipulator(2, 2),
 }
 
 # Still NumPy-only (S22). Empty since 2026-09-06: every catalog plant traces.
@@ -69,9 +69,9 @@ def test_plant_compiles_on_both_backends_and_agrees(name):
 TRACED_TF = (
     "OneLinkManipulator",
     "TwoLinkManipulator",
-    "ThreeLinkManipulator3D",
-    "FiveLinkPlanarManipulator",
-    "SpeedControlledManipulator",
+    "ThreeLinkManipulator",
+    "FiveLinkManipulator",
+    "KinematicManipulator",
     "DoublePendulum",
     "Acrobot",
     "RotatingCartPole",

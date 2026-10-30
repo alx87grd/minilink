@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from minilink.control.siso import as_dof_vector
@@ -14,7 +16,7 @@ from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 ###############################################################################
 
 
-class ComputedTorqueController(System):
+class ComputedTorque(System):
     """Computed torque with built-in outer PD on joint space (Pyro ``nonlinear.py``).
 
     Desired acceleration ``qdd = Kp (q_d - q) + Kd (dq_d - dq)`` (regulation
@@ -24,9 +26,10 @@ class ComputedTorqueController(System):
     ``r`` is ``q_d`` (dim ``dof``) or stacked ``[q_d; dq_d]`` when
     ``tracking_ref=True``.
 
-    The embedded model (``inverse_dynamics``) reads the referenced plant's
-    **live** ``self.params``; the controller's own params carry gains only.
-    See DESIGN §4 (*Embedded-model params rule*).
+    The embedded model (``inverse_dynamics``) reads the controller's own
+    ``params["model"]``, a copy of the plant's numbers taken at construction:
+    a model mismatch is one edit of that subtree (DESIGN §4, *Embedded-model
+    params rule*).
     """
 
     plot_space = "absolute_qdq"  # plot_control_law sweeps the (q, dq) plane
@@ -42,18 +45,18 @@ class ComputedTorqueController(System):
         require_mechanical_plant(plant)
 
         super().__init__()
-        self.name = "Computed Torque Controller"
 
-        # The embedded model: the plant itself, read with its live params
+        # The embedded model: the plant's equations, on the controller's own numbers
         self.plant = plant
         self.tracking_ref = tracking_ref
         n = plant.dof
         ref_dim = 2 * n if tracking_ref else n
 
-        # Parameters: the outer PD gains, per joint
+        # Parameters: the outer PD gains, per joint, and the model's numbers
         self.params = {
             "Kp": as_dof_vector(25.0 if Kp is None else Kp, n),
             "Kd": as_dof_vector(8.0 if Kd is None else Kd, n),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the reference r (q_d, or [q_d; dq_d] when tracking), the state
@@ -81,7 +84,8 @@ class ComputedTorqueController(System):
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant  # The embedded model reads the plant's live params
+        plant = self.plant  # The embedded model, on the controller's own numbers
+        model = params["model"]
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])
 
@@ -94,7 +98,7 @@ class ComputedTorqueController(System):
         qdd_des = Kp * (q_d - q) - Kd * dq
 
         # τ = inverse_dynamics(q, q̇, q̈_des): the torque that produces that acceleration
-        tau = plant.inverse_dynamics(q, dq, qdd_des)
+        tau = plant.inverse_dynamics(q, dq, qdd_des, params=model)
         tau = xp.asarray(tau).reshape(-1)
 
         return tau
@@ -103,7 +107,8 @@ class ComputedTorqueController(System):
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant  # The embedded model reads the plant's live params
+        plant = self.plant  # The embedded model, on the controller's own numbers
+        model = params["model"]
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])
 
@@ -118,13 +123,13 @@ class ComputedTorqueController(System):
         qdd_des = Kp * (q_d - q) + Kd * (dq_d - dq)
 
         # τ = inverse_dynamics(q, q̇, q̈_des): the torque that produces that acceleration
-        tau = plant.inverse_dynamics(q, dq, qdd_des)
+        tau = plant.inverse_dynamics(q, dq, qdd_des, params=model)
         tau = xp.asarray(tau).reshape(-1)
 
         return tau
 
 
-class SlidingModeController(ComputedTorqueController):
+class SlidingMode(ComputedTorque):
     """Joint-space sliding-mode law on a mechanical plant (Pyro ``nonlinear.py``).
 
     Inherits computed-torque port layout (``r``, ``y = [q; dq]``). Fixed-goal
@@ -149,14 +154,14 @@ class SlidingModeController(ComputedTorqueController):
     ):
         super().__init__(plant, tracking_ref=tracking_ref, Kp=0.0, Kd=0.0)
         n = plant.dof
-        self.name = "Sliding Mode Controller"
 
         # Parameters: the surface slope λ, the switching gain, and the switching gain
-        # scaled by the inertia, per joint
+        # scaled by the inertia, per joint, and the model's numbers
         self.params = {
             "lam": as_dof_vector(1.0 if lam is None else lam, n),
             "gain": as_dof_vector(1.0 if gain is None else gain, n),
             "nab": as_dof_vector(0.1 if nab is None else nab, n),
+            "model": copy.deepcopy(plant.params),
         }
 
         # Ports: the parent's layout, its torque output bound to this law
@@ -166,11 +171,30 @@ class SlidingModeController(ComputedTorqueController):
         # Solver hints: the sign(s) term switches
         self.solver_info["discontinuous_behavior"] = True
 
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params``.
+
+        On the surface the error decays as ``ė = −λ e``: the law sets a time
+        constant of its own, ``τ = 1 / max λᵢ``, often faster than the plant's.
+        """
+        lam = np.asarray(self.params["lam"])
+
+        info = self.own_solver_info
+        info["smallest_time_constant"] = 1.0 / float(np.max(lam))
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
     def ctl_regulation(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant  # The embedded model reads the plant's live params
+        plant = self.plant  # The embedded model, on the controller's own numbers
+        model = params["model"]
         lam = xp.asarray(params["lam"])
         gain = xp.asarray(params["gain"])
         nab = xp.asarray(params["nab"])
@@ -191,9 +215,9 @@ class SlidingModeController(ComputedTorqueController):
         ddq_r = ddq_d - lam * dq_e
 
         # τ = inverse_dynamics(q, q̇, q̈_r) − K(q) sign(s),  K(q) = diag(gain) + H(q) diag(nab)
-        H = plant.H(q)
+        H = plant.H(q, model)
         K = xp.diag(gain) + H @ xp.diag(nab)
-        u_computed = plant.inverse_dynamics(q, dq, ddq_r)
+        u_computed = plant.inverse_dynamics(q, dq, ddq_r, params=model)
         u_discontinuous = K @ xp.sign(s)
         tau = u_computed - u_discontinuous
         tau = xp.asarray(tau).reshape(-1)
@@ -204,7 +228,8 @@ class SlidingModeController(ComputedTorqueController):
         params = self.params if params is None else params
         xp = array_module(u)
 
-        plant = self.plant  # The embedded model reads the plant's live params
+        plant = self.plant  # The embedded model, on the controller's own numbers
+        model = params["model"]
         lam = xp.asarray(params["lam"])
         gain = xp.asarray(params["gain"])
         nab = xp.asarray(params["nab"])
@@ -226,9 +251,9 @@ class SlidingModeController(ComputedTorqueController):
         ddq_r = ddq_d - lam * dq_e
 
         # τ = inverse_dynamics(q, q̇, q̈_r) − K(q) sign(s),  K(q) = diag(gain) + H(q) diag(nab)
-        H = plant.H(q)
+        H = plant.H(q, model)
         K = xp.diag(gain) + H @ xp.diag(nab)
-        u_computed = plant.inverse_dynamics(q, dq, ddq_r)
+        u_computed = plant.inverse_dynamics(q, dq, ddq_r, params=model)
         u_discontinuous = K @ xp.sign(s)
         tau = u_computed - u_discontinuous
         tau = xp.asarray(tau).reshape(-1)
@@ -244,4 +269,4 @@ class SlidingModeController(ComputedTorqueController):
 def require_mechanical_plant(plant):
     """Refuse a plant that is not a ``MechanicalSystem``: the law needs its model."""
     if not isinstance(plant, MechanicalSystem):
-        raise TypeError("ComputedTorqueController requires a MechanicalSystem plant")
+        raise TypeError("ComputedTorque requires a MechanicalSystem plant")

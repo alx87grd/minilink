@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade: derivatives, linearization, structure, equilibria, modes, frequency
 # and time responses, sensitivity functions, Lyapunov certificates.

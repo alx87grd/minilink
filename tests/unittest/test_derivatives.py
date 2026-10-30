@@ -10,7 +10,7 @@ import pytest
 from minilink import (
     CartPole,
     DoublePendulum,
-    ImpedanceController,
+    Impedance,
     InvertedPendulum,
     Pendulum,
     controllability,
@@ -22,10 +22,11 @@ from minilink.analysis.frequency import bode, pzmap, transfer_function
 from minilink.analysis.linearization import linearize, linearize_matrices
 from minilink.analysis.structural import controllability_matrix
 from minilink.blocks.transfer_function import TransferFunction
-from minilink.control.state import StateFeedbackController
+from minilink.control.state import StateFeedback
 from minilink.core.backends import array_module, jax_installed
 from minilink.core.compile.compiler import compile_auto
-from minilink.core.system import DynamicSystem, StepSystem
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.system import DynamicSystem
 
 JAX = jax_installed()
 jax_only = pytest.mark.skipif(not JAX, reason="JAX not installed")
@@ -79,7 +80,7 @@ class _Untraceable(Pendulum):
 
 
 def _closed_loop():
-    return ImpedanceController() @ Pendulum()
+    return Impedance() @ Pendulum()
 
 
 class TestJacobianValues(unittest.TestCase):
@@ -162,16 +163,14 @@ class TestJacobianSelectors(unittest.TestCase):
             plant.jacobian("f", "plant:u")
 
     def test_static_block_x_reaches_the_port(self):
-        ctl = StateFeedbackController(
-            np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5]
-        )
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5])
         np.testing.assert_allclose(ctl.jacobian("u", "x"), [[-1.0, -2.0]], atol=1e-8)
         np.testing.assert_allclose(ctl.jacobian("u", "r"), [[1.0, 2.0]], atol=1e-8)
         with self.assertRaisesRegex(ValueError, "not a step system|of must be"):
             ctl.jacobian("f", "u")
 
     def test_static_block_without_x_port_has_no_state(self):
-        gain = ImpedanceController()
+        gain = Impedance()
         with self.assertRaisesRegex(ValueError, "no state"):
             gain.jacobian("u", "x")
 
@@ -339,7 +338,14 @@ class TestMethod(unittest.TestCase):
     def test_auto_uses_finite_differences_when_params_do_not_trace(self):
         from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
 
-        plant = TwoMass()  # A(t, params) is a NumPy matrix built from params
+        class NumpyTwoMass(TwoMass):
+            def A(self, t=0.0, params=None):
+                # A NumPy matrix built from the params as floats: they do not trace
+                params = self.params if params is None else params
+                numbers = {key: float(value) for key, value in params.items()}
+                return np.asarray(super().A(0.0, numbers))
+
+        plant = NumpyTwoMass()
         self.assertEqual(compile_auto(plant)[0], "jax")
         S = plant.jacobian("f", "params")
         S_fd = plant.jacobian("f", "params", method="fd")
@@ -447,9 +453,7 @@ class TestFamilyPattern(unittest.TestCase):
         )
 
     def test_static_channel_is_a_pure_gain(self):
-        ctl = StateFeedbackController(
-            np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5]
-        )
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5])
         G = transfer_function(ctl, of="u", wrt=("x", 1))
         np.testing.assert_allclose(G.numerator, [-2.0])
         np.testing.assert_allclose(G.denominator, [1.0])
@@ -508,9 +512,9 @@ class TestFamilyPattern(unittest.TestCase):
         auto = lqr(plant, Q, R, x_bar=[0.0, 0.0])
         np.testing.assert_allclose(fd.params["K"], auto.params["K"], atol=1e-4)
 
-    def test_discretize_names_its_integrator(self):
-        disc = discretize(Pendulum(), 0.05, integrator="euler")
-        self.assertEqual(disc.integrator, "euler")
+    def test_discretize_names_its_solver(self):
+        disc = discretize(Pendulum(), 0.05, solver="euler")
+        self.assertEqual(disc.solver, "euler")
         np.testing.assert_allclose(
             disc.jacobian("step", "x")[0], [1.0, 0.05], atol=1e-8
         )

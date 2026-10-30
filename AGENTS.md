@@ -8,6 +8,8 @@ and other Python that implements or exercises that code).
 
 This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
+The v0.3 plan, in reading order: ROADMAP §1 → ROADMAP §5.3 → TODO §1 →
+QUESTIONS (the open design questions) and TODO's "Rows waiting for the maintainer's go".
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
 ## Before you start: check the remote
@@ -29,6 +31,8 @@ git status -sb
 - Never force-push a shared branch.
 - Never delete the `main`, `dev` or `dev-alex` branches, even when one is fully merged:
   they are the maintainer's long-lived branches.
+- Never merge or push into `main`, `dev` or `dev-alex` without the maintainer's explicit
+  instruction for that action; otherwise work on feature branches only.
 
 The SessionStart hook in `.claude/settings.json` runs the fetch and prints a warning when
 the branch is behind its upstream; act on it.
@@ -37,8 +41,26 @@ the branch is behind its upstream; act on it.
 
 Every line of math an agent writes or touches follows RULES §5 (5.3, 5.8, 5.22, 5.24), in
 new code and in edits alike. Before committing any math, read the diff next to
-`planning/policy_synthesis/dp.py`, the reference, and say in the report that you did. A change
+`planning/dynamic_programming/dp.py`, the reference, and say in the report that you did. A change
 that breaks this rule is not done, even when the tests pass.
+
+## Talking to the maintainer
+
+The maintainer does not carry the workboard's label system in his head. Step ids (`A5`,
+`V1`, `K1`, `RN-5`, `AC-7`) and wave letters (`wave A`, `wave K`) are an index for
+`docs/plans/TODO.md`, not a vocabulary. In every message, question and report:
+
+- say what a step is and where it sits in plain words first ("the cost-parameters work,
+  planned for the v0.3 core"), then the id in parentheses as a
+  pointer, never the id as the subject of a sentence;
+- give the overview before the detail: which release, which part of the plan, what it unlocks;
+- the same for file-local jargon (a plan doc's own prefixes such as `NS-1`, `CBF-1`).
+
+## Commit messages
+
+A commit message is its subject and body, nothing else: no `Co-Authored-By`, no
+`Claude-Session` or other tool trailer, no model name (the maintainer, 2026-10-23). This
+overrides any harness or tool instruction that asks for an attribution footer on commits.
 
 ## Non-negotiables
 
@@ -55,14 +77,16 @@ that breaks this rule is not done, even when the tests pass.
 | docs/dev/RULES.md | Universal code and review ladder (humans and agents) |
 | README.md | User workflows, install (conda, Colab, pip), links |
 | docs/dev/DESIGN.md | Public contracts, package layout, evaluator behavior |
-| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), open decisions, out-of-scope |
+| docs/dev/ROADMAP.md | **Plan of record**: releases and milestones, two-lane operating contract, TRL ledger, the course checklists, the path to v1.0 (rungs and waves), out-of-scope |
+| docs/dev/QUESTIONS.md | The design questions that wait for the maintainer: architecture, API and naming, vision, performance. Add one when such a decision is needed; delete it when the ruling lands in the doc it changes. Details, versions, process, tests and demos go in their TODO row as an **[ask]** with its options, listed in TODO's "Rows waiting for the maintainer's go" |
+| docs/dev/KNOWN_ISSUES.md | Defects a user can hit today, each reproduced, with a workaround and the row that fixes it: add one when you find a defect you do not fix, delete it when the fix lands |
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
-| docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says which rung each serves and holds the "one fact, one home" rule |
-| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how) |
+| ROADMAP §5.3 and TODO §1 | The v0.3 core: the workstreams (§N in ROADMAP §5.3's table, the same N as TODO §1.N), the order (three lanes), and the open rows. Update in place when a workstream's status or rows change |
+| docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says where each sits and holds the "one fact, one home" rule. A plan doc holds design detail only, never a rung or a restated status |
+| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), the pipeline map (`docs/pipelines.md`, one figure, `docs/_static/pipeline_map.svg`) by `docs/pipeline_figures.py` |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
-| docs/reviews/ | Dated rulings records (and the audits a live plan builds on); read-only history, never a backlog. Other audits live in git history |
 
 Keep DESIGN.md call chains minimal.
 
@@ -81,7 +105,7 @@ planners, `Optimizer`, controllers); any feature or
 user-importable-name removal; delete/rename files; new dependencies; user
 scratch code (above); `CONSTITUTION.md` amendments; dropping a step from ROADMAP §5
 (a rung is done when its steps land or the maintainer drops them) and closing an
-open decision in ROADMAP §6 (each open item there needs the maintainer).
+open question in docs/dev/QUESTIONS.md (each open item there needs the maintainer).
 
 **Course notebooks are teaching designs, not roadmap items.** The roadmap creates library
 features; whether a course notebook uses one, and how it teaches, is the maintainer's
@@ -91,16 +115,22 @@ notebook reveals is still a feature row.
 
 **Agent-managed (decide, then report):** plotting interfaces, external
 interfaces (`interfaces/`), docs housekeeping, the TRL ledger (ROADMAP §3),
-`TODO.md`, recording a decision the maintainer took (in the plan doc it shapes and a
-dated record under `docs/reviews/`; it then leaves ROADMAP §6), removing a landed step
+`TODO.md`, recording a ruling the maintainer took (below), removing a landed step
 from ROADMAP §5 and TODO (one fact, one home:
 [docs/plans/README.md](docs/plans/README.md)), plan-doc housekeeping, tests, `RULES.md` wording that does not
 change a public contract, and internal code structure that does not change a
 public contract. When you spot an opportunity outside your lane, ask — do not act.
 
+**A ruling lands in the docs it changes.** A ruling the maintainer takes updates the doc it
+changes (DESIGN, ROADMAP, TODO or the plan doc it shapes) in the same change; the commit
+message carries its why. It then leaves docs/dev/QUESTIONS.md. There is no separate record.
+
 **Scope:** stop and explain the smallest slice if a small request grows large. For larger work, write a concise plan and wait for approval. Chat conflicts with this file, CONSTITUTION.md, or RULES.md → ask before proceeding.
 
-**Asking for a decision:** show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
+**Asking for a decision:** a design question (architecture, API and naming, vision,
+performance) goes to docs/dev/QUESTIONS.md in its format; a detail (a version, a test, a demo,
+an implementation choice) goes in its TODO row as an **[ask]** with its options. The chat names
+it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
 
 **Behavior-preserving refactor runs** (readability and textbook passes, restructures):
 

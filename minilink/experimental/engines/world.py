@@ -1,4 +1,8 @@
-"""DynamicSystem wrapper for the JAX physics engine world."""
+"""DynamicSystem wrapper for the JAX physics engine world.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
+"""
 
 import numpy as np
 

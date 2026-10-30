@@ -83,7 +83,7 @@ def _showcase_trajopt_metrics(cfg: IntegrationCheckSuiteConfig) -> list[MetricRe
             direction="lower_better",
             value=result.total_s,
             unit="s",
-            notes="showcase cart-pole swing-up, scipy_slsqp, compile_backend=jax",
+            notes="showcase cart-pole swing-up, scipy_slsqp, backend=jax",
         ),
         MetricRecord(
             id=f"{prefix}.solve_s",

@@ -16,15 +16,14 @@ from minilink.dynamics.catalog.aerial.plane import Plane2D, Plane3D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
-    SimpleIntegrator,
     TripleIntegrator,
 )
 from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
 from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
+    KinematicManipulator,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.marine.boat import Boat2D, Boat2DWithCurrent
@@ -33,7 +32,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import (
     ThreeMass,
     TwoMass,
 )
-from minilink.dynamics.catalog.pendulum.cartpole import CartPole, CartPoleWithNoisePort
+from minilink.dynamics.catalog.pendulum.cartpole import CartPole, NoisyCartPole
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot
 from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
@@ -41,8 +40,8 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
 )
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
-    LongitudinalFrontWheelDriveCarWithTorqueInput,
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+    LongitudinalTorqueCar,
+    LongitudinalSlipCar,
 )
 from examples.projects.car_trajopt.vehicles.extras import (
     ConstantSpeedKinematicCar,
@@ -53,7 +52,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicBicycle,
 )
-from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
+from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
 from minilink.graphical.animation.primitives import Arrow, TorqueArrow
 from tests.unittest.graphics_contract_helpers import geometry_smoke as _geometry_smoke
 from tests.unittest.graphics_contract_helpers import (
@@ -63,9 +62,6 @@ from tests.unittest.graphics_contract_helpers import (
 
 class TestCatalogSmoke(unittest.TestCase):
     def test_low_risk_equation_reference_values(self):
-        np.testing.assert_allclose(
-            SimpleIntegrator().f(np.array([2.0]), np.array([3.0])), [3.0]
-        )
         np.testing.assert_allclose(
             DoubleIntegrator().f(np.array([2.0, 4.0]), np.array([3.0])), [4.0, 3.0]
         )
@@ -137,7 +133,7 @@ class TestCatalogSmoke(unittest.TestCase):
             ),
             [3.0, 4.0, 5.0, 6.0],
         )
-        car = LongitudinalFrontWheelDriveCarWithWheelSlipInput()
+        car = LongitudinalSlipCar()
         self.assertGreater(car.acceleration(speed=0.0, slip=0.1), 0.0)
         mountain = MountainCar()
         np.testing.assert_allclose(mountain.H(np.array([0.0])), [[1.0]])
@@ -145,7 +141,7 @@ class TestCatalogSmoke(unittest.TestCase):
     def test_quarter_car_damps_against_the_road_vertical_velocity(self):
         # The road rises under the wheel at z' = dz/dx * vx, so the damper
         # force b (y' - z') grows linearly with the forward speed vx.
-        car = QuarterCarOnRoughTerrain()
+        car = QuarterCar()
         b, mass = car.params["b"], car.params["mass"]
         x = np.array([0.0, 0.0, 2.0])
         u = np.zeros(1)
@@ -202,7 +198,7 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(
             one.forward_kinematics(np.array([0.0])), [0.0, one.params["l1"]]
         )
-        five = FiveLinkPlanarManipulator()
+        five = FiveLinkManipulator()
         np.testing.assert_allclose(
             five.forward_kinematics(np.zeros(5)), [0.0, np.sum(five.params["l"])]
         )
@@ -217,14 +213,14 @@ class TestCatalogSmoke(unittest.TestCase):
             (Rocket(), 1),
             (Boat2D(), 1),
             (Boat2DWithCurrent(), 2),
-            (QuarterCarOnRoughTerrain(), 1),
+            (QuarterCar(), 1),
             (MountainCar(), 1),
             (HolonomicMobileRobot(), 1),
             (DynamicHolonomicMobileRobot(), 1),
             (HolonomicMobileRobot3D(), 1),
-            (LongitudinalFrontWheelDriveCarWithTorqueInput(), 1),
+            (LongitudinalTorqueCar(), 1),
             (CartPole(), 1),
-            (SpeedControlledManipulator(2, 2), 1),
+            (KinematicManipulator(2, 2), 1),
         ]
         for system, expected in arrow_cases:
             with self.subTest(system=system.name):
@@ -305,8 +301,8 @@ class TestCartPole(unittest.TestCase):
         geometry_smoke(sys)
 
     def test_noise_ports_add_disturbance_and_sensor_noise(self):
-        sys = CartPoleWithNoisePort()
-        self.assertEqual(sys.name, "Cart Pole with noise ports")
+        sys = NoisyCartPole()
+        self.assertEqual(sys.name, "NoisyCartPole")
         self.assertEqual(sys.inputs["d"].dim, 1)
         self.assertEqual(sys.inputs["n"].dim, 4)
         x = np.array([0.1, 0.2, 0.3, 0.4])
@@ -377,10 +373,10 @@ class TestDynamicBicycle(unittest.TestCase):
 
 from minilink.dynamics.abstraction.manipulator import Manipulator
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
-    ThreeLinkManipulator3D,
+    KinematicManipulator,
+    ThreeLinkManipulator,
     TwoLinkManipulator,
     planar_joint_positions,
 )
@@ -389,8 +385,8 @@ from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 _MANIPULATORS = (
     OneLinkManipulator,
     TwoLinkManipulator,
-    ThreeLinkManipulator3D,
-    FiveLinkPlanarManipulator,
+    ThreeLinkManipulator,
+    FiveLinkManipulator,
     UR5Manipulator,
 )
 
@@ -409,7 +405,7 @@ class TestManipulatorCatalog(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 arm = cls()
                 self.assertLess(arm.camera_scale, 10.0)
-        speed = SpeedControlledManipulator(2, 2)
+        speed = KinematicManipulator(2, 2)
         self.assertLess(speed.camera_scale, 10.0)
 
     def test_h_p_and_h_pdot_match_kinematics(self):
@@ -452,7 +448,7 @@ class TestManipulatorCatalog(unittest.TestCase):
         np.testing.assert_allclose(arm.forward_kinematics(q), tip[-1])
 
     def test_three_link_fk_matches_tf_end_effector(self):
-        arm = ThreeLinkManipulator3D()
+        arm = ThreeLinkManipulator()
         q = np.array([0.1, -0.2, 0.15])
         x = arm.q2x(q, np.zeros(3))
         fk = arm.forward_kinematics(q)
@@ -541,7 +537,7 @@ class TestManipulatorCatalog(unittest.TestCase):
         geometry_smoke(arm, x, np.zeros(6))
 
     def test_five_link_uses_placeholder_inertia(self):
-        arm = FiveLinkPlanarManipulator()
+        arm = FiveLinkManipulator()
         np.testing.assert_allclose(arm.H(np.zeros(5)), np.eye(5))
         np.testing.assert_allclose(
             arm.inverse_dynamics(np.zeros(5), np.zeros(5), np.ones(5)), np.ones(5)
@@ -566,7 +562,7 @@ class TestManipulatorCatalog(unittest.TestCase):
 
     def test_from_manipulator_inherits_kinematics(self):
         source = TwoLinkManipulator()
-        speed = SpeedControlledManipulator.from_manipulator(source)
+        speed = KinematicManipulator.from_manipulator(source)
         q = np.array([0.2, -0.1])
         np.testing.assert_allclose(
             speed.forward_kinematics(q), source.forward_kinematics(q)
@@ -576,7 +572,7 @@ class TestManipulatorCatalog(unittest.TestCase):
         np.testing.assert_allclose(speed.f(q, np.array([0.3, -0.2])), [0.3, -0.2])
 
     def test_speed_plant_p_port(self):
-        speed = SpeedControlledManipulator.from_manipulator(TwoLinkManipulator())
+        speed = KinematicManipulator.from_manipulator(TwoLinkManipulator())
         q = np.array([0.2, -0.1])
         np.testing.assert_allclose(
             speed.h_p(q, np.zeros(2)), speed.forward_kinematics(q)
@@ -916,7 +912,7 @@ class TestCarProfile(unittest.TestCase):
 
 # The params family: a method reads the params it is given
 
-from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator3D
+from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator
 from minilink.dynamics.catalog.pendulum.cartpole import (
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
@@ -948,7 +944,7 @@ def speed_two_link(params=None):
     arm = TwoLinkManipulator()
     if params is not None:
         arm.params = params
-    return SpeedControlledManipulator.from_manipulator(arm)
+    return KinematicManipulator.from_manipulator(arm)
 
 
 speed_two_link.defaults = lambda: TwoLinkManipulator().params
@@ -967,17 +963,17 @@ PARAMS_CASES = [
     (stored(TwoLinkManipulator), "h_pdot", "l2", 0.4),
     (stored(TwoLinkManipulator), "tf", "l1", 0.7),
     (stored(TwoLinkManipulator), "get_dynamic_geometry", "l1", 0.7),
-    (stored(ThreeLinkManipulator3D), "forward_kinematics", "l1", 1.4),
-    (stored(ThreeLinkManipulator3D), "J", "l3", 1.4),
-    (stored(ThreeLinkManipulator3D), "h_p", "l2", 1.4),
-    (stored(ThreeLinkManipulator3D), "h_pdot", "l3", 1.4),
-    (stored(ThreeLinkManipulator3D), "tf", "l2", 1.4),
-    (stored(FiveLinkPlanarManipulator), "forward_kinematics", "l", np.full(5, 0.6)),
-    (stored(FiveLinkPlanarManipulator), "J", "l", np.full(5, 0.6)),
-    (stored(FiveLinkPlanarManipulator), "h_p", "l", np.full(5, 0.6)),
-    (stored(FiveLinkPlanarManipulator), "h_pdot", "l", np.full(5, 0.6)),
-    (stored(FiveLinkPlanarManipulator), "tf", "l", np.full(5, 0.6)),
-    (stored(FiveLinkPlanarManipulator), "get_dynamic_geometry", "l", np.full(5, 0.6)),
+    (stored(ThreeLinkManipulator), "forward_kinematics", "l1", 1.4),
+    (stored(ThreeLinkManipulator), "J", "l3", 1.4),
+    (stored(ThreeLinkManipulator), "h_p", "l2", 1.4),
+    (stored(ThreeLinkManipulator), "h_pdot", "l3", 1.4),
+    (stored(ThreeLinkManipulator), "tf", "l2", 1.4),
+    (stored(FiveLinkManipulator), "forward_kinematics", "l", np.full(5, 0.6)),
+    (stored(FiveLinkManipulator), "J", "l", np.full(5, 0.6)),
+    (stored(FiveLinkManipulator), "h_p", "l", np.full(5, 0.6)),
+    (stored(FiveLinkManipulator), "h_pdot", "l", np.full(5, 0.6)),
+    (stored(FiveLinkManipulator), "tf", "l", np.full(5, 0.6)),
+    (stored(FiveLinkManipulator), "get_dynamic_geometry", "l", np.full(5, 0.6)),
     (speed_two_link, "tf", "l1", 0.7),
     (speed_two_link, "get_dynamic_geometry", "l2", 0.4),
     # The double pendulum and the acrobot: frames and torque arcs
@@ -1010,19 +1006,19 @@ PARAMS_CASES = [
     (stored(KinematicCar), "tf", "length", 6.0),
     # The longitudinal cars: the traction arrow
     (
-        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        stored(LongitudinalSlipCar),
         "get_dynamic_geometry",
         "length",
         3.0,
     ),
     (
-        stored(LongitudinalFrontWheelDriveCarWithWheelSlipInput),
+        stored(LongitudinalSlipCar),
         "get_dynamic_geometry",
         "mu_max",
         1.2,
     ),
     (
-        stored(LongitudinalFrontWheelDriveCarWithTorqueInput),
+        stored(LongitudinalTorqueCar),
         "get_dynamic_geometry",
         "mu_max",
         1.2,
@@ -1030,7 +1026,7 @@ PARAMS_CASES = [
     (
         # Rolling at 10 m/s with the wheel near its rolling speed: the slip is not clipped
         stored(
-            LongitudinalFrontWheelDriveCarWithTorqueInput,
+            LongitudinalTorqueCar,
             x0=np.array([0.0, 10.0, 33.0, 0.0]),
         ),
         "get_dynamic_geometry",
@@ -1038,7 +1034,7 @@ PARAMS_CASES = [
         0.4,
     ),
     # The quarter car: the spring down to the road
-    (stored(QuarterCarOnRoughTerrain), "get_dynamic_geometry", "a", np.full(6, 0.4)),
+    (stored(QuarterCar), "get_dynamic_geometry", "a", np.full(6, 0.4)),
     # The planar aircraft: its chords and its lift and drag arrows
     (stored(Plane2D), "tf", "l_t", 1.3),
     (stored(Plane2D), "get_dynamic_geometry", "rho", 1.5),

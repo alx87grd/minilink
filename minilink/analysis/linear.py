@@ -90,16 +90,23 @@ def gain(A, B, C, D):
     return float(np.real(k))
 
 
-def frequency_response(A, B, C, D, w):
-    """Frequency response of a SISO channel, one complex value per frequency in ``w``."""
+def frequency_response(A, B, C, D, w, period=None):
+    """Frequency response of a SISO channel, one complex value per frequency in ``w``.
+
+    ``G(jω)`` of a continuous model; with ``period`` ``Δ``, ``G(e^{jωΔ})`` of a
+    difference equation, the discrete response at the sample period.
+    """
     A, B, C, D = as_siso_matrices(A, B, C, D)
     w = np.asarray(w, dtype=float).reshape(-1)
     I = np.eye(A.shape[0])
 
-    # G(jω) = C (jω I − A)⁻¹ B + D
+    # s = jω, or z = e^{jωΔ} on the unit circle
+    s = 1j * w if period is None else np.exp(1j * w * float(period))
+
+    # G(s) = C (s I − A)⁻¹ B + D
     G = np.empty(w.size, dtype=complex)
-    for k, omega in enumerate(w):
-        G[k] = (C @ np.linalg.solve(1j * omega * I - A, B) + D)[0, 0]
+    for k, s_k in enumerate(s):
+        G[k] = (C @ np.linalg.solve(s_k * I - A, B) + D)[0, 0]
 
     return G
 

@@ -1,10 +1,16 @@
-"""Spatial workspace: obstacles, reference paths, and state-field exports."""
+"""Spatial workspace: obstacles, reference paths, and the workspace fields."""
 
+from minilink.core.shaping import (
+    inverse_barrier,
+    occupancy,
+    quadratic_excess,
+    quadratic_hinge,
+)
 from minilink.planning.spatial.collision import (
     CollisionBody,
-    bind,
     car_outline,
     disc,
+    mount,
     point_probe,
 )
 from minilink.planning.spatial.paths import (
@@ -14,17 +20,10 @@ from minilink.planning.spatial.paths import (
     from_waypoints,
 )
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
-    inverse_barrier,
-    occupancy,
-    quadratic_excess,
-    quadratic_hinge,
-)
 from minilink.planning.spatial.state_fields import (
     ClearanceField,
     CorridorMarginField,
     PathDistanceField,
-    StateField,
 )
 from minilink.planning.spatial.track import ReferenceTrack
 
@@ -37,8 +36,7 @@ __all__ = [
     "ReferencePath",
     "ReferenceTrack",
     "Scene",
-    "StateField",
-    "bind",
+    "mount",
     "car_outline",
     "disc",
     "circuit_waypoints",

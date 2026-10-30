@@ -9,7 +9,7 @@ import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.core.system import AUTO_DT_SCALE
 
 
 def _have_jax() -> bool:
@@ -61,17 +61,17 @@ class DiscontinuousLinearSystem(StableLinearSystem):
 
 class TestNewSimulator(unittest.TestCase):
     def test_a_diagram_x0_set_by_the_user_is_kept(self):
-        from minilink import Pendulum, StateFeedbackController
+        from minilink import Pendulum, StateFeedback
 
         K = np.array([[10.0, 2.0]])
-        loop = StateFeedbackController(K) @ Pendulum()
+        loop = StateFeedback(K) @ Pendulum()
         loop.x0 = np.array([0.5, -0.2])
         traj = loop.compute_trajectory(tf=0.05, verbose=False)
         np.testing.assert_allclose(traj.x[:, 0], [0.5, -0.2])
         np.testing.assert_allclose(loop.x0, [0.5, -0.2])
 
         plant = Pendulum()
-        loop = StateFeedbackController(K) @ plant
+        loop = StateFeedback(K) @ plant
         plant.x0 = np.array([0.7, 0.0])  # set on the block after composition
         traj = loop.compute_trajectory(tf=0.05, verbose=False)
         np.testing.assert_allclose(traj.x[:, 0], [0.7, 0.0])
@@ -91,14 +91,14 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="numpy",
+            backend="numpy",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "scipy")
 
     def test_default_compile_backend_is_numpy(self):
         sim = Simulator(StableLinearSystem(), tf=1.0, n_steps=5, verbose=False)
-        self.assertEqual(sim.compile_backend, "numpy")
+        self.assertEqual(sim.backend, "numpy")
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -108,10 +108,10 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=5,
-            compile_backend=COMPILE_BACKEND_AUTO,
+            backend=COMPILE_BACKEND_AUTO,
             verbose=False,
         )
-        self.assertEqual(sim.compile_backend, "jax")
+        self.assertEqual(sim.backend, "jax")
 
     @pytest.mark.optional
     @pytest.mark.jax
@@ -121,7 +121,7 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="jax",
+            backend="jax",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "rk4_fixedsteps")
@@ -134,7 +134,7 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_steps=9999,
-            compile_backend="jax",
+            backend="jax",
             verbose=False,
         )
         self.assertEqual(sim.solver_mode, "scipy")
@@ -147,7 +147,7 @@ class TestNewSimulator(unittest.TestCase):
             DiscontinuousLinearSystem(),
             tf=1.0,
             n_steps=10000,
-            compile_backend="jax",
+            backend="jax",
             solver_warnings="ignore",
             verbose=False,
         )
@@ -198,9 +198,7 @@ class TestNewSimulator(unittest.TestCase):
     def test_coarse_dt_warning_falls_back_to_the_system_default(self):
         sys = DiscontinuousLinearSystem()
         del sys.solver_info["smallest_time_constant"]
-        with patch(
-            "minilink.simulation.solver_warnings.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02
-        ):
+        with patch("minilink.core.system.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02):
             with pytest.warns(UserWarning, match=r"consider dt <= 0\.002"):
                 Simulator(sys, tf=1.0, dt=0.01, solver="euler", verbose=False)
 
@@ -445,7 +443,7 @@ except ImportError:
 class TestStaticSimulator(unittest.TestCase):
     def test_gain_compute_trajectory_shape(self):
         gain = Gain(K=2.0, dim=1)
-        traj = gain.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        traj = gain.compute_trajectory(t_start=0, tf=1, n_steps=5, verbose=False)
         self.assertEqual(traj.x.shape, (0, 5))
         self.assertEqual(traj.u.shape, (1, 5))
         self.assertIn("y", traj.signals)
@@ -455,7 +453,7 @@ class TestStaticSimulator(unittest.TestCase):
         from minilink import P
 
         ctl = P(2.0, ports="reference")
-        traj = ctl.compute_trajectory(t0=0, tf=1, n_steps=5, verbose=False)
+        traj = ctl.compute_trajectory(t_start=0, tf=1, n_steps=5, verbose=False)
         self.assertEqual(traj.u.shape, (2, 5))  # the stacked inputs r, y
         self.assertNotIn("u", traj.signals)
 
@@ -463,7 +461,7 @@ class TestStaticSimulator(unittest.TestCase):
         step = Step(
             initial_value=np.array([0.0]), final_value=np.array([1.0]), step_time=0.5
         )
-        traj = step.compute_trajectory(t0=0, tf=1, n_steps=3, verbose=False)
+        traj = step.compute_trajectory(t_start=0, tf=1, n_steps=3, verbose=False)
         self.assertEqual(traj.x.shape, (0, 3))
         y = traj.signals["y"]
         np.testing.assert_array_equal(y[:, 0], [0.0])
@@ -472,7 +470,7 @@ class TestStaticSimulator(unittest.TestCase):
 
     def test_static_simulator_direct(self):
         gain = Gain(K=3.0, dim=1)
-        sim = StaticSimulator(gain, t0=0, tf=0.2, n_steps=3)
+        sim = StaticSimulator(gain, t_start=0, tf=0.2, n_steps=3)
         traj = sim.solve_forced(np.array([[1.0, 2.0, 3.0]]))
         np.testing.assert_allclose(traj.signals["y"], [[3.0, 6.0, 9.0]])
 
@@ -484,14 +482,14 @@ class TestStaticSimulatorJax(unittest.TestCase):
     def test_gain_jax_compile_backend(self):
         gain = Gain(K=2.0, dim=1)
         traj = gain.compute_trajectory(
-            t0=0, tf=0.5, n_steps=3, compile_backend="jax", verbose=False
+            t_start=0, tf=0.5, n_steps=3, backend="jax", verbose=False
         )
         self.assertEqual(traj.x.shape, (0, 3))
         self.assertIn("y", traj.signals)
 
 
-from minilink.control.modelbased import SlidingModeController
-from minilink.core.composition import closed_loop
+from minilink.control.modelbased import SlidingMode
+from minilink.core.closed_loop import closed_loop
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.simulation.simulator import Simulator
 
@@ -509,7 +507,7 @@ def _build_smc_diagram():
         final_value=np.array([0.0, 0.0]),
         step_time=0.5,
     )
-    smc = SlidingModeController(model, lam=20.0, gain=8.0, nab=0.15)
+    smc = SlidingMode(model, lam=20.0, gain=8.0, nab=0.15)
     return ref >> closed_loop(smc, plant)
 
 
@@ -545,8 +543,9 @@ class TestDiscontinuousSolvers(unittest.TestCase):
         self.assertEqual(sim.solver_mode, "euler")
 
     def test_auto_dt_uses_discontinuous_scale(self):
-        sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
+        sim = Simulator(self.diagram, tf=0.5, solver_warnings="ignore", verbose=False)
+        tau = self.diagram.solver_info["smallest_time_constant"]
+        expected_dt = tau * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -582,258 +581,19 @@ class TestDiscontinuousSolvers(unittest.TestCase):
 from minilink.blocks.basic import Integrator
 
 
-class TestIntegrateZoh(unittest.TestCase):
-    def test_single_step_matches_integrate(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        x0 = np.array([0.0])
-        u_hold = np.array([2.0])
-        x_final = evaluator.integrate_zoh(x0, u_hold, t0=0.0, dt_hold=0.1)
-        x_seq = evaluator.rk4_integrate_zoh(x0, u_hold.reshape(1, 1), t0=0.0, dt=0.1)
-        np.testing.assert_allclose(x_final, x_seq[-1])
-
-    def test_subdivided_dt_inner(self):
+class TestStepSubsteps(unittest.TestCase):
+    def test_substeps_are_the_fine_rollout_of_the_held_input(self):
         plant = Integrator()
         evaluator = plant.compile()
         x0 = np.array([0.0])
         u_hold = np.array([1.0])
-        dt_hold = 0.1
-        dt_inner = 0.02
-        x_final = evaluator.integrate_zoh(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        n_sub = int(round(dt_hold / dt_inner))
-        u_sequence = np.ones((n_sub, 1))
-        dt_step = dt_hold / n_sub
-        x_seq = evaluator.rk4_integrate_zoh(x0, u_sequence, t0=0.0, dt=dt_step)
+        x_final = evaluator.step(x0, u_hold, 0.0, dt=0.1, substeps=5)
+        x_seq = evaluator.rollout(x0, np.ones((5, 1)), 0.0, 0.02)
         np.testing.assert_allclose(x_final, x_seq[-1], rtol=1e-10, atol=1e-10)
-
-    def test_integrate_zoh_rollout_grid(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        x0 = np.array([0.0])
-        u_hold = np.array([1.0])
-        dt_hold = 0.1
-        dt_inner = 0.02
-        t_samples, x_samples = evaluator.integrate_zoh_rollout(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        n_sub = int(round(dt_hold / dt_inner))
-        self.assertEqual(t_samples.shape[0], n_sub + 1)
-        self.assertEqual(x_samples.shape, (n_sub + 1, 1))
-        np.testing.assert_allclose(t_samples[0], 0.0)
-        np.testing.assert_allclose(t_samples[-1], dt_hold, rtol=1e-12)
-        x_final = evaluator.integrate_zoh(
-            x0, u_hold, t0=0.0, dt_hold=dt_hold, dt_inner=dt_inner
-        )
-        np.testing.assert_allclose(x_samples[-1], x_final)
-
-    def test_invalid_dt_raises(self):
-        plant = Integrator()
-        evaluator = plant.compile()
-        with self.assertRaises(ValueError):
-            evaluator.integrate_zoh(np.array([0.0]), np.array([1.0]), 0.0, 0.0)
-
-
-from minilink.core.compile.evaluators.step_rollout import gather_u
-from minilink.core.diagram import StepDiagramSystem
-from minilink.core.system import StepSystem, System
-from minilink.simulation.computer import Computer, StepSchedule
-
-
-class KDependentPort(System):
-    """Static block whose output depends on step index ``k`` in the third slot."""
-
-    def __init__(self):
-        super().__init__()
-        self.add_input_port("u", dim=1)
-        self.add_output_port("y", dim=1, function=self.compute, dependencies=("u",))
-
-    def compute(self, x, u, t=0, params=None):
-        xp = array_module(u)
-        k = int(t)
-        return xp.array([u[0] + float(k)])
-
-
-class Accumulator(StepSystem):
-    def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.x0 = np.zeros(1)
-
-    def step(self, x, u, k=0, params=None):
-        xp = array_module(x, u)
-        x = xp.asarray(x, dtype=float).reshape(1)
-        u = xp.asarray(u, dtype=float).reshape(1)
-        return xp.array([x[0] + u[0]])
-
-    def h(self, x, u, k=0, params=None):
-        xp = array_module(x)
-        return xp.asarray(x, dtype=float).reshape(1).copy()
-
-
-def _build_direct_plant():
-    """Boundary input wired directly to the plant — no in-tick serial dependency."""
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(Accumulator(), "plant")
-    diagram.add_input_port("u")
-    diagram.connect("input", "u", "plant", "u")
-    diagram.connect_new_output_port("plant", "y", "y")
-    return diagram
-
-
-def _build_fast_slow_series():
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(Accumulator(), "fast")
-    diagram.add_subsystem(Accumulator(), "slow")
-    diagram.add_input_port("u")
-    diagram.connect("input", "u", "fast", "u")
-    diagram.connect("fast", "y", "slow", "u")
-    diagram.connect_new_output_port("slow", "y", "y")
-    return diagram
-
-
-def _hand_tick(computer: Computer, u) -> dict[str, np.ndarray]:
-    """Reference one-tick update mirroring Computer double-buffer semantics."""
-    plan = computer.plan
-    k_tick = computer.k
-    read = computer.signal_read
-    write = computer.signal_write
-    write[:] = read
-    x_work = computer.x.copy()
-    u_arr = np.asarray(u, dtype=float).reshape(computer.diagram.m)
-    for sys_id in computer.all_sys_ids:
-        if k_tick % computer.divisor(sys_id) != 0:
-            continue
-        for op in computer.port_ops_by_sys.get(sys_id, ()):
-            local_x = x_work[op.local_x_slice]
-            local_u = gather_u(op.gather_sources, op.u_dim, read, u_arr)
-            write[op.out_slice] = op.compute_func(
-                local_x, local_u, k_tick, op.bound_params
-            )
-        step_op = computer.step_op_by_sys.get(sys_id)
-        if step_op is not None:
-            local_x = x_work[step_op.local_x_slice]
-            local_u = gather_u(step_op.gather_sources, step_op.u_dim, read, u_arr)
-            x_work[step_op.local_x_slice] = step_op.step_func(
-                local_x, local_u, k_tick, step_op.bound_params
-            )
-    computer.signal_read, computer.signal_write = (write, read)
-    computer.x = x_work
-    outs = {
-        port_id: computer.signal_read[sl].copy()
-        for port_id, sl in plan.external_output_slices.items()
-    }
-    computer.k += 1
-    return outs
-
-
-class TestComputer(unittest.TestCase):
-    def test_single_rate_matches_rollout(self):
-        diagram = _build_direct_plant()
-        schedule = StepSchedule(dt_base=0.01)
-        computer = Computer(diagram, schedule)
-        computer.compile()
-        computer.reset()
-        n_steps = 20
-        u_val = 1.0
-        xs = [computer.x.copy()]
-        for _ in range(n_steps):
-            computer.tick(np.array([u_val]))
-            xs.append(computer.x.copy())
-        rollout = diagram.compute_rollout(n_steps=n_steps, u=np.array([u_val]))
-        np.testing.assert_allclose(xs[-1], rollout.x[:, -1], rtol=1e-10, atol=1e-10)
-        for i in range(1, n_steps + 1):
-            np.testing.assert_allclose(xs[i], rollout.x[:, i], rtol=1e-10, atol=1e-10)
-
-    def test_k_increments_and_passed_to_leaf(self):
-        diagram = StepDiagramSystem()
-        diagram.add_subsystem(KDependentPort(), "blk")
-        diagram.add_input_port("u")
-        diagram.connect("input", "u", "blk", "u")
-        diagram.connect_new_output_port("blk", "y", "y")
-        computer = Computer(diagram, StepSchedule(dt_base=0.01))
-        computer.compile()
-        computer.reset()
-        self.assertEqual(computer.k, 0)
-        outs = computer.tick(np.array([2.0]))
-        self.assertAlmostEqual(float(outs["y"][0]), 2.0)
-        self.assertEqual(computer.k, 1)
-        outs = computer.tick(np.array([2.0]))
-        self.assertAlmostEqual(float(outs["y"][0]), 3.0)
-
-    def test_multi_rate_hold(self):
-        diagram = _build_fast_slow_series()
-        schedule = StepSchedule(dt_base=0.01, fire={"fast": 1, "slow": 2})
-        computer = Computer(diagram, schedule)
-        computer.compile()
-        computer.reset()
-        ref = Computer(diagram, schedule)
-        ref.compile()
-        ref.reset()
-        n_steps = 12
-        u_val = 1.0
-        for _ in range(n_steps):
-            outs = computer.tick(np.array([u_val]))
-            ref_outs = _hand_tick(ref, np.array([u_val]))
-            np.testing.assert_allclose(computer.x, ref.x)
-            for key in outs:
-                np.testing.assert_allclose(outs[key], ref_outs[key])
-
-    def test_from_rates_divisors(self):
-        schedule = StepSchedule.from_rates(
-            dt_base=0.01, rates_hz={"a": 100.0, "b": 50.0}
-        )
-        self.assertEqual(schedule.fire["a"], 1)
-        self.assertEqual(schedule.fire["b"], 2)
-        with self.assertRaises(ValueError):
-            StepSchedule.from_rates(dt_base=0.01, rates_hz={"a": 30.0})
-        with self.assertRaises(ValueError):
-            StepSchedule.from_rates(dt_base=0.01, rates_hz={"a": 200.0})
-
-    def test_rollout_differs_when_scheduled(self):
-        diagram = _build_fast_slow_series()
-        sync = diagram.compute_rollout(n_steps=6, u=np.array([1.0]))
-        schedule = StepSchedule(dt_base=0.01, fire={"fast": 1, "slow": 2})
-        computer = Computer(diagram, schedule)
-        computer.compile()
-        computer.reset()
-        for _ in range(6):
-            computer.tick(np.array([1.0]))
-        self.assertFalse(np.allclose(computer.x, sync.x[:, -1]))
-
-    def test_reset_replay(self):
-        diagram = _build_direct_plant()
-        computer = Computer(diagram, StepSchedule(dt_base=0.01))
-        computer.compile()
-        computer.reset()
-        n_steps = 10
-        for k in range(n_steps):
-            computer.tick(np.array([float(k)]))
-        x_final = computer.x.copy()
-        k_final = computer.k
-        computer.reset()
-        for k in range(n_steps):
-            computer.tick(np.array([float(k)]))
-        np.testing.assert_allclose(computer.x, x_final)
-        self.assertEqual(computer.k, k_final)
-
-    def test_unknown_sys_id_in_fire_raises(self):
-        diagram = _build_direct_plant()
-        schedule = StepSchedule(dt_base=0.01, fire={"missing": 2})
-        computer = Computer(diagram, schedule)
-        with self.assertRaises(ValueError):
-            computer.compile()
-
-    def test_tick_before_compile_raises(self):
-        diagram = _build_direct_plant()
-        computer = Computer(diagram, StepSchedule(dt_base=0.01))
-        with self.assertRaises(RuntimeError):
-            computer.tick(np.array([1.0]))
 
 
 from minilink.control.siso import P
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.simulation.computer import Computer, StepSchedule, as_computer
+from minilink.core.discrete.sampled_system import SampledSystem
 
 
 class ScheduledP(P):
@@ -843,61 +603,23 @@ class ScheduledP(P):
         return super().__mod__(schedule)
 
 
-class UnscheduledP(P):
-    """A block whose own ``%`` returns something other than a Computer."""
+class TestTheClockOperator(unittest.TestCase):
+    """``%`` puts any block on a clock, a block's own override included."""
 
-    def __mod__(self, schedule):
-        return self
-
-
-def _build_step_diagram():
-    diagram = StepDiagramSystem()
-    diagram.add_subsystem(P(0.5, ports="reference"), "controller")
-    diagram.add_input_port("r")
-    diagram.add_input_port("y")
-    diagram.connect("input", "r", "controller", "r")
-    diagram.connect("input", "y", "controller", "y")
-    diagram.connect_new_output_port("controller", "u", "u")
-    return diagram
-
-
-class TestAsComputer(unittest.TestCase):
-    def test_leaf_mod_float(self):
-        computer = P(0.3, ports="reference") % 0.02
-        self.assertIsInstance(computer, Computer)
-        self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
-        self.assertIn("controller", computer.diagram.subsystems)
-
-    def test_step_diagram_as_computer(self):
-        diagram = _build_step_diagram()
-        computer = as_computer(diagram, StepSchedule(dt_base=0.01))
-        self.assertIs(diagram, computer.diagram)
-
-    def test_rejects_continuous_plant(self):
-        with self.assertRaises(TypeError):
-            Integrator() % 0.01
-
-    def test_mod_override_calling_super_builds_a_computer(self):
-        """``%``, ``as_computer`` and ``hybrid_closed_loop`` reach the plain build."""
+    def test_mod_override_calling_super_puts_the_block_on_a_clock(self):
+        """``%`` is the clock for every block, an override that calls the base's included."""
         ctl = ScheduledP(0.3, ports="reference")
-        computers = (
-            ctl % 0.02,
-            as_computer(ctl, 0.02),
-            hybrid_closed_loop(ctl, Integrator(), schedule=0.02).computer,
-        )
-        for computer in computers:
-            self.assertIsInstance(computer, Computer)
-            self.assertAlmostEqual(computer.schedule.dt_base, 0.02)
+        sampled = ctl % 0.02
+        self.assertIsInstance(sampled, SampledSystem)
+        self.assertEqual(sampled.sample_period, 0.02)
 
-    def test_as_computer_rejects_a_mod_that_is_not_a_computer(self):
-        with self.assertRaises(TypeError):
-            as_computer(UnscheduledP(0.3, ports="reference"), 0.02)
-
-    def test_mpc_mod_exposes_u_ff(self):
+    def test_mpc_mod_sets_the_native_laws_period(self):
         pytest = __import__("pytest")
         jax = pytest.importorskip("jax")
         del jax
-        from minilink.control.mpc import ModelPredictiveController
+        from minilink.planning.trajectory_optimization.mpc import (
+            ModelPredictiveController,
+        )
         from minilink.core.backends import configure_jax
         from minilink.core.costs import QuadraticCost
         from minilink import BicycleDynRate
@@ -920,27 +642,28 @@ class TestAsComputer(unittest.TestCase):
                 tf=1.0,
                 x_start=x0,
                 cost=QuadraticCost.from_system(sys, xbar=x0),
+                U=sys.input_box,
             ),
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="jax",
+                backend="jax",
                 record_solve_time=True,
-                optimizer_method="scipy_slsqp",
+                method="scipy_slsqp",
                 optimizer_options={"maxiter": 5, "ftol": 0.1},
             ),
         )
-        computer = (
-            ModelPredictiveController(planner, dt_mpc=0.2, warm_start=False) % 0.2
-        )
-        self.assertIn("y", computer.diagram.inputs)
-        self.assertIn("u_ff", computer.diagram.outputs)
+        computer = ModelPredictiveController(planner) % 0.2
+        self.assertEqual(computer.sample_period, 0.2)
+        self.assertIn("y", computer.inputs)
+        self.assertEqual(list(computer.outputs)[:2], ["u", "z"])
 
 
 from minilink.simulation.realtime import (
     CallbackInput,
     CallbackOutput,
+    LiveSignalPlotOutput,
     RealtimeSimulator,
 )
 
@@ -1003,14 +726,14 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=0.01,
             renderer=None,
-            compile_backend=None,
+            backend=None,
             max_steps=1,
         )
         if _have_jax():
-            self.assertEqual(rt_sim.compile_backend, "jax")
+            self.assertEqual(rt_sim.backend, "jax")
         else:
-            self.assertEqual(rt_sim.compile_backend, "numpy")
-        self.assertEqual(rt_sim.evaluator.backend, rt_sim.compile_backend)
+            self.assertEqual(rt_sim.backend, "numpy")
+        self.assertEqual(rt_sim.evaluator.backend, rt_sim.backend)
 
     def test_realtime_overrun_emits_warning(self):
         import time
@@ -1024,7 +747,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=0.005,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             input=CallbackInput(slow_u),
             max_steps=2,
         )
@@ -1046,7 +769,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
         # Default plant offline_dt=1e-4 → many steps fit; live ceiling (10) binds.
@@ -1064,7 +787,7 @@ class TestRealtimeSimulator(unittest.TestCase):
             sys,
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
         n_max = rt_sim._auto_n_sub_max()
@@ -1081,19 +804,18 @@ class TestRealtimeSimulator(unittest.TestCase):
             StableLinearSystem(),
             frame_dt=frame_dt,
             renderer=None,
-            compile_backend="numpy",
+            backend="numpy",
             max_steps=1,
         )
-        real_zoh = rt_sim.evaluator.integrate_zoh
+        real_step = rt_sim.evaluator.step
         n_cap = rt_sim._auto_n_sub_max()
 
-        def slow_zoh(x, u, t, dt_hold, dt_inner=None):
+        def slow_step(x, u, t, params=None, *, dt, solver="rk4", substeps=1):
             # ~3 ms per substep → probe exceeds the quarter-frame budget.
-            n_sub = max(1, int(round(float(dt_hold) / float(dt_inner))))
-            time_mod.sleep(0.003 * n_sub)
-            return real_zoh(x, u, t, dt_hold, dt_inner=dt_inner)
+            time_mod.sleep(0.003 * substeps)
+            return real_step(x, u, t, params, dt=dt, solver=solver, substeps=substeps)
 
-        with patch.object(rt_sim.evaluator, "integrate_zoh", side_effect=slow_zoh):
+        with patch.object(rt_sim.evaluator, "step", side_effect=slow_step):
             rt_sim.run()
         n_sub = int(round(frame_dt / rt_sim.sim_dt))
         self.assertLess(n_sub, n_cap)
@@ -1106,7 +828,7 @@ class TestRealtimeSimulator(unittest.TestCase):
                 StableLinearSystem(),
                 frame_dt=0.01,
                 renderer=None,
-                compile_backend="numpy",
+                backend="numpy",
                 max_steps=2,
                 verbose=True,
             ).run()
@@ -1120,9 +842,264 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertIn("Completed in", out)
         self.assertIn("n_frames:", out)
 
+    def test_live_signal_plot_output_updates_rolling_window(self):
+        import matplotlib.pyplot as plt
+
+        sys = StableLinearSystem()
+        live_out = LiveSignalPlotOutput(
+            window=0.03,
+            every=2,
+            show=False,
+            close_on_stop=True,
+        )
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            backend="numpy",
+            input=CallbackInput(lambda t, x: np.array([2.0])),
+            output=live_out,
+            max_steps=6,
+        )
+        traj = rt_sim.run()
+
+        self.assertEqual(traj.t.size, 7)
+        # Window of 0.03 s at t=0.06 keeps samples from t=0.03..0.06 (4 samples).
+        win_traj = live_out.window_trajectory()
+        np.testing.assert_allclose(win_traj.t, [0.03, 0.04, 0.05, 0.06])
+        self.assertEqual(len(live_out.lines), 2)  # x and u
+        np.testing.assert_allclose(live_out.lines[0].get_xdata(), win_traj.t)
+        np.testing.assert_allclose(live_out.lines[0].get_ydata(), win_traj.x[0])
+        np.testing.assert_allclose(live_out.lines[1].get_ydata(), win_traj.u[0])
+        plt.close("all")
+
+    def test_realtime_simulator_plot_flag_and_diagram_signals(self):
+        import matplotlib.pyplot as plt
+        from minilink import Pendulum, StateFeedback
+
+        plant = Pendulum()
+        ctl = StateFeedback(np.array([[10.0, 2.0]]))
+        loop = ctl @ plant
+
+        live_out = LiveSignalPlotOutput(
+            window=0.05,
+            every=1,
+            show=False,
+            close_on_stop=True,
+        )
+        published = []
+        rt_sim = RealtimeSimulator(
+            loop,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            backend="numpy",
+            plot=True,
+            output=CallbackOutput(lambda t, x, u, outputs: published.append(outputs)),
+            max_steps=3,
+        )
+        # Replace the default shown LiveSignalPlotOutput with the headless one for CI
+        rt_sim.output.outputs = (live_out, rt_sim.output.outputs[1])
+
+        with patch.object(
+            loop,
+            "reconstruct_internal_signals",
+            wraps=loop.reconstruct_internal_signals,
+        ) as spy_reconstruct:
+            rt_sim.run()
+            # Internal diagram signals are sampled incrementally per step, never reconstructed O(N).
+            self.assertEqual(spy_reconstruct.call_count, 0)
+
+        # A user output that overrides publish alone inherits the base contract: it is
+        # opened beside the live plot and still receives the boundary outputs
+        self.assertEqual(len(published), 3)
+        self.assertIn("y", published[0])
+        self.assertIn("controller:u", live_out.resolved_signals)
+        win_traj = live_out.window_trajectory()
+        self.assertTrue(win_traj.has_signal("controller:u"))
+        self.assertEqual(len(live_out.lines), 3)  # x[0], x[1], controller:u[0]
+        plt.close("all")
+
+    def test_pygame_input_windowless_when_joystick_connected(self):
+        import os
+        from unittest.mock import MagicMock
+
+        from minilink.simulation.realtime import PygameInput
+
+        sys = TwoPortLinearSystem()
+        sys.inputs["left"].lower_bound[0] = -10.0
+        sys.inputs["left"].upper_bound[0] = 10.0
+        sys.inputs["right"].lower_bound[0] = -5.0
+        sys.inputs["right"].upper_bound[0] = 5.0
+
+        fake_joy = MagicMock()
+        fake_joy.get_numaxes.return_value = 6
+        fake_joy.get_axis.side_effect = lambda idx: {
+            0: -0.4,
+            1: 0.5,
+            2: -1.0,
+            3: -0.5,
+            4: -0.25,
+            5: -1.0,
+        }[idx]
+
+        fake_pygame = MagicMock()
+        fake_pygame.display.get_init.return_value = False
+        fake_pygame.display.get_surface.return_value = None
+        fake_pygame.joystick.get_count.return_value = 1
+        fake_pygame.joystick.Joystick.return_value = fake_joy
+        fake_pygame.key.key_code.side_effect = lambda name: hash(name) % 256
+        fake_pygame.key.get_pressed.return_value = [False] * 256
+        fake_pygame.event.get.return_value = []
+
+        inp = PygameInput(joystick_axes=[(1, 1.0), (0, -1.0)], camera_rate=2.0)
+        with patch(
+            "minilink.simulation.realtime.pygame_input._import_pygame",
+            return_value=fake_pygame,
+        ):
+            inp.open(sys)
+            self.assertEqual(
+                os.environ.get("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS"), "1"
+            )
+            # A connected joystick skips the 640x240 focus window in "auto" mode.
+            fake_pygame.display.set_mode.assert_not_called()
+            self.assertIsNone(inp._screen)
+            # On 6-axis gamepads (Xbox), right stick axes (3, 4) are auto-assigned to camera orbit.
+            self.assertEqual(inp._joy_camera_axes, ((3, -1.0), (4, -1.0)))
+
+            u, should_stop = inp.poll(0.0, sys.x0)
+            self.assertFalse(should_stop)
+            # left = +1.0 * 0.5 * 10 = 5.0; right = -1.0 * (-0.4) * 5 = +2.0
+            np.testing.assert_allclose(u, [5.0, 2.0])
+            d_az, d_el = inp.poll_camera(0.1)
+            np.testing.assert_allclose([d_az, d_el], [0.1, 0.05])
+
+            inp.close()
+            fake_pygame.quit.assert_called_once()
+
+            # When right-stick axes (3 or 4) are used for control, camera orbit is disabled.
+            inp_plane = PygameInput(joystick_axes=[(5, 1.0), (3, 1.0)])
+            inp_plane.open(sys)
+            self.assertEqual(inp_plane._joy_camera_axes, ())
+            self.assertEqual(inp_plane.poll_camera(0.1), (0.0, 0.0))
+            inp_plane.close()
+
+    def test_keyboard_interrupt_returns_partial_trajectory(self):
+        sys = StableLinearSystem()
+        calls = 0
+
+        def interrupt_on_third_step(t, x):
+            nonlocal calls
+            calls += 1
+            if calls >= 3:
+                raise KeyboardInterrupt
+            return np.array([1.0])
+
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            backend="numpy",
+            input=CallbackInput(interrupt_on_third_step),
+            max_steps=10,
+        )
+        traj = rt_sim.run()
+        # Sample 0 + 2 completed steps before KeyboardInterrupt on step 3.
+        self.assertEqual(traj.t.size, 3)
+        self.assertIs(rt_sim.last_traj, traj)
+
+    def test_game_facade_forwards_joystick_axes(self):
+        from unittest.mock import MagicMock
+
+        sys = TwoPortLinearSystem()
+        with (
+            patch("minilink.simulation.realtime.PygameInput") as mock_pg_cls,
+            patch("minilink.simulation.realtime.RealtimeSimulator") as mock_rt_cls,
+        ):
+            expected_traj = MagicMock()
+            mock_rt_cls.return_value.run.return_value = expected_traj
+
+            out = sys.game(
+                renderer=None,
+                joystick_axes=[(1, 1.0), (3, -1.0)],
+                camera_axes=[(2, 1.0), (0, 1.0)],
+                max_steps=1,
+            )
+
+            mock_pg_cls.assert_called_once_with(
+                joystick_axes=[(1, 1.0), (3, -1.0)],
+                camera_axes=[(2, 1.0), (0, 1.0)],
+            )
+            self.assertIs(out, expected_traj)
+            self.assertIs(sys.traj, expected_traj)
+
+    def test_named_system_channels_in_live_and_offline_plots(self):
+        import matplotlib.pyplot as plt
+        from minilink.graphical.signals.time_signals import build_signal_plot_spec
+
+        sys = TwoPortLinearSystem()
+        sys.state.labels = ["pos"]
+        live_out = LiveSignalPlotOutput(
+            signals=("y", "left", "pos"),
+            window=0.05,
+            every=1,
+            show=False,
+            close_on_stop=True,
+        )
+        rt_sim = RealtimeSimulator(
+            sys,
+            frame_dt=0.01,
+            sim_dt=0.005,
+            renderer=None,
+            backend="numpy",
+            output=live_out,
+            max_steps=2,
+        )
+        traj = rt_sim.run()
+        self.assertEqual(len(live_out.lines), 3)  # y (1), left (1), pos (1)
+
+        # Offline spec builder resolves the same output port, input port, and state label.
+        spec = build_signal_plot_spec(sys, traj, signals=("y", "left", "pos"))
+        self.assertEqual(len(spec.traces), 3)
+        self.assertEqual(spec.traces[1].label, "left[0]")
+        self.assertEqual(spec.traces[2].label, "pos")
+        plt.close("all")
+
+        # The backend is plot_backend; a name passed as plot is refused and says so
+        with self.assertRaisesRegex(ValueError, "plot_backend"):
+            RealtimeSimulator(sys, renderer=None, plot="plotly")
+        with self.assertRaisesRegex(ValueError, "Unknown signal backend"):
+            RealtimeSimulator(
+                sys, renderer=None, plot=("y",), plot_backend="invalid_backend"
+            )
+
+
+class DeclaredPendulum(Pendulum):
+    """A pendulum whose time constant is given: ``τ = tau``, read live."""
+
+    def __init__(self, tau):
+        super().__init__()
+        self.tau = tau
+
+    def fastest_mode(self):
+        return self.tau
+
+
+class UndeclaredPlant(DynamicSystem):
+    """A custom plant that declares no time constant: ``ẋ = −x + u``."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+    def f(self, x, u, t=0, params=None):
+        xp = array_module(x)
+        return xp.array([-x[0] + u[0]])
+
 
 class TestAutomaticTimeGrid(unittest.TestCase):
-    """S01: solver first, then a grid sized to it."""
+    """The solver first, then a grid sized to it: Δt = 0.1 τ_min, dividing every hold period."""
 
     def test_adaptive_default_is_a_fine_reporting_grid_with_scipy(self):
         from minilink.simulation.time_grid import DEFAULT_N_STEPS
@@ -1153,29 +1130,32 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertAlmostEqual(sim.dt, 0.005)
 
     def test_loop_takes_dt_from_its_plant_time_constant(self):
-        from minilink import Integrator, Pendulum, StateFeedbackController
+        from minilink import Integrator, StateFeedback
 
-        plant = Pendulum()
-        plant.solver_info["smallest_time_constant"] = 0.5
-        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+        plant = DeclaredPendulum(0.5)
+        controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
         loop = Simulator(controller @ plant, tf=1.0, solver="euler", verbose=False)
         np.testing.assert_array_equal(loop.t, alone.t)  # dt = 0.05, not 1e-4
 
-        # a stateful block without a hint keeps the conservative default
-        with_filter = controller @ plant + Integrator()
+        # An integrator, a pole at the origin, bounds no step
+        with_integrator = controller @ plant + Integrator()
+        self.assertEqual(with_integrator.solver_info["smallest_time_constant"], 0.5)
+
+        # A custom stateful block that declares nothing keeps the conservative default
+        with_custom = controller @ plant + UndeclaredPlant()
         self.assertEqual(
-            with_filter.solver_info["smallest_time_constant"],
+            with_custom.solver_info["smallest_time_constant"],
             DEFAULT_SMALLEST_TIME_CONSTANT,
         )
 
     def test_loop_follows_a_plant_hint_changed_after_composing(self):
-        from minilink import Pendulum, StateFeedbackController
+        from minilink import StateFeedback
 
-        plant = Pendulum()
-        loop = StateFeedbackController(np.array([[10.0, 2.0]])) @ plant
-        plant.solver_info["smallest_time_constant"] = 0.5
+        plant = DeclaredPendulum(0.01)
+        loop = StateFeedback(np.array([[10.0, 2.0]])) @ plant
+        plant.tau = 0.5
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
         closed = Simulator(loop, tf=1.0, solver="euler", verbose=False)
@@ -1190,21 +1170,17 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     def test_loop_takes_the_hint_a_block_sets_for_itself(self):
         from minilink import (
             DiagramSystem,
-            Pendulum,
-            RateLimiter,
             Saturation,
-            StateFeedbackController,
+            StateFeedback,
         )
 
-        plant = Pendulum()
-        plant.solver_info["smallest_time_constant"] = 0.5
-        controller = StateFeedbackController(np.array([[10.0, 2.0]]))
+        plant = DeclaredPendulum(0.5)
+        controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         # a static block that declares a time constant counts like a stateful one
         saturation = Saturation(-1.0, 1.0)
         saturation.solver_info["smallest_time_constant"] = 0.02
-        limiter = RateLimiter(rate_max=5.0, tau=0.02)
-        for block in (saturation, limiter):
+        for block in (saturation,):
             with self.subTest(block=block.name):
                 loop = DiagramSystem()
                 loop.add_subsystem(controller, "controller")
@@ -1217,34 +1193,20 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * AUTO_DT_SCALE
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
-        from minilink import Pendulum, WhiteNoise
-        from minilink.simulation.simulator import HELD_SIGNAL_STEPS_PER_SAMPLE
+        from minilink import WhiteNoise
 
         cases = [
-            # (declared plant time constant, sample period, discontinuous) -> (solver, dt)
-            (None, 0.01, False, "rk4_fixedsteps", 0.01 / HELD_SIGNAL_STEPS_PER_SAMPLE),
+            # (plant time constant, sample period, discontinuous) -> (solver, dt)
+            (None, 0.01, False, "rk4_fixedsteps", 0.01 / 100),
             (0.003, 0.01, False, "rk4_fixedsteps", 0.01 / 34),
-            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 10),
-            (
-                None,
-                0.001,
-                False,
-                "rk4_fixedsteps",
-                0.001 / HELD_SIGNAL_STEPS_PER_SAMPLE,
-            ),
-            (
-                None,
-                0.01,
-                True,
-                "euler",
-                0.01 / 100,
-            ),  # the discontinuous policy keeps its scale
+            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 1),
+            (0.5, 0.001, False, "rk4_fixedsteps", 0.001 / 1),
+            (0.02, 0.01, False, "rk4_fixedsteps", 0.01 / 5),
+            (None, 0.01, True, "euler", 0.01 / 100),
         ]
         for tau, period, discontinuous, solver, dt in cases:
             with self.subTest(tau=tau, period=period, discontinuous=discontinuous):
-                plant = Pendulum()
-                if tau is not None:
-                    plant.solver_info["smallest_time_constant"] = tau
+                plant = UndeclaredPlant() if tau is None else DeclaredPendulum(tau)
                 plant.solver_info["discontinuous_behavior"] = discontinuous
                 loop = WhiteNoise(1, sample_period=period) >> plant
                 self.assertEqual(loop.solver_info["sample_period"], period)
@@ -1254,6 +1216,112 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 self.assertEqual(sim.solver_mode, solver)
                 self.assertAlmostEqual(sim.dt, dt)
                 self.assertAlmostEqual(period / sim.dt, round(period / sim.dt))
+
+    def test_a_linear_block_reads_its_time_constant_from_its_eigenvalues(self):
+        from minilink import PI, PID, CartPole, Integrator, luenberger
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        A = np.array([[0.0, 1.0], [-4.0, -1.0]])
+        B = np.array([[0.0], [1.0]])
+        lti = LTISystem(A, B)
+        self.assertAlmostEqual(
+            lti.solver_info["smallest_time_constant"],
+            1.0 / np.max(np.abs(np.linalg.eigvals(A))),
+        )
+
+        # The current params, not the ones at construction
+        lti.params["A"] = 10.0 * A
+        self.assertAlmostEqual(
+            lti.solver_info["smallest_time_constant"],
+            1.0 / np.max(np.abs(np.linalg.eigvals(10.0 * A))),
+        )
+
+        # An observer: the eigenvalues of A − L C
+        observer = luenberger(CartPole(), poles=[-20.0, -21.0, -22.0, -23.0])
+        self.assertAlmostEqual(observer.solver_info["smallest_time_constant"], 1 / 23)
+
+        # A PID: its derivative filters; a pole at the origin bounds nothing
+        self.assertEqual(
+            PID(1.0, 1.0, 1.0, tau=0.05).solver_info["smallest_time_constant"], 0.05
+        )
+        self.assertEqual(PI(1.0, 1.0).solver_info["smallest_time_constant"], np.inf)
+        self.assertEqual(Integrator().solver_info["smallest_time_constant"], np.inf)
+
+    def test_a_catalog_plant_declares_its_physics(self):
+        from minilink import CartPole, Pendulum, SingleMass
+
+        pendulum = Pendulum()
+        m, l, I, g = (pendulum.params[k] for k in ("m", "l", "I", "gravity"))
+        self.assertAlmostEqual(
+            pendulum.solver_info["smallest_time_constant"],
+            np.sqrt((m * l**2 + I) / (m * g * l)),
+        )
+        cartpole = CartPole()
+        self.assertAlmostEqual(
+            cartpole.solver_info["smallest_time_constant"], 1 / 4.6455, places=4
+        )
+        self.assertAlmostEqual(
+            SingleMass(mass=1.0, k=4.0).solver_info["smallest_time_constant"], 0.5
+        )
+
+        # The step follows the plant's own numbers
+        pendulum.params["gravity"] = 4.0 * g
+        sim = Simulator(pendulum, tf=1.0, solver="rk4_fixedsteps", verbose=False)
+        self.assertAlmostEqual(
+            sim.dt,
+            AUTO_DT_SCALE * np.sqrt((m * l**2 + I) / (4.0 * m * g * l)),
+            places=3,
+        )
+
+    def test_a_hold_period_is_never_a_time_constant(self):
+        from minilink import WhiteNoise
+        from minilink.blocks.sources import NoiseSource
+        from minilink.core.distributions import Gaussian
+
+        for source in (
+            WhiteNoise(1, sample_period=0.01),
+            NoiseSource(Gaussian(np.zeros(1), cov=np.eye(1)), sample_period=0.01),
+        ):
+            with self.subTest(source=source.name):
+                self.assertEqual(
+                    source.solver_info["smallest_time_constant"],
+                    DEFAULT_SMALLEST_TIME_CONSTANT,
+                )
+                loop = source >> DeclaredPendulum(0.5)
+                self.assertEqual(loop.solver_info["smallest_time_constant"], 0.5)
+
+    def test_every_hold_period_is_a_whole_number_of_steps(self):
+        from minilink import DiagramSystem, WhiteNoise
+
+        loop = DiagramSystem()
+        loop.add_subsystem(WhiteNoise(1, sample_period=0.01, seed=1), "torque")
+        loop.add_subsystem(WhiteNoise(1, sample_period=0.015, seed=2), "sensor")
+        loop.add_subsystem(DeclaredPendulum(0.5), "plant")
+        loop.connect("torque", "y", "plant", "u")
+        self.assertAlmostEqual(loop.solver_info["sample_period"], 0.005)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sim = Simulator(loop, tf=1.0, verbose=False)
+        self.assertAlmostEqual(sim.dt, 0.005)
+
+    def test_the_noise_loop_and_the_digital_loop_on_one_plant_share_the_rule(self):
+        from minilink import PID, WhiteNoise
+        from minilink.core.system import automatic_step_of
+
+        for plant in (UndeclaredPlant(), DeclaredPendulum(0.02)):
+            with self.subTest(plant=plant.name):
+                period = 0.01
+                noise_loop = WhiteNoise(1, sample_period=period) >> plant
+                digital = (PID(2.0) % period) @ plant
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sim = Simulator(noise_loop, tf=1.0, verbose=False)
+                substeps = digital.subsystems["plant"].substeps
+                self.assertAlmostEqual(sim.dt, period / substeps)
+                self.assertAlmostEqual(
+                    sim.dt,
+                    automatic_step_of(dict(plant.solver_info, sample_period=period)),
+                )
 
     def test_a_held_signal_warns_on_a_forced_adaptive_solver_or_a_stray_dt(self):
         from minilink import Pendulum, WhiteNoise
@@ -1301,9 +1369,7 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     def test_jax_automatic_grid_never_selects_rk4(self):
         from minilink.simulation.time_grid import DEFAULT_N_STEPS
 
-        sim = Simulator(
-            StableLinearSystem(), tf=10.0, compile_backend="jax", verbose=False
-        )
+        sim = Simulator(StableLinearSystem(), tf=10.0, backend="jax", verbose=False)
         self.assertEqual(sim.solver_mode, "scipy")
         self.assertEqual(sim.n_pts, DEFAULT_N_STEPS)
 
@@ -1365,3 +1431,67 @@ class TestDtTimeGrid(unittest.TestCase):
                 build_time_grid(0.0, 1.0, dt=bad)
             with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
                 build_time_grid(0.0, 1.0, n_steps=11, dt=bad)
+
+
+def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
+    """A sampled input is held over each period; a function of time is read at the RK4 stage times."""
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.x0 = np.array([0.4, -0.2])
+    ev = plant.compile("numpy")
+    t = np.linspace(0.0, 1.0, 20)
+    dt = t[1] - t[0]
+    u = 0.5 * np.sin(2.0 * t)[None, :]
+
+    sampled = plant.compute_forced(
+        u, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    )
+    held = ev.rollout(plant.x0, u[:, :-1].T, 0.0, dt)
+    np.testing.assert_allclose(sampled.x, held.T, rtol=1e-12)
+
+    def u_of_t(tt):
+        return np.array([0.5 * np.sin(2.0 * tt)])
+
+    forced = plant.compute_forced(
+        u_of_t, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    )
+    x = plant.x0
+    for k in range(19):
+        tk = k * dt
+        k1 = ev.f(x, u_of_t(tk), tk)
+        k2 = ev.f(x + 0.5 * dt * k1, u_of_t(tk + 0.5 * dt), tk + 0.5 * dt)
+        k3 = ev.f(x + 0.5 * dt * k2, u_of_t(tk + 0.5 * dt), tk + 0.5 * dt)
+        k4 = ev.f(x + dt * k3, u_of_t(tk + dt), tk + dt)
+        x = x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
+    np.testing.assert_allclose(forced.x[:, -1], x, rtol=1e-12)
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_rk4_on_a_held_noise_converges_as_the_step_shrinks(backend):
+    """A held sample read at each RK4 stage time: first order at its switches, tightened by a finer ``dt``."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    from minilink import WhiteNoise
+    from minilink.dynamics.abstraction.state_space import LTISystem
+
+    period = 0.01
+    A = np.array([[0.0, 1.0], [-25.0, -2.0]])
+    B = np.array([[0.0], [1.0]])
+
+    def final_state(dt):
+        loop = WhiteNoise(1, psd=1.0, sample_period=period, seed=3) >> LTISystem(
+            A, B, np.eye(2), np.zeros((2, 1))
+        )
+        traj = loop.compute_trajectory(
+            tf=1.0, dt=dt, solver="rk4_fixedsteps", backend=backend, verbose=False
+        )
+        return traj.x[:, -1]
+
+    reference = final_state(period / 60)
+    errors = [
+        np.linalg.norm(final_state(dt) - reference) for dt in (period, period / 3)
+    ]
+
+    # A third of the step, an error about 3 times smaller: first order at the switches
+    assert errors[0] / errors[1] > 2.0

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import warnings
 
 import numpy as np
@@ -132,7 +133,6 @@ class Animator:
         ``save=True`` writes a file before playback: matplotlib a GIF, meshcat
         a standalone HTML page of the native keyframed animation.
         """
-        import sys
 
         # The output channel: inline where the environment prefers it, always inline
         # for meshcat in Colab, and the per-frame loop refused where it cannot run

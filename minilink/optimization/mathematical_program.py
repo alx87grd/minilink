@@ -6,8 +6,8 @@ from typing import Any, TypeAlias
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_NUMPY
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.backends import BACKEND_NUMPY, array_module
+from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
 
 # These stay loose on purpose: the runtime contract is native-backend behavior
 # plus shape checks in evaluators, without making JAX a core dependency.
@@ -33,6 +33,15 @@ class MathematicalProgram:
     the decision vector ``z`` and no solver state such as an initial guess;
     backend casting, JAX compilation and SciPy-friendly wrappers live on the
     program evaluators the optimizers own.
+
+    A program may declare parameters: with ``params`` a tree of
+    numbers, every callable takes ``(z, params)`` (``J(z, params)``,
+    ``h(z, params)``, ``grad_J(z, params)``, …), ``params`` the frozen default
+    the values of a solve are merged onto
+    (``Optimizer(program).solve(params=...)``), so one compiled program is
+    solved for many values without a recompile. Without ``params`` the
+    callables take ``z`` alone, as a hand-written program does. The tree's
+    structure is fixed; its sizes are structural, never parameters.
 
     Native function contract
     ------------------------
@@ -79,6 +88,9 @@ class MathematicalProgram:
         the program-evaluator backend they should be compiled with.
     metadata : dict
         Optional transcription or diagnostic metadata.
+    params : dict, optional
+        The default values of the parameters the callables read, a nested
+        dict of numbers; ``None`` (the default) for callables of ``z`` alone.
     """
 
     n_z: int
@@ -93,6 +105,7 @@ class MathematicalProgram:
     jac_g: ArrayFunction | None = None
     backend: str = BACKEND_NUMPY
     metadata: dict[str, object] = field(default_factory=dict)
+    params: dict | None = None
 
     def __post_init__(self) -> None:
         n_z = int(self.n_z)
@@ -108,6 +121,7 @@ class MathematicalProgram:
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
         object.__setattr__(self, "metadata", dict(self.metadata))
+        require_params_tree(self.params)
 
     # Display
 
@@ -116,6 +130,9 @@ class MathematicalProgram:
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
+
+    def _repr_latex_(self):
+        return latex_inspect(self)
 
 
 @dataclass(frozen=True)
@@ -141,8 +158,12 @@ class OptimizationResult:
     solve_time_s: float | None = None
 
     def __post_init__(self) -> None:
-        # The solution as a flat float copy, the statistics as their own dict
-        z = np.asarray(self.z, dtype=float).reshape(-1).copy()
+        # The solution as a flat float copy (a JAX array kept as it is, so a solve
+        # traces), the statistics as their own dict
+        if array_module(self.z) is not np:
+            z = self.z.reshape(-1)
+        else:
+            z = np.asarray(self.z, dtype=float).reshape(-1).copy()
         object.__setattr__(self, "z", z)
         object.__setattr__(self, "stats", dict(self.stats))
 
@@ -150,10 +171,24 @@ class OptimizationResult:
         if self.solve_time_s is not None:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
 
+    def __str__(self):
+        return inspect_text(self)
+
+    def _repr_pretty_(self, p, cycle):
+        repr_pretty(self, p, cycle)
+
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_params_tree(params):
+    """Refuse declared parameters that are not a tree (a dict)."""
+    if params is not None and not isinstance(params, dict):
+        raise TypeError(
+            f"params must be a dict of the program's parameters, got {type(params).__name__}"
+        )
 
 
 def require_positive_size(n_z):

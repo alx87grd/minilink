@@ -71,7 +71,9 @@ def frequency_response(
     w : array, optional
         Frequencies in rad/s. When omitted, a logarithmic grid runs one
         decade below the slowest pole or zero to one decade above the fastest,
-        widened until it brackets the 0 dB crossing.
+        widened until it brackets the 0 dB crossing; a step or sampled system's
+        (its difference equation, ``G(e^{jωΔ})``) runs three decades up to its
+        Nyquist frequency ``π/Δ``, in rad per tick for a tick law.
     n : int, optional
         Number of frequencies for the automatic grid.
     method : {"auto", "fd", "jax"}, optional
@@ -82,10 +84,11 @@ def frequency_response(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    w = frequency_grid(A, B, C, D, w, n)
+    period = discrete_period(sys)
+    w = frequency_grid(A, B, C, D, w, n, period)
 
-    # G(jω) on the grid
-    G = linear.frequency_response(A, B, C, D, w)
+    # G(jω) on the grid, G(e^{jωΔ}) for a difference equation
+    G = linear.frequency_response(A, B, C, D, w, period)
 
     return w, G
 
@@ -143,11 +146,12 @@ def margins(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    w = frequency_grid(A, B, C, D, w, n)
+    period = discrete_period(sys)
+    w = frequency_grid(A, B, C, D, w, n, period)
 
     # L(jω) on the grid brackets the crossovers; each is then solved on the exact L(jω)
-    G = linear.frequency_response(A, B, C, D, w)
-    loop_margins = linear.margins(w, G, loop_response(A, B, C, D))
+    G = linear.frequency_response(A, B, C, D, w, period)
+    loop_margins = linear.margins(w, G, loop_response(A, B, C, D, period))
 
     return loop_margins
 
@@ -327,10 +331,11 @@ def plot_bode(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
-    w_plot = frequency_grid(A, B, C, D, w, n)
+    period = discrete_period(sys)
+    w_plot = frequency_grid(A, B, C, D, w, n, period)
 
     # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
-    G = linear.frequency_response(A, B, C, D, w_plot)
+    G = linear.frequency_response(A, B, C, D, w_plot, period)
     with np.errstate(divide="ignore"):
         magnitude_db = 20.0 * np.log10(np.abs(G))
     phase_deg = np.degrees(np.unwrap(np.angle(G)))
@@ -338,9 +343,10 @@ def plot_bode(
     # The margins, bracketed on the grid of margins() and solved on the exact L(jω)
     loop_margins = None
     if margins:
-        w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS)
-        G_margins = linear.frequency_response(A, B, C, D, w_margins)
-        loop_margins = linear.margins(w_margins, G_margins, loop_response(A, B, C, D))
+        w_margins = frequency_grid(A, B, C, D, w, _MARGIN_GRID_POINTS, period)
+        G_margins = linear.frequency_response(A, B, C, D, w_margins, period)
+        response = loop_response(A, B, C, D, period)
+        loop_margins = linear.margins(w_margins, G_margins, response)
 
     figure = bode_figure(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
@@ -384,7 +390,7 @@ def plot_pzmap(
         minimal=minimal,
     )
 
-    figure = pzmap_figure(z, p, sys, of, wrt, radius)
+    figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
     return render_control_figure(figure, backend=backend, show=show)
 
@@ -458,10 +464,14 @@ def plot_nyquist(
 ###############################################################################
 
 
-def frequency_grid(A, B, C, D, w, n):
-    """The frequencies to evaluate: the user's, or a log grid from the poles and zeros."""
-    # By default, n frequencies evenly spaced in log ω across the poles and zeros
-    if w is None:
+def frequency_grid(A, B, C, D, w, n, period=None):
+    """The frequencies to evaluate: the user's, or a log grid from the poles and zeros (to the Nyquist frequency ``π/Δ`` of a difference equation)."""
+    # By default, n frequencies evenly spaced in log ω across the poles and zeros;
+    # a difference equation's three decades below its Nyquist frequency π/Δ
+    if w is None and period is not None:
+        w_nyquist = np.pi / float(period)
+        w = np.logspace(np.log10(w_nyquist) - 3.0, np.log10(w_nyquist), int(n))
+    elif w is None:
         w_min, w_max = linear.frequency_range(A, B, C, D)
         w = np.logspace(np.log10(w_min), np.log10(w_max), int(n))
 
@@ -472,11 +482,24 @@ def frequency_grid(A, B, C, D, w, n):
     return w
 
 
-def loop_response(A, B, C, D):
-    """``w -> L(jw)``, one complex value, for the root solve of the crossovers."""
+def discrete_period(sys):
+    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
+    # Lazy import: the step system loads with the first discrete analysis
+    from minilink.analysis.linearization import period_of
+    from minilink.core.discrete.step_system import StepSystem
+
+    if not isinstance(sys, StepSystem):
+        return None
+    period = period_of(sys)
+
+    return 1.0 if period is None else period
+
+
+def loop_response(A, B, C, D, period=None):
+    """``w -> L(jw)`` (``L(e^{jωΔ})``), one complex value, for the root solve of the crossovers."""
 
     def response(w):
-        return linear.frequency_response(A, B, C, D, np.atleast_1d(w))[0]
+        return linear.frequency_response(A, B, C, D, np.atleast_1d(w), period)[0]
 
     return response
 
@@ -578,19 +601,29 @@ def margins_text(m: Margins) -> str:
     return f"Gm = {gm}\nPm = {pm}"
 
 
-def pzmap_figure(z, p, sys, of, wrt, radius=None):
-    """The pole-zero map figure: poles as ``x``, zeros as ``o``."""
+def pzmap_figure(z, p, sys, of, wrt, radius=None, period=None):
+    """The pole-zero map figure: poles as ``x``, zeros as ``o``; a difference equation's with the unit circle."""
     # The view frames every root, or those within radius of the origin
     points = np.concatenate([z, p])
     if radius is not None:
         points = points[np.abs(points) <= radius]
+
+    # In z, the unit circle |z| = 1, the stability boundary, framed too
+    traces = root_markers(p, z)
+    if period is not None:
+        theta = np.linspace(0.0, 2.0 * np.pi, 361)
+        circle = np.exp(1j * theta)
+        traces = (
+            Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
+        ) + traces
+        points = np.concatenate([points, circle])
 
     return ControlFigure(
         title=style.PZMAP_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
-                traces=root_markers(p, z),
+                traces=traces,
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,

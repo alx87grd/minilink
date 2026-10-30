@@ -62,15 +62,15 @@ class TestBlocks(unittest.TestCase):
         plant = Integrator()
         evaluator = plant.compile()
         u_sequence = np.ones((3, 1))
-        x = evaluator.rk4_integrate_zoh(np.array([0.0]), u_sequence, t0=0.0, dt=0.1)
+        x = evaluator.rollout(np.array([0.0]), u_sequence, t_start=0.0, dt=0.1)
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.1, 0.2, 0.3]))
 
     def test_integrator_compiled_parametric_rollout(self):
         plant = Integrator()
         evaluator = plant.compile()
         u_sequence = np.ones((2, 1))
-        x = evaluator.rk4_integrate_zoh_p(
-            np.array([0.0]), u_sequence, t0=0.0, dt=0.1, params={"k": 2.0}
+        x = evaluator.rollout(
+            np.array([0.0]), u_sequence, t_start=0.0, dt=0.1, params={"k": 2.0}
         )
         np.testing.assert_allclose(x[:, 0], np.array([0.0, 0.2, 0.4]))
 
@@ -109,17 +109,17 @@ class TestBlocks(unittest.TestCase):
         pytest.importorskip("jax")
         import jax.numpy as jnp
         from minilink.blocks.routing import Gain
-        from minilink.core.compile.evaluators.jax_evaluators import JaxStaticEvaluator
+        from minilink.core.compile.evaluators.static import StaticEvaluator
 
         gain = Gain(K=2.0, dim=1)
         ev = gain.compile(backend="jax")
-        self.assertIsInstance(ev, JaxStaticEvaluator)
+        self.assertIsInstance(ev, StaticEvaluator)
         out = ev.outputs(jnp.array([]), jnp.array([3.0]), 0.0)
         np.testing.assert_allclose(np.asarray(out["y"]), [6.0])
 
 
-from minilink.blocks.filters import LowPassFilter, NotchFilter, Washout
-from minilink.blocks.nonlinear import DeadZone, Relay, Saturation
+from minilink.blocks.filters import LowPassFilter
+from minilink.blocks.nonlinear import Saturation
 from minilink.blocks.routing import Demux, Error, Gain, Mux, Sum
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.trajectory import Trajectory
@@ -196,16 +196,6 @@ class TestNonlinearBlocks(unittest.TestCase):
         flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
         np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
 
-    def test_dead_zone(self):
-        dz = DeadZone(width=1.0)
-        out = [dz.compute(None, np.array([v]))[0] for v in (-2.0, -0.5, 0.0, 0.5, 2.0)]
-        np.testing.assert_allclose(out, [-1.0, 0.0, 0.0, 0.0, 1.0])
-
-    def test_relay_sign(self):
-        relay = Relay(amplitude=2.0)
-        out = [relay.compute(None, np.array([v]))[0] for v in (-3.0, 0.0, 4.0)]
-        np.testing.assert_allclose(out, [-2.0, 0.0, 2.0])
-
 
 class TestFilterBlocks(unittest.TestCase):
     def _dc_gain(self, lti):
@@ -218,21 +208,10 @@ class TestFilterBlocks(unittest.TestCase):
         self.assertAlmostEqual(self._dc_gain(lpf), 1.0, places=6)
 
     def test_a_filter_is_not_a_plant_and_exposes_no_state(self):
-        for block in (LowPassFilter(), NotchFilter(), Washout()):
+        for block in (LowPassFilter(),):
             with self.subTest(block=block.name):
                 self.assertEqual(list(block.inputs), ["u"])
                 self.assertEqual(list(block.outputs), ["y"])
-
-    def test_washout_blocks_dc(self):
-        self.assertAlmostEqual(self._dc_gain(Washout(cutoff_hz=1.0)), 0.0, places=6)
-
-    def test_notch_rejects_centre_frequency(self):
-        notch = NotchFilter(notch_hz=1.0, quality=10.0)
-        w0 = 2.0 * np.pi * 1.0
-        A, B, C, D = (notch.A(), notch.B(), notch.C(), notch.D())
-        n = A.shape[0]
-        H = C @ np.linalg.solve(1j * w0 * np.eye(n) - A, B) + D
-        self.assertLess(abs(H[0, 0]), 1e-06)
 
 
 class TestTrajectorySource(unittest.TestCase):
@@ -415,39 +394,39 @@ class TestWhiteNoiseSource(unittest.TestCase):
                 self.assertTrue(np.all(np.isfinite(value)))
 
 
-from minilink.blocks.neural import NeuralNetwork
+from minilink.blocks.neural import MLP
 
 
-class TestNeuralNetwork(unittest.TestCase):
+class TestOneHiddenLayerMLP(unittest.TestCase):
     def test_forward_equation_and_shape(self):
-        net = NeuralNetwork(input_dim=2, output_dim=1, hidden_dim=3)
+        net = MLP(input_dim=2, output_dim=1, hidden=(3,))
         params = {
-            "W1": np.array([[1.0, 0.0], [0.0, 1.0], [-1.0, 1.0]]),
-            "b1": np.array([0.0, 0.5, -0.5]),
-            "W2": np.array([[2.0, -1.0, 0.5]]),
-            "b2": np.array([0.25]),
+            "W0": np.array([[1.0, 0.0], [0.0, 1.0], [-1.0, 1.0]]),
+            "b0": np.array([0.0, 0.5, -0.5]),
+            "W1": np.array([[2.0, -1.0, 0.5]]),
+            "b1": np.array([0.25]),
         }
         u = np.array([0.2, -0.4])
         y = net.compute(np.array([]), u, params=params)
         expected = (
-            params["W2"] @ np.tanh(params["W1"] @ u + params["b1"]) + params["b2"]
+            params["W1"] @ np.tanh(params["W0"] @ u + params["b0"]) + params["b1"]
         )
         self.assertEqual(y.shape, (1,))
         np.testing.assert_allclose(y, expected)
 
     def test_explicit_params_override_defaults(self):
-        net = NeuralNetwork(input_dim=1, output_dim=1, hidden_dim=2)
+        net = MLP(input_dim=1, output_dim=1, hidden=(2,))
         net.params = {
-            "W1": np.array([[1.0], [1.0]]),
-            "b1": np.array([0.0, 0.0]),
-            "W2": np.array([[1.0, 1.0]]),
-            "b2": np.array([0.0]),
+            "W0": np.array([[1.0], [1.0]]),
+            "b0": np.array([0.0, 0.0]),
+            "W1": np.array([[1.0, 1.0]]),
+            "b1": np.array([0.0]),
         }
         override = {
-            "W1": np.zeros((2, 1)),
-            "b1": np.zeros(2),
-            "W2": np.zeros((1, 2)),
-            "b2": np.array([3.0]),
+            "W0": np.zeros((2, 1)),
+            "b0": np.zeros(2),
+            "W1": np.zeros((1, 2)),
+            "b1": np.array([3.0]),
         }
         y_default = net.compute(np.array([]), np.array([1.0]))
         y_override = net.compute(np.array([]), np.array([1.0]), params=override)
@@ -458,7 +437,7 @@ class TestNeuralNetwork(unittest.TestCase):
         jax = pytest.importorskip("jax")
         import jax.numpy as jnp
 
-        net = NeuralNetwork(input_dim=2, output_dim=1, hidden_dim=3)
+        net = MLP(input_dim=2, output_dim=1, hidden=(3,))
         params = {key: jnp.asarray(value) for key, value in net.params.items()}
         y = jax.jit(lambda u, params: net.compute([], u, params=params))(
             jnp.array([1.0, -1.0]), params

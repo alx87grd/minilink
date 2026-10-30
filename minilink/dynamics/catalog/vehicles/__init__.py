@@ -9,8 +9,8 @@ from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
 )
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
-    LongitudinalFrontWheelDriveCarWithTorqueInput,
-    LongitudinalFrontWheelDriveCarWithWheelSlipInput,
+    LongitudinalSlipCar,
+    LongitudinalTorqueCar,
 )
 from minilink.dynamics.catalog.vehicles.racecar import (
     UdeSRacecar,
@@ -22,7 +22,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
     KinematicCar,
 )
-from minilink.dynamics.catalog.vehicles.suspension import QuarterCarOnRoughTerrain
+from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
 
 __all__ = [
     "BicycleDynRate",
@@ -31,10 +31,10 @@ __all__ = [
     "HolonomicMobileRobot",
     "KinematicBicycle",
     "KinematicCar",
-    "LongitudinalFrontWheelDriveCarWithTorqueInput",
-    "LongitudinalFrontWheelDriveCarWithWheelSlipInput",
+    "LongitudinalTorqueCar",
+    "LongitudinalSlipCar",
     "MountainCar",
-    "QuarterCarOnRoughTerrain",
+    "QuarterCar",
     "UdeSRacecar",
     "UdeSRacecarDyn",
     "UdeSRacecarDyn3D",

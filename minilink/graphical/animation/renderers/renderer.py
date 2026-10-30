@@ -2,6 +2,8 @@
 
 from abc import ABC, abstractmethod
 
+import numpy as np
+
 
 class AnimationRenderer(ABC):
     """
@@ -49,6 +51,9 @@ class AnimationRenderer(ABC):
         """
         return {}
 
+    def orbit_camera(self, d_azimuth: float, d_elevation: float) -> None:
+        """Rotate the 3-D camera eye by ``(d_azimuth, d_elevation)`` [rad] (no-op default)."""
+
     @abstractmethod
     def close_scene(self) -> None:
         """Release/close backend resources for the current session."""
@@ -85,3 +90,29 @@ class AnimationRenderer(ABC):
         can fall back to the generic per-frame loop.
         """
         raise NotImplementedError("Native playback is not supported by this renderer.")
+
+
+# Axis names of a camera column aligned with the world axes
+AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
+
+
+def axis_label_from_column(col) -> str:
+    """Return ``"X" / "Y" / "Z"`` if *col* is (close to) an axis-aligned unit vector, else ``""``."""
+    col = np.asarray(col, dtype=float).reshape(3)
+    abs_col = np.abs(col)
+    i = int(np.argmax(abs_col))
+    if abs_col[i] < 0.999:
+        return ""
+    other = np.delete(abs_col, i)
+    if np.any(other > 1e-3):
+        return ""
+    return ("-" if col[i] < 0 else "") + AXIS_LABEL_BY_INDEX[i]
+
+
+def camera_is_world_xy(camera) -> bool:
+    """True when 2D drawing can stay in world XY and move only the axis ranges."""
+    R_xy = np.asarray(camera[:3, :2], dtype=float)
+    return bool(
+        np.allclose(R_xy[:, 0], [1.0, 0.0, 0.0])
+        and np.allclose(R_xy[:, 1], [0.0, 1.0, 0.0])
+    )

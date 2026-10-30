@@ -1,8 +1,8 @@
 """Dual-rate path-tracking MPC with a ROS2-style manual deploy loop.
 
 Big ``=====`` boxes mark the ROS2 copy-paste surface: one ``__init__`` block
-(path → planning problem → planner → ``mpc``) and two timer callbacks.
-Everything else is offline sim / plotting only.
+(path → planning problem → planner → its compiled face ``pv`` and the plan
+``z``) and two timer callbacks. Everything else is offline sim / plotting only.
 
 Flip ``BACKEND`` below: ``"jax"`` parametric compile, ``"numpy"`` rebuild each
 replan tick (see ``mpc_integrator_numpy.py``).
@@ -15,9 +15,9 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.control.mpc import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
+from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.primitives import (
     HorizonPolyline,
@@ -25,12 +25,11 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline, point_probe
+from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
-from minilink.planning.spatial.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -47,7 +46,7 @@ SHOW_COST_FIELD = True
 CAMERA_SCALE = 14.0
 
 # =============================================================================
-# ROS2 NODE __init__ — copy this whole block once (keep ``mpc`` as a member)
+# ROS2 NODE __init__ — copy this whole block once (keep ``pv`` and ``z`` as members)
 # =============================================================================
 WAYPOINTS = [
     (0.0, 0.0),
@@ -82,7 +81,7 @@ sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
 )
@@ -107,16 +106,22 @@ x0 = np.array([waypoints[0, 0], waypoints[0, 1], 0.0, VX0, 0.0, 0.0, VX0 / r_r, 
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
-        sys=sys_mpc, x_start=x0, cost=cost, tf=MPC_HORIZON, X=sys_mpc.state.box
+        sys=sys_mpc,
+        x_start=x0,
+        cost=cost,
+        tf=MPC_HORIZON,
+        X=sys_mpc.state.box,
+        U=sys_mpc.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend=BACKEND,
+    backend=BACKEND,
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 100, "ftol": 0.1},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+pv = planner.compile()  # the planner's pure face: solve, shift, command, prediction
+z = pv.initial()  # the plan, its origin t_start inside
 # =============================================================================
 # end ROS2 NODE __init__
 # =============================================================================
@@ -136,7 +141,7 @@ if SHOW_COST_FIELD:
         (waypoints[:, 0].min() - 4.0, waypoints[:, 0].max() + 4.0),
         (waypoints[:, 1].min() - 4.0, waypoints[:, 1].max() + 4.0),
     )
-    probe = bind(sys_mpc, point_probe())
+    probe = mount(point_probe(), on=sys_mpc)
     path_viz = track.distance_field(probe).as_cost(
         weight=PATH_COST_WEIGHT, shaping=quadratic_excess(threshold=0.1)
     )
@@ -171,37 +176,36 @@ while t < TF_SIM - 1e-12:
     if t >= next_replan_t - 1e-12:
         # =============================================================================
         # ROS2 NODE slow timer (period = MPC_DT) — copy these 2 lines
-        #   inputs: measured state ``x``, wall time ``t``
+        #   inputs: measured state ``x``, wall time ``t``; a failed solve keeps the old plan
         # =============================================================================
-        cmd = mpc.compute_command(x, t=t)
-        mpc.generate_nominal_interpolator(derivatives=True)
+        z_new, status = pv.solve({"x_start": x, "t_start": t}, z0=pv.shift(z, t))
+        z = z_new if status["success"] else z
         # =============================================================================
         # end ROS2 NODE slow timer
         # =============================================================================
 
         # offline only: stash horizon for animation overlay
-        plan = cmd.solution.trajectory
-        mpc_plans.append(
-            (t, Trajectory(t=plan.t + t, x=plan.x.copy(), u=plan.u.copy()))
-        )
+        plan = pv.solution(z, {"t_start": float(z[-1])}).trajectory
+        mpc_plans.append((t, plan))
         next_replan_t += MPC_DT
 
     if t >= next_broadcast_t - 1e-12:
         # =============================================================================
         # ROS2 NODE fast timer (period = DT_BROADCAST) — copy these 4 lines
-        #   then publish / apply ``u_nom`` (and optionally x/du/dx) to the plant
+        #   then publish / apply ``u_nom`` (and optionally x/du/dx) to the plant;
+        #   the plan is linear between its knots: its rates over one broadcast period
         # =============================================================================
-        u_nom = mpc.get_nominal_u(t)
-        x_nom = mpc.get_nominal_x(t)
-        du_nom = mpc.get_nominal_u_dot(t)
-        dx_nom = mpc.get_nominal_x_dot(t)
+        x_nom, u_nom = pv.prediction(z, t)
+        x_ahead, u_ahead = pv.prediction(z, t + DT_BROADCAST)
+        du_nom = (u_ahead - u_nom) / DT_BROADCAST
+        dx_nom = (x_ahead - x_nom) / DT_BROADCAST
         # =============================================================================
         # end ROS2 NODE fast timer
         # =============================================================================
         next_broadcast_t += DT_BROADCAST
 
     # offline only: integrate plant (ROS2 talks to the real vehicle / estimator)
-    x = plant.rk4_step(x, u_nom, t, SIM_DT)
+    x = plant.step(x, u_nom, t, dt=SIM_DT)
     t += SIM_DT
     t_hist.append(t)
     x_hist.append(x.copy())

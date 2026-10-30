@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from types import MappingProxyType
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, repr_pretty
 
 ###############################################################################
@@ -64,36 +66,75 @@ class Trajectory(SampledSignals):
         Input samples with shape ``(m, N)``.
     signals : dict of str to np.ndarray, optional
         Additional sampled signals, each with shape ``(dim, N)``.
+    roles : dict, optional
+        The static layout of a loop's run: for each role (``"plant"``), the
+        ``(start, stop)`` of its state in ``x`` and the name of the signal that
+        records its input, read by :meth:`of`.
 
     Notes
     -----
     The trajectory semantic core is ``(t, x, u)``. Extra signals such as
     outputs, derivatives, or reconstructed internal ports can be attached
-    through :meth:`with_signal` or :meth:`with_signals`.
+    through :meth:`with_signal` or :meth:`with_signals`. The samples keep their
+    array module: NumPy arrays are copied as floats, JAX arrays are kept, and a
+    trajectory is a JAX pytree, so ``jit``, ``grad`` and ``vmap`` pass through a
+    function that returns one.
     """
 
     t: np.ndarray
     x: np.ndarray
     u: np.ndarray
     signals: dict[str, np.ndarray] = field(default_factory=dict)
+    roles: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # The core samples as float copies, the times flat
-        t = np.asarray(self.t, dtype=float).reshape(-1).copy()
-        x = np.asarray(self.x, dtype=float).copy()
-        u = np.asarray(self.u, dtype=float).copy()
+        xp = array_module(self.t, self.x, self.u)
+
+        # The core samples as floats on their own backend (copies on NumPy), the times flat
+        t = samples_of(xp, self.t).reshape(-1)
+        x = samples_of(xp, self.x)
+        u = samples_of(xp, self.u)
         check_samples(t, x, u)
 
-        # The extra signals as float copies, each on the same time grid
+        # The extra signals as floats, each on the same time grid
         signals = {}
         for name, values in dict(self.signals).items():
             signals[name] = signal_samples(name, values, t.size)
 
-        # The frozen fields take the copies
+        # The frozen fields take the samples, the roles a read-only layout
         object.__setattr__(self, "t", t)
         object.__setattr__(self, "x", x)
         object.__setattr__(self, "u", u)
         object.__setattr__(self, "signals", MappingProxyType(signals))
+        object.__setattr__(self, "roles", MappingProxyType(dict(self.roles)))
+
+    def with_cost(
+        self, cost, *, discount_rate=0.0, params=None, t_start=0.0
+    ) -> Trajectory:
+        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t_start``."""
+        cost_rate, running = cost.integrate(
+            self, discount_rate=discount_rate, params=params, t_start=t_start
+        )
+
+        return self.with_signals(
+            {"cost_rate": cost_rate.reshape(1, -1), "cost": running.reshape(1, -1)}
+        )
+
+    def of(self, role: str) -> Trajectory:
+        """
+        The run of one block of a loop: its state slice and its recorded input.
+
+        ``traj.of("plant")`` indexes the loop's samples by the static layout in
+        :attr:`roles`, so it traces under JAX like any slice.
+        """
+        require_role(self, role)
+        start, stop = self.roles[role]["x"]
+        u_name = self.roles[role]["u"]
+
+        x = self.x[start:stop]
+        u = self.signals[u_name]
+
+        return Trajectory(t=self.t, x=x, u=u)
 
     @property
     def n_samples(self) -> int:
@@ -133,7 +174,9 @@ class Trajectory(SampledSignals):
         new_signals = dict(self.signals)
         new_signals[name] = values
 
-        return Trajectory(t=self.t, x=self.x, u=self.u, signals=new_signals)
+        return Trajectory(
+            t=self.t, x=self.x, u=self.u, signals=new_signals, roles=self.roles
+        )
 
     def with_signals(self, values: dict[str, np.ndarray]) -> Trajectory:
         """Return a new trajectory with multiple additional sampled signals."""
@@ -142,7 +185,9 @@ class Trajectory(SampledSignals):
             require_extra_channel(name)
             new_signals[name] = arr
 
-        return Trajectory(t=self.t, x=self.x, u=self.u, signals=new_signals)
+        return Trajectory(
+            t=self.t, x=self.x, u=self.u, signals=new_signals, roles=self.roles
+        )
 
     # Samples at a time
 
@@ -168,21 +213,23 @@ class Trajectory(SampledSignals):
             x=self.x.copy(),
             u=self.u.copy(),
             signals={name: values.copy() for name, values in self.signals.items()},
+            roles=self.roles,
         )
 
     def save(self, path) -> None:
-        """Save the sampled trajectory to an ``.npz`` file."""
+        """Save the sampled trajectory to an ``.npz`` file, its role layout with it."""
         signal_names = list(self.signals)
 
-        # The core samples and the signal names, then one array per signal
+        # The core samples, the signal names and the role layout, then one array per signal
         arrays = {
-            "t": self.t,
-            "x": self.x,
-            "u": self.u,
+            "t": np.asarray(self.t),
+            "x": np.asarray(self.x),
+            "u": np.asarray(self.u),
             "signal_names": np.asarray(signal_names),
+            "roles": np.asarray(json.dumps(roles_as_json(self.roles))),
         }
         for i, name in enumerate(signal_names):
-            arrays[f"signal_{i}"] = self.signals[name]
+            arrays[f"signal_{i}"] = np.asarray(self.signals[name])
 
         np.savez(path, **arrays)
 
@@ -192,7 +239,14 @@ class Trajectory(SampledSignals):
         with np.load(path, allow_pickle=False) as data:
             names = [str(name) for name in data["signal_names"]]
             signals = {name: data[f"signal_{i}"] for i, name in enumerate(names)}
-            return cls(t=data["t"], x=data["x"], u=data["u"], signals=signals)
+            roles = json.loads(str(data["roles"])) if "roles" in data else {}
+            roles = {
+                role: {"x": tuple(layout["x"]), "u": layout["u"]}
+                for role, layout in roles.items()
+            }
+            return cls(
+                t=data["t"], x=data["x"], u=data["u"], signals=signals, roles=roles
+            )
 
     # Resampling
 
@@ -226,7 +280,9 @@ class Trajectory(SampledSignals):
         u_new = _interp(self.u)
         signals_new = {name: _interp(values) for name, values in self.signals.items()}
 
-        return Trajectory(t=t_new, x=x_new, u=u_new, signals=signals_new)
+        return Trajectory(
+            t=t_new, x=x_new, u=u_new, signals=signals_new, roles=self.roles
+        )
 
     # Display
 
@@ -286,6 +342,14 @@ def interpolate_schedule(xp, t_samples, values, t):
 ###############################################################################
 
 
+def samples_of(xp, values):
+    """Samples as floats: a fresh NumPy copy, or the JAX array as it is (a tracer stays one)."""
+    if xp is np:
+        return np.array(values, dtype=float)
+
+    return xp.asarray(values, dtype=float)
+
+
 def check_samples(t, x, u):
     """Refuse core samples off one nonempty, nondecreasing grid of ``N`` times."""
     if t.ndim != 1:
@@ -300,7 +364,7 @@ def check_samples(t, x, u):
         raise ValueError("u must have shape (m, N) where N == t.size")
     if t.size == 0:
         raise ValueError("Trajectory must contain at least one sample")
-    if np.any(np.diff(t) < 0.0):
+    if isinstance(t, np.ndarray) and np.any(np.diff(t) < 0.0):
         raise ValueError("t must be monotonically nondecreasing")
 
 
@@ -309,7 +373,7 @@ def signal_samples(name, values, N):
     if name in {"x", "u"}:
         raise ValueError("signals cannot redefine core channels 'x' or 'u'")
 
-    arr = np.asarray(values, dtype=float).copy()
+    arr = samples_of(array_module(values), values)
     if arr.ndim != 2:
         raise ValueError(f"Signal {name!r} must have shape (dim, N)")
     if arr.shape[1] != N:
@@ -341,3 +405,63 @@ def time_grid_of(traj, t_new, n_samples):
             raise ValueError("t_new must be monotonically nondecreasing")
 
     return t_new
+
+
+def require_role(traj, role):
+    """Refuse a role the trajectory's layout does not record."""
+    if role not in traj.roles:
+        recorded = ", ".join(traj.roles) or "none"
+        raise ValueError(
+            f"this trajectory records no {role!r} role (roles: {recorded}); a loop's "
+            "run from problem.compile(...).trajectory() records its plant"
+        )
+
+
+def roles_as_json(roles):
+    """The role layout as plain lists and strings."""
+    return {
+        role: {"x": list(layout["x"]), "u": layout["u"]}
+        for role, layout in roles.items()
+    }
+
+
+def trajectory_flatten(traj):
+    """The pytree children (the samples, the signals by name) and the static layout."""
+    names = tuple(sorted(traj.signals))
+    children = (traj.t, traj.x, traj.u, *(traj.signals[name] for name in names))
+    layout = tuple(
+        (role, tuple(roles["x"]), roles["u"])
+        for role, roles in sorted(traj.roles.items())
+    )
+
+    return children, (names, layout)
+
+
+def trajectory_unflatten(aux, children):
+    """A trajectory from its children, without validation (a transformation's leaves)."""
+    names, layout = aux
+    t, x, u, *signal_values = children
+
+    traj = object.__new__(Trajectory)
+    object.__setattr__(traj, "t", t)
+    object.__setattr__(traj, "x", x)
+    object.__setattr__(traj, "u", u)
+    object.__setattr__(
+        traj, "signals", MappingProxyType(dict(zip(names, signal_values)))
+    )
+    object.__setattr__(
+        traj,
+        "roles",
+        MappingProxyType(
+            {role: {"x": x_slice, "u": u_name} for role, x_slice, u_name in layout}
+        ),
+    )
+
+    return traj
+
+
+def register_trajectory_pytree(jax):
+    """Register :class:`Trajectory` as a JAX pytree with the module ``jax`` (once, when minilink loads JAX)."""
+    jax.tree_util.register_pytree_node(
+        Trajectory, trajectory_flatten, trajectory_unflatten
+    )

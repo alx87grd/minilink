@@ -95,4 +95,6 @@ venv.bak/
 # README assets built by docs/make_assets.py (kept in git so GitHub renders them)
 !docs/_static/*.gif
 !docs/_static/*.png
+!docs/plans/*.png
 !docs/_static/showcase/*.html
+!docs/presentation.html

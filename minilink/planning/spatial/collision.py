@@ -10,7 +10,7 @@ from minilink.core.kinematics import apply
 
 __all__ = [
     "CollisionBody",
-    "bind",
+    "mount",
     "car_outline",
     "collision_spheres",
     "disc",
@@ -73,7 +73,7 @@ def car_outline(
     Body-frame rectangular car footprint: corners and edge midpoints.
 
     Each probe is a :class:`Sphere` offset in the body frame. Attach to a
-    planner plant with :func:`bind` and ``frame="body"`` (default).
+    planner plant with :func:`mount` and ``frame="body"`` (default).
     """
     # Half length and half width of the footprint
     hl = 0.5 * length
@@ -95,38 +95,38 @@ def car_outline(
     return probes
 
 
-def bind(sys, spec, *, frame: str = "body") -> CollisionBody:
+def mount(geometry, *, on, frame: str = "body") -> CollisionBody:
     """
-    Bind frameless collision geometry to a planner plant's ``tf`` dict.
+    Mount frameless collision geometry on a plant, at a frame of its ``tf`` dict.
 
-    The world poses then come from ``sys.tf``: one forward-kinematics pass,
+    The world poses then come from ``on.tf``: one forward-kinematics pass,
     shared with rendering.
 
     Single-frame (default ``frame="body"``)::
 
-        body = bind(sys_mpc, disc(0.25))
-        body = bind(sys_mpc, car_outline(2.4, 0.2, margin=0.05))
+        body = mount(disc(0.25), on=sys_mpc)
+        body = mount(car_outline(2.4, 0.2, margin=0.05), on=sys_mpc)
 
     Multi-frame — pass a **list** of ``(frame_key, geometry)`` pairs::
 
-        body = bind(sys, [("body", car_outline(2.4, 0.2)), ("link3", disc(0.15))])
+        body = mount([("body", car_outline(2.4, 0.2)), ("link3", disc(0.15))], on=sys)
     """
     if (
-        isinstance(spec, list)
-        and spec
-        and isinstance(spec[0], (list, tuple))
-        and len(spec[0]) == 2
-        and isinstance(spec[0][0], str)
+        isinstance(geometry, list)
+        and geometry
+        and isinstance(geometry[0], (list, tuple))
+        and len(geometry[0]) == 2
+        and isinstance(geometry[0][0], str)
     ):
         # Several frames: one (frame_key, geometry) pair each
         bindings = tuple(
-            (frame_key, normalize_shapes(geometry)) for frame_key, geometry in spec
+            (frame_key, normalize_shapes(shapes)) for frame_key, shapes in geometry
         )
     else:
         # One frame carries all the geometry
-        bindings = ((frame, normalize_shapes(spec)),)
+        bindings = ((frame, normalize_shapes(geometry)),)
 
-    return BoundCollisionBody(sys, bindings)
+    return BoundCollisionBody(on, bindings)
 
 
 def iter_probes(body, x, u=None, t=0.0, params=None):

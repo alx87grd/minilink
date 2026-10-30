@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from minilink.core.backends import array_module
 from minilink.core.kinematics import translation
 from minilink.dynamics.abstraction.state_space import StateSpaceSystem
 from minilink.graphical.animation.primitives import (
@@ -20,7 +21,7 @@ class SingleMass(StateSpaceSystem):
     """Single linear mass-spring-damper model."""
 
     def __init__(self, mass=1.0, k=2.0, b=0.0):
-        super().__init__(n=2, m=1, p=1, name="Single Mass Spring Damper")
+        super().__init__(n=2, m=1, p=1)
 
         # Parameters
         self.params = {"mass": float(mass), "k": float(k), "b": float(b)}
@@ -38,6 +39,7 @@ class SingleMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         mass = params["mass"]
         k = params["k"]
@@ -45,7 +47,7 @@ class SingleMass(StateSpaceSystem):
 
         # m ẍ + b ẋ + k x = u, on the state [x, ẋ]
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [      0.0,       1.0],
             [-k / mass, -b / mass],
         ])
@@ -55,12 +57,13 @@ class SingleMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         mass = params["mass"]
 
         # The force enters through the acceleration row
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [1.0 / mass],
         ])
@@ -114,7 +117,7 @@ class TwoMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        super().__init__(n=4, m=1, p=1, name="Two Mass Spring Damper")
+        super().__init__(n=4, m=1, p=1)
 
         # Parameters: the measured mass, then the chain's masses, springs and dampers
         self.output_mass = int(output_mass)
@@ -141,6 +144,7 @@ class TwoMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -161,7 +165,7 @@ class TwoMass(StateSpaceSystem):
 
         # The state [x₁, x₂, ẋ₁, ẋ₂]: the positions move at the velocities
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
             [A31, A32, A33, 0.0],
@@ -173,12 +177,13 @@ class TwoMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m2 = params["m2"]
 
         # The force enters on the second mass
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [0.0],
             [0.0],
@@ -241,7 +246,7 @@ class ThreeMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        super().__init__(n=6, m=1, p=1, name="Three Mass Spring Damper")
+        super().__init__(n=6, m=1, p=1)
 
         # Parameters: the measured mass, then the chain's masses, springs and dampers
         self.output_mass = int(output_mass)
@@ -271,6 +276,7 @@ class ThreeMass(StateSpaceSystem):
 
     def A(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m1 = params["m1"]
         m2 = params["m2"]
@@ -300,7 +306,7 @@ class ThreeMass(StateSpaceSystem):
 
         # The state [x₁, x₂, x₃, ẋ₁, ẋ₂, ẋ₃]: the positions move at the velocities
         # fmt: off
-        A = np.array([
+        A = xp.array([
             [0.0, 0.0, 0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 1.0, 0.0],
             [0.0, 0.0, 0.0, 0.0, 0.0, 1.0],
@@ -314,12 +320,13 @@ class ThreeMass(StateSpaceSystem):
 
     def B(self, t=0.0, params=None):
         params = self.params if params is None else params
+        xp = array_module(t, *params.values())
 
         m3 = params["m3"]
 
         # The force enters on the third mass
         # fmt: off
-        B = np.array([
+        B = xp.array([
             [0.0],
             [0.0],
             [0.0],
@@ -388,7 +395,6 @@ class FloatingSingleMass(SingleMass):
 
     def __init__(self, m=1.0, b=0.0):
         super().__init__(mass=m, k=0.0, b=b)
-        self.name = "Floating Single Mass"
 
 
 class FloatingTwoMass(TwoMass):
@@ -396,7 +402,6 @@ class FloatingTwoMass(TwoMass):
 
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=2):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)
-        self.name = "Floating Two Mass"
 
         # Parameters: no ground spring
         self.params["k1"] = 0.0
@@ -407,7 +412,6 @@ class FloatingThreeMass(ThreeMass):
 
     def __init__(self, m=1.0, k=1.0, b=0.0, output_mass=3):
         super().__init__(m=m, k=k, b=b, output_mass=output_mass)
-        self.name = "Floating Three Mass"
 
         # Parameters: no ground spring
         self.params["k1"] = 0.0

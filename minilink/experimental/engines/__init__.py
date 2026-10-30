@@ -9,7 +9,10 @@ pick, and ``engines/`` holds kernels that *build* a
 The boundary test: engine code **executes inside ``f`` during
 simulation** (``world_ode`` runs every step). Offline authoring that derives
 a plant and then exits — symbolic EoM derivation, data fitting — is a verb
-and lives in the tools band (``symbolic/``, ``identification/``). Bridges to
+and lives in the tools band (``symbolic/``, the learning band). Bridges to
 *external* engines (MuJoCo, FMI) belong in ``interfaces/``. Status:
 experimental (TRL 1) — math not yet QA-validated.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """

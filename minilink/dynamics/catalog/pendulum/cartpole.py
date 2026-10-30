@@ -26,7 +26,10 @@ class CartPole(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=1)
-        self.name = "Cart Pole"
+
+        # The plant's own range: angles and rates within ±2π
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
 
         # Parameters
         self.params = {
@@ -57,6 +60,37 @@ class CartPole(MechanicalSystem):
         self.wheel_radius = 0.15
         self.line_width = 1.5
         self.camera_scale = 10.0
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: the time constant of the pole's unstable mode about the upright, in seconds.
+
+        Linearized about ``θ = π`` the pole falls as ``e^{λt}``, ``λ = √(g (m₁ + m₂) / (m₁ l))``,
+        ``l`` the distance to the pole's centre of gravity: ``τ = 1 / λ``.
+        """
+        params = self.params
+
+        m1 = params["m1"]
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        gravity = params["gravity"]
+
+        # λ² = g (m₁ + m₂) / (m₁ l), the unstable pole of the upright
+        lam = float(np.sqrt(gravity * (m1 + m2) / (m1 * lcg)))
+        tau = 1.0 / lam
+
+        return tau
 
     def H(self, q, params=None):
         params = self.params if params is None else params
@@ -236,7 +270,7 @@ class CartPole(MechanicalSystem):
         }
 
 
-class CartPoleWithNoisePort(CartPole):
+class NoisyCartPole(CartPole):
     """Linear cart-pole with process and measurement noise ports.
 
     ``d`` injects a disturbance force into the cart; ``n`` corrupts the
@@ -245,7 +279,6 @@ class CartPoleWithNoisePort(CartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Cart Pole with noise ports"
 
         # Ports: the disturbance force d and the measurement noise n
         self.add_input_port("d", dim=1, nominal_value=np.array([0.0]))
@@ -289,7 +322,12 @@ class RotatingCartPole(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Rotating Cart Pole"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -459,7 +497,6 @@ class UnderactuatedRotatingCartPole(RotatingCartPole):
 
     def __init__(self):
         super().__init__()
-        self.name = "Underactuated Rotating Cart Pole"
 
         # Ports: one torque, on the base joint, within ±5 N·m
         self.inputs.clear()

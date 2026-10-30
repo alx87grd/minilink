@@ -227,9 +227,9 @@ class TestChannelTools(unittest.TestCase):
         self.assertEqual(margins_text(coarse), margins_text(fine))
 
     def test_the_default_channel_is_the_command_port(self):
-        from minilink import PendulumWithNoisePort
+        from minilink import NoisyPendulum
 
-        plant = PendulumWithNoisePort()
+        plant = NoisyPendulum()
         _, mag_default, _ = bode(plant, w=[1.0])
         _, mag_command, _ = bode(plant, wrt="u", w=[1.0])
         np.testing.assert_allclose(mag_default, mag_command)

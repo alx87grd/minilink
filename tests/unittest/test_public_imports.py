@@ -24,14 +24,14 @@ class TestPublicImports(unittest.TestCase):
 
     def test_control_and_analysis_band_exports(self):
         from minilink.analysis import bode, discretize, linearize, modal_analysis
-        from minilink.control import ImpedanceController, lqr
+        from minilink.control import Impedance, lqr
 
         self.assertTrue(callable(lqr))
         self.assertTrue(callable(linearize))  # the function, not a module of that name
         self.assertTrue(callable(discretize))
         self.assertTrue(callable(bode))
         self.assertTrue(callable(modal_analysis))
-        self.assertTrue(callable(ImpedanceController))
+        self.assertTrue(callable(Impedance))
 
     def test_root_prelude_is_the_teaching_surface(self):
         import minilink
@@ -40,7 +40,7 @@ class TestPublicImports(unittest.TestCase):
         self.assertIn("Boat2D", minilink.__all__)  # the catalog is teaching surface
         self.assertIn("ReinforcementLearningPlanner", minilink.__all__)
         self.assertIn("TabularLearningPlanner", minilink.__all__)
-        self.assertIn("StochasticPlanningProblem", minilink.__all__)
+        self.assertNotIn("StochasticPlanningProblem", minilink.__all__)
         self.assertNotIn("ModelPredictiveController", minilink.__all__)  # research lane
         self.assertNotIn("HybridDiagram", minilink.__all__)
 

@@ -19,7 +19,7 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
 ConstraintFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -43,12 +43,29 @@ class Transcription(ABC):
     #: instead of ``hasattr`` so a subclass cannot inherit a wrong one.
     supports_parametric = False
 
+    #: The plant compiled for this transcription, ``(sys, backend, evaluator)``:
+    #: a transcription is built once per planner and compiles its plant once
+    held_plant = None
+
+    def plant_evaluator(self, problem: PlanningProblem, backend: str):
+        """The plant of ``problem`` compiled on ``backend``, held while the plant is the same object (``None`` in direct mode)."""
+        key = normalize_backend(backend, allow_direct=True)
+        if key == BACKEND_DIRECT:
+            return None
+
+        held = self.held_plant
+        if held is None or held[0] is not problem.sys or held[1] != key:
+            held = (problem.sys, key, problem.sys.compile(backend=key))
+            self.held_plant = held
+
+        return held[2]
+
     @abstractmethod
     def transcribe(
         self,
         problem: PlanningProblem,
         *,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> MathematicalProgram:
         """Convert ``problem`` into a finite-dimensional mathematical program."""
         ...
@@ -68,7 +85,7 @@ class Transcription(ABC):
         result: OptimizationResult,
         *,
         problem: PlanningProblem,
-        compile_backend: str = BACKEND_NUMPY,
+        backend: str = BACKEND_NUMPY,
     ) -> Trajectory:
         """Convert an optimizer result back into a trajectory."""
         ...
@@ -90,7 +107,13 @@ class FixedGridOptions:
         self.n_steps = int(self.n_steps)
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
-        """Time grid from finite ``problem.tf`` and ``n_steps``."""
+        """The time grid on the horizon ``[t_start, t_start + tf]``: ``t_start`` plus ``linspace(0, tf, n_steps)``."""
+        t = problem.t_start + fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+
+        return t
+
+    def offsets(self, problem: PlanningProblem) -> np.ndarray:
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t_start + offset_k``."""
         return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
@@ -103,16 +126,23 @@ class FixedGridOptions:
 # collocation defect, one RK4 step between input knots)
 
 
-def trajectory_cost(cost, x, u, t, dt, params):
-    """Sampled Bolza objective on a uniform grid.
+def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t_start=0.0):
+    """Sampled Bolza objective on a uniform grid, discounted from the horizon's start.
 
     ``x`` and ``u`` are knot matrices with shape ``(dim, N)``; the running
-    cost is integrated with the trapezoid rule.
+    cost is integrated with the trapezoid rule. The discount is the
+    problem's, ``e^{−ρ(t − t_start)}``; ``ρ = 0`` is the plain sum.
     """
-    # J = Σ dt/2 (g_k + g_{k+1}) + h(x_N, t_N)
-    g = running_cost_samples(cost, x, u, t, params)
+    xp = array_module(x, t)
+    rho = discount_rate
+
+    # w_k = e^{−ρ(t_k − t_start)}, the discount at each knot
+    w = xp.exp(-rho * (t - t_start))
+
+    # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N)
+    g = w * running_cost_samples(cost, x, u, t, params)
     running = trapezoid_integral(g, dt)
-    terminal = cost.h(x[:, -1], t[-1], params=params)
+    terminal = w[-1] * cost.h(x[:, -1], t[-1], params=params)
     J = running + terminal
 
     return J
@@ -165,58 +195,40 @@ def trapezoidal_defect(x, dx, dt):
     return defect
 
 
-def rk4_step_between_knots(f, x, u0, u1, t, dt):
-    """One RK4 step from knot ``k`` to ``k+1`` with linear input interpolation."""
-    # The input at mid-step, interpolated linearly between the knots
-    umid = 0.5 * (u0 + u1)
-
-    # The four slopes
-    k1 = f(x, u0, t)
-    k2 = f(x + 0.5 * dt * k1, umid, t + 0.5 * dt)
-    k3 = f(x + 0.5 * dt * k2, umid, t + 0.5 * dt)
-    k4 = f(x + dt * k3, u1, t + dt)
-
-    # x_{k+1} = x_k + dt/6 (k₁ + 2 k₂ + 2 k₃ + k₄)
-    x_next = x + (dt / 6.0) * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
-
-    return x_next
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
 
 
-def program_backend_for_compile(compile_backend: str) -> str:
+def program_backend_for_compile(backend: str) -> str:
     """Return the mathematical-program evaluator backend for a transcription."""
-    key = normalize_backend(compile_backend, allow_direct=True)
+    key = normalize_backend(backend, allow_direct=True)
     return BACKEND_JAX if key == BACKEND_JAX else BACKEND_NUMPY
 
 
-def dynamics_function(problem: PlanningProblem, compile_backend: str):
+def dynamics_function(problem: PlanningProblem, backend: str, evaluator=None):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
-    ``"numpy"`` and ``"jax"`` use a compiled evaluator; system params from
-    ``problem.params.system`` flow through the parametric tier ``f_p``.
+    ``"numpy"`` and ``"jax"`` use a compiled evaluator (``evaluator`` when
+    given, the transcription's held one, else a new compile); system params from
+    ``nominal_plant_params(problem)`` flow through the evaluator's ``params`` argument.
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """
-    key = normalize_backend(compile_backend, allow_direct=True)
-    params = problem.params.system
+    key = normalize_backend(backend, allow_direct=True)
+    params = nominal_plant_params(problem)
 
     # The escape hatch: the system's own f, uncompiled
     if key == BACKEND_DIRECT:
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
-    # A compiled evaluator: its trace tier when it has one, the params when given
-    evaluator = problem.sys.compile(backend=key, verbose=False)
-    if getattr(evaluator, "has_trace_tier", False):
-        if params is None:
-            return lambda x, u, t: evaluator.f_trace(x, u, t)
-        return lambda x, u, t: evaluator.f_trace_p(x, u, t, params)
-    if params is None:
-        return lambda x, u, t: evaluator.f(x, u, t)
-    return lambda x, u, t: evaluator.f_p(x, u, t, params)
+    # A compiled evaluator, on the params when given, else on the plant's numbers now
+    if evaluator is None:
+        evaluator = problem.sys.compile(backend=key)
+    f = evaluator.f
+    params = evaluator.call_params() if params is None else params
+
+    return lambda x, u, t: f(x, u, t, params)
 
 
 def native_concatenate(values, like):
@@ -237,6 +249,20 @@ def native_concatenate(values, like):
         return empty
 
     stacked = xp.concatenate(pieces)
+
+    return stacked
+
+
+def stack_parametric(constraints):
+    """One native constraint vector of ``(z, params)`` from a list of vector functions, ``None`` for none."""
+    if not constraints:
+        return None
+
+    def stacked(z, params):
+        values = native_concatenate(
+            (constraint(z, params) for constraint in constraints), z
+        )
+        return values
 
     return stacked
 
@@ -292,10 +318,9 @@ def require_fixed_grid_horizon(tf):
         raise ValueError("fixed-grid tf must be positive and finite")
 
 
-def require_jax_compile_backend(compile_backend):
+def require_jax_compile_backend(backend):
     """Refuse a parametric program on any compile backend but JAX."""
-    if normalize_backend(compile_backend, allow_direct=True) != BACKEND_JAX:
+    if normalize_backend(backend, allow_direct=True) != BACKEND_JAX:
         raise ValueError(
-            "a parametric program requires compile_backend='jax' "
-            f"(got {compile_backend!r})."
+            f"a parametric program requires backend='jax' (got {backend!r})."
         )

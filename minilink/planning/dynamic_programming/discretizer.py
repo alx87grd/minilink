@@ -1,0 +1,623 @@
+"""State-space grid for value iteration: states, inputs, Euler successors and interpolation."""
+
+import time
+
+import numpy as np
+from scipy.interpolate import RegularGridInterpolator
+
+from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
+from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
+from minilink.planning.dynamic_programming.progress import (
+    maybe_print_build_progress,
+    print_build_complete,
+    progress,
+)
+from minilink.planning.problems import PlanningProblem
+
+#: Node-action pairs evaluated per JAX chunk when building tables on device.
+PAIR_CHUNK_SIZE = 50_000
+
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+class StateSpaceGrid:
+    """
+    Regular grid over the state and input spaces of a planning problem.
+
+    Parameters
+    ----------
+    problem : PlanningProblem
+        Source of the system, the state set ``X`` (grid extent and state
+        validity), and the input set ``U`` (grid extent and input validity).
+    x_grid_shape : sequence of int
+        Number of levels per state axis, length ``n``.
+    u_grid_shape : sequence of int
+        Number of levels per input axis, length ``m``.
+    dt : float
+        Sample period of the successor map, the input held over it.
+    solver : {"euler", "rk4"}, optional
+        The step model of the successor map: forward Euler (default, the
+        textbook value iteration) or RK4.
+    precompute : bool, optional
+        When ``True`` (default) the successor and validity tables are built once
+        at construction (``t = 0``) — fast sweeps, but only valid when neither
+        the dynamics ``f`` nor the running cost ``g`` depends on time: the
+        value-iteration planner then also builds its running-cost table once.
+        When ``False`` both are recomputed at each sweep's time, which costs
+        less memory and supports a time-varying ``f`` or ``g``.
+    precompute_backend : {"numpy", "jax"}, optional
+        Engine for building the successor lookup table. ``"numpy"`` (default) uses
+        nested Python loops (pyro's reference). ``"jax"`` vectorizes the forward
+        dynamics with ``vmap`` and is much faster on large grids when the plant
+        is JAX-traceable and the state/input sets are boxes.
+    verbose : bool, optional
+        Print mesh size and lookup-table build progress: one in-place line
+        about every 2% with elapsed time and ETA until each step completes.
+
+    Attributes
+    ----------
+    states : np.ndarray
+        Grid states, shape ``(nodes_n, n)``.
+    inputs : np.ndarray
+        Grid inputs, shape ``(actions_n, m)``.
+    x_next, action_ok, x_next_ok : np.ndarray or None
+        Successor and validity tables, built at construction when ``precompute``
+        is set (or by :meth:`ensure_jax_transition` and :meth:`load`); ``None``
+        until then.
+    """
+
+    def __init__(
+        self,
+        problem: PlanningProblem,
+        *,
+        x_grid_shape,
+        u_grid_shape,
+        dt: float,
+        solver: str = "euler",
+        precompute: bool = True,
+        precompute_backend: str = BACKEND_NUMPY,
+        verbose: bool = False,
+    ) -> None:
+        # The problem, its system's dimensions and its step face: one period
+        # of the plant and its stage cost, the one face value iteration reads
+        require_step_knobs(solver, 1)
+        self.problem = problem
+        self.sys = problem.sys
+        self.n = int(self.sys.n)
+        self.m = int(self.sys.m)
+        self.face = face_of(problem, dt, solver)
+        self.dt = 1.0 if self.face.dt is None else float(self.face.dt)
+        self.solver = solver
+
+        # Levels per axis, and the box they span
+        self.x_grid_shape = self.coerce_shape(x_grid_shape, self.n, "x_grid_shape")
+        self.u_grid_shape = self.coerce_shape(u_grid_shape, self.m, "u_grid_shape")
+
+        x_lb, x_ub = self.state_bounds(problem)
+        u_lb, u_ub = self.input_bounds(problem)
+        self.x_lb = x_lb
+        self.x_ub = x_ub
+        self.u_lb = u_lb
+        self.u_ub = u_ub
+
+        # Evenly spaced levels on every axis, and their spacing
+        self.x_levels = [
+            np.linspace(x_lb[i], x_ub[i], self.x_grid_shape[i]) for i in range(self.n)
+        ]
+        self.u_levels = [
+            np.linspace(u_lb[i], u_ub[i], self.u_grid_shape[i]) for i in range(self.m)
+        ]
+        self.x_step = self.step_sizes(x_lb, x_ub, self.x_grid_shape)
+        self.u_step = self.step_sizes(u_lb, u_ub, self.u_grid_shape)
+
+        # The nodes and the actions: every combination of levels, one per row
+        self.states = self.grid_points(self.x_levels)
+        self.inputs = self.grid_points(self.u_levels)
+        self.nodes_n = self.states.shape[0]
+        self.actions_n = self.inputs.shape[0]
+
+        # Table build options
+        self.precompute_backend = precompute_backend
+        self.verbose = bool(verbose)
+        self._jax_transition = False
+        self.require_precompute_backend(precompute_backend)
+
+        # Successor and validity tables, built once here when precomputed
+        self.x_next = None
+        self.action_ok = None
+        self.x_next_ok = None
+        self.precomputed = bool(precompute)
+        if self.precomputed:
+            if self.verbose:
+                self.print_mesh_summary()
+            self.x_next, self.action_ok, self.x_next_ok = self.build_transition(0.0)
+            if precompute_backend == BACKEND_JAX:
+                self._jax_transition = True
+
+    @property
+    def X(self) -> BoxSet:
+        """The state box the grid spans, ``x_lb ≤ x ≤ x_ub``."""
+        return BoxSet(self.x_lb, self.x_ub)
+
+    @property
+    def U(self) -> BoxInputSet:
+        """The input box the grid's actions span, ``u_lb ≤ u ≤ u_ub``."""
+        return BoxInputSet.from_bounds(self.u_lb, self.u_ub)
+
+    # Dynamics and validity
+
+    def transition(self, t: float = 0.0):
+        """
+        Return ``(x_next, action_ok, x_next_ok)`` at time ``t``.
+
+        Cached tables are returned when ``precompute`` is set; otherwise the
+        successor map and validity masks are recomputed for time ``t``.
+        """
+        if self.precomputed:
+            return self.x_next, self.action_ok, self.x_next_ok
+
+        return self.build_transition(t)
+
+    def successors(self, t: float = 0.0) -> np.ndarray:
+        """Return the successor states ``x_next`` of shape ``(nodes_n, actions_n, n)``."""
+        if self.precomputed:
+            return self.x_next
+
+        return self.build_transition(t)[0]
+
+    def on_grid(self, x_next):
+        """Mask of successors inside the grid's box, the table's domain (``(N, A)`` for an ``(N, A, n)`` table)."""
+        x_lb = self.x_lb
+        x_ub = self.x_ub
+
+        # x_lb ≤ x_next ≤ x_ub on every axis
+        inside = np.all(x_next >= x_lb, axis=-1) & np.all(x_next <= x_ub, axis=-1)
+
+        return inside
+
+    def ensure_jax_transition(self, t: float = 0.0) -> None:
+        """Build or rebuild transition tables with the JAX backend.
+
+        Called by :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
+        when ``backend="jax"``. Use ``precompute=False`` on the grid in JAX demos
+        so the slow NumPy build is skipped at construction time.
+        """
+        # Already built on device
+        if self._jax_transition and self.precomputed:
+            return
+
+        if self.verbose and not self.precomputed:
+            self.print_mesh_summary()
+
+        # The tables traced on device; a plant JAX cannot trace is refused
+        try:
+            self.x_next, self.action_ok, self.x_next_ok = self.compute_transition_jax(t)
+        except Exception as exc:
+            raise ValueError(
+                "JAX grid precompute requires a JAX-traceable plant f and BoxSet X"
+            ) from exc
+
+        self.precomputed = True
+        self._jax_transition = True
+
+    # The successor map
+
+    def successor(self, x, u, t, params=None):
+        """``x_{k+1}``: the plant one period after ``x``, ``u`` held: the step face's step (``params``: the plant's numbers)."""
+        return self.face.step_at(x, u, t, params)
+
+    def stage_cost(self, x, u, t, params=None):
+        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
+        return self.face.stage_cost_at(x, u, t, params)
+
+    def stage_cost_law(self, t, params=None):
+        """``c(x, u)``: :meth:`stage_cost` of the period starting at ``t`` as a function of the pair, built once for a table."""
+        return self.face.stage_cost_law(t, params)
+
+    # The successor tables
+
+    def compute_transition_numpy(self, t):
+        """Build the successors of the step face and the input/state validity masks."""
+        X = self.problem.X
+        U = self.problem.U
+        sys_params = self.face.params["plant"]
+        set_params = None
+        states = self.states
+        inputs = self.inputs
+        N = self.nodes_n
+        A = self.actions_n
+        n = self.n
+        verbose = self.verbose
+
+        x_next = np.empty((N, A, n), dtype=float)
+        action_ok = np.empty((N, A), dtype=bool)
+        x_next_ok = np.empty((N, A), dtype=bool)
+
+        nodes = progress(
+            range(N), "Computing x_next array", verbose, unit="pairs", per_item=A
+        )
+
+        # For all state nodes
+        for s in nodes:
+            x = states[s]
+
+            # For all control actions
+            for a in range(A):
+                u = inputs[a]
+
+                # x_{k+1} = Φ(x_k, u, t): the step model, x + f(x, u, t) dt for Euler
+                xnext = self.successor(x, u, t, sys_params)
+                x_next[s, a] = xnext
+
+                # Admissible input, and a successor in X and on the grid (the table's
+                # domain)
+                action_ok[s, a] = U.contains(u, x, t, set_params)
+                x_next_ok[s, a] = X.contains(xnext, t, set_params) and bool(
+                    self.on_grid(xnext)
+                )
+
+        return x_next, action_ok, x_next_ok
+
+    def compute_transition_jax(self, t):
+        """Vectorized successor map and box validity masks on device."""
+        jax = ensure_jax_x64()
+        jnp = jax.numpy
+
+        N = self.nodes_n
+        A = self.actions_n
+        n = self.n
+        sys_params = self.face.params["plant"]
+        X = self.problem.X
+        U = self.problem.U
+        set_params = None
+        verbose = self.verbose
+
+        # The nodes, the actions and the grid's box, on device
+        states = jnp.asarray(self.states)
+        inputs = jnp.asarray(self.inputs)
+        grid_box = BoxSet(jnp.asarray(self.x_lb), jnp.asarray(self.x_ub))
+
+        if verbose:
+            print(
+                f"Computing x_next array (JAX vmap).. {N * A:,} pairs",
+                flush=True,
+            )
+
+        def pair(s, a):
+            x = states[s]
+            u = inputs[a]
+
+            # x_{k+1} = Φ(x_k, u, t): the step model, x + f(x, u, t) dt for Euler
+            xnext = self.successor(x, u, t, sys_params)
+
+            # Validity from the problem's sets and the grid: u ∈ U(x, t), x_next ∈ X(t)
+            # and on the grid (the table's domain; off the grid is infeasible)
+            action_ok = jnp.all(U.margin(u, x, t, set_params) >= 0.0)
+            x_next_ok = jnp.all(X.margin(xnext, t, set_params) >= 0.0) & jnp.all(
+                grid_box.margin(xnext) >= 0.0
+            )
+
+            return xnext, action_ok, x_next_ok
+
+        # Every (node, action) pair, in fixed-size chunks
+        x_next, action_ok, x_next_ok = self.build_xnext_jax_chunks(
+            pair, N, A, n, jax, jnp, interval=PAIR_CHUNK_SIZE
+        )
+
+        return x_next, action_ok, x_next_ok
+
+    # Interpolation and reshaping
+
+    def build_interpolator(self, values, method: str = "linear"):
+        """
+        Return a regular-grid interpolator callable for a node-indexed field.
+
+        ``method`` is one of ``{"linear", "nearest", "cubic", "quintic"}``;
+        ``"spline"`` is accepted as an alias for ``"cubic"``. Out-of-bounds
+        queries return 0. Spline methods are smoother but ring across the
+        infeasibility penalty, so they suit fields without large cliffs.
+        """
+        method = "cubic" if method == "spline" else method
+        grid = values.reshape(self.x_grid_shape)
+
+        return RegularGridInterpolator(
+            tuple(self.x_levels),
+            grid,
+            method=method,
+            bounds_error=False,
+            fill_value=0.0,
+        )
+
+    def interpolate(self, values, queries, method: str = "linear") -> np.ndarray:
+        """Interpolate a node-indexed field ``values`` at states ``queries`` (M, n)."""
+        interp = self.build_interpolator(values, method)
+
+        return interp(np.asarray(queries, dtype=float))
+
+    def grid_from_array(self, values) -> np.ndarray:
+        """Reshape a node-indexed array ``(nodes_n,)`` into the state grid shape."""
+        return np.asarray(values).reshape(self.x_grid_shape)
+
+    def input_from_policy(self, pi) -> np.ndarray:
+        """Map a policy of action ids ``(nodes_n,)`` to inputs ``(nodes_n, m)``."""
+        return self.inputs[np.asarray(pi, dtype=int)]
+
+    # Grid lookups
+
+    def nearest_node(self, x) -> int:
+        """Return the node id of the grid state closest to ``x``."""
+        index = self.nearest_index(x, self.x_lb, self.x_step, self.x_grid_shape)
+
+        return int(np.ravel_multi_index(index, self.x_grid_shape))
+
+    def nearest_action(self, u) -> int:
+        """Return the action id of the grid input closest to ``u``."""
+        index = self.nearest_index(u, self.u_lb, self.u_step, self.u_grid_shape)
+
+        return int(np.ravel_multi_index(index, self.u_grid_shape))
+
+    def slice_2d(self, grid_nd, axis_x: int = 0, axis_y: int = 1, anchor=None):
+        """
+        Take a 2-D ``(axis_x, axis_y)`` slice of an ``n``-D grid array.
+
+        Other axes are pinned to the grid node nearest ``anchor`` (defaulting to
+        the problem goal when available, otherwise the grid centre).
+        """
+        grid_nd = np.asarray(grid_nd)
+        if self.n == 2:
+            return grid_nd
+
+        # The other axes pinned at the node nearest the anchor
+        anchor = self.default_anchor() if anchor is None else np.asarray(anchor)
+        index = list(
+            self.nearest_index(anchor, self.x_lb, self.x_step, self.x_grid_shape)
+        )
+
+        # The (axis_x, axis_y) plane through that node
+        nx = self.x_grid_shape[axis_x]
+        ny = self.x_grid_shape[axis_y]
+        out = np.empty((nx, ny), dtype=float)
+        for i in range(nx):
+            for j in range(ny):
+                index[axis_x] = i
+                index[axis_y] = j
+                out[i, j] = grid_nd[tuple(index)]
+
+        return out
+
+    # Plotting
+
+    def plot_value(self, values, *, show_3d=False, **kwargs):
+        """
+        Draw a node-indexed field on this grid: a heatmap, or a surface with ``show_3d``.
+
+        ``values`` has shape ``(nodes_n,)`` — a cost-to-go, a policy's value, a
+        fitted approximation. Options (``axes``, ``anchor``, ``vmin``, ``vmax``,
+        ``title``, ``show``) are those of
+        :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
+        """
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.planning.dynamic_programming import plotting
+
+        values = np.asarray(values, dtype=float)
+
+        # A surface takes no colour limits: the field itself is clipped to [vmin, vmax]
+        if show_3d:
+            vmin = kwargs.pop("vmin", None)
+            vmax = kwargs.pop("vmax", None)
+            if vmin is not None or vmax is not None:
+                values = np.clip(values, vmin, vmax)
+            return plotting.plot_value_3d(self, values, **kwargs)
+
+        return plotting.plot_value(self, values, **kwargs)
+
+    # Persistence
+
+    def save(self, path: str) -> None:
+        """Save the successor and validity tables to ``path`` (single ``.npz``)."""
+        x_next, action_ok, x_next_ok = self.transition(0.0)
+        np.savez(path, x_next=x_next, action_ok=action_ok, x_next_ok=x_next_ok)
+
+    def load(self, path: str) -> None:
+        """Load successor and validity tables saved by :meth:`save`."""
+        data = np.load(path)
+        self.x_next = data["x_next"]
+        self.action_ok = data["action_ok"]
+        self.x_next_ok = data["x_next_ok"]
+        self.precomputed = True
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    @staticmethod
+    def coerce_shape(shape, dim, label):
+        """The grid shape as integers: ``dim`` axes, at least two levels on each."""
+        shape = tuple(int(s) for s in shape)
+        if len(shape) != dim:
+            raise ValueError(f"{label} must have length {dim}")
+        if any(s < 2 for s in shape):
+            raise ValueError(f"{label} entries must be at least 2")
+
+        return shape
+
+    def state_bounds(self, problem):
+        """The state set's bounding box, or the system's state bounds when it is not finite."""
+        box = problem.X.bounding_box()
+        if not is_finite_box(box):
+            box = self.sys.state.box
+
+        return self.require_finite_box(box.lower, box.upper, "state")
+
+    def input_bounds(self, problem):
+        """The input set's bounding box; an input set without one is refused."""
+        box = problem.U.bounding_box()
+        if box is None:
+            raise ValueError("StateSpaceGrid needs an input set with a bounding box")
+
+        return self.require_finite_box(box.lower, box.upper, "input")
+
+    @staticmethod
+    def require_finite_box(lower, upper, label):
+        """Refuse an infinite bound; return the bounds as float arrays."""
+        lower = np.asarray(lower, dtype=float)
+        upper = np.asarray(upper, dtype=float)
+        if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+            line = "U=plant.input_box" if label == "input" else "X=plant.state.box"
+            raise ValueError(
+                f"StateSpaceGrid needs finite {label} bounds: the problem's set is "
+                f"unbounded. Declare it on the problem ({line}, the plant's declared "
+                "range, or a finite box set)."
+            )
+
+        return lower, upper
+
+    @staticmethod
+    def step_sizes(lb, ub, shape):
+        """Spacing of the levels on each axis, ``(ub − lb) / (N − 1)``."""
+        counts = np.asarray(shape, dtype=int)
+        spans = np.asarray(ub, dtype=float) - np.asarray(lb, dtype=float)
+
+        step = np.where(counts > 1, spans / np.maximum(counts - 1, 1), 1.0)
+
+        return step
+
+    @staticmethod
+    def grid_points(levels):
+        """Cartesian product of per-axis levels as rows, C-order over the shape."""
+        mesh = np.meshgrid(*levels, indexing="ij")
+
+        return np.stack([axis.ravel() for axis in mesh], axis=1)
+
+    @staticmethod
+    def require_precompute_backend(precompute_backend):
+        """Refuse an unknown engine for the table build."""
+        if precompute_backend not in (BACKEND_NUMPY, BACKEND_JAX):
+            raise ValueError(f"Unknown precompute_backend {precompute_backend!r}")
+
+    def print_mesh_summary(self):
+        """Print grid size summary (mirrors pyro ``GridDynamicSystem.compute``)."""
+        name = self.sys.name
+        print(f"\nGenerating mesh for: {name}")
+        print("---------------------------------------------------")
+        print(f"State space dimensions: {self.n}  Input space dimension: {self.m}")
+        print(f"Number of nodes: {self.nodes_n}  Number of actions: {self.actions_n}")
+        print(f"Number of node-action pairs: {self.nodes_n * self.actions_n}")
+        print("---------------------------------------------------")
+
+    def build_transition(self, t):
+        """Build successor and validity tables with the selected precompute backend."""
+        if self.precompute_backend == BACKEND_JAX:
+            return self.compute_transition_jax(t)
+
+        return self.compute_transition_numpy(t)
+
+    def build_xnext_jax_chunks(self, pair, N, A, n, jax, jnp, *, interval):
+        """Fill ``x_next`` in fixed-size JAX chunks with optional progress lines."""
+        total_pairs = N * A
+        x_next = np.empty((N, A, n), dtype=float)
+        action_ok = np.empty((N, A), dtype=bool)
+        x_next_ok = np.empty((N, A), dtype=bool)
+        verbose = self.verbose
+
+        @jax.jit
+        def eval_chunk(sa):
+            s = sa // A
+            a = sa % A
+            xnext, u_ok, ok = jax.vmap(pair)(s, a)
+            return xnext, u_ok, ok
+
+        build_start = time.time()
+        progress_state = {"enabled": verbose}
+        for begin in range(0, total_pairs, interval):
+            end = min(begin + interval, total_pairs)
+            count = end - begin
+            sa = jnp.arange(begin, end)
+
+            # A full chunk runs the compiled kernel; the shorter last one, vmap alone
+            if count == interval:
+                xnext_chunk, u_ok_chunk, ok_chunk = eval_chunk(sa)
+            else:
+                s = sa // A
+                a = sa % A
+                xnext_chunk, u_ok_chunk, ok_chunk = jax.vmap(pair)(s, a)
+
+            # The chunk's pairs written into the (node, action) tables
+            xnext_chunk = np.asarray(xnext_chunk)
+            u_ok_chunk = np.asarray(u_ok_chunk)
+            ok_chunk = np.asarray(ok_chunk)
+            idx = np.arange(begin, end)
+            s_idx = idx // A
+            a_idx = idx % A
+            x_next[s_idx, a_idx] = xnext_chunk
+            action_ok[s_idx, a_idx] = u_ok_chunk
+            x_next_ok[s_idx, a_idx] = ok_chunk
+
+            maybe_print_build_progress(
+                end,
+                total_pairs,
+                build_start,
+                prefix="Computing x_next array (JAX vmap)",
+                unit="pairs",
+                state=progress_state,
+            )
+
+        if verbose:
+            print_build_complete(
+                "Computing x_next array (JAX vmap)",
+                time.time() - build_start,
+                f"({total_pairs:,} pairs)",
+            )
+
+        return x_next, action_ok, x_next_ok
+
+    @staticmethod
+    def nearest_index(point, lb, step, shape):
+        """The multi-index of the grid level nearest ``point`` on every axis."""
+        point = np.asarray(point, dtype=float).reshape(-1)
+
+        # i = round((p − lb) / Δ), clipped to the grid
+        raw = np.rint((point - lb) / step).astype(int)
+        index = tuple(np.clip(raw, 0, np.asarray(shape) - 1))
+
+        return index
+
+    def default_anchor(self):
+        """The problem's goal point (``Xf``'s point, else the cost's ``xbar``, else the start)."""
+        return self.problem.goal_point()
+
+
+def face_of(problem, dt, solver):
+    """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
+    # Lazy import: the step problem loads with the first grid on one
+    from minilink.planning.step_problems import StepPlanningProblem
+
+    if isinstance(problem, StepPlanningProblem):
+        return problem.compile()
+
+    return problem.compile(dt=dt, solver=solver)
+
+
+if __name__ == "__main__":
+    from minilink.core.system import DynamicSystem
+
+    class DoubleIntegrator(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=2, input_dim=1, output_dim=2)
+            self.state.lower_bound = np.array([-2.0, -2.0])
+            self.state.upper_bound = np.array([2.0, 2.0])
+            self.inputs["u"].lower_bound = np.array([-1.0])
+            self.inputs["u"].upper_bound = np.array([1.0])
+
+        def f(self, x, u, t=0, params=None):
+            return np.array([x[1], u[0]])
+
+    plant = DoubleIntegrator()
+    problem = PlanningProblem(plant, U=plant.input_box)
+    grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
+    print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
+    print("x_next shape:", grid.successors().shape)

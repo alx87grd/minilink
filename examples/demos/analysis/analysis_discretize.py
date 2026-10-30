@@ -7,8 +7,10 @@ from minilink import Pendulum, discretize
 plant = Pendulum()
 plant.x0 = np.array([0.5, 0.0])
 
-disc = discretize(plant, dt=0.05, integrator="rk4")
-print(f"continuous n={plant.n}  ->  discrete {type(disc).__name__}  dt={disc.dt}")
+disc = discretize(plant, dt=0.05, solver="rk4")
+print(
+    f"continuous n={plant.n}  ->  discrete {type(disc).__name__}  sample_period={disc.sample_period}"
+)
 print("discrete A = d(step)/dx =\n", np.round(disc.jacobian("step", "x"), 4))
 
 u_seq = np.zeros((40, plant.m))

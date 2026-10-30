@@ -1,19 +1,19 @@
 """Manipulator catalog systems."""
 
 from minilink.dynamics.catalog.manipulators.arms import (
-    FiveLinkPlanarManipulator,
+    FiveLinkManipulator,
+    KinematicManipulator,
     OneLinkManipulator,
-    SpeedControlledManipulator,
-    ThreeLinkManipulator3D,
+    ThreeLinkManipulator,
     TwoLinkManipulator,
 )
 from minilink.dynamics.catalog.manipulators.ur5 import UR5Manipulator
 
 __all__ = [
-    "FiveLinkPlanarManipulator",
+    "FiveLinkManipulator",
     "OneLinkManipulator",
-    "SpeedControlledManipulator",
-    "ThreeLinkManipulator3D",
+    "KinematicManipulator",
+    "ThreeLinkManipulator",
     "TwoLinkManipulator",
     "UR5Manipulator",
 ]

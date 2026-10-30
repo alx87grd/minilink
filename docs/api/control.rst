@@ -25,11 +25,11 @@ Control
 .. automodule:: minilink.control.neural
    :members:
 
-.. automodule:: minilink.control.mpc.controller
+.. automodule:: minilink.control.stochastic
    :members:
 
-.. automodule:: minilink.control.mpc.utilities
+.. automodule:: minilink.planning.trajectory_optimization.mpc.predictive
    :members:
 
-.. automodule:: minilink.control.mpc.viz
+.. automodule:: minilink.planning.trajectory_optimization.mpc.viz
    :members:

@@ -1,5 +1,7 @@
 """Planar drones: two vertical thrusters, a lateral thruster, velocity inputs, the tunnel helicopter."""
 
+import numpy as np
+
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.system import DynamicSystem
@@ -22,7 +24,12 @@ class Drone2D(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, actuators=2)
-        self.name = "Planar Drone"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -169,7 +176,6 @@ class Drone2DWithSideThruster(Drone2D):
 
     def __init__(self):
         super().__init__()
-        self.name = "Planar Drone With Side Thruster"
 
         # Ports: a third thrust input, the lateral thruster TL
         self.inputs.clear()
@@ -214,7 +220,6 @@ class SpeedControlledDrone2D(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
-        self.name = "Speed Controlled Planar Drone"
 
         # Signal labels and units
         self.state.labels = ["x", "y"]
@@ -263,7 +268,6 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
 
     def __init__(self):
         super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
-        self.name = "Constant Speed Helicopter Tunnel"
 
         # Parameters
         self.params = {

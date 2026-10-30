@@ -2,14 +2,13 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
-# ``from minilink.control import PID, ImpedanceController, lqr, place`` and
-# ``from minilink.control.mpc import ModelPredictiveController``.
+# ``from minilink.control import PID, Impedance, lqr, place, ModelPredictiveController``.
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
-# derivative filtered) and ``ImpedanceController``, ``ImpedanceIntegralController`` (a
+# derivative filtered) and ``Impedance``, ``IntegralImpedance`` (a
 # measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
 # independent loops, actuator limits that are infinite by default.
 #
@@ -17,19 +16,36 @@ from minilink.core.facade import lazy_facade
 # ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,
 # ``place_gain``, ``lqr_gain_schedule``) take arrays. Both live in ``control.design``.
 #
+# The loop builders ``closed_loop`` and ``feedback`` close a controller around a plant;
+# they live in ``core.closed_loop`` and stay on the root prelude too.
+#
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
-    "ComputedTorqueController": (
-        "minilink.control.modelbased",
-        "ComputedTorqueController",
+    # The loop builders
+    "closed_loop": ("minilink.core.closed_loop", "closed_loop"),
+    "feedback": ("minilink.core.closed_loop", "feedback"),
+    # Model predictive control: the block lives with its trajectory optimization planner
+    "ModelPredictiveController": (
+        "minilink.planning.trajectory_optimization.mpc.predictive",
+        "ModelPredictiveController",
     ),
-    "NeuralPolicyController": ("minilink.control.neural", "NeuralPolicyController"),
+    "PlanFollower": (
+        "minilink.planning.trajectory_optimization.mpc.predictive",
+        "PlanFollower",
+    ),
+    "ComputedTorque": (
+        "minilink.control.modelbased",
+        "ComputedTorque",
+    ),
+    "NeuralPolicy": ("minilink.control.neural", "NeuralPolicy"),
+    "GaussianPolicy": ("minilink.control.stochastic", "GaussianPolicy"),
+    "SquashedGaussianPolicy": ("minilink.control.stochastic", "SquashedGaussianPolicy"),
     "angle_features": ("minilink.control.neural", "angle_features"),
     "PID": ("minilink.control.siso", "PID"),
     "PurePursuit": ("minilink.control.geometric", "PurePursuit"),
     "PI": ("minilink.control.siso", "PI"),
     "PD": ("minilink.control.siso", "PD"),
-    "ImpedanceController": ("minilink.control.impedance", "ImpedanceController"),
+    "Impedance": ("minilink.control.impedance", "Impedance"),
     "lqr": ("minilink.control.design", "lqr"),
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_gain_schedule": ("minilink.control.design", "lqr_gain_schedule"),
@@ -38,32 +54,31 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "place": ("minilink.control.design", "place"),
     "place_gain": ("minilink.control.design", "place_gain"),
     "lqg": ("minilink.control.design", "lqg"),
-    "ImpedanceIntegralController": (
+    "IntegralImpedance": (
         "minilink.control.impedance",
-        "ImpedanceIntegralController",
+        "IntegralImpedance",
     ),
     "JointImpedance": ("minilink.control.robotic", "JointImpedance"),
-    "ModelJointImpedance": ("minilink.control.robotic", "ModelJointImpedance"),
     "P": ("minilink.control.siso", "P"),
-    "SlidingModeController": (
+    "SlidingMode": (
         "minilink.control.modelbased",
-        "SlidingModeController",
+        "SlidingMode",
     ),
-    "StateFeedbackController": (
+    "StateFeedback": (
         "minilink.control.state",
-        "StateFeedbackController",
+        "StateFeedback",
     ),
-    "OutputReferenceController": (
+    "OutputReference": (
         "minilink.control.state",
-        "OutputReferenceController",
+        "OutputReference",
     ),
-    "TimeVaryingStateFeedbackController": (
+    "TimeVaryingFeedback": (
         "minilink.control.state",
-        "TimeVaryingStateFeedbackController",
+        "TimeVaryingFeedback",
     ),
-    "TrajectoryFeedbackController": (
+    "TrajectoryFeedback": (
         "minilink.control.state",
-        "TrajectoryFeedbackController",
+        "TrajectoryFeedback",
     ),
     "TaskImpedance": ("minilink.control.robotic", "TaskImpedance"),
     "TaskKinematic": ("minilink.control.robotic", "TaskKinematic"),
@@ -73,7 +88,4 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
 }
 
-__all__, __getattr__, __dir__ = lazy_facade(
-    globals(), _EXPORTS, modules={"mpc": "minilink.control.mpc"}
-)
-__all__ = [*__all__, "mpc"]
+__all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

@@ -1,9 +1,14 @@
-"""Dual-rate hybrid MPC: replan at ``dt_mpc``, broadcast ``u_nom`` at ``dt_broadcast``.
+"""Dual-rate MPC: replan at ``MPC_DT``, apply the plan at ``DT_BROADCAST``.
 
-Contrasts with default ``mpc @ plant`` (single-rate ``u_ff`` ZOH)::
+Contrasts with the single-rate ``(mpc % dt) @ plant`` (the plan's command held
+over each slow period)::
 
-    computer = mpc.dual_rate_computer(dt_broadcast=0.01)
+    computer = (mpc % 0.5) >> (PlanFollower(planner) % 0.01)
     hybrid = computer @ plant
+
+The zero-delay MPC (``delay=False``) hands the plan solved from the state at
+one slow tick to the follower at that tick; the delayed MPC (the default)
+hands it at the next, one slow period late, as on a real computer.
 
 Run from repo root::
 
@@ -13,13 +18,14 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
-from minilink.control.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.trajectory_optimization.mpc import (
+    ModelPredictiveController,
+    PlanFollower,
+    mpc_animation_overlays,
+)
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -57,27 +63,28 @@ planner = TrajectoryOptimizationPlanner(
     ),
     n_steps=20,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": 50, "ftol": 1.0},
 )
 
-mpc = ModelPredictiveController(
-    planner, dt_mpc=MPC_DT, warm_start=True, verbose=STEP_DISP
-)
-computer = mpc.dual_rate_computer(dt_broadcast=DT_BROADCAST)
+mpc = ModelPredictiveController(planner, delay=False)
+computer = (mpc % MPC_DT) >> (PlanFollower(planner) % DT_BROADCAST)
 hybrid = computer @ sys
 
 hybrid.plot_diagram()
 
-result = hybrid.compute_trajectory(
-    tf=TF_SIM,
-    x0_plant=x0,
-    plant_dt_inner=SIM_DT,
-    compile_backend="jax",
-)
+result = hybrid.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
+if STEP_DISP:
+    start, end = hybrid.state_index["plant"]
+    print(f"{round(TF_SIM / MPC_DT)} solves; final state {result.x[start:end, -1]}")
 hybrid.plot_trajectory()
 hybrid.animate(
-    overlays=mpc_animation_overlays(result, planner, reference_pad=REF_X_PAD)
+    overlays=mpc_animation_overlays(
+        result,
+        mpc,
+        loop=hybrid,
+        reference_pad=REF_X_PAD,
+    )
 )

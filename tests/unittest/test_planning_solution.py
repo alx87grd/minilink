@@ -5,16 +5,16 @@ import pytest
 
 from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, QuadraticCost
 from minilink.blocks import TrajectorySource
+from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.equations import DoubleIntegrator
+from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
-    MonteCarloEvaluator,
     PlanningSolution,
-    StochasticPlanningProblem,
     Uniform,
+    evaluate,
 )
-from minilink.planning.evaluation import control_law, nominal_trajectory
-from minilink.planning.reinforcement_learning import TabularLearningPlanner
+from minilink.planning.evaluator import held_law, nominal_trajectory
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTOptions, RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -40,11 +40,20 @@ def pendulum_problem(stochastic=False):
         plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), xbar=np.array([np.pi, 0.0])
     )
     if stochastic:
-        return StochasticPlanningProblem(
-            plant, cost=cost, tf=2.0, x0_distribution=Uniform([-0.2, -0.2], [0.2, 0.2])
+        return PlanningProblem(
+            plant,
+            cost=cost,
+            tf=2.0,
+            x_start=Uniform([-0.2, -0.2], [0.2, 0.2]),
+            U=plant.input_box,
         )
     return PlanningProblem(
-        plant, x_start=[0.0, 0.0], x_goal=[np.pi, 0.0], cost=cost, tf=2.0
+        plant,
+        x_start=[0.0, 0.0],
+        Xf=SingletonSet([np.pi, 0.0]),
+        cost=cost,
+        tf=2.0,
+        U=plant.input_box,
     )
 
 
@@ -55,15 +64,21 @@ def move_problem(stochastic=False):
     plant.inputs["u"].upper_bound = np.array([2.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     if stochastic:
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             plant,
             cost=cost,
             tf=2.0,
-            x_goal=[0.0, 0.0],
-            x0_distribution=Uniform([0.8, -0.2], [1.2, 0.2]),
+            Xf=SingletonSet([0.0, 0.0]),
+            x_start=Uniform([0.8, -0.2], [1.2, 0.2]),
+            U=plant.input_box,
         )
     return PlanningProblem(
-        plant, x_start=[1.0, 0.0], x_goal=[0.0, 0.0], cost=cost, tf=2.0
+        plant,
+        x_start=[1.0, 0.0],
+        Xf=SingletonSet([0.0, 0.0]),
+        cost=cost,
+        tf=2.0,
+        U=plant.input_box,
     )
 
 
@@ -72,7 +87,7 @@ def trajopt(problem, transcription, n_steps=10):
         problem,
         transcription=transcription(n_steps),
         options=TrajectoryOptimizationOptions(
-            compile_backend="numpy", optimizer_options={"maxiter": 200, "ftol": 1e-10}
+            backend="numpy", optimizer_options={"maxiter": 200, "ftol": 1e-10}
         ),
     )
 
@@ -108,7 +123,7 @@ def held_input_rollout(plant, law, t, x0):
     x[:, 0] = x0
     for k in range(t.size - 1):
         u = law(x[:, k], t[k])
-        x[:, k + 1] = evaluator.rk4_step(x[:, k], u, t[k], t[k + 1] - t[k])
+        x[:, k + 1] = evaluator.step(x[:, k], u, t[k], dt=t[k + 1] - t[k])
     return x
 
 
@@ -167,14 +182,14 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
             horizon=0.6,
             n_substeps=6,
         ),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     solution = planner.solve()
     assert solution.success and solution.solver.reached_goal
     assert solution.open_loop and solution.policy.interpolation == "previous"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
-    law = control_law(solution.policy, planned.t, "numpy")
+    law = held_law(solution.policy, planned.t)
     x_hand = held_input_rollout(problem.sys, law, planned.t, planned.x[:, 0])
     np.testing.assert_allclose(x_hand, planned.x, atol=1e-8)
 
@@ -194,7 +209,9 @@ def double_integrator_problem():
         x_start=[1.0, 0.0],
         cost=cost,
         tf=np.inf,
-        infeasible_cost=20.0,
+        penalize_failure=True,
+        failure_cost=20.0,
+        U=plant.input_box,
     )
 
 
@@ -207,7 +224,7 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
         solution = planner.solve(evaluate=True)
     else:
         planner = TabularLearningPlanner(
-            problem, alpha=0.9, integrator="euler", seed=0, **grid
+            problem, alpha=0.9, solver="euler", seed=0, **grid
         )
         solution = planner.solve(episodes=300, evaluate=True)
     assert not solution.open_loop and solution.evaluation.n_trials == 1
@@ -226,24 +243,24 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
     assert str(solution.evaluation).startswith("J = ")
 
 
-def test_one_evaluator_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
+def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
     problem = pendulum_problem(stochastic=True)
     with pytest.warns(UserWarning):
         open_loop = trajopt(problem, shooting).solve()
     feedback = DynamicProgrammingPlanner(
         problem.nominal(), x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.1
     ).solve()
-    evaluator = MonteCarloEvaluator(
-        problem, dt=0.1, n_trials=4, backend="numpy", seed=3
-    )
-    scored = [evaluator.evaluate(s.policy) for s in (open_loop, feedback)]
+    scored = [
+        evaluate(problem, s, dt=0.1, n_trials=4, backend="numpy", key=3)
+        for s in (open_loop, feedback)
+    ]
     np.testing.assert_array_equal(scored[0].x0, scored[1].x0)
     assert all(np.all(np.isfinite(report.J)) for report in scored)
 
 
 def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     pytest.importorskip("jax")
-    from minilink.planning.reinforcement_learning import ReinforcementLearningPlanner
+    from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
 
     plant = Pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
@@ -251,8 +268,12 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     plant.state.lower_bound = np.array([-np.pi, -8.0])
     plant.state.upper_bound = np.array([np.pi, 8.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1))
-    problem = StochasticPlanningProblem(
-        plant, cost=cost, tf=np.inf, x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5])
+    problem = PlanningProblem(
+        plant,
+        cost=cost,
+        tf=np.inf,
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
         problem,
@@ -289,11 +310,13 @@ def solved_pendulum():
     problem = PlanningProblem(
         plant,
         x_start=[0.0, 0.0],
-        x_goal=[np.pi, 0.0],
+        Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
         tf=np.inf,
         X=plant.state.box,
-        infeasible_cost=500.0,
+        penalize_failure=True,
+        failure_cost=500.0,
+        U=plant.input_box,
     )
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
@@ -376,14 +399,20 @@ def test_compare_reads_the_solutions_side_by_side():
     fig, axes = race.plot_trajectory(show=False)
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
-    # one evaluator scores every policy on the same draws; a solution stands for its policy
-    evaluator = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy")
-    scored = race.evaluate(evaluator)
-    assert list(scored) == ["VI", "LQR"] and scored["LQR"].policy is lqr.policy
-    assert scored["LQR"].evaluation.mean == evaluator.evaluate(lqr.policy).mean
-    assert (
-        "J = " in str(scored) and race["LQR"].evaluation is not scored["LQR"].evaluation
+    # one evaluation scores every policy on the same draws; a solution stands for its policy
+    scored = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+    assert list(scored) == ["VI", "LQR"] and scored["LQR"] is lqr
+    J_lqr = evaluate(problem, lqr.policy, dt=0.1, backend="numpy").J
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, J_lqr)
+    assert "J = " in str(scored)
+    np.testing.assert_array_equal(
+        scored.difference("VI", "LQR"),
+        scored.evaluations["VI"].J - scored.evaluations["LQR"].J,
     )
+
+    # a bare controller and an evaluation already computed take part too
+    mixed = compare(problem, LQR=lqr.policy, VI=scored.evaluations["VI"], dt=0.1)
+    assert list(mixed) == ["LQR"] and "given" in str(mixed)
     grid_eval = PolicyEvaluator(
         problem, grid=DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.2
@@ -404,28 +433,42 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     from minilink.planning import compare
 
     problem, vi, lqr = solved_pendulum()
-    spread = StochasticPlanningProblem(
+    spread = PlanningProblem(
         problem.sys,
         cost=problem.cost,
         tf=np.inf,
         X=problem.X,
-        infeasible_cost=500.0,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        penalize_failure=True,
+        failure_cost=500.0,
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        U=problem.sys.input_box,
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
-    evaluator = MonteCarloEvaluator(spread, **settings)
 
     # the lookup table runs on NumPy only, so the LQR law is scored there too
-    with pytest.warns(UserWarning, match="does not trace on JAX"):
-        scored = compare(VI=vi, LQR=lqr).evaluate(evaluator)
+    scored = compare(spread, VI=vi, LQR=lqr, **settings)
     np.testing.assert_array_equal(
-        scored["VI"].evaluation.x0, scored["LQR"].evaluation.x0
+        scored.evaluations["VI"].x0, scored.evaluations["LQR"].x0
     )
-    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings)
-    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_numpy.evaluate(lqr).J)
-    assert evaluator.backend == "auto"  # the caller's evaluator keeps its choice
+    on_numpy = evaluate(spread, lqr, backend="numpy", **settings)
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_numpy.J)
 
     # laws that all trace keep the JAX backend and its numbers
-    scored = compare(LQR=lqr).evaluate(evaluator)
-    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings)
-    np.testing.assert_array_equal(scored["LQR"].evaluation.J, on_jax.evaluate(lqr).J)
+    scored = compare(spread, LQR=lqr, **settings)
+    on_jax = evaluate(spread, lqr, backend="jax", **settings)
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_jax.J)
+
+
+def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():
+    from minilink.planning import Comparison, compare
+
+    problem, vi, lqr = solved_pendulum()
+    race = compare(problem, VI=vi, LQR=lqr, dt=0.1, backend="numpy")
+
+    # The named solutions, in order, and one evaluation each on the same draws
+    assert isinstance(race, Comparison)
+    assert list(race.solutions) == ["VI", "LQR"] and list(race.evaluations) == [
+        "VI",
+        "LQR",
+    ]
+    assert race.difference("VI", "LQR").shape == race.evaluations["VI"].J.shape

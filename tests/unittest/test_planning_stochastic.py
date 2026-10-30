@@ -3,16 +3,12 @@
 import numpy as np
 import pytest
 
-from minilink import Pendulum
+from minilink import Pendulum, WhiteNoise
 from minilink.core.costs import CostFunction, QuadraticCost
-from minilink.core.distributions import Gaussian, Particles, Sampler, Uniform
+from minilink.core.distributions import Gaussian, Particles, Uniform
 from minilink.core.trajectory import Trajectory
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingPlanner
-from minilink.planning.problems import (
-    PlanningProblem,
-    StochasticPlanningProblem,
-    as_stochastic,
-)
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
+from minilink.planning.problems import PlanningProblem
 
 
 def pendulum():
@@ -26,52 +22,99 @@ def quadratic(plant):
     return QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
 
 
-# --- R1: cost horizon and discount, problem exit rule ---
+# --- cost horizon and discount, problem exit rule ---
 
 
 def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
     plant = pendulum()
     cost = quadratic(plant)
-    assert PlanningProblem(plant, cost=cost, tf=5.0).horizon_kind() == "finite"
-    assert PlanningProblem(plant, cost=cost, tf=np.inf).horizon_kind() == "infinite"
-    assert PlanningProblem(plant, cost=cost).horizon_kind() == "infinite"
+    assert (
+        PlanningProblem(plant, cost=cost, tf=5.0, U=plant.input_box).horizon_kind()
+        == "finite"
+    )
+    assert (
+        PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box).horizon_kind()
+        == "infinite"
+    )
+    assert (
+        PlanningProblem(plant, cost=cost, U=plant.input_box).horizon_kind()
+        == "infinite"
+    )
     assert not hasattr(CostFunction, "horizon")  # one owner: the problem's tf
 
-    class Discounted(CostFunction):
-        discount_rate = 0.5
-
-        def g(self, x, u, t=0.0, params=None):
-            return 0.0
-
-        def h(self, x, t=0.0, params=None):
-            return 0.0
-
-    np.testing.assert_allclose(Discounted().discount_factor(0.1), np.exp(-0.05))
-    assert cost.discount_factor(0.1) == 1.0
+    # The discount has one owner too: the problem
+    discounted = PlanningProblem(plant, cost=cost, tf=np.inf, discount_rate=0.5)
+    np.testing.assert_allclose(discounted.discount_factor(0.1), np.exp(-0.05))
+    assert PlanningProblem(plant, cost=cost).discount_factor(0.1) == 1.0
+    assert not hasattr(CostFunction, "discount_rate")
+    with pytest.raises(ValueError, match="discount_rate"):
+        PlanningProblem(plant, cost=cost, discount_rate=-1.0)
 
 
 def test_problem_exit_rule_and_penalty():
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), tf=np.inf)
-    assert problem.infeasible_cost is None
-    assert problem.infeasible_penalty(np.zeros(2)) is None
+    problem = PlanningProblem(
+        plant, cost=quadratic(plant), tf=np.inf, U=plant.input_box
+    )
+    assert problem.penalize_failure is False and problem.failure_cost is None
     assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
-    scalar = PlanningProblem(plant, tf=2.0, infeasible_cost=50)
-    assert scalar.infeasible_cost == 50.0
-    assert scalar.infeasible_penalty(np.zeros(2), 1.0) == 50.0
+    scalar = PlanningProblem(
+        plant, tf=2.0, penalize_failure=True, failure_cost=50, U=plant.input_box
+    )
+    assert scalar.failure_cost == 50.0
+    assert scalar.failure_cost_at() == 50.0
     assert scalar.horizon_kind() == "finite"
 
-    shaped = PlanningProblem(
-        plant, infeasible_cost=lambda x, t: 10.0 * float(x[0] ** 2)
+    # The switch a bool, the cost a number (None: the bound); anything else is refused
+    assert PlanningProblem(plant, penalize_failure=True).failure_cost is None
+    for refused in (lambda x, t: 1.0, True, "big"):
+        with pytest.raises(TypeError, match="failure_cost"):
+            PlanningProblem(plant, failure_cost=refused)
+    with pytest.raises(TypeError, match="penalize_failure"):
+        PlanningProblem(plant, penalize_failure=50.0)
+
+
+def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
+    plant = pendulum()  # state box ±2π × ±10, input box the plant's ±5
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), S=np.eye(2))
+    g_max = (2 * np.pi) ** 2 + 10.0**2 + 5.0**2
+    h_max = (2 * np.pi) ** 2 + 10.0**2
+
+    # Finite horizon: g_max T + h_max
+    finite = PlanningProblem(
+        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
     )
-    assert shaped.infeasible_penalty(np.array([2.0, 0.0])) == 40.0
+    assert finite.cost_bound() == pytest.approx(2.0 * g_max + h_max)
+    assert finite.failure_cost_at() == pytest.approx(2.0 * g_max + h_max)
+
+    # Discounted infinite horizon: g_max / ρ, no h
+    discounted = PlanningProblem(
+        plant,
+        cost=cost,
+        tf=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+        discount_rate=0.5,
+    )
+    assert discounted.cost_bound() == pytest.approx(g_max / 0.5)
+
+    # Undiscounted infinite horizon: no bound, 1e6 announced
+    undiscounted = PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box)
+    with pytest.warns(UserWarning, match="failure_cost"):
+        assert undiscounted.cost_bound() == 1.0e6
 
 
-def test_dp_reads_the_problem_infeasible_cost():
+def test_dp_reads_the_problem_failure_cost():
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), infeasible_cost=42.0)
+    problem = PlanningProblem(
+        plant,
+        cost=quadratic(plant),
+        penalize_failure=True,
+        failure_cost=42.0,
+        U=plant.input_box,
+    )
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     assert planner.options.out_of_bound_cost == 42.0
     explicit = DynamicProgrammingPlanner(
@@ -80,10 +123,8 @@ def test_dp_reads_the_problem_infeasible_cost():
     assert explicit.options.out_of_bound_cost == 7.0
 
 
-def test_dp_reads_the_cost_discount_rate():
-    class Discounted(CostFunction):
-        discount_rate = 1.0
-
+def test_dp_reads_the_problem_discount_rate():
+    class Zero(CostFunction):
         def g(self, x, u, t=0.0, params=None):
             return 0.0
 
@@ -91,7 +132,7 @@ def test_dp_reads_the_cost_discount_rate():
             return 0.0
 
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=Discounted())
+    problem = PlanningProblem(plant, cost=Zero(), U=plant.input_box, discount_rate=1.0)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
     np.testing.assert_allclose(planner.options.alpha, np.exp(-0.05))
     explicit = DynamicProgrammingPlanner(
@@ -100,7 +141,39 @@ def test_dp_reads_the_cost_discount_rate():
     assert explicit.options.alpha == 0.9
 
 
-# --- R2: distributions and the stochastic problem ---
+def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_periods():
+    class Unit(CostFunction):
+        def g(self, x, u, t=0.0, params=None):
+            return 1.0
+
+        def h(self, x, t=0.0, params=None):
+            return 0.0
+
+    plant = pendulum()
+    problem = PlanningProblem(plant, cost=Unit(), U=plant.input_box, discount_rate=1.0)
+    alpha, dt = 0.9, 0.05
+    planner = DynamicProgrammingPlanner(
+        problem,
+        x_grid=(5, 5),
+        u_grid=(3,),
+        dt=dt,
+        solver="rk4",
+        alpha=alpha,
+        tol=1e-12,
+        max_iterations=5000,
+        clean_infeasible=False,
+    )
+    solution = planner.solve()
+    rho = -np.log(alpha) / dt
+
+    # At rest at the bottom: J = c + α J, c = ∫₀^dt e^{−ρτ} dτ = (1 − α) / ρ, so J = 1 / ρ
+    J = planner.result.J[planner.grid.nearest_node(np.zeros(2))]
+    np.testing.assert_allclose(J, 1.0 / rho, rtol=1e-6)
+    assert solution.solver.discount_rate == pytest.approx(rho)
+    assert planner.problem.discount_rate == 1.0
+
+
+# --- distributions and the stochastic problem ---
 
 
 def test_distributions_sample_on_numpy():
@@ -119,9 +192,6 @@ def test_distributions_sample_on_numpy():
     pts = Particles([[0.0, 0.0], [1.0, 1.0]])
     assert pts.sample(rng, n=4).shape == (4, 2)
 
-    custom = Sampler(lambda key: np.array([1.0, -1.0]), mean=[1.0, -1.0])
-    assert custom.sample(rng, n=2).shape == (2, 2)
-
 
 @pytest.mark.optional
 @pytest.mark.jax
@@ -134,7 +204,6 @@ def test_distributions_sample_and_trace_on_jax():
         Gaussian([0.0, 0.0], [1.0, 2.0]),
         Uniform([-1.0, -1.0], [1.0, 1.0]),
         Particles([[0.0, 1.0], [2.0, 3.0]]),
-        Sampler(lambda k: jax.random.normal(k, (2,)), mean=[0.0, 0.0]),
     ):
         one = dist.sample(key)
         assert one.shape == (2,)
@@ -145,56 +214,67 @@ def test_distributions_sample_and_trace_on_jax():
 
 def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=np.inf,
-        x0_distribution=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
-        params_distribution={"m": Uniform([0.8], [1.2])},
-        infeasible_cost=100.0,
+        x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+        params={"plant": {"m": Uniform([0.8], [1.2])}},
+        penalize_failure=True,
+        failure_cost=100.0,
+        U=plant.input_box,
     )
     assert isinstance(problem, PlanningProblem)
     np.testing.assert_allclose(problem.x_start, [0.0, 0.0])
     assert problem.X0.contains(np.array([1.0, 0.5]))  # the support of the draw
     assert problem.sample_x0(0, n=4).shape == (4, 2)
-    assert set(problem.sample_params(0)) == {"m"}
+    assert set(problem.sample_params(0)["plant"]) == {"m"}
+    assert (
+        problem.is_stochastic
+        and problem.params["plant"]["m"] is problem.laws["plant"]["m"]
+    )
 
     nominal = problem.nominal()
-    assert type(nominal) is PlanningProblem
+    assert type(nominal) is PlanningProblem and not nominal.is_stochastic
     np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])
-    assert nominal.infeasible_cost == 100.0
+    assert nominal.failure_cost == 100.0 and nominal.penalize_failure
 
     with pytest.raises(ValueError):
-        StochasticPlanningProblem(plant, x0_distribution=Gaussian([0.0], 1.0))
+        PlanningProblem(plant, x_start=Gaussian([0.0], 1.0), U=plant.input_box)
     with pytest.raises(ValueError):
-        StochasticPlanningProblem(
+        PlanningProblem(
             plant,
-            x0_distribution=Gaussian([0.0, 0.0], 1.0),
-            params_distribution={"nope": Uniform([0.0], [1.0])},
+            x_start=Gaussian([0.0, 0.0], 1.0),
+            params={"plant": {"nope": Uniform([0.0], [1.0])}},
+            U=plant.input_box,
         )
 
 
-def test_as_stochastic_is_the_inverse_bridge_of_nominal():
+def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
+    from minilink.core.sets import BoxSet
+
     plant = pendulum()
     deterministic = PlanningProblem(
         plant,
         x_start=[0.3, -0.1],
         cost=quadratic(plant),
         tf=5.0,
-        infeasible_cost=10.0,
+        penalize_failure=True,
+        failure_cost=10.0,
+        U=plant.input_box,
     )
-    stochastic = as_stochastic(deterministic)
-    assert type(stochastic) is StochasticPlanningProblem
-    # every draw is the single start, and nothing else is random
-    np.testing.assert_allclose(stochastic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
-    assert stochastic.sample_params(0) == {} and stochastic.sample_disturbances(0) == {}
-    assert stochastic.criterion == "expectation"
-    assert (stochastic.tf, stochastic.infeasible_cost) == (
-        5.0,
-        10.0,
-    )
-    np.testing.assert_allclose(stochastic.nominal().x_start, [0.3, -0.1])
-    assert as_stochastic(stochastic) is stochastic
+    assert not deterministic.is_stochastic and deterministic.criterion == "expectation"
+    np.testing.assert_allclose(deterministic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
+    assert deterministic.sample_params(0) == {}
+    assert deterministic.nominal().x_start.tolist() == [0.3, -0.1]
+
+    # A set as the start is the uniform law on it, the set its X0
+    box = BoxSet([0.0, -1.0], [1.0, 1.0])
+    from_a_set = deterministic.replace(x_start=box)
+    assert from_a_set.is_stochastic and from_a_set.X0 is box
+    starts = from_a_set.sample_x0(1, n=50)
+    assert np.all([box.contains(x) for x in starts])
+    np.testing.assert_allclose(from_a_set.x_start, [0.5, 0.0])
 
 
 # --- the shared scoring contract ---
@@ -204,8 +284,6 @@ def test_evaluate_trajectory_applies_the_discount_rate():
     from minilink.core.trajectory import Trajectory
 
     class Unit(CostFunction):
-        discount_rate = 1.0
-
         def g(self, x, u, t=0.0, params=None):
             return 1.0
 
@@ -214,13 +292,13 @@ def test_evaluate_trajectory_applies_the_discount_rate():
 
     t = np.linspace(0.0, 1.0, 101)
     traj = Trajectory(t=t, x=np.zeros((2, t.size)), u=np.zeros((1, t.size)))
-    J = Unit().evaluate_trajectory(traj).signals["cost"][0, -1]
+    J = traj.with_cost(Unit(), discount_rate=1.0).signals["cost"][0, -1]
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
 
 
-def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
+def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
     from minilink.core.trajectory import Trajectory
-    from minilink.planning.evaluation import score_trajectory
+    from minilink.planning import evaluate_trajectory
 
     plant = pendulum()
     plant.state.lower_bound = np.array([-1.0, -10.0])
@@ -241,37 +319,43 @@ def test_score_trajectory_cuts_at_the_exit_and_charges_the_problem_price():
     x_exit[0, 5:] = 2.0  # leaves the box at t = 0.5
     exits = Trajectory(t=t, x=x_exit, u=u)
 
+    box = dict(X=plant.state.box, U=plant.input_box)
     finite = PlanningProblem(
-        plant, cost=Unit(), tf=1.0, X=plant.state.box, infeasible_cost=50.0
+        plant, cost=Unit(), tf=1.0, penalize_failure=True, failure_cost=50.0, **box
     )
-    J, failed = score_trajectory(finite, inside)
-    assert not failed and np.isclose(J, 1.0 + 7.0)  # running cost + h at tf
-    J, failed = score_trajectory(finite, exits)
-    assert failed and np.isclose(J, 0.5 + 50.0)  # cut at the exit sample, charged, no h
+    report = evaluate_trajectory(finite, inside)
+    assert not report.failed[0] and np.isclose(report.J[0], 1.0 + 7.0)  # ∫ g + h
+    report = evaluate_trajectory(finite, exits)
+    assert report.failed[0] and np.isclose(
+        report.J[0], 1.0 + 7.0 + 50.0
+    )  # + failure_cost
+    assert np.isclose(report.feasibility_margin[0], -1.0)
 
-    unpriced = PlanningProblem(plant, cost=Unit(), tf=np.inf, X=plant.state.box)
-    J, failed = score_trajectory(unpriced, exits)
-    assert failed and np.isinf(J)  # no price declared, none derived: infinity itself
-    J, failed = score_trajectory(unpriced, exits, infeasible_cost=30.0)
-    assert failed and np.isclose(J, 0.5 + 30.0)  # the evaluator's derived bound
-    free = PlanningProblem(plant, cost=Unit(), tf=np.inf)  # unconstrained: no failure
-    J, failed = score_trajectory(free, exits)
-    assert not failed and np.isclose(J, 1.0)
+    # The switch off: the plain cost, the failure reported beside it
+    uncharged = PlanningProblem(plant, cost=Unit(), tf=np.inf, **box)
+    report = evaluate_trajectory(uncharged, exits)
+    assert report.failed[0] and np.isclose(
+        report.J[0], 1.0
+    )  # no h on an infinite horizon
+    free = PlanningProblem(plant, cost=Unit(), tf=np.inf, U=plant.input_box)
+    assert not evaluate_trajectory(free, exits).failed[0]  # X unconstrained: no failure
 
 
 def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
-    """A parametric, time-varying X is read with problem.params.sets at each sample time."""
-    from minilink.control import StateFeedbackController
+    """A parametric, time-varying X is read on its own parameters at each sample time."""
+    from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
-    from minilink.planning.evaluation import MonteCarloEvaluator
-    from minilink.planning.problems import ProblemParameters
+    from minilink.planning import evaluate
 
     class Band(Set):
-        """|z_i| <= r - 0.2 t: a band narrowing from its half-width r (1 by default)."""
+        """|z_i| <= r - 0.2 t: a band narrowing from its half-width r."""
+
+        def __init__(self, r):
+            self.params = {"r": r}
 
         def margin(self, z, t=0.0, params=None):
-            r0 = 1.0 if params is None else params["r"]
+            r0 = (self.params if params is None else params)["r"]
             xp = array_module(z)
 
             r = r0 - 0.2 * t
@@ -279,86 +363,85 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             return xp.concatenate([z + r, r - z])
 
     plant = pendulum()
-    ctl = StateFeedbackController(K=[[-20.0, 0.0]])  # u = 20 theta: the loop diverges
-    backends = ("numpy", "simulator") + (("jax",) if jax_available() else ())
+    ctl = StateFeedback(K=[[-20.0, 0.0]])  # u = 20 theta: the loop diverges
+    runs = [("numpy", "rk4"), ("numpy", "scipy")]
+    runs += [("jax", "rk4")] if jax_available() else []
     for r, leaves in ((0.5, True), (3.0, False)):
         problem = PlanningProblem(
             plant,
             x_start=[0.1, 0.0],
             cost=quadratic(plant),
-            tf=np.inf,
-            X=Band(),
-            params=ProblemParameters(sets={"r": r}),
-            infeasible_cost=1.0,
+            tf=1.0,
+            X=Band(r),
+            penalize_failure=True,
+            failure_cost=1.0,
         )
         reports = {
-            backend: MonteCarloEvaluator(
-                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
-            ).evaluate(ctl)
-            for backend in backends
+            run: evaluate(problem, ctl, dt=0.01, backend=run[0], solver=run[1])
+            for run in runs
         }
         assert all(bool(report.failed[0]) == leaves for report in reports.values())
-        if "jax" in reports:
-            np.testing.assert_allclose(reports["numpy"].J, reports["jax"].J, rtol=1e-6)
-        # the simulator integrates the continuous-time loop: same contract, O(dt) apart
-        np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
+        reference = reports["numpy", "rk4"].J
+        if ("jax", "rk4") in reports:
+            np.testing.assert_allclose(reports["jax", "rk4"].J, reference, rtol=1e-6)
+        # the adaptive integral of the same loop, within its tolerance
+        np.testing.assert_allclose(reports["numpy", "scipy"].J, reference, rtol=1e-3)
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-def test_monte_carlo_backends_share_the_score_on_identical_starts():
+def test_the_backends_share_the_score_on_identical_starts():
     pytest.importorskip("jax")
-    from minilink.control import NeuralPolicyController
+    from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
-    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
 
     class Discounted(CostFunction):
-        discount_rate = 0.2
-
         def g(self, x, u, t=0.0, params=None):
             return x[0] ** 2 + 0.01 * u[0] ** 2
 
         def h(self, x, t=0.0, params=None):
             return 3.0
 
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=5)  # bounded by construction
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=5)  # bounded by construction
     one_start = Particles([[2.5, 0.0]])
     for kwargs in (
         {"tf": np.inf},
-        {"tf": 1.0, "infeasible_cost": 20.0},
+        {"tf": 1.0, "penalize_failure": True, "failure_cost": 20.0},
     ):
-        problem = StochasticPlanningProblem(
-            plant, cost=Discounted(), x0_distribution=one_start, **kwargs
+        problem = PlanningProblem(
+            plant,
+            cost=Discounted(),
+            x_start=one_start,
+            discount_rate=0.2,
+            **kwargs,
         )
-        reports = {
-            backend: MonteCarloEvaluator(
-                problem, dt=0.05, n_trials=3, episode_length=1.0, backend=backend
-            ).evaluate(ctl)
-            for backend in ("jax", "numpy", "simulator")
-        }
-        np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
-        # the simulator integrates the continuous-time loop: same contract, O(dt) apart
-        np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
-        assert reports["jax"].value("worst_case") == reports["jax"].worst
+        settings = dict(dt=0.05, n_trials=3, episode_length=1.0)
+        on_jax = evaluate(problem, ctl, backend="jax", **settings)
+        on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
+        adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+        np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
+        np.testing.assert_allclose(adaptive.J, on_numpy.J, rtol=1e-2)
+        assert float(on_jax.worst) == float(np.max(on_jax.J))
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
-    """Port bounds are information: no backend clips a law that exceeds them."""
+def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
+    """Port bounds are information: nothing clips a law that exceeds them; a declared U fails it."""
     pytest.importorskip("jax")
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-0.5])
     plant.inputs["u"].upper_bound = np.array([0.5])
-    ctl = StateFeedbackController(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
+    ctl = StateFeedback(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
 
     class Effort(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -367,76 +450,59 @@ def test_monte_carlo_applies_the_law_beyond_the_port_bounds():
         def h(self, x, t=0.0, params=None):
             return 0.0
 
-    problem = StochasticPlanningProblem(
-        plant, cost=Effort(), tf=np.inf, x0_distribution=Particles([[0.5, 0.0]])
+    problem = PlanningProblem(
+        plant,
+        cost=Effort(),
+        tf=np.inf,
+        x_start=Particles([[0.5, 0.0]]),
+        U=plant.input_box,
     )
-    reports = {
-        backend: MonteCarloEvaluator(
-            problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
-        ).evaluate(ctl)
-        for backend in ("jax", "numpy", "simulator")
-    }
+    settings = dict(dt=0.01, n_trials=1, episode_length=1.0)
+    on_jax = evaluate(problem, ctl, backend="jax", **settings)
+    on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
     saturated_bound = 0.5**2 * 1.0
-    assert reports["numpy"].J[0] > 10 * saturated_bound
-    np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
-    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.1)
+    assert on_numpy.J[0] > 10 * saturated_bound and on_numpy.failed[0]
+    np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
 
 
-def test_an_exiting_trial_scores_alike_on_numpy_and_the_simulator():
-    """An exit is charged the trial environment's price on both backends."""
-    import warnings
-
-    from minilink.control import StateFeedbackController
-    from minilink.planning.evaluation import MonteCarloEvaluator
+def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
+    from minilink.control import StateFeedback
+    from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=np.inf,
         X=plant.state.box,
-        x0_distribution=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+        x_start=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
     )
-    ctl = StateFeedbackController(K=[[0.0, 0.0]])
-    reports = {}
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore")  # the announced price of leaving X
-        for backend in ("numpy", "simulator"):
-            reports[backend] = MonteCarloEvaluator(
-                problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
-            ).evaluate(ctl)
-    assert reports["numpy"].failed[0] and reports["simulator"].failed[0]
-    assert np.isfinite(reports["numpy"].J[0])
-    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+    ctl = StateFeedback(K=[[0.0, 0.0]])
+    settings = dict(dt=0.01, n_trials=1, episode_length=1.0, backend="numpy")
+    step = evaluate(problem, ctl, **settings)
+    adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+    assert step.failed[0] and adaptive.failed[0]
+    assert np.isfinite(step.J[0])  # the switch off: the plain cost, failure reported
+    np.testing.assert_allclose(adaptive.J, step.J, rtol=1e-3)
 
 
-def test_simulator_backend_scores_a_controller_with_internal_state():
-    """The controller state is stacked first; the score reads the plant's own trajectory."""
+def test_a_controller_with_internal_state_scores_like_its_static_twin():
+    """The controller's state is stacked in the loop; the score reads the plant's own run."""
     from minilink import PID, SingleMass
-    from minilink.control import StateFeedbackController
+    from minilink.control import StateFeedback
     from minilink.core.distributions import Particles
-    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning import evaluate
 
     mass = SingleMass()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         mass,
         cost=quadratic(mass),
         tf=np.inf,
-        x0_distribution=Particles([[0.5, 0.0]]),
+        x_start=Particles([[0.5, 0.0]]),
     )
-    settings = dict(dt=0.01, n_trials=1, episode_length=2.0)
-    J_pid = (  # a proportional law with filter states
-        MonteCarloEvaluator(problem, backend="simulator", **settings)
-        .evaluate(PID(Kp=4.0))
-        .J
-    )
-    J_static = (
-        MonteCarloEvaluator(problem, backend="numpy", **settings)
-        .evaluate(StateFeedbackController(K=[[4.0, 0.0]]))
-        .J
-    )
+    settings = dict(dt=0.01, n_trials=1, episode_length=2.0, backend="numpy")
+    J_pid = evaluate(problem, PID(Kp=4.0), **settings).J  # with filter states
+    J_static = evaluate(problem, StateFeedback(K=[[4.0, 0.0]]), **settings).J
     np.testing.assert_allclose(J_pid, J_static, rtol=0.05)
 
 
@@ -444,118 +510,91 @@ def test_simulator_backend_scores_a_controller_with_internal_state():
 @pytest.mark.jax
 def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     pytest.importorskip("jax")
-    from minilink.control import NeuralPolicyController
+    from minilink.control import NeuralPolicy
     from minilink.core.distributions import Particles
-    from minilink.planning.evaluation import MonteCarloEvaluator
+    from minilink.planning import evaluate
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
-    ctl = NeuralPolicyController(plant, hidden=(8,), seed=5)
+    ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
-    heavy = StochasticPlanningProblem(
-        plant,
-        cost=quadratic(plant),
-        tf=np.inf,
-        x0_distribution=start,
-        params_distribution={"m": Particles([[3.0]])},
-    )
-    nominal = StochasticPlanningProblem(
-        plant, cost=quadratic(plant), tf=np.inf, x0_distribution=start
-    )
+    task = dict(cost=quadratic(plant), tf=np.inf, x_start=start)
+    heavy = PlanningProblem(plant, params={"plant": {"m": Particles([[3.0]])}}, **task)
+    nominal = PlanningProblem(plant, **task)
+    settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
+    J_heavy = {}
     for backend in ("jax", "numpy"):
-        J_heavy = (
-            MonteCarloEvaluator(
-                heavy, dt=0.05, n_trials=1, episode_length=1.0, backend=backend
-            )
-            .evaluate(ctl)
-            .J
-        )
-        J_nominal = (
-            MonteCarloEvaluator(
-                nominal, dt=0.05, n_trials=1, episode_length=1.0, backend=backend
-            )
-            .evaluate(ctl)
-            .J
-        )
-        assert not np.isclose(J_heavy[0], J_nominal[0])
-        if backend == "jax":
-            J_heavy_jax = J_heavy[0]
-    np.testing.assert_allclose(J_heavy[0], J_heavy_jax, rtol=1e-6)
+        J_heavy[backend] = evaluate(heavy, ctl, backend=backend, **settings).J[0]
+        J_nominal = evaluate(nominal, ctl, backend=backend, **settings).J[0]
+        assert not np.isclose(J_heavy[backend], J_nominal)
+    np.testing.assert_allclose(J_heavy["numpy"], J_heavy["jax"], rtol=1e-6)
     assert plant.params["m"] == 1.0  # the draw never touched the nominal plant
 
 
-def test_default_backend_scores_a_lookup_table_law_on_numpy():
-    """A DP law runs on NumPy only: the default falls back, an explicit JAX backend says why."""
-    import warnings
-
-    from minilink.control import StateFeedbackController
-    from minilink.planning.evaluation import MonteCarloEvaluator
+def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
+    """A DP law runs on NumPy only: "auto" falls back, an explicit JAX backend refuses."""
+    from minilink.control import StateFeedback
+    from minilink.planning import ProblemEvaluator
 
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-5.0])
     plant.inputs["u"].upper_bound = np.array([5.0])
-    task = dict(
-        cost=quadratic(plant), tf=np.inf, X=plant.state.box, infeasible_cost=500.0
+    problem = PlanningProblem(
+        plant,
+        x_start=[0.5, 0.0],
+        cost=quadratic(plant),
+        tf=1.0,
+        X=plant.state.box,
+        U=plant.input_box,
+        penalize_failure=True,
+        failure_cost=500.0,
     )
-    problem = PlanningProblem(plant, x_start=[0.5, 0.0], **task)
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
     ).solve()
-    settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
 
-    # one start: the NumPy trials are the JAX ones, the fallback is silent
-    with warnings.catch_warnings():
-        warnings.simplefilter("error")
-        report = MonteCarloEvaluator(problem, **settings).evaluate(vi)
-    on_numpy = MonteCarloEvaluator(problem, backend="numpy", **settings).evaluate(vi)
-    np.testing.assert_array_equal(report.J, on_numpy.J)
+    auto = ProblemEvaluator(problem, vi, 0.1)
+    assert auto.backend == "numpy"
+    on_numpy = ProblemEvaluator(problem, vi, 0.1, backend="numpy")
+    np.testing.assert_array_equal(auto.evaluate().J, on_numpy.evaluate().J)
     if not jax_available():
         return
 
-    # random starts: NumPy draws other starts than a law scored on JAX, announced
-    spread = StochasticPlanningProblem(
-        plant, x0_distribution=Uniform([0.0, -0.5], [1.0, 0.5]), **task
-    )
-    with pytest.warns(UserWarning, match="same draws"):
-        report = MonteCarloEvaluator(spread, **settings).evaluate(vi)
-    on_numpy = MonteCarloEvaluator(spread, backend="numpy", **settings).evaluate(vi)
-    np.testing.assert_array_equal(report.J, on_numpy.J)
+    with pytest.raises(RuntimeError, match="JAX"):
+        ProblemEvaluator(problem, vi, 0.1, backend="jax")
 
-    # an explicit JAX backend names the cause
-    with pytest.raises(RuntimeError, match="NumPy-only.*backend='numpy'"):
-        MonteCarloEvaluator(problem, backend="jax", **settings).evaluate(vi)
-
-    # a law that traces keeps the JAX backend and its numbers
-    law = StateFeedbackController(K=[[5.0, 1.0]])
-    on_jax = MonteCarloEvaluator(spread, backend="jax", **settings).evaluate(law)
-    report = MonteCarloEvaluator(spread, **settings).evaluate(law)
-    np.testing.assert_array_equal(report.J, on_jax.J)
+    # a law that traces keeps the JAX backend
+    law = StateFeedback(K=[[5.0, 1.0]])
+    assert ProblemEvaluator(problem, law, 0.1).backend == "jax"
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-def test_default_backend_falls_back_on_a_numpy_only_set_or_cost():
-    """The JAX trial traces X and the cost as well: a NumPy-only one keeps the default on NumPy."""
-    from minilink.control import StateFeedbackController
+def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
+    """The JAX run traces X and the cost as well: a NumPy-only one keeps "auto" on NumPy."""
+    from minilink.control import StateFeedback
     from minilink.core.backends import array_module
     from minilink.core.sets import Set
-    from minilink.planning.evaluation import MonteCarloEvaluator
-    from minilink.planning.problems import ProblemParameters
+    from minilink.planning import ProblemEvaluator
 
     class NumpyBand(Set):
-        """|z_i| <= r, the margin written with NumPy only (r = 1 by default)."""
+        """|z_i| <= r, the margin written with NumPy only."""
+
+        params = {"r": 0.8}
 
         def margin(self, z, t=0.0, params=None):
-            r = 1.0 if params is None else params["r"]
+            r = (self.params if params is None else params)["r"]
 
-            return np.concatenate([z + r, r - z])
+            return np.concatenate([np.asarray(z) + r, r - np.asarray(z)])
 
     class Band(Set):
         """The same band, written for both backends."""
 
+        params = {"r": 0.8}
+
         def margin(self, z, t=0.0, params=None):
-            r = 1.0 if params is None else params["r"]
+            r = (self.params if params is None else params)["r"]
             xp = array_module(z)
 
             return xp.concatenate([z + r, r - z])
@@ -570,29 +609,25 @@ def test_default_backend_falls_back_on_a_numpy_only_set_or_cost():
             return 0.0
 
     plant = pendulum()
-    law = StateFeedbackController(K=[[5.0, 1.0]])
-    settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
+    law = StateFeedback(K=[[5.0, 1.0]])
     task = dict(
-        tf=np.inf,
-        x0_distribution=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params=ProblemParameters(sets={"r": 0.8}),
-        infeasible_cost=5.0,
+        tf=1.0,
+        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        penalize_failure=True,
+        failure_cost=5.0,
     )
-    for X, cost, culprit in (
-        (NumpyBand(), quadratic(plant), "the constraint set X"),
-        (plant.state.box, NumpyEnergy(), "the cost"),
-    ):
-        problem = StochasticPlanningProblem(plant, cost=cost, X=X, **task)
-        with pytest.warns(UserWarning, match=f"^{culprit} does not trace on JAX"):
-            report = MonteCarloEvaluator(problem, **settings).evaluate(law)
-        numpy = MonteCarloEvaluator(problem, backend="numpy", **settings).evaluate(law)
-        np.testing.assert_array_equal(report.J, numpy.J)
+    for X, cost in ((NumpyBand(), quadratic(plant)), (plant.state.box, NumpyEnergy())):
+        problem = PlanningProblem(plant, cost=cost, X=X, **task)
+        auto = ProblemEvaluator(problem, law, 0.1)
+        assert auto.backend == "numpy"
+        numpy = ProblemEvaluator(problem, law, 0.1, backend="numpy")
+        np.testing.assert_array_equal(
+            auto.evaluate(n_trials=3).J, numpy.evaluate(n_trials=3).J
+        )
 
-    # the same band written with xp traces, and keeps the JAX backend and its numbers
-    problem = StochasticPlanningProblem(plant, cost=quadratic(plant), X=Band(), **task)
-    on_jax = MonteCarloEvaluator(problem, backend="jax", **settings).evaluate(law)
-    report = MonteCarloEvaluator(problem, **settings).evaluate(law)
-    np.testing.assert_array_equal(report.J, on_jax.J)
+    # the same band written with xp traces, and keeps the JAX backend
+    problem = PlanningProblem(plant, cost=quadratic(plant), X=Band(), **task)
+    assert ProblemEvaluator(problem, law, 0.1).backend == "jax"
 
 
 def test_deterministic_planner_warns_on_a_stochastic_problem():
@@ -601,11 +636,12 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
     )
 
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=2.0,
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        U=plant.input_box,
     )
     with pytest.warns(
         UserWarning, match="deterministic planner: it reads the start set X0"
@@ -619,12 +655,12 @@ def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
     from minilink.core.sets import SingletonSet
 
     plant = pendulum()
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=2.0,
-        x_start=[0.05, 0.0],
-        x0_distribution=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        U=plant.input_box,
     )
     assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
     nominal = problem.nominal()
@@ -641,13 +677,15 @@ def test_gymnasium_view_of_a_stochastic_problem():
     plant = pendulum()
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
-    problem = StochasticPlanningProblem(
+    problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
         tf=1.0,
         X=plant.state.box,
-        x0_distribution=Particles([[0.3, 0.0], [-0.3, 0.0]]),
-        infeasible_cost=50.0,
+        x_start=Particles([[0.3, 0.0], [-0.3, 0.0]]),
+        penalize_failure=True,
+        failure_cost=50.0,
+        U=plant.input_box,
     )
     env = Sys2Gym.from_problem(problem, dt=0.05)
     starts = {
@@ -655,7 +693,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
         for s in range(6)
     }
     assert starts <= {(0.3, 0.0), (-0.3, 0.0)} and len(starts) == 2
-    # a charged exit: terminated, the price on the reward
+    # a charged exit: terminated, the failure_cost on the reward
     env.x = np.array([2 * np.pi - 0.01, 9.9])
     _, r, terminated, truncated, _ = env.step(np.array([4.0]))
     assert terminated and not truncated and r < -49.0
@@ -666,36 +704,32 @@ def test_gymnasium_view_of_a_stochastic_problem():
     assert terminated
 
 
-# --- the Evaluation record, and open-loop policies replayed by the evaluator ---
+# --- the Evaluation record, and open-loop policies in the loop ---
 
 
-def test_evaluation_of_one_trajectory_prints_a_single_cost():
-    from minilink.planning.evaluation import Evaluation, MonteCarloEvaluator
+def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
+    from minilink.control import StateFeedback
+    from minilink.planning import evaluate, evaluate_trajectory
 
     plant = pendulum()
     problem = PlanningProblem(plant, cost=quadratic(plant), tf=1.0)
     t = np.linspace(0.0, 1.0, 6)
     traj = Trajectory(t=t, x=np.vstack([0.1 * t, np.zeros(6)]), u=np.zeros((1, 6)))
-    single = Evaluation.of_trajectory(problem, traj)
+    single = evaluate_trajectory(problem, traj)
     assert single.n_trials == 1 and single.trajectories[0] is traj
-    assert str(single).startswith("J = ") and "trials" not in str(single)
-    # a deterministic problem is one trial for the evaluator as well
-    from minilink.control import StateFeedbackController
+    assert str(single).startswith("J = ") and "runs" not in str(single)
 
-    law = StateFeedbackController(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
-    report = MonteCarloEvaluator(problem, dt=0.1, n_trials=1, backend="numpy").evaluate(
-        law
-    )
+    # a deterministic problem is one run for the evaluation as well
+    law = StateFeedback(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
+    report = evaluate(problem, law, dt=0.1, backend="numpy")
     assert report.n_trials == 1 and np.all(report.x0[0] == problem.x_start)
 
 
-def test_open_loop_source_scores_like_its_replayed_trajectory_on_every_backend():
+def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     from minilink.blocks import TrajectorySource
-    from minilink.planning.evaluation import MonteCarloEvaluator, score_trajectory
+    from minilink.planning import evaluate, evaluate_trajectory
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
     problem = PlanningProblem(plant, x_start=[0.3, 0.0], cost=quadratic(plant), tf=1.0)
     dt, n_steps = 0.1, 10
     t = dt * np.arange(n_steps + 1)
@@ -703,24 +737,37 @@ def test_open_loop_source_scores_like_its_replayed_trajectory_on_every_backend()
     source = TrajectorySource(t, u)
     assert int(source.m) == 0  # no input port: an open-loop policy
 
-    # the same held-input rollout by hand, scored under the contract
-    evaluator = plant.compile(backend="numpy", verbose=False)
-    x = np.zeros((2, n_steps + 1))
-    x[:, 0] = problem.x_start
-    for k in range(n_steps):
-        x[:, k + 1] = evaluator.rk4_step(x[:, k], u[:, k], t[k], dt)
-    J_hand, _ = score_trajectory(problem, Trajectory(t=t, x=x, u=u))
+    # The source interpolates linearly: the plant's first-order-hold rollout, its
+    # running cost integrated with the state by the same RK4 step,
+    # ż = [f(x, u(τ)); g(x, u(τ))], plus h(x_N)
+    from minilink.core.compile.evaluators.stepping import step_body
 
-    reports = {}
-    for backend in ("numpy", "simulator") + (("jax",) if jax_available() else ()):
-        reports[backend] = MonteCarloEvaluator(
-            problem, dt=dt, n_trials=1, backend=backend
-        ).evaluate(source)
-    np.testing.assert_allclose(reports["numpy"].J[0], J_hand, rtol=1e-10)
-    if "jax" in reports:
-        np.testing.assert_allclose(reports["jax"].J[0], J_hand, rtol=1e-8)
-    # the simulator integrates the source in series and lands within its step error
-    np.testing.assert_allclose(reports["simulator"].J[0], J_hand, rtol=0.05)
+    cost = problem.cost
+
+    def f_aug(z, u, tau):
+        dx = plant.f(z[:2], u, tau)
+        return np.concatenate([dx, [cost.g(z[:2], u, tau)]])
+
+    z = np.concatenate([problem.x_start, [0.0]])
+    for k in range(n_steps):
+        z = step_body(f_aug, z, u[:, k], u[:, k + 1], t[k], dt, "rk4", 1)
+    J_hand = z[2] + cost.h(z[:2], t[-1])
+    evaluator = plant.compile(backend="numpy", verbose=False)
+    xs = evaluator.rollout(problem.x_start, u.T, 0.0, dt, hold="foh")
+    np.testing.assert_allclose(xs[-1], z[:2], rtol=1e-12)
+    trapezoid = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
+    np.testing.assert_allclose(trapezoid, J_hand, rtol=2e-2)
+
+    runs = [("numpy", "rk4"), ("numpy", "scipy")]
+    runs += [("jax", "rk4")] if jax_available() else []
+    reports = {
+        run: evaluate(problem, source, dt=dt, backend=run[0], solver=run[1])
+        for run in runs
+    }
+    np.testing.assert_allclose(reports["numpy", "rk4"].J, J_hand, rtol=1e-10)
+    if ("jax", "rk4") in reports:
+        np.testing.assert_allclose(reports["jax", "rk4"].J, J_hand, rtol=1e-8)
+    np.testing.assert_allclose(reports["numpy", "scipy"].J, J_hand, rtol=1e-3)
 
     # a held (zero-order) replay keeps each sample until the next
     held = TrajectorySource(t, u, interpolation="previous")
@@ -737,48 +784,115 @@ def jax_available():
     return importlib.util.find_spec("jax") is not None
 
 
-def test_monte_carlo_scores_a_time_varying_law_at_each_instant():
+def test_a_time_varying_law_scores_alike_on_every_backend():
     pytest.importorskip("jax")
-    import jax
-
-    from minilink.control.state import TimeVaryingStateFeedbackController
-    from minilink.planning.evaluation import MonteCarloEvaluator, control_law
+    from minilink.control.state import TimeVaryingFeedback
+    from minilink.planning import evaluate
 
     t = np.linspace(0.0, 1.0, 5)
     K = np.stack([np.array([[1.0 + 10.0 * k, 0.5]]) for k in range(5)])
-    ctl = TimeVaryingStateFeedbackController(t, K)
-    x = np.array([0.3, -0.1])
-    grid = np.linspace(0.0, 1.0, 21)
-    for backend in ("numpy", "jax"):
-        law = control_law(ctl, grid, backend)
-        if backend == "jax":
-            law = jax.jit(law)
-        for t_k in (0.0, 0.5, 0.95):
-            expected = ctl.ctl(None, np.concatenate([x, np.zeros(2)]), t_k)
-            np.testing.assert_allclose(np.asarray(law(x, t_k)), expected, rtol=1e-12)
-
-    problem = StochasticPlanningProblem(
+    ctl = TimeVaryingFeedback(t, K)
+    problem = PlanningProblem(
         pendulum(),
         cost=QuadraticCost.from_system(pendulum()),
-        x0_distribution=Particles([[0.5, 0.0]]),
+        x_start=Particles([[0.5, 0.0]]),
         tf=1.0,
     )
-    reports = {
-        backend: MonteCarloEvaluator(
-            problem, dt=0.01, n_trials=1, episode_length=1.0, backend=backend
-        ).evaluate(ctl)
-        for backend in ("jax", "numpy", "simulator")
-    }
-    np.testing.assert_allclose(reports["jax"].J, reports["numpy"].J, rtol=1e-6)
-    # O(dt) apart; the law frozen at t = 0 scored 0.97 against 45 here
-    np.testing.assert_allclose(reports["simulator"].J, reports["numpy"].J, rtol=0.05)
+    settings = dict(dt=0.01, n_trials=1)
+    on_jax = evaluate(problem, ctl, backend="jax", **settings)
+    on_numpy = evaluate(problem, ctl, backend="numpy", **settings)
+    adaptive = evaluate(problem, ctl, solver="scipy", **settings)
+    np.testing.assert_allclose(on_jax.J, on_numpy.J, rtol=1e-6)
+    np.testing.assert_allclose(adaptive.J, on_numpy.J, rtol=1e-2)
 
 
 def test_a_disturbance_on_the_command_port_is_refused():
     with pytest.raises(ValueError, match="command port of sys"):
-        StochasticPlanningProblem(
+        PlanningProblem(
             pendulum(),
             cost=QuadraticCost.from_system(pendulum()),
-            x0_distribution=Particles([[0.5, 0.0]]),
-            disturbances={"u": Gaussian([0.0], 0.1)},
+            x_start=Particles([[0.5, 0.0]]),
+            disturbances={"u": WhiteNoise(1, psd=0.1)},
         )
+
+
+def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
+    from minilink.core.sets import BallSet, IntersectionSet
+
+    plant = Pendulum()
+    box = plant.state.box
+    ball = BallSet(center=np.zeros(2), radius=1.0)
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        tf=1.0,
+        x_start=np.zeros(2),
+        X=IntersectionSet([box, ball]),
+    )
+    problem.params = {"X": {"1": {"radius": 2.0}}}
+    assert problem.X.sets[1].radius == 2.0 and problem.X.sets[0] is box
+    with pytest.raises(ValueError, match="unknown member"):
+        IntersectionSet([box, ball]).with_params({"2": {"radius": 1.0}})
+
+
+def test_a_user_set_with_numbers_is_moved_on_a_copy():
+    from minilink.core.sets import Set
+
+    class Disk(Set):
+        def __init__(self):
+            self.params = {"r": 1.0}
+
+        @property
+        def dim(self):
+            return 2
+
+        def margin(self, z, t=0.0, params=None):
+            params = self.params if params is None else params
+            r = params["r"]
+            return r**2 - z @ z
+
+    disk = Disk()
+    moved = disk.with_params({"r": 2.0})
+    assert moved is not disk and disk.params["r"] == 1.0 and moved.params["r"] == 2.0
+
+
+def test_a_source_policy_is_held_from_the_problems_start_time():
+    from minilink.blocks.sources import TrajectorySource
+    from minilink.planning.evaluator import nominal_trajectory
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant, xbar=np.array([np.pi, 0.0]))
+    problem = PlanningProblem(
+        plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, tf=2.0, t_start=1.5
+    )
+    t_grid = 1.5 + 0.1 * np.arange(21)
+    source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
+    traj = nominal_trajectory(problem, source, dt=0.1)
+    np.testing.assert_allclose(traj.u[:, 0], [np.sin(1.5)])
+
+
+def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_value_iteration():
+    from minilink.planning.environment import RolloutEnvironment
+
+    plant = pendulum()
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), S=np.eye(2))
+    problem = PlanningProblem(
+        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
+    )
+    dt = 0.1
+    face = problem.compile(dt=dt)
+    env = RolloutEnvironment(problem, dt=dt, backend="numpy")
+    vi = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=dt)
+
+    # Undiscounted and finite: the integral g_max T and the sum g_max dt N agree
+    bound = problem.cost_bound()
+    np.testing.assert_allclose(
+        [face.cost_bound, env.failure_cost, vi.options.out_of_bound_cost],
+        bound,
+        rtol=1e-12,
+    )
+
+    # A failure cost given: every tool charges it
+    fixed = problem.replace(penalize_failure=True, failure_cost=7.0)
+    assert fixed.compile(dt=dt).failure_cost == 7.0
+    assert RolloutEnvironment(fixed, dt=dt, backend="numpy").failure_cost == 7.0

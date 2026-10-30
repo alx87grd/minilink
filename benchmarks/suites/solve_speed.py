@@ -19,6 +19,7 @@ from benchmarks.optimization import (
 )
 from benchmarks.scenarios.common import assert_simulation_finite
 from minilink.core.costs import QuadraticCost
+from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -122,9 +123,10 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         sys=sys,
         tf=PENDULUM_TF,
         x_start=x_start,
-        x_goal=x_goal,
+        Xf=SingletonSet(x_goal),
         cost=cost,
         X=sys.state.box,
+        U=sys.input_box,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -132,8 +134,8 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
         ),
         options=TrajectoryOptimizationOptions(
-            compile_backend="numpy",
-            optimizer_method="scipy_slsqp",
+            backend="numpy",
+            method="scipy_slsqp",
             optimizer_options={
                 "maxiter": PENDULUM_MAXITER,
                 "ftol": PENDULUM_FTOL,
@@ -171,7 +173,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             value=float(np.mean(total_times)),
             unit="s",
             notes=(
-                f"catalog Pendulum swing-up, compile_backend=numpy, "
+                f"catalog Pendulum swing-up, backend=numpy, "
                 f"n_steps={PENDULUM_N_STEPS}, scipy_slsqp"
             ),
         ),

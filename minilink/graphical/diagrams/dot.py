@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import tempfile
 import warnings
 from dataclasses import replace
 
@@ -123,6 +125,7 @@ def get_system_block_html(sys, html_id="sys1"):
 
 FONT = "Helvetica"
 TITLE_FILL = "#e5e7eb"
+BOX_FILL = "#f4f4f5"
 BOUNDARY_COLOR = "#71717a"
 
 
@@ -251,7 +254,7 @@ def render_block(graph, node):
 def render_cluster(graph, cluster, nodes):
     """Draw one nested diagram as a labelled Graphviz cluster around its blocks."""
     with graph.subgraph(name=f"cluster_{cluster.id}") as box:
-        box.attr(label=f"{cluster.name}::{cluster.display_id}")
+        box.attr(**box_attrs(f"{cluster.name}::{cluster.display_id}"))
 
         # Its own blocks, then the diagrams nested inside it, each in a box of its own
         for node_id in cluster.node_ids:
@@ -259,6 +262,21 @@ def render_cluster(graph, cluster, nodes):
             render_block(box, node)
         for child in cluster.clusters:
             render_cluster(box, child, nodes)
+
+
+def box_attrs(title):
+    """The Graphviz attributes of a box around a nested diagram: a grey container, its title top-left."""
+    return dict(
+        label=f"<<B>{title}</B>>",
+        labeljust="l",
+        fontname=FONT,
+        fontsize="12",
+        style="filled",
+        fillcolor=BOX_FILL,
+        color=BOUNDARY_COLOR,
+        penwidth="1.2",
+        margin="12",
+    )
 
 
 def require_port_role(role):
@@ -317,7 +335,7 @@ def render_diagram_graph(
         # raising. Do not IPython.display the graph: plot_diagram returns it,
         # and the notebook auto-displays that last expression. Calling
         # display() *and* returning the object renders the figure twice
-        # (same rule as SharedSystemFacades.animate).
+        # (same rule as SystemAnimation.animate).
         try:
             graph.pipe(format="svg")
         except Exception as exc:
@@ -337,8 +355,6 @@ def render_diagram_graph(
     show_mpl = show and (not show_inline) and (not show_pdf)
     if show_mpl:
         try:
-            import io
-
             import matplotlib.pyplot as plt
 
             # Graphviz default DPI is ~96; bump for a sharper Matplotlib window.
@@ -379,8 +395,6 @@ def render_diagram_graph(
         return drawn
 
     if filename is None:
-        import tempfile
-
         with tempfile.NamedTemporaryFile(
             suffix="_" + graph.name + ".gv",
             delete=False,

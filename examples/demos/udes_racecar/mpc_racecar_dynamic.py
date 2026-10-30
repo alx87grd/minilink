@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
 from minilink.catalog import UdeSRacecarDyn
-from minilink.control.mpc import ModelPredictiveController, mpc_animation_overlays
+from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.racecar_skin import (
     racecar_skin_2d,  # noqa: F401  (used by the commented 2-D look below)
     racecar_skin_3d,
@@ -13,14 +13,15 @@ from minilink.planning import (
     ReferenceTrack,
     Scene,
     Sphere,
-    bind,
     car_outline,
     circuit_waypoints,
     from_waypoints,
+    mount,
     point_probe,
     quadratic_excess,
     quadratic_hinge,
 )
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
 LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0  # [m] the circuit: a rounded rectangle, 36.6 m
 V_TARGET = 6.0  # [m/s] asked for everywhere; the corners are what take it back
@@ -33,7 +34,7 @@ MPC_DT = 0.1  # [s] between two solves
 MPC_HORIZON = 1.2  # [s] ~4.5 m ahead at V_TARGET: one corner's worth
 MPC_STEPS = 12  # knots, 0.1 s apart: a cone must not fall between two of them
 SLSQP_MAXITER = 60
-SLSQP_FTOL = 1.0
+SLSQP_FTOL = 0.3
 # 110 warm-started solves at ~0.15 s each; the whole script takes about half a minute.
 
 BODY_LENGTH, BODY_WIDTH, BODY_MARGIN = 0.34, 0.20, 0.02  # [m] footprint the plan keeps
@@ -74,9 +75,10 @@ design.state.upper_bound[8] = design.params["P_max"]
 # What the car is asked for: hold the target speed, keep its centre on the line, keep
 # its whole footprint inside the lane and clear of the cones. The quadratic part says
 # nothing about where the car is on the map — the three spatial fields do all of that.
-centre = bind(design, point_probe())
-body = bind(
-    design, car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN)
+centre = mount(point_probe(), on=design)
+body = mount(
+    car_outline(length=BODY_LENGTH, width=BODY_WIDTH, margin=BODY_MARGIN),
+    on=design,
 )
 x_cruise = np.zeros(design.n)
 x_cruise[3] = V_TARGET
@@ -125,41 +127,44 @@ x0 = np.array(
 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
-        sys=design, x_start=x0, cost=cost, tf=MPC_HORIZON, X=design.state.box
+        sys=design,
+        x_start=x0,
+        cost=cost,
+        tf=MPC_HORIZON,
+        X=design.state.box,
+        U=design.input_box,
     ),
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
+    backend="jax",
     record_solve_time=True,
-    optimizer_method="scipy_slsqp",
+    method="scipy_slsqp",
     optimizer_options={"maxiter": SLSQP_MAXITER, "ftol": SLSQP_FTOL},
 )
-mpc = ModelPredictiveController(planner, dt_mpc=MPC_DT, warm_start=True, verbose=True)
+mpc = ModelPredictiveController(planner, delay=False, verbose=True)
 
 car = UdeSRacecarDyn(named_ports=False)
 car.params["mu"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 
-lap = mpc @ car
+lap = (mpc % MPC_DT) @ car
 # lap.plot_diagram()
-result = lap.compute_trajectory(
-    tf=TF_SIM, x0_plant=x0, plant_dt_inner=SIM_DT, compile_backend="jax"
-)
+result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 # lap.plot_trajectory()
 
 
 # car.skin = racecar_skin_2d
 # lap.animate(
-#     result.plant.resample(n_samples=N_FRAMES),
-#     overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+#     result.resample(n_samples=N_FRAMES),
+#     overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
 # )
 
 
 car.skin = racecar_skin_3d
 lap.animate(
-    result.plant.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, planner, scene=scene, track=track),
+    result.resample(n_samples=N_FRAMES),
+    overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
     renderer="meshcat",
     native=False,
 )

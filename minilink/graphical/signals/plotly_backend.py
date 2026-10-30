@@ -21,6 +21,7 @@ from minilink.graphical.signals.time_signals import (
     PlotResult,
     SignalPlotSpec,
     coerce_signal_plot_spec,
+    require_same_trace_count,
 )
 
 ###############################################################################
@@ -50,22 +51,16 @@ def open_plotly_signal_plot(
     **kwargs,
 ) -> LivePlotHandle:
     """Open a live Plotly time-signal plot."""
-    create_kw = dict(kwargs)
+    fig = create_figure(spec, **kwargs)
 
     # Not shown: the figure alone, updated in place
     if not show:
-        fig = create_figure(spec, **create_kw)
-        return PlotlyLivePlotHandle(
-            fig,
-            spec_builder=spec_builder,
-            create_kw=create_kw,
-        )
+        return PlotlyLivePlotHandle(fig, spec_builder=spec_builder)
 
     # In a notebook: a FigureWidget under the cell, updated in place
     env = detect_env()
     if env in ("jupyter", "colab"):
         go, _ = require_plotly()
-        fig = create_figure(spec, **create_kw)
         try:
             fw = go.FigureWidget(fig)
         except (TypeError, ValueError, ImportError):
@@ -75,7 +70,6 @@ def open_plotly_signal_plot(
             return PlotlyLivePlotHandle(
                 fig,
                 spec_builder=spec_builder,
-                create_kw=create_kw,
                 polling_server=polling,
             )
 
@@ -86,21 +80,15 @@ def open_plotly_signal_plot(
         except ImportError:
             fw.show()
 
-        return PlotlyLivePlotHandle(
-            fw,
-            spec_builder=spec_builder,
-            create_kw=create_kw,
-        )
+        return PlotlyLivePlotHandle(fw, spec_builder=spec_builder)
 
     # Elsewhere: a browser page on localhost polls the latest figure
-    initial_fig = create_figure(spec, **create_kw)
     polling = PlotlyPollingServer()
-    polling.start(initial_fig)
+    polling.start(fig)
 
     return PlotlyLivePlotHandle(
-        initial_fig,
+        fig,
         spec_builder=spec_builder,
-        create_kw=create_kw,
         polling_server=polling,
     )
 
@@ -113,12 +101,10 @@ class PlotlyLivePlotHandle(LivePlotHandle):
         fig,
         *,
         spec_builder=None,
-        create_kw=None,
         polling_server: PlotlyPollingServer | None = None,
     ):
         self.fig = fig
         self.spec_builder = spec_builder
-        self._create_kw = dict(create_kw) if create_kw is not None else {}
         self._polling_server = polling_server
 
     def update(self, traj_or_spec, *, title: str | None = None) -> None:
@@ -129,13 +115,6 @@ class PlotlyLivePlotHandle(LivePlotHandle):
             title=title,
         )
 
-        # Through the polling page: a fresh figure, pushed whole
-        if self._polling_server is not None:
-            new_fig = create_figure(spec, **self._create_kw)
-            self.fig = new_fig
-            self._polling_server.push_figure(new_fig)
-            return
-
         # In place: the same traces take the new samples, in one batched redraw
         # when the figure has one (a FigureWidget)
         require_same_trace_count(spec, self.fig.data)
@@ -145,6 +124,10 @@ class PlotlyLivePlotHandle(LivePlotHandle):
                 redraw_traces(self.fig, spec, title)
         else:
             redraw_traces(self.fig, spec, title)
+
+        # Through the polling page: push the updated figure
+        if self._polling_server is not None:
+            self._polling_server.push_figure(self.fig)
 
     def close(self) -> None:
         """Stop the polling server, when there is one."""
@@ -364,14 +347,6 @@ class PlotlyPollHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         """Keep the per-request log off the console."""
         return
-
-
-def require_same_trace_count(spec, lines):
-    """Refuse an update whose spec has another number of traces than the plot."""
-    if len(spec.traces) != len(lines):
-        raise ValueError(
-            "Live plot update changed the number of traces; open a new plot.",
-        )
 
 
 def redraw_traces(fig, spec, title):

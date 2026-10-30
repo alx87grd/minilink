@@ -13,12 +13,12 @@ from minilink import (
 )
 from minilink.core import SingletonSet
 from minilink.core.geometry import Sphere
+from minilink.core.shaping import quadratic_excess
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
-from minilink.planning.spatial.collision import bind, disc
+from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 
 TF = 14.0
@@ -89,12 +89,12 @@ sys.inputs["u"].upper_bound = np.array([1.5, 1.5])
 
 scene = Scene(obstacles=OBSTACLES)
 track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH)
-body = bind(sys, disc(ROBOT_RADIUS))
+body = mount(disc(ROBOT_RADIUS), on=sys)
 
 X = (
     BoxSet.from_system_state(sys)
-    & scene.clearance_field(body).as_constraint()
-    & track.corridor_field(body).as_constraint(lower=0.0)
+    & scene.clearance_field(body).as_set()
+    & track.corridor_field(body).as_set(lower=0.0)
 )
 control_cost = QuadraticCost.from_system(
     sys,
@@ -111,17 +111,17 @@ problem = PlanningProblem(
     sys=sys,
     tf=TF,
     x_start=X_START,
-    x_goal=X_GOAL,
     X=X,
     Xf=SingletonSet(X_GOAL),
     cost=control_cost + path_cost,
+    U=sys.input_box,
 )
 
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,
     transcription="direct_collocation",
-    compile_backend="numpy",
+    backend="numpy",
     optimizer_options={"maxiter": 500, "ftol": 1e-1},
 )
 
@@ -136,7 +136,7 @@ guess = Trajectory(
     u=np.gradient(xy, t_grid, axis=0).T,
 )
 
-traj = planner.solve(initial_guess=guess).trajectory
+traj = planner.solve(guess=guess).trajectory
 distances = [
     float(track.distance_field(body).value(traj.x[:, k])) for k in range(traj.n_samples)
 ]

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.blocks import Step, Integrator, Error, Sum, Saturation``; the defining
@@ -17,6 +17,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Sine": ("minilink.blocks.sources", "Sine"),
     "TrajectorySource": ("minilink.blocks.sources", "TrajectorySource"),
     "WhiteNoise": ("minilink.blocks.sources", "WhiteNoise"),
+    "NoiseSource": ("minilink.blocks.sources", "NoiseSource"),
     # Routing
     "Demux": ("minilink.blocks.routing", "Demux"),
     "Error": ("minilink.blocks.routing", "Error"),
@@ -24,22 +25,15 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Mux": ("minilink.blocks.routing", "Mux"),
     "Sum": ("minilink.blocks.routing", "Sum"),
     # Nonlinear
-    "DeadZone": ("minilink.blocks.nonlinear", "DeadZone"),
-    "RateLimiter": ("minilink.blocks.nonlinear", "RateLimiter"),
-    "Relay": ("minilink.blocks.nonlinear", "Relay"),
     "Saturation": ("minilink.blocks.nonlinear", "Saturation"),
     # Transfer functions and filters
     "LowPassFilter": ("minilink.blocks.filters", "LowPassFilter"),
-    "NotchFilter": ("minilink.blocks.filters", "NotchFilter"),
     "TransferFunction": ("minilink.blocks.transfer_function", "TransferFunction"),
     "Lead": ("minilink.blocks.transfer_function", "Lead"),
-    "Lag": ("minilink.blocks.transfer_function", "Lag"),
-    "Washout": ("minilink.blocks.filters", "Washout"),
     # Neural
-    "NeuralNetwork": ("minilink.blocks.neural", "NeuralNetwork"),
     "MLP": ("minilink.blocks.neural", "MLP"),
     # Discrete
-    "ZOHHold": ("minilink.blocks.step", "ZOHHold"),
+    "UnitDelay": ("minilink.blocks.step", "UnitDelay"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

@@ -23,6 +23,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.core.backends import array_module
 from minilink.core.compile.compiler import compile_auto
 from minilink.core.diagram import DiagramSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
 from minilink.dynamics.catalog.mass_spring_damper.linear import SingleMass
 from minilink.dynamics.abstraction.state_space import LTISystem
@@ -298,11 +299,11 @@ class TestLQR(unittest.TestCase):
         from minilink.analysis.linearization import design_model
         from minilink.dynamics.catalog.pendulum.cartpole import (
             CartPole,
-            CartPoleWithNoisePort,
+            NoisyCartPole,
         )
 
         x_up = np.array([0.0, np.pi, 0.0, 0.0])
-        model = design_model(CartPoleWithNoisePort(), x_up)
+        model = design_model(NoisyCartPole(), x_up)
         self.assertEqual(model.B().shape, (4, 1))
         self.assertEqual(model.D().shape, (4, 1))
         np.testing.assert_allclose(model.ubar, [0.0])
@@ -318,7 +319,7 @@ class TestLQR(unittest.TestCase):
         self.assertEqual(sensed.C().shape, (2, 4))
         np.testing.assert_allclose(sensed.ybar, x_up[:2])
         Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
-        K_noisy = lqr(CartPoleWithNoisePort(), Q, R, x_bar=x_up).params["K"]
+        K_noisy = lqr(NoisyCartPole(), Q, R, x_bar=x_up).params["K"]
         K_quiet = lqr(CartPole(), Q, R, x_bar=x_up).params["K"]
         self.assertEqual(K_noisy.shape, (1, 4))
         np.testing.assert_allclose(K_noisy, K_quiet)
@@ -347,13 +348,13 @@ class TestLQR(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
-from minilink.control.impedance import ImpedanceController, ImpedanceIntegralController
+from minilink.control.impedance import Impedance, IntegralImpedance
 from minilink.control.siso import P
 from minilink.control.siso import PD, PI, PID
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
-    TrajectoryFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
+    TrajectoryFeedback,
 )
 from minilink.dynamics.catalog.equations.integrators import DoubleIntegrator
 
@@ -418,7 +419,7 @@ class TestTrajectoryLQR(unittest.TestCase):
         reference = self.sinusoid(tf=1.0, n=3)  # samples at t = 0, 0.5, 1
         K = np.zeros((3, 1, 2))
         K[:, 0, 0] = [1.0, 2.0, 3.0]
-        ctl = TrajectoryFeedbackController(reference, K)
+        ctl = TrajectoryFeedback(reference, K)
         x = reference.x[:, 1]  # on the reference at t = 0.5: only the feedforward acts
         np.testing.assert_allclose(ctl.ctl(None, x, t=0.5), reference.u[:, 1])
         x = reference.x[:, 2] + np.array(
@@ -481,13 +482,13 @@ class TestFiniteHorizonLQR(unittest.TestCase):
     def test_scheduled_gain_interpolates_and_holds(self):
         t = np.array([0.0, 1.0, 2.0])
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
-        ctl = TimeVaryingStateFeedbackController(t, K)
+        ctl = TimeVaryingFeedback(t, K)
         z = np.array([1.0, 0.0, 0.0, 0.0])  # x = [1, 0], r = 0
         np.testing.assert_allclose(ctl.ctl(None, z, t=-1.0), [-1.0])
         np.testing.assert_allclose(ctl.ctl(None, z, t=0.0), [-1.0])
         np.testing.assert_allclose(ctl.ctl(None, z, t=1.5), [-2.5])
         np.testing.assert_allclose(ctl.ctl(None, z, t=9.0), [-3.0])
-        stationary = TimeVaryingStateFeedbackController(t, K, K_after=[[7.0, 0.0]])
+        stationary = TimeVaryingFeedback(t, K, K_after=[[7.0, 0.0]])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.0), [-3.0])
         np.testing.assert_allclose(stationary.ctl(None, z, t=2.5), [-7.0])
 
@@ -496,7 +497,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         K = np.array([[[1.0, 0.0]], [[2.0, 0.0]], [[3.0, 0.0]]])
         for K_after in ([[7.0]], [[7.0, 0.0], [0.0, 7.0]], 7.0):
             with self.assertRaisesRegex(ValueError, r"K_after must have shape"):
-                TimeVaryingStateFeedbackController(t, K, K_after=K_after)
+                TimeVaryingFeedback(t, K, K_after=K_after)
 
     def test_gain_schedule_plot_draws_every_entry(self):
         import matplotlib
@@ -560,28 +561,26 @@ class TestP(unittest.TestCase):
 
 class TestStateFeedbackController(unittest.TestCase):
     def test_reference_defaults_to_xbar(self):
-        ctl = StateFeedbackController(
-            np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1]
-        )
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.5, 0.0])
 
     def test_an_operating_point_of_the_wrong_size_is_refused(self):
         K = np.array([[1.0, 2.0]])
         with self.assertRaisesRegex(ValueError, r"ubar must have shape \(1,\)"):
-            StateFeedbackController(K, ubar=[0.5, 0.5])
+            StateFeedback(K, ubar=[0.5, 0.5])
         with self.assertRaisesRegex(ValueError, r"xbar must have shape \(2,\)"):
-            TimeVaryingStateFeedbackController([0.0, 1.0], [K, K], xbar=[0.0])
+            TimeVaryingFeedback([0.0, 1.0], [K, K], xbar=[0.0])
 
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
-        ctl = StateFeedbackController(K, xbar=[0.0, 0.0], ubar=[0.5])
+        ctl = StateFeedback(K, xbar=[0.0, 0.0], ubar=[0.5])
         u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [0.5 - 3.0])
 
 
 class TestImpedanceIntegralController(unittest.TestCase):
     def test_equations(self):
-        pid = ImpedanceIntegralController()
+        pid = IntegralImpedance()
         np.testing.assert_allclose(
             pid.f(np.array([0.0]), np.array([1.0, 0.2, 0.5])), [0.8]
         )
@@ -591,7 +590,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
 
     def test_closed_loop_removes_steady_state_error(self):
         plant = DoubleIntegrator()
-        pid = ImpedanceIntegralController(Kp=5.0, Ki=1.0, Kd=4.0)
+        pid = IntegralImpedance(Kp=5.0, Ki=1.0, Kd=4.0)
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
@@ -657,28 +656,28 @@ class TestPID(unittest.TestCase):
 
 class TestImpedanceController(unittest.TestCase):
     def test_gain_init_kwargs(self):
-        ctl = ImpedanceController(Kp=100.0, Kd=10.0)
+        ctl = Impedance(Kp=100.0, Kd=10.0)
         np.testing.assert_allclose(ctl.params["Kp"], [[100.0]])
         np.testing.assert_allclose(ctl.params["Kd"], [[10.0]])
 
     def test_vector_regulation(self):
-        ctl = ImpedanceController(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
+        ctl = Impedance(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.3, 0.4]))
         np.testing.assert_allclose(u, [2.0 * 0.9 - 0.5 * 0.3, 3.0 * 1.8 - 0.5 * 0.4])
 
     def test_a_full_stiffness_matrix_couples_the_axes(self):
         Kp = np.array([[2.0, 1.0], [0.0, 3.0]])
-        ctl = ImpedanceController(dof=2, Kp=Kp, Kd=0.0)
+        ctl = Impedance(dof=2, Kp=Kp, Kd=0.0)
         e = np.array([0.9, 1.8])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.0, 0.0]))
         np.testing.assert_allclose(u, Kp @ e)
         with self.assertRaisesRegex(ValueError, r"\(2, 2\) matrix"):
-            ImpedanceController(dof=2, Kp=np.ones((3, 3)))
+            Impedance(dof=2, Kp=np.ones((3, 3)))
 
     def test_the_limits_clip_the_command_and_hold_the_integrator(self):
-        ctl = ImpedanceController(Kp=10.0, Kd=0.0, u_max=1.0)
+        ctl = Impedance(Kp=10.0, Kd=0.0, u_max=1.0)
         np.testing.assert_allclose(ctl.ctl(None, np.array([1.0, 0.0, 0.0])), [1.0])
-        pid = ImpedanceIntegralController(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
+        pid = IntegralImpedance(Kp=10.0, Ki=1.0, Kd=0.0, u_max=1.0)
         # the command sits on u_max with the error pushing further: the integrator is held
         np.testing.assert_allclose(
             pid.f(np.array([0.0]), np.array([1.0, 0.0, 0.0])), [0.0]
@@ -689,9 +688,7 @@ class TestImpedanceController(unittest.TestCase):
         )
 
     def test_vector_tracking_ref(self):
-        ctl = ImpedanceController(
-            dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0]
-        )
+        ctl = Impedance(dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,
@@ -1201,7 +1198,7 @@ class TestPhasePlane(unittest.TestCase):
             plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
 
 
-from minilink.analysis.discretization import DiscretizedRK4DynamicSystem, discretize
+from minilink.analysis.discretization import SampledSystem, discretize
 
 
 def _rk4_step(f, x, u, t, dt, params):
@@ -1237,7 +1234,16 @@ class TestDiscretize(unittest.TestCase):
         x1_ref = _rk4_step(plant.f, x0, u, 0.0, dt, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.dt, dt)
+        self.assertEqual(step_leaf.sample_period, dt)
+
+    def test_the_method_facade_is_the_function(self):
+        plant = DoubleIntegrator()
+        x = np.array([0.2, -0.1])
+        u = np.array([0.4])
+        np.testing.assert_array_equal(
+            plant.discretize(0.05, solver="euler").step(x, u, k=3),
+            discretize(plant, 0.05, solver="euler").step(x, u, k=3),
+        )
 
     def test_discretize_h_delegates_to_source(self):
         plant = DoubleIntegrator()
@@ -1253,14 +1259,14 @@ class TestDiscretize(unittest.TestCase):
     def test_discretize_euler_matches_source_step(self):
         plant = DoubleIntegrator()
         dt = 0.05
-        step_leaf = discretize(plant, dt, integrator="euler")
+        step_leaf = discretize(plant, dt, solver="euler")
         p = step_leaf.params
         x0 = np.array([0.2, -0.1])
         u = np.array([0.4])
         x1_ref = x0 + dt * plant.f(x0, u, 0.0, p)
         x1 = step_leaf.step(x0, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-        self.assertEqual(step_leaf.integrator, "euler")
+        self.assertEqual(step_leaf.solver, "euler")
 
     def test_discretize_keeps_full_feedthrough(self):
         plant = _GainIntegrator()
@@ -1268,12 +1274,12 @@ class TestDiscretize(unittest.TestCase):
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(step_leaf.outputs["y"].dependencies, "all")
 
-    def test_discretize_reads_a_partial_feedthrough_on_its_one_input(self):
-        from minilink.dynamics.catalog.pendulum.pendulum import PendulumWithNoisePort
+    def test_discretize_keeps_the_partial_feedthrough_of_each_port(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 
-        plant = PendulumWithNoisePort()  # y reads the noise port n alone
+        plant = NoisyPendulum()  # y reads the noise port n alone
         step_leaf = discretize(plant, 0.05)
-        self.assertEqual(step_leaf.outputs["y"].dependencies, ("u",))
+        self.assertEqual(step_leaf.outputs["y"].dependencies, ("n",))
         x = np.array([0.3, 0.1])
         u = np.array([0.2, 0.0, 0.5])  # torque, disturbance, noise
         x1 = step_leaf.step(x, u, k=0)
@@ -1281,61 +1287,37 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(step_leaf.h(x, u, k=0), [0.3, 0.6])
         self.assertEqual(discretize(Pendulum(), 0.05).outputs["y"].dependencies, ())
 
-    def test_discretize_accepts_dt_in_params_only(self):
-        step_leaf = discretize(_GainIntegrator(), params={"gain": 2.0, "dt": 0.02})
-        self.assertEqual(step_leaf.dt, 0.02)
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-        x1 = step_leaf.step(np.array([0.0]), np.array([1.0]), k=0)
-        np.testing.assert_allclose(x1, [0.02 * 2.0])
-
-    def test_discretize_refuses_params_holding_only_dt(self):
-        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
-            discretize(Pendulum(), params={"dt": 0.05})
-        with self.assertRaisesRegex(ValueError, r"discretize\(system, dt=0.05\)"):
-            discretize(Pendulum(), 0.05, params={"dt": 0.05})
-        step_leaf = discretize(DoubleIntegrator(), params={"dt": 0.05})
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertEqual(step_leaf.params, {})
-        plant = DoubleIntegrator()
-        plant.params = {"dt": 0.05}
-        step_leaf = discretize(plant, params=plant.params)
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertEqual(step_leaf.params, {})
-
-    def test_discretize_refuses_two_different_sample_times(self):
-        with self.assertRaisesRegex(ValueError, r"dt=0.1 and params\['dt'\] = 0.02"):
-            discretize(_GainIntegrator(), 0.1, params={"gain": 2.0, "dt": 0.02})
-        step_leaf = discretize(
-            _GainIntegrator(), 0.02, params={"gain": 2.0, "dt": 0.02}
-        )
-        self.assertEqual(step_leaf.dt, 0.02)
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-
-    def test_assigning_params_refuses_a_dt(self):
-        step_leaf = discretize(Pendulum(), 0.05)
-        with self.assertRaisesRegex(ValueError, r"'dt' = 0.5.*dt = 0.05 s"):
-            step_leaf.params = {**Pendulum().params, "dt": 0.5}
-        self.assertNotIn("dt", step_leaf.params)
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
-        plant = _GainIntegrator()
-        step_leaf = discretize(plant, 0.05, params={"gain": 2.0})
-        plant.params["dt"] = 0.05
-        with self.assertRaisesRegex(ValueError, "the params of"):
-            step_leaf.params = None
-        self.assertEqual(step_leaf.params, {"gain": 2.0})
-
     def test_discretize_refuses_a_dt_in_the_source_params(self):
         plant = _GainIntegrator()
         plant.params["dt"] = 0.05
-        for dt in (None, 0.05, 0.1):
-            with self.assertRaisesRegex(ValueError, "'dt'"):
-                discretize(plant, dt)
-        with self.assertRaisesRegex(ValueError, "'dt'"):
-            DiscretizedRK4DynamicSystem(plant, 0.05)
-        step_leaf = discretize(plant, params=plant.params)
-        self.assertEqual(step_leaf.dt, 0.05)
-        self.assertNotIn("dt", step_leaf.params)
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
+        with self.assertRaisesRegex(ValueError, "remove 'dt'"):
+            discretize(plant, 0.05)
+
+    def test_discretize_requires_the_sample_time(self):
+        with self.assertRaises(TypeError):
+            discretize(Pendulum())
+
+    def test_exact_discretization_matches_cont2discrete(self):
+        from scipy.signal import cont2discrete
+
+        from minilink.analysis import linearize
+
+        lin = linearize(Pendulum())
+        dt = 0.1
+        A_d, B_d, *_ = cont2discrete((lin.A(), lin.B(), lin.C(), lin.D()), dt)
+        step_leaf = discretize(lin, dt, solver="exact")
+        x, u = np.array([0.3, -0.2]), np.array([0.5])
+        np.testing.assert_allclose(step_leaf.step(x, u), A_d @ x + B_d @ u, atol=1e-12)
+        with self.assertRaisesRegex(TypeError, "linear model"):
+            discretize(Pendulum(), dt, solver="exact")
+
+    def test_substeps_split_the_period(self):
+        plant = Pendulum()
+        x, u = np.array([1.0, 0.0]), np.array([0.0])
+        fine = discretize(plant, 0.2, substeps=50).step(x, u)
+        coarse = discretize(plant, 0.2).step(x, u)
+        two = discretize(plant, 0.2, substeps=2).step(x, u)
+        self.assertLess(np.max(np.abs(two - fine)), np.max(np.abs(coarse - fine)))
 
     def test_step_params_override_gain(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1363,7 +1345,6 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_allclose(
             step_leaf.step(x, u, 0, plant.params), step_leaf.step(x, u)
         )
-        self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
 
     def test_step_reads_the_source_live_params(self):
         plant = _GainIntegrator(gain=1.0)
@@ -1388,26 +1369,12 @@ class TestDiscretize(unittest.TestCase):
         x1 = step_leaf.step(x, u, k=0)
         np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
 
-    def test_discretize_steps_a_closed_loop_with_dt_in_params(self):
-        loop = PID(Kp=1.0, Ki=0.0, Kd=0.0) @ Pendulum()
-        dt = 0.01
-        x = np.linspace(0.1, 0.4, loop.n)
-        u = np.zeros(loop.m)
-        x1_ref = _rk4_step(loop.f, x, u, 0.0, dt, None)
-        for step_leaf in (
-            discretize(loop, params={**loop.params, "dt": dt}),
-            discretize(loop, dt, params={**loop.params, "dt": dt}),
-        ):
-            x1 = step_leaf.step(x, u, k=0)
-            np.testing.assert_allclose(x1, x1_ref, rtol=1e-09, atol=1e-09)
-            self.assertNotIn("dt", step_leaf.jacobian("step", "params"))
-
     def test_discretized_system_checks_dt(self):
         plant = _GainIntegrator()
         with self.assertRaises(TypeError):
-            DiscretizedRK4DynamicSystem(plant, {"gain": 1.0, "dt": 0.1})
+            SampledSystem(plant, {"gain": 1.0, "dt": 0.1})
         with self.assertRaises(ValueError):
-            DiscretizedRK4DynamicSystem(plant, -0.1)
+            SampledSystem(plant, -0.1)
 
     def test_discretize_keeps_the_y_metadata(self):
         plant = Pendulum()
@@ -1439,26 +1406,46 @@ class TestDiscretize(unittest.TestCase):
         rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
         self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
 
-    def test_discretize_stacks_each_input_port_into_u(self):
+    def test_discretize_keeps_each_input_port_of_its_source(self):
         plant = _GainIntegrator()
         plant.add_input_port("w", labels=["disturbance"], upper_bound=[1.0])
         step_leaf = discretize(plant, 0.1)
-        self.assertEqual(step_leaf.inputs["u"].labels, ["u[0]", "disturbance"])
-        np.testing.assert_array_equal(step_leaf.inputs["u"].upper_bound, [np.inf, 1.0])
+        self.assertEqual(list(step_leaf.inputs), ["u", "w"])
+        self.assertEqual(step_leaf.inputs["w"].labels, ["disturbance"])
+        np.testing.assert_array_equal(step_leaf.inputs["w"].upper_bound, [1.0])
 
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()
         with self.assertRaises(ValueError):
-            discretize(plant, 0.01, integrator="bdf")
+            discretize(plant, 0.01, solver="bdf")
 
-    def test_discretize_rejects_missing_dt(self):
-        plant = DoubleIntegrator()
-        with self.assertRaisesRegex(ValueError, r"params=\{\.\.\., 'dt': \.\.\.\}"):
-            discretize(plant)
+    def test_discretize_reads_a_static_block_at_the_sampling_instants(self):
+        gain = P(2.0, ports="reference")
+        sampled = discretize(gain, dt=0.01)
+        u = np.array([1.0, 0.25])
+        self.assertEqual(sampled.n, 0)
+        self.assertEqual(list(sampled.inputs), list(gain.inputs))
+        np.testing.assert_array_equal(
+            sampled.h(np.zeros(0), u, k=3), gain.h(np.zeros(0), u, 0.03)
+        )
+        self.assertEqual(sampled.step(np.zeros(0), u, k=3).shape, (0,))
 
-    def test_discretize_rejects_static_system(self):
+    def test_a_tick_law_keeps_its_count_and_has_no_seconds_face(self):
+        class Counter(StepSystem):
+            def __init__(self):
+                super().__init__(n=1, input_dim=1, output_dim=1)
+
+            def step(self, x, u, k=0, params=None):
+                return x + k
+
+        sampled = discretize(Counter(), 0.1)
+        np.testing.assert_array_equal(
+            sampled.step(np.zeros(1), np.zeros(1), k=4), [4.0]
+        )
         with self.assertRaises(TypeError):
-            discretize(P(1.0, ports="reference"), dt=0.01)
+            sampled.update(np.zeros(1), np.zeros(1), 0.4)
+        with self.assertRaises(ValueError):
+            discretize(Counter(), 0.1, substeps=2)
 
 
 from minilink.dynamics.abstraction.state_space import LTISystem, StateSpaceSystem
@@ -1497,12 +1484,12 @@ class TestLTISystem(unittest.TestCase):
         np.testing.assert_allclose(sys.f(x, u), np.array([-4.0, -0.2]))
         np.testing.assert_allclose(sys.h(x, u), np.array([7.5]))
 
-    def test_constant_matrices_ignore_params(self):
+    def test_the_matrices_are_the_params(self):
         sys = LTISystem(np.array([[2.0]]), np.array([[3.0]]))
-        np.testing.assert_allclose(
-            sys.f(np.array([4.0]), np.array([5.0]), params={"A": np.array([[0.0]])}),
-            np.array([23.0]),
-        )
+        x, u = np.array([4.0]), np.array([5.0])
+        np.testing.assert_allclose(sys.f(x, u), np.array([23.0]))
+        moved = {**sys.params, "A": np.array([[0.0]])}
+        np.testing.assert_allclose(sys.f(x, u, params=moved), np.array([15.0]))
 
     def test_rejects_invalid_dimensions(self):
         with self.assertRaisesRegex(ValueError, "A must be"):
@@ -1598,8 +1585,8 @@ class TestCompensatorStateLayout(unittest.TestCase):
     def test_the_rate_measured_pair_adds_no_filter_pole(self):
         plant_poles = 2
         for controller, extra_poles in (
-            (ImpedanceController(Kp=20.0, Kd=2.0), 0),
-            (ImpedanceIntegralController(Kp=20.0, Ki=10.0, Kd=2.0), 1),
+            (Impedance(Kp=20.0, Kd=2.0), 0),
+            (IntegralImpedance(Kp=20.0, Ki=10.0, Kd=2.0), 1),
         ):
             with self.subTest(controller=type(controller).__name__):
                 _, poles, _ = pzmap(controller @ self.plant)
@@ -1862,7 +1849,7 @@ class TestPolePlacement(unittest.TestCase):
 
 
 class TestOutputReference(unittest.TestCase):
-    """``OutputReferenceController(K, N)``: the textbook output reference."""
+    """``OutputReference(K, N)``: the textbook output reference."""
 
     def setUp(self):
         from minilink.control.design import place_gain
@@ -1874,11 +1861,11 @@ class TestOutputReference(unittest.TestCase):
         self.K = place_gain(self.A, self.B, [-2.0, -3.0])
 
     def test_y_tracks_r_at_steady_state(self):
-        from minilink.control.state import OutputReferenceController
+        from minilink.control.state import OutputReference
 
         A, B, C, K = self.A, self.B, self.C, self.K
         N = -np.linalg.inv(C @ np.linalg.inv(A - B @ K) @ B)
-        ctl = OutputReferenceController(K, N)
+        ctl = OutputReference(K, N)
         self.assertEqual(ctl.inputs["r"].dim, 1)
 
         loop = ctl @ self.plant
@@ -1888,9 +1875,9 @@ class TestOutputReference(unittest.TestCase):
         np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)
 
     def test_the_state_reference_is_the_other_block(self):
-        from minilink.control.state import StateFeedbackController
+        from minilink.control.state import StateFeedback
 
-        ctl = StateFeedbackController(self.K, xbar=[0.1, 0.0])
+        ctl = StateFeedback(self.K, xbar=[0.1, 0.0])
         self.assertEqual(ctl.inputs["r"].dim, 2)
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.1, 0.0])
         self.assertEqual(set(ctl.params), {"K", "ubar"})
@@ -1899,13 +1886,13 @@ class TestOutputReference(unittest.TestCase):
             ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)
         )
         with self.assertRaises(TypeError):
-            StateFeedbackController(self.K, N=np.ones((1, 1)))
+            StateFeedback(self.K, N=np.ones((1, 1)))
 
     def test_n_needs_one_row_per_command(self):
-        from minilink.control.state import OutputReferenceController
+        from minilink.control.state import OutputReference
 
         with self.assertRaisesRegex(ValueError, "needs 1 row"):
-            OutputReferenceController(self.K, np.ones((2, 1)))
+            OutputReference(self.K, np.ones((2, 1)))
 
 
 class TestPrint(unittest.TestCase):
@@ -2021,7 +2008,7 @@ class TestSensitivity(unittest.TestCase):
     def test_a_filter_on_the_measurement(self):
         from minilink.analysis import complementary_sensitivity, sensitivity
         from minilink.blocks.transfer_function import TransferFunction
-        from minilink.core.composition import feedback
+        from minilink.core.closed_loop import feedback
 
         H = TransferFunction([1.0], [1.0, 3.0, 2.0])
         C = PID(4.0, 2.0, 0.5)
@@ -2035,7 +2022,7 @@ class TestSensitivity(unittest.TestCase):
         )
         np.testing.assert_allclose(
             self.response(T),
-            self.response(loop, of="transfer_function:y", wrt="r"),
+            self.response(loop, of="TransferFunction:y", wrt="r"),
             atol=1e-9,
         )
 
@@ -2143,3 +2130,17 @@ class TestSensitivity(unittest.TestCase):
             self.response(sensitivity(plant=H, controller=PI(2.0, 1.0))),
             atol=1e-9,
         )
+
+
+def test_a_structural_test_returns_its_matrix_rank_and_dimension():
+    from minilink.analysis import StructuralResult, controllability
+
+    A = np.array([[1.0, 0.0], [0.0, 2.0]])
+    B = np.array([[1.0], [0.0]])
+    result = controllability(LTISystem(A, B))
+
+    # The record: 𝒞 = [B, A B], its rank and n; full rank when rank = n
+    assert isinstance(result, StructuralResult)
+    np.testing.assert_allclose(result.matrix, [[1.0, 1.0], [0.0, 0.0]])
+    assert (result.rank, result.n, result.is_full_rank) == (1, 2, False)
+    assert "rank 1 of n = 2" in str(result)

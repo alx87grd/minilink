@@ -6,9 +6,10 @@ import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
-from minilink.core.feedback import command_port
+from minilink.core.discrete.step_system import StepSystem
+from minilink.core.roles import command_port
 from minilink.core.system import System
-from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
 from minilink.graphical.control import style
 
 ###############################################################################
@@ -30,10 +31,14 @@ def linearize_matrices(
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Linearize ``sys`` about ``(x_bar, u_bar)`` and return ``A, B, C, D``.
 
+    On a continuous system ``A = ∂f/∂x``; on a step or sampled system (a tick
+    law, ``block % dt``, a sampled loop) the difference equation's
+    ``A_d = ∂step/∂x``, ``t`` its tick ``k``: the z-domain model.
+
     Parameters
     ----------
-    sys : DynamicSystem
-        Leaf or diagram whose ``f`` defines the dynamics.
+    sys : DynamicSystem or StepSystem
+        Leaf or diagram whose ``f`` (``step``) defines the dynamics.
     x_bar, u_bar : array-like, optional
         Operating point; default the nominal state and the nominal port values.
     t : float, optional
@@ -62,9 +67,11 @@ def linearize_matrices(
     point = (x_bar, u_bar, t, params)
     at = dict(method=method, eps=eps)
 
-    # A = ∂f/∂x and B = ∂f/∂u at the operating point; a static block has no state
-    A = jacobian(sys, "f", "x", *point, **at) if n > 0 else np.zeros((0, 0))
-    B = jacobian_block(sys, [("f", None)], inputs, point, at) if n > 0 else None
+    # A = ∂f/∂x and B = ∂f/∂u at the operating point (∂step/∂x and ∂step/∂u on a
+    # step system); a static block has no state
+    dynamics = "step" if isinstance(sys, StepSystem) else "f"
+    A = jacobian(sys, dynamics, "x", *point, **at) if n > 0 else np.zeros((0, 0))
+    B = jacobian_block(sys, [(dynamics, None)], inputs, point, at) if n > 0 else None
 
     # C = ∂h/∂x and D = ∂h/∂u; with no output port the output is the state: C = I, D = 0
     if outputs is None:
@@ -100,7 +107,10 @@ def linearize(
     the nominal state like every tool of the analysis family. The model
     carries the operating point it was taken at (``xbar``, ``ubar`` for the
     selected inputs, ``ybar`` for the selected outputs), so a design made on
-    it (``lqr``, ``kalman``) knows where it applies.
+    it (``lqr``, ``kalman``) knows where it applies. A step or sampled system
+    gives a :class:`~minilink.dynamics.abstraction.state_space.DiscreteLTISystem`,
+    ``x_{k+1} = A_d x_k + B_d u_k``, with the period it runs at (``None`` for a
+    tick law): its poles sit in ``z``, stable inside the unit circle.
     """
     # The Jacobians at the operating point
     A, B, C, D = linearize_matrices(
@@ -115,17 +125,13 @@ def linearize(
     ubar = point_inputs(sys, u_bar, inputs)
     ybar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
 
-    # The model, its state the deviation from the point
-    lti = LTISystem(
-        A,
-        B,
-        C,
-        D,
-        name=f"Linearized {sys.name}",
-        xbar=x_bar,
-        ubar=ubar,
-        ybar=ybar,
-    )
+    # The model, its state the deviation from the point: a difference equation
+    # with its period for a step system
+    point = dict(name=f"Linearized {sys.name}", xbar=x_bar, ubar=ubar, ybar=ybar)
+    if isinstance(sys, StepSystem):
+        lti = DiscreteLTISystem(A, B, C, D, period=period_of(sys), **point)
+    else:
+        lti = LTISystem(A, B, C, D, **point)
     lti.state.labels = [f"Delta {label}" for label in sys.state.labels]
 
     return lti
@@ -194,9 +200,18 @@ def design_model(
 ###############################################################################
 
 
+def period_of(sys):
+    """The sample period ``Δ`` a step system runs at, in seconds; ``None`` for a tick law."""
+    if isinstance(sys, DiscreteLTISystem):
+        return sys.period
+
+    return getattr(sys, "sample_period", None)
+
+
 def require_own_point(sys, x_bar, u_bar):
     """Refuse a point given with a linear model: an ``LTISystem`` carries the one it was taken at."""
-    if isinstance(sys, LTISystem) and (x_bar is not None or u_bar is not None):
+    linear_model = isinstance(sys, (LTISystem, DiscreteLTISystem))
+    if linear_model and (x_bar is not None or u_bar is not None):
         raise ValueError(
             f"{sys.name!r} is a linear model and carries its operating point "
             f"(xbar = {sys.xbar}); linearize the plant at x_bar instead of passing "
@@ -292,7 +307,7 @@ def selector_rows(sys, name, index):
     """Number of rows one output selector (or the state equation ``"f"``) contributes."""
     if index is not None:
         return 1
-    if name == "f":
+    if name in ("f", "step"):
         return sys.n
     if name in sys.outputs:
         return sys.outputs[name].dim
@@ -340,7 +355,7 @@ def point_outputs(sys, outputs, x_bar, u_bar, t, params):
 
     # The output ports, and the internal wires only when a selector names one
     evaluator = compiled(sys, "fd")
-    ports = evaluator.outputs_p(x_bar, u_bar, t, params)
+    ports = evaluator.outputs(x_bar, u_bar, t, params)
     wires = (
         evaluator.compute_internal_signals_dict(x_bar, u_bar, t)
         if any(name not in ports for name, _ in outputs)

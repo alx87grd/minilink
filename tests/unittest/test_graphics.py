@@ -9,7 +9,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from minilink.core.composition import propagate_animation_camera
+from minilink.core.assembly import propagate_animation_camera
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
@@ -24,9 +24,9 @@ from minilink.graphical.animation.primitives import (
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
-    _axis_label_from_column,
     _camera_3d_view_init,
 )
+from minilink.graphical.animation.renderers.renderer import axis_label_from_column
 from minilink.graphical.common.environment import override_env
 
 
@@ -232,14 +232,14 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
 
 class TestRendererHelpers(unittest.TestCase):
     def test_axis_label_axis_aligned(self):
-        self.assertEqual(_axis_label_from_column([1.0, 0.0, 0.0]), "X")
-        self.assertEqual(_axis_label_from_column([0.0, 1.0, 0.0]), "Y")
-        self.assertEqual(_axis_label_from_column([0.0, 0.0, 1.0]), "Z")
-        self.assertEqual(_axis_label_from_column([-1.0, 0.0, 0.0]), "-X")
+        self.assertEqual(axis_label_from_column([1.0, 0.0, 0.0]), "X")
+        self.assertEqual(axis_label_from_column([0.0, 1.0, 0.0]), "Y")
+        self.assertEqual(axis_label_from_column([0.0, 0.0, 1.0]), "Z")
+        self.assertEqual(axis_label_from_column([-1.0, 0.0, 0.0]), "-X")
 
     def test_axis_label_blank_for_oblique(self):
         v = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
-        self.assertEqual(_axis_label_from_column(v), "")
+        self.assertEqual(axis_label_from_column(v), "")
 
     def test_view_init_decode_default_top_down(self):
         T = camera_matrix()
@@ -256,7 +256,6 @@ class TestRendererHelpers(unittest.TestCase):
 
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, System
-from minilink.dynamics.catalog.equations.integrators import SimpleIntegrator
 from minilink.graphical.animation.drawables import SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, Point
 from minilink.graphical.animation.visualization import (
@@ -303,17 +302,6 @@ class TestEmptyTfWorldGeometry(unittest.TestCase):
         self.assertEqual(len(draw_list), 1)
         _, transform = draw_list[0]
         np.testing.assert_allclose(transform, np.eye(4))
-
-
-class TestIntegratorLocalTransform(unittest.TestCase):
-    def test_marker_tracks_state_via_local_transform(self):
-        sys = SimpleIntegrator()
-        x = np.array([3.0])
-        frame = resolve_draw_frame(sys, x, np.zeros(sys.m))
-        self.assertEqual(len(frame["primitives"]), 1)
-        transform = np.asarray(frame["transforms"][0], dtype=float)
-        self.assertAlmostEqual(transform[0, 3], 3.0)
-        self.assertAlmostEqual(transform[1, 3], 0.0)
 
 
 class TestDiagramSharedWorld(unittest.TestCase):
@@ -431,7 +419,6 @@ class TestCameraFollowWorld(unittest.TestCase):
 from minilink.core.geometry import Box as GeomBox
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.drawables import (
-    Replay,
     SceneHistory,
     require_overlay,
 )
@@ -451,7 +438,7 @@ class TestOverlayValidation(unittest.TestCase):
 
     def test_rejects_bare_system(self):
         sys = DynamicSystem(1, output_dim=1, expose_state=True)
-        with self.assertRaisesRegex(TypeError, "Replay"):
+        with self.assertRaisesRegex(TypeError, "not an overlay"):
             require_overlay(sys)
 
 
@@ -476,27 +463,6 @@ class TestSceneHistory(unittest.TestCase):
         early_pts = history.get_dynamic_geometry(t=0.0)["world"][0].pts
         late_pts = history.get_dynamic_geometry(t=0.5)["world"][0].pts
         self.assertFalse(np.allclose(early_pts, late_pts))
-
-
-class TestReplay(unittest.TestCase):
-    def test_forwards_drawable_at_trajectory_time(self):
-
-        class MarkerPlant(DynamicSystem):
-            def __init__(self):
-                super().__init__(0)
-                self.last_t = None
-
-            def tf(self, x, u, t=0, params=None):
-                self.last_t = t
-                return {}
-
-        plant = MarkerPlant()
-        traj = Trajectory(
-            t=np.array([0.0, 0.5, 1.0]), x=np.zeros((0, 3)), u=np.zeros((0, 3))
-        )
-        ghost = Replay(plant, traj)
-        ghost.tf(t=0.5)
-        self.assertAlmostEqual(plant.last_t, 0.5)
 
 
 class TestTrajectoryPolyline(unittest.TestCase):
@@ -1164,7 +1130,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.diagram.connect("step", "y", "controller", "r")
         self.diagram.connect("controller", "u", "plant", "u")
         self.diagram.connect("plant", "y", "controller", "y")
-        self.sim = Simulator(self.diagram, t0=0, tf=2.0, dt=0.1, verbose=False)
+        self.sim = Simulator(self.diagram, t_start=0, tf=2.0, dt=0.1, verbose=False)
         self.traj = self.sim.solve()
 
     def test_plotting_import_is_quiet(self):
@@ -1177,7 +1143,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertEqual(stream.getvalue(), "")
         self.assertEqual(plt.isinteractive(), interactive)
 
-    def test_compute_internal_signals(self):
+    def test_reconstruct_internal_signals(self):
         self.assertFalse(self.traj.has_signal("step:y"))
         traj_plus = self.diagram.reconstruct_internal_signals(self.traj)
         self.assertTrue(traj_plus.has_signal("step:y"))
@@ -1226,13 +1192,13 @@ class TestAdvancedPlotting(unittest.TestCase):
         plt.close(result.figure)
 
     def test_a_block_nested_in_a_sub_diagram_is_plotted_by_identity(self):
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         pendulum = Pendulum()
         pendulum.x0 = np.array([0.3, 0.0])
         outer = DiagramSystem()
-        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.5, verbose=False)
 
         spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "y"),))
@@ -1245,12 +1211,12 @@ class TestAdvancedPlotting(unittest.TestCase):
             build_signal_plot_spec(outer, traj, signals=((Pendulum(), "y"),))
 
     def test_the_state_port_reads_the_state_labels(self):
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         pendulum = Pendulum()
         outer = DiagramSystem()
-        outer.add_subsystem(ImpedanceController() @ pendulum, "loop")
+        outer.add_subsystem(Impedance() @ pendulum, "loop")
         traj = outer.compute_trajectory(tf=0.2, verbose=False)
         spec = build_signal_plot_spec(outer, traj, signals=((pendulum, "x"),))
         self.assertEqual(
@@ -1295,13 +1261,11 @@ class TestAdvancedPlotting(unittest.TestCase):
 
     def test_resolve_plot_signals_series_into_closed_loop(self):
         from minilink.blocks.sources import Step
-        from minilink.control.impedance import ImpedanceController
+        from minilink.control.impedance import Impedance
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
-        diagram = (
-            Step(final_value=[1.0], step_time=0.0) >> ImpedanceController() @ Pendulum()
-        )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
+        diagram = Step(final_value=[1.0], step_time=0.0) >> Impedance() @ Pendulum()
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "Step:y", "controller:u"))
 
     def test_resolve_plot_signals_dynamic_controller(self):
         from minilink.blocks.sources import Step
@@ -1312,7 +1276,7 @@ class TestAdvancedPlotting(unittest.TestCase):
             Step(final_value=[1.0], step_time=0.0)
             >> PID(ports="reference") @ DoubleIntegrator()
         )
-        self.assertEqual(resolve_plot_signals(diagram), ("x", "step:y", "controller:u"))
+        self.assertEqual(resolve_plot_signals(diagram), ("x", "Step:y", "controller:u"))
 
     def test_plot_trajectory_uses_default_signals_for_closed_loop(self):
         from minilink.graphical.common.environment import override_env
@@ -1380,13 +1344,25 @@ from minilink.graphical.animation.renderers.plotly_renderer import (
     PlotlyRenderer,
     _import_plotly,
 )
-from minilink.graphical.catalog.skins import debug_state_skin
 from minilink.graphical.common.plotly_style import (
     PLOTLY_ANIMATION_2D_MARGIN,
     PLOTLY_ANIMATION_HEIGHT,
     PLOTLY_FIG_WIDTH,
 )
 from minilink.graphical.signals import open_time_signal_plot, plot_time_signals
+
+
+def debug_state_skin(plant):
+    """One marker per state upward and per input downward, in a column along y."""
+    markers = []
+    for row, color in [(i, "blue") for i in range(plant.n)] + [
+        (-i - 1, "red") for i in range(plant.m)
+    ]:
+        marker = Point(color=color, marker="o")
+        marker.local_transform = np.eye(4)
+        marker.local_transform[1, 3] = float(row)
+        markers.append(marker)
+    return {"world": markers}
 
 
 class Integrator_plotly_renderer(DynamicSystem):
@@ -1729,11 +1705,11 @@ class TestArrowGeometry(unittest.TestCase):
 # error-space sign conventions (e = r − y, de = vel_d − rate).
 
 from minilink.blocks.nonlinear import Saturation  # noqa: E402
-from minilink.control.impedance import ImpedanceController  # noqa: E402
-from minilink.control.modelbased import ComputedTorqueController  # noqa: E402
+from minilink.control.impedance import Impedance  # noqa: E402
+from minilink.control.modelbased import ComputedTorque  # noqa: E402
 from minilink.control.siso import P  # noqa: E402
 from minilink.control.siso import PID  # noqa: E402
-from minilink.control.state import StateFeedbackController  # noqa: E402
+from minilink.control.state import StateFeedback  # noqa: E402
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum  # noqa: E402
 from minilink.graphical import port_map  # noqa: E402
 
@@ -1789,7 +1765,7 @@ class TestPlotControlLaw(unittest.TestCase):
         K = np.array([[3.0, 1.0]])
         xbar = np.array([np.pi, 0.0])
         ubar = np.array([0.5])
-        lqr = StateFeedbackController(K, xbar=xbar, ubar=ubar)
+        lqr = StateFeedback(K, xbar=xbar, ubar=ubar)
         spec_bounds = ((0.0, 2 * np.pi), (-4.0, 4.0))
         res = lqr.plot_control_law(bounds=spec_bounds, grid_shape=(5, 5), show=False)
         mesh = res.axes.collections[0]
@@ -1804,7 +1780,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_impedance_error_plane_values(self):
-        pd = ImpedanceController(dof=1, Kp=10.0, Kd=1.0)
+        pd = Impedance(dof=1, Kp=10.0, Kd=1.0)
         res = pd.plot_control_law(
             bounds=((-1.0, 1.0), (-2.0, 2.0)), grid_shape=(5, 5), show=False
         )
@@ -1820,7 +1796,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_modelbased_default_axes_are_qdq(self):
-        ct = ComputedTorqueController(Pendulum())
+        ct = ComputedTorque(Pendulum())
         res = ct.plot_control_law(grid_shape=(5, 5), show=False)
         self.assertEqual(res.axes.get_xlabel(), "q0")
         self.assertEqual(res.axes.get_ylabel(), "dq0")
@@ -1864,7 +1840,7 @@ class TestPlotControlLaw(unittest.TestCase):
         np.testing.assert_allclose(line.get_ydata(), 2.0 * line.get_xdata())
         plt.close(res.figure)
 
-        lqr = StateFeedbackController(np.array([[1.0, 1.0]]))
+        lqr = StateFeedback(np.array([[1.0, 1.0]]))
         res = lqr.plot_control_law(
             bounds=((-1.0, 1.0), (-1.0, 1.0)),
             grid_shape=(5, 5),
@@ -2058,3 +2034,91 @@ class TestGifExport(unittest.TestCase):
                         file_name=os.path.join(tmp, name),
                     )
             self.assertEqual(sorted(os.listdir(tmp)), ["clip.gif", "plain.gif"])
+
+
+# --- the catalog's drawing pieces: skins keyed to frames, primitives as declared ---
+
+
+def catalog_skins():
+    from minilink import KinematicBicycle, UR5Manipulator
+    from minilink.dynamics.catalog.aerial.plane import Plane3D
+    from minilink.graphical.catalog import car_skin_2d, plane_skin_3d, ur5_skin
+
+    return [
+        (KinematicBicycle, car_skin_2d),
+        (Plane3D, plane_skin_3d),
+        (UR5Manipulator, ur5_skin),
+    ]
+
+
+def test_each_catalog_skin_draws_on_the_frames_its_plant_places():
+    from minilink.graphical.animation.primitives import GraphicPrimitive
+
+    for plant_class, skin in catalog_skins():
+        plant = plant_class()
+        frames = plant.tf(plant.x0, np.zeros(plant.m), 0.0)
+        look = skin(plant)
+
+        # A skin is (plant) -> {frame: [primitive]}: the frames of tf, or the world
+        assert set(look) <= set(frames) | {"world"}, plant_class.__name__
+        assert all(isinstance(p, GraphicPrimitive) for ps in look.values() for p in ps)
+
+
+def test_the_line_primitives_span_what_their_docstrings_state():
+    from minilink.graphical.catalog import ground_line, spring_between, spring_line
+
+    # The ground: a backdrop of span L at height y
+    ground = ground_line(length=4.0, y=-1.0)
+    np.testing.assert_allclose(ground.pts, [[-2.0, -1.0, 0.0], [2.0, -1.0, 0.0]])
+    assert ground.camera_fit is False
+
+    # The unit spring: from x = 0 to x = 1, 2·coils + 1 coil vertices within ±amplitude
+    spring = spring_line(coils=4, amplitude=0.2)
+    assert spring.pts[0, 0] == 0.0 and spring.pts[-1, 0] == 1.0
+    assert len(spring.pts) == 2 * 4 + 1 + 4 and np.max(np.abs(spring.pts[:, 1])) == 0.2
+
+    # The spring between two points: its ends pinned on them
+    coil = spring_between([0.0, 0.0], [3.0, 4.0])
+    np.testing.assert_allclose(coil.pts[0], [0.0, 0.0, 0.0])
+    np.testing.assert_allclose(coil.pts[-1], [3.0, 4.0, 0.0])
+
+
+def test_the_solid_primitives_hold_their_declared_extents():
+    from minilink.graphical.catalog import ExtrudedPolygon, plane_airframe_3d, wheel_box
+
+    # A wheel: a flat box of the given length and width
+    wheel = wheel_box(length=0.5, width=0.2)
+    assert (wheel.length_x, wheel.length_y) == (0.5, 0.2)
+
+    # An extruded polygon: its outline on z = ∓h/2, the closing repeat dropped
+    prism = ExtrudedPolygon([[0, 0], [1, 0], [0, 1], [0, 0]], height=2.0)
+    vertices = prism.vertices_local()
+    assert vertices.shape == (6, 3)
+    np.testing.assert_allclose(vertices[:3, 2], -1.0)
+    np.testing.assert_allclose(vertices[3:, 2], 1.0)
+
+    # The airframe: fuselage, wing and the two tails
+    assert len(plane_airframe_3d()) == 4
+
+
+def test_the_poses_place_a_unit_primitive_between_two_points():
+    from minilink.graphical.catalog import link_pose_3d, point_pose, segment_pose_2d
+
+    p0 = np.array([1.0, 2.0, 0.5])
+    p1 = np.array([1.0, 5.0, 4.5])
+
+    # The rod's pose: a rotation (orthonormal, det +1) at p0, its −y along p1 − p0
+    T = link_pose_3d(p0, p1)
+    R = T[:3, :3]
+    np.testing.assert_allclose(R.T @ R, np.eye(3), atol=1e-12)
+    assert np.linalg.det(R) == pytest.approx(1.0)
+    np.testing.assert_allclose(T[:3, 3], p0)
+    np.testing.assert_allclose(-R[:, 1], (p1 - p0) / 5.0, atol=1e-12)
+
+    # A point's pose: the identity rotation, the point lifted to z = 0
+    np.testing.assert_allclose(point_pose([1.0, 2.0])[:3, 3], [1.0, 2.0, 0.0])
+
+    # The planar segment: (0, 0) ↦ p0 and (1, 0) ↦ p1
+    S = segment_pose_2d([1.0, 1.0], [4.0, 5.0])
+    np.testing.assert_allclose(S @ [0.0, 0.0, 0.0, 1.0], [1.0, 1.0, 0.0, 1.0])
+    np.testing.assert_allclose(S @ [1.0, 0.0, 0.0, 1.0], [4.0, 5.0, 0.0, 1.0])

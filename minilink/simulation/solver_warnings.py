@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import warnings
 
-from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
-from minilink.simulation.time_grid import AUTO_DT_SCALE
+from minilink.core.system import AUTO_DT_SCALE, automatic_step_of
 
 ###############################################################################
 # Public API
@@ -83,8 +82,7 @@ def collect_discontinuous_solver_notes(
         "Prefer explicit Euler with a small dt; logged port torques match "
         "one evaluation per step. RK4 sub-steps and SciPy adaptive stepping "
         "can produce misleading or unstable results. For digital sample-and-hold "
-        "semantics, consider HybridSimulator with a sampled computer model and "
-        "an explicit sample time (hybrid_closed_loop)."
+        "semantics, put the law on its clock: (ctl % dt) @ plant."
     ]
 
     # The risk of the solver the user forced
@@ -106,9 +104,8 @@ def collect_discontinuous_solver_notes(
             "substeps near switching surfaces."
         )
 
-    # Δt_rec = τ_min × AUTO_DT_SCALE, the automatic step of the loop
-    smallest = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
-    recommended_dt = smallest * AUTO_DT_SCALE
+    # Δt_rec = 0.1 τ_min, the automatic step of the loop
+    recommended_dt = automatic_step_of(solver_info)
 
     # A forced Euler step coarser than Δt_rec; in the verbose panel, the automatic
     # Euler step
@@ -116,8 +113,8 @@ def collect_discontinuous_solver_notes(
         if dt > recommended_dt:
             notes.append(
                 f"Euler with dt={dt:g} may be too coarse for discontinuous feedback; "
-                f"consider dt <= {recommended_dt:g}, HybridSimulator with an explicit "
-                "computer sample time, or a hybrid_closed_loop path."
+                f"consider dt <= {recommended_dt:g}, or the law on its clock: "
+                "(ctl % dt) @ plant."
             )
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(

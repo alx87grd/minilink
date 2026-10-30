@@ -30,7 +30,12 @@ class DoublePendulum(MechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2)
-        self.name = "Double Pendulum"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -267,7 +272,6 @@ class Acrobot(DoublePendulum):
 
     def __init__(self):
         super().__init__()
-        self.name = "Acrobot"
 
         # Ports: one torque, on the elbow, within ±10 N·m
         self.inputs.clear()

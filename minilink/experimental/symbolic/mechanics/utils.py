@@ -1,4 +1,8 @@
-"""Inertia dyadic helpers for symbolic multibody models."""
+"""Inertia dyadic helpers for symbolic multibody models.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
+"""
 
 import sympy as sp
 from sympy.physics.mechanics import inertia as _make_inertia

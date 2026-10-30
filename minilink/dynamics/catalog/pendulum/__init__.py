@@ -2,26 +2,26 @@
 
 from minilink.dynamics.catalog.pendulum.cartpole import (
     CartPole,
-    CartPoleWithNoisePort,
+    NoisyCartPole,
     RotatingCartPole,
     UnderactuatedRotatingCartPole,
 )
 from minilink.dynamics.catalog.pendulum.double_pendulum import Acrobot, DoublePendulum
 from minilink.dynamics.catalog.pendulum.pendulum import (
     InvertedPendulum,
+    NoisyPendulum,
     Pendulum,
-    PendulumWithNoisePort,
     TwoIndependentPendulums,
 )
 
 __all__ = [
     "Acrobot",
     "CartPole",
-    "CartPoleWithNoisePort",
+    "NoisyCartPole",
     "DoublePendulum",
     "InvertedPendulum",
     "Pendulum",
-    "PendulumWithNoisePort",
+    "NoisyPendulum",
     "RotatingCartPole",
     "TwoIndependentPendulums",
     "UnderactuatedRotatingCartPole",

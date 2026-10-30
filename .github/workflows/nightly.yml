@@ -46,6 +46,13 @@ jobs:
         SDL_VIDEODRIVER: dummy
       run: pytest
 
+    # The experimental tier's tests: off the merge gate, smoked here (ROADMAP §2)
+    - name: Test the experimental tier
+      if: ${{ !cancelled() }}
+      env:
+        SDL_VIDEODRIVER: dummy
+      run: pytest tests/experimental
+
     - name: All example scripts under examples/demos
       if: ${{ !cancelled() }}
       env:

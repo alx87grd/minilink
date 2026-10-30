@@ -24,7 +24,12 @@ class Boat2D(GeneralizedMechanicalSystem):
 
     def __init__(self):
         super().__init__(dof=3, pos=3, actuators=2)
-        self.name = "Planar Boat"
+
+        # The plant's own range: positions and velocities within ±10, forces within ±5
+        self.state.lower_bound = np.full(self.n, -10.0)
+        self.state.upper_bound = np.full(self.n, 10.0)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters: the hull's areas and length scale with the thruster lever arm
         l_t = 3.0
@@ -285,7 +290,6 @@ class Boat2DWithCurrent(Boat2D):
 
     def __init__(self):
         super().__init__()
-        self.name = "Planar Boat With Current"
 
         # Parameters: the current's velocity in the world frame
         self.params["current_velocity"] = np.array([-1.0, -1.0])

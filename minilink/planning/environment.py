@@ -1,0 +1,443 @@
+"""The rollout environment: a stochastic planning problem as pure step functions, on NumPy or JAX."""
+
+import warnings
+import zlib
+
+import numpy as np
+
+from minilink.core.backends import (
+    BACKEND_JAX,
+    BACKEND_NUMPY,
+    array_module,
+    is_jax_key,
+    numpy_generator,
+    require_jax,
+)
+from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.distributions import child_seed
+from minilink.core.params import flatten, merge_tree
+from minilink.core.roles import command_port
+from minilink.core.wiring import WiredDiagramMixin
+
+###############################################################################
+# Public API
+###############################################################################
+
+
+# An episode's seed of a source: a non-negative 31-bit integer
+MAX_SEED = 2**31 - 1
+
+
+class RolloutEnvironment:
+    """
+    A planning problem seen by a learner: ``reset`` draws a start, ``step`` runs one control period.
+
+    The problem is compiled once to its step face. ``step`` is the face's
+    ``transition``: the plant over ``dt`` with the input held; the training
+    reward is ``r_k = −g(x_k, u_k, t_k) dt``, the running cost at the period's
+    start (``reward="stage"``: ``−c_k``, the face's stage cost
+    ``∫₀^dt e^{−ρτ} g dτ`` integrated beside the state, the score's own; a native
+    step problem's reward is ``−c_k``); the score of a trained law is always the
+    problem's. It tells how the episode ends: at the
+    horizon, at a failure (the state left ``X`` or the input left ``U``, checked
+    at the sample as the judge does: a charged terminal event, a training device
+    that ends the episode early), or at the edge of the training zone (a
+    truncation: the model is not studied there, the value of the state stands in
+    for the rest). On the JAX backend every method traces, so collectors ``vmap`` over plants and ``scan`` over time with
+    no Python per step; on NumPy the same methods drive plain loops (tabular
+    learning, Monte Carlo trials).
+
+    Parameters
+    ----------
+    problem : PlanningProblem
+        The task: plant, cost, constraint set ``X`` and the cost of a failure,
+        horizon, start (a point, a set or a law), the plant's parameter laws and
+        the disturbance sources. A point start restarts every episode at
+        ``x_start``.
+    dt : float
+        Control period (one integration step, input held).
+    episode_length : float, optional
+        Episode duration for an infinite-horizon problem (default 10 s);
+        ignored for a finite horizon, whose episodes end at ``problem.tf``.
+    solver : {"rk4", "euler"}
+        Integration scheme of the step model.
+    substeps : int
+        Integration steps per control period, the action held over them.
+    backend : {"jax", "numpy"}
+        Arrays the step functions run on.
+    training_zone : Set, optional
+        Where episodes run; leaving it truncates the episode. A training
+        management choice, not a constraint: the plant's state box by default.
+    reward : {"running", "stage"}
+        The training reward: ``−g dt`` (default) or ``−c_k``.
+    """
+
+    REWARDS = ("running", "stage")
+
+    def __init__(
+        self,
+        problem,
+        *,
+        dt=0.05,
+        episode_length=None,
+        solver="rk4",
+        substeps=1,
+        backend="jax",
+        training_zone=None,
+        reward="running",
+    ):
+        # The task: the problem, its plant and its cost, on one control period
+        require_continuous_problem(problem)
+        self.problem = problem
+        self.sys = problem.sys
+        self.cost = problem.require_cost()
+        self.dt = float(dt)
+        self.backend = backend
+        self.n = int(self.sys.n)
+
+        # Horizon: a finite one ends at tf, an infinite one runs episodes of fixed length
+        self.finite_horizon = problem.horizon_kind() == "finite"
+        if self.finite_horizon:
+            self.tf = float(problem.tf)
+        else:
+            self.tf = 10.0 if episode_length is None else float(episode_length)
+        self.n_steps_per_episode = int(round(self.tf / self.dt))
+        require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
+        self.discount_rate = problem.discount_rate
+        self.t_start = float(problem.t_start)
+
+        # Plant and stage cost: the problem's step face at dt, one transition per
+        # control period, on nominal or drawn parameters
+        require_rollout_backend(backend)
+        require_step_knobs(solver, substeps)
+        self.solver = solver
+        self.substeps = int(substeps)
+        self.face = problem.compile(dt=self.dt, solver=solver, substeps=self.substeps)
+        self.face_params = self.face.params
+
+        # The training reward: −g dt on a continuous problem unless the stage cost is
+        # asked for; a native step problem has only its stage cost
+        require_reward(reward, self.REWARDS)
+        self.reward = reward if is_continuous(problem) else "stage"
+
+        # The episode's realization: the plant's laws drawn, a seed per random source
+        self.laws = problem.laws.get("plant", {})
+        self.sources = dict(problem.disturbances)
+        require_stepped_sources(self.sys, self.sources)
+        random_sources = any(block.is_random for block in self.sources.values())
+        self.randomizes_params = bool(self.laws) or random_sources
+
+        # The constraints X and U, whose violation is a failure (the judge's rule,
+        # checked at the sample), and the training zone, whose exit is a truncation
+        self.X = problem.X
+        self.U = problem.U
+        self.set_params = None
+        self.training_zone = (
+            self.sys.state.box if training_zone is None else training_zone
+        )
+
+        # Input vector: the action fills its port, disturbances fill theirs
+        self.action_port = command_port(self.sys)
+        self.m = int(self.sys.inputs[self.action_port].dim)
+        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
+        self.nominal_inputs = self.sys.get_port_values_from_u(u_nominal)
+
+        # The cost a failure is charged: declared on the problem, else the face's cost
+        # bound over the episode, the sum the return runs
+        self.failure_cost = self.face.failure_cost_over(
+            self.n_steps_per_episode, self.face.gamma
+        )
+
+        # Noise the held-input rollout never sees is announced
+        warn_inert_noise(self.sys, self.sources)
+
+    def reset(self, key):
+        """An initial state drawn from the problem's start (its law, or its one point)."""
+        xp = array_module(key)
+
+        x0 = xp.asarray(self.problem.sample_x0(key), dtype=float)
+
+        return x0
+
+    def sample_params(self, key):
+        """
+        The episode's realization: ``{"plant": draws, port: {"seed": s}}`` (empty when nothing is drawn).
+
+        Each law of the plant is drawn once, at its path; each random source gets
+        the episode's seed, so two episodes from one training key see
+        distinct noise.
+        """
+        if not self.randomizes_params:
+            return {}
+
+        draws = self.problem.sample_params(key) if self.laws else {}
+        realization = {"plant": draws.get("plant", {})} if self.laws else {}
+        realization.update(self.source_seeds(key))
+
+        return realization
+
+    def source_seeds(self, key):
+        """The episode's seed of each random source, ``{port: {"seed": s}}``."""
+        return {
+            port: {"seed": episode_seed(key, port)}
+            for port, block in self.sources.items()
+            if block.is_random
+        }
+
+    def step(self, x, t, u, key, params=None, *, t_origin=None):
+        """
+        One control period: ``(x_next, t_next, reward, terminated, truncated)``.
+
+        ``params`` is the episode's parameter draws (``None`` or empty: nominal);
+        ``key`` draws the disturbances (``None``: nominal). ``terminated`` ends
+        the episode with its cost fully accounted: the finite horizon is
+        reached, or the state left ``X`` (a failure, charged). ``truncated``
+        ends it with the value of ``x_next`` still to come: the episode length
+        is reached, or the state left the training zone. ``t_origin`` is the
+        episode's start when it is not the problem's ``t_start`` (a receding
+        horizon solved from a later tick): the horizon is ``tf`` after it.
+        """
+        xp = array_module(x)
+
+        dt = self.dt
+        tf = self.tf
+        t_start = self.t_start if t_origin is None else t_origin
+        finite_horizon = self.finite_horizon
+        face = self.face
+        X = self.X
+        U = self.U
+        zone = self.training_zone
+        failure_cost = self.failure_cost
+        X_params = (params or {}).get("X", self.set_params)
+        U_params = self.set_params
+        tree = self.episode_tree(params)
+        gamma = face.gamma_at(tree) if "discount_rate" in (params or {}) else face.gamma
+
+        # Plant input: the action on its port, each source's signal at t on theirs
+        u_full = self.input_vector(u, t, params)
+
+        # Transition: x_{k+1}, c_k over one control period, input held
+        x_next, c = face.transition_at(x, u_full, t, tree)
+        t_next = t + dt
+
+        # A step that blew up ends the episode; the last finite state stands in
+        # for the next one and its cost counts for nothing (the failure is charged
+        # below), so rewards, values and the reset stay finite
+        finite = xp.all(xp.isfinite(x_next))
+        x_next = xp.where(finite, x_next, x)
+
+        # Reward: r_k = −g(x_k, u_k, t_k) dt, the running cost on the plant's whole
+        # input at the period's start, or r_k = −c_k, the stage cost; the discount
+        # enters the return once, through the algorithm, never the reward
+        if self.reward == "running":
+            g = self.cost.g(x, u_full, t, tree["cost"])
+            reward = xp.where(finite, -g * dt, 0.0)
+        else:
+            reward = xp.where(finite, -c, 0.0)
+
+        # Leaving X or U is a failure; leaving the training zone is not; the horizon ends
+        out_of_U = ~xp.all(U.margin(u_full, x, t, U_params) >= 0.0)
+        out_of_X = ~xp.all(X.margin(x_next, t_next, X_params) >= 0.0)
+        failed = out_of_X | out_of_U | ~finite
+        left_zone = ~xp.all(zone.margin(x_next, t_next) >= 0.0)
+        horizon_reached = xp.asarray(t_next >= t_start + tf - 0.5 * dt)
+
+        # A failure is charged its cost; a finite horizon pays h(x_N),
+        # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
+        # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
+        reward = reward - xp.where(failed, failure_cost, 0.0)
+        if finite_horizon:
+            h_N = face.terminal(x_next, t_next, tree)
+            reward = reward - horizon_reached * gamma * h_N
+
+        # What is paid is terminal; what is left unpaid is truncated
+        terminated = failed | (horizon_reached & finite_horizon)
+        truncated = (left_zone & ~failed) | (horizon_reached & (not finite_horizon))
+
+        return x_next, t_next, reward, terminated, truncated
+
+    def plant_step(self, x, u_full, t, params=None):
+        """``x_next`` alone of one control period, on the nominal or the episode's parameters (no cost evaluated)."""
+        tree = self.episode_tree(params)
+
+        return self.face.step_at(x, u_full, t, tree["plant"])
+
+    def episode_tree(self, params=None):
+        """The face's tree with the episode's plant draws, and a planner's cost and discount, merged in (none: the face's own)."""
+        params = params or {}
+        plant = params.get("plant")
+        cost = params.get("cost")
+        if not plant and cost is None and "discount_rate" not in params:
+            return self.face_params
+
+        tree = dict(self.face_params)
+        if plant:
+            tree["plant"] = merge_tree(self.face_params["plant"], plant)
+        if cost is not None:
+            tree["cost"] = merge_tree(self.face_params["cost"], cost)
+        if "discount_rate" in params:
+            tree["discount_rate"] = params["discount_rate"]
+
+        return tree
+
+    def input_vector(self, u, t, params=None):
+        """
+        Full plant input: the action on its port, each source's signal at ``t`` on theirs.
+
+        The action is applied as given; port bounds are information, not
+        saturation. A random source reads the episode's seed from ``params``;
+        without one it is at its mean.
+        """
+        xp = array_module(u)
+
+        # Every port at its nominal value, the action on its own
+        ports = dict(self.nominal_inputs)
+        ports[self.action_port] = u
+
+        # Each source's output at t on its port, with the episode's seed
+        for port, block in self.sources.items():
+            ports[port] = source_signal(block, t, (params or {}).get(port), xp)
+
+        # The ports stacked in port order
+        u_full = xp.concatenate(
+            [xp.asarray(ports[port_id], dtype=float) for port_id in ports]
+        )
+
+        return u_full
+
+    def describe(self) -> str:
+        """One line naming the horizon, the reward, the cost of a failure, the training zone and the randomization."""
+        kind = "finite horizon" if self.finite_horizon else "infinite horizon"
+        charged = f"{self.failure_cost:.3g}"
+        reward = "-g dt" if self.reward == "running" else "-c_k (the stage cost)"
+        names = [".".join(path) for path, _ in flatten(self.laws)]
+        randomized = f", randomized params {sorted(names)}" if self.laws else ""
+
+        return (
+            f"{kind}, episodes of {self.tf:g} s at dt={self.dt:g}; reward {reward}, "
+            f"scored on the problem's cost; a failure (leaving X or U, or a non-finite "
+            f"state) terminates and is charged {charged}; leaving the training zone "
+            f"truncates (value bootstrapped){randomized}"
+        )
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def is_continuous(problem) -> bool:
+    """Whether the problem is a continuous one, with a running cost ``g`` (not a native step problem)."""
+    # Lazy import: the problems import the planners' modules
+    from minilink.planning.problems import PlanningProblem
+
+    return isinstance(problem, PlanningProblem)
+
+
+def require_continuous_problem(problem) -> None:
+    """Refuse a native step problem: the environment samples a continuous problem at its ``dt``."""
+    if is_continuous(problem):
+        return
+    origin = getattr(problem, "origin", None)
+    hint = (
+        f"build it on the continuous problem it samples: RolloutEnvironment(origin, "
+        f"dt={origin_dt(problem)})"
+        if origin is not None
+        else "step its face (problem.compile().transition) directly"
+    )
+    raise TypeError(
+        f"{type(problem).__name__} is a step problem: the "
+        f"environment samples a continuous problem at its control period; {hint}"
+    )
+
+
+def origin_dt(problem):
+    """The period a discretized step problem samples its origin at, as text."""
+    dt = getattr(problem, "dt", None)
+
+    return "dt" if dt is None else f"{float(dt):g}"
+
+
+def require_reward(reward, supported):
+    """Refuse a training reward the environment does not have."""
+    if reward not in supported:
+        raise ValueError(f"reward must be one of {supported}, got {reward!r}")
+
+
+def require_episode_steps(n_steps, tf, dt):
+    """Refuse an episode shorter than half a control period: it holds no step."""
+    if n_steps == 0:
+        raise ValueError(
+            f"an episode of {tf:g} s is shorter than half the control period dt={dt:g} s "
+            "and holds no step; lengthen the episode or shorten dt"
+        )
+
+
+def episode_seed(key, port):
+    """The episode's integer seed of the source on ``port``, from the episode's key: one stream per port."""
+    if is_jax_key(key):
+        jax = require_jax()
+        k = jax.random.fold_in(key, zlib.crc32(port.encode()))
+        return jax.random.randint(k, (), 0, MAX_SEED)
+    if isinstance(key, (int, np.integer)):
+        return child_seed(int(key), port)
+
+    return int(numpy_generator(key).integers(0, MAX_SEED))
+
+
+def require_stepped_sources(sys, sources):
+    """Refuse a source the stepped episode cannot feed: a port the plant lacks, a state, a diagram."""
+    for port, block in sources.items():
+        if port not in sys.inputs:
+            raise ValueError(
+                f"the disturbance on {port!r} has no port on {sys.name} "
+                f"(inputs {list(sys.inputs)}): the RL episode feeds plant ports only"
+            )
+        if isinstance(block, WiredDiagramMixin) or block.n > 0:
+            raise TypeError(
+                f"the source on {port!r} ({block.name}) has a state or blocks of its own: "
+                "the RL episode evaluates a source's h at t; give a memoryless source"
+            )
+
+
+def source_signal(block, t, realization, xp):
+    """A source block's output at ``t``: the episode's seed when given, its mean otherwise."""
+    params = block.realize(None) if block.is_random else block.params
+    if realization is not None:
+        params = dict(params, **realization)
+    nothing = xp.zeros(0)
+
+    w = block.h(nothing, nothing, t, params)
+
+    return xp.reshape(xp.asarray(w, dtype=float), (-1,))
+
+
+def warn_inert_noise(sys, disturbances):
+    """Warn about noise the held-input rollout never sees: a port only ``h`` reads, a random block inside the plant."""
+    # Disturbance ports whose Jacobian on f is zero at the nominal point
+    inert = [
+        port
+        for port in disturbances
+        if not np.any(sys.jacobian("f", port, method="fd"))
+    ]
+    if inert:
+        warnings.warn(
+            f"disturbances on {inert} do not reach f at the nominal point: the stepped "
+            "rollout feeds the true state to the law and never calls h, so these draws "
+            "change nothing here",
+            stacklevel=3,
+        )
+
+    # A random block inside the plant draws the same signal every episode
+    if sys.is_random:
+        warnings.warn(
+            "the plant holds a random block with a fixed seed: every trial and episode "
+            "sees the same noise signal",
+            stacklevel=3,
+        )
+
+
+def require_rollout_backend(backend):
+    """Refuse an array backend other than ``"jax"`` and ``"numpy"``."""
+    if backend not in (BACKEND_JAX, BACKEND_NUMPY):
+        raise ValueError(f"backend must be 'jax' or 'numpy', got {backend!r}")

@@ -94,15 +94,6 @@ def merge_geometry(*geometries):
 # A diagram's subsystems, namespaced under their ids
 
 
-def prefix_keys(mapping, prefix, sep=":"):
-    """Return *mapping* with every key namespaced as ``f"{prefix}{sep}{key}"``.
-
-    Used to namespace a subsystem's frames/geometry inside a diagram
-    (``"plant:body"``), keeping keys unique when drawables are concatenated.
-    """
-    return {f"{prefix}{sep}{key}": value for key, value in mapping.items()}
-
-
 def namespace_subsystem_frames(sub_frames, sys_id, sep=":"):
     """Prefix articulated subsystem frames; omit ``world`` (shared diagram root)."""
     return {

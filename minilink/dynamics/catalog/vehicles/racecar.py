@@ -71,7 +71,6 @@ class UdeSRacecar(KinematicBicycle):
 
     def __init__(self):
         super().__init__()
-        self.name = "UdeS Racecar"
 
         # Parameters: the 1/10 car's wheelbase and rear wheel radius
         a = PUBLIC_RACECAR_PARAMS["a"]
@@ -141,7 +140,6 @@ class UdeSRacecarDyn(DynamicBicycle):
 
     def __init__(self, named_ports=True):
         super().__init__(named_ports=True)
-        self.name = "UdeS Racecar"
         self.named_ports = bool(named_ports)
 
         # State: the body's six, the rear wheel rate, the steer angle and the power
@@ -244,11 +242,20 @@ class UdeSRacecarDyn(DynamicBicycle):
         self.camera_follow_frame = "body"
         self.camera_scale = 1.5
 
-        # Solver hint: the plant's fastest mode
-        self.refresh()
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
 
-    def refresh(self):
-        """Recompute the solver hint: an estimate of the plant's fastest mode.
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: an estimate of the plant's fastest mode, in seconds.
 
         The tire modes are stiffest at rest, where the slip denominators sit on their
         floor ``v_min_epsilon``. Three of them are estimated — the wheel against the
@@ -288,7 +295,8 @@ class UdeSRacecarDyn(DynamicBicycle):
 
         # Half the smallest of the three estimates and the two actuator lags
         T_min = 0.5 * min(T_long, T_yaw, T_lat, engine_tau, steering_tau)
-        self.solver_info["smallest_time_constant"] = T_min
+
+        return T_min
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -483,8 +491,6 @@ class UdeSRacecarDyn3D(UdeSRacecarDyn):
 
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
-
-        self.name = "UdeS Racecar (3D)"
 
         # State: the car's nine, then the rear and front rolling angles
         self.n = 11

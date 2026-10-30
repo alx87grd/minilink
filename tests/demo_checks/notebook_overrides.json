@@ -1,7 +1,8 @@
 {
   "examples/tutorial/showcase_minilink.ipynb": {
     "requires": [
-      "jax"
+      "jax",
+      "meshcat"
     ],
     "timeout": 420
   },
@@ -13,7 +14,8 @@
   },
   "examples/tutorial/showcase_from_rl_to_bode.ipynb": {
     "requires": [
-      "jax"
+      "jax",
+      "meshcat"
     ],
     "timeout": 300
   },
@@ -57,10 +59,6 @@
       "jax"
     ],
     "smoke": false
-  },
-  "examples/teaching/topics/robotics/manipulator_eom.ipynb": {
-    "smoke": false,
-    "nightly": false
   },
   "examples/teaching/courses/udes_gro860/pendulum_value_iteration.ipynb": {
     "smoke": false

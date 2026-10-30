@@ -2,10 +2,8 @@
 
 import numpy as np
 
-from minilink import Integrator, P, StepDiagramSystem, StepSystem
+from minilink import Integrator, P, Step, StepSystem, closed_loop
 from minilink.core.backends import array_module
-from minilink.core.hybrid_composition import hybrid_closed_loop
-from minilink.simulation import StepSchedule
 
 DT_BASE = 0.01
 TF = 2.0
@@ -33,43 +31,18 @@ class DiscreteLowPass(StepSystem):
         return xp.asarray(x, dtype=float).reshape(1).copy()
 
 
-def reference(t):
-    """Step reference on the computer boundary input."""
-    return np.array([1.0 if t < 1.0 else 0.0])
+# The continuous plant: the loop integrates it in steps of PLANT_DT_INNER (the run's dt)
+plant = Integrator()
 
-
-step_diagram = StepDiagramSystem()
-step_diagram.add_subsystem(DiscreteLowPass(alpha=0.6), "filter")
-step_diagram.add_subsystem(P(10.0, ports="reference"), "controller")
-step_diagram.add_input_port("r")
-step_diagram.add_input_port("y_meas")
-step_diagram.connect("input", "r", "controller", "r")
-step_diagram.connect("input", "y_meas", "filter", "u")
-step_diagram.connect("filter", "y", "controller", "y")
-step_diagram.connect_new_output_port("filter", "y", "y_f")
-step_diagram.connect_new_output_port("controller", "u", "u_cmd")
-
-schedule = StepSchedule.from_rates(
-    dt_base=DT_BASE,
-    rates_hz={"filter": 100.0, "controller": 10.0},
+# A 10 Hz gain on a 100 Hz filtered measurement, the reference a step down at 1 s
+loop = closed_loop(
+    P(10.0, ports="reference") % (10 * DT_BASE),
+    plant,
+    reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
+    filter=DiscreteLowPass(alpha=0.6) % DT_BASE,
 )
 
-hybrid = hybrid_closed_loop(
-    step_diagram,
-    Integrator(),
-    schedule=schedule,
-    computer_out="u_cmd",
-    computer_in="y_meas",
-)
+loop.plot_diagram()
 
-hybrid.plot_diagram()
-
-result = hybrid.compute_forced(
-    reference,
-    t0=0,
-    tf=TF,
-    input_port_id="r",
-    plant_dt_inner=PLANT_DT_INNER,
-)
-hybrid.plot_trajectory(signals=("r", "y", "x", "u"), show=True)
-result.plot_computer(signals=("y_f", "u_cmd"), show=True)
+loop.compute_trajectory(tf=TF, dt=PLANT_DT_INNER)
+loop.plot_trajectory(show=True)

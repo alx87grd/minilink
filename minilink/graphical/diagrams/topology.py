@@ -4,12 +4,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
-from minilink.core.system import StepSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.wiring import WiredDiagramMixin
 
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+def diagram_of(sys):
+    """Return the underlying diagram if sys is a diagram or wraps one on a clock."""
+    if isinstance(sys, WiredDiagramMixin):
+        return sys
+    if hasattr(sys, "source") and isinstance(sys.source, WiredDiagramMixin):
+        return sys.source
+    return None
 
 
 def build_diagram_topology(
@@ -22,10 +31,11 @@ def build_diagram_topology(
     ``expand=True`` replaces every nested diagram by its own blocks, at every
     depth, and records one :class:`TopologyCluster` per nested diagram.
     """
-    if isinstance(sys_or_diagram, WiredDiagramMixin):
-        topology = build_diagram_system_topology(sys_or_diagram)
+    diagram = diagram_of(sys_or_diagram)
+    if diagram is not None:
+        topology = build_diagram_system_topology(diagram)
         if expand:
-            topology = expand_nested_diagrams(topology, sys_or_diagram)
+            topology = expand_nested_diagrams(topology, diagram)
     else:
         topology = build_single_system_topology(sys_or_diagram)
 
@@ -48,11 +58,13 @@ def expand_nested_diagrams(topology: DiagramTopology, diagram) -> DiagramTopolog
     # Each nested diagram's own topology, expanded at every depth, its ids prefixed
     inner = {
         sys_id: prefix_topology(
-            build_diagram_topology(sys, abstract_boundary=True, expand=True),
+            build_diagram_topology(
+                diagram_of(sys), abstract_boundary=True, expand=True
+            ),
             f"{sys_id}__",
         )
         for sys_id, sys in diagram.subsystems.items()
-        if isinstance(sys, WiredDiagramMixin)
+        if diagram_of(sys) is not None
     }
     if not inner:
         return topology

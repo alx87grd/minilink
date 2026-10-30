@@ -4,7 +4,7 @@ import tempfile
 import unittest
 import numpy as np
 from minilink.core.costs import QuadraticCost
-from minilink.core.sets import BallSet, BoxSet, SingletonSet
+from minilink.core.sets import BallSet, BoxSet, CallableSet, SingletonSet
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
@@ -14,7 +14,7 @@ from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
 )
-from minilink.planning.problems import PlanningProblem, ProblemParameters
+from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -84,9 +84,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys,
             tf=1.0,
             x_start=np.array([0.0]),
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
+            U=sys.input_box,
         )
 
     def test_box_and_boundary_sets(self):
@@ -107,7 +108,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_planning_problem_defaults(self):
         sys = self.make_system()
-        problem = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
+        problem = PlanningProblem(
+            sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
+        )
         np.testing.assert_allclose(problem.x_start, sys.x0)
         self.assertIsNone(problem.tf)
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
@@ -119,83 +122,118 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_planning_problem_tf_validation_and_grid(self):
         sys = self.make_system()
         with self.assertRaisesRegex(ValueError, "tf must be positive"):
-            PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]), tf=0.0)
+            PlanningProblem(
+                sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), tf=0.0, U=sys.input_box
+            )
         infinite = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), tf=float("inf")
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            tf=float("inf"),
+            U=sys.input_box,
         )
         self.assertTrue(np.isposinf(infinite.tf))
         with self.assertRaisesRegex(ValueError, "finite problem.tf"):
             infinite.require_finite_tf()
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([0.0, 0.0]),
+            Xf=SingletonSet(np.array([0.0, 0.0])),
             cost=QuadraticCost.from_system(sys),
             tf=2.0,
+            U=sys.input_box,
         )
         options = DirectCollocationOptions(n_steps=5)
         np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 5))
         self.assertAlmostEqual(options.dt(problem), 0.5)
         self.assertNotIn("tf", options.__dataclass_fields__)
-        unset = PlanningProblem(sys=sys, x_goal=np.array([0.0, 0.0]))
+        unset = PlanningProblem(
+            sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
+        )
         with self.assertRaisesRegex(ValueError, "finite problem.tf"):
             options.t(unset)
 
-    def test_planning_problem_open_boundary_sets_use_representatives(self):
+    def test_planning_problem_open_boundary_sets_and_the_goal_point(self):
         sys = self.make_system()
         X0 = BallSet(center=np.zeros(2), radius=0.5)
         Xf = BallSet(center=np.array([0.5, 0.0]), radius=0.25)
         x_start = np.array([0.1, -0.1])
-        x_goal = np.array([0.5, 0.0])
-        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal, X0=X0, Xf=Xf)
+        problem = PlanningProblem(
+            sys=sys, x_start=x_start, X0=X0, Xf=Xf, U=sys.input_box
+        )
         self.assertIs(problem.X0, X0)
         self.assertIs(problem.Xf, Xf)
         np.testing.assert_allclose(problem.x_start, x_start)
-        np.testing.assert_allclose(problem.x_goal, x_goal)
+        np.testing.assert_allclose(problem.goal_point(), [0.5, 0.0])
 
-    def test_planning_problem_derives_representatives_from_singleton_sets(self):
+    def test_planning_problem_derives_the_start_and_the_goal_from_singleton_sets(self):
         sys = self.make_system()
         x_start = np.array([0.25, -0.5])
         x_goal = np.array([0.75, 0.5])
         problem = PlanningProblem(
-            sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal)
+            sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal), U=sys.input_box
         )
         np.testing.assert_allclose(problem.x_start, x_start)
-        np.testing.assert_allclose(problem.x_goal, x_goal)
+        np.testing.assert_allclose(problem.goal_point(), x_goal)
 
-    def test_planning_problem_rejects_representatives_outside_boundary_sets(self):
+        # A vector is the singleton at it
+        vectors = PlanningProblem(sys=sys, X0=x_start, Xf=x_goal, U=sys.input_box)
+        self.assertIsInstance(vectors.X0, SingletonSet)
+        self.assertIsInstance(vectors.Xf, SingletonSet)
+        np.testing.assert_allclose(vectors.Xf.point, x_goal)
+
+    def test_the_goal_point_falls_back_to_the_costs_target_then_the_start(self):
+        sys = self.make_system()
+        xbar = np.array([0.3, 0.0])
+        cost = QuadraticCost.from_system(sys, xbar=xbar)
+        x_start = np.array([0.1, 0.1])
+        with_cost = PlanningProblem(sys=sys, x_start=x_start, cost=cost)
+        np.testing.assert_allclose(with_cost.goal_point(), xbar)
+        bare = PlanningProblem(sys=sys, x_start=x_start)
+        np.testing.assert_allclose(bare.goal_point(), x_start)
+
+    def test_a_region_start_defaults_to_its_centre_else_the_plants_start(self):
+        sys = self.make_system()
+        box = BoxSet([0.0, 0.0], [1.0, 2.0])
+        problem = PlanningProblem(sys=sys, X0=box)
+        np.testing.assert_allclose(problem.x_start, [0.5, 1.0])
+        ball = BallSet(center=np.array([2.0, 0.0]), radius=0.1)
+        np.testing.assert_allclose(
+            PlanningProblem(sys=sys, X0=ball).x_start, [2.0, 0.0]
+        )
+        with self.assertRaisesRegex(ValueError, "give x_start"):
+            # An annulus with no bounding box: neither a centre nor sys.x0 = 0 in it
+            annulus = CallableSet(lambda z, t, p: np.array([1.0 - z @ z, z @ z - 0.25]))
+            PlanningProblem(sys=sys, X0=annulus)
+
+    def test_assigning_the_start_moves_its_singleton_one_home_in_the_tree(self):
+        sys = self.make_system()
+        problem = PlanningProblem(sys=sys, x_start=np.array([0.1, 0.0]))
+        problem.x_start = np.array([0.2, 0.3])
+        np.testing.assert_allclose(problem.X0.point, [0.2, 0.3])
+        self.assertNotIn("X0", problem.params)
+        np.testing.assert_allclose(problem.params["x_start"], [0.2, 0.3])
+
+    def test_planning_problem_rejects_a_start_outside_x0(self):
         sys = self.make_system()
         with self.assertRaisesRegex(ValueError, "x_start must belong to X0"):
             PlanningProblem(
                 sys=sys,
                 x_start=np.array([1.0, 0.0]),
                 X0=BallSet(center=np.zeros(2), radius=0.25),
-            )
-        with self.assertRaisesRegex(ValueError, "x_goal must belong to Xf"):
-            PlanningProblem(
-                sys=sys,
-                x_goal=np.array([1.0, 0.0]),
-                Xf=BallSet(center=np.zeros(2), radius=0.25),
+                U=sys.input_box,
             )
 
     def test_planning_problem_boundary_types_are_validated(self):
         sys = self.make_system()
-        params = ProblemParameters(
-            system={"mass": 1.0}, cost={"weight": 2.0}, sets={"radius": 0.25}
-        )
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([0.0, 0.0]),
-            params=params,
-            metadata={"tag": "demo"},
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            U=sys.input_box,
         )
-        self.assertIs(problem.params, params)
-        self.assertEqual(problem.metadata["tag"], "demo")
+        self.assertIs(problem.params["plant"], sys.params)  # a view of the parts
         with self.assertRaises(TypeError):
-            problem.metadata["tag"] = "changed"
-        with self.assertRaisesRegex(TypeError, "params must be"):
-            PlanningProblem(sys=sys, params={"system": {}})
-        with self.assertRaisesRegex(TypeError, "metadata must be"):
-            PlanningProblem(sys=sys, metadata=[("tag", "demo")])
+            PlanningProblem(sys=sys, params={"plant": {"m": 1.0}}, U=sys.input_box)
+        with self.assertRaises(TypeError):  # A problem keeps no free-form notes
+            PlanningProblem(sys=sys, metadata={"tag": "demo"}, U=sys.input_box)
 
     def test_quadratic_cost_evaluates_trajectory(self):
         sys = self.make_system()
@@ -205,10 +243,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             x=np.array([[0.0, 1.0], [0.0, 0.0]]),
             u=np.array([[0.0, 0.0]]),
         )
-        evaluated = cost.evaluate_trajectory(traj)
+        evaluated = traj.with_cost(cost)
         self.assertTrue(evaluated.has_signal("cost_rate"))
         self.assertTrue(evaluated.has_signal("cost"))
-        self.assertGreaterEqual(cost.total_cost(traj), 0.0)
+        self.assertGreaterEqual(float(evaluated.signals["cost"][0, -1]), 0.0)
 
     def test_trajectory_save_load_roundtrip(self):
         traj = Trajectory(
@@ -230,7 +268,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = MechanicalSystem(dof=1)
         x_start = np.array([0.0, 0.5])
         x_goal = np.array([1.0, -0.25])
-        problem = PlanningProblem(sys=sys, x_start=x_start, x_goal=x_goal)
+        problem = PlanningProblem(
+            sys=sys, x_start=x_start, Xf=SingletonSet(x_goal), U=sys.input_box
+        )
         guess = mechanical_cubic_initial_trajectory(problem, np.linspace(0.0, 2.0, 5))
         np.testing.assert_allclose(guess.x[:, 0], x_start)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
@@ -239,7 +279,11 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            cost=cost,
+            tf=1.0,
+            U=sys.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
@@ -279,23 +323,25 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         cost = QuadraticCost.from_system(sys)
         problem = PlanningProblem(
-            sys=sys, x_goal=np.array([0.0, 0.0]), cost=cost, tf=1.0
+            sys=sys,
+            Xf=SingletonSet(np.array([0.0, 0.0])),
+            cost=cost,
+            tf=1.0,
+            U=sys.input_box,
         )
         to = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(compile_backend="numpy"),
+            options=TrajectoryOptimizationOptions(backend="numpy"),
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
-        self.assertEqual(to.options.compile_backend, "numpy")
+        self.assertEqual(to.options.backend, "numpy")
         guess = default_initial_trajectory(
             problem, to.transcription.initial_guess_time_grid(problem)
         )
-        program = to.transcription.transcribe(
-            problem, compile_backend=to.options.compile_backend
-        )
+        program = to.transcription.transcribe(problem, backend=to.options.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)
@@ -309,7 +355,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
@@ -334,7 +380,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
                 verbose=True,
             ),
@@ -358,15 +404,15 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="direct",
+                backend="direct",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
                 record_history=True,
             ),
         )
         traj = planner.solve().trajectory
-        warm_started = planner.solve(warm_start=True).trajectory
+        warm_started = planner.solve(guess=planner.last_solution).trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "direct")
+        self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.iteration_history), 0)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         np.testing.assert_allclose(warm_started.x[:, -1], [1.0], atol=1e-07)
@@ -378,13 +424,13 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.metadata["backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
@@ -400,13 +446,13 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 optimizer_options={"maxiter": 100, "ftol": 1e-09},
             ),
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
-        self.assertEqual(planner.last_program.metadata["compile_backend"], "numpy")
+        self.assertEqual(planner.last_program.metadata["backend"], "numpy")
         self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
@@ -414,7 +460,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(traj.has_signal("cost"))
 
     def test_dynamics_function_routes_system_params_through_compiled_evaluator(self):
-        """System params flow through the parametric tier f_p, not direct sys.f."""
+        """System params flow through the compiled evaluator's params argument, not direct sys.f."""
         from minilink.blocks.basic import Integrator
         from minilink.planning.trajectory_optimization.transcription import (
             dynamics_function,
@@ -423,20 +469,20 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = Integrator()
         problem = PlanningProblem(
             sys=sys,
-            x_goal=np.array([1.0]),
+            Xf=SingletonSet(np.array([1.0])),
             cost=QuadraticCost.from_system(sys),
-            params=ProblemParameters(system={"k": 3.0}),
+            U=sys.input_box,
         )
         x = np.array([0.0])
         u = np.array([2.0])
+        f = dynamics_function(problem, "numpy")
+        np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
+
+        # The plant's parameters, written through the problem's view, reach f
+        problem.params = {"plant": {**sys.params, "k": 3.0}}
         for backend in ("numpy", "direct"):
             f = dynamics_function(problem, backend)
             np.testing.assert_allclose(f(x, u, 0.0), [6.0], atol=1e-12)
-        plain = PlanningProblem(
-            sys=sys, x_goal=np.array([1.0]), cost=QuadraticCost.from_system(sys)
-        )
-        f = dynamics_function(plain, "numpy")
-        np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
 
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()
@@ -444,16 +490,16 @@ class TestPlanningArchitecture(unittest.TestCase):
         guess = default_initial_trajectory(
             problem, transcription.initial_guess_time_grid(problem)
         )
-        program = transcription.transcribe(problem, compile_backend="direct")
+        program = transcription.transcribe(problem, backend="direct")
         z0 = transcription.pack_initial_guess(problem, guess)
         self.assertEqual(program.n_z, 5)
         np.testing.assert_allclose(z0, guess.u.reshape(-1))
-        self.assertEqual(program.metadata["compile_backend"], "direct")
+        self.assertEqual(program.metadata["backend"], "direct")
 
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
-        x = evaluator.rk4_integrate_linear(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25)
+        x = evaluator.rollout(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh")
         np.testing.assert_allclose(x.reshape(-1), np.linspace(0.0, 1.0, 5))
 
     def test_live_trajectory_plot_callback_reuses_artists(self):
@@ -493,7 +539,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertEqual(id(callback.fig), fig_id)
         self.assertEqual([id(line) for line in callback.lines], line_ids)
 
-    def test_trajopt_warm_start_passes_previous_trajectory(self):
+    def test_trajopt_a_solution_as_guess_passes_its_trajectory(self):
 
         class RecordingTranscription(DirectCollocationTranscription):
             def __init__(self, options):
@@ -510,12 +556,28 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             transcription=transcription,
             options=TrajectoryOptimizationOptions(
-                warm_start=True, optimizer_options={"maxiter": 100, "ftol": 1e-09}
+                optimizer_options={"maxiter": 100, "ftol": 1e-09}
             ),
         )
-        first = planner.solve().trajectory
+        first = planner.solve()
+        planner.solve(guess=first)
+        self.assertIs(transcription.guesses[1], first.trajectory)
+
+        # No solve reads the last one: a bare solve starts from the default again
         planner.solve()
-        self.assertIs(transcription.guesses[1], first)
+        self.assertIsNot(transcription.guesses[2], first.trajectory)
+
+    def test_trajopt_solve_on_params_is_a_solve_of_the_moved_problem(self):
+        problem = self.make_single_integrator_problem()
+        planner = TrajectoryOptimizationPlanner(
+            problem,
+            n_steps=5,
+            transcription="direct_collocation",
+            optimizer_options={"maxiter": 100, "ftol": 1e-09},
+        )
+        moved = planner.solve({"x_start": np.array([0.4])})
+        np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
+        np.testing.assert_allclose(planner.problem.x_start, problem.x_start)
 
 
 import pytest
@@ -570,6 +632,7 @@ def _trajopt_problem():
         cost=QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         ),
+        U=sys.input_box,
     )
 
 
@@ -582,7 +645,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             options=TrajectoryOptimizationOptions(
-                compile_backend="numpy",
+                backend="numpy",
                 record_solve_time=True,
                 optimizer_options={"maxiter": 20, "ftol": 0.001},
             ),
@@ -591,13 +654,13 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             problem,
             n_steps=5,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
             record_solve_time=True,
             optimizer_options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
-        self.assertEqual(flat.options.compile_backend, nested.options.compile_backend)
+        self.assertEqual(flat.options.backend, nested.options.backend)
         self.assertEqual(
             flat.options.record_solve_time, nested.options.record_solve_time
         )
@@ -628,7 +691,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
 
 
 @pytest.mark.parametrize(
-    "compile_backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
 @pytest.mark.parametrize(
     "transcription, options",
@@ -640,7 +703,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
     ids=["direct_collocation", "shooting", "multiple_shooting"],
 )
 def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
-    transcription, options, compile_backend
+    transcription, options, backend
 ):
     class MarginInputSet(InputSet):
         def __init__(self, margin_fn):
@@ -660,18 +723,17 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
             U=MarginInputSet(margin_fn),
             Xf=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
         )
-        program = transcription(options(n_steps=4)).transcribe(
-            problem, compile_backend=compile_backend
-        )
+        program = transcription(options(n_steps=4)).transcribe(problem, backend=backend)
         z = np.linspace(0.1, 0.5, program.n_z)
-        if compile_backend == "jax":
+        if backend == "jax":
             import jax.numpy as jnp
 
             z = jnp.asarray(z)
-        return np.asarray(program.g(z))
+        args = (z,) if program.params is None else (z, program.params)
+        return np.asarray(program.g(*args))
 
     def scalar(z):
-        if compile_backend == "jax":
+        if backend == "jax":
             return 2.0  # float() of a tracer does not trace; a constant does
         return 2.0 - float(z[0])
 
@@ -697,66 +759,6 @@ class TestRrtFlatConstructor(unittest.TestCase):
         self.assertEqual(flat.options.max_nodes, nested.options.max_nodes)
         self.assertEqual(flat.options.goal_bias, nested.options.goal_bias)
         self.assertEqual(flat.options.seed, nested.options.seed)
-
-
-@pytest.mark.optional
-@pytest.mark.jax
-class TestHybridDefaultComputerX0(unittest.TestCase):
-    def test_omit_x0_computer_matches_helper(self):
-        pytest.importorskip("jax")
-        import jax.numpy as jnp
-        from minilink.control.mpc import ModelPredictiveController
-        from minilink.control.mpc.utilities import mpc_default_computer_x0
-        from minilink.core.backends import configure_jax
-
-        class JaxSingleIntegrator(DynamicSystem):
-            def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
-                self.state.lower_bound = np.array([-10.0])
-                self.state.upper_bound = np.array([10.0])
-                self.inputs["u"].lower_bound = np.array([-10.0])
-                self.inputs["u"].upper_bound = np.array([10.0])
-
-            def f(self, x, u, t=0, params=None):
-                return jnp.array([u[0]])
-
-            def h(self, x, u, t=0, params=None):
-                return x
-
-        configure_jax(enable_x64=True)
-        sys = JaxSingleIntegrator()
-        sys.x0 = np.array([0.0])
-        problem = PlanningProblem(
-            sys=sys,
-            tf=0.4,
-            x_start=np.array([0.0]),
-            cost=QuadraticCost.from_system(
-                sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
-            ),
-        )
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=4,
-            transcription="direct_collocation",
-            compile_backend="jax",
-            optimizer_options={"maxiter": 30, "ftol": 0.001},
-        )
-        mpc = ModelPredictiveController(planner, dt_mpc=0.2, warm_start=True)
-        hybrid = mpc @ sys
-        z0 = mpc_default_computer_x0(planner)
-        with_helper = hybrid.compute_trajectory(
-            tf=0.4,
-            x0_plant=np.array([0.0]),
-            x0_computer=z0,
-            compile_backend="numpy",
-            verbose=False,
-        )
-        without = hybrid.compute_trajectory(
-            tf=0.4, x0_plant=np.array([0.0]), compile_backend="numpy", verbose=False
-        )
-        np.testing.assert_allclose(
-            without.plant.x[:, -1], with_helper.plant.x[:, -1], atol=1e-08, rtol=1e-08
-        )
 
 
 from minilink.core.sets import BallSet, BoxSet
@@ -821,9 +823,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(
-            seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
-        ),
+        options=RRTOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -843,8 +843,9 @@ def test_kdtree_requires_euclidean_metric():
     problem = PlanningProblem(
         sys=sys,
         x_start=np.array([-3.0, -3.0, 0.0]),
-        x_goal=np.array([3.0, 3.0, np.pi / 2]),
+        Xf=SingletonSet(np.array([3.0, 3.0, np.pi / 2])),
         X=BoxSet.from_system_state(sys),
+        U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
     planner = RRTPlanner(
@@ -873,7 +874,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -886,10 +887,11 @@ def test_kinodynamic_reaches_goal_and_stays_free():
 
 def test_kinodynamic_random_controls_reaches_goal():
     problem, _ = make_holonomic_obstacle_problem()
+    problem = problem.replace(Xf=BallSet(problem.goal_point(), 0.6))
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=1, goal_tolerance=0.6, max_nodes=6000),
+        options=RRTOptions(seed=1, max_nodes=6000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -906,7 +908,7 @@ def test_seeded_run_is_deterministic():
                 extender=KinodynamicExtender(
                     controls=COMPASS, horizon=0.6, n_substeps=6
                 ),
-                options=RRTOptions(seed=7, goal_tolerance=0.5, max_nodes=4000),
+                options=RRTOptions(seed=7, max_nodes=4000),
             )
             .solve()
             .trajectory
@@ -924,7 +926,7 @@ def test_steering_reaches_goal_and_stays_free():
         extender=SteeringExtender(
             StraightLineSteering(speed=1.0), max_distance=0.6, resolution=0.05
         ),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTOptions(seed=0, max_nodes=4000),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -943,7 +945,7 @@ def test_steering_edge_is_dynamically_feasible():
     x = np.asarray(edge.states[0], dtype=float)
     for k in range(len(edge.inputs)):
         dt = float(edge.times[k + 1] - edge.times[k])
-        x = np.asarray(evaluator.rk4_step(x, edge.inputs[k], 0.0, dt), dtype=float)
+        x = np.asarray(evaluator.step(x, edge.inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, edge.states[k + 1], atol=1e-06)
 
 
@@ -981,7 +983,7 @@ def test_dubins_edge_is_dynamically_feasible():
     x = np.asarray(states[0], dtype=float)
     for k in range(len(inputs)):
         dt = float(times[k + 1] - times[k])
-        x = np.asarray(evaluator.rk4_step(x, inputs[k], 0.0, dt), dtype=float)
+        x = np.asarray(evaluator.step(x, inputs[k], 0.0, dt=dt), dtype=float)
         assert np.allclose(x, states[k + 1], atol=1e-06)
 
 
@@ -991,7 +993,11 @@ def test_dubins_rrt_reaches_goal_pose():
     x_goal = np.array([3.0, 3.0, np.pi / 2])
     X = BoxSet.from_system_state(sys)
     problem = PlanningProblem(
-        sys=sys, x_start=x_start, x_goal=x_goal, X=X, Xf=BallSet(x_goal, 0.6)
+        sys=sys,
+        x_start=x_start,
+        X=X,
+        Xf=BallSet(x_goal, 0.6),
+        U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
     planner = RRTPlanner(
@@ -1090,9 +1096,13 @@ def test_edge_resolution_rejects_segment_through_obstacle():
 
 
 class ShrinkingInputs(InputSet):
-    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when the set parameters give one."""
+    """|uᵢ| ≤ 1 − |x₀| / 2, or ≤ ``u_max`` when its parameters give one."""
+
+    def __init__(self, params=None):
+        self.params = params
 
     def margin(self, u, x=None, t=0.0, params=None):
+        params = self.params if params is None else params
         limit = 1.0 - 0.5 * abs(x[0]) if params is None else params["u_max"]
         return limit - np.abs(u)
 
@@ -1103,13 +1113,11 @@ def edge_inputs_problem(params=None):
     sys = HolonomicMobileRobot()
     sys.state.lower_bound = np.array([-6.0, -6.0])
     sys.state.upper_bound = np.array([6.0, 6.0])
-    kwargs = {} if params is None else {"params": params}
     return PlanningProblem(
         sys=sys,
         x_start=np.zeros(2),
-        x_goal=np.ones(2),
-        U=ShrinkingInputs(),
-        **kwargs,
+        Xf=SingletonSet(np.ones(2)),
+        U=ShrinkingInputs(params),
     )
 
 
@@ -1131,7 +1139,8 @@ def test_edge_inputs_are_checked_at_their_states():
 
 
 def test_edge_inputs_read_the_set_parameters():
-    problem = edge_inputs_problem(ProblemParameters(sets={"u_max": 0.3}))
+    problem = edge_inputs_problem({"u_max": 0.3})
+    assert problem.params["U"] == {"u_max": 0.3}
     planner = RRTPlanner(problem, extender=KinodynamicExtender(controls=COMPASS))
     assert planner.edge_is_free(straight_edge(0.0, 0.2))
     assert not planner.edge_is_free(straight_edge(0.0, 0.6))
@@ -1174,7 +1183,7 @@ def test_plot_tree_and_animate_search_smoke():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(seed=0, goal_tolerance=0.5, max_nodes=2000),
+        options=RRTOptions(seed=0, max_nodes=2000),
     )
     planner.solve()
     fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
@@ -1201,7 +1210,7 @@ def test_rrt_star_reaches_goal():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(seed=0, goal_tolerance=0.5, max_nodes=4000),
+        options=RRTStarOptions(seed=0, max_nodes=4000),
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -1217,9 +1226,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=0, goal_tolerance=0.5, max_nodes=4000, nearest_backend="kd_tree"
-        ),
+        options=RRTStarOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -1233,7 +1240,7 @@ def test_rrt_star_improves_path_cost_over_rrt():
     star_costs = []
     rrt_costs = []
     for seed in range(12):
-        options = RRTStarOptions(seed=seed, goal_tolerance=0.5, max_nodes=3000)
+        options = RRTStarOptions(seed=seed, max_nodes=3000)
         rrt = RRTPlanner(problem, extender=extender, options=options)
         rrt.solve()
         star = RRTStarPlanner(problem, extender=extender, options=options)
@@ -1252,14 +1259,12 @@ def test_rewire_false_is_at_least_as_costly():
     with_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=True),
+        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=True),
     )
     without_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(
-            seed=5, goal_tolerance=0.5, max_nodes=2500, rewire=False
-        ),
+        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=False),
     )
     with_rewire.solve()
     without_rewire.solve()
@@ -1271,7 +1276,7 @@ def test_rewire_false_is_at_least_as_costly():
 def test_rrt_star_is_deterministic():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    options = RRTStarOptions(seed=11, goal_tolerance=0.5, max_nodes=2000)
+    options = RRTStarOptions(seed=11, max_nodes=2000)
 
     def run():
         planner = RRTStarPlanner(problem, extender=extender, options=options)
@@ -1320,7 +1325,6 @@ def test_search_callback_invoked_on_rrt():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=0,
-            goal_tolerance=0.5,
             max_nodes=200,
             callback=RecordingCallback(),
             live_plot_every=1,
@@ -1345,7 +1349,6 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=1,
-            goal_tolerance=0.5,
             max_nodes=2500,
             optimize_after_goal=True,
             convergence_patience=100,
@@ -1376,7 +1379,7 @@ def test_live_plot_option_builds_callback():
 def test_optimize_after_goal_runs_longer_and_refines_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    base = dict(seed=4, goal_tolerance=0.5, max_nodes=3500, goal_bias=0.05)
+    base = dict(seed=4, max_nodes=3500, goal_bias=0.05)
     first_hit = RRTStarPlanner(
         problem,
         extender=extender,
@@ -1404,7 +1407,6 @@ def test_convergence_patience_stops_search():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=6,
-            goal_tolerance=0.5,
             max_nodes=8000,
             optimize_after_goal=True,
             cost_tol=0.05,
@@ -1424,7 +1426,6 @@ def test_record_history_for_animation():
         extender=make_steering_extender(),
         options=RRTStarOptions(
             seed=0,
-            goal_tolerance=0.5,
             max_nodes=800,
             record_history=True,
             history_stride=25,
@@ -1446,24 +1447,24 @@ from minilink.dynamics.catalog.vehicles.steering import (
 )
 from minilink.planning.spatial.collision import (
     CollisionBody,
-    bind,
+    mount,
     car_outline,
     disc,
     point_probe,
 )
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
+from minilink.core.shaping import (
     inverse_barrier,
     occupancy,
     quadratic_hinge,
 )
-from minilink.planning.spatial.state_fields import StateField
+from minilink.core.fields import Field
 from minilink.planning.spatial.workspace_fields import GaussianField
 
 
 @dataclass(frozen=True)
-class _ConstField(StateField):
+class _ConstField(Field):
     val: float
 
     def value(self, x, u=None, t=0.0, params=None):
@@ -1486,15 +1487,15 @@ class _TwoSphereBody(CollisionBody):
 
 
 def _holonomic_disc(radius=0.3):
-    return bind(HolonomicMobileRobot(), disc(radius))
+    return mount(disc(radius), on=HolonomicMobileRobot())
 
 
 def _holonomic_point():
-    return bind(HolonomicMobileRobot(), point_probe())
+    return mount(point_probe(), on=HolonomicMobileRobot())
 
 
 def _kinematic_car_body(length=1.6, width=0.5):
-    return bind(KinematicCar(), car_outline(length, width))
+    return mount(car_outline(length, width), on=KinematicCar())
 
 
 def test_bind_disc_body_pose():
@@ -1518,7 +1519,7 @@ class _Point3D(DynamicSystem):
 
 
 def test_bind_disc_in_3d():
-    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
+    body = mount(Sphere(np.zeros(3), 0.5), on=_Point3D())
     (T,) = body.body_poses(np.array([1.0, 2.0, 3.0]))
     assert T.shape == (4, 4)
     assert apply(T, np.zeros(3)) == pytest.approx([1.0, 2.0, 3.0])
@@ -1553,7 +1554,7 @@ def test_bound_car_clearance_depends_on_heading():
 
 def test_bound_frame_mismatch_raises():
     sys = HolonomicMobileRobot()
-    body = bind(sys, disc(0.1), frame="missing")
+    body = mount(disc(0.1), on=sys, frame="missing")
     with pytest.raises(KeyError):
         body.body_poses(np.array([0.0, 0.0]))
 
@@ -1570,7 +1571,7 @@ class _TwoFramePlant:
 
 def test_bind_multi_frame():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
-    body = bind(_TwoFramePlant(), [("f1", disc(0.1)), ("f2", disc(0.2))])
+    body = mount([("f1", disc(0.1)), ("f2", disc(0.2))], on=_TwoFramePlant())
     value = scene.clearance_field(body).value(np.array([0.0, 0.0]))
     assert value == pytest.approx(min(-0.5 - 0.1, 1.0 - 0.5 - 0.2))
 
@@ -1581,7 +1582,7 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
     sys = HolonomicMobileRobot()
-    free = scene.clearance_field(bind(sys, disc(0.3))).as_constraint()
+    free = scene.clearance_field(mount(disc(0.3), on=sys)).as_set()
     x = np.array([0.0, 0.0])
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
         float(free.margin(x)[0])
@@ -1592,10 +1593,10 @@ def test_bound_jax_twin_margin_matches_and_differentiates():
 
 def test_clearance_pipeline_in_3d():
     scene = Scene(obstacles=(Sphere([0.0, 0.0, 0.0], 1.0),))
-    body = bind(_Point3D(), Sphere(np.zeros(3), 0.5))
+    body = mount(Sphere(np.zeros(3), 0.5), on=_Point3D())
     field = scene.clearance_field(body)
     assert field.value(np.array([3.0, 0.0, 0.0])) == pytest.approx(3.0 - 1.0 - 0.5)
-    free = field.as_constraint()
+    free = field.as_set()
     assert free.contains(np.array([3.0, 0.0, 0.0]))
     assert not free.contains(np.array([0.5, 0.0, 0.0]))
 
@@ -1650,7 +1651,7 @@ def test_cost_field_as_constraint_keep_out_band():
     scene = Scene(
         workspace_fields=(GaussianField(center=[0.0, 0.0], amplitude=1.0, sigma=0.5),)
     )
-    keep_out = scene.cost_field(_holonomic_point()).as_constraint(upper=0.2)
+    keep_out = scene.cost_field(_holonomic_point()).as_set(upper=0.2)
     assert keep_out.contains(np.array([2.0, 0.0]))
     assert not keep_out.contains(np.array([0.0, 0.0]))
 
@@ -1666,7 +1667,7 @@ def test_empty_workspace_fields_return_zero_density_and_cost_field():
 def test_fieldset_contains_matches_minkowski_sum():
     center, obstacle_r, robot_r = (np.array([2.0, 2.0]), 0.5, 0.3)
     scene = Scene(obstacles=(Sphere(center, obstacle_r),))
-    free = scene.clearance_field(_holonomic_disc(robot_r)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(robot_r)).as_set()
     rng = np.random.default_rng(0)
     for x in rng.uniform(-1.0, 5.0, size=(200, 2)):
         expected_free = np.linalg.norm(x - center) >= obstacle_r + robot_r
@@ -1676,20 +1677,20 @@ def test_fieldset_contains_matches_minkowski_sum():
 def test_sphere_radius_shifts_free_boundary():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
     x = np.array([0.65, 0.0])
-    assert scene.clearance_field(_holonomic_point()).as_constraint().contains(x)
-    assert not scene.clearance_field(_holonomic_disc(0.3)).as_constraint().contains(x)
+    assert scene.clearance_field(_holonomic_point()).as_set().contains(x)
+    assert not scene.clearance_field(_holonomic_disc(0.3)).as_set().contains(x)
 
 
 def test_fieldset_bound_mechanics():
     f = _ConstField(0.5)
-    assert f.as_constraint(lower=0.0).contains(np.zeros(1))
-    assert not f.as_constraint(lower=None, upper=0.2).contains(np.zeros(1))
-    assert f.as_constraint(lower=0.0, upper=1.0).contains(np.zeros(1))
+    assert f.as_set(lower=0.0).contains(np.zeros(1))
+    assert not f.as_set(lower=None, upper=0.2).contains(np.zeros(1))
+    assert f.as_set(lower=0.0, upper=1.0).contains(np.zeros(1))
 
 
 def test_fieldset_requires_a_bound():
     with pytest.raises(ValueError):
-        _ConstField(1.0).as_constraint(lower=None, upper=None)
+        _ConstField(1.0).as_set(lower=None, upper=None)
 
 
 def test_fieldcost_weight_and_shaping():
@@ -1702,7 +1703,7 @@ def test_fieldcost_weight_and_shaping():
 def test_cross_export_constraint_and_barrier_cost():
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 0.5),))
     field = scene.clearance_field(_holonomic_disc(0.3))
-    free = field.as_constraint()
+    free = field.as_set()
 
     def barrier(v):
         xp = array_module(v)
@@ -1750,7 +1751,7 @@ def test_jax_twin_margin_matches_and_differentiates():
     import jax.numpy as jnp
 
     scene = Scene(obstacles=(Sphere([2.0, 2.0], 0.5),))
-    free = scene.clearance_field(_holonomic_disc(0.3)).as_constraint()
+    free = scene.clearance_field(_holonomic_disc(0.3)).as_set()
     x = np.array([0.0, 0.0])
     assert float(free.margin(jnp.array(x))[0]) == pytest.approx(
         float(free.margin(x)[0])
@@ -1897,20 +1898,20 @@ def test_plot_cost_field_exports_smoke(tmp_path):
 
 import os
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
-from minilink.planning.spatial.collision import bind, disc, point_probe
+from minilink.planning.spatial.collision import mount, disc, point_probe
 from minilink.planning.spatial.paths import PolylinePath, from_waypoints
-from minilink.planning.spatial.shaping import quadratic_excess
+from minilink.core.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 
 _HOLONOMIC = HolonomicMobileRobot()
 
 
 def _disc(radius=0.3):
-    return bind(_HOLONOMIC, disc(radius))
+    return mount(disc(radius), on=_HOLONOMIC)
 
 
 def _point():
-    return bind(_HOLONOMIC, point_probe())
+    return mount(point_probe(), on=_HOLONOMIC)
 
 
 def test_polyline_distance_to_segment():
@@ -1966,7 +1967,7 @@ def test_path_distance_field_uses_robot_probes():
 
 def test_corridor_field_as_constraint():
     track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.0)
-    inside = track.corridor_field(_point()).as_constraint(lower=0.0)
+    inside = track.corridor_field(_point()).as_set(lower=0.0)
     assert inside.contains(np.array([5.0, 0.5]))
     assert not inside.contains(np.array([5.0, 2.0]))
 
@@ -1986,9 +1987,9 @@ def test_obstacle_and_corridor_compose():
     scene = Scene(obstacles=(Sphere([5.0, 0.0], 0.5),))
     track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.0)
     body = _point()
-    free = scene.clearance_field(body).as_constraint() & track.corridor_field(
-        body
-    ).as_constraint(lower=0.0)
+    free = scene.clearance_field(body).as_set() & track.corridor_field(body).as_set(
+        lower=0.0
+    )
     assert free.contains(np.array([1.0, 0.2]))
     assert not free.contains(np.array([5.0, 0.0]))
     assert not free.contains(np.array([1.0, 2.0]))
@@ -2060,15 +2061,16 @@ class TestParametricCapabilityFlag(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=2.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
             n_steps=10,
             transcription="multiple_shooting",
-            compile_backend="jax",
+            backend="jax",
         )
         with self.assertRaises(TypeError):
             planner.compile_parametric_program()
@@ -2087,9 +2089,10 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         return PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=tf,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
 
     def test_feasible_plan_records_violations_and_succeeds(self):
@@ -2097,7 +2100,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             self._pendulum_problem(20.0),
             n_steps=20,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
         ).solve()
         md = plan.solver
         self.assertTrue(md.success)
@@ -2111,7 +2114,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             self._pendulum_problem(0.0, tf=1.0),
             n_steps=10,
             transcription="direct_collocation",
-            compile_backend="numpy",
+            backend="numpy",
         ).solve()
         md = plan.solver
         self.assertFalse(md.feasible)
@@ -2135,7 +2138,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
                 self._pendulum_problem(0.0, tf=1.0),
                 n_steps=10,
                 transcription="direct_collocation",
-                compile_backend="numpy",
+                backend="numpy",
             ).solve()
         self.assertEqual(plan.solver.message, "solver claims success")
         self.assertTrue(plan.solver.solver_success)
@@ -2157,9 +2160,10 @@ class TestTextbookOptions(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
@@ -2180,9 +2184,10 @@ class TestTextbookOptions(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             x_start=np.zeros(2),
-            x_goal=goal,
+            Xf=SingletonSet(goal),
             tf=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            U=plant.input_box,
         )
         seen = []
         planner = TrajectoryOptimizationPlanner(
@@ -2259,15 +2264,22 @@ def test_collocation_bounds_survive_an_intersection():
     cost = QuadraticCost.from_system(sys)
     free = CallableSet(lambda z, t, params: np.reshape(1.0 - abs(z[0]), (1,)))
     boxed = PlanningProblem(
-        sys, x_start=np.zeros(2), x_goal=np.ones(2), cost=cost, tf=1.0, X=sys.state.box
+        sys,
+        x_start=np.zeros(2),
+        Xf=SingletonSet(np.ones(2)),
+        cost=cost,
+        tf=1.0,
+        X=sys.state.box,
+        U=sys.input_box,
     )
     mixed = PlanningProblem(
         sys,
         x_start=np.zeros(2),
-        x_goal=np.ones(2),
+        Xf=SingletonSet(np.ones(2)),
         cost=cost,
         tf=1.0,
         X=sys.state.box & free,
+        U=sys.input_box,
     )
     transcription = DirectCollocationTranscription(DirectCollocationOptions(n_steps=4))
     lower_boxed, upper_boxed = transcription.decision_bounds(boxed)
@@ -2288,7 +2300,7 @@ def test_box_probes_stay_at_the_solver_boundary():
     lowering = {
         "planning/trajectory_optimization/direct_collocation.py",
         "planning/trajectory_optimization/shooting.py",
-        "planning/policy_synthesis/discretizer.py",
+        "planning/dynamic_programming/discretizer.py",
         "core/inspect.py",  # the printer names the set's type; reporting, not math
     }
     offenders = []
@@ -2309,3 +2321,221 @@ def test_box_probes_stay_at_the_solver_boundary():
                 if names & {"BoxSet", "BoxInputSet"}:
                     offenders.append(f"{rel}:{node.lineno}")
     assert offenders == [], offenders
+
+
+def test_a_track_draws_and_overlays_its_corridor_at_half_width_from_the_centerline():
+    from minilink.planning import TrackCorridorOverlay, plot_track
+
+    track = ReferenceTrack(from_waypoints([[0, 0], [10, 0]]), half_width=1.5)
+
+    # The overlay: both edges and the centerline, in the world frame, at y = ±w and 0
+    geometry = TrackCorridorOverlay(track, n_samples=5).get_kinematic_geometry()
+    edges = [line.pts[:, 1] for line in geometry["world"]]
+    np.testing.assert_allclose(edges, [[1.5] * 5, [-1.5] * 5, [0.0] * 5])
+
+    # The plot: the same three polylines on one axes
+    import matplotlib.pyplot as plt
+
+    fig, ax = plot_track(track, show=False)
+    assert len(ax.get_lines()) >= 3
+    plt.close(fig)
+
+
+def test_a_field_has_four_conversions_and_a_gradient():
+    from minilink.core.fields import Field
+
+    class Energy(Field):
+        def value(self, x, u=None, t=0.0, params=None):
+            return 0.5 * x[0] ** 2 + (0.0 if u is None else u[0])
+
+    V = Energy()
+    x, u = np.array([2.0]), np.array([0.5])
+    assert V.as_set(upper=1.0).contains(np.array([1.0]))
+    assert not V.as_set(upper=1.0).contains(np.array([2.0]))
+    assert V.as_input_set(upper=2.5).contains(u, x)
+    assert V.as_cost(weight=3.0).g(x, u) == pytest.approx(7.5)
+    assert V.as_terminal_cost(weight=3.0).h(x) == pytest.approx(6.0)
+    assert V.as_terminal_cost().g(x, u) == 0.0
+    np.testing.assert_allclose(V.gradient(x), [2.0], rtol=1e-8)
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_field_gradient_is_jax_grad_on_jax_arrays():
+    jnp = pytest.importorskip("jax.numpy")
+    from minilink.core.fields import Field
+
+    class Bowl(Field):
+        def value(self, x, u=None, t=0.0, params=None):
+            return x @ x
+
+    np.testing.assert_allclose(Bowl().gradient(jnp.array([1.0, -2.0])), [2.0, -4.0])
+
+
+def test_a_set_as_a_cost_is_its_margin_through_a_hinge():
+    from minilink.core.shaping import quadratic_hinge
+
+    box = BoxSet([-1.0], [1.0])
+    cost = box.as_cost(weight=2.0)
+    assert cost.g(np.array([0.5]), np.zeros(0)) == 0.0
+    assert cost.g(np.array([1.5]), np.zeros(0)) == pytest.approx(2.0 * 0.5**2)
+    identity = box.as_cost(shaping=lambda v: v)
+    assert identity.g(np.array([0.25]), np.zeros(0)) == pytest.approx(0.75)
+    assert box.as_cost(shaping=quadratic_hinge(0.5)).g(
+        np.array([0.75]), np.zeros(0)
+    ) == pytest.approx(0.25**2)
+
+
+def test_a_field_set_in_an_intersection_survives_a_params_write():
+    plant = Integrator()
+    X = BoxSet([-5.0], [5.0]) & _ConstField(0.5).as_set(lower=0.0)
+    problem = PlanningProblem(plant, X=X, tf=1.0)
+
+    problem.params = problem.params  # a frozen field set has no numbers to write
+    assert problem.X.contains(np.zeros(1))
+
+
+# --- the planner's compiled face ---
+
+
+def face_swing_up():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    goal = np.array([np.pi, 0.0])
+    return PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.zeros(2),
+        Xf=SingletonSet(goal),
+        cost=QuadraticCost.from_system(plant, xbar=goal, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_the_compiled_face_reproduces_the_planners_solve(backend):
+    planner = TrajectoryOptimizationPlanner(
+        face_swing_up(),
+        n_steps=11,
+        transcription="direct_collocation",
+        backend=backend,
+        optimizer_options={"maxiter": 60},
+    )
+    solved = planner.solve()
+    pv = planner.compile()
+
+    # pv.solution(pv.solve()) is planner.solve(), number for number
+    z, status = pv.solve()
+    face = pv.solution(z, status=status)
+    np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
+    np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
+    assert face.solver.cost == solved.solver.cost
+    assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
+    assert set(pv.params) >= {"x_start", "t_start", "plant", "cost"}
+
+    # The plan's command is its input at t; shifted, it is the same plan read later
+    np.testing.assert_allclose(pv.command(z, None, 0.0), solved.trajectory.u[:, 0])
+    shifted = pv.shift(z, 0.4)
+    assert shifted[-1] == 0.4
+    np.testing.assert_allclose(
+        pv.command(shifted, None, 0.4), pv.command(z, None, 0.8), atol=1e-12
+    )
+    x, u = pv.prediction(z, 0.0)
+    np.testing.assert_allclose(x, solved.trajectory.x[:, 0], atol=1e-12)
+
+    # A solve at other values is checked on the program it was solved on: the
+    # record of a planner built at that start, on the same z
+    start = {"x_start": np.array([0.05, 0.0])}
+    moved, moved_status = pv.solve(start)
+    record = pv.solution(moved, start, moved_status).solver
+    at_start = TrajectoryOptimizationPlanner(
+        face_swing_up().replace(x_start=start["x_start"]),
+        n_steps=11,
+        transcription="direct_collocation",
+        backend=backend,
+        optimizer_options={"maxiter": 60},
+    ).compile()
+    oracle = at_start.solution(moved, None, moved_status).solver
+    assert record.max_equality_violation == pytest.approx(
+        oracle.max_equality_violation, rel=1e-9, abs=1e-12
+    )
+
+    # A guess packs back to z, and an unknown path is refused
+    np.testing.assert_allclose(pv.pack(face)[:-1], z[:-1], atol=1e-12)
+    with pytest.raises(ValueError, match="known entries"):
+        pv.solve({"plant": {"nu": 1.0}})
+
+
+@pytest.mark.jax
+def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
+    import jax
+    import jax.numpy as jnp
+
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        tf=2.0,
+        x_start=np.array([0.5, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        backend="jax",
+        method="adam",
+        iterations=200,
+        optimizer_options={"learning_rate": 0.05},
+    )
+    pv = planner.compile()
+
+    starts = jnp.asarray([[0.5, 0.0], [0.2, 0.1], [-0.4, 0.0]])
+    zs, status = jax.vmap(lambda x: pv.solve({"x_start": x}))(starts)
+    assert zs.shape == (3, pv.n_z)
+    for x, z in zip(starts, zs):
+        alone, _ = pv.solve({"x_start": np.asarray(x)})
+        np.testing.assert_allclose(z, alone, rtol=1e-12)
+
+    # One jitted solve, and the cost lower than at the initial guess
+    solve = jax.jit(lambda x: pv.solve({"x_start": x})[0])
+    np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
+    J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
+    assert float(status["cost"][0]) < J0
+
+
+def test_every_planner_has_one_tree_shape():
+    pytest.importorskip("jax")
+    from minilink import (
+        Pendulum,
+        PlanningProblem,
+        ReinforcementLearningPlanner,
+        TrajectoryOptimizationPlanner,
+    )
+    from minilink.planning import MPPIPlanner
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
+    problem = PlanningProblem(
+        plant, cost=cost, tf=1.0, x_start=np.array([0.5, 0.0]), U=plant.input_box
+    )
+    planners = [
+        TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
+        MPPIPlanner(problem, dt=0.1, n_samples=16),
+        ReinforcementLearningPlanner(
+            problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,), verbose=False
+        ),
+    ]
+    for planner in planners:
+        tree = planner.params
+        assert isinstance(tree["method"], dict) and "seed" in tree
+    trajopt, mppi, rl = (planner.params for planner in planners)
+    assert {"learning_rate", "b1", "b2", "eps"} <= set(trajopt["method"])
+    assert trajopt["seed"] is None and trajopt["cost"] is not None
+    assert {"temperature", "noise", "control_cost"} <= set(mppi["method"])
+    assert "cost" in mppi and "discount_rate" in mppi
+    assert "gamma" in rl["method"] and rl["seed"] == 0

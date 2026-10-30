@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Fishing Net FE Dynamic Model — Minilink Placeholder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #030712;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .overlay-ui {
+      position: relative;
+      z-index: 10;
+      pointer-events: none;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 100%;
+    }
+    .header-card {
+      background: rgba(11, 17, 32, 0.88);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 8px;
+      padding: 16px 20px;
+      max-width: 520px;
+      pointer-events: auto;
+    }
+    .tag {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #38bdf8;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+    p {
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      background: rgba(3, 7, 18, 0.6);
+      border: 1px solid rgba(148, 163, 184, 0.12);
+      border-radius: 6px;
+      padding: 10px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.75rem;
+      margin-bottom: 14px;
+    }
+    .spec-item span:first-child {
+      color: #64748b;
+      display: block;
+      font-size: 0.68rem;
+    }
+    .spec-item span:last-child {
+      color: #e2e8f0;
+      font-weight: 500;
+    }
+    .btn-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-open {
+      background: #0284c7;
+      color: #ffffff;
+      border: none;
+      border-radius: 5px;
+      padding: 7px 14px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.15s;
+    }
+    .btn-open:hover {
+      background: #0369a1;
+    }
+    .file-input {
+      display: none;
+    }
+    .status-badge {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.72rem;
+      color: #94a3b8;
+    }
+    .footer-note {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.7rem;
+      color: rgba(148, 163, 184, 0.6);
+      background: rgba(3, 7, 18, 0.75);
+      padding: 6px 12px;
+      border-radius: 4px;
+      align-self: flex-start;
+      pointer-events: auto;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <canvas id="netCanvas"></canvas>
+  </div>
+
+  <div class="overlay-ui">
+    <div class="header-card">
+      <div class="tag">Prototype 2 &bull; Finite Element Continuum Block</div>
+      <h2>Hydrodynamic Fishing Net Dynamic Model</h2>
+      <p>
+        Multi-thousand-node flexible continuum structure running as a native <code>System</code> block in Minilink. Integrated fluid-structure interaction, cable elasticity, and current drag.
+      </p>
+
+      <div class="specs-grid">
+        <div class="spec-item">
+          <span>DISCRETIZATION</span>
+          <span>Truss / Lumped-Mass FE</span>
+        </div>
+        <div class="spec-item">
+          <span>DIMENSION</span>
+          <span>&gt; 2,400 Nodes (14.4k States)</span>
+        </div>
+        <div class="spec-item">
+          <span>HYDRODYNAMICS</span>
+          <span>Morison Cross-Flow Drag</span>
+        </div>
+        <div class="spec-item">
+          <span>PIPELINE INTEGRATION</span>
+          <span>Native Minilink Block</span>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <label class="btn-open">
+          Open Local Animation (.html)
+          <input type="file" id="fileInput" class="file-input" accept=".html,.htm">
+        </label>
+        <span id="loadStatus" class="status-badge">External repo model placeholder</span>
+      </div>
+    </div>
+
+    <div class="footer-note">
+      Model repository: external &bull; Manual inspection enabled until merged into docs/_static/showcase/
+    </div>
+  </div>
+
+  <script>
+    // Load local HTML file if user selects one
+    const fileInput = document.getElementById('fileInput');
+    const loadStatus = document.getElementById('loadStatus');
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      loadStatus.textContent = `Loading ${file.name}...`;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const doc = document.open('text/html', 'replace');
+        doc.write(event.target.result);
+        doc.close();
+      };
+      reader.readAsText(file);
+    });
+
+    // 3D Wireframe Fishing Net Simulation Canvas
+    const canvas = document.getElementById('netCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let width, height;
+    function resize() {
+      width = canvas.width = window.innerWidth;
+      height = canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    const COLS = 42;
+    const ROWS = 28;
+    let t = 0;
+
+    function render() {
+      ctx.fillStyle = '#030712';
+      ctx.fillRect(0, 0, width, height);
+
+      t += 0.025;
+      const cx = width * 0.58;
+      const cy = height * 0.52;
+      const scale = Math.min(width, height) * 0.024;
+
+      const pitch = 0.55;
+      const yaw = 0.45;
+
+      const cosP = Math.cos(pitch);
+      const sinP = Math.sin(pitch);
+      const cosY = Math.cos(yaw);
+      const sinY = Math.sin(yaw);
+
+      const grid = [];
+
+      for (let r = 0; r < ROWS; r++) {
+        const row = [];
+        for (let c = 0; c < COLS; c++) {
+          const u = (c - COLS / 2);
+          const v = (r - ROWS / 2);
+
+          // Wave equation for hydrodynamic ocean current
+          const wave1 = Math.sin(u * 0.22 - t * 1.4) * Math.cos(v * 0.25 - t * 0.8) * 2.8;
+          const wave2 = Math.sin(u * 0.45 + v * 0.3 - t * 2.1) * 1.2;
+          const droop = ((v * v) / ROWS) * 0.18 - ((u * u) / COLS) * 0.08;
+
+          const x = u * 0.95;
+          const y = v * 0.95;
+          const z = wave1 + wave2 + droop;
+
+          // 3D rotation
+          const x1 = x * cosY - y * sinY;
+          const y1 = x * sinY + y * cosY;
+          const z1 = z;
+
+          const y2 = y1 * cosP - z1 * sinP;
+          const z2 = y1 * sinP + z1 * cosP;
+
+          // Perspective projection
+          const fov = 42;
+          const camZ = 35;
+          const factor = fov / (camZ + z2);
+
+          const px = cx + x1 * scale * factor;
+          const py = cy + y2 * scale * factor;
+
+          row.push({ px, py, z: z2 });
+        }
+        grid.push(row);
+      }
+
+      // Draw net mesh lines (Columns & Rows)
+      ctx.lineWidth = 1;
+
+      // Horizontal lines
+      for (let r = 0; r < ROWS; r++) {
+        ctx.beginPath();
+        for (let c = 0; c < COLS; c++) {
+          const p = grid[r][c];
+          if (c === 0) ctx.moveTo(p.px, p.py);
+          else ctx.lineTo(p.px, p.py);
+        }
+        const depthAlpha = Math.max(0.15, Math.min(0.65, 0.4 + (r / ROWS) * 0.3));
+        ctx.strokeStyle = `rgba(56, 189, 248, ${depthAlpha * 0.45})`;
+        ctx.stroke();
+      }
+
+      // Vertical lines
+      for (let c = 0; c < COLS; c++) {
+        ctx.beginPath();
+        for (let r = 0; r < ROWS; r++) {
+          const p = grid[r][c];
+          if (r === 0) ctx.moveTo(p.px, p.py);
+          else ctx.lineTo(p.px, p.py);
+        }
+        const depthAlpha = Math.max(0.15, Math.min(0.65, 0.4 + (c / COLS) * 0.3));
+        ctx.strokeStyle = `rgba(56, 189, 248, ${depthAlpha * 0.35})`;
+        ctx.stroke();
+      }
+
+      // Draw highlighted nodes
+      for (let r = 0; r < ROWS; r += 2) {
+        for (let c = 0; c < COLS; c += 2) {
+          const p = grid[r][c];
+          const brightness = Math.max(0.2, (p.z + 10) / 20);
+          ctx.fillStyle = `rgba(125, 211, 252, ${brightness * 0.8})`;
+          ctx.fillRect(p.px - 1, p.py - 1, 2, 2);
+        }
+      }
+
+      requestAnimationFrame(render);
+    }
+    render();
+  </script>
+</body>
+</html>

@@ -7,7 +7,6 @@ import numpy as np
 # Titles, axis labels and colours follow the MATLAB Control System Toolbox, so
 # the figures read like the ones in the course notes.
 SYSTEM_COLOR = "#0072BD"  # MATLAB blue
-SECOND_COLOR = "#D95319"  # MATLAB orange
 CRITICAL_COLOR = "#A2142F"  # MATLAB red, the -1 point
 AXIS_COLOR = "#7f7f7f"
 

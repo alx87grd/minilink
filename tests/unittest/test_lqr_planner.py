@@ -7,11 +7,11 @@ from scipy.linalg import solve_continuous_are
 from minilink import LQRPlanner, Pendulum, PlanningProblem, QuadraticCost
 from minilink.control.design import lqr_gain, lqr_gain_schedule
 from minilink.control.state import (
-    StateFeedbackController,
-    TimeVaryingStateFeedbackController,
+    StateFeedback,
+    TimeVaryingFeedback,
 )
 from minilink.core.costs import TimeCost
-from minilink.planning.policy_synthesis.lqr import RiccatiRecord
+from minilink.planning.dynamic_programming.lqr import RiccatiRecord
 
 UPRIGHT = np.array([np.pi, 0.0])
 Q = np.diag([10.0, 1.0])
@@ -24,7 +24,11 @@ def pendulum_problem(tf=np.inf, S=None):
     plant.inputs["u"].upper_bound = np.array([20.0])
     cost = QuadraticCost.from_system(plant, Q=Q, R=R, S=S, xbar=UPRIGHT)
     return PlanningProblem(
-        plant, x_start=UPRIGHT + [0.3, 0.0], x_goal=UPRIGHT, cost=cost, tf=tf
+        plant,
+        x_start=UPRIGHT + [0.3, 0.0],
+        cost=cost,
+        tf=tf,
+        U=plant.input_box,
     )
 
 
@@ -40,12 +44,29 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     np.testing.assert_allclose(solution.solver.K, lqr_gain(A, B, Q, R))
     np.testing.assert_allclose(solution.solver.P, P)
     assert np.all(np.real(solution.solver.poles) < 0.0)
-    assert isinstance(solution.policy, StateFeedbackController)
+    assert isinstance(solution.policy, StateFeedback)
     np.testing.assert_allclose(solution.policy.inputs["r"].nominal_value, UPRIGHT)
     x = UPRIGHT + [0.4, -0.2]
     assert solution.cost_to_go(x) == pytest.approx((x - UPRIGHT) @ P @ (x - UPRIGHT))
     assert solution.trajectory is None and solution.evaluation is None
     assert "closed-loop poles" in str(solution.solver)
+
+
+@pytest.mark.parametrize("tf", [np.inf, 2.0])
+def test_the_record_says_U_ignored_and_nothing_warns(tf):
+    """LQR never reads U: its record's printout says so when U bounds the command, silently."""
+    import warnings
+
+    bounded = pendulum_problem(tf=tf)
+    free = bounded.replace(U=None)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        bounded_record = LQRPlanner(bounded).solve().solver
+        free_record = LQRPlanner(free).solve().solver
+
+    assert bounded_record.U_ignored and "U ignored" in str(bounded_record)
+    assert not free_record.U_ignored and "U ignored" not in str(free_record)
+    np.testing.assert_array_equal(bounded_record.K, free_record.K)
 
 
 def test_finite_horizon_is_the_riccati_differential_equation():
@@ -55,7 +76,7 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     A, B = planner.linear_model()
     t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=201)
 
-    assert isinstance(solution.policy, TimeVaryingStateFeedbackController)
+    assert isinstance(solution.policy, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop
     np.testing.assert_allclose(solution.policy.params["K"], K)
     np.testing.assert_allclose(solution.solver.K, K[0])
@@ -69,27 +90,33 @@ def test_finite_horizon_is_the_riccati_differential_equation():
 
 
 def test_a_plant_with_noise_ports_is_designed_about_its_command():
-    from minilink import CartPoleWithNoisePort, lqr
+    from minilink import NoisyCartPole, lqr
 
-    plant = CartPoleWithNoisePort()  # inputs u, d, n
+    plant = NoisyCartPole()  # inputs u, d, n
     x_up = np.array([0.0, np.pi, 0.0, 0.0])
     Q_x = np.diag([1.0, 10.0, 1.0, 1.0])
     R_all = 0.1 * np.eye(plant.m)  # a cost over every input stacked
     cost = QuadraticCost.from_system(plant, Q=Q_x, R=R_all, xbar=x_up)
 
-    stationary = LQRPlanner(PlanningProblem(plant, cost=cost)).solve()
+    stationary = LQRPlanner(
+        PlanningProblem(plant, cost=cost, U=plant.input_box)
+    ).solve()
     K = stationary.policy.params["K"]
     assert K.shape == (1, 4)
     np.testing.assert_allclose(
         K, lqr(plant, Q_x, R_all[:1, :1], x_bar=x_up).params["K"]
     )
-    finite = LQRPlanner(PlanningProblem(plant, cost=cost, tf=2.0), n_steps=51).solve()
+    finite = LQRPlanner(
+        PlanningProblem(plant, cost=cost, tf=2.0, U=plant.input_box), n_steps=51
+    ).solve()
     assert finite.policy.params["K"].shape == (51, 1, 4)
 
 
 def test_lqr_needs_a_quadratic_cost():
     plant = Pendulum()
-    problem = PlanningProblem(plant, cost=TimeCost.from_system(plant), tf=np.inf)
+    problem = PlanningProblem(
+        plant, cost=TimeCost.from_system(plant), tf=np.inf, U=plant.input_box
+    )
     with pytest.raises(TypeError, match="QuadraticCost"):
         LQRPlanner(problem)
 

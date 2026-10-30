@@ -1,11 +1,13 @@
 """Workspace fields: smooth penalty densities over a workspace point ``p`` in ℝ² or ℝ³."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import cached_property
 
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.params import own_params
 
 ###############################################################################
 # Public API
@@ -25,7 +27,14 @@ class WorkspaceField(ABC):
 
     Construction is a NumPy/Python boundary; :meth:`density` is a native-array
     math path that stays NumPy under NumPy input and traces under JAX.
+    ``params`` is the field's own numbers (``{}`` for none).
     """
+
+    params = own_params()
+
+    def with_params(self, params):
+        """The field moved to ``params``: a copy holding them."""
+        return replace(self, **params)
 
     @abstractmethod
     def density(self, p, t=0.0, params=None):
@@ -65,12 +74,18 @@ class GaussianField(WorkspaceField):
         object.__setattr__(self, "amplitude", amplitude)
         object.__setattr__(self, "sigma", sigma)
 
+    @cached_property
+    def params(self) -> dict:
+        """``{"center", "amplitude", "sigma"}``, the peak's numbers."""
+        return {"center": self.center, "amplitude": self.amplitude, "sigma": self.sigma}
+
     def density(self, p, t=0.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        center = self.center
-        amplitude = self.amplitude
-        sigma = self.sigma
+        center = params["center"]
+        amplitude = params["amplitude"]
+        sigma = params["sigma"]
 
         # density(p) = A exp(−½ ‖p − c‖² / σ²)
         d2 = xp.sum((p - center) ** 2)

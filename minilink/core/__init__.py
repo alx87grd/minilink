@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.core.facade import lazy_facade
+from minilink.core.exports import lazy_facade
 
 # The band facade for short teaching imports, e.g.
 # ``from minilink.core import DynamicSystem, DiagramSystem, Trajectory``; the defining
@@ -12,15 +12,21 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Systems
     "System": ("minilink.core.system", "System"),
     "DynamicSystem": ("minilink.core.system", "DynamicSystem"),
-    "StepSystem": ("minilink.core.system", "StepSystem"),
+    "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
-    "StepDiagramSystem": ("minilink.core.diagram", "StepDiagramSystem"),
+    "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
     # Data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     # Costs
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
+    "StepCost": ("minilink.core.costs", "StepCost"),
+    "SampledCost": ("minilink.core.costs", "SampledCost"),
     "TimeCost": ("minilink.core.costs", "TimeCost"),
+    # Fields
+    "Field": ("minilink.core.fields", "Field"),
+    "QuadraticField": ("minilink.core.fields", "QuadraticField"),
+    "EllipsoidSet": ("minilink.core.fields", "EllipsoidSet"),
     # Sets
     "Set": ("minilink.core.sets", "Set"),
     "InputSet": ("minilink.core.sets", "InputSet"),
@@ -33,7 +39,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
-    "Sampler": ("minilink.core.distributions", "Sampler"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

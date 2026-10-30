@@ -264,7 +264,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     gain = Gain(K=2.0, dim=1)
     t0 = time.perf_counter()
     gain.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t_start=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(
@@ -288,7 +288,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     diagram.connect("src", "y", "gain", "u")
     t0 = time.perf_counter()
     diagram.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t_start=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(

@@ -6,12 +6,14 @@ from minilink.simulation.realtime.io import (
     RealtimeInput,
     RealtimeOutput,
 )
+from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
 from minilink.simulation.realtime.pygame_input import PygameInput
 from minilink.simulation.realtime.simulator import RealtimeSimulator
 
 __all__ = [
     "CallbackInput",
     "CallbackOutput",
+    "LiveSignalPlotOutput",
     "PygameInput",
     "RealtimeInput",
     "RealtimeOutput",

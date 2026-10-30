@@ -1,8 +1,9 @@
-"""Four ZOHHold blocks in series — cumulative one-step phase lag."""
+"""Four unit delays in series — cumulative one-step phase lag."""
 
 import numpy as np
 
-from minilink import StepDiagramSystem, ZOHHold
+from minilink import StepDiagramSystem
+from minilink.blocks import UnitDelay
 
 
 def pulse_input(k):
@@ -10,10 +11,10 @@ def pulse_input(k):
 
 
 diagram = StepDiagramSystem()
-diagram.add_subsystem(ZOHHold(), "hold1")
-diagram.add_subsystem(ZOHHold(), "hold2")
-diagram.add_subsystem(ZOHHold(), "hold3")
-diagram.add_subsystem(ZOHHold(), "hold4")
+diagram.add_subsystem(UnitDelay(), "hold1")
+diagram.add_subsystem(UnitDelay(), "hold2")
+diagram.add_subsystem(UnitDelay(), "hold3")
+diagram.add_subsystem(UnitDelay(), "hold4")
 diagram.add_input_port("u")
 diagram.connect("input", "u", "hold1", "u")
 diagram.connect("hold1", "y", "hold2", "u")

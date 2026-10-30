@@ -21,17 +21,17 @@ from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
 from minilink.core.sets import BoxSet
-from minilink.planning.problems import PlanningProblem
-from minilink.planning.spatial.collision import bind, car_outline, point_probe
-from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
-from minilink.planning.spatial.paths import from_waypoints
-from minilink.planning.spatial.plotting import plot_cost_field_exports
-from minilink.planning.spatial.scene import Scene
-from minilink.planning.spatial.shaping import (
+from minilink.core.shaping import (
     inverse_barrier,
     quadratic_excess,
     quadratic_hinge,
 )
+from minilink.planning.problems import PlanningProblem
+from minilink.planning.spatial.collision import car_outline, mount, point_probe
+from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
+from minilink.planning.spatial.paths import from_waypoints
+from minilink.planning.spatial.plotting import plot_cost_field_exports
+from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
@@ -149,8 +149,8 @@ sys_mpc.inputs["w_rear_dot"].upper_bound[0] = 80.0
 sys_mpc.inputs["delta_dot"].lower_bound[0] = -2.0
 sys_mpc.inputs["delta_dot"].upper_bound[0] = 2.0
 
-probe = bind(sys_mpc, point_probe())
-body = bind(sys_mpc, car_outline(length=2.4, width=0.2, margin=0.05))
+probe = mount(point_probe(), on=sys_mpc)
+body = mount(car_outline(length=2.4, width=0.2, margin=0.05), on=sys_mpc)
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
 s_start, _ = track.path.project(start_xy)
@@ -186,16 +186,18 @@ cost = (
 
 X = (
     BoxSet.from_system_state(sys_mpc)
-    & scene.clearance_field(body).as_constraint(lower=0.0)
-    & track.corridor_field(body).as_constraint(lower=0.0)
+    & scene.clearance_field(body).as_set(lower=0.0)
+    & track.corridor_field(body).as_set(lower=0.0)
 )
-problem = PlanningProblem(sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON)
+problem = PlanningProblem(
+    sys=sys_mpc, x_start=x0, X=X, cost=cost, tf=MPC_HORIZON, U=sys_mpc.input_box
+)
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
-    compile_backend="jax",
-    optimizer_method="scipy_slsqp",
+    backend="jax",
+    method="scipy_slsqp",
     verbose=False,
     optimizer_options={"maxiter": 150, "ftol": 0.1},
 )

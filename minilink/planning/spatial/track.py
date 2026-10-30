@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
@@ -10,7 +11,7 @@ from minilink.planning.spatial.collision import CollisionBody
 from minilink.planning.spatial.paths import ReferencePath
 
 if TYPE_CHECKING:
-    from minilink.planning.spatial.state_fields import StateField
+    from minilink.core.fields import Field
 
 
 ###############################################################################
@@ -27,8 +28,11 @@ class ReferenceTrack:
     through its state fields::
 
         track = ReferenceTrack(from_waypoints(pts), half_width=1.0)
-        X = bounds & track.corridor_field(body).as_constraint()
+        X = bounds & track.corridor_field(body).as_set()
         cost = base + track.distance_field(body).as_cost(weight=5.0)
+
+    Its ``params`` are ``{"path", "half_width"}``: the path's numbers and the
+    corridor radius.
 
     Parameters
     ----------
@@ -36,6 +40,7 @@ class ReferenceTrack:
         Workspace centerline.
     half_width : float
         Corridor radius around the path (same units as ``path.distance``).
+
     """
 
     path: ReferencePath
@@ -44,30 +49,44 @@ class ReferenceTrack:
     def __post_init__(self) -> None:
         require_positive_half_width(self.half_width)
 
+    @cached_property
+    def params(self) -> dict:
+        """``{"path", "half_width"}``: the centerline's numbers and the corridor's radius."""
+        return {"path": self.path.params, "half_width": self.half_width}
+
+    def with_params(self, params):
+        """The track with its centerline and half-width moved to ``params``."""
+        path = self.path.with_params(params["path"])
+
+        return replace(self, path=path, half_width=params["half_width"])
+
     def distance(self, p, t=0.0, params=None):
         """Distance from ``p`` to the centerline."""
-        return self.path.distance(p, t=t, params=params)
+        params = self.params if params is None else params
+        return self.path.distance(p, t=t, params=params["path"])
 
     def corridor_margin(self, p, t=0.0, params=None):
         """Positive when ``p`` lies inside the corridor: ``half_width - distance``."""
+        params = self.params if params is None else params
         xp = array_module(p)
 
-        half_width = self.half_width
+        half_width = params["half_width"]
         path = self.path
+        path_params = params["path"]
 
         # m(p) = w − d(p), the room left to the corridor's edge
-        margin = xp.asarray(half_width) - path.distance(p, t=t, params=params)
+        margin = xp.asarray(half_width) - path.distance(p, t=t, params=path_params)
 
         return margin
 
-    def distance_field(self, body: CollisionBody) -> StateField:
+    def distance_field(self, body: CollisionBody) -> Field:
         """The least distance from ``body``'s probes to the centerline, as a field."""
         # Lazy import: the state fields load on first use, not with the track
         from minilink.planning.spatial.state_fields import PathDistanceField
 
         return PathDistanceField(self, body)
 
-    def corridor_field(self, body: CollisionBody) -> StateField:
+    def corridor_field(self, body: CollisionBody) -> Field:
         """The smallest corridor margin over ``body``'s probes, as a field."""
         # Lazy import: the state fields load on first use, not with the track
         from minilink.planning.spatial.state_fields import CorridorMarginField

@@ -2,8 +2,8 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.3, step A3 of [TODO.md](TODO.md).  
-**Depends on:** [fields.md](fields.md) for the `Field` ABC (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
+**Rung:** v0.4, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([TODO.md](TODO.md) §1.9).  
+**Depends on:** the `Field` ABC (`core/fields.py`, DESIGN §4) (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
 
 Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
 
@@ -11,10 +11,10 @@ Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink
 
 ```python
 track, scene = racecar_circuit()
-body = bind(car, point_probe())
+body = mount(point_probe(), on=car)
 cost = track.distance_field(body).as_cost() + scene.clearance_field(body).as_cost(shaping=quadratic_hinge())
 loop = PurePursuit(track) @ car
-J = cost.total_cost(loop.compute_trajectory(tf=10))
+J_t = cost.integrate(loop.compute_trajectory(tf=10))   # the running integral J(t_k), no problem needed (total_cost leaves the cost)
 ```
 
 Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review §4.6, in git history): glyphs, skins, S30, S44 are not this module. Constitution still holds: a few textbook objects (`Shape`, `Path`, `Track`, `Scene`, posed probes), not a computational-geometry library.
@@ -31,17 +31,17 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 | `Scene` | [`planning/spatial/scene.py`](../../minilink/planning/spatial/scene.py) | `core/geometry/scene.py` |
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
-| `CollisionBody`, `bind` | same file | `core/geometry/collision.py` |
-| `StateField` → `Field`, `FieldSet`, `FieldCost` | [`planning/spatial/state_fields.py`](../../minilink/planning/spatial/state_fields.py) | [`core/fields.py`](fields.md) |
+| `CollisionBody`, `mount` | same file | `core/geometry/collision.py` |
+| `Field`, `FieldSet`, `FieldCost` (was `StateField`) | [`core/fields.py`](../../minilink/core/fields.py) (moved in the v0.3 run) | stays |
 | `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | same file | `core/geometry/fields.py` (subclass `Field`) |
-| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`planning/spatial/shaping.py`](../../minilink/planning/spatial/shaping.py) | `core/fields.py` next to `Field.as_cost` |
+| `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`core/shaping.py`](../../minilink/core/shaping.py) (moved in the v0.3 run) | stays, beside `core/fields.py` |
 | `FieldGrid`, `sample_grid` | [`planning/spatial/grid.py`](../../minilink/planning/spatial/grid.py) | `core/geometry/grid.py` |
 | `plot_scene`, `plot_track`, cost rasters | [`planning/spatial/plotting.py`](../../minilink/planning/spatial/plotting.py) | `graphical/` (lazy; `scene.plot()` / `track.plot()` stay on the object) |
 | `TrackCorridorOverlay` | [`planning/spatial/overlays.py`](../../minilink/planning/spatial/overlays.py) | `graphical/` |
 | named courses | copy-pasted in demos | `core/geometry/catalog.py` |
 | `planning.spatial` | owner | re-export, then **delete** |
 
-Student import after the move: `from minilink.core.geometry import Scene, bind, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../dev/RULES.md) 3.4), then drop them.
+Student import after the move: `from minilink.core.geometry import Scene, mount, racecar_circuit`. Band facades may keep `minilink.planning` names for one migration commit ([RULES.md](../dev/RULES.md) 3.4), then drop them.
 
 **Stay put**
 
@@ -67,10 +67,10 @@ Short teaching list, like `minilink.catalog` for plants. No `Course` DTO: `track
 | Factory | What | Today |
 | --- | --- | --- |
 | `oval_circuit(length, width, radius, half_width=…)` | rounded-rectangle `Track` (wraps `circuit_waypoints`) | tests |
-| `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | three UdeS racecar demos (MPC, dyn MPC, RL) |
+| `racecar_circuit()` | 6×4 m oval, `half_width=0.6`, far-straight cones | the two UdeS racecar demos (`mpc_racecar_kinematic.py`, `mpc_racecar_dynamic.py`) |
 | `holonomic_forest()` | scatter of discs in `[-6, 6]²` | [`rrt_holonomic_obstacles.py`](../../examples/demos/rrt/rrt_holonomic_obstacles.py) |
 
-Leave in the owning demo until a second teaching script needs them: wide MPC circuit, slalom, U-turn corridor, car_trajopt corner. `circuit_waypoints` stays a thin alias during the split. The RL racecar demo may keep extra cones as arguments on `racecar_circuit`, not a second factory.
+Leave in the owning demo until a second teaching script needs them: wide MPC circuit, slalom, U-turn corridor, car_trajopt corner. `circuit_waypoints` stays a thin alias during the split. A demo that needs extra cones passes them as arguments on `racecar_circuit`, not a second factory (no RL racecar demo exists today).
 
 ## Where new things go later
 
@@ -108,11 +108,11 @@ minilink/graphical/          # drawing only
 ## Implementation (later)
 
 1. `geometry.py` → `core/geometry/shapes.py`.
-2. Move Path, Track, Scene, probes, `bind`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
+2. Move Path, Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
-4. Catalog factories; switch the three UdeS racecar demos and the RRT forest demo.
+4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
 5. PurePursuit accepts a `Path` / `Track`.
-6. Step 4.1 of [fields.md](fields.md): spatial subclasses already live in geometry when `Field` lands.
+6. The minimal `Field` (landed in v0.3): spatial subclasses already live in geometry when `Field` lands.
 
 ## Out of scope
 

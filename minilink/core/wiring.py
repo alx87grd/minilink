@@ -9,9 +9,13 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
-from minilink.core.feedback import check_reserved_id
+from minilink.core.roles import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
+from minilink.core.topology import (
+    check_algebraic_loops,
+    feedthrough_inputs,
+)
 
 if TYPE_CHECKING:
     from minilink.core.diagram import DiagramSystem
@@ -27,25 +31,51 @@ class WiredDiagramMixin:
     Evolution-agnostic diagram wiring, gather, and visualization helpers.
 
     Shared by :class:`~minilink.core.diagram.DiagramSystem` and
-    :class:`~minilink.core.diagram.StepDiagramSystem`. Flow diagrams pass
+    :class:`~minilink.core.discrete.step_diagram.StepDiagramSystem`. Flow diagrams pass
     simulation time ``t`` (float) as the third gather slot; step diagrams pass
     step index ``k`` (int) in the same parameter position.
     """
 
-    def init_wiring(self, *, name: str = "Diagram") -> None:
+    def init_wiring(self) -> None:
         """The wiring memory and the stacked state of a new diagram, set up by its ``__init__``.
 
         The diagram sets its subsystem registry and wiring table first, before
         ``System.__init__``, whose params setter reads them.
         """
-        # Wiring memory: a quiet connect, and the diagram's name
+        # Wiring memory: a quiet connect
         self.connection_verbose = False
-        self.name = name
 
         # The stacked state of the (still empty) subsystems
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
+
+    @property
+    def x0(self):
+        """
+        The diagram's initial state: a view stacked from its blocks' ``x0``.
+
+        Read-only as an array; assigning a whole vector writes each block's
+        slice through to the block, which owns its start.
+        """
+        x0 = stacked_x0(self.subsystems)
+        x0.flags.writeable = False
+
+        return x0
+
+    @x0.setter
+    def x0(self, value):
+        write_through_x0(self, value, self.n)
+
+    @property
+    def solver_info(self):
+        """The diagram's solver hints, derived from its blocks at each read (set a hint on the block it describes)."""
+        info = self.own_solver_info
+        bubble_solver_info(info, self.subsystems)
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value):
+        self.own_solver_info = dict(value)
 
     @property
     def params(self):
@@ -80,18 +110,16 @@ class WiredDiagramMixin:
         """Add a subsystem under a unique id, with all its inputs unconnected.
 
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
-        tool reads (:func:`minilink.core.feedback.roles`); one of each per level.
+        tool reads (:func:`minilink.core.roles.roles`); one of each per level.
         """
+        require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
 
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
-        # The stacked state and the solver hints, with the new block
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
-        self.refresh_solver_info()
+        # The stacked state, with the new block
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         """
@@ -101,11 +129,13 @@ class WiredDiagramMixin:
         ``target_sys_id="output"`` connects to a diagram boundary output
         (used by :meth:`connect_new_output_port`). Existence and dimension
         are validated immediately so wiring mistakes fail at connect time,
-        not at compile or simulation time.
+        not at compile or simulation time. A subsystem input already connected
+        is refused: :meth:`disconnect` it first to rewire it.
         """
         self.require_connectable(
             source_sys_id, source_port_id, target_sys_id, target_port_id
         )
+        self.require_open_input(target_sys_id, target_port_id)
 
         # The target input reads the source output
         self.connections.setdefault(target_sys_id, {})[target_port_id] = (
@@ -118,6 +148,16 @@ class WiredDiagramMixin:
                 f"Connected {source_sys_id}:{source_port_id} "
                 f"to {target_sys_id}:{target_port_id}"
             )
+
+    def disconnect(self, target_sys_id, target_port_id):
+        """Open a subsystem input and return the ``(sys_id, port_id)`` it read, ``None`` if it was open."""
+        require_subsystem_target(target_sys_id)
+        self.target_port_of(target_sys_id, target_port_id)
+
+        source = self.connections[target_sys_id][target_port_id]
+        self.connections[target_sys_id][target_port_id] = None
+
+        return source
 
     def connect_new_output_port(
         self,
@@ -225,8 +265,8 @@ class WiredDiagramMixin:
         This is an optional diagram-building shortcut. It does not overwrite
         existing connections and returns ``self`` so it can be used fluently.
         """
-        # A real cycle: composition imports DiagramSystem, built on this mixin
-        from minilink.core.composition import autowire
+        # A real cycle: the operators import DiagramSystem, built on this mixin
+        from minilink.core.operators import autowire
 
         return autowire(self, strict=strict, validate=validate)
 
@@ -252,32 +292,15 @@ class WiredDiagramMixin:
     # Refresh, random draws and topology
 
     def refresh(self):
-        """Refresh all subsystems and rebuild the flattened state metadata.
+        """Refresh all subsystems and rebuild the stacked state layout.
 
-        The solver hints are then bubbled again from the refreshed subsystems
-        (``refresh_solver_info``). Compiled evaluators are snapshots:
-        recompile after structural changes. An ``x0`` set on the diagram itself
-        is kept; otherwise the subsystems' current ``x0`` are stacked again.
+        A structural change inside a block (its state size) needs it; the
+        diagram's ``x0`` and solver hints are views of its blocks and need none.
+        Compiled evaluators are snapshots: recompile after structural changes.
         """
-        # An x0 set on the diagram differs from the one stacked from its subsystems
-        x0 = np.copy(self.x0)
-        derived_x0 = self.derived_x0
-        user_set_x0 = x0.shape == derived_x0.shape and not np.array_equal(
-            x0, derived_x0
-        )
-
-        # The subsystems first, then the stack of their metadata
         for subsystem in self.subsystems.values():
             subsystem.refresh()
-        self.n, self.state_index, self.state, self.x0, self.derived_x0 = state_layout(
-            self.subsystems
-        )
-
-        # The diagram's own x0 stays while its size still fits
-        if user_set_x0 and x0.shape == self.x0.shape:
-            self.x0 = x0
-
-        self.refresh_solver_info()
+        self.n, self.state_index, self.state = state_layout(self.subsystems)
 
     def realize(self, key):
         """Nested params with every random block realized under its own stream, named by its id."""
@@ -343,14 +366,14 @@ class WiredDiagramMixin:
         """Route nested diagram params to one subsystem (strict contract).
 
         ``None`` → ``None`` (subsystem uses its live ``self.params``);
-        a mapping → ``params.get(sys_id)`` (missing id → ``None`` → defaults).
+        a mapping → ``params[sys_id]`` (every block id must be present).
         Anything else is a contract violation.
         """
         if params is None:
             return None
         require_params_mapping(params)
 
-        return params.get(sys_id)
+        return params[sys_id]
 
     def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
@@ -421,54 +444,6 @@ class WiredDiagramMixin:
     # Internal machinery
     ###########################################################################
 
-    def refresh_solver_info(self):
-        """Bubble subsystem solver hints to the diagram root.
-
-        The diagram is discontinuous when any subsystem is. Its smallest time
-        constant is the smallest one among the subsystems that carry one: every
-        stateful subsystem, and a stateless block that sets its own. A static
-        block left at the default has no time constant and does not pin the
-        diagram to the default. Its sample period is the shortest one among the
-        sampled subsystems, and it has none when no subsystem is sampled.
-
-        The hints are derived from the subsystems at every :meth:`add_subsystem`
-        and :meth:`refresh` (a ``Simulator`` refreshes before it solves), so a
-        hint changed on a block after composition reaches the diagram. Set a
-        hint on the block it describes: one set by hand on the diagram is
-        replaced at the next refresh.
-        """
-        if not hasattr(self, "solver_info"):
-            return
-
-        # Discontinuous when any subsystem is
-        self.solver_info["discontinuous_behavior"] = any(
-            subsystem.solver_info.get("discontinuous_behavior", False)
-            for subsystem in self.subsystems.values()
-        )
-
-        # The smallest time constant among the subsystems that carry one
-        time_constants = []
-        for subsystem in self.subsystems.values():
-            tau = subsystem.solver_info.get(
-                "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
-            )
-            if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
-                time_constants.append(tau)
-        self.solver_info["smallest_time_constant"] = min(
-            time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
-        )
-
-        # The shortest sample period, when any subsystem is sampled
-        periods = [
-            subsystem.solver_info["sample_period"]
-            for subsystem in self.subsystems.values()
-            if "sample_period" in subsystem.solver_info
-        ]
-        if periods:
-            self.solver_info["sample_period"] = min(periods)
-        else:
-            self.solver_info.pop("sample_period", None)
-
     def require_connectable(
         self, source_sys_id, source_port_id, target_sys_id, target_port_id
     ):
@@ -481,6 +456,18 @@ class WiredDiagramMixin:
                 f"Port dimension mismatch: {source_sys_id}:{source_port_id} "
                 f"has dim {source_port.dim}, {target_sys_id}:{target_port_id} "
                 f"has dim {target_port.dim}"
+            )
+
+    def require_open_input(self, target_sys_id, target_port_id):
+        """Refuse to rewire a subsystem input that already reads a source."""
+        if target_sys_id == "output":
+            return
+        source = self.connections.get(target_sys_id, {}).get(target_port_id)
+        if source is not None:
+            raise ValueError(
+                f"{target_sys_id}:{target_port_id} is already connected to "
+                f"{source[0]}:{source[1]}; disconnect('{target_sys_id}', "
+                f"'{target_port_id}') first to rewire it"
             )
 
     def source_port_of(self, source_sys_id, source_port_id):
@@ -655,19 +642,17 @@ class DiagramOutputPort(OutputPort):
 def check_diagram_params(params, subsystem_ids):
     """Check the nested diagram params contract.
 
-    ``params`` must be ``None`` or a mapping keyed by subsystem id whose values
-    are per-subsystem params dicts. Missing subsystem ids are allowed (those
-    subsystems fall back to their live ``self.params``); unknown ids raise so
-    sys-id typos fail loudly instead of silently using defaults.
+    ``params`` must be ``None`` or a mapping that names every subsystem id.
+    A missing id is an error; unknown ids raise so sys-id typos fail loudly.
 
     Called once at public entry points (``DiagramSystem.f``, ``tf``,
-    ``get_dynamic_geometry``, the evaluators' parametric tier, the ``params``
+    ``get_dynamic_geometry``, the evaluators given ``params``, the ``params``
     setter), not inside the recursion.
 
     Parameters
     ----------
     params : None or Mapping
-        Candidate diagram-level params, e.g. ``{"plant": {"m": 1.0}}``.
+        Candidate diagram-level params, e.g. ``{"plant": {…}, "controller": {…}}``.
     subsystem_ids : container of str
         Valid subsystem ids (e.g. ``diagram.subsystems``).
     """
@@ -684,97 +669,10 @@ def check_diagram_params(params, subsystem_ids):
             f"Unknown subsystem ids in diagram params: {names}; available: {available}"
         )
 
-
-def check_algebraic_loops(diagram: DiagramSystem) -> None:
-    """Check a wired diagram for algebraic loops.
-
-    An algebraic loop exists when a cycle contains only direct-feedthrough
-    paths (i.e., output ports whose ``dependencies`` include the input ports
-    that close the cycle). This check is **standalone**: call it right after
-    wiring a diagram to validate its topology before simulation; the order
-    the compiler evaluates the ports in is :func:`evaluation_order_of`.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    evaluation_order_of(diagram)
-
-
-def evaluation_order_of(diagram: DiagramSystem) -> list[tuple[str, str]]:
-    """The topological evaluation order of a diagram's output ports.
-
-    Uses depth-first search over output-port dependency edges; a cycle of
-    direct-feedthrough paths (an algebraic loop) is refused.
-
-    Parameters
-    ----------
-    diagram : DiagramSystem
-        The wired diagram to analyse.
-
-    Returns
-    -------
-    list[tuple[str, str]]
-        Output ports ``(sys_id, port_id)`` in valid topological order
-        (dependencies before dependents).
-
-    Raises
-    ------
-    RuntimeError
-        If an algebraic loop is detected, with the full cycle path in the
-        error message.
-    """
-    visited: set[tuple[str, str]] = set()
-    stack: list[tuple[str, str]] = []
-    stack_set: set[tuple[str, str]] = set()
-    order: list[tuple[str, str]] = []
-
-    def visit_port(sys_id: str, port_id: str) -> None:
-        node = (sys_id, port_id)
-
-        # A port already on the search path closes an algebraic loop
-        require_no_algebraic_loop(node, stack, stack_set)
-
-        # A port already scheduled
-        if node in visited:
-            return
-
-        # The sources the port feeds through from come first
-        stack.append(node)
-        stack_set.add(node)
-
-        port = diagram.subsystems[sys_id].outputs.get(port_id)
-        if port is not None:
-            deps = port.dependencies
-            sys_inputs = diagram.subsystems[sys_id].inputs
-            input_deps = sys_inputs.keys() if deps == "all" else deps
-
-            for in_port_id in input_deps:
-                source = diagram.connections[sys_id].get(in_port_id)
-                if source is not None:
-                    src_sys_id, src_port_id = source
-                    if src_sys_id != "input":
-                        visit_port(src_sys_id, src_port_id)
-
-        # Its sources scheduled, the port takes its place in the order
-        stack.pop()
-        stack_set.remove(node)
-        visited.add(node)
-        order.append(node)
-
-    # Every output port of every subsystem, in insertion order
-    for sys_id, subsystem in diagram.subsystems.items():
-        for port_id in subsystem.outputs:
-            visit_port(sys_id, port_id)
-
-    return order
+    missing = [key for key in subsystem_ids if key not in params]
+    if missing:
+        names = ", ".join(repr(key) for key in missing)
+        raise ValueError(f"Diagram params must name every subsystem; missing: {names}")
 
 
 def iter_subsystems(diagram, prefix=()):
@@ -791,16 +689,95 @@ def iter_subsystems(diagram, prefix=()):
 ###############################################################################
 
 
+def bubble_solver_info(info, subsystems) -> None:
+    """Write the solver hints a diagram derives from its blocks into ``info``.
+
+    The diagram is discontinuous when any subsystem is. Its smallest time
+    constant is the smallest one among the subsystems that carry one: every
+    stateful subsystem (the default 1 ms when it declares none), and a
+    stateless block that sets its own. A static block left at the default has
+    no time constant and does not pin the diagram to the default; a block whose
+    spectrum is all zero (an integrator) declares ``∞`` and bounds nothing. Its
+    sample period is the base period of the sampled subsystems' (their greatest
+    common divisor), and it has none when no subsystem is sampled. Read at each
+    access, so a hint changed on a block after composition reaches the
+    diagram; one set by hand on the diagram is replaced at the next read.
+    """
+    # Discontinuous when any subsystem is
+    info["discontinuous_behavior"] = any(
+        subsystem.solver_info.get("discontinuous_behavior", False)
+        for subsystem in subsystems.values()
+    )
+
+    # The smallest time constant among the subsystems that carry one
+    time_constants = []
+    for subsystem in subsystems.values():
+        tau = subsystem.solver_info.get(
+            "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
+        )
+        declared = subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT
+        if declared and np.isfinite(tau):
+            time_constants.append(tau)
+    info["smallest_time_constant"] = min(
+        time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
+    )
+
+    # The base period of the held signals, when any subsystem is sampled: every
+    # hold period a whole number of it
+    periods = {
+        subsystem.solver_info["sample_period"]
+        for subsystem in subsystems.values()
+        if "sample_period" in subsystem.solver_info
+    }
+    if len(periods) == 1:
+        info["sample_period"] = periods.pop()
+    elif periods:
+        # A real cycle: the sampled diagram imports the wiring
+        from minilink.core.discrete.sampled_diagram import base_period_of
+
+        info["sample_period"] = base_period_of(sorted(periods))
+    else:
+        info.pop("sample_period", None)
+
+
+def stacked_x0(subsystems):
+    """The blocks' ``x0`` stacked in insertion order, a fresh float array."""
+    if not subsystems:
+        return np.zeros(0)
+
+    return np.concatenate(
+        [np.asarray(sub.x0, dtype=float).reshape(-1) for sub in subsystems.values()]
+    )
+
+
+def write_through_x0(diagram, value, n) -> None:
+    """Write each block's slice of ``value`` (the diagram's stacked state, size ``n``) to the block."""
+    value = np.array(value, dtype=float).reshape(-1)
+    require_x0_size(diagram, value, n)
+    for sys_id, sub in diagram.subsystems.items():
+        start, end = diagram.state_index[sys_id]
+        if end > start:
+            sub.x0 = value[start:end]
+
+
+def require_x0_size(diagram, value, n) -> None:
+    """Refuse an ``x0`` whose size is not the diagram's state size."""
+    if value.size != n:
+        raise ValueError(
+            f"{diagram.name}: x0 has size {value.size}, the diagram's state has {n}"
+        )
+
+
 def state_layout(subsystems):
     """
-    The stacked state of a diagram's blocks: ``(n, state_index, state, x0, derived_x0)``.
+    The stacked state layout of a diagram's blocks: ``(n, state_index, state)``.
 
     The stacked state vector is ``x = [x_1; x_2; ...]`` in subsystem insertion
     order; ``state_index`` maps each subsystem id to its ``(start, end)``
     indices in the stacked vector. State labels are prefixed with the
-    subsystem id whenever the same label appears in several subsystems.
-    ``derived_x0`` is a copy of the stacked ``x0``, so a refresh can tell an
-    ``x0`` set on the diagram from a stale stacked one.
+    subsystem id whenever the same label appears in several subsystems. The
+    stacked ``x0`` is not part of it: it is a view of the blocks
+    (:func:`stacked_x0`).
     """
     # x = [x_1; x_2; ...]: each subsystem's (start, end) in the stack
     state_index = {}
@@ -823,12 +800,11 @@ def state_layout(subsystems):
         for sys_id, label in owned_labels
     ]
 
-    # The stacked state signal, and its default initial condition
+    # The stacked state signal
     n = idx
     state = VectorSignal("x", dim=n)
-    x0 = np.zeros(n)
 
-    # The subsystems' metadata and x0, stacked in insertion order
+    # The subsystems' metadata, stacked in insertion order
     if subsystems:
         substates = [sub.state for sub in subsystems.values()]
         state.labels = labels
@@ -836,12 +812,8 @@ def state_layout(subsystems):
         state.upper_bound = np.concatenate([s.upper_bound for s in substates])
         state.lower_bound = np.concatenate([s.lower_bound for s in substates])
         state.nominal_value = np.concatenate([s.nominal_value for s in substates])
-        x0 = np.concatenate([sub.x0 for sub in subsystems.values()])
 
-    # The x0 stacked from the subsystems
-    derived_x0 = np.copy(x0)
-
-    return n, state_index, state, x0, derived_x0
+    return n, state_index, state
 
 
 def require_params_mapping(params):
@@ -859,6 +831,17 @@ def require_one_size(name, dims):
         raise ValueError(
             f"the open inputs named {name!r} have different sizes ({sorted(dims)}); "
             "wire them with connect"
+        )
+
+
+def require_plain_id(sys_id):
+    """Refuse a block id holding a path separator: ``.`` and ``/`` join parameter paths, ``:`` a port."""
+    separators = [c for c in ".:/" if c in str(sys_id)]
+    if separators:
+        raise ValueError(
+            f"block id {sys_id!r} holds {''.join(separators)!r}: '.' and '/' join "
+            "parameter paths ('controller.Kp') and ':' names a port ('plant:y'); "
+            "use letters, digits and '_' (motor_v2)"
         )
 
 
@@ -886,46 +869,10 @@ def require_output_port(outputs, sys_id, port_id):
         )
 
 
-def feedthrough_inputs(diagram, sys_id, port_id) -> tuple[str, ...]:
-    """
-    Diagram boundary inputs that reach one subsystem output by direct feedthrough.
-
-    Walks the ``dependencies`` edges back from ``sys_id:port_id``; a state
-    breaks the path, a boundary input ends it. The result is what a leaf would
-    declare for the same port, in diagram input order. An algebraic loop inside
-    the diagram ends the walk here and is reported by :func:`check_algebraic_loops`.
-    """
-    reached = set()
-    visited = set()
-    stack = [(sys_id, port_id)]
-
-    # Back along the feedthrough edges: a boundary input ends a path, an output
-    # continues it
-    while stack:
-        node = stack.pop()
-        if node in visited:
-            continue
-        visited.add(node)
-
-        source_sys_id, source_port_id = node
-        subsystem = diagram.subsystems[source_sys_id]
-        deps = subsystem.outputs[source_port_id].dependencies
-        for in_port_id in subsystem.inputs if deps == "all" else deps:
-            source = diagram.connections[source_sys_id].get(in_port_id)
-            if source is None:
-                continue
-            if source[0] == "input":
-                reached.add(source[1])
-            else:
-                stack.append(source)
-
-    return tuple(input_id for input_id in diagram.inputs if input_id in reached)
-
-
-def require_no_algebraic_loop(node, stack, stack_set):
-    """Refuse a port already on the search path, which closes an algebraic loop."""
-    if node in stack_set:
-        cycle_start_idx = stack.index(node)
-        cycle_path = stack[cycle_start_idx:] + [node]
-        cycle_str = " -> ".join(f"{s}:{p}" for s, p in cycle_path)
-        raise RuntimeError(f"Algebraic loop detected: {cycle_str}")
+def require_subsystem_target(target_sys_id):
+    """Refuse to disconnect a diagram output: its source is set where it is exposed."""
+    if target_sys_id == "output":
+        raise ValueError(
+            "disconnect opens a subsystem input; a diagram output is set where it is "
+            "exposed (connect_new_output_port or expose)"
+        )

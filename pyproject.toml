@@ -102,7 +102,7 @@ ignore = ["E501", "E741"]
 "tests/unittest/test_costs_optimizer.py" = ["E402", "F811", "I001"]
 "tests/unittest/test_diagrams.py" = ["E402", "F811", "I001"]
 "tests/unittest/test_dynamics_catalog.py" = ["E402", "F811", "I001"]
-"tests/unittest/test_engine_jax.py" = ["E402", "F811", "I001"]
+"tests/experimental/test_engine_jax.py" = ["E402", "F811", "I001"]
 "tests/unittest/test_graphics.py" = ["E402", "F811", "I001"]
 "tests/unittest/test_hybrid.py" = ["E402", "F811", "I001", "F401"]
 "tests/unittest/test_jax_planning.py" = ["E402", "F811", "I001"]
@@ -140,7 +140,7 @@ git_describe_command = "git describe --dirty --tags --long --match '0.*'"
 [tool.hatch.build.targets.sdist]
 exclude = [
     "/minilink/experimental",
-    "/examples/experimental",
+    "/experimental",
     "/examples/projects",
     "/docs/_static/showcase",
 ]

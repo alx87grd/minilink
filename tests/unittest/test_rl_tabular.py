@@ -5,10 +5,7 @@ import pytest
 
 from minilink import DynamicProgrammingPlanner, PlanningProblem, QuadraticCost
 from minilink.dynamics.catalog.equations import DoubleIntegrator
-from minilink.planning import StochasticPlanningProblem, Uniform
-from minilink.planning.policy_synthesis.dp import DynamicProgrammingResult
-from minilink.planning.policy_synthesis.lookup_policy import LookupTableController
-from minilink.planning.reinforcement_learning import (
+from minilink.learning.reinforcement_learning import (
     SARSA,
     UCB,
     EpsilonGreedy,
@@ -16,7 +13,10 @@ from minilink.planning.reinforcement_learning import (
     QLearning,
     TabularLearningPlanner,
 )
-from minilink.planning.reinforcement_learning.environment import RolloutEnvironment
+from minilink.planning import Uniform
+from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
+from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
 
 GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
@@ -29,18 +29,27 @@ def double_integrator_problem(stochastic=False):
     plant.inputs["u"].lower_bound = np.array([-1.0])
     plant.inputs["u"].upper_bound = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
-    exit_rule = dict(infeasible_cost=20.0)  # one price for both tools
+    exit_rule = dict(
+        penalize_failure=True, failure_cost=20.0
+    )  # one failure_cost for both tools
     if stochastic:
-        return StochasticPlanningProblem(
+        return PlanningProblem(
             plant,
             cost=cost,
             tf=np.inf,
             X=plant.state.box,
-            x0_distribution=Uniform([-1, -1], [1, 1]),
+            U=plant.input_box,
+            x_start=Uniform([-1, -1], [1, 1]),
             **exit_rule,
         )
     return PlanningProblem(
-        plant, x_start=[1.0, 0.0], cost=cost, tf=np.inf, X=plant.state.box, **exit_rule
+        plant,
+        x_start=[1.0, 0.0],
+        cost=cost,
+        tf=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+        **exit_rule,
     )
 
 
@@ -49,13 +58,13 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     vi = DynamicProgrammingPlanner(problem, alpha=0.9, tol=1e-6, **GRID)
     vi.solve()
 
-    # The same grid, Euler step and exit price; the learner samples what value iteration sweeps
+    # The same grid, Euler step and exit failure_cost; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
-        problem, alpha=0.9, eta=0.1, integrator="euler", seed=0, **GRID
+        problem, alpha=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
     solution = learner.solve(episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert isinstance(solution.policy, LookupTableController)
+    assert isinstance(solution.policy, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
     assert solution.solver.episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.value_at(np.zeros(2))
@@ -67,7 +76,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
 
     # The greedy law is a lookup-table block that closes the loop and regulates
     ctl = learner.get_controller()
-    assert isinstance(ctl, LookupTableController)
+    assert isinstance(ctl, LookupPolicy)
     plant = problem.sys
     plant.x0 = np.array([1.0, 0.0])
     traj = (ctl @ plant).compute_trajectory(tf=6.0, dt=0.01, verbose=False)
@@ -78,17 +87,30 @@ def test_nearest_rounding_aliases_a_coarse_grid():
     # From a node with a small speed, one Euler step rounds back to the same node
     problem = double_integrator_problem()
     nearest = TabularLearningPlanner(
-        problem, rounding="nearest", integrator="euler", seed=0, **GRID
+        problem, rounding="nearest", solver="euler", seed=0, **GRID
     )
     x = nearest.grid.states[nearest.node(np.array([0.9, 0.5]))]
     x_next = x + problem.sys.f(x, np.array([0.0])) * GRID["dt"]
     assert nearest.node(x_next) == nearest.node(x)
     # stochastic rounding moves on with the probability of the fractional position
-    stochastic = TabularLearningPlanner(problem, integrator="euler", seed=0, **GRID)
+    stochastic = TabularLearningPlanner(problem, solver="euler", seed=0, **GRID)
     nodes = {stochastic.node(x_next) for _ in range(200)}
     assert len(nodes) == 2
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, rounding="floor", **GRID)
+
+
+def test_the_learner_steps_with_its_grids_solver_unless_told_otherwise():
+    problem = double_integrator_problem()
+    learner = TabularLearningPlanner(problem, **GRID)
+    assert learner.env.solver == learner.grid.solver == "euler"
+    x = np.array([0.5, -0.3])
+    u = np.array([1.0])
+    x_next = learner.env.plant_step(x, u, 0.0)
+    np.testing.assert_allclose(x_next, learner.grid.sys.f(x, u) * GRID["dt"] + x)
+
+    rk4 = TabularLearningPlanner(problem, solver="rk4", **GRID)
+    assert rk4.env.solver == "rk4"
 
 
 @pytest.mark.parametrize(
@@ -154,7 +176,7 @@ def test_numpy_environment_steps_like_the_problem():
         x, t, r, terminated, truncated = env.step(x, t, np.array([0.5]), rng)
         assert np.isfinite(r) and not terminated
         assert bool(truncated) == (k == 2)
-    # a state pushed out of the box pays the problem's exit price and terminates
+    # a state pushed out of the box pays the problem's exit failure_cost and terminates
     _, _, r, terminated, truncated = env.step(
         np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
     )

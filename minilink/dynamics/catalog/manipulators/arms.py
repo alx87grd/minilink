@@ -25,7 +25,12 @@ class OneLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=1, actuators=1, task_dim=2)
-        self.name = "One Link Manipulator"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -163,7 +168,12 @@ class TwoLinkManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=2, actuators=2, task_dim=2)
-        self.name = "Two Link Manipulator"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -361,12 +371,17 @@ class TwoLinkManipulator(Manipulator):
         return planar_torque_geometry(lengths, u, upper_bound)
 
 
-class ThreeLinkManipulator3D(Manipulator):
+class ThreeLinkManipulator(Manipulator):
     """Three-link spatial manipulator from the Pyro catalog."""
 
     def __init__(self):
         super().__init__(dof=3, actuators=3, task_dim=3)
-        self.name = "Three Link Manipulator 3D"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -652,7 +667,7 @@ class ThreeLinkManipulator3D(Manipulator):
         }
 
 
-class FiveLinkPlanarManipulator(Manipulator):
+class FiveLinkManipulator(Manipulator):
     """Five-link planar manipulator with Pyro's default unit joint dynamics.
 
     Kinematics and Jacobian are fully specified; dynamics use the
@@ -663,7 +678,12 @@ class FiveLinkPlanarManipulator(Manipulator):
 
     def __init__(self):
         super().__init__(dof=5, actuators=5, task_dim=2)
-        self.name = "Five Link Planar Manipulator"
+
+        # The plant's own range: angles and rates within ±2π, torques within ±5
+        self.state.lower_bound = np.full(self.n, -2 * np.pi)
+        self.state.upper_bound = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {"l": np.array([0.5, 0.5, 0.5, 0.5, 0.5])}
@@ -758,7 +778,7 @@ class FiveLinkPlanarManipulator(Manipulator):
         return planar_torque_geometry(lengths, u, upper_bound)
 
 
-class SpeedControlledManipulator(DynamicSystem):
+class KinematicManipulator(DynamicSystem):
     """Joint-space integrator for velocity-controlled manipulators.
 
     Dynamics: ``dq = u``. State and default output ``y`` are joint angles ``q``.
@@ -777,7 +797,6 @@ class SpeedControlledManipulator(DynamicSystem):
             output_dim=self.dof,
             expose_state=True,
         )
-        self.name = f"{self.dof} Joint Speed Controlled Manipulator"
 
         # Signal labels and units: the joint angles, driven by the joint rates
         self.state.labels = [f"q{i + 1}" for i in range(self.dof)]
@@ -810,6 +829,9 @@ class SpeedControlledManipulator(DynamicSystem):
         # The plant, named after the arm whose kinematics it reads
         inst = cls(arm.dof, arm.task_dim)
         inst._kin_arm = arm
+
+        # The arm's parameters are the plant's: its kinematics read them from the plant's branch
+        inst.params = dict(arm.params)
         inst.name = f"{arm.dof} Joint Speed Controlled {arm.name}"
 
         # Graphics: the camera frames the arm's full reach
@@ -834,6 +856,7 @@ class SpeedControlledManipulator(DynamicSystem):
 
     def forward_kinematics(self, q, params=None):
         if self._kin_arm is not None:
+            params = self.params if params is None else params
             return self._kin_arm.forward_kinematics(q, params)
 
         xp = array_module(q)
@@ -847,6 +870,7 @@ class SpeedControlledManipulator(DynamicSystem):
 
     def J(self, q, params=None):
         if self._kin_arm is not None:
+            params = self.params if params is None else params
             return self._kin_arm.J(q, params)
 
         xp = array_module(q)
@@ -871,7 +895,7 @@ class SpeedControlledManipulator(DynamicSystem):
         """The drawn link lengths: the arm's, read from ``params`` when they are given."""
         if self._kin_arm is not None:
             arm = self._kin_arm
-            arm_params = arm.params if params is None else params
+            arm_params = self.params if params is None else params
             if hasattr(arm, "lengths"):
                 return arm.lengths(arm_params)
             if "l" in arm_params:

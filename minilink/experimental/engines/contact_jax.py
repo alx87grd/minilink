@@ -6,6 +6,9 @@ Current features:
 - fixed plane contact via penalty spring-damper,
 - full 6-DoF body state (position, quaternion, linear/angular velocity),
 - pure functional ODE API suitable for JIT/grad.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 from typing import NamedTuple

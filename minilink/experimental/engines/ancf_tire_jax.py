@@ -10,6 +10,9 @@ TODO: User Architectural Review. This is an ANCF ring/cable tire prototype, not
 Chrono's full laminated ANCF shell tire. It is meant to prove the Minilink
 system wrapping, differentiability, contact, and animation path before adding
 full shell elements, pressure loads, rim constraints, and tire-section layers.
+
+Experimental tier: out of the wheel, off the docs site, nightly smoke at most, no stability
+promise (ROADMAP §2).
 """
 
 from typing import NamedTuple
@@ -20,10 +23,17 @@ from minilink.core.backends import require_jax_numpy
 from minilink.core.kinematics import translation
 from minilink.core.system import DynamicSystem
 from minilink.graphical.animation.primitives import (
+    CustomLine,
     Plane,
     Sphere,
 )
-from minilink.graphical.catalog.shapes import line_segment
+
+
+def line_segment(p0, p1, **style):
+    """A world-space line segment from ``p0`` to ``p1``."""
+    points = np.array([np.asarray(p0, dtype=float), np.asarray(p1, dtype=float)])
+
+    return CustomLine(points, **style)
 
 
 class ANCFTireModel(NamedTuple):

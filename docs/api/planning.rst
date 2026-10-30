@@ -4,6 +4,12 @@ Planning
 .. automodule:: minilink.planning.problems
    :members:
 
+.. automodule:: minilink.planning.step_problems
+   :members:
+
+.. automodule:: minilink.planning.step_face
+   :members:
+
 .. automodule:: minilink.planning.planner
    :members:
 
@@ -13,6 +19,9 @@ Planning
 .. automodule:: minilink.planning.comparison
    :members:
    :exclude-members: Evaluation
+
+.. automodule:: minilink.planning.evaluator
+   :members:
 
 .. automodule:: minilink.planning.evaluation
    :members:
@@ -27,6 +36,9 @@ Planning
    :members:
 
 .. automodule:: minilink.planning.trajectory_optimization.direct_collocation
+   :members:
+
+.. automodule:: minilink.planning.trajectory_optimization.path_integral
    :members:
 
 .. automodule:: minilink.planning.trajectory_optimization.multiple_shooting
@@ -48,9 +60,6 @@ Spatial
    :members:
 
 .. automodule:: minilink.planning.spatial.paths
-   :members:
-
-.. automodule:: minilink.planning.spatial.shaping
    :members:
 
 .. automodule:: minilink.planning.spatial.workspace_fields
@@ -80,32 +89,23 @@ Search
 .. automodule:: minilink.planning.search.tree
    :members:
 
-Policy synthesis
-----------------
+Dynamic programming
+-------------------
 
-.. automodule:: minilink.planning.policy_synthesis.dp
+.. automodule:: minilink.planning.dynamic_programming.dp
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.discretizer
+.. automodule:: minilink.planning.dynamic_programming.discretizer
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.lookup_policy
+.. automodule:: minilink.planning.dynamic_programming.lookup_policy
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.lqr
+.. automodule:: minilink.planning.dynamic_programming.lqr
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.policy_eval
+.. automodule:: minilink.planning.dynamic_programming.policy_eval
    :members:
 
-.. automodule:: minilink.planning.policy_synthesis.approximation
-   :members:
-
-Reinforcement learning
-----------------------
-
-.. automodule:: minilink.planning.reinforcement_learning.planner
-   :members:
-
-.. automodule:: minilink.planning.reinforcement_learning.tabular
+.. automodule:: minilink.planning.dynamic_programming.approximation
    :members:

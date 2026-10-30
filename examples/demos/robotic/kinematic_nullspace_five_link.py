@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink import FiveLinkPlanarManipulator, Source, SpeedControlledManipulator, Step
+from minilink import FiveLinkManipulator, KinematicManipulator, Source, Step
 from minilink.control import TaskKinematicNullspace
 
 TF = 8.0
@@ -13,7 +13,7 @@ q0 = np.array([0.1, 0.1, 0.1, 0.1, 0.1])
 q1 = -np.array([1.0, 1.0, 1.0, 1.0, 1.0])
 q2 = np.array([1.0, 1.0, 0.0, -1.0, -1.0])
 
-arm = SpeedControlledManipulator.from_manipulator(FiveLinkPlanarManipulator())
+arm = KinematicManipulator.from_manipulator(FiveLinkManipulator())
 arm.x0 = q0.copy()
 
 ref_p = Source(2)
