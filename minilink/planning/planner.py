@@ -233,7 +233,7 @@ def held_feedback(policy, dt):
     from minilink.core.discrete.step_system import StepSystem
 
     policy = policy_of(policy)
-    reads_input = int(getattr(policy, "m", 0)) > 0
+    reads_input = int(policy.m) > 0
     tick_or_clocked = isinstance(policy, StepSystem)
     if reads_input and not tick_or_clocked:
         return policy % float(dt)
