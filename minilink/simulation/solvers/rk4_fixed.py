@@ -76,17 +76,14 @@ class RK4SolverBackend(SolverBackend):
         dt = require_uniform_times(times, "rk4_fixedsteps")
         u_unused = np.zeros(evaluator.m)
 
-        # The input u(t) read at each stage time; a held block once per step, at its start
-        def f_at(t_k):
-            rhs = evaluator.rhs_of(params, t_held=t_k if evaluator.holds else None)
-            return lambda x, u, t: rhs(x, u_of_t(t), t)
+        def f(x, u, t):
+            return evaluator.f(x, u_of_t(t), t, params)
 
         # x_{k+1} = x_k + Δt/6 (k₁ + 2k₂ + 2k₃ + k₄), each kᵢ at u(t) of its stage
         x = np.asarray(x0, dtype=float)
         x_seq = [x]
         for k in range(n_pts - 1):
-            t_k = t0 + k * dt
-            x = step_body(f_at(t_k), x, u_unused, u_unused, t_k, dt, "rk4", 1)
+            x = step_body(f, x, u_unused, u_unused, t0 + k * dt, dt, "rk4", 1)
             x_seq.append(np.asarray(x))
         x_traj = np.array(x_seq).T
 

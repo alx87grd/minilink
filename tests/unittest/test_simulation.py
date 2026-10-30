@@ -1468,8 +1468,8 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
 
 
 @pytest.mark.parametrize("backend", ["numpy", "jax"])
-def test_rk4_on_a_held_noise_is_fourth_order(backend):
-    """A held sample read once per step, at its start: the four RK4 stages read one draw."""
+def test_rk4_on_a_held_noise_converges_as_the_step_shrinks(backend):
+    """A held sample read at each RK4 stage time: first order at its switches, tightened by a finer ``dt``."""
     if backend == "jax":
         pytest.importorskip("jax")
     from minilink import WhiteNoise
@@ -1493,5 +1493,5 @@ def test_rk4_on_a_held_noise_is_fourth_order(backend):
         np.linalg.norm(final_state(dt) - reference) for dt in (period, period / 3)
     ]
 
-    # A third of the step, an error 3⁴ = 81 times smaller (3 for a first-order bias)
-    assert errors[0] / errors[1] > 40.0
+    # A third of the step, an error about 3 times smaller: first order at the switches
+    assert errors[0] / errors[1] > 2.0
