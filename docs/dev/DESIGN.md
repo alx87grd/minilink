@@ -805,10 +805,10 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `solver_info["sample_period"]` (a diagram gathers the base period of its blocks', their
   greatest common divisor); a hold period places the grid's points and is never a time
   constant. With no solver named the simulator takes fixed-step RK4 at the automatic step
-  (§5, "Automatic grid"), rounded down to divide `Δ`, and reads each held block once per
-  step, at its start, so the four stages read one sample: fourth order with no stage reading
-  the next draw (a held block inside a nested sub-diagram reads the stage time; `flatten=True`
-  reaches it). A step that does not divide `Δ`, a forced
+  (§5, "Automatic grid"), rounded down to divide `Δ`. A held block is read like any block,
+  at each stage's time: the last RK4 stage of a step ending on a switch reads the next draw,
+  first order at the switches, an approximation below what a held-noise model claims (a finer
+  `dt` tightens it; R188). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.

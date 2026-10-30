@@ -27,7 +27,7 @@ passed, no gate moved); the notebook smoke (33 passed, 1 skipped); the docs buil
 The v0.3 baseline moved once, on purpose: `noise.white.x`, row 1's RK4 fix (§3); every other
 row kept it byte-identical. `dev-v0.3-merge-review` is merged into `dev-v0.3` with `--no-ff`.
 
-**To raise first:** M-7 (`SlidingMode` declares its surface, so the SMC demo steps Euler at
+**To raise first** (ruled 2026-10-31, R188–R193, [the record](2026-10-31-release-review-rulings.md); R188 removed M-1's fix): M-7 (`SlidingMode` declares its surface, so the SMC demo steps Euler at
 5 ms), M-8 (the kinematic bicycle declares no `τ` and keeps 1 ms), M-4 (the PID family and the
 integrator counted as linear blocks), M-13 (the neural demo on `gd`, L-BFGS overfits), M-1
 (how the held time reaches the held blocks, and where it does not: KNOWN_ISSUES), and §7's
