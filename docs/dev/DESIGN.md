@@ -55,7 +55,7 @@ The lane contract is [ROADMAP.md §2](ROADMAP.md#2-two-lanes). The teaching surf
 root prelude plus the band facades, registered in `minilink/__init__.py` and the band
 `__init__` files, and checked as a set by `test_teaching_surface.py`. A name reaches the root
 when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` and
-`SampledCost` (`minilink.core`) stay on their bands until one does (R185); `StepSystem` is
+`SampledCost` (`minilink.core`) stay on their bands until one does; `StepSystem` is
 on the root.
 
 ## 3. Package Map
@@ -84,7 +84,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` (and `Lead`, its lead compensator), routing (`Error`/`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`), the step block `UnitDelay` |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `stochastic.py` (`GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, `u = μ(x) + σ(x) ε(t)` with `ε` the noise block's counter signal of its seed at `⌊t/Δ⌋`, `seed=None` the mean; `log_prob` and `entropy` as methods; `SquashedGaussianPolicy` in a box, R129), `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `stochastic.py` (`GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, `u = μ(x) + σ(x) ε(t)` with `ε` the noise block's counter signal of its seed at `⌊t/Δ⌋`, `seed=None` the mean; `log_prob` and `entropy` as methods; `SquashedGaussianPolicy` in a box), `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -95,7 +95,7 @@ state-feedback block):
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
-| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ` and its `plot_pzmap` with the unit circle, R175), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
+| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ` and its `plot_pzmap` with the unit circle), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `step_problems.py` and `step_face.py` (the step problem and the compiled step face), `results.py`, `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -189,7 +189,7 @@ rate; step and sampled systems live on sibling types and separate compile and si
 (`StepSystem` beside `DynamicSystem`), and nothing of theirs enters `DynamicSystem`, flow
 `compile()` or `Simulator`.
 
-**The sampled loop is a step diagram on a clock** (R146, R158, R174). `%` means one thing: this
+**The sampled loop is a step diagram on a clock**. `%` means one thing: this
 block runs on the computer at period `Δ`. The block's kind (its base class) decides what its
 third argument is, never the operator:
 
@@ -248,7 +248,7 @@ for a rate names it (`filt % 0.01`); one inside a nested box clocked slower than
 is refused at compile, since it would tick faster there than in its box alone. The loop's plant
 (the one continuous system, at any depth) is what the dense run keeps the substeps of and the
 host runner integrates adaptively; the dense run, the substeps and the host runner exist exactly
-when the loop has one. Signals propagate within the tick (R125): a delay is a
+when the loop has one. Signals propagate within the tick: a delay is a
 block. A run records signals from its own signal pass: `compute_trajectory(record=("path/block:port",
 …))` keeps each tick's value held over its period (the end sample the last tick's) in the
 trajectory's `signals`, `compute_rollout(record=)` the same at the ticks, and a loop with a
@@ -333,7 +333,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   verbose line appends a planner's own account (MPPI's `S_min`, `effective_samples` of `K`).
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
   delay=False, warm_start=True, backend=None, verbose=False)` closes a planner's compiled face
-  `pv = planner.compile()` on the loop, one solve per tick, `(mpc % dt) @ plant` (R176). Every
+  `pv = planner.compile()` on the loop, one solve per tick, `(mpc % dt) @ plant`. Every
   MPC is one architecture, a box of pure blocks (`PredictiveController`, a
   `SampledDiagramSystem`; `mpc % dt` clocks its blocks): `PlanSolver` under the id `solve`
   (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0)`), `PlanCommand` under `command`
@@ -431,21 +431,20 @@ Applies to every method CONSTITUTION §2 names ('One signature'), and also to po
 computes, transcriptions and the `MathematicalProgram` `J`/`h`/`g`.
 Native in, native out; no `np.asarray` / `float()` inside equation paths. Convert at
 boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object reads its
-`params` (R169); the written exceptions are listed below.
+`params`; the written exceptions are listed below.
 
 ### Parameters
 
 - `params is None` → `self.params`; any other value overrides (never
   `params or self.params`).
-- **One contract for every core math object (R140).** Its mathematics is a function of its
+- **One contract for every core math object.** Its mathematics is a function of its
   arguments and `params` (`f`, `h`, `step`, `g`, `margin`, `value`, `sample`); it has a
   `params` dict, `{}` when it has none; a composed object's `params` is its parts' dicts, by a
   dotted path; the leaves are numbers and numeric arrays, an integer leaf (a seed) never in
   `wrt`; every function is deterministic given its parameters, the seed among them.
   `tests/unittest/test_contract.py` walks every public system, cost, set and law on both
   backends (`params=None` its defaults, the same values twice, the JAX numbers the NumPy ones,
-  a finite gradient through a float leaf). Every number that is not structure is a leaf
-  (R169): a field's numbers are leaves of the set's and the cost's tree (`{"field": …}`, a
+  a finite gradient through a float leaf). Every number that is not structure is a leaf: a field's numbers are leaves of the set's and the cost's tree (`{"field": …}`, a
   shaping's under `"shaping"`), a shape's and a path's of the scene's and the track's, an LTI
   block's matrices of its own (`{"A", "B", "C", "D"}`), a lookup policy's table and levels, a
   replayed signal's times and values, a model-based law's model under `"model"`. A number
@@ -457,15 +456,15 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   blocks', walked as blocks); `Trajectory` (a record, not a function); a hand-written
   `MathematicalProgram` without `params` (`J(z)` alone); a student-written model (RULES 2.3). A base class's
   `params` is each instance's own dict (`{}` until it assigns one), never one shared dict.
-- **One keyword per kind of choice (R134).** `backend=` is the array module (`"numpy"`,
+- **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
   optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
   optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
-- **One word for a run's origin (R164):** `t_start`, on every runner (`compute_trajectory`,
+- **One word for a run's origin:** `t_start`, on every runner (`compute_trajectory`,
   `compute_forced`, `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
-- **Two words for two times (R157).** `dt` is the step of a computation and names it at every
+- **Two words for two times.** `dt` is the step of a computation and names it at every
   call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
   `sample_period` is the clock a block holds and names it on every such block (the sampled
   system, the noise sources, the seeded policy). `discretize(plant, dt, substeps=4)` shows the
@@ -809,7 +808,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (§5, "Automatic grid"), rounded down to divide `Δ`. A held block is read like any block,
   at each stage's time: the last RK4 stage of a step ending on a switch reads the next draw,
   first order at the switches, an approximation below what a held-noise model claims (a finer
-  `dt` tightens it; R188). A step that does not divide `Δ`, a forced
+  `dt` tightens it). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
@@ -922,7 +921,7 @@ is marked `@compiled` (a step evaluator's `rollout` through its scan, returning 
 `(N + 1, n)` arrays) (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
 on first use and cached per evaluator, the knobs (`solver`, `substeps`, `hold`, `n_steps`)
 static. Every leaf of `params` is numeric (floats, numeric arrays, or integer seeds; never
-a `bool` or `str` mode switch, which belongs on the constructor, R118), so the whole
+a `bool` or `str` mode switch, which belongs on the constructor), so the whole
 `params` tree traces directly. A compiled method is fast from Python and composes inside an outer `jit`, `grad`,
 `vmap` or `scan` with the numbers of the uncompiled body, so there is one name per method:
 no parametric twin, no trace tier, no `jit` namespace.
@@ -939,7 +938,7 @@ the compiled ones (the frozen form), else the live tree (the parametric form), s
 sweep on one tool compiles once. A convenience call (`compute_trajectory`, `problem.compile`,
 `closed_loop`) compiles each time, so it sees every edit; speed is a tool held by the user
 (`Simulator(sys, backend="jax")`, `pe = problem.compile(ctl)`, `planner.compile()`), built
-once and run many times (R168: no cache, no hidden registry). The `jit` sits at the outermost pure
+once and run many times (no cache, no hidden registry). The `jit` sits at the outermost pure
 computation of each pipeline: the rollout (not `f`), the problem's trial function, the
 fixed-count solve and the fused first-order step, the RL rollout; a host loop (SciPy, a
 host SLSQP) calls jitted `f`, Jacobian, objective and gradient.
@@ -963,7 +962,7 @@ one period after the sampling instant `t` (a continuous source integrated by `so
 or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of a linear model;
 a static source has `n = 0`), its output ports functions in seconds; the tick face
 `step(x, u, k)` and `h(x, u, k)`, `t_k = k·sample_period` (the origin 0; a consumer with an origin
-calls the seconds face, R158). A tick source (a `StepSystem`) keeps its count and has no seconds
+calls the seconds face). A tick source (a `StepSystem`) keeps its count and has no seconds
 face (`counts` is true). The sample time is `dt` alone, never a key of the plant's `params`. The
 hold belongs to sequences (`rollout`), never to a step.
 
@@ -1045,7 +1044,7 @@ hint belongs on the block: one set by hand on the diagram is replaced, and so is
 a block that computes its own (change its `params`, or pass `dt=`).
 `StaticSimulator` shares the 10001-point default.
 
-**Three owners of a start (R124).** A block owns its `x0`; a diagram's `x0` is a view
+**Three owners of a start.** A block owns its `x0`; a diagram's `x0` is a view
 stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
 through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
 `SampledSystem`'s `x0` is its source's. `refresh()` only rebuilds the stacked layout after a
@@ -1080,13 +1079,13 @@ and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_sls
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
 constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
-declare parameters (R130): `MathematicalProgram(..., params=tree)` takes callables of
+declare parameters: `MathematicalProgram(..., params=tree)` takes callables of
 `(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` merges a partial
 tree once onto the defaults (`core.params.merge_known`: an unknown path raises naming the known
 ones, a new shape raises) and binds it, so one compiled program is solved for many values
 without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
 body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
-differentiates in `z`. **The stochastic program is the seed case** (R131): every program is
+differentiates in `z`. **The stochastic program is the seed case**: every program is
 deterministic given its parameters, the seed one of them, an integer leaf found by the key
 `seed` and never a decision (`pe.program` refuses a seed in `wrt`); complete trees inside, one
 merge at the boundary; sizes structural (the knots `N`, the iterations `K`, a batch size are
@@ -1094,17 +1093,17 @@ constructor arguments, never parameters); the warm start an argument of the solv
 core's sample-average export is `pe.program(wrt, key=, n_trials=)`: the draws realized once
 from `key`, so `J` is deterministic and any method solves it; how a solver uses the seed
 (advanced per iteration, `vmap`ped) is an `Optimizer` strategy for later. **The native
-methods** `gd` and `adam` are pure laws on the array module of their input (R132,
-`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
+methods** `gd` and `adam` are pure laws on the array module of their input
+(`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
 gradient oracle beside it, the box projection in the step). `Optimizer(program, method=,
-iterations=K)` takes exactly `K` steps (R149): one `lax.scan` on a JAX program, so
+iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
 `solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
 `success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
 `iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
 jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
 the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
 iterates. The failure cost of
-an evaluation follows its cost's numbers (R165): the bound is taken at the overridden weights,
+an evaluation follows its cost's numbers: the bound is taken at the overridden weights,
 once per value (cached), and under a trace at the problem's own (a failure cost is a step, with no
 gradient). One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
@@ -1113,12 +1112,12 @@ among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous horizon `tf` and its start `t_start` (R148: the
+`U=plant.input_box`), cost, the continuous horizon `tf` and its start `t_start` (the
 horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
 transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
 evaluator's tree, so `jax.grad` differentiates it), the discount rate and the failure cost
-switch (below). **The boundary dials** (R177): `X0=` is the start constraint `x(0) ∈ X0` (a
+switch (below). **The boundary dials**: `X0=` is the start constraint `x(0) ∈ X0` (a
 vector is its singleton; by default the start's singleton, a law's support, else the
 singleton at `sys.x0`); `Xf=` the terminal constraint (a vector its singleton, a hard terminal
 equality for collocation and shooting; `None` a free end); `x_start=` the evaluation start, a
@@ -1136,7 +1135,7 @@ for the trajectory family — `solution.open_loop` — or a time-varying feedbac
 `u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
 names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
-bounds the command, since the Riccati law never reads `U` (R21, amended by R186: LQR never
+bounds the command, since the Riccati law never reads `U` (LQR never
 warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
@@ -1176,7 +1175,7 @@ the RL planner.
 The discount rate `rho` is the problem's, `problem.discount_rate`; planners convert it
 with `problem.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` and `U` are hard
 constraints in every tool: a run that leaves them is a failure. **The failure switch**
-(R172) `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
+`penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
 facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
 number, `None` for the cost bound). **The cost bound** is one formula owned by the problem,
 `cost_bound(tf=None, *, discount_rate=None, dt=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
@@ -1211,7 +1210,7 @@ J                   = cost, or with penalize_failure on cost + failure_cost · (
                       and cost_bound + failure_cost for a run not finite
 ```
 
-**The stage cost is integrated with the state** (R142): the evaluator's run carries the running
+**The stage cost is integrated with the state**: the evaluator's run carries the running
 cost `C(t) = ∫ e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
 scheme and substeps, read at the plant block's own state and input in the pass that computes
 `dx` (a sampled loop: inside the plant's period, `SampledSystem.update_with_cost`), recorded as
@@ -1229,7 +1228,7 @@ has the plant's `n`, `u` its `m`, and it carries no recorded signals (a logged r
 trajectory with recorded signals and no role is refused.
 `evaluate_trajectory(problem, traj)` scores a trajectory already held (a loop's run
 through its `plant` role; a logged plant run without signals). **The planning problem defines
-the problem** (R171, R173): a tool may plan or train on a modified copy of it and its record names
+the problem**: a tool may plan or train on a modified copy of it and its record names
 the modification, but the score is always the problem's. RL *trains* on `r_k = −g(x_k, u_k, t_k)
 dt`, one call of the cost's `g` at the period's start (`reward="stage"`: `−c_k`, the face's stage
 cost `∫₀^dt e^{−ρτ} g dτ`, the score's), with per-step factor `gamma`; `exp(-rho t)` is not folded
@@ -1239,25 +1238,24 @@ reward) is internal and consistent: the tool plans on the problem at `ρ_tool = 
 stage integral and the step both, names it in its record, and its policy is scored at the
 problem's `ρ`.
 
-**A problem stochastic by its parts (R143):** there is no stochastic class; where a number
+**A problem stochastic by its parts:** there is no stochastic class; where a number
 goes, a law may go. `x_start=` takes a point, a `Set` (the uniform law on it, the set its
 `X0`) or a `Distribution` (its mean the representative `x_start`, its support the default
 `X0`); `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
 a block inside a diagram plant by its id); `disturbances=` takes source blocks on the plant's
-ports (`{"d": WhiteNoise(...)}`, R128; a bare law is refused, naming the fix); `criterion`
+ports (`{"d": WhiteNoise(...)}`; a bare law is refused, naming the fix); `criterion`
 (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the mean of the worst `alpha`
 fraction; an evaluation's `objective` is this reduction of the runs' `J`, and the RL planner,
 which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
 parts; `problem.params` shows each law at its leaf and the start's law under `"x_start"`;
-`problem.realize(key, n)` is one tree (R144): the problem's numbers with `"x_start"` of shape
+`problem.realize(key, n)` is one tree: the problem's numbers with `"x_start"` of shape
 `(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
 path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
 law or a source leaves every other draw unchanged, and an integer key draws on the host: the
 same trials on NumPy and JAX. `realize(None)` draws nothing: every law at its mean, every seed
 `None`; `nominal()` is that tree written into a copy of the problem's parts (the caller's
-untouched), the random sources kept with seed `None`, their mean signal. The evaluated loop is exactly the one `closed_loop` builds with the same sources (R128:
-two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
+untouched), the random sources kept with seed `None`, their mean signal. The evaluated loop is exactly the one `closed_loop` builds with the same sources (two forms, one diagram): the source of `d` is its block `disturbance`, of `n` its `noise` (a
 `Sum` on the command or the measurement when the plant has no such port), any other port's
 under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
 trial for every random block of the loop, the problem's sources or the loop's own, even on a
@@ -1272,10 +1270,10 @@ from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto")` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once. The
-controller's kind decides the loop (R105): a continuous law runs the continuous diagram on the
+controller's kind decides the loop: a continuous law runs the continuous diagram on the
 grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
-refused, naming the period (R158), `solver` and `substeps` its plant's integration per base period (`None`, the
+refused, naming the period, `solver` and `substeps` its plant's integration per base period (`None`, the
 automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
 them) with no clock is refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
@@ -1289,9 +1287,9 @@ output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
 problem `vmap`ped on JAX, so `jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`
 reaches every gain, plant parameter, cost weight and the start; a tree holding an integer leaf (a
 noise block's `seed`) is differentiated with `jax.grad(..., allow_int=True)`, the integer leaves
-getting a zero (`float0`) gradient (R152); that reads a gradient, since `float0` leaves refuse
+getting a zero (`float0`) gradient; that reads a gradient, since `float0` leaves refuse
 the next tree arithmetic, and tuning goes through `pe.program(wrt)`, which never sees an
-integer leaf (R131). `solver="scipy*"` is the
+integer leaf. `solver="scipy*"` is the
 adaptive integral on NumPy, `dt` its reporting grid; `"auto"` falls back to NumPy when the
 loop, the cost or a set does not trace. `pe.program(wrt, bounds, key, n_trials,
 params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted paths,
@@ -1308,9 +1306,8 @@ with no gradient, and a non-finite objective at `z0` warns once. The feedback pl
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
 a planner's evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
-`planning/planner.py`, an internal helper the seven planners' `solve()` call, R181) runs on
-the real plant: a feedback law with no clock of its own held over each period, `policy % dt`
-(R159), the plant integrated at the automatic step (§5, R180), the planner's own `J` in its
+`planning/planner.py`, an internal helper the seven planners' `solve()` call) runs on
+the real plant: a feedback law with no clock of its own held over each period, `policy % dt`, the plant integrated at the automatic step (§5), the planner's own `J` in its
 record beside it, so the evidence does not repeat the planner's own belief; an open-loop
 source keeps the interpolation its planner states. Scoring a law is the problem evaluator's:
 `problem.compile(ctl % dt).evaluate()`, `substeps=` for the planner's own physics.
@@ -1331,17 +1328,17 @@ source keeps the interpolation its planner states. Scoring a law is the problem 
   the margins are the numbers a course reports, not an NLP objective (a smooth bound, the
   sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
 
-**The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
+**The step face (`planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
 substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
 -> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
-beside the state by the same scheme (`g·dt` to the last bit under one Euler step, R142),
+beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
 `N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
 (`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
 cost, `x_start`, `t_start`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
 (`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
 face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit step problem
-of a continuous one, its cost a `SampledCost` (R154), compiling to the same face to the bit.
+of a continuous one, its cost a `SampledCost`, compiling to the same face to the bit.
 Value iteration, the RL environment and a planner's evidence read only this face.
 
 The pipeline in two pictures. Every object carries its own parameters `p` (the amber tab on
@@ -1396,13 +1393,13 @@ Flax/Optax dependency. Training prints one line per update; `verbose=False` sile
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
 step functions on either backend — the step face's `transition` with the training reward `r = −g dt` (`reward="stage"`: `r = −c_k`),
 the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
-the first failure, a training device, R159) and the horizon — shared by the JAX collectors
+the first failure, a training device) and the horizon — shared by the JAX collectors
 and the tabular learners, so one object owns what a training episode means (an evaluation
 scores the learned law by `evaluate`, the law held over each period). The heads draw at a JAX
 key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
-tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes (R160). The discount is
+tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes. The discount is
 the problem's `e^{−ρ dt}` unless `gamma=` overrides it, and the record (`gamma`,
-`scored_gamma`) says when the two differ (R150).
+`scored_gamma`) says when the two differ.
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the
@@ -1438,7 +1435,7 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 `solve_trajectory` always rebuilds a fresh
 `MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
-(PP-2, PP-3, R148): `x_start` (the start's residual when `X0` is the start's singleton),
+(PP-2, PP-3): `x_start` (the start's residual when `X0` is the start's singleton),
 `t_start`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
 bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
@@ -1450,15 +1447,15 @@ of the problem holding the values (the caller's parts unchanged): one API at two
 one-time speed warning is emitted only when a JAX planner omits parametric compile. The
 reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
 tree costs 1.34× the compile, 1.14× the solve and 1.51× an evaluator call of the same program
-with it frozen on the bicycle MPC (R156's bar is 2×). Every transcription's objective is the
+with it frozen on the bicycle MPC (the bar is 2×). Every transcription's objective is the
 problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
 `w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face** (R148):
+`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
 `z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
-`pv.params` the tree (`planner.params`: **one shape for every planner** (R170), the problem's
+`pv.params` the tree (`planner.params`: **one shape for every planner**, the problem's
 leaves the plan reads, `"method"` the method's numbers (a native law's `learning_rate`, `b1`,
 `b2`, `eps`; MPPI's `temperature`, `noise`, `control_cost`; the RL planner's `gamma` and its
 algorithm's and optimizer's numbers; `{}` for a host method, whose name and tolerances are
@@ -1500,7 +1497,7 @@ continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid 
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
 works on both); `grid.X` and `grid.U` are the boxes it spans. The grid reads the problem's
-step face (`grid.face`, R141): the successors are one period of the step model, forward
+step face (`grid.face`): the successors are one period of the step model, forward
 Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
 step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
 `c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),

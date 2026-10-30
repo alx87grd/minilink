@@ -54,11 +54,10 @@ concrete formatting, ordered by the cost of being wrong:
   (floats, numeric arrays, and integer PRNG seeds; never `bool` or `str` flags). Structural
   choices that change which equation or branch runs (`gravity_comp`, `tracking_ref`, `hold`,
   `interpolation`) are fixed at `__init__` (for example by binding a port's compute function
-  to `ctl` vs. `ctl_with_gravity`), never stored in `params` (ruled 2026-10-25, R118).
+  to `ctl` vs. `ctl_with_gravity`), never stored in `params`.
   An explicit override on a diagram or evaluator is the complete nested tree (every
-  block id present) or `None` for the compile snapshot; a missing block is an error
-  (ruled 2026-10-25, R121). Live mutation of one number stays `sys.params["m"] = 4`.
-  The same holds for every core math object (R140): a cost, a set, a distribution, a field
+  block id present) or `None` for the compile snapshot; a missing block is an error. Live mutation of one number stays `sys.params["m"] = 4`.
+  The same holds for every core math object: a cost, a set, a distribution, a field
   have a `params` dict (`{}` when they have none), read when the call passes `None`; a
   composed object's `params` is its parts' dicts, by a dotted path; every function is
   deterministic given its parameters, the seed among them. The written exceptions are DESIGN
@@ -91,8 +90,7 @@ concrete formatting, ordered by the cost of being wrong:
   derivative, the optimizer's algorithm, the interpolation, the certificate family); `solver=`
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
   `compute_forced`, `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
-  `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule
-  (ruled 2026-10-23, R42).
+  `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
 
 ---
 
@@ -545,7 +543,7 @@ concrete formatting, ordered by the cost of being wrong:
   `lqr`, an integration loop behind `compute_trajectory`), one teaching place writes the mechanism
   out in a few lines, then shows the one-line tool doing the same and agreeing with it; every other
   demo and notebook uses the tool. One place per mechanism, named in the doc that owns the tool
-  (ruled 2026-10-23, R75, amended 2026-10-25, R91: the closing PID example,
+  (the closing PID example,
   `examples/demos/compile/pid_autotuning_jax.py`, for gradient descent).
 
 ---

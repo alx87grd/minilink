@@ -8,14 +8,13 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 
 A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
-file. The v0.3 core's rulings are the architecture of record
-(R166). `§N` names the workstream of
+file. The v0.3 core's rulings are the architecture of record. `§N` names the workstream of
 [ROADMAP §5.3](ROADMAP.md#53-v03--the-complete-core), the same N as TODO §1.N.
 
 ## The core
 
-The v0.3 core's architecture is of record (2026-10-28, R166). The questions the independent
-review of the two runs raised were ruled on 2026-10-29 (R168–R179); they landed on
+The v0.3 core's architecture is of record. The questions the independent
+review of the two runs raised were ruled on 2026-10-29; they landed on
 `dev-v0.3` the same day. Its run's decisions taken without you, and those of the three runs before it, are sorted
 for one sitting in the merge-review triage. Nothing else is open here.
 
@@ -23,10 +22,10 @@ for one sitting in the merge-review triage. Nothing else is open here.
 
 ### How does a public name change once v1.0 is frozen?
 - **Your answer (2026-10-27):** not a `DeprecationWarning` shim for one minor release, as
-  proposed; the policy stays open (R139). R82 (no alias, one sweep) holds meanwhile.
+  proposed; the policy stays open. No alias, one sweep, holds meanwhile.
 - **Blocks:** the trust contract (V4); the renames that wait for the freeze (`xbar` / `ubar` →
-  `x_bar` / `u_bar`, `plot_cost2go` → `plot_cost_to_go`; `NeuralPolicy` moved to v0.3, R151).
-- **Today:** no alias or shim ever (R82). The frozen names are drawn at v0.9 from one rule (R139).
+  `x_bar` / `u_bar`, `plot_cost2go` → `plot_cost_to_go`; `NeuralPolicy` moved to v0.3).
+- **Today:** no alias or shim ever. The frozen names are drawn at v0.9 from one rule.
 - **Options still open:** do the pending renames before the freeze, so none is needed after it;
   a shim of another length; a major version per rename; a snapshot test of the export list
   either way.

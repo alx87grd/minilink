@@ -22,7 +22,7 @@ def quadratic(plant):
     return QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
 
 
-# --- R1: cost horizon and discount, problem exit rule ---
+# --- cost horizon and discount, problem exit rule ---
 
 
 def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
@@ -173,7 +173,7 @@ def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_perio
     assert planner.problem.discount_rate == 1.0
 
 
-# --- R2: distributions and the stochastic problem ---
+# --- distributions and the stochastic problem ---
 
 
 def test_distributions_sample_on_numpy():
