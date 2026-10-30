@@ -23,7 +23,11 @@ from minilink.graphical.animation.primitives import (
     TorqueArrow,
     world_to_camera,
 )
-from minilink.graphical.animation.renderers.renderer import AnimationRenderer
+from minilink.graphical.animation.renderers.renderer import (
+    AnimationRenderer,
+    axis_label_from_column,
+    camera_is_world_xy,
+)
 from minilink.graphical.common.environment import is_blocking_needed
 from minilink.graphical.common.matplotlib_style import (
     DPI_EXPORT,
@@ -32,8 +36,6 @@ from minilink.graphical.common.matplotlib_style import (
     FONT_SIZE,
     style_animation_axes,
 )
-
-_AXIS_LABEL_BY_INDEX = ("X", "Y", "Z")
 
 
 def gif_export_path(file_name) -> Path:
@@ -48,19 +50,6 @@ def gif_export_path(file_name) -> Path:
     return path
 
 
-def _axis_label_from_column(col):
-    """Return ``"X" / "Y" / "Z"`` if *col* is (close to) an axis-aligned unit vector, else ``""``."""
-    col = np.asarray(col, dtype=float).reshape(3)
-    abs_col = np.abs(col)
-    i = int(np.argmax(abs_col))
-    if abs_col[i] < 0.999:
-        return ""
-    other = np.delete(abs_col, i)
-    if np.any(other > 1e-3):
-        return ""
-    return ("-" if col[i] < 0 else "") + _AXIS_LABEL_BY_INDEX[i]
-
-
 def _camera_3d_view_init(camera):
     """Decode matplotlib ``view_init(elev, azim)`` from camera-Z (view-out direction)."""
     view_out = np.asarray(camera[:3, 2], dtype=float).reshape(3)
@@ -71,15 +60,6 @@ def _camera_3d_view_init(camera):
     elev = float(np.degrees(np.arcsin(np.clip(v[2], -1.0, 1.0))))
     azim = float(np.degrees(np.arctan2(v[1], v[0])))
     return elev, azim
-
-
-def _camera_is_world_xy(camera) -> bool:
-    """True when 2D drawing can stay in world XY and move only axis limits."""
-    R_xy = np.asarray(camera[:3, :2], dtype=float)
-    return bool(
-        np.allclose(R_xy[:, 0], [1.0, 0.0, 0.0])
-        and np.allclose(R_xy[:, 1], [0.0, 1.0, 0.0])
-    )
 
 
 class MatplotlibCanvas:
@@ -449,14 +429,14 @@ class MatplotlibRenderer(AnimationRenderer):
             if view is not None:
                 ax.view_init(elev=view[0], azim=view[1])
         else:
-            if _camera_is_world_xy(camera):
+            if camera_is_world_xy(camera):
                 ax.set_xlim(target[0] - scale, target[0] + scale)
                 ax.set_ylim(target[1] - scale, target[1] + scale)
             else:
                 ax.set_xlim(-scale, scale)
                 ax.set_ylim(-scale, scale)
-            ax.set_xlabel(_axis_label_from_column(camera[:3, 0]))
-            ax.set_ylabel(_axis_label_from_column(camera[:3, 1]))
+            ax.set_xlabel(axis_label_from_column(camera[:3, 0]))
+            ax.set_ylabel(axis_label_from_column(camera[:3, 1]))
             ax.set_aspect("equal")
 
     def _create_figure_and_ax(self, is_3d, camera):
@@ -492,7 +472,7 @@ class MatplotlibRenderer(AnimationRenderer):
         # pairs still project onto the selected camera plane.
         # 3D matplotlib keeps world coordinates; limits and ``view_init`` come from the
         # camera once at ``open_scene``, then the interactive UI owns the viewpoint.
-        if self.canvas.is_3d or _camera_is_world_xy(camera):
+        if self.canvas.is_3d or camera_is_world_xy(camera):
             draw_transforms = transforms
         else:
             W = world_to_camera(camera)
@@ -546,7 +526,7 @@ class MatplotlibRenderer(AnimationRenderer):
             canvas.clear()
             camera = frame["camera"]
             frame_primitives = frame["primitives"]
-            if is_3d or _camera_is_world_xy(camera):
+            if is_3d or camera_is_world_xy(camera):
                 draw_transforms = frame["transforms"]
             else:
                 W = world_to_camera(camera)

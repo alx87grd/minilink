@@ -24,9 +24,9 @@ from minilink.graphical.animation.primitives import (
     world_to_camera,
 )
 from minilink.graphical.animation.renderers.matplotlib_renderer import (
-    _axis_label_from_column,
     _camera_3d_view_init,
 )
+from minilink.graphical.animation.renderers.renderer import axis_label_from_column
 from minilink.graphical.common.environment import override_env
 
 
@@ -232,14 +232,14 @@ class TestAnimatorPipesCameraToRenderer(unittest.TestCase):
 
 class TestRendererHelpers(unittest.TestCase):
     def test_axis_label_axis_aligned(self):
-        self.assertEqual(_axis_label_from_column([1.0, 0.0, 0.0]), "X")
-        self.assertEqual(_axis_label_from_column([0.0, 1.0, 0.0]), "Y")
-        self.assertEqual(_axis_label_from_column([0.0, 0.0, 1.0]), "Z")
-        self.assertEqual(_axis_label_from_column([-1.0, 0.0, 0.0]), "-X")
+        self.assertEqual(axis_label_from_column([1.0, 0.0, 0.0]), "X")
+        self.assertEqual(axis_label_from_column([0.0, 1.0, 0.0]), "Y")
+        self.assertEqual(axis_label_from_column([0.0, 0.0, 1.0]), "Z")
+        self.assertEqual(axis_label_from_column([-1.0, 0.0, 0.0]), "-X")
 
     def test_axis_label_blank_for_oblique(self):
         v = np.array([1.0, 1.0, 0.0]) / np.sqrt(2)
-        self.assertEqual(_axis_label_from_column(v), "")
+        self.assertEqual(axis_label_from_column(v), "")
 
     def test_view_init_decode_default_top_down(self):
         T = camera_matrix()
