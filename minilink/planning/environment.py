@@ -308,10 +308,6 @@ class RolloutEnvironment:
         """The cost of a failure at ``(x, t)``: one number for every exit."""
         return self.failure_cost
 
-    def full_params(self, params):
-        """The plant's params with the episode's draws merged in (other entries untouched)."""
-        return merge_tree(self.sys.params, params)
-
     def describe(self) -> str:
         """One line naming the horizon, the reward, the cost of a failure, the training zone and the randomization."""
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
