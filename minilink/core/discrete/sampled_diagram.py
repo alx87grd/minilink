@@ -375,9 +375,7 @@ def base_period_of(periods):
                 f"a block's period {p!r} s is not a whole number of nanoseconds; "
                 "give the clocks commensurate periods"
             )
-    base = 0
-    for n in ticks:
-        base = gcd(base, n)
+    base = gcd(*ticks)
 
     return base / NANOSECONDS_PER_SECOND
 
