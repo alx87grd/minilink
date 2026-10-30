@@ -139,7 +139,8 @@ class RolloutEnvironment:
         # Input vector: the action fills its port, disturbances fill theirs
         self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
-        self.nominal_inputs = self.nominal_port_values()
+        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
+        self.nominal_inputs = self.sys.get_port_values_from_u(u_nominal)
 
         # The cost a failure is charged: declared on the problem, else the face's cost
         # bound over the episode, the sum the return runs
@@ -206,6 +207,7 @@ class RolloutEnvironment:
         X = self.X
         U = self.U
         zone = self.training_zone
+        failure_cost = self.failure_cost
         X_params = (params or {}).get("X", self.set_params)
         U_params = self.set_params
         tree = self.episode_tree(params)
@@ -243,8 +245,7 @@ class RolloutEnvironment:
         # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
         # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
-        penalty = self.failure_penalty(x_next, t_next)
-        reward = reward - xp.where(failed, penalty, 0.0)
+        reward = reward - xp.where(failed, failure_cost, 0.0)
         if finite_horizon:
             h_N = face.terminal(x_next, t_next, tree)
             reward = reward - horizon_reached * gamma * h_N
@@ -304,10 +305,6 @@ class RolloutEnvironment:
 
         return u_full
 
-    def failure_penalty(self, x, t):
-        """The cost of a failure at ``(x, t)``: one number for every exit."""
-        return self.failure_cost
-
     def describe(self) -> str:
         """One line naming the horizon, the reward, the cost of a failure, the training zone and the randomization."""
         kind = "finite horizon" if self.finite_horizon else "infinite horizon"
@@ -322,23 +319,6 @@ class RolloutEnvironment:
             f"state) terminates and is charged {charged}; leaving the training zone "
             f"truncates (value bootstrapped){randomized}"
         )
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def nominal_port_values(self):
-        """The nominal value of each input port, in port order."""
-        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
-
-        # The nominal input vector cut into its ports
-        values = {}
-        i = 0
-        for port_id, port in self.sys.inputs.items():
-            values[port_id] = u_nominal[i : i + port.dim]
-            i += port.dim
-
-        return values
 
 
 ###############################################################################

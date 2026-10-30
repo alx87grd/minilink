@@ -419,16 +419,10 @@ class DirectCollocationTranscription(Transcription):
         return xp.asarray(self.options.offsets(problem))
 
     def jax_unpacker(self, problem: PlanningProblem):
-        """``unpack_jax(z) -> (x, u)``: the knots packed in ``z``, the states row by row, then the inputs."""
-        n = int(problem.sys.n)
-        m = int(problem.sys.m)
-        n_steps = int(self.options.n_steps)
+        """``unpack_jax(z) -> (x, u)``: :meth:`unpack` on the traced ``z``."""
 
         def unpack_jax(z):
-            split = n * n_steps
-            x = z[:split].reshape(n, n_steps)
-            u = z[split:].reshape(m, n_steps)
-            return x, u
+            return self.unpack(z, problem)
 
         return unpack_jax
 
