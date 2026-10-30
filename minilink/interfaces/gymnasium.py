@@ -259,6 +259,7 @@ class Sys2Gym(gym.Env):
     # Internal machinery
 
     def _init_render(self):
+        # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.animation.animator import Animator, make_renderer
 
         self._animator = Animator(self.sys)
@@ -381,6 +382,7 @@ def _compiled_step(sys, backend):
     branches). Under JAX the whole step is one jitted call.
     """
     if backend is None:
+        # Lazy import: the compiler loads on first use, not with the interface
         from minilink.core.compile.compiler import compile_auto
 
         backend, evaluator = compile_auto(sys)
