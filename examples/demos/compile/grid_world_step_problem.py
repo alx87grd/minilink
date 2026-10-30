@@ -3,8 +3,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import StepCost, StepPlanningProblem, StepSystem
-from minilink.planning import DynamicProgrammingPlanner
+from minilink import StepSystem
+from minilink.core import StepCost
+from minilink.planning import DynamicProgrammingPlanner, StepPlanningProblem
 
 SIZE = 9  # cells per side
 GOAL = np.array([7.0, 2.0])  # the goal cell

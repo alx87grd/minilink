@@ -280,6 +280,21 @@ class TestTeachingSurface(unittest.TestCase):
                 f"minilink.{name} lives in the research lane ({home})",
             )
 
+    def test_the_step_problem_names_live_on_their_bands_not_the_root(self):
+        """``StepPlanningProblem``, ``StepCost`` and ``SampledCost`` stay off the root until a lesson uses them."""
+        root = importlib.import_module("minilink")
+        bands = {
+            "StepCost": "minilink.core",
+            "SampledCost": "minilink.core",
+            "StepPlanningProblem": "minilink.planning",
+        }
+        for name, band in bands.items():
+            with self.subTest(name=name):
+                self.assertNotIn(name, root.__all__)
+                self.assertFalse(hasattr(root, name))
+                self.assertIn(name, importlib.import_module(band).__all__)
+        self.assertIn("StepSystem", root.__all__)
+
     def test_every_band_facade_is_checked_like_the_root(self):
         """Each band's ``__all__`` in full, not only its registry row.
 
