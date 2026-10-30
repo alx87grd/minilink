@@ -97,3 +97,4 @@ venv.bak/
 !docs/_static/*.png
 !docs/plans/*.png
 !docs/_static/showcase/*.html
+!docs/presentation.html
