@@ -135,8 +135,10 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   on step and sampled operands (a continuous operand beside a step one refused, naming `%`);
   step evaluators that trace and batch (`rollout` one `lax.scan`, `rollout_batch` one `vmap`);
   one signal pass per tick; `compute_rollout` a `Trajectory`; `jacobian` on a step evaluator.
-  Rest: `linearize` and poles against the unit circle (R122) have no step tool yet; the loops
-  still written around the one-period formula are listed in the v0.3 run log §4.
+  In the consolidation (R175): `linearize` on a step or sampled system returns a
+  `DiscreteLTISystem`, and `bode`, `margins`, `nyquist` and the pole-zero map read it against
+  the unit circle; `root_locus` and `step_response` stay continuous. The loops still written
+  around the one-period formula are listed in the v0.3 run log §4.
 - **Open:** nothing at the design level.
 - **Rows:** [TODO §1.2](TODO.md#12-the-step-algebra-first-class).
 
@@ -228,8 +230,8 @@ terminal = QuadraticField(P, x_bar).as_terminal_cost()   # §9: the LQR value en
   refused, N-8); the two run verbs (`compute_rollout`; `compute_trajectory` on `rollout_dense`,
   the plant integrated once per period); the host clock runner (`solver="scipy"`); the sampled
   face of `problem.compile`; the signals recorded in the run (`record=`, N-1); the legacy
-  runtime gone. Rest: the realtime runner on the pure blocks (v0.4, R161); `compute_rollout`
-  takes no `record=` yet (a ticks run records nothing).
+  runtime gone; `compute_rollout(record=)` keeps the ticks of the dense run (the consolidation).
+  Rest: the realtime runner on the pure blocks (v0.4, R161).
 - **Open:** the lazy `core` → `simulation` import is DESIGN §3's dependency-law exception.
   Settled 2026-10-28: the realtime runner's re-base is a v0.4 feature (R161); the left operand
   of `@` is `controller`, box or block (R162); the conventions' first sampled-loop step is folded
