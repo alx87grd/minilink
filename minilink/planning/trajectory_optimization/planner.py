@@ -1133,7 +1133,7 @@ def type_name(value: object | None) -> str | None:
 
 def require_parametric_transcription(transcription):
     """Refuse a transcription that cannot build a parametric program."""
-    if not getattr(transcription, "supports_parametric", False):
+    if not transcription.supports_parametric:
         raise TypeError(
             f"{type(transcription).__name__} does not support a "
             "parametric program; use transcription='direct_collocation'."
