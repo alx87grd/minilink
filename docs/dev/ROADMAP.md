@@ -354,30 +354,35 @@ code, with no date. It supersedes R86's "v0.3 stays continuous". Where the piece
 - **The history of how v0.3 got here:** [the simplification record](../reviews/2026-10-26-plan-simplification.md)
   §4.
 
-**Landed, pending the maintainer's review (R79)** (2026-10-24/25, DESIGN §4–§6):
-- the step model (S75);
-- the path to the cost (V1's steps 1–6 and 7a, with the cost parameters A2 and the Monte Carlo
-  fold);
-- the optimizer's method table (S74);
-- the closing PID example (S77).
+**Landed, pending the maintainer's review (R79):**
+- 2026-10-24/25 (DESIGN §4–§6): the step model (S75); the path to the cost (V1's steps 1–6 and
+  7a, with the cost parameters A2 and the Monte Carlo fold); the optimizer's method table
+  (S74); the closing PID example (S77);
+- 2026-10-28/29, the v0.3 core run, the night run and the consolidation (R168–R179): the main
+  rows of every workstream below, acceptance scripts 1–7 and 10–12 as tests, the budget
+  (script 9) as `benchmarks/v03_budget.py`.
+
+The decisions those runs took without the maintainer are sorted for one sitting in
+[the triage](../reviews/2026-10-30-merge-review-triage.md); that review, then `dev-v0.3` into
+`dev` and the tag, are what v0.3 waits on.
 
 **The workstreams** (each with the go, R166). One number per workstream, the same in
-core-architecture §N and TODO §1.N:
+core-architecture §N and TODO §1.N; each one's main rows landed, and what is left is small:
 
-| § | Workstream | The main rows |
+| § | Workstream | Left (TODO §1.N) |
 | --- | --- | --- |
-| 1 | Every object pure, every number a parameter (invariant) | one contract for every core math object (R140, first), the names sweep (R134, R151), the three owners of a start (S29, R124), A5, RN-2, the sets as costs (was V1 step 8), one parameter-tree module, T1, T2 |
-| 2 | The step algebra first-class (invariant) | one same-tick semantic, the operators on step systems, step evaluators trace and batch, one signal pass per tick, the `StepRollout` fold, S53, S65 |
-| 3 | The draws | per-block seeds and disturbance signals, the one-tree `realize` (V1 step 7, RN-4, RN-5, AC-7), a problem stochastic by its parts (R143), RN-3, `Sys2Gym`'s start law |
-| 4 | The seeded stochastic policy | the seeded block (D29) |
-| 5 | The sampled loop: a step diagram, two runners | `SampledSystem`, periods on blocks and `SampledDiagramSystem` (S31, AC-8b, D13), the two run verbs, the host clock runner, the sampled face (was V1 step 7b) |
-| 6 | One score | `StepPlanningProblem`, the compiled step face, the judge, value iteration and RL on `transition`, the RL discount derived (R141, R142, R150; three points open) |
-| 7 | The parametric program; the stochastic program its seed case | S76 (PP-1–PP-5), `t_start`, OPW-1–OPW-5, the stochastic program |
-| 8 | The native proof of concept | NS-1, `iterations=K`, the planner's compiled face, the MPC rebuilt on it, its closed loop tuned by gradient (NS-8, NS-9; R148, R149) |
-| 9 | Fields | A1, `as_terminal_cost` (R153) |
-| 10 | Hardening and the merge | S66, material and contracts (was V1 step 9), the notebooks (R47), the merge (R79), the tag |
+| 1 | Every object pure, every number a parameter (invariant) | A5's later nouns, the sets-as-costs demos (was V1 step 8), T2 |
+| 2 | The step algebra first-class (invariant) | S53 (a parameter family's batch price), S65 (one owner per rule) |
+| 3 | The draws | RN-6, the contract in DESIGN |
+| 4 | The seeded stochastic policy | nothing |
+| 5 | The sampled loop: a step diagram, two runners | nothing (the realtime runner on the pure blocks is v0.4, R161) |
+| 6 | One score | a step problem's own tree: `realize` and the tick offset |
+| 7 | The parametric program; the stochastic program its seed case | the friction-aware MPC example from a port |
+| 8 | The native proof of concept | the compiled face of the LQR and value-iteration planners |
+| 9 | Fields | nothing |
+| 10 | Hardening and the merge | the maintainer's review, the student-facing numbers re-pinned, the merge (R79), the tag |
 
-**The order, a proposal** ([core-architecture.md](../plans/core-architecture.md) §10):
+**The order the runs followed** ([core-architecture.md](../plans/core-architecture.md) §10):
 - **Three lanes:**
   - objects and draws: §1, §3, §4;
   - the loop, the critical path, which starts first: §2, §5;
