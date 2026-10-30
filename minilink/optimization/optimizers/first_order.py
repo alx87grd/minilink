@@ -92,8 +92,8 @@ class FirstOrderOptimizer(OptimizerBackend):
         lower, upper = box_of(program_evaluator)
         method = self.numbers(method)
 
-        # The law, Adam's update compiled once per program when JAX is at hand (not
-        # once per step, nor once per solve); its numbers an argument
+        # The law, Adam's update compiled once per JAX program (not once per step,
+        # nor once per solve); its numbers an argument
         law = self.law(program_evaluator)
         update = (
             law.update
@@ -212,7 +212,8 @@ class FirstOrderOptimizer(OptimizerBackend):
         forms = program_evaluator.compiled_forms
         key = ("update", *self.numbers_key(program_evaluator))
         if key not in forms:
-            forms[key] = compiled(law.update)
+            jax = require_jax()
+            forms[key] = jax.jit(law.update)
 
         return forms[key]
 
@@ -458,16 +459,6 @@ def safe_root(v, xp):
     root = xp.where(positive, xp.where(positive, v, 1.0) ** 0.5, 0.0)
 
     return root
-
-
-def compiled(update):
-    """The law's update compiled once by ``jax.jit`` when JAX is at hand, else the update on NumPy."""
-    try:
-        jax = require_jax()
-    except ImportError:
-        return update
-
-    return jax.jit(update)
 
 
 def require_algorithm(algorithm):
