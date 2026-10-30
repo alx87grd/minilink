@@ -1337,20 +1337,10 @@ scores its `Trajectory` (the cost `J`, and the margin `m` of the run to the sets
 when it leaves one), and returns the objective with its `Evaluation`; `pe.evaluate(θ)` alone
 evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes the objective
 over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
-rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the objects;
-amber, the parameters; fuchsia, randomness; green, the results. The figures are drawn by
-`docs/pipeline_figures.py`; the other pipelines are in [docs/pipelines.md](../pipelines.md).
-
-**Deterministic:** one run, one score.
-
-![The evaluator pipeline, deterministic](../_static/pipeline_deterministic.svg)
-
-**Stochastic:** the noise's seed is a leaf of `θ` like any other, and so are the
-distributions' own parameters; the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key,
-the `n` runs go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
-
-![The evaluator pipeline, stochastic](../_static/pipeline_stochastic.svg)
-
+rows, and the optimizer writes the tuned leaves back into `θ`. On a stochastic problem the
+noise's seed is a leaf of `θ` like any other, and so are the distributions' own parameters;
+the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key, the `n` runs
+go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.

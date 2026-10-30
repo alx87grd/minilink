@@ -56,10 +56,10 @@ under JAX for research.
 Everything starts from one definition, a `System`: `ẋ = f(x, u, t; p)`, `y = h(x, u, t; p)`.
 A diagram of systems is a `System` too, and so is every controller a tool returns. Each tool
 is a lane from the system, or from a `PlanningProblem` built on it, to what it gives back;
-the pipelines behind them are drawn one by one in
+the map is read in
 [docs/pipelines.md](https://github.com/alx87grd/minilink/blob/main/docs/pipelines.md).
 
-![Minilink on one page: the System, the PlanningProblem and the optimizer, seven tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
+![Minilink on one page: where a System comes from, the System, the PlanningProblem and the optimizer, seven tools and JAX](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/pipeline_map.png)
 
 ## Write a model
 
