@@ -9,9 +9,10 @@ docs/make_assets.py map` the README's PNG too).
 
 ## The library on one page
 
-A `System` is made one of three ways: a class of your own that writes `f` (and `h`, `tf`),
-a plant from the catalog (`Pendulum()`), or a composition of blocks (`ctl @ plant`, `a >> b`,
-a `DiagramSystem`); the tools cannot tell them apart. Three foundations (CONSTITUTION §1.1):
+A `System` is made one of three ways: a composition of blocks (`ctl @ plant`, `a >> b`, a
+`DiagramSystem`), a class of your own that writes `f` (and `h`, `tf`), or a plant from the
+catalog (`Pendulum()`); the tools cannot tell them apart, and every controller a tool returns
+closes on the plant into a composition again. Three foundations (CONSTITUTION §1.1):
 the model, a `System`; the task, a `PlanningProblem` built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
 is a path from them: simulate, play, analyze and design straight from the system; plan, learn
 and evaluate from the problem. Each tool's lane ends in what it gives back, drawn as a small

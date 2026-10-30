@@ -554,13 +554,13 @@ def pic_blocks(f, x, y, w, h, c):
 
 
 def origin_cards(f, x0, y, width, h, target):
-    """How a System is made: three cards, a class, the catalog, a composition, each arrow meeting the System."""
+    """How a System is made: three cards, a composition, a class, the catalog, each arrow meeting the System."""
     gap = 24
     w = (width - 2 * gap) / 3
     origins = (
+        ("A composition of blocks", pic_blocks, "ctl @ plant · a >> b · DiagramSystem"),
         ("Your own class", pic_class, "f, h, tf written by hand"),
         ("The catalog", pic_catalog, "Pendulum(), CartPole(), …"),
-        ("A composition of blocks", pic_blocks, "ctl @ plant · a >> b · DiagramSystem"),
     )
     tx, ty, tw = target
     for k, (title, pic, line) in enumerate(origins):
@@ -686,11 +686,11 @@ def library_map():
         width=2,
     )
 
-    # Every controller is a System again: one bold loop back to the top
+    # Every controller is a System again: one bold loop back to the composition card
     drops = [cols["Design"] + w / 2, plan_cx - 30, cols["Learn"] + w / 2]
     loop = BLUE[1]
     lx = 34
-    path = f"M{max(drops)},{bus_y} L{lx},{bus_y} L{lx},{sys_y + sys_h / 2} L{x0 - 2},{sys_y + sys_h / 2}"
+    path = f"M{max(drops)},{bus_y} L{lx},{bus_y} L{lx},{org_y + org_h / 2} L{x0 - 2},{org_y + org_h / 2}"
     f.add(f'<path d="{path}" fill="none" stroke="#ffffff" stroke-width="8"/>')
     for cx in drops:
         f.add(
