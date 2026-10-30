@@ -231,7 +231,7 @@ class PlanningProblem:
         # The sets: X and U unconstrained unless given, X0 the start's singleton,
         # Xf as given (none by default)
         X = unconstrained(n) if self.X is None else self.X
-        U = unconstrained_inputs(int(self.sys.m)) if self.U is None else self.U
+        U = BoxInputSet(unconstrained(int(self.sys.m))) if self.U is None else self.U
         X0 = SingletonSet(x_start) if self.X0 is None else self.X0
         Xf = self.Xf
 
@@ -313,7 +313,7 @@ class PlanningProblem:
             elif role in self.sources_by_id():
                 self.sources_by_id()[role].params = entry
             else:
-                setattr(self, role, moved_set(role, getattr(self, role), entry))
+                setattr(self, role, getattr(self, role).with_params(entry))
 
     @property
     def x_start(self) -> np.ndarray:
@@ -1029,17 +1029,6 @@ def require_roles(value, view):
         )
 
 
-def moved_set(role, set_, entry):
-    """The set of ``role`` with its numbers ``entry``; refuse numbers a set does not hold."""
-    # The view's own entry for a set without parameters writes back as nothing
-    if not entry and not set_.params:
-        return set_
-    if not set_.params:
-        raise TypeError(f"{role} ({type(set_).__name__}) holds no parameters")
-
-    return set_.with_params(entry)
-
-
 def boundary_set_of(boundary):
     """A boundary set as given (``None``, a :class:`~minilink.core.sets.Set`), or a vector's singleton."""
     if boundary is None or isinstance(boundary, Set):
@@ -1142,8 +1131,3 @@ def coerce_rate(rate) -> float:
 def unconstrained(n):
     """The whole state space as a set: no constraint on ``x``."""
     return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
-
-
-def unconstrained_inputs(m):
-    """The whole input space as an input set: no constraint on ``u``."""
-    return BoxInputSet(unconstrained(m))
