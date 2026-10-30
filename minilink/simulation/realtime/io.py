@@ -16,9 +16,9 @@ from abc import ABC, abstractmethod
 
 import numpy as np
 
-# =============================================================================
-# Public API — contracts
-# =============================================================================
+###############################################################################
+# Public API
+###############################################################################
 
 
 class RealtimeInput(ABC):
@@ -98,9 +98,7 @@ class RealtimeOutput(ABC):
         """Release connections or files after the loop stops (no-op default)."""
 
 
-# =============================================================================
-# Public API — callable adapters
-# =============================================================================
+# Callable adapters
 
 
 class CallbackInput(RealtimeInput):
