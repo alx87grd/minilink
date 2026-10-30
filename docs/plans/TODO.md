@@ -142,7 +142,11 @@ Why: [core-architecture.md](core-architecture.md) §2.
 
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
-  steps). Done when the family path is within 2× of the plain batch. Also: gate the quoted
+  steps). Two mitigations, neither a design change: hoist the plant's pre-computation block
+  (the `m·l²` lines RULES 5.3 already separates) out of the scan when parameters are batched,
+  computing it once per member; or carry the drawn parameters as constant columns of the
+  batched state so they ride the same memory stream. Done when the family path is within 2× of
+  the plain batch. Also: gate the quoted
   batch-rollout claim, and batch the static-leaf time grid (scan: compile-sim#11, #12).
 - [ ] **One owner per rule** (S65; scan: compile-sim#0, #1, #2, #3, #6, #7, #8, #10, #13,
   planning#0, #5, #8, #11, core#8, #10). One item per step:
@@ -164,6 +168,10 @@ Why: [core-architecture.md](core-architecture.md) §2.
     - one owner of the sets between `StateSpaceGrid` and its planner;
     - one print-text rule for the textbook objects;
     - one verbose and empty-cache rule across the `compute_*` facades.
+- [ ] **The root locus and the step response in `z`**: `linearize`, `bode`, `margins`,
+  `nyquist` and `pzmap` read a `StepSystem` or a `SampledSystem` in `z` (R175); `root_locus`
+  and `step_response` stay continuous. Done when both give the discrete answer on a
+  `DiscreteLTISystem` and the continuous callers see no change.
 
 ### 1.3 The draws
 
@@ -173,8 +181,11 @@ when": [randomness.md](randomness.md) §9.
 - [ ] **The draws' contract in DESIGN** (RN-6; the per-block seeds, the disturbance sources and
   the problem stochastic by its parts landed in the v0.3 run): DESIGN §4's distributions entry
   (the convention, the three periods, the bridge table, the solver hint) and §6 (the problem's
-  laws and sources, `realize`, `evaluate` on the draws), as [randomness.md](randomness.md)'s
-  RN-6 lists. Done when DESIGN states each and the RN-6 row there is closed.
+  laws and sources, `realize`, `evaluate` on the draws); DESIGN §4's "Randomness" entry and
+  §6's problem evaluator already hold most of it. Then: `kalman()` reads intensities (the
+  discrete filter later `Q_d`, `R_d`); the release notes of the draws' changes; CONSTITUTION
+  §2's disturbance sentence amended with it (R128, the maintainer's). Done when DESIGN states
+  each.
 
 ### 1.4 The seeded stochastic policy
 
@@ -208,6 +219,10 @@ the input held, a solver's own objective allowed but the score always the proble
   and the laws through its parts) and `t_start` as its tick offset. Done when a grid world with a
   law as its start realizes from its own tree and a step problem started at `t_start = k₀` scores
   as from 0 with the cost shifted.
+- [ ] **The RL environment on a native step problem**: `RolloutEnvironment` refuses a
+  `StepPlanningProblem` by name today (a discretized one names its origin and period); reading
+  the face's `N`, `γ` and cost bound instead needs the step problem's sets, laws and sources.
+  Done when an RL planner trains on a native grid-world problem through its face.
 
 ### 1.7 The parametric program; the stochastic program its seed case
 
@@ -232,8 +247,18 @@ solvers are v0.4 (§4); MPPI landed on the face in the night run of 2026-10-29 (
   trajectory optimization, its `"method"` and `seed` leaves, the MPC as one box on it and its
   closed loop tuned by gradient landed in the v0.3 runs): `planner.compile()` for the LQR and
   value-iteration planners, the others as they are wrapped; `last_solution` leaves with the
-  plotting shortcuts' move to the solution (D1.4, §3). Done when `pv.solution(pv.solve(p)[0])`
-  reproduces `planner.solve()` byte-identically for both.
+  plotting shortcuts' move to the solution (D1.4, §3). What each face holds (`z`; `initial`;
+  `shift`; `command`):
+  - LQR: `K`, `x̄`, `ū`; the gain at the operating point; identity; `ū − K(x − x̄)`;
+  - value iteration: the `J` and `π` tables; `J` from the terminal cost (or zeros); identity;
+    the lookup `π(x)`;
+  - RL: the weights; the network initialized from `seed`; identity; the network at `x`;
+  - RRT (never traced, its algorithm is not pure): the path resampled to `N` knots and
+    `t_start`; the straight line from `x_start` to the goal; drop the part already passed; the
+    path's input at `t`.
+
+  Done when `pv.solution(pv.solve(p)[0])` reproduces `planner.solve()` byte-identically for
+  LQR and value iteration.
 
 ### 1.9 Fields
 
@@ -262,6 +287,9 @@ needs (R168). K4 and the hand-loop demos (OD-32) are §2's rows.
     of `docs/pipeline_figures.py`; the regression baselines moved with each change, §1's gates);
   - `dev-v0.3` into `dev` after that review (R79);
   - the v0.3 tag.
+- [ ] **The cart-pole RL demo re-measured**: the training reward moved to `−g·dt` (R171) and no
+  RL demo was re-run for its numbers; its reliability re-measured on 8 seeds at its budget and
+  reported, no constant changed; the budget after that is the maintainer's **[ask]**.
 
 ---
 
@@ -395,6 +423,24 @@ textbook pass.
     plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, the v0.3 core
     (§1.3); AC-8a the sampled loop keeps in step, alongside; AC-8b with S31 (§1.5; it was v0.4
     by R86).
+  - **AC-5, the plots' rules:** `signals="plant"`, `"controller"` or `"observer"` selects
+    every port of that block, as `"plant:y"` selects one; the default auto mode shows every
+    port of the plant and the controller, each wire once (the reference, the error, `d` and
+    `n` come in through their inputs); signal names take paths (`plant/plant:y`), and a block
+    inside a box is found by object too; labels and units are copied onto edge ports, colours
+    follow roles; with no roles the plain default, a leaf keeping `("x", "u")`;
+    `compute_trajectory(show=True)` and the planning and comparison plots use the same
+    default. Open while building: how the auto mode drops duplicate wires, and whether a
+    many-output plant (the racecar) needs a name filter.
+  - **AC-6, the animation's rules:** resolved when animating; the camera comes from the one
+    drawable block anywhere in the tree, else the drawable block inside `plant`, else an
+    auto-fit view, and `scene_grid` and the follow frame from the same block; a compensator
+    draws no skin inside a loop; the camera copied at composition time and `camera_priority`
+    (never read) go.
+
+  Done when `controller @ plant`, the same loop wired by hand with the role names, and
+  `closed_loop` with sources give the same plots and camera, and a census of the loops (ids,
+  edge ports with labels and units, roles) is byte-identical apart from the intended change.
 
   Related rows: S66 lands after
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
@@ -589,8 +635,13 @@ pillar names it.
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
 
 - [ ] **The rest of the field object** **[ask — core]** (A1's steps 4.4–4.8 of
-  [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField` (DP and tabular
-  tables, a per-sweep time axis); `CallableField` (RL critics); `LinearApproximator` as a field;
+  [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField(grid, values)`
+  (`value(x)` interpolates a `StateSpaceGrid` table with `grid.interpolate`'s `fill_value=0`
+  outside, so the DP numbers hold; a leading time axis, the per-sweep tables of
+  `record_history=True` / `solve_steps`, gives `value(x, t)`, the finite-horizon `J(x, t)`; a
+  trailing action axis over `grid.actions` gives `value(x, u) = Q(x, u)`, with `min_over_u()`
+  the `J` field and `greedy()` the `LookupPolicy`; DP's and tabular RL's `cost_to_go` become
+  one, `sol.cost_to_go(x)` working either way); `CallableField` (RL critics); `LinearApproximator` as a field;
   `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the field (its
   `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon` handing out
   `QuadraticField(x̄, S, t)` beside its controller (R185: later, with the fields' consumers); `PolicyEvaluator` takes the evaluators' verb and returns a
@@ -622,9 +673,13 @@ pillar names it.
   `RolloutEnvironment` (moved to `planning/environment.py`, R108), the `method` and `seed`
   leaves (RD-54), the MPC in its three forms on it, the seeded-determinism, LQR-direction and
   swing-up tests (`test_mppi.py`), the demos `examples/demos/mpc/mppi_pendulum.py` and
-  `mppi_racecar.py`. Rest: MP-3 the stochastic branch (`n_plant_samples` realizations per
-  control sample, mean or CVaR by the problem's criterion; today a stochastic problem plans on
-  its nominal with the deterministic planner's warning); the fan of an offline solve as
+  `mppi_racecar.py`. Rest: MP-3 the stochastic branch: each control sample scored over
+  `M = n_plant_samples` plant draws (the tree's laws and the sources' seeds, by path from one
+  key; the start stays the bound `x_start`), its score the mean of the `M` for `"expectation"`
+  or their CVaR for `"worst_case"` (`problem.criterion`), one `vmap` over the `K × M` axis;
+  `M = 1` by default (R107), the docstring stating its bias (the softmin rewards a lucky plant
+  draw as much as a good input); a deterministic problem ignores `M`, byte-identical. Today a
+  stochastic problem plans on its nominal with the deterministic planner's warning; the fan of an offline solve as
   `solution.plot_samples()` (the closed loop's fans landed: `mpc_sampled_futures`,
   `mpc_animation_overlays(samples=)`, `plot_sampled_futures`); MP-6 (the `loop` backend,
   DESIGN §6) with V3.
@@ -925,8 +980,13 @@ One line each; open a plan doc only when a design needs a writeup.
   Pacejka tire; stochastic forcing; ROS2 / FMI; sparse long-horizon trajopt; RRT-Connect.
 - Ipopt given the Lagrangian Hessian, not the objective's alone (scan: planning#13);
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11).
-- `LowPassFilter(tau=)`: the shaping filter of the colored-noise recipe parameterized by its
-  time constant, beside `cutoff_hz` (randomness.md RD-D23, RN-4).
+- Colored noise, as a demo and its twin test: white noise of intensity `W` through the
+  shaping filter `τ ż = −z + w`, its state started from `N(0, W / 2τ)` so it is stationary
+  from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
+  `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`
+  (RD-D23).
+- Multiple shooting with the problem's parameters: shooting and collocation take the
+  parametric program's tree; `MultipleShootingTranscription.transcribe_parametric` refuses.
 - A training run that rebinds its numbers (R182): the RL planner's `params` is a report for
   v0.3, with no `solve(params=)`; a run that trains on a moved plant or reward, if research needs
   one.

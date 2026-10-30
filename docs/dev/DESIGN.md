@@ -366,7 +366,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
   from the memory's state). A sampled-data law written in seconds whose equation needs its
   period is a `NativeSampledSystem(n, sample_period=Δ)`: its period set at construction, `%`
-  on it refused.
+  on it refused. Out of the MPC's contract: a shrinking horizon (`N` is structural) and
+  event-triggered replanning (a later option in the tick).
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
   (`StateObserver`; later filters keep the ports, their state may be larger than the
   estimate). Under the id `observer`, top level or inside the controller box, `roles()`
@@ -1314,6 +1315,21 @@ record beside it, so the evidence does not repeat the planner's own belief; an o
 source keeps the interpolation its planner states. Scoring a law is the problem evaluator's:
 `problem.compile(ctl % dt).evaluate()`, `substeps=` for the planner's own physics.
 `problem.compile(law)` called directly closes a continuous law as a continuous loop.
+
+**What the gradient path is not.** Three limits of the differentiable evaluation:
+- **Single shooting is not collocation.** `pe.program(wrt)` differentiates one forward run
+  of the loop, single shooting (an open-loop source's leaves, a held input): through an unstable plant over a long horizon its gradients
+  explode or vanish and the landscape is nonconvex. `ShootingTranscription` and
+  `DirectCollocationTranscription` stay the trajectory-optimization path; the export is an
+  evaluation and tuning tool.
+- **Backpropagation through the dynamics and policy gradients are complementary.** The
+  evaluator differentiates through `f` and the reparameterized draws; REINFORCE, PPO and SAC
+  differentiate the log-policy score and never `f`. Short smooth horizons favour the first;
+  long horizons, saturations and stiff dynamics the second.
+- **Crossover margins jump.** A gain or phase margin is read at a crossover that can appear,
+  vanish or switch during a descent, and an eigenvalue has no derivative at a repeated pole:
+  the margins are the numbers a course reports, not an NLP objective (a smooth bound, the
+  sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
 
 **The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
 substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
