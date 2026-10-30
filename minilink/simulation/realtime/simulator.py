@@ -405,17 +405,13 @@ class RealtimeSimulator:
                 return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
         return backend, self.sys.compile(backend=backend)
 
-    def _offline_auto_dt(self):
-        """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
-        return automatic_step_of(self.sys.solver_info)
-
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
 
         Never refine past the offline Simulator auto-``dt``, and never take
         more than ``DEFAULT_SIM_STEPS_PER_FRAME`` substeps (prefer not lagging).
         """
-        offline_dt = max(self._offline_auto_dt(), np.finfo(float).eps)
+        offline_dt = max(automatic_step_of(self.sys.solver_info), np.finfo(float).eps)
         n_from_offline = max(1, int(self.frame_dt // offline_dt))
         return max(1, min(DEFAULT_SIM_STEPS_PER_FRAME, n_from_offline))
 

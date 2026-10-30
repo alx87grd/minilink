@@ -15,6 +15,7 @@ from minilink.control.state import (
 )
 from minilink.core.costs import QuadraticCost
 from minilink.core.roles import command_port
+from minilink.core.sets import is_bounded
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import Planner, planner_evidence
@@ -143,7 +144,7 @@ class LQRPlanner(Planner):
                 poles=poles,
                 horizon=tf,
                 schedule=(t, K, S),
-                U_ignored=constrains_inputs(problem.U),
+                U_ignored=is_bounded(problem.U.bounding_box()),
             )
             cost_to_go = quadratic_cost_to_go(x_bar, S, t)
         else:
@@ -165,7 +166,7 @@ class LQRPlanner(Planner):
                 P=P,
                 poles=poles,
                 horizon=np.inf,
-                U_ignored=constrains_inputs(problem.U),
+                U_ignored=is_bounded(problem.U.bounding_box()),
             )
             cost_to_go = quadratic_cost_to_go(x_bar, P)
 
@@ -252,15 +253,6 @@ class RiccatiRecord:
             )
 
         return f"K = {K}, closed-loop poles {poles}{ignored}"
-
-
-def constrains_inputs(U) -> bool:
-    """Whether the input set bounds the command: a finite bound on some axis, or a set that is no box."""
-    box = U.bounding_box()
-    if box is None:
-        return True
-
-    return bool(np.any(np.isfinite(box.lower)) or np.any(np.isfinite(box.upper)))
 
 
 def quadratic_cost_to_go(x_bar, P, t_samples=None):

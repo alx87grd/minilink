@@ -89,13 +89,9 @@ class Evaluator(JacobianMixin):
         """The parameters taken at compile: ``params=None`` reads these."""
         return self._frozen_params
 
-    def live_params(self):
-        """The parameters read from the system now: the tree a new compile would freeze."""
-        return self.params_reader()
-
     def call_params(self):
         """``None`` when the system's parameters still equal the compiled ones (the frozen form), else the live tree."""
-        live = self.live_params()
+        live = self.params_reader()
         if tree_digest(live) == tree_digest(self._frozen_params):
             return None
 

@@ -360,19 +360,19 @@ class DynamicBicycle(DynamicSystem):
         tr = self.track
 
         delta = self.wheel_rate_and_steer(x, u)[1]
+        # The body frame: 2-D chassis, 3-D body box, rear wheels, contact arrows
         T_wb = SE2(x[0], x[1], x[2])
         R_steer = SE2(0.0, 0.0, delta)
 
-        return {
-            # The body frame: 2-D chassis, 3-D body box, rear wheels, contact arrows
-            "body": T_wb,
-            # The 2-D front axle, steered; the rear axle's wheels ride on ``body``
-            # through ``local_transform`` in the skin
-            "axle_front": T_wb @ SE2(a, 0.0, delta),
-            # The 3-D steered front wheels (lift and steer need frames of their own)
-            "wheel_fl": T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer,
-            "wheel_fr": T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer,
-        }
+        # The 2-D front axle, steered; the rear axle's wheels ride on ``body``
+        # through ``local_transform`` in the skin
+        T_front = T_wb @ SE2(a, 0.0, delta)
+
+        # The 3-D steered front wheels (lift and steer need frames of their own)
+        T_fl = T_wb @ translation(a, 0.5 * tr, r_f) @ R_steer
+        T_fr = T_wb @ translation(a, -0.5 * tr, r_f) @ R_steer
+
+        return {"body": T_wb, "axle_front": T_front, "wheel_fl": T_fl, "wheel_fr": T_fr}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """2-D centerline look: one velocity and one force arrow per axle."""

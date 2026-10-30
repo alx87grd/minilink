@@ -566,6 +566,14 @@ def is_finite_box(box) -> bool:
     )
 
 
+def is_bounded(box) -> bool:
+    """Whether a set's bounding box has any finite face (``None``, no box, counts as bounded: a general set)."""
+    if box is None:
+        return True
+
+    return bool(np.any(np.isfinite(box.lower)) or np.any(np.isfinite(box.upper)))
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################

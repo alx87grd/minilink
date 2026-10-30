@@ -428,7 +428,7 @@ class StepSimulation:
         S = dense_points_of(self, ev)
 
         # What the run records: the named signals, and a loop's plant input
-        plant_op = getattr(getattr(ev, "plan", None), "plant_op", None)
+        plant_op = plant_op_of(ev)
         record = recorded_names(record, plant_op, host)
         signals = {}
         roles = {}
@@ -549,7 +549,7 @@ class StepSimulation:
         u_steps = u_samples[:, :n_steps].T
 
         # What the run records: the named signals, and a loop's plant input
-        plant_op = getattr(getattr(ev, "plan", None), "plant_op", None)
+        plant_op = plant_op_of(ev)
         if record:
             require_clocked_signals_to_record(self)
         record = recorded_names(record, plant_op, False)
@@ -702,6 +702,13 @@ def require_no_record(names):
             "record= keeps signals from the scan's own signal pass; the host clock "
             "runner (solver='scipy') has none: run the scan (solver=None)"
         )
+
+
+def plant_op_of(ev):
+    """A loop's plant operation in the compiled plan (``None`` for a lone block or no plan)."""
+    plan = getattr(ev, "plan", None)
+
+    return getattr(plan, "plant_op", None)
 
 
 def dense_points_of(system, ev):

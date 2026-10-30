@@ -4,6 +4,7 @@ import math
 
 import numpy as np
 
+from minilink.blocks.sources import require_positive_period, require_seed
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed, sample_index, standard_normal
 from minilink.core.system import System
@@ -256,15 +257,3 @@ def require_static(law, label):
     """Refuse a law with a state: the policy's ``h`` is pure in its input."""
     if law.n != 0:
         raise TypeError(f"the {label} law {law.name} has a state; give a static law")
-
-
-def require_positive_period(sample_period):
-    """Refuse a sample period that is not positive."""
-    if float(sample_period) <= 0.0:
-        raise ValueError("sample_period must be > 0")
-
-
-def require_seed(seed):
-    """Refuse a negative seed (``None`` is the mean)."""
-    if seed is not None and int(seed) < 0:
-        raise ValueError(f"seed must be a non-negative integer or None, got {seed!r}")

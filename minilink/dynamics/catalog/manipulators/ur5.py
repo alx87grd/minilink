@@ -592,12 +592,6 @@ def spatial_inertia(mass, com, inertia):
     return I
 
 
-def as_params(params, *keys, like):
-    """Cast selected parameter values to the backend of *like*."""
-    xp = array_module(like)
-    return tuple(xp.asarray(params[key]) for key in keys)
-
-
 if __name__ == "__main__":
     sys = UR5Manipulator()
     q0 = np.array([0.0, -np.pi / 2 + 0.2, 0.0, -np.pi / 2, 0.0, 0.0])

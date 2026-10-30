@@ -362,11 +362,6 @@ def is_box(sys) -> bool:
     return isinstance(sys, WiredDiagramMixin)
 
 
-def is_step_box(sys) -> bool:
-    """Whether ``sys`` is a step or sampled diagram."""
-    return isinstance(sys, StepDiagramSystem)
-
-
 def carry_left_operand(diagram, left) -> None:
     """Carry a diagram left operand's name and camera settings into ``diagram``.
 
@@ -399,11 +394,6 @@ def copy_diagram(diagram):
     carry_left_operand(copy, diagram)
 
     return copy
-
-
-def new_diagram_like(sys):
-    """A diagram operand as a new diagram with the same ids and wiring; a leaf as is."""
-    return copy_diagram(sys) if is_box(sys) else sys
 
 
 def add_input_port_like(diagram, port_id: str, port) -> None:
