@@ -38,6 +38,7 @@ sentence: the plain title comes first.
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
+| [minimal-surface.md](minimal-surface.md) | **Draft, decisions open.** Demos, notebooks, tests and CI redrafted on the v0.3 core: the audit, seven decisions with options (D1–D7), the order | proposed new v0.4 |
 | [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.4 (the proof of concept landed in v0.3) |
 | [future-policies.md](future-policies.md) | The API projected onto MPPI, behavior cloning and diffusion policy; the seeded policy (D29, §5.1); questions for discussion (§7) | after v1.0 |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.4; v0.9 |
