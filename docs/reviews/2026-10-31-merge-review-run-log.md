@@ -151,7 +151,8 @@ and `e26d9df1`).
   (`tf=N_STEPS * DT`, the same 10 s). 224 lines to 81. *Alternative:* keep the hand-written
   rollout and trapezoid as the hand loop's loss (then the two sections minimize two costs).
 - **M-17 (row 10) The map's new layer and the README's one sentence.** The composition
-  inset that sat inside the `System` card moves to the third origin card; the `System` card
+  inset that sat inside the `System` card moves to the first origin card, top left, where the
+  map's closed-loop arrow now comes back in (the maintainer's request after the merge); the `System` card
   keeps its definition, centred. `docs/pipelines.md` keeps "The library on one page" (its text
   now names the three origins) and loses the other sections, its "Not drawn yet" list
   among them. README's sentence "the pipelines behind them are drawn one by one in
