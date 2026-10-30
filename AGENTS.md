@@ -31,6 +31,8 @@ git status -sb
 - Never force-push a shared branch.
 - Never delete the `main`, `dev` or `dev-alex` branches, even when one is fully merged:
   they are the maintainer's long-lived branches.
+- Never merge or push into `main`, `dev` or `dev-alex` without the maintainer's explicit
+  instruction for that action; otherwise work on feature branches only.
 
 The SessionStart hook in `.claude/settings.json` runs the fetch and prints a warning when
 the branch is behind its upstream; act on it.
