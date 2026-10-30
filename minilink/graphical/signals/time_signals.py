@@ -566,3 +566,11 @@ def coerce_signal_plot_spec(traj_or_spec, spec_builder, *, title=None):
         raise TypeError("Updating from a trajectory requires a spec builder.")
 
     return spec_builder(traj_or_spec, title=title)
+
+
+def require_same_trace_count(spec, lines):
+    """Refuse an update whose spec has another number of traces than the plot."""
+    if len(spec.traces) != len(lines):
+        raise ValueError(
+            "Live plot update changed the number of traces; open a new plot."
+        )

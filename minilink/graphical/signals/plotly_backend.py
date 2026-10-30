@@ -21,6 +21,7 @@ from minilink.graphical.signals.time_signals import (
     PlotResult,
     SignalPlotSpec,
     coerce_signal_plot_spec,
+    require_same_trace_count,
 )
 
 ###############################################################################
@@ -346,14 +347,6 @@ class PlotlyPollHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         """Keep the per-request log off the console."""
         return
-
-
-def require_same_trace_count(spec, lines):
-    """Refuse an update whose spec has another number of traces than the plot."""
-    if len(spec.traces) != len(lines):
-        raise ValueError(
-            "Live plot update changed the number of traces; open a new plot.",
-        )
 
 
 def redraw_traces(fig, spec, title):
