@@ -249,7 +249,7 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
 
-- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). The plan: [merge-review-run.md](merge-review-run.md).
+- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). The plan: [merge-review-run.md](merge-review-run.md). Its six points raised first, ruled 2026-10-31 (R188–R193, [the record](../reviews/2026-10-31-release-review-rulings.md)) and implemented on `dev-v0.3-release-rulings`.
 
 Landed in the v0.3 runs: wiring mistakes fail at wiring time (S66), DESIGN and ROADMAP §3
 brought up at each step, the showcases on the new API, and compile once in the form the call
@@ -299,6 +299,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   site's plant page. Done when the root prelude lists exactly R60's plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
+- [ ] **The kinematic car family declares its time constant** (R191, v0.4, with K8-0; [the record](../reviews/2026-10-31-release-review-rulings.md)): `KinematicBicycle` and `UdeSRacecar` get default input bounds and declare `τ = L / (v_max tan δ_max)`, so their loops leave the 1 ms default (1000 substeps a 0.1 s MPC period today). Done when the car family's automatic step reads its declared `τ` and the moved numbers sit in a ledger.
 - [ ] **The experimental tier, untested** (K9) (ruled 2026-10-22, R3; [record](../reviews/2026-10-22-rulings-session-1.md)). Landed 2026-10-23: the prototype
   scripts moved from `examples/experimental/` to a top-level `experimental/` (K9-1); the tier's
   tests (`test_symbolic.py`, `test_engine_jax.py`) moved to `tests/experimental/`, off the merge
