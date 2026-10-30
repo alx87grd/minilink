@@ -31,6 +31,11 @@ from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
+from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
+from minilink.simulation.sim_reporting import (
+    print_realtime_preamble,
+    print_realtime_report,
+)
 
 # In ``sync="realtime"`` the measured wall elapsed is clamped to this many
 # frame periods so a stall (window drag, GC pause) cannot inject a huge step.
@@ -189,6 +194,7 @@ class RealtimeSimulator:
         self._animator = None
         self._backend = None
         if renderer is not None:
+            # Lazy import: the graphics load on first use, not with the core
             from minilink.graphical.animation.animator import Animator, make_renderer
 
             self._animator = Animator(sys)
@@ -229,8 +235,6 @@ class RealtimeSimulator:
         self._warm_up(x, u, t)
         warm_up_s = time.perf_counter() - t_warm
         if self.verbose:
-            from minilink.simulation.sim_reporting import print_realtime_preamble
-
             print_realtime_preamble(
                 system_name=sys.name,
                 n=evaluator.n,
@@ -366,8 +370,6 @@ class RealtimeSimulator:
                 self.output.close()
 
         if self.verbose:
-            from minilink.simulation.sim_reporting import print_realtime_report
-
             wall_s = time.perf_counter() - run_wall_start
             print_realtime_report(
                 elapsed_s=wall_s,
@@ -566,8 +568,6 @@ def realtime_output_of(output, plot, *, plot_backend: str = "matplotlib"):
     """The user's ``RealtimeOutput``, with a ``LiveSignalPlotOutput`` beside it when ``plot`` asks for one."""
     if plot is False or plot is None:
         return output
-
-    from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
 
     signals = None if plot is True else tuple(plot)
     plot_out = LiveSignalPlotOutput(signals=signals, backend=plot_backend)

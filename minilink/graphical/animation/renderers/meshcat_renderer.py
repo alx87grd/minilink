@@ -22,6 +22,7 @@ from minilink.graphical.animation.primitives import (
 )
 from minilink.graphical.animation.renderers.renderer import AnimationRenderer
 from minilink.graphical.common.environment import is_blocking_needed
+from minilink.graphical.meshes import merge_meshes
 
 
 def html_export_path(file_name) -> Path:
@@ -296,7 +297,6 @@ def polyline_strip_mesh(
         return None
     if len(pieces) == 1:
         return pieces[0]
-    from minilink.graphical.meshes import merge_meshes
 
     return merge_meshes(*pieces)
 
