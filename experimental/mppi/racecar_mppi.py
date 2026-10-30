@@ -15,7 +15,6 @@ from minilink import (
     TrajectoryOptimizationPlanner,
     UdeSRacecar,
 )
-from minilink.analysis import discretize
 from minilink.graphical.animation.drawables import Overlay, SceneHistory
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.animation.visualization import WORLD
@@ -172,9 +171,9 @@ planner = TrajectoryOptimizationPlanner(
     optimizer_options={"maxiter": 40, "ftol": 0.05},
 )
 mpc = ModelPredictiveController(planner)
-loop = (mpc % DT) @ discretize(car, DT, substeps=round(DT / SIM_DT))
+loop = (mpc % DT) @ car
 t0 = time.perf_counter()
-result = loop.compute_trajectory(tf=TF)
+result = loop.compute_trajectory(tf=TF, dt=SIM_DT)
 mpc_wall = time.perf_counter() - t0
 traj_mpc = plant_run(result, loop)
 

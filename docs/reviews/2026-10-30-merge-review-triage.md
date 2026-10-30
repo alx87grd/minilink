@@ -21,6 +21,8 @@ decides (R53, R125, R142, R144, R148, R159, R160, R171–R174, R176–R178) left
 their original numbers, so the numbers below have gaps on purpose; the work after the night run
 joined §2.3 and §4.
 
+**In session, 2026-10-30:** the answers are recorded in [the rulings of the merge review](2026-10-30-merge-review-rulings.md) (R180 onward); each answered item below carries its ruling in brackets.
+
 **How to answer.** Per line: **yes** (keep it as landed), **no** (take the log's alternative),
 or **later** (it becomes a TODO row). §5 needs no answer.
 
@@ -43,135 +45,135 @@ moved in its own commit. The size is the relative difference from its log's ledg
 | 1.2 | `evaluate` runs the continuous loop to `tf` (the old Monte Carlo held the law over each period and cut at the first exit) | median 7.7 % for a stiff PD at `dt = 0.05`, 2.8 % for a weak one | the Monte Carlo scores of the RL and evaluation lessons | OD §3 |
 | 1.14 | The Lyapunov certificate's `P` is symmetrized after the solve | 1.8e-16 | nowhere | N §3 |
 
-**Recommendation:** yes to the three left. The eleven others follow a ruling (§5).
+**Recommendation:** yes to the three left. The eleven others follow a ruling (§5). **[Ruled R184: yes]**
 
 ## 2. Behaviour and names a user meets
 
 ### 2.1 Marked "to raise first" by the consolidation
 
-1. **A planner's evidence on an undeclared plant** (C-30). The judge integrates a plant that
+1. **A planner's evidence on an undeclared plant** (C-30). **[Ruled R181]** The judge integrates a plant that
    declares no time constant at the simulator's 0.1 ms step, so a planner's `evaluate` no
    longer equals its own step face to the bit (7e-5); `substeps=1` gives the face's number back.
    *Question:* should a planner's evidence score on its own step model instead? *Recommendation:*
    keep the one rule (R174): the record already carries the face's own `J` (C-42).
-2. **The continuous simulator's held-signal step** (C-23). Your rule removed "one step per
+2. **The continuous simulator's held-signal step** (C-23). **[Ruled R180: 2c]** Your rule removed "one step per
    sample" from the sampled loop; the continuous `Simulator` still uses it for a held source in
    a continuous diagram (a `WhiteNoise`, a sampled policy). Removing it there too would move the
    noise demos' numbers (`lqg_cartpole`, `lqg_monte_carlo`, the state-space notebooks) and make
    them about 100× slower. *Recommendation:* keep it in v0.3, named in DESIGN §5 as the one
    exception; give those demos an explicit `dt` in a later row if you want one rule everywhere.
-4. **The dual-rate plan one slow period late** (C-33). The MPC's `z` port is now the plan
+4. **The dual-rate plan one slow period late** (C-33). **[Ruled R183: by hand]** The MPC's `z` port is now the plan
    solved at this tick, so the late form needs
    `(mpc % slow) >> (UnitDelay(dim=n_z).rename_ports(u="z") % slow) >> (PlanFollower(planner) % fast)`.
    *Recommendation:* a small `PlanDelay(planner)` block reads better; it is a new public name,
    so yours.
-5. **Hand-wiring a continuous plant into a sampled diagram** (C-22). Only `@` and `closed_loop`
+5. **Hand-wiring a continuous plant into a sampled diagram** (C-22). **[Ruled R186: no new method]** Only `@` and `closed_loop`
    put a continuous plant in a `SampledDiagramSystem`; `add_subsystem` on a `discretize`d model
    gives a loop of ticks only. *Recommendation:* no new method until a caller needs one.
 6. The `experimental/` scripts (C-31): see 3.7.
 
 ### 2.2 The consolidation's other points to raise
 
-7. **A model-based law copies the plant's numbers** (C-7). `ComputedTorque`, `SlidingMode` and
+7. **A model-based law copies the plant's numbers** (C-7). **[Ruled R182: copy]** `ComputedTorque`, `SlidingMode` and
    the impedance and kinematic laws hold `params["model"]`, a deep copy taken at construction;
    an edit of `plant.params` after the law is built no longer reaches the law. A GMC714 lab that
    tunes the plant after building its controller now sees a model mismatch.
    *Recommendation:* yes (the model and the plant are two things, and the mismatch is written
    `law.params["model"]["m"] = …`); say it in the lab text. *Ruled in substance by R169* (a
    law's model is its own leaves); what is left is the lab text.
-8. **The RL planner's tree is a report** (C-9). `planner.params` shows the training numbers and
+8. **The RL planner's tree is a report** (C-9). **[Ruled R182: report]** `planner.params` shows the training numbers and
    the seed, but `solve(params=)` does not rebind them. *Recommendation:* yes for v0.3; a later
    RL row if a training run should take its numbers as an argument.
-9. **Value iteration's bound** (C-11) is taken over its sweeps to convergence, not over the
+9. **Value iteration's bound** (C-11) **[Ruled R184]** is taken over its sweeps to convergence, not over the
    problem's finite horizon. *Recommendation:* yes (it is the sum value iteration computes);
    R173 (a tool's own discount and its sums are internal) already covers it.
 ### 2.3 New or changed public names
 
-11. `disconnect(sys_id, port_id)`, a new verb; `connect` refuses to rewire a connected input
+11. `disconnect(sys_id, port_id)` **[Ruled R185]**, a new verb; `connect` refuses to rewire a connected input
     (RD-60). *Recommendation:* yes.
-12. `certificate.V` is an attribute, a `QuadraticField` (`V(x)` still works) (RD-57).
+12. `certificate.V` is an attribute **[Ruled R185]**, a `QuadraticField` (`V(x)` still works) (RD-57).
     *Recommendation:* yes.
-14. `compute_trajectory(record=(…))` records signals during the run; the last sample holds the
+14. `compute_trajectory(record=(…))` **[Ruled R184: hold]** records signals during the run; the last sample holds the
     last tick's value (N-1, N-11, N-12). The tool is your decision 6 of 2026-10-28 and its form
     your words ("an argument to pass to compute_trajectory"); what is left is the end-sample rule
     (N-11). *Recommendation:* yes.
-15. `StepPlanningProblem` on the root prelude, `StepCost` and `SampledCost` on the root and
+15. `StepPlanningProblem` on the root prelude **[Ruled R185: bands]**, `StepCost` and `SampledCost` on the root and
     `minilink.core` (RD-42). The root is the course set (R64, K8-1) and no course teaches these
     yet. *Recommendation:* **no**: keep them on `minilink.planning` and `minilink.core` only.
-16. `NoiseSource` on `minilink.blocks`, not on the root (RD-26). *Recommendation:* yes.
-17. `Sys2Gym(x_start=law)`; with no start it starts at `sys.x0` (the old default, a uniform
+16. `NoiseSource` on `minilink.blocks` **[Ruled R185]**, not on the root (RD-26). *Recommendation:* yes.
+17. `Sys2Gym(x_start=law)`; **[Ruled R184]** with no start it starts at `sys.x0` (the old default, a uniform
     tenth of the state bounds, was a law nobody wrote and refused an unbounded plant). The
     GRO860 SB3 notebooks moved to `x_start=Uniform(…)` (RD-27). R177 (`x_start` a point or a
     law) decides the argument; what is left is the default at `sys.x0`. *Recommendation:* yes.
-18. `transcription="single_shooting"` beside the two other strings (RD-50). *Recommendation:* yes.
-19. The MPC refuses a planner whose problem has a point start beside an explicit `X0` set
+18. `transcription="single_shooting"` **[Ruled R183]** beside the two other strings (RD-50). *Recommendation:* yes.
+19. The MPC refuses a planner whose problem has a point start **[Ruled R183: refuse]** beside an explicit `X0` set
     (N-4). *Recommendation:* yes.
-20. `compare` keeps two forms by its first argument: solutions only, or
+20. `compare` keeps two forms **[Ruled R185]** by its first argument: solutions only, or
     `compare(problem, …, dt=)` that also scores each entry (OD-28). *Recommendation:* yes.
-22. `pe.program(wrt, …, params=)` overrides the base point (OD-14); `problem.replace(**fields)`
+22. `pe.program(wrt, …, params=)` **[Ruled R182]** overrides the base point (OD-14); `problem.replace(**fields)`
     builds a new problem (OD-23). *Recommendation:* yes.
 
-27. **MPPI's fan of sampled futures** (P-1, `1df28c76`): `pv.samples(params, z0, n_shown)` on
+27. **MPPI's fan of sampled futures** **[Ruled R183]** (P-1, `1df28c76`): `pv.samples(params, z0, n_shown)` on
     MPPI's face redraws a solve's own samples on its key (the seed and the tick);
     `mpc_sampled_futures(run, mpc, loop=)` rebuilds every tick's fan after a run,
     `mpc_animation_overlays(..., samples=n)` draws it, `plot_sampled_futures(run, mpc, loop=,
     ticks=, axes=)` gives the static figure (all on `minilink.planning.trajectory_optimization.mpc`,
     the provisional band of R178). *Recommendation:* yes, provisional with MPPI.
-28. **Each face reads its plan as a trajectory** (P-2): `pv.planned_trajectory(z, params)` on
+28. **Each face reads its plan as a trajectory** **[Ruled R183]** (P-2): `pv.planned_trajectory(z, params)` on
     the collocation face (its knots) and on MPPI's (its plan rolled out on the model); the MPC's
     `verbose=True` line appends a planner's own account (MPPI: `S_min`, `S_weighted`,
     `effective_samples=…/K`, `exit_rate`). *Recommendation:* yes.
 
 ### 2.4 Small leftovers
 
-23. `lqr_finite_horizon` does not hand out its `QuadraticField` (RD-58). *Recommendation:*
+23. `lqr_finite_horizon` does not hand out **[Ruled R185: later]** its `QuadraticField` (RD-58). *Recommendation:*
     later, with the fields' consumers (TODO §4).
-24. A drawn mass runs 3.6× the plain batch (each trial factors its mass matrix); the budget
+24. A drawn mass runs 3.6× the plain batch **[Ruled R184: reported; the solve unchanged]** (each trial factors its mass matrix); the budget
     reports it and does not judge it (RD-62, line 5b). *Recommendation:* not judged in v0.3; it
     joins the batch-price row (S53).
-25. The same cost added twice (`q + 10 * q`) shares its numbers between the two terms
+25. The same cost added twice (`q + 10 * q`) **[Done: now refused with the line to write]** shares its numbers between the two terms
     (OD §6, point 5). Not re-checked on the current code. *Recommendation:* later.
-26. `A >> B >> C` is named `A >> B` (OD §7). Not re-checked. *Recommendation:* an agent fixes it
+26. `A >> B >> C` is named `A >> B` (OD §7). **[Done: named `Gain >> Gain >> Gain` on the current code]** Not re-checked. *Recommendation:* an agent fixes it
     if it still holds.
 
 ## 3. Student-facing material
 
 These are yours by AGENTS ("Ask first": demos, notebooks, lessons).
 
-1. **The cart-pole RL swing-up** (N-7, N-22; the consolidation's §1 item 7). At 2M steps:
+1. **The cart-pole RL swing-up** (N-7, N-22; **[Ruled R186: the maintainer's]** the consolidation's §1 item 7). At 2M steps:
    9 of 12 seeds swung up before the runs, 4 of 12 on the integrated reward `−c_k` (3 of 8 at
    3M). R171 put the training reward back to `−g·dt`, the variant the night run measured at
    7 of 12. Nothing has been re-run since, and the demo now trains 3M steps.
    *Recommendation:* one 12-seed re-measure at 2M on a machine with JAX (about ten minutes)
    before you set the demo's budget back.
-2. **About 90 constructions write `U=plant.input_box`** so their numbers stay (OD-18), the
+2. **About 90 constructions write `U=plant.input_box`** **[Ruled R186: (c)]** so their numbers stay (OD-18), the
    GRO860 LQR lessons among them; the LQR warning waits on them (OD-33). The options are in
    TODO §2, "V1.2, the rest".
-3. **The three hand gradient-loop demos** (OD-32): the options are in TODO §2, "S74, the rest".
-4. **The closing PID example's loss** is the problem's cost, tracking plus `ρ = 0.01` effort
+3. **The three hand gradient-loop demos** (OD-32): **[Ruled R186: convert, one hand loop kept]** the options are in TODO §2, "S74, the rest".
+4. **The closing PID example's loss** **[Ruled R186: as simple as possible]** is the problem's cost, tracking plus `ρ = 0.01` effort
    measured from the torque that holds the setpoint (OD-20). *Recommendation:* one read.
-5. **The MPC notebooks' prose** (RD-63): `udes_gro501/racecar_toward_mpc` §7–§8, the showcase
+5. **The MPC notebooks' prose** (RD-63): **[Ruled R186: behaviour prose deleted]** `udes_gro501/racecar_toward_mpc` §7–§8, the showcase
    §8, `mpc_spatial_stack`. Since your call of 2026-10-29 they run `delay=False`, so the
    zero-delay story should hold again, but no one has re-read the prose against the new runs
    (1.11 moved the bicycle's guess). *Recommendation:* one read. The demos' retuning for the
    delay (RD-52) can close: every MPC demo runs `delay=False` except the two compile demos that
    show the delay on purpose.
-6. **The showcase notebook's sampled loop** (1.12, C-26). *Recommendation:* give
+6. **The showcase notebook's sampled loop** (1.12, C-26). **[Follows R180]** *Recommendation:* give
    `(ctl % 0.1) @ plant` an explicit `dt=` so it runs as before.
-7. **Three scripts in the top-level `experimental/`** (`boat/parking_compare.py`,
+7. **Three scripts in the top-level `experimental/`** **[Done in session]** (`boat/parking_compare.py`,
    `boat/parking_mpc.py`, `mppi/racecar_mppi.py`) close loops on `discretize(...)`, so they now
    run ticks only (C-31). They are your scratch. *Recommendation:* move them to `@ plant` with
    `dt=`.
 8. **The `x_goal` lines removed from the demos** (C-18), each where the cost's `xbar` or the
    given `Xf` is the same point; RRT's turned into `Xf=BallSet(goal, tol)`. *Recommendation:*
    a look at the diff.
-9. **ROADMAP §4.1's RL row** still names `StochasticPlanningProblem`, which is gone (§4 is
+9. **ROADMAP §4.1's RL row** **[Ruled R186: yes]** still names `StochasticPlanningProblem`, which is gone (§4 is
    yours). *Recommendation:* "`PlanningProblem` with laws".
-11. **Three demos' style** (OD §7): in K4's row (TODO §2), for your demo pass.
-12. **The pipeline figures** (`docs/pipeline_figures.py`) still show the old labels; they are
+11. **Three demos' style** (OD §7): **[Ruled R186: fix all]** in K4's row (TODO §2), for your demo pass.
+12. **The pipeline figures** **[Ruled R186: the map only, with the System's origins]** (`docs/pipeline_figures.py`) still show the old labels; they are
     regenerated with the student-facing numbers at the merge. Nothing to decide.
 
-## 4. Internal choices: accept as a block
+## 4. Internal choices: accept as a block **[Ruled R187: accepted]**
 
 Structure, placement and internal names behind the public contract. Each row in its log has the
 alternative.

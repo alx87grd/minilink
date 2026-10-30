@@ -39,7 +39,6 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| Your review of the four runs' decisions, before the merge | [the triage](../reviews/2026-10-30-merge-review-triage.md) | v0.3 (the merge, §1.10) | one sitting: the number changes as a block, about forty answers, the internal choices as a block; the decisions later rulings settled are listed there and need nothing |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -251,6 +250,8 @@ and `PolicyEvaluator`'s field-shaped result) is a row of §4,
 after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
+
+- [ ] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): the step rule from the physics, the evidence the problem evaluator's, the step-problem names off the root, LQR's "U ignored", the gradient demos on `Optimizer`, the closing example, the MPC notebooks' prose, the pipeline map, the Ipopt test. The plan, its order and its done-whens: [merge-review-run.md](merge-review-run.md).
 
 Landed in the v0.3 runs: wiring mistakes fail at wiring time (S66), DESIGN and ROADMAP §3
 brought up at each step, the showcases on the new API, and compile once in the form the call

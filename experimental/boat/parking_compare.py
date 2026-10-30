@@ -21,7 +21,6 @@ from minilink import (
     Trajectory,
     TrajectoryOptimizationPlanner,
 )
-from minilink.analysis import discretize
 from minilink.planning import evaluate_trajectory
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
@@ -72,8 +71,8 @@ for water, current in WATERS.items():
     )
     mpc = ModelPredictiveController(planner)
     boat.x0 = X_START
-    loop = (mpc % MPC_DT) @ discretize(boat, MPC_DT, substeps=round(MPC_DT / DT))
-    runs["MPC", water] = plant_run(loop.compute_trajectory(tf=TF), loop)
+    loop = (mpc % MPC_DT) @ boat
+    runs["MPC", water] = plant_run(loop.compute_trajectory(tf=TF, dt=DT), loop)
 
     for name in ("Cascade", "MPC", "PPO"):
         runs[name, water] = (

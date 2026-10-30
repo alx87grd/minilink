@@ -3,7 +3,6 @@
 from parking import CURRENT, X_START, ParkingBoat, parking_cost
 
 from minilink import PlanningProblem, TrajectoryOptimizationPlanner
-from minilink.analysis import discretize
 from minilink.graphical.catalog.boat_skin import boat_skin_3d
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,
@@ -41,8 +40,8 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(planner)
 
 boat.x0 = X_START
-loop = (mpc % MPC_DT) @ discretize(boat, MPC_DT, substeps=round(MPC_DT / SIM_DT))
-result = loop.compute_trajectory(tf=TF_SIM)
+loop = (mpc % MPC_DT) @ boat
+result = loop.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
 loop.plot_trajectory()
 loop.animate(
     result.resample(n_samples=N_FRAMES),
