@@ -4,6 +4,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2
+from minilink.core.system import fastest_time_constant
 from minilink.dynamics.abstraction.mechanical import MechanicalSystem
 from minilink.graphical.animation.primitives import (
     Circle,
@@ -48,6 +49,40 @@ class Pendulum(MechanicalSystem):
         # Graphics: no camera_scale, so the view follows params["l"]
         self.camera_target = np.array([0.0, 0.0, 0.0])
         self.camera_plot_axes = (0, 1)
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: the time constant of the swing about the hanging rest, in seconds.
+
+        With no damping the swing's modes are ``±i √(m g l / (m l² + I))``, so
+        ``τ = √((m l² + I) / (m g l))``, ``√(l/g)`` for a point mass; the damping
+        ``d`` moves them, and the upright's modes have the same magnitude.
+        """
+        params = self.params
+
+        m = params["m"]
+        l = params["l"]
+        I = params["I"]
+        gravity = params["gravity"]
+        d = params["d"]
+
+        # (m l² + I) θ̈ = −m g l θ − d θ̇, linearized about θ = 0 on the state [θ, θ̇]
+        H = m * l**2 + I
+        A = np.array([[0.0, 1.0], [-m * gravity * l / H, -d / H]])
+        tau = fastest_time_constant(np.linalg.eigvals(A))
+
+        return tau
 
     def H(self, q, params=None):
         params = self.params if params is None else params

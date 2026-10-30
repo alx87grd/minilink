@@ -17,6 +17,23 @@ the triage marks each answered item with its ruling.
 | R186 | **The student material.** No new method to hand-wire a continuous plant into a sampled diagram (`@` and `closed_loop` are the ways); the cart-pole RL budget is the maintainer's; LQR never warns about a declared `U`, its Riccati record's printout says "U ignored" (amends R21); the three hand gradient-loop demos (`cartpole_rollout_gradients`, `neural_controller_jax`, `params_gradient`) move onto `Optimizer`, and one hand descent loop stays, the closing example's first section (`pid_autotuning_jax.py`), shown before the library's `Optimizer` lands on the same gains; the MPC notebooks (`racecar_toward_mpc` §7–§8, the showcase §8, `mpc_spatial_stack`) lose the prose that describes the car's behaviour, which the maintainer rewrites after re-running them; ROADMAP §4.1's RL row says "`PlanningProblem` with laws"; the closing example made as simple as possible, a demonstration of the features that work (its loss the problem's cost); the three demos' style fixed now (`pid_autotuning_jax.py`'s helpers, arithmetic prints and hand-made figure; `diagram_shortcuts.py`'s `NoisyPendulum` label; `custom_one_link_arm.py` reading `params`); the pipeline figures down to the library map (README, `docs/pipelines.md`), with a layer above the `System` showing its three origins: a user's class, the catalog, a composition of blocks; the other figures deleted for now | 2.1 item 5; 3.1, 3.2, 3.3, 3.4, 3.5, 3.9, 3.11, 3.12 |
 | R187 | **The internal choices accepted as a block**, after a recap of the core's architecture, organisation and contract (the spine; the objects and `%`/`@`/`discretize`; the invariants R168–R174, R180; the problem, its evaluator and the program; the planners and their compiled face; the four bands and the root as the teaching surface) | §4, all |
 
+**Implemented** on `dev-v0.3-merge-review` (2026-10-31, [the run's log](2026-10-31-merge-review-run-log.md)),
+one commit per row of [the plan](../plans/merge-review-run.md):
+
+- Row 1, R180, the step rule from the physics and RK4's held sample: `39563f6e`.
+- Row 2, R181, `planner_evidence`: `2b27625a`.
+- Row 3, R185, the step-problem names off the root: `ce76d365`.
+- Row 4, R186, LQR's "U ignored": `5f1e1e3e`.
+- Row 5, R186, the three gradient demos on `Optimizer`: `154072c4`.
+- Row 6, R186, the closing example: `dfe29abe`.
+- Row 7, R186, two demos' style: `6e17b47a`.
+- Row 8, R186, the MPC notebooks' prose: no commit (nothing left to delete; the log, §5).
+- Row 9, R186, ROADMAP §4.1's RL row: `609452c8`.
+- Row 10, R186, the pipeline figures down to the map: `0536ae37`.
+- Row 11, the removed `x_goal` lines: no commit (each checked; the log, §5).
+- Row 12, the Ipopt test: `33dcd288`.
+- Row 13, the records: the commit that adds this list.
+
 Done in session, no ruling needed: the three `experimental/` scripts close their loops on the
 plant with `dt=` at the run (3.7, the maintainer's yes); `q + 10 * q` is now refused with the line
 to write (2.4 item 25) and `A >> B >> C` is named `Gain >> Gain >> Gain` (2.4 item 26), both

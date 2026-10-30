@@ -1,9 +1,6 @@
 # file  module — deep imports that predate the teaching-surface rule (S12).
 # This list only shrinks; see test_teaching_imports.py.
-examples/demos/compile/neural_controller_jax.py minilink.graphical.common.environment
-examples/demos/compile/neural_controller_jax.py minilink.graphical.common.matplotlib_style
 examples/demos/compile/params_gradient.py minilink.core.backends
-examples/demos/compile/pid_autotuning_jax.py minilink.graphical.signals
 examples/demos/hybrid/hybrid_multi_rate.py minilink.core.backends
 examples/demos/hybrid/step_accumulator.py minilink.core.backends
 examples/demos/hybrid/step_fibonacci.py minilink.core.backends

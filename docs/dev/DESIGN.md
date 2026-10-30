@@ -53,7 +53,10 @@ Rules:
 
 The lane contract is [ROADMAP.md §2](ROADMAP.md#2-two-lanes). The teaching surface is the
 root prelude plus the band facades, registered in `minilink/__init__.py` and the band
-`__init__` files, and checked as a set by `test_teaching_surface.py`.
+`__init__` files, and checked as a set by `test_teaching_surface.py`. A name reaches the root
+when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` and
+`SampledCost` (`minilink.core`) stay on their bands until one does (R185); `StepSystem` is
+on the root.
 
 ## 3. Package Map
 
@@ -215,8 +218,8 @@ a `DiagramSystem`; a static block joins any of them; a continuous operand with s
 step one is refused, naming `%`, except `sampled @ continuous`, the one place the two worlds
 meet, where the plant becomes the plant on the controller's base clock (`plant` role, a
 `SampledSystem` of kind `"plant"` the user never builds). Its integration step is the continuous
-simulator's, one rule: RK4 at `Δt = AUTO_DT_SCALE·τ_min` (the plant's
-`solver_info["smallest_time_constant"]`, the catalog default 1 ms), `substeps = ⌈Δ / Δt⌉`;
+simulator's, one rule (`automatic_step_of`, §5 "Automatic grid"): RK4 at
+`Δt = AUTO_DT_SCALE·τ_min` from the plant's physics, `substeps = ⌈Δ / Δt⌉`;
 `dt=` at the run verbs (`loop.compute_trajectory(tf, dt=0.01)`, `loop.compute_rollout(N,
 dt=0.01)`) and `substeps=` at the compiles (`loop.compile(substeps=20)`,
 `problem.compile(mpc % Δ, substeps=20)`) choose another, `solver=` beside them (`"rk4"`,
@@ -799,11 +802,13 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `PlanningProblem` on a random system resolve `params=None` through `realize(None)`, so a
   noisy loop is linearized and planned at `E[w] = 0`. Three periods: the block's `Δ`, a
   controller's period, the solver's step. A block publishes `Δ` as
-  `solver_info["sample_period"]` (a diagram gathers the minimum) and as its time constant;
-  with no solver named the simulator takes fixed-step RK4 at the largest `Δ / n` at or under
-  the smooth policy's step, one step per sample when no block declares a time constant, since
-  the period is the resolution the user chose, and `dt` buys a finer one (the
-  realtime simulator reads only the time constant). A step that does not divide `Δ`, a forced
+  `solver_info["sample_period"]` (a diagram gathers the base period of its blocks', their
+  greatest common divisor); a hold period places the grid's points and is never a time
+  constant. With no solver named the simulator takes fixed-step RK4 at the automatic step
+  (§5, "Automatic grid"), rounded down to divide `Δ`, and reads each held block once per
+  step, at its start, so the four stages read one sample: fourth order with no stage reading
+  the next draw (a held block inside a nested sub-diagram reads the stage time; `flatten=True`
+  reaches it). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
@@ -1018,13 +1023,25 @@ via `compute_forced`. Facades default `backend="numpy"`.
 (user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
 is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
-take `dt` from `solver_info["smallest_time_constant"]` × `AUTO_DT_SCALE` (0.1,
-one owner in `simulation/time_grid.py`), discontinuous loops included. A diagram's hint is
-the smallest over its stateful subsystems and any block that sets its own; a
-static block left at the default does not count. A diagram's hints are derived from its
-blocks at each read, and a block whose hint follows its parameters (a noise block's sample
-period, the racecar's fastest mode) reads them at each read too, so no tool refreshes before
-a run and a hint belongs on the block: one set by hand on the diagram is replaced.
+step at the automatic step, one rule wherever a fixed-step run picks its own step (a
+continuous diagram, discontinuous loops included; a sampled loop's plant; `problem.compile(law
+% dt)`; a planner's evidence): `Δt = AUTO_DT_SCALE × τ_min` (0.1, `core/system.py`,
+`automatic_step_of`) over the blocks that have dynamics, rounded down so it divides every
+hold period of the loop. An explicit `dt=` at a run and `substeps=` at a compile win. `τ_min`
+comes from the physics: a linear block reads it from its eigenvalues in its current `params`
+(`τ = 1 / max |λᵢ|`, `fastest_time_constant`: an LTI or state-space block's `A`, an
+observer's `A − L C`, a PID's derivative filters; an all-zero spectrum, an integrator,
+declares `∞` and bounds nothing); a catalog plant declares its own from its linearization at
+the nominal point by a closed formula, as a `fastest_mode()` read from `params` (the
+pendulum's `√((m l² + I)/(m g l))`, the cart-pole's unstable pole, the dynamic bicycle's tire
+modes at rest, the racecar's); a law with a time constant of its own declares it
+(`SlidingMode`'s `1/λ`). A custom plant that declares nothing keeps the 1 ms default; no
+plant is linearized automatically. A diagram's hint is the smallest over its stateful
+subsystems and any block that sets its own; a static block left at the default does not
+count. A diagram's hints are derived from its blocks at each read, and a block whose hint
+follows its parameters reads them at each read too, so no tool refreshes before a run and a
+hint belongs on the block: one set by hand on the diagram is replaced, and so is one set on
+a block that computes its own (change its `params`, or pass `dt=`).
 `StaticSimulator` shares the 10001-point default.
 
 **Three owners of a start (R124).** A block owns its `x0`; a diagram's `x0` is a view
@@ -1117,7 +1134,9 @@ unbounded one with the line to write. Offline entry is
 for the trajectory family — `solution.open_loop` — or a time-varying feedback
 `u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
-names it), the
+names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
+bounds the command, since the Riccati law never reads `U` (R21, amended by R186: LQR never
+warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
 `cost_to_go` where the method produces one (the DP and tabular tables; the
@@ -1287,10 +1306,14 @@ backends for an integer key, while a deterministic problem runs each block's own
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
-a planner's score (`Planner.evaluate`) holds a feedback law with no clock of its own over
-each period, `policy % dt` on the plant's own clock (R159), so value iteration's or a
-learner's policy gets the face's `J`; an open-loop source keeps the interpolation its planner
-states. `problem.compile(law)` called directly closes a continuous law as a continuous loop.
+a planner's evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
+`planning/planner.py`, an internal helper the seven planners' `solve()` call, R181) runs on
+the real plant: a feedback law with no clock of its own held over each period, `policy % dt`
+(R159), the plant integrated at the automatic step (§5, R180), the planner's own `J` in its
+record beside it, so the evidence does not repeat the planner's own belief; an open-loop
+source keeps the interpolation its planner states. Scoring a law is the problem evaluator's:
+`problem.compile(ctl % dt).evaluate()`, `substeps=` for the planner's own physics.
+`problem.compile(law)` called directly closes a continuous law as a continuous loop.
 
 **The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
 substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
@@ -1314,19 +1337,10 @@ scores its `Trajectory` (the cost `J`, and the margin `m` of the run to the sets
 when it leaves one), and returns the objective with its `Evaluation`; `pe.evaluate(θ)` alone
 evaluates a solution. Tuning is an optional export: `pe.program(wrt)` minimizes the objective
 over the chosen leaves of `θ` (dotted paths such as `"controller.Kp"`) with `m ≥ 0` as its
-rows, and the optimizer writes the tuned leaves back into `θ`. Colours: blue, the objects;
-amber, the parameters; fuchsia, randomness; green, the results. The figures are drawn by
-`docs/pipeline_figures.py`; the other pipelines are in [docs/pipelines.md](../pipelines.md).
-
-**Deterministic:** one run, one score.
-
-![The evaluator pipeline, deterministic](../_static/pipeline_deterministic.svg)
-
-**Stochastic:** the noise's seed is a leaf of `θ` like any other, and so are the
-distributions' own parameters; the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key,
-the `n` runs go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
-
-![The evaluator pipeline, stochastic](../_static/pipeline_stochastic.svg)
+rows, and the optimizer writes the tuned leaves back into `θ`. On a stochastic problem the
+noise's seed is a leaf of `θ` like any other, and so are the distributions' own parameters;
+the draws `ωᵢ` (starts, drawn parameters, block seeds) are realized from one key, the `n` runs
+go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.

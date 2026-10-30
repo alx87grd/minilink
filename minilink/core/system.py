@@ -18,13 +18,9 @@ if TYPE_CHECKING:
 # Solver hint of a system that declares no time constant of its own (seconds)
 DEFAULT_SMALLEST_TIME_CONSTANT = 0.001
 
-# Automatic step of a fixed-step solver, smooth or discontinuous loop alike:
-# dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"]
+# Automatic step of a fixed-step run, smooth or discontinuous loop alike:
+# dt = AUTO_DT_SCALE × solver_info["smallest_time_constant"] (automatic_step_of)
 AUTO_DT_SCALE = 0.1
-
-# Integration steps per sample of a held signal on a smooth loop that declares
-# no time constant: the period itself is the resolution
-HELD_SIGNAL_STEPS_PER_SAMPLE = 1
 
 
 ###############################################################################
@@ -646,6 +642,44 @@ class DynamicSystem(
         y = xp.zeros(p)
 
         return y
+
+
+def automatic_step_of(solver_info) -> float:
+    """
+    The step of a fixed-step run that names none: ``Δt = AUTO_DT_SCALE · τ_min``, rounded down to divide the hold period.
+
+    ``τ_min`` is the hints' smallest time constant, the blocks' physics (the
+    default 1 ms when none declares a finite one). A block holding a signal over
+    ``T_s`` places the grid's points: ``Δt = T_s / ⌈T_s / Δt⌉``. The continuous
+    simulator, a sampled loop's plant and a planner's evidence share this rule.
+    """
+    tau = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
+    period = solver_info.get("sample_period")
+    if not np.isfinite(tau):
+        tau = DEFAULT_SMALLEST_TIME_CONSTANT
+
+    # Δt = 0.1 τ_min
+    dt = tau * AUTO_DT_SCALE
+
+    # Δt = T_s / n, n = ⌈T_s / Δt⌉: the largest step under it that divides the period
+    # (a multiple landing on its round despite the division, as a loop's substeps)
+    if period is not None:
+        n = max(1, int(np.ceil(period / dt - 1e-9)))
+        dt = period / n
+
+    return dt
+
+
+def fastest_time_constant(eigenvalues) -> float:
+    """``τ = 1 / max |λᵢ|``: a linear block's fastest mode; ``∞`` for an all-zero spectrum (an integrator)."""
+    rate = float(np.max(np.abs(np.asarray(eigenvalues)), initial=0.0))
+    if rate == 0.0:
+        return np.inf
+
+    # τ = 1 / max |λᵢ|
+    tau = 1.0 / rate
+
+    return tau
 
 
 ###############################################################################

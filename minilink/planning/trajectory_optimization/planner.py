@@ -32,7 +32,7 @@ from minilink.optimization.reporting import (
     preview_vector,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
@@ -667,7 +667,8 @@ class TrajectoryOptimizationPlanner(Planner):
         evaluation = None
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
-            evaluation = self.evaluate(
+            evaluation = planner_evidence(
+                self,
                 policy,
                 dt=dt,
                 n_trials=n_trials,

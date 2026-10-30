@@ -59,6 +59,26 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
     return x
 
 
+def held_step_body(rhs_at, x, u0, u1, t, dt, solver, substeps):
+    """
+    :func:`step_body` with the held signals read once per substep, at its start: ``rhs_at(s)`` is ``f`` with them read at ``s``.
+
+    The four RK4 stages of a substep read one sample, so a held signal whose
+    switches sit on the substep grid is integrated to fourth order: no last
+    stage, at ``s + h``, reads the next sample.
+    """
+    h = dt / substeps
+
+    # The substeps, each one step with the held signals read at its start
+    for i in range(substeps):
+        s = t + i * h
+        ua = u0 if i == 0 else u0 + (i / substeps) * (u1 - u0)
+        ub = u1 if i == substeps - 1 else u0 + ((i + 1) / substeps) * (u1 - u0)
+        x = step_body(rhs_at(s), x, ua, ub, s, h, solver, 1)
+
+    return x
+
+
 def step_with_cost(f, rate, x, u, t, dt, solver, substeps):
     """
     ``(x(t + dt), c)``: one period of :func:`step_body` with the stage cost integrated beside the state.

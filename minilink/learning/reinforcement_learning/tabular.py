@@ -14,7 +14,7 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -196,7 +196,7 @@ class TabularLearningPlanner(Planner):
             dt = self.grid.dt
             tf = self.env.tf
             trajectory = nominal_trajectory(self.problem, policy, dt=dt, tf=tf)
-            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials, tf=tf)
+            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials, tf=tf)
 
         # The solution: the law, the record, the rollout, the interpolated cost-to-go
         record = self.learning_record()

@@ -28,7 +28,7 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
 from minilink.core.compile.evaluators.stepping import substeps_of
-from minilink.core.system import AUTO_DT_SCALE, DynamicSystem
+from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
 
@@ -407,8 +407,7 @@ class RealtimeSimulator:
 
     def _offline_auto_dt(self):
         """Same automatic ``dt`` the offline :class:`Simulator` would pick."""
-        info = self.sys.solver_info
-        return float(info["smallest_time_constant"]) * AUTO_DT_SCALE
+        return automatic_step_of(self.sys.solver_info)
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.

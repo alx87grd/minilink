@@ -1,8 +1,8 @@
 """Draw the pipeline figures of Minilink as hand-laid SVG.
 
 Run from the repository root: ``python docs/pipeline_figures.py``; it writes one
-``docs/_static/pipeline_<name>.svg`` per figure in :data:`FIGURES`. The evaluator's two
-(deterministic, stochastic) are in DESIGN §6; the gallery is ``docs/pipelines.md``.
+``docs/_static/pipeline_<name>.svg`` per figure in :data:`FIGURES`: the library map, shown by
+``docs/pipelines.md``.
 
 The map is also the README's first figure, as a PNG (a raw-URL SVG does not show on
 PyPI): ``python docs/make_assets.py map`` rebuilds both.
@@ -28,7 +28,6 @@ COLORS = {
     "loop": ("#f0fdfa", "#0f766e", "#134e4a"),
 }
 INK, MUTED, LINE = "#0f172a", "#64748b", "#64748b"
-CARD_W, CARD_H = 150, 76
 
 
 class Figure:
@@ -47,66 +46,12 @@ class Figure:
             f'fill="{color}" text-anchor="{anchor}">{s}</text>'
         )
 
-    def card(self, x, y, w, h, title, lines, kind="step", stack=0, lift=0):
-        """A rounded card, its title and lines centred; ``stack`` cards drawn behind it."""
-        fill, stroke, ink = COLORS[kind]
-        for k in range(stack, 0, -1):
-            self.add(
-                f'<rect x="{x + 6 * k}" y="{y - 6 * k}" width="{w}" height="{h}" rx="8" '
-                f'fill="{fill}" stroke="{stroke}" stroke-width="1.2" opacity="0.85"/>'
-            )
-        self.add(
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{fill}" '
-            f'stroke="{stroke}" stroke-width="1.5"/>'
-        )
-        y0 = y + h / 2 - len(lines) * 10 + 5 - lift
-        self.text(x + w / 2, y0, title, 15, 650, ink)
-        for i, s in enumerate(lines):
-            self.text(x + w / 2, y0 + 21 * (i + 1), s, 14, 400, ink)
-
-    def pill(self, cx, cy, s, kind="par", w=50, h=24, size=13.5, weight=600):
-        fill, stroke, ink = COLORS[kind]
-        self.add(
-            f'<rect x="{cx - w / 2}" y="{cy - h / 2}" width="{w}" height="{h}" rx="{h / 2}" '
-            f'fill="{fill}" stroke="{stroke}" stroke-width="1.5"/>'
-        )
-        self.text(cx, cy + 4.5, s, size, weight, ink)
-
     def arrow(self, d, color=LINE, dashed=False, marker="arr", width=1.6):
         dash = ' stroke-dasharray="5 4"' if dashed else ""
         self.add(
             f'<path d="{d}" fill="none" stroke="{color}" stroke-width="{width}"{dash} '
             f'marker-end="url(#{marker})"/>'
         )
-
-    def dotted(self, d, color):
-        self.add(
-            f'<path d="{d}" fill="none" stroke="{color}" stroke-width="1.4" '
-            f'stroke-dasharray="3 3"/>'
-        )
-
-    def frame(self, x, y, w, h, label, dashed=False, label_bottom=False):
-        dash = ' stroke-dasharray="6 5"' if dashed else ""
-        fill = "#ffffff" if dashed else "#f8fafc"
-        self.add(
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="{fill}" '
-            f'stroke="#cbd5e1" stroke-width="1.2"{dash}/>'
-        )
-        label_y = y + h - 12 if label_bottom else y + 22
-        self.text(x + 16, label_y, label, 13.5, 600, MUTED, anchor="start")
-
-    def trajectory(self, x, y, w, h, title, sub, stack=0):
-        """The trajectory object: a card with a small sketch of x(t)."""
-        self.card(x, y, w, h, "", [], "obj", stack=stack)
-        ink = COLORS["obj"][2]
-        sx, sy = x + 18, y + 30
-        self.add(
-            f'<path d="M{sx},{sy} C{sx + 14},{sy - 22} {sx + 26},{sy + 16} {sx + 40},{sy - 4} '
-            f'S{sx + 62},{sy - 10} {sx + w - 36},{sy - 8}" fill="none" stroke="{COLORS["obj"][1]}" '
-            f'stroke-width="2"/>'
-        )
-        self.text(x + w / 2, y + h - 30, title, 15, 650, ink)
-        self.text(x + w / 2, y + h - 11, sub, 13.5, 400, ink)
 
     def math(self, cx, cy, tex, size=17, color=INK, max_width=None):
         """A LaTeX equation (matplotlib's mathtext) as filled SVG paths, centred on (cx, cy)."""
@@ -131,52 +76,6 @@ class Figure:
             f'transform="translate({tx:.2f},{ty:.2f}) scale(1,-1)"/>'
         )
 
-    def eq_card(self, x, y, w, h, title, tex, kind="step", size=17):
-        """A card with its title and one or two equations under it."""
-        fill, stroke, ink = COLORS[kind]
-        self.add(
-            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="8" fill="{fill}" '
-            f'stroke="{stroke}" stroke-width="1.5"/>'
-        )
-        lines = [tex] if isinstance(tex, str) else tex
-        top = y + 26
-        self.text(x + w / 2, top, title, 15, 650, ink)
-        room = (y + h - 10) - (top + 12)
-        for i, line in enumerate(lines):
-            cy = top + 12 + room * (i + 0.5) / len(lines)
-            self.math(x + w / 2, cy, line, size, ink, max_width=w - 18)
-
-    def grid_icon(self, x, y, n=5, step=9):
-        """A small lattice of nodes: a discretized state space."""
-        for i in range(n):
-            for j in range(n):
-                self.add(
-                    f'<circle cx="{x + i * step}" cy="{y + j * step}" r="1.8" fill="{COLORS["obj"][1]}"/>'
-                )
-
-    def heat_icon(self, x, y, n=5, size=9):
-        """A small table of shaded cells: a cost-to-go on the grid."""
-        for i in range(n):
-            for j in range(n):
-                d = ((i - 2) ** 2 + (j - 2) ** 2) / 8
-                alpha = 0.15 + 0.7 * min(d, 1)
-                self.add(
-                    f'<rect x="{x + i * size}" y="{y + j * size}" width="{size - 1}" height="{size - 1}" '
-                    f'fill="{COLORS["obj"][1]}" opacity="{alpha:.2f}"/>'
-                )
-
-    def loop_back(self, x0, x1, y, label, color=LINE, below=0):
-        """An arc over a row (or under it, ``below`` its height), from ``x1`` back to ``x0``."""
-        if below:
-            yb = y + below
-            d = f"M{x1},{yb} C{x1},{yb + 46} {x0},{yb + 46} {x0},{yb + 2}"
-            self.arrow(d, color, dashed=True)
-            self.text((x0 + x1) / 2, yb + 50, label, 12.5, 500, MUTED)
-            return
-        d = f"M{x1},{y} C{x1},{y - 46} {x0},{y - 46} {x0},{y - 2}"
-        self.arrow(d, color, dashed=True)
-        self.text((x0 + x1) / 2, y - 40, label, 12.5, 500, MUTED)
-
     def svg(self):
         markers = "".join(
             f'<marker id="{mid}" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" '
@@ -197,675 +96,6 @@ class Figure:
             + "".join(self.parts)
             + "</svg>"
         )
-
-
-def objects(f, cards, problem_label, y=92, band_y=244):
-    """The controller, the problem's cards, the loop, the parameter tabs and the tree."""
-    ctl_x, prob_x, prob_w = 100, 300, 780
-    f.frame(prob_x, y - 50, prob_w, CARD_H + 84, problem_label)
-
-    # The controller, outside the problem, closing the loop on the problem's plant
-    f.card(ctl_x, y, CARD_W, CARD_H, "Controller", ["u = π(y)"], "obj", lift=6)
-    plant_x = cards[0][0]
-    mid = (ctl_x + CARD_W + plant_x) / 2
-    f.arrow(f"M{ctl_x + CARD_W},{y + 22} L{plant_x - 2},{y + 22}")
-    f.text(mid, y + 15, "u", 14, 500, MUTED)
-    f.arrow(f"M{plant_x},{y + 50} L{ctl_x + CARD_W + 2},{y + 50}")
-    f.text(mid, y + 67, "y", 14, 500, MUTED)
-
-    leaves = [(ctl_x + CARD_W / 2, [("p", "par")], "controller")]
-    for x, title, lines, kind, tabs, key in cards:
-        f.card(x, y, CARD_W, CARD_H, title, lines, kind, lift=6)
-        leaves.append((x + CARD_W / 2, tabs, key))
-
-    # The tree: one band, the branch of every object under its key
-    left, right = ctl_x - 70, prob_x + prob_w
-    par_stroke, par_ink = COLORS["par"][1], COLORS["par"][2]
-    f.add(
-        f'<rect x="{left}" y="{band_y}" width="{right - left}" height="46" rx="23" '
-        f'fill="#ffffff" stroke="{par_stroke}" stroke-width="1.6"/>'
-    )
-    f.text(left + 36, band_y + 25, "θ", 22, 700, par_ink)
-    f.text(left + 36, band_y + 39, "pe.params", 10.5, 500, par_ink)
-    for cx, tabs, key in leaves:
-        f.dotted(f"M{cx},{y + CARD_H + 12} L{cx},{band_y}", par_stroke)
-        for i, (s, kind) in enumerate(tabs):
-            f.pill(cx + (i - (len(tabs) - 1) / 2) * 58, y + CARD_H, s, kind)
-        f.text(cx, band_y + 28, key, 14, 500, par_ink)
-    return band_y + 46
-
-
-def evaluator_frame(f, y, h, label):
-    """The problem evaluator's box: one row, its steps inside."""
-    f.frame(30, y - 24, 1120, h + 74, label, label_bottom=True)
-
-
-def optional_export(f, objective_cx, y_obj, y, h, program, optimizer, band_bottom):
-    """The optional export: the program over chosen leaves, its optimizer, θ* back into θ."""
-    label = "optional export · pe.program(wrt): tune the chosen leaves of θ"
-    f.frame(30, y - 40, 1120, h + 62, label, dashed=True)
-    f.arrow(f"M{objective_cx},{y_obj} L{objective_cx},{y - 2}", dashed=True)
-    f.card(830, y, 300, h, "Program", program)
-    f.arrow(f"M830,{y + h / 2} L772,{y + h / 2}")
-    f.card(470, y, 300, h, "Optimizer", optimizer)
-    f.arrow(f"M470,{y + h / 2} L412,{y + h / 2}")
-    f.pill(378, y + h / 2, "θ*", "out", w=62, h=34, size=16, weight=700)
-    f.arrow(
-        f"M347,{y + h / 2} L40,{y + h / 2} C14,{y + h / 2} 14,{y + h / 2 - 26} 14,{y + h / 2 - 40} "
-        f"L14,{band_bottom + 40} C14,{band_bottom + 16} 22,{band_bottom + 8} 40,{band_bottom + 4}",
-        COLORS["out"][1],
-        dashed=True,
-        marker="arrg",
-    )
-
-
-def objective(f, cx, cy, value, w=118):
-    """The evaluator's output: the objective, and the record it comes with."""
-    f.pill(cx, cy, value, "out", w=w, h=40, size=15, weight=700)
-    f.text(cx, cy + 40, "pe.evaluate(θ)", 12.5, 500, COLORS["out"][2])
-    f.text(cx, cy + 56, "→ Evaluation", 12.5, 500, COLORS["out"][2])
-
-
-def deterministic():
-    f = Figure(1180, 712)
-    band_bottom = objects(
-        f,
-        [
-            (330, "Plant", ["ẋ = f(x, u)"], "obj", [("p", "par")], "plant"),
-            (520, "Cost", ["∫ g dt + h"], "obj", [("p", "par")], "cost"),
-            (710, "Sets", ["X · U · Xf"], "obj", [("p", "par")], "X · U · Xf"),
-            (900, "Start", ["x(0)"], "obj", [("x₀", "par")], "x_start"),
-        ],
-        "PlanningProblem",
-    )
-
-    # The problem evaluator: simulate the closed loop, score its trajectory
-    r1, h = 362, 96
-    evaluator_frame(f, r1, h, "ProblemEvaluator · pe = problem.compile(controller, dt)")
-    f.arrow(f"M190,{band_bottom} L190,{r1 - 2}")
-    f.card(
-        60,
-        r1,
-        260,
-        h,
-        "Simulation",
-        ["ẋ = f(x, π(y)),  x(0) = x₀", "integrated forward on [0, tf]"],
-    )
-    f.arrow(f"M320,{r1 + h / 2} L358,{r1 + h / 2}")
-    f.trajectory(360, r1 + 4, 140, h - 8, "Trajectory", "x(t), u(t)")
-    f.arrow(f"M500,{r1 + h / 2} L538,{r1 + h / 2}")
-    f.card(
-        540,
-        r1,
-        400,
-        h,
-        "Score",
-        [
-            "J = ∫ g(x, u) dt + h(x(tf))",
-            "m = margin to X, U, Xf  (m < 0: a set is left)",
-        ],
-    )
-    f.arrow(f"M940,{r1 + h / 2} L1008,{r1 + h / 2}")
-    objective(f, 1070, r1 + h / 2 - 12, "J(θ), m(θ)")
-
-    r2 = r1 + h + 112
-    optional_export(
-        f,
-        1070,
-        r1 + h / 2 + 52,
-        r2,
-        h,
-        ["min J(θ)", "s.t.  m(θ) ≥ 0"],
-        ["θ ← θ − η ∇J(θ)", "gd · Adam · L-BFGS · SLSQP · Ipopt"],
-        band_bottom,
-    )
-    return f.svg()
-
-
-def stochastic():
-    f = Figure(1180, 718)
-    band_bottom = objects(
-        f,
-        [
-            (
-                330,
-                "Plant",
-                ["ẋ = f(x, u, w)"],
-                "obj",
-                [("p", "par"), ("seed", "rnd")],
-                "plant · seed",
-            ),
-            (520, "Cost", ["∫ g dt + h"], "obj", [("p", "par")], "cost"),
-            (710, "Sets", ["X · U · Xf"], "obj", [("p", "par")], "X · U · Xf"),
-            (
-                900,
-                "Distributions",
-                ["x₀ ~ D₀ · p ~ Dₚ"],
-                "rnd",
-                [("p", "par")],
-                "distributions",
-            ),
-        ],
-        "PlanningProblem",
-    )
-
-    # The problem evaluator: n draws, n simulations, n trajectories, n scores, one criterion
-    r1, h = 368, 96
-    evaluator_frame(
-        f,
-        r1,
-        h,
-        "ProblemEvaluator · pe = problem.compile(controller, dt) · pe.evaluate(θ, key, n)",
-    )
-    f.pill(72, r1 + h / 2, "key", "rnd", w=48, h=28)
-    f.arrow(f"M96,{r1 + h / 2} L108,{r1 + h / 2}", COLORS["rnd"][1], marker="arrp")
-    f.arrow(f"M170,{band_bottom} L170,{r1 - 2}")
-    f.card(110, r1, 120, h, "Draws", ["ω₁ … ωₙ", "x₀ᵢ, pᵢ, seedᵢ"])
-    f.arrow(f"M230,{r1 + h / 2} L252,{r1 + h / 2}")
-    f.card(
-        254,
-        r1,
-        200,
-        h,
-        "Simulation × n",
-        ["ẋ = f(x, π(y), wᵢ)", "x(0) = x₀ᵢ, one vmap"],
-        stack=2,
-    )
-    f.arrow(f"M466,{r1 + h / 2} L488,{r1 + h / 2}")
-    f.trajectory(490, r1 + 4, 124, h - 8, "Trajectories", "xᵢ(t), uᵢ(t)", stack=2)
-    f.arrow(f"M626,{r1 + h / 2} L648,{r1 + h / 2}")
-    f.card(
-        650, r1, 190, h, "Scores", ["Jᵢ = ∫ g dt + h", "mᵢ = margin to sets"], stack=2
-    )
-    f.arrow(f"M852,{r1 + h / 2} L874,{r1 + h / 2}")
-    f.card(876, r1, 140, h, "Criterion C", ["mean, CVaR", "or worst case"])
-    f.arrow(f"M1016,{r1 + h / 2} L1032,{r1 + h / 2}")
-    objective(f, 1090, r1 + h / 2 - 12, "C(J₁ … Jₙ)", w=112)
-
-    r2 = r1 + h + 112
-    optional_export(
-        f,
-        1090,
-        r1 + h / 2 + 52,
-        r2,
-        h,
-        ["min C(J₁ … Jₙ)", "s.t.  mᵢ(θ) ≥ 0"],
-        ["θ ← θ − η ∇C(θ)", "Adam · L-BFGS · SLSQP · Ipopt"],
-        band_bottom,
-    )
-    return f.svg()
-
-
-def chain(f, y, h, items, x0=60, gap=44, reverse=False, arrows=True):
-    """Lay cards along a row, left to right (or right to left), with arrows between.
-
-    Each item is ``(kind, w, title, lines)``; ``kind`` is a colour role, ``"traj"``
-    for a trajectory card, or ``"pill"`` for a result. Returns the ``(x, w)`` of each.
-    """
-    xs, x = [], x0
-    for _kind, w, _title, _lines in items:
-        xs.append((x, w))
-        x += w + gap
-    if reverse:
-        right = xs[-1][0] + xs[-1][1]
-        xs = [(right - (xx - x0) - w, w) for xx, w in xs]
-    for (kind, w, title, lines), (x, _) in zip(items, xs):
-        if kind == "traj":
-            f.trajectory(x, y + 4, w, h - 8, title, lines[0])
-        elif kind == "pill":
-            f.pill(x + w / 2, y + h / 2, title, "out", w=w, h=40, size=15, weight=700)
-        else:
-            f.card(x, y, w, h, title, lines, kind)
-    if arrows:
-        for (a, wa), (b, wb) in zip(xs, xs[1:]):
-            if reverse:
-                f.arrow(f"M{a},{y + h / 2} L{b + wb + 2},{y + h / 2}")
-            else:
-                f.arrow(f"M{a + wa},{y + h / 2} L{b - 2},{y + h / 2}")
-    return xs
-
-
-def problem_row(f, cards, label, y=70, h=76):
-    """The problem's box: its object cards in one row."""
-    f.frame(30, y - 44, 1120, h + 66, label)
-    w = (1120 - 40 - 24 * (len(cards) - 1)) / len(cards)
-    for i, (title, lines, kind) in enumerate(cards):
-        f.card(50 + i * (w + 24), y, w, h, title, lines, kind)
-    return y + h + 22
-
-
-def trajectory_optimization():
-    f = Figure(1180, 520)
-    bottom = problem_row(
-        f,
-        [
-            ("Plant", ["ẋ = f(x, u)"], "obj"),
-            ("Cost", ["∫ g dt + h(x(tf))"], "obj"),
-            ("Sets", ["x ∈ X,  u ∈ U"], "obj"),
-            ("Goal", ["x(tf) ∈ Xf"], "obj"),
-            ("Start", ["x(0) = x₀"], "obj"),
-        ],
-        "PlanningProblem",
-    )
-
-    # The transcription: the trajectory itself is the decision
-    y, h = bottom + 58, 96
-    label = (
-        "Transcription · direct collocation (or single, multiple shooting): "
-        "no simulation, the dynamics become constraints"
-    )
-    f.frame(30, y - 34, 1120, h + 60, label)
-    f.arrow(f"M590,{bottom} L590,{y - 36}")
-    chain(
-        f,
-        y,
-        h,
-        [
-            (
-                "step",
-                220,
-                "Decision vector",
-                ["z = (x₀ … xₙ, u₀ … uₙ)", "the knots of the trajectory"],
-            ),
-            (
-                "step",
-                300,
-                "Dynamics as defects",
-                ["xₖ₊₁ − xₖ − dt/2 (fₖ + fₖ₊₁) = 0", "on every interval"],
-            ),
-            (
-                "step",
-                250,
-                "Cost as a sum",
-                ["Σ dt/2 (gₖ + gₖ₊₁) + h(xₙ)", "the trapezoidal rule"],
-            ),
-            ("step", 210, "Sets as rows", ["xₖ ∈ X, uₖ ∈ U", "xₙ ∈ Xf"]),
-        ],
-        x0=50,
-        gap=24,
-        arrows=False,
-    )
-
-    # The program, its solver, and the plan read back
-    y2 = y + h + 74
-    f.arrow(f"M190,{y + h + 26} L190,{y2 - 2}")
-    xs = chain(
-        f,
-        y2,
-        h,
-        [
-            (
-                "step",
-                260,
-                "MathematicalProgram",
-                ["min J(z)", "s.t. h(z) = 0, g(z) ≥ 0"],
-            ),
-            ("step", 200, "Optimizer", ["SLSQP · Ipopt", "from a first guess z₀"]),
-            ("traj", 150, "Trajectory", ["x*(t), u*(t)"]),
-            (
-                "obj",
-                290,
-                "PlanningSolution",
-                ["policy u = π(t), open loop", "or tracked; MPC re-solves"],
-            ),
-        ],
-        x0=60,
-        gap=60,
-    )
-    f.text((xs[1][0] + xs[1][1] + xs[2][0]) / 2, y2 + h / 2 - 8, "z*", 13, 600, MUTED)
-    return f.svg()
-
-
-def dynamic_programming():
-    f = Figure(1180, 580)
-    bottom = problem_row(
-        f,
-        [
-            ("Plant", ["ẋ = f(x, u)"], "obj"),
-            ("Cost", ["g(x, u) dt,  h(x)"], "obj"),
-            ("Sets", ["X, U: bounded boxes"], "obj"),
-        ],
-        "PlanningProblem",
-    )
-
-    # The discretization: nodes, actions and their successors
-    y, h = bottom + 58, 96
-    f.frame(
-        30, y - 34, 1120, h + 60, "StateSpaceGrid · the continuous problem on a lattice"
-    )
-    f.arrow(f"M590,{bottom} L590,{y - 36}")
-    xs = chain(
-        f,
-        y,
-        h,
-        [
-            ("step", 320, "Nodes", ["x-grid over X", "N states"]),
-            ("step", 320, "Actions", ["u-grid over U", "A inputs"]),
-            (
-                "step",
-                360,
-                "Successors",
-                ["x⁺ = x + f(x, u) dt", "between nodes: interpolated"],
-            ),
-        ],
-        x0=50,
-        gap=40,
-        arrows=False,
-    )
-    f.grid_icon(xs[0][0] + 24, y + 26)
-
-    # The Bellman sweep, backward, then the greedy policy
-    y2 = y + h + 70
-    f.arrow(f"M420,{y + h + 26} L420,{y2 - 2}")
-    xs = chain(
-        f,
-        y2,
-        h,
-        [
-            ("step", 170, "Terminal", ["J(x, tf) = h(x)"]),
-            (
-                "step",
-                320,
-                "Bellman backup",
-                ["Jₖ(x) = minᵤ [ g(x, u) dt", "+ α Jₖ₊₁(x⁺) ]"],
-            ),
-            ("obj", 220, "Cost-to-go", ["J(x) on the grid"]),
-            (
-                "obj",
-                260,
-                "PlanningSolution",
-                ["policy u = π(x) = argminᵤ", "a lookup table, and J"],
-            ),
-        ],
-        x0=50,
-        gap=40,
-    )
-    f.loop_back(
-        xs[1][0] + 60,
-        xs[1][0] + xs[1][1] - 60,
-        y2,
-        "backward in time, until J converges",
-        below=h,
-    )
-    f.heat_icon(xs[2][0] + 12, y2 + 30, size=7)
-    return f.svg()
-
-
-def lqr():
-    f = Figure(1180, 470)
-    problem_row(
-        f,
-        [
-            ("Plant", ["ẋ = f(x, u)"], "obj"),
-            ("QuadraticCost", ["g = (x − x̄)ᵀQ(x − x̄) + (u − ū)ᵀR(u − ū)"], "obj"),
-        ],
-        "PlanningProblem",
-    )
-
-    # The plant feeds the linearization, the cost's weights the Riccati equation
-    y, h = 226, 96
-    xs = chain(
-        f,
-        y,
-        h,
-        [
-            (
-                "step",
-                290,
-                "Linearize at (x̄, ū)",
-                ["A = ∂f/∂x,  B = ∂f/∂u", "the model near the goal"],
-            ),
-            (
-                "step",
-                380,
-                "Riccati",
-                ["AᵀP + PA − PBR⁻¹BᵀP + Q = 0", "(finite tf: the ODE backward from S)"],
-            ),
-            ("step", 290, "Gain", ["K = R⁻¹BᵀP", "(K(t) on a finite horizon)"]),
-        ],
-        x0=60,
-        gap=60,
-    )
-    f.arrow(f"M{xs[0][0] + 145},168 L{xs[0][0] + 145},{y - 2}")
-    f.arrow(f"M{xs[1][0] + 190},168 L{xs[1][0] + 190},{y - 2}")
-    f.text(xs[1][0] + 200, 200, "Q, R", 13, 600, MUTED, anchor="start")
-
-    # The solution from the gain; the cost-to-go and the poles beside it
-    y2 = y + h + 46
-    f.card(
-        xs[1][0],
-        y2,
-        380,
-        h,
-        "Cost-to-go",
-        ["J(x) = (x − x̄)ᵀP(x − x̄)", "of the linear model"],
-        "obj",
-    )
-    f.arrow(f"M{xs[1][0] + 190},{y + h} L{xs[1][0] + 190},{y2 - 2}")
-    f.card(
-        xs[2][0],
-        y2,
-        290,
-        h,
-        "PlanningSolution",
-        ["policy u = ū − K(x − x̄)", "poles eig(A − BK)"],
-        "obj",
-    )
-    f.arrow(f"M{xs[2][0] + 145},{y + h} L{xs[2][0] + 145},{y2 - 2}")
-    return f.svg()
-
-
-def reinforcement_learning():
-    f = Figure(1180, 576)
-    bottom = problem_row(
-        f,
-        [
-            ("Plant", ["ẋ = f(x, u, w)"], "obj"),
-            ("Cost", ["reward r = −g dt"], "obj"),
-            ("Sets", ["leave X: a failure"], "obj"),
-            ("Distributions", ["x₀ ~ D₀,  p ~ Dₚ"], "rnd"),
-        ],
-        "PlanningProblem",
-    )
-
-    y, h = bottom + 58, 96
-    f.frame(
-        30, y - 34, 1120, h + 60, "RolloutEnvironment · the step model of the problem"
-    )
-    f.arrow(f"M590,{bottom} L590,{y - 36}")
-    chain(
-        f,
-        y,
-        h,
-        [
-            ("step", 330, "Step", ["xₖ₊₁ = Φ(xₖ, uₖ)", "the plant held over dt"]),
-            (
-                "step",
-                330,
-                "Reward and end",
-                ["rₖ = −g(xₖ, uₖ) dt", "done when x ∉ X, or at the horizon"],
-            ),
-            ("rnd", 340, "Reset", ["x₀ drawn from D₀", "one seed per episode"]),
-        ],
-        x0=50,
-        gap=40,
-        arrows=False,
-    )
-
-    # The learning loop: collect with the current policy, then update it
-    y2 = y + h + 70
-    f.arrow(f"M410,{y + h + 26} L410,{y2 - 2}")
-    xs = chain(
-        f,
-        y2,
-        h,
-        [
-            ("step", 220, "Policy πθ", ["u ~ πθ(· | x)", "a neural network"]),
-            ("step", 220, "Collect", ["episodes, one scan", "vmap over envs"]),
-            ("step", 220, "Returns", ["Gₖ = Σⱼ γʲ rₖ₊ⱼ", "advantages, critic"]),
-            ("step", 230, "Update θ", ["θ ← θ + η ∇θ E[G]", "PPO · SAC · REINFORCE"]),
-        ],
-        x0=50,
-        gap=30,
-    )
-    f.loop_back(
-        xs[0][0] + xs[0][1] / 2,
-        xs[3][0] + xs[3][1] / 2,
-        y2,
-        "repeat: collect with the updated policy",
-        below=h,
-    )
-    f.arrow(f"M{xs[3][0] + xs[3][1]},{y2 + h / 2} L1053,{y2 + h / 2}")
-    f.pill(1094, y2 + h / 2, "π(x)", "out", w=78, h=40, size=15, weight=700)
-    f.text(1094, y2 + h / 2 + 40, "PlanningSolution", 12.5, 500, COLORS["out"][2])
-    return f.svg()
-
-
-def modeling_and_simulation():
-    f = Figure(1180, 540)
-    # The model: Controller @ Plant = one closed-loop System
-    y, h = 70, 86
-    f.frame(
-        30,
-        y - 44,
-        1120,
-        h + 66,
-        "Model · every block a System, and so is their diagram",
-    )
-    f.card(60, y, 230, h, "Controller", ["u = π(y; p)"], "obj")
-    f.text(318, y + h / 2 + 10, "@", 28, 700, MUTED)
-    f.card(346, y, 230, h, "Plant", ["ẋ = f(x, u, t; p)", "y = h(x, u, t; p)"], "obj")
-    f.text(606, y + h / 2 + 10, "=", 30, 700, MUTED)
-    lines = ["Ẋ = F(X, U, t; P)", "operators @ >> +, or connect"]
-    f.card(636, y, 484, h, "Closed-loop diagram, a System", lines, "obj")
-
-    # Compile once
-    y2 = y + h + 92
-    f.frame(30, y2 - 34, 1120, h + 60, "compile(backend): the diagram lowered once")
-    f.arrow(f"M860,{y + h + 22} L860,{y2 - 36}")
-    chain(
-        f,
-        y2,
-        h,
-        [
-            (
-                "step",
-                330,
-                "ExecutionPlan",
-                ["block order, wires, state slices", "algebraic loops refused"],
-            ),
-            (
-                "step",
-                340,
-                "Evaluator",
-                ["f, h, rollout as arrays", "NumPy, or JAX: jit · grad · vmap"],
-            ),
-            (
-                "step",
-                330,
-                "Parameters",
-                ["params: one tree for all blocks", "swap any leaf, no recompile"],
-            ),
-        ],
-        x0=50,
-        gap=40,
-        arrows=False,
-    )
-
-    # What uses it: the simulator and the analysis tools
-    y3 = y2 + h + 80
-    f.arrow(f"M190,{y2 + h + 26} L190,{y3 - 2}")
-    f.arrow(f"M975,{y2 + h + 26} L975,{y3 - 2}")
-    chain(
-        f,
-        y3,
-        h,
-        [
-            (
-                "step",
-                260,
-                "Simulator",
-                ["integrate ẋ = f from x₀", "solve_ivp or fixed-step RK4"],
-            ),
-            ("traj", 150, "Trajectory", ["x(t), u(t), y(t)"]),
-            ("out", 170, "Plots, animation", ["plot_trajectory", "animate"]),
-        ],
-        x0=60,
-        gap=40,
-    )
-    f.card(
-        830,
-        y3,
-        290,
-        h,
-        "Analysis",
-        ["linearize: A, B, C, D", "poles · Bode · margins"],
-        "step",
-    )
-    return f.svg()
-
-
-def overview():
-    f = Figure(1180, 450)
-    y, h = 30, 70
-    f.card(
-        390,
-        y,
-        400,
-        h,
-        "PlanningProblem",
-        ["plant · cost · sets · start · horizon"],
-        "obj",
-    )
-
-    # Five planners, one problem, one kind of solution
-    y2 = y + h + 64
-    y3 = y2 + 92 + 76
-    solution_cx = 260 + 125
-    planners = [
-        ("LQR", ["linearize + Riccati", "u = ū − K(x − x̄)"]),
-        ("Dynamic programming", ["Bellman on a grid", "u = π(x), J(x)"]),
-        ("Trajectory optimization", ["transcription + NLP", "u = π(t), x*(t)"]),
-        ("Reinforcement learning", ["collect + update θ", "u = π(x; θ)"]),
-        ("RRT", ["kinodynamic tree", "u = π(t)"]),
-    ]
-    w, gap = 200, 20
-    for i, (title, lines) in enumerate(planners):
-        x = 50 + i * (w + gap)
-        cx = x + w / 2
-        f.arrow(f"M590,{y + h} C590,{y + h + 36} {cx},{y2 - 36} {cx},{y2 - 2}")
-        f.card(x, y2, w, 92, title, lines, "step")
-        down = f"M{cx},{y2 + 92} C{cx},{y2 + 130} {solution_cx},{y3 - 40} {solution_cx},{y3 - 2}"
-        f.arrow(down)
-
-    chain(
-        f,
-        y3,
-        96,
-        [
-            (
-                "obj",
-                250,
-                "PlanningSolution",
-                ["policy · trajectory", "and the solver's log"],
-            ),
-            (
-                "obj",
-                230,
-                "Closed loop",
-                ["solution.policy @ plant", "you connect it"],
-            ),
-            (
-                "step",
-                300,
-                "ProblemEvaluator",
-                ["simulate, score J and margins", "→ Evaluation, compare(…)"],
-            ),
-        ],
-        x0=260,
-        gap=50,
-    )
-    return f.svg()
 
 
 JAX_TILES = (
@@ -1174,57 +404,6 @@ def code(f, cx, y, s):
     )
 
 
-def pic_composition(f, x, y, w, h, c):
-    """A lighter inset: a closed loop and an arbitrary wiring, and each is a System."""
-    f.add(
-        f'<rect x="{x - 8}" y="{y - 10}" width="326" height="{h + 20}" rx="9" '
-        f'fill="#ffffff" fill-opacity="0.7" stroke="#cbd5e1" stroke-width="1.2"/>'
-    )
-    f.text(x + 2, y + 4, "composition", 10.5, 600, GREY_INK, anchor="start")
-    y, h = y + 10, h - 10
-    # K @ P
-    cx, yy, bw, bh = x + 66, y + 12, 30, 20
-    grey_block(f, cx - bw - 8, yy, bw, bh, "K")
-    grey_block(f, cx + 8, yy, bw, bh, "P")
-    my, fy = yy + bh / 2, yy + bh + 14
-    grey_wire(f, f"M{cx - 8},{my} L{cx + 6},{my}")
-    grey_wire(
-        f,
-        f"M{cx + 8 + bw},{my} L{cx + bw + 20},{my} L{cx + bw + 20},{fy} "
-        f"L{cx - bw - 20},{fy} L{cx - bw - 20},{my} L{cx - bw - 10},{my}",
-    )
-    code(f, cx, y + h - 2, "K @ P")
-    # Any wiring: a branch, a sum and a loop around them
-    ax, my = x + 150, y + 30
-    grey_block(f, ax, my - 10, 26, 20, "A")
-    grey_block(f, ax + 50, y + 2, 26, 18, "B")
-    grey_block(f, ax + 50, y + 38, 26, 18, "C")
-    sx = ax + 102
-    f.add(
-        f'<circle cx="{sx}" cy="{my}" r="6" fill="#ffffff" stroke="{GREY}" stroke-width="1.5"/>'
-    )
-    f.text(sx, my + 3.5, "+", 10, 700, GREY)
-    grey_block(f, sx + 18, my - 10, 26, 20, "D")
-    grey_wire(f, f"M{ax - 12},{my} L{ax - 2},{my}")
-    grey_wire(
-        f, f"M{ax + 26},{my} L{ax + 36},{my} L{ax + 36},{y + 11} L{ax + 48},{y + 11}"
-    )
-    grey_wire(f, f"M{ax + 36},{my} L{ax + 36},{y + 47} L{ax + 48},{y + 47}")
-    grey_wire(f, f"M{ax + 76},{y + 11} L{sx},{y + 11} L{sx},{my - 8}")
-    grey_wire(f, f"M{ax + 76},{y + 47} L{sx},{y + 47} L{sx},{my + 8}")
-    grey_wire(f, f"M{sx + 6},{my} L{sx + 16},{my}")
-    ly = y + 58
-    grey_wire(
-        f,
-        f"M{sx + 44},{my} L{sx + 54},{my} L{sx + 54},{ly} L{ax + 13},{ly} L{ax + 13},{my + 12}",
-    )
-    code(f, ax + 64, y + h - 2, "connect(...)")
-    # Each is a System: the arrow leads to the definition
-    rx = x + 326
-    grey_wire(f, f"M{rx},{my + 4} L{x + w + 2},{my + 4}", width=2.2)
-    f.text((rx + x + w) / 2, my - 6, "is a System", 12, 650, GREY_INK)
-
-
 def pic_problem(f, x, y, w, h, c):
     """The allowed set X, a start in it and the goal set Xf."""
     f.add(
@@ -1291,14 +470,13 @@ TOOL_TEX = {**PATHS, "Plan": r"$\pi^{\star} = \arg\min_{\pi}\; J$"}
 
 
 def system_card(f, x, y, w, h):
-    """The System: the composition inset, then the definition, the first thing the eye meets."""
+    """The System: its definition, centred, the first thing the eye meets; returns the definition's box."""
     f.add(
         f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="#f0f9ff" '
         f'stroke="{BLUE[1]}" stroke-width="1.4"/>'
     )
-    pic_composition(f, x + 22, y + 18, 440, h - 36, BLUE[1])
-    bx, by = x + 22 + 444, y + 10
-    bw, bh = x + w - 14 - bx, h - 20
+    bw, bh = 440, h - 20
+    bx, by = x + (w - bw) / 2, y + 10
     f.add(
         f'<rect x="{bx}" y="{by}" width="{bw}" height="{bh}" rx="10" fill="#ffffff" '
         f'stroke="{BLUE[1]}" stroke-width="3" filter="url(#lift)"/>'
@@ -1307,10 +485,106 @@ def system_card(f, x, y, w, h):
     f.text(cx, by + 28, "System", 19, 750, BLUE[2])
     f.math(cx, by + 58, r"$\dot{x} = f(x, u, t;\, p)$", 25, BLUE[2])
     f.math(cx, by + 92, r"$y = h(x, u, t;\, p)$", 25, BLUE[2])
+    return bx, by, bw
+
+
+def pic_class(f, x, y, w, h, c):
+    """A class written by hand: its two lines of code, the equation it owns."""
+    f.add(
+        f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="7" fill="#ffffff" '
+        f'stroke="#cbd5e1" stroke-width="1.2"/>'
+    )
+    for k, line in enumerate(
+        ("class Arm(System):", "  def f(self, x, u, t, params):", "    return dx")
+    ):
+        s = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        f.add(
+            f'<text x="{x + 12}" y="{y + 22 + 18 * k}" font-size="12" font-weight="600" '
+            f'fill="{GREY_INK}" font-family="{MONO}" xml:space="preserve">{s}</text>'
+        )
+
+
+def pic_catalog(f, x, y, w, h, c):
+    """The catalog: a shelf of plants, a pendulum, a cart-pole and a car."""
+    base = y + h - 6
+    f.add(f'<path d="M{x},{base} L{x + w},{base}" stroke="{GREY}" stroke-width="1.5"/>')
+    # A pendulum on its pivot
+    px, py = x + w * 0.16, y + 8
+    f.add(
+        f'<path d="M{px - 12},{py} L{px + 12},{py}" stroke="{GREY}" stroke-width="2"/>'
+    )
+    f.add(
+        f'<path d="M{px},{py} L{px + 16},{py + 32}" stroke="{c}" stroke-width="2.2"/>'
+    )
+    f.add(
+        f'<circle cx="{px + 16}" cy="{py + 32}" r="6" fill="{BLUE[0]}" stroke="{c}" stroke-width="2"/>'
+    )
+    # A cart and its pole
+    cx = x + w * 0.5
+    f.add(
+        f'<rect x="{cx - 20}" y="{base - 18}" width="40" height="14" rx="3" fill="{BLUE[0]}" '
+        f'stroke="{c}" stroke-width="1.8"/>'
+    )
+    f.add(
+        f'<path d="M{cx},{base - 18} L{cx + 10},{y + 6}" stroke="{c}" stroke-width="2.2"/>'
+    )
+    # A car seen from above
+    vx = x + w * 0.84
+    f.add(
+        f'<rect x="{vx - 14}" y="{y + 8}" width="28" height="{base - y - 16}" rx="7" '
+        f'fill="{BLUE[0]}" stroke="{c}" stroke-width="1.8"/>'
+    )
+    for wy in (y + 14, base - 16):
+        for wx in (vx - 18, vx + 14):
+            f.add(f'<rect x="{wx}" y="{wy}" width="4" height="9" rx="1.5" fill="{c}"/>')
+
+
+def pic_blocks(f, x, y, w, h, c):
+    """A composition: a controller closed on a plant, K @ P."""
+    cx, yy, bw, bh = x + w / 2, y + 8, 34, 22
+    grey_block(f, cx - bw - 10, yy, bw, bh, "K")
+    grey_block(f, cx + 10, yy, bw, bh, "P")
+    my, fy = yy + bh / 2, yy + bh + 16
+    grey_wire(f, f"M{cx - 10},{my} L{cx + 8},{my}")
+    grey_wire(
+        f,
+        f"M{cx + 10 + bw},{my} L{cx + bw + 24},{my} L{cx + bw + 24},{fy} "
+        f"L{cx - bw - 24},{fy} L{cx - bw - 24},{my} L{cx - bw - 12},{my}",
+    )
+
+
+def origin_cards(f, x0, y, width, h, target):
+    """How a System is made: three cards, a class, the catalog, a composition, each arrow meeting the System."""
+    gap = 24
+    w = (width - 2 * gap) / 3
+    origins = (
+        ("Your own class", pic_class, "f, h, tf written by hand"),
+        ("The catalog", pic_catalog, "Pendulum(), CartPole(), …"),
+        ("A composition of blocks", pic_blocks, "ctl @ plant · a >> b · DiagramSystem"),
+    )
+    tx, ty, tw = target
+    for k, (title, pic, line) in enumerate(origins):
+        x = x0 + k * (w + gap)
+        f.add(
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="12" fill="url(#gblue)" '
+            f'stroke="{BLUE[1]}" stroke-width="1.6"/>'
+        )
+        f.text(x + w / 2, y + 24, title, 15.5, 700, BLUE[2])
+        pic(f, x + 40, y + 34, w - 80, h - 66, BLUE[1])
+        code(f, x + w / 2, y + h - 12, line)
+
+        # The arrow from the card's foot to the System's definition
+        end_x = tx + tw * (k + 1) / 4
+        f.arrow(
+            f"M{x + w / 2},{y + h} C{x + w / 2},{y + h + 26} {end_x},{ty - 30} {end_x},{ty - 3}",
+            BLUE[1],
+            marker="mblue",
+            width=2,
+        )
 
 
 def library_map():
-    """The whole library on one page: three foundations, seven tools as coloured lanes, JAX beside."""
+    """The whole library on one page: where a System comes from, three foundations, seven tools as coloured lanes, JAX beside."""
     order = list(ACCENT)
     x0, w, gap = 58, 144, 14
     pair = 14  # Simulate and Play share a lane, the replay arrow between them
@@ -1320,7 +594,8 @@ def library_map():
     right = cols[order[-1]] + w
     jx, jw = right + 24, 134
     px0, px1 = cols["Plan"], right
-    sys_y, sys_h = 30, 134
+    org_y, org_h = 30, 132
+    sys_y, sys_h = org_y + org_h + 56, 134
     py, ph = sys_y + sys_h + 36, 120
     ry, rh = py + ph + 36, 92
     oy, oh = ry + rh + 30, 104
@@ -1329,7 +604,8 @@ def library_map():
     f = Figure(jx + jw + 30, by + bh + 30)
     markers(f)
 
-    system_card(f, x0, sys_y, right - x0, sys_h)
+    target = system_card(f, x0, sys_y, right - x0, sys_h)
+    origin_cards(f, x0, org_y, right - x0, org_h, target)
     foundation(
         f,
         px0,
@@ -1467,14 +743,6 @@ def library_map():
 
 
 FIGURES = {
-    "deterministic": deterministic,
-    "stochastic": stochastic,
-    "trajectory_optimization": trajectory_optimization,
-    "dynamic_programming": dynamic_programming,
-    "lqr": lqr,
-    "reinforcement_learning": reinforcement_learning,
-    "modeling_and_simulation": modeling_and_simulation,
-    "overview": overview,
     "map": library_map,
 }
 

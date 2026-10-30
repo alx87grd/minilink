@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.dynamics.abstraction.state_space import point_component
 
 ###############################################################################
@@ -92,6 +92,18 @@ class StateObserver(DynamicSystem):
         poles = np.linalg.eigvals(A - L @ C)
 
         return poles
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant ``1 / max |λᵢ(A − L C)|`` read from the current ``params``."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = fastest_time_constant(self.poles)
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params

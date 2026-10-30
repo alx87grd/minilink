@@ -7,7 +7,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.signals import VectorSignal
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
@@ -105,6 +105,59 @@ class DynamicBicycle(DynamicSystem):
         self.skin = partial(car_skin_2d, color="#1a1a1a")
         self.camera_follow_frame = "body"
         self.camera_scale = 10.0
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: the fastest tire mode of the body at rest, in seconds.
+
+        At rest the slip denominators sit on their floor ``v_min_epsilon``, where
+        the tires are stiffest: the body's velocities ``[vx, vy, r]`` then relax on
+        the linearization below (the rear tire pulling ``vx`` to the wheel's
+        speed, the two cornering forces coupling ``vy`` and the yaw rate ``r``),
+        and ``τ = 1 / max |λᵢ|`` of its modes.
+        """
+        params = self.params
+
+        a = params["a"]
+        b = params["b"]
+        mass = params["mass"]
+        inertia = params["inertia"]
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+        v_eps = params["v_min_epsilon"]
+
+        # m v̇x = −C_κ vx / ε, the rear tire alone (the front wheel rolls free)
+        A11 = -Ck / (mass * v_eps)
+
+        # m v̇y = C_α (α_f + α_r) and I ṙ = C_α (a α_f − b α_r), with
+        # α_f = −(vy + a r) / ε and α_r = −(vy − b r) / ε
+        A22 = -2.0 * Ca / (mass * v_eps)
+        A23 = -Ca * (a - b) / (mass * v_eps)
+        A32 = -Ca * (a - b) / (inertia * v_eps)
+        A33 = -Ca * (a**2 + b**2) / (inertia * v_eps)
+
+        # fmt: off
+        A = np.array([
+            [A11, 0.0, 0.0],
+            [0.0, A22, A23],
+            [0.0, A32, A33],
+        ])
+        # fmt: on
+
+        tau = fastest_time_constant(np.linalg.eigvals(A))
+
+        return tau
 
     def M(self, q, params=None):
         params = self.params if params is None else params

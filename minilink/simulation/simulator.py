@@ -10,12 +10,7 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
 )
 from minilink.core.inspect import inspect_text
-from minilink.core.system import (
-    AUTO_DT_SCALE,
-    DEFAULT_SMALLEST_TIME_CONSTANT,
-    HELD_SIGNAL_STEPS_PER_SAMPLE,
-    DynamicSystem,
-)
+from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
@@ -317,32 +312,19 @@ class Simulator:
         Explicit ``n_steps`` or ``dt`` win (``n_steps`` if both are set, with a
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
-        the grid, so ``dt`` comes from the system's smallest time constant
-        scaled by :data:`~minilink.core.system.AUTO_DT_SCALE`, rounded
-        down to a divisor of the sample period when a block holds a signal; adaptive solvers pick
+        the grid, so ``dt`` is :func:`~minilink.core.system.automatic_step_of`:
+        the system's smallest time constant scaled by
+        :data:`~minilink.core.system.AUTO_DT_SCALE`, rounded down to a divisor
+        of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
         :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
         """
         # An adaptive solver picks its own steps: the DEFAULT_N_STEPS reporting grid
         default_dt = None
 
-        # A fixed-step solver steps on the grid: Δt = τ_min × AUTO_DT_SCALE
+        # A fixed-step solver steps on the grid: Δt = 0.1 τ_min, dividing the hold period
         if solver_mode in FIXED_STEP_SOLVERS:
-            discontinuous = sys.solver_info.get("discontinuous_behavior", False)
-            tau = sys.solver_info["smallest_time_constant"]
-            default_dt = tau * AUTO_DT_SCALE
-            period = sys.solver_info.get("sample_period")
-            if period is not None:
-                # A held signal steps on a divisor of its period, Δt = T_s / n, at or
-                # under the policy's step; on a smooth loop with no declared time
-                # constant the period itself is the resolution:
-                # HELD_SIGNAL_STEPS_PER_SAMPLE steps per sample
-                undeclared = tau == DEFAULT_SMALLEST_TIME_CONSTANT and not discontinuous
-                if undeclared:
-                    n = HELD_SIGNAL_STEPS_PER_SAMPLE
-                else:
-                    n = int(np.ceil(period / default_dt))
-                default_dt = period / n
+            default_dt = automatic_step_of(sys.solver_info)
 
         return build_time_grid(
             t_start, tf, n_steps=n_steps, dt=dt, default_dt=default_dt

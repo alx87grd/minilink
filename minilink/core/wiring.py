@@ -694,11 +694,13 @@ def bubble_solver_info(info, subsystems) -> None:
 
     The diagram is discontinuous when any subsystem is. Its smallest time
     constant is the smallest one among the subsystems that carry one: every
-    stateful subsystem, and a stateless block that sets its own. A static
-    block left at the default has no time constant and does not pin the
-    diagram to the default. Its sample period is the shortest one among the
-    sampled subsystems, and it has none when no subsystem is sampled. Read at
-    each access, so a hint changed on a block after composition reaches the
+    stateful subsystem (the default 1 ms when it declares none), and a
+    stateless block that sets its own. A static block left at the default has
+    no time constant and does not pin the diagram to the default; a block whose
+    spectrum is all zero (an integrator) declares ``∞`` and bounds nothing. Its
+    sample period is the base period of the sampled subsystems' (their greatest
+    common divisor), and it has none when no subsystem is sampled. Read at each
+    access, so a hint changed on a block after composition reaches the
     diagram; one set by hand on the diagram is replaced at the next read.
     """
     # Discontinuous when any subsystem is
@@ -713,20 +715,27 @@ def bubble_solver_info(info, subsystems) -> None:
         tau = subsystem.solver_info.get(
             "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
         )
-        if subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT:
+        declared = subsystem.n > 0 or tau != DEFAULT_SMALLEST_TIME_CONSTANT
+        if declared and np.isfinite(tau):
             time_constants.append(tau)
     info["smallest_time_constant"] = min(
         time_constants, default=DEFAULT_SMALLEST_TIME_CONSTANT
     )
 
-    # The shortest sample period, when any subsystem is sampled
-    periods = [
+    # The base period of the held signals, when any subsystem is sampled: every
+    # hold period a whole number of it
+    periods = {
         subsystem.solver_info["sample_period"]
         for subsystem in subsystems.values()
         if "sample_period" in subsystem.solver_info
-    ]
-    if periods:
-        info["sample_period"] = min(periods)
+    }
+    if len(periods) == 1:
+        info["sample_period"] = periods.pop()
+    elif periods:
+        # A real cycle: the sampled diagram imports the wiring
+        from minilink.core.discrete.sampled_diagram import base_period_of
+
+        info["sample_period"] = base_period_of(sorted(periods))
     else:
         info.pop("sample_period", None)
 

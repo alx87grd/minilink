@@ -45,10 +45,16 @@ class LowPass(StepSystem):
         return x
 
 
+class FastPendulum(Pendulum):
+    """A pendulum whose time constant is given: 5 ms, so a 10 ms period takes 20 plant steps."""
+
+    def fastest_mode(self):
+        return 0.005
+
+
 def digital_pid_problem():
     """A digital PID on the pendulum, its setpoint 1 rad, scored over 2 s."""
-    plant = Pendulum()
-    plant.solver_info["smallest_time_constant"] = 0.005
+    plant = FastPendulum()
     cost = QuadraticCost.from_system(plant, xbar=np.array([1.0, 0.0]))
     problem = PlanningProblem(plant, cost=cost, x_start=np.zeros(2), tf=2.0)
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)

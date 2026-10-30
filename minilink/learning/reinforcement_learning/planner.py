@@ -32,7 +32,7 @@ from minilink.learning.reinforcement_learning.policy import (
 )
 from minilink.planning.environment import RolloutEnvironment, is_continuous
 from minilink.planning.evaluation import evaluate_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
 #: The update rule of each name ``algorithm=`` accepts.
@@ -612,7 +612,8 @@ class ReinforcementLearningPlanner(Planner):
         # The nominal rollout, and the Monte Carlo score over the problem's draws
         if evaluate:
             trajectory = self.nominal_trajectory()
-            evaluation = self.evaluate(
+            evaluation = planner_evidence(
+                self,
                 self.controller,
                 dt=self.dt,
                 n_trials=n_trials,

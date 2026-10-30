@@ -29,8 +29,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     "CostFunction": ("minilink.core.costs", "CostFunction"),
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
-    "StepCost": ("minilink.core.costs", "StepCost"),
-    "SampledCost": ("minilink.core.costs", "SampledCost"),
     "BoxSet": ("minilink.core.sets", "BoxSet"),
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
     # Blocks
@@ -116,7 +114,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StaticSimulator": ("minilink.simulation.static_simulator", "StaticSimulator"),
     # Planning
     "PlanningProblem": ("minilink.planning.problems", "PlanningProblem"),
-    "StepPlanningProblem": ("minilink.planning.step_problems", "StepPlanningProblem"),
     "PlanningSolution": ("minilink.planning.results", "PlanningSolution"),
     "LQRPlanner": ("minilink.planning.dynamic_programming.lqr", "LQRPlanner"),
     "compare": ("minilink.planning.comparison", "compare"),

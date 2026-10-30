@@ -198,9 +198,7 @@ class TestNewSimulator(unittest.TestCase):
     def test_coarse_dt_warning_falls_back_to_the_system_default(self):
         sys = DiscontinuousLinearSystem()
         del sys.solver_info["smallest_time_constant"]
-        with patch(
-            "minilink.simulation.solver_warnings.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02
-        ):
+        with patch("minilink.core.system.DEFAULT_SMALLEST_TIME_CONSTANT", 0.02):
             with pytest.warns(UserWarning, match=r"consider dt <= 0\.002"):
                 Simulator(sys, tf=1.0, dt=0.01, solver="euler", verbose=False)
 
@@ -545,8 +543,9 @@ class TestDiscontinuousSolvers(unittest.TestCase):
         self.assertEqual(sim.solver_mode, "euler")
 
     def test_auto_dt_uses_discontinuous_scale(self):
-        sim = Simulator(self.diagram, tf=0.01, solver_warnings="ignore", verbose=False)
-        expected_dt = DEFAULT_SMALLEST_TIME_CONSTANT * AUTO_DT_SCALE
+        sim = Simulator(self.diagram, tf=0.5, solver_warnings="ignore", verbose=False)
+        tau = self.diagram.solver_info["smallest_time_constant"]
+        expected_dt = tau * AUTO_DT_SCALE
         self.assertAlmostEqual(sim.t[1] - sim.t[0], expected_dt)
 
     def test_euler_matches_f_based_ddq_better_than_rk4_on_coarse_dt(self):
@@ -1077,8 +1076,30 @@ class TestRealtimeSimulator(unittest.TestCase):
             )
 
 
+class DeclaredPendulum(Pendulum):
+    """A pendulum whose time constant is given: ``τ = tau``, read live."""
+
+    def __init__(self, tau):
+        super().__init__()
+        self.tau = tau
+
+    def fastest_mode(self):
+        return self.tau
+
+
+class UndeclaredPlant(DynamicSystem):
+    """A custom plant that declares no time constant: ``ẋ = −x + u``."""
+
+    def __init__(self):
+        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+
+    def f(self, x, u, t=0, params=None):
+        xp = array_module(x)
+        return xp.array([-x[0] + u[0]])
+
+
 class TestAutomaticTimeGrid(unittest.TestCase):
-    """S01: solver first, then a grid sized to it."""
+    """The solver first, then a grid sized to it: Δt = 0.1 τ_min, dividing every hold period."""
 
     def test_adaptive_default_is_a_fine_reporting_grid_with_scipy(self):
         from minilink.simulation.time_grid import DEFAULT_N_STEPS
@@ -1109,29 +1130,32 @@ class TestAutomaticTimeGrid(unittest.TestCase):
         self.assertAlmostEqual(sim.dt, 0.005)
 
     def test_loop_takes_dt_from_its_plant_time_constant(self):
-        from minilink import Integrator, Pendulum, StateFeedback
+        from minilink import Integrator, StateFeedback
 
-        plant = Pendulum()
-        plant.solver_info["smallest_time_constant"] = 0.5
+        plant = DeclaredPendulum(0.5)
         controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
         loop = Simulator(controller @ plant, tf=1.0, solver="euler", verbose=False)
         np.testing.assert_array_equal(loop.t, alone.t)  # dt = 0.05, not 1e-4
 
-        # a stateful block without a hint keeps the conservative default
-        with_filter = controller @ plant + Integrator()
+        # An integrator, a pole at the origin, bounds no step
+        with_integrator = controller @ plant + Integrator()
+        self.assertEqual(with_integrator.solver_info["smallest_time_constant"], 0.5)
+
+        # A custom stateful block that declares nothing keeps the conservative default
+        with_custom = controller @ plant + UndeclaredPlant()
         self.assertEqual(
-            with_filter.solver_info["smallest_time_constant"],
+            with_custom.solver_info["smallest_time_constant"],
             DEFAULT_SMALLEST_TIME_CONSTANT,
         )
 
     def test_loop_follows_a_plant_hint_changed_after_composing(self):
-        from minilink import Pendulum, StateFeedback
+        from minilink import StateFeedback
 
-        plant = Pendulum()
+        plant = DeclaredPendulum(0.01)
         loop = StateFeedback(np.array([[10.0, 2.0]])) @ plant
-        plant.solver_info["smallest_time_constant"] = 0.5
+        plant.tau = 0.5
 
         alone = Simulator(plant, tf=1.0, solver="euler", verbose=False)
         closed = Simulator(loop, tf=1.0, solver="euler", verbose=False)
@@ -1146,13 +1170,11 @@ class TestAutomaticTimeGrid(unittest.TestCase):
     def test_loop_takes_the_hint_a_block_sets_for_itself(self):
         from minilink import (
             DiagramSystem,
-            Pendulum,
             Saturation,
             StateFeedback,
         )
 
-        plant = Pendulum()
-        plant.solver_info["smallest_time_constant"] = 0.5
+        plant = DeclaredPendulum(0.5)
         controller = StateFeedback(np.array([[10.0, 2.0]]))
 
         # a static block that declares a time constant counts like a stateful one
@@ -1171,34 +1193,20 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 self.assertAlmostEqual(sim.dt, 0.002)  # 0.02 * AUTO_DT_SCALE
 
     def test_a_held_signal_selects_rk4_on_a_divisor_of_its_period(self):
-        from minilink import Pendulum, WhiteNoise
-        from minilink.core.system import HELD_SIGNAL_STEPS_PER_SAMPLE
+        from minilink import WhiteNoise
 
         cases = [
-            # (declared plant time constant, sample period, discontinuous) -> (solver, dt)
-            (None, 0.01, False, "rk4_fixedsteps", 0.01 / HELD_SIGNAL_STEPS_PER_SAMPLE),
+            # (plant time constant, sample period, discontinuous) -> (solver, dt)
+            (None, 0.01, False, "rk4_fixedsteps", 0.01 / 100),
             (0.003, 0.01, False, "rk4_fixedsteps", 0.01 / 34),
-            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 10),
-            (
-                None,
-                0.001,
-                False,
-                "rk4_fixedsteps",
-                0.001 / HELD_SIGNAL_STEPS_PER_SAMPLE,
-            ),
-            (
-                None,
-                0.01,
-                True,
-                "euler",
-                0.01 / 100,
-            ),  # the discontinuous policy keeps its scale
+            (0.5, 0.01, False, "rk4_fixedsteps", 0.01 / 1),
+            (0.5, 0.001, False, "rk4_fixedsteps", 0.001 / 1),
+            (0.02, 0.01, False, "rk4_fixedsteps", 0.01 / 5),
+            (None, 0.01, True, "euler", 0.01 / 100),
         ]
         for tau, period, discontinuous, solver, dt in cases:
             with self.subTest(tau=tau, period=period, discontinuous=discontinuous):
-                plant = Pendulum()
-                if tau is not None:
-                    plant.solver_info["smallest_time_constant"] = tau
+                plant = UndeclaredPlant() if tau is None else DeclaredPendulum(tau)
                 plant.solver_info["discontinuous_behavior"] = discontinuous
                 loop = WhiteNoise(1, sample_period=period) >> plant
                 self.assertEqual(loop.solver_info["sample_period"], period)
@@ -1208,6 +1216,112 @@ class TestAutomaticTimeGrid(unittest.TestCase):
                 self.assertEqual(sim.solver_mode, solver)
                 self.assertAlmostEqual(sim.dt, dt)
                 self.assertAlmostEqual(period / sim.dt, round(period / sim.dt))
+
+    def test_a_linear_block_reads_its_time_constant_from_its_eigenvalues(self):
+        from minilink import PI, PID, CartPole, Integrator, luenberger
+        from minilink.dynamics.abstraction.state_space import LTISystem
+
+        A = np.array([[0.0, 1.0], [-4.0, -1.0]])
+        B = np.array([[0.0], [1.0]])
+        lti = LTISystem(A, B)
+        self.assertAlmostEqual(
+            lti.solver_info["smallest_time_constant"],
+            1.0 / np.max(np.abs(np.linalg.eigvals(A))),
+        )
+
+        # The current params, not the ones at construction
+        lti.params["A"] = 10.0 * A
+        self.assertAlmostEqual(
+            lti.solver_info["smallest_time_constant"],
+            1.0 / np.max(np.abs(np.linalg.eigvals(10.0 * A))),
+        )
+
+        # An observer: the eigenvalues of A − L C
+        observer = luenberger(CartPole(), poles=[-20.0, -21.0, -22.0, -23.0])
+        self.assertAlmostEqual(observer.solver_info["smallest_time_constant"], 1 / 23)
+
+        # A PID: its derivative filters; a pole at the origin bounds nothing
+        self.assertEqual(
+            PID(1.0, 1.0, 1.0, tau=0.05).solver_info["smallest_time_constant"], 0.05
+        )
+        self.assertEqual(PI(1.0, 1.0).solver_info["smallest_time_constant"], np.inf)
+        self.assertEqual(Integrator().solver_info["smallest_time_constant"], np.inf)
+
+    def test_a_catalog_plant_declares_its_physics(self):
+        from minilink import CartPole, Pendulum, SingleMass
+
+        pendulum = Pendulum()
+        m, l, I, g = (pendulum.params[k] for k in ("m", "l", "I", "gravity"))
+        self.assertAlmostEqual(
+            pendulum.solver_info["smallest_time_constant"],
+            np.sqrt((m * l**2 + I) / (m * g * l)),
+        )
+        cartpole = CartPole()
+        self.assertAlmostEqual(
+            cartpole.solver_info["smallest_time_constant"], 1 / 4.6455, places=4
+        )
+        self.assertAlmostEqual(
+            SingleMass(mass=1.0, k=4.0).solver_info["smallest_time_constant"], 0.5
+        )
+
+        # The step follows the plant's own numbers
+        pendulum.params["gravity"] = 4.0 * g
+        sim = Simulator(pendulum, tf=1.0, solver="rk4_fixedsteps", verbose=False)
+        self.assertAlmostEqual(
+            sim.dt,
+            AUTO_DT_SCALE * np.sqrt((m * l**2 + I) / (4.0 * m * g * l)),
+            places=3,
+        )
+
+    def test_a_hold_period_is_never_a_time_constant(self):
+        from minilink import WhiteNoise
+        from minilink.blocks.sources import NoiseSource
+        from minilink.core.distributions import Gaussian
+
+        for source in (
+            WhiteNoise(1, sample_period=0.01),
+            NoiseSource(Gaussian(np.zeros(1), cov=np.eye(1)), sample_period=0.01),
+        ):
+            with self.subTest(source=source.name):
+                self.assertEqual(
+                    source.solver_info["smallest_time_constant"],
+                    DEFAULT_SMALLEST_TIME_CONSTANT,
+                )
+                loop = source >> DeclaredPendulum(0.5)
+                self.assertEqual(loop.solver_info["smallest_time_constant"], 0.5)
+
+    def test_every_hold_period_is_a_whole_number_of_steps(self):
+        from minilink import DiagramSystem, WhiteNoise
+
+        loop = DiagramSystem()
+        loop.add_subsystem(WhiteNoise(1, sample_period=0.01, seed=1), "torque")
+        loop.add_subsystem(WhiteNoise(1, sample_period=0.015, seed=2), "sensor")
+        loop.add_subsystem(DeclaredPendulum(0.5), "plant")
+        loop.connect("torque", "y", "plant", "u")
+        self.assertAlmostEqual(loop.solver_info["sample_period"], 0.005)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sim = Simulator(loop, tf=1.0, verbose=False)
+        self.assertAlmostEqual(sim.dt, 0.005)
+
+    def test_the_noise_loop_and_the_digital_loop_on_one_plant_share_the_rule(self):
+        from minilink import PID, WhiteNoise
+        from minilink.core.system import automatic_step_of
+
+        for plant in (UndeclaredPlant(), DeclaredPendulum(0.02)):
+            with self.subTest(plant=plant.name):
+                period = 0.01
+                noise_loop = WhiteNoise(1, sample_period=period) >> plant
+                digital = (PID(2.0) % period) @ plant
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore")
+                    sim = Simulator(noise_loop, tf=1.0, verbose=False)
+                substeps = digital.subsystems["plant"].substeps
+                self.assertAlmostEqual(sim.dt, period / substeps)
+                self.assertAlmostEqual(
+                    sim.dt,
+                    automatic_step_of(dict(plant.solver_info, sample_period=period)),
+                )
 
     def test_a_held_signal_warns_on_a_forced_adaptive_solver_or_a_stray_dt(self):
         from minilink import Pendulum, WhiteNoise
@@ -1351,3 +1465,33 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
         k4 = ev.f(x + dt * k3, u_of_t(tk + dt), tk + dt)
         x = x + dt / 6.0 * (k1 + 2.0 * k2 + 2.0 * k3 + k4)
     np.testing.assert_allclose(forced.x[:, -1], x, rtol=1e-12)
+
+
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_rk4_on_a_held_noise_is_fourth_order(backend):
+    """A held sample read once per step, at its start: the four RK4 stages read one draw."""
+    if backend == "jax":
+        pytest.importorskip("jax")
+    from minilink import WhiteNoise
+    from minilink.dynamics.abstraction.state_space import LTISystem
+
+    period = 0.01
+    A = np.array([[0.0, 1.0], [-25.0, -2.0]])
+    B = np.array([[0.0], [1.0]])
+
+    def final_state(dt):
+        loop = WhiteNoise(1, psd=1.0, sample_period=period, seed=3) >> LTISystem(
+            A, B, np.eye(2), np.zeros((2, 1))
+        )
+        traj = loop.compute_trajectory(
+            tf=1.0, dt=dt, solver="rk4_fixedsteps", backend=backend, verbose=False
+        )
+        return traj.x[:, -1]
+
+    reference = final_state(period / 60)
+    errors = [
+        np.linalg.norm(final_state(dt) - reference) for dt in (period, period / 3)
+    ]
+
+    # A third of the step, an error 3⁴ = 81 times smaller (3 for a first-order bias)
+    assert errors[0] / errors[1] > 40.0

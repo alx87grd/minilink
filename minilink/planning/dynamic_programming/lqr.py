@@ -17,7 +17,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.roles import command_port
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
@@ -138,7 +138,12 @@ class LQRPlanner(Planner):
 
             # The record, and the cost-to-go J(x, t) = (x − x̄)ᵀ S(t) (x − x̄)
             record = RiccatiRecord(
-                K=K[0], P=S[0], poles=poles, horizon=tf, schedule=(t, K, S)
+                K=K[0],
+                P=S[0],
+                poles=poles,
+                horizon=tf,
+                schedule=(t, K, S),
+                U_ignored=constrains_inputs(problem.U),
             )
             cost_to_go = quadratic_cost_to_go(x_bar, S, t)
         else:
@@ -155,7 +160,13 @@ class LQRPlanner(Planner):
             poles = np.linalg.eigvals(A - B @ K)
 
             # The record, and the cost-to-go J(x) = (x − x̄)ᵀ P (x − x̄)
-            record = RiccatiRecord(K=K, P=P, poles=poles, horizon=np.inf)
+            record = RiccatiRecord(
+                K=K,
+                P=P,
+                poles=poles,
+                horizon=np.inf,
+                U_ignored=constrains_inputs(problem.U),
+            )
             cost_to_go = quadratic_cost_to_go(x_bar, P)
 
         # Optionally, roll the law out from the problem's start and score it over
@@ -164,7 +175,7 @@ class LQRPlanner(Planner):
         evaluation = None
         if evaluate:
             trajectory = nominal_trajectory(problem, policy, dt=dt)
-            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials)
+            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
 
         # The solution: the law, the record, the rollout, the quadratic cost-to-go
         solution = PlanningSolution(
@@ -210,6 +221,8 @@ class RiccatiRecord:
     ``schedule`` holds the whole sweep ``(t, K(t), S(t))``. ``success`` is
     the closed loop of the linear model being stable (every pole in the left
     half-plane) on the infinite horizon, a finite sweep otherwise.
+    ``U_ignored`` is the problem declaring an input set that bounds the
+    command: the Riccati law never reads it, and the printout says so.
     """
 
     K: np.ndarray
@@ -217,6 +230,7 @@ class RiccatiRecord:
     poles: np.ndarray
     horizon: float
     schedule: tuple | None = None
+    U_ignored: bool = False
 
     @property
     def success(self) -> bool:
@@ -231,10 +245,22 @@ class RiccatiRecord:
     def __str__(self) -> str:
         K = np.array2string(np.round(self.K, 3), separator=", ").replace("\n", "")
         poles = ", ".join(f"{p:.3g}" for p in np.round(self.poles, 3))
+        ignored = "; U ignored" if self.U_ignored else ""
         if np.isfinite(self.horizon):
-            return f"K(0) = {K} over {self.horizon:g} s, poles at t = 0: {poles}"
+            return (
+                f"K(0) = {K} over {self.horizon:g} s, poles at t = 0: {poles}{ignored}"
+            )
 
-        return f"K = {K}, closed-loop poles {poles}"
+        return f"K = {K}, closed-loop poles {poles}{ignored}"
+
+
+def constrains_inputs(U) -> bool:
+    """Whether the input set bounds the command: a finite bound on some axis, or a set that is no box."""
+    box = U.bounding_box()
+    if box is None:
+        return True
+
+    return bool(np.any(np.isfinite(box.lower)) or np.any(np.isfinite(box.upper)))
 
 
 def quadratic_cost_to_go(x_bar, P, t_samples=None):

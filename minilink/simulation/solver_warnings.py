@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import warnings
 
-from minilink.core.system import AUTO_DT_SCALE, DEFAULT_SMALLEST_TIME_CONSTANT
+from minilink.core.system import AUTO_DT_SCALE, automatic_step_of
 
 ###############################################################################
 # Public API
@@ -104,9 +104,8 @@ def collect_discontinuous_solver_notes(
             "substeps near switching surfaces."
         )
 
-    # Δt_rec = τ_min × AUTO_DT_SCALE, the automatic step of the loop
-    smallest = solver_info.get("smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT)
-    recommended_dt = smallest * AUTO_DT_SCALE
+    # Δt_rec = 0.1 τ_min, the automatic step of the loop
+    recommended_dt = automatic_step_of(solver_info)
 
     # A forced Euler step coarser than Δt_rec; in the verbose panel, the automatic
     # Euler step

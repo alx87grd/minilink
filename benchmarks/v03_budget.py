@@ -12,9 +12,10 @@ once to compile, then its best of ``REPEATS`` calls is taken (CPU, float64).
 4. The parametric program's solve (a native fixed-iteration solve, jitted with the parameters
    an argument) within 2× of the same solve with its parameters frozen (constants of the trace).
 5. A parameter family (1000 draws of the pendulum's gravity) within 2× of the plain batch
-   (1000 starts). A drawn mass (5b) is reported, not judged: each trial then factors its
-   own mass matrix in the plant's ``solve(H, τ − C v − g)``, the plant's cost, not the
-   evaluator's.
+   (1000 starts). A drawn mass (5b) is reported, not judged: it is slower because each
+   trial solves its own mass matrix in the plant's ``solve(H, τ − C v − g)``, and JAX's
+   batched solve of many tiny matrices is slow on a CPU; the plant's cost, not the
+   evaluator's, and the mechanical base's ``solve`` stays as it is.
 """
 
 from __future__ import annotations

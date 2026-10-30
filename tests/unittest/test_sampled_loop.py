@@ -162,10 +162,16 @@ def test_a_box_of_clocked_blocks_nests_under_its_role():
     assert computer.hold_dim == 1
 
 
+class FastPendulum(Pendulum):
+    """A pendulum whose time constant is given: 5 ms, so a 10 ms period takes 20 plant steps."""
+
+    def fastest_mode(self):
+        return 0.005
+
+
 def a_digital_pid_on_a_pendulum(dt=0.01):
-    plant = Pendulum()
+    plant = FastPendulum()
     plant.x0 = np.array([0.3, 0.0])
-    plant.solver_info["smallest_time_constant"] = 0.005
     return (PID(Kp=8.0, Ki=1.0, Kd=2.0) % dt) @ plant
 
 

@@ -1,19 +1,18 @@
 # Minilink's pipelines, in pictures
 
-One figure per major pipeline, in one visual language: blue, the objects (systems, the
-problem, trajectories, solutions); amber, parameters; fuchsia, randomness; white, the steps;
-green, the results. The map has its own palette: blue, the three foundations; a colour per
-tool, cool for the tools that start from the system and warm for those that start from the
-problem; indigo, JAX.
-One notation throughout: `p` is one object's own parameters, the `p` of `f(x, u, t; p)`;
-`θ` is what a tool moves, the evaluator's whole tree `θ = pe.params` or a policy's weights
-(`π_θ`), and `D₀`, `Dₚ` are the distributions of the start and of `p`. The figures are drawn
-by `docs/pipeline_figures.py` (`python docs/pipeline_figures.py` rebuilds every `docs/_static/pipeline_*.svg`).
+The library map, in one palette: blue, the three foundations and where a `System` comes
+from; a colour per tool, cool for the tools that start from the system and warm for those
+that start from the problem; indigo, JAX. `p` is one object's own parameters, the `p` of
+`f(x, u, t; p)`. The figure is drawn by `docs/pipeline_figures.py` (`python
+docs/pipeline_figures.py` rebuilds `docs/_static/pipeline_map.svg`; `python
+docs/make_assets.py map` the README's PNG too).
 
 ## The library on one page
 
-Three foundations (CONSTITUTION §1.1): the model, a `System`; the task, a `PlanningProblem`
-built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
+A `System` is made one of three ways: a class of your own that writes `f` (and `h`, `tf`),
+a plant from the catalog (`Pendulum()`), or a composition of blocks (`ctl @ plant`, `a >> b`,
+a `DiagramSystem`); the tools cannot tell them apart. Three foundations (CONSTITUTION §1.1):
+the model, a `System`; the task, a `PlanningProblem` built on it; and the solver boundary, a `MathematicalProgram` and its `Optimizer`. Every tool
 is a path from them: simulate, play, analyze and design straight from the system; plan, learn
 and evaluate from the problem. Each tool's lane ends in what it gives back, drawn as a small
 picture. Play is the live session (`sys.game()`, keyboard or joystick on the wall clock), and a
@@ -24,75 +23,3 @@ tools built on them compile once (`jit`), give exact gradients (`grad`), and run
 one call (`vmap`).
 
 ![The library on one page](_static/pipeline_map.svg)
-
-## The planners, one problem, one yardstick
-
-Every planner takes the same `PlanningProblem` and returns the same kind of
-`PlanningSolution`: a policy and the solver's own evidence. The script closes the loop
-(`solution.policy @ plant`), and the problem evaluator scores every closed loop the same way,
-so `compare` can put them side by side.
-
-![The planners: one problem, one solution, one evaluator](_static/pipeline_overview.svg)
-
-## Modeling and simulation
-
-Every block is a `System` with its parameters, and a diagram of blocks is a `System` again.
-`compile` lowers it once to arrays on NumPy or JAX; the simulator integrates it forward into a
-`Trajectory`, and the analysis tools linearize it.
-
-![Modeling and simulation](_static/pipeline_modeling_and_simulation.svg)
-
-## Evaluation and tuning
-
-The problem evaluator simulates the controller closed on the problem's plant, scores the
-trajectory (the cost `J`, the margin `m` to the sets) and returns the objective. Every
-parameter of every object sits in one tree `θ`; tuning is an optional export, a program over
-the chosen leaves of `θ`. The contract is DESIGN §6.
-
-![Evaluation and tuning, deterministic](_static/pipeline_deterministic.svg)
-
-On a stochastic problem the evaluator draws `n` realizations from one key, simulates them in
-one `vmap`, and the criterion (mean, CVaR or worst case) reduces their costs.
-
-![Evaluation and tuning, stochastic](_static/pipeline_stochastic.svg)
-
-## Trajectory optimization
-
-No simulation inside: the transcription makes the trajectory itself the decision vector, the
-dynamics become equality constraints (the defects between knots), the cost a sum and the sets
-inequality rows. The optimizer solves that one program; the plan read back is a trajectory
-and an open-loop policy, tracked or re-solved by an MPC.
-
-![Trajectory optimization](_static/pipeline_trajectory_optimization.svg)
-
-## Dynamic programming
-
-The problem is put on a lattice of states and actions, each pair with its successor. The
-Bellman backup sweeps backward from the terminal cost until the cost-to-go converges; the
-policy is the minimizing action at every node, a lookup table.
-
-![Dynamic programming](_static/pipeline_dynamic_programming.svg)
-
-## The linear-quadratic regulator
-
-The plant is linearized at the goal `(x̄, ū)` of the quadratic cost, the Riccati equation gives
-`P`, and the gain `K` closes the loop; the solution carries the law, its cost-to-go and the
-closed-loop poles.
-
-![The linear-quadratic regulator](_static/pipeline_lqr.svg)
-
-## Reinforcement learning
-
-The stochastic problem becomes a step environment (step, reward, end, reset). The learner
-collects episodes with its current policy, computes the returns and updates the weights `θ`,
-and repeats; the trained network is the policy of the solution.
-
-![Reinforcement learning](_static/pipeline_reinforcement_learning.svg)
-
-## Not drawn yet
-
-- **Model predictive control**: trajectory optimization repeated at every tick from the
-  measured state, warm-started by the last plan; worth a figure with the sampled loop
-  (`docs/plans/sampled-path.md` §8, a draft vision).
-- **RRT**: a kinodynamic tree search; short enough for its overview card.
-- **The hybrid loop** (`computer @ plant`): a tentative draft vision, drawn once it is decided.

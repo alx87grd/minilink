@@ -12,7 +12,7 @@ from minilink.core.params import merge_known
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
 # A solve between two knots folds its offset in, in this many parts of dt
@@ -143,7 +143,9 @@ class MPPIPlanner(Planner):
         solution = pv.solution(z, params, status)
 
         if evaluate:
-            evaluation = self.evaluate(solution.policy, dt=self.dt, n_trials=n_trials)
+            evaluation = planner_evidence(
+                self, solution.policy, dt=self.dt, n_trials=n_trials
+            )
             solution = PlanningSolution(
                 solution.problem,
                 solution.policy,

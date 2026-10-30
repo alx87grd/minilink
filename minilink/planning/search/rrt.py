@@ -9,7 +9,7 @@ import numpy as np
 
 from minilink.core.sets import SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender
@@ -415,8 +415,8 @@ class RRTPlanner(Planner):
         evaluation = None
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
-            evaluation = self.evaluate(
-                policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+            evaluation = planner_evidence(
+                self, policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
 
         solution = PlanningSolution(

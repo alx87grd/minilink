@@ -84,7 +84,7 @@ noisy.connect("sensor_noise", "y", "plant", "n")
 show(
     noisy,
     "Closed loop with explicit sensor noise",
-    "Step() >> Impedance() @ Pendulum(), WhiteNoise() -> pendulum.n",
+    "Step() >> Impedance() @ NoisyPendulum(), WhiteNoise() -> pendulum.n",
 )
 noisy.plot_diagram()
 
