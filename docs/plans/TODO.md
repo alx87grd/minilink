@@ -160,7 +160,7 @@ Why: [core-architecture.md](core-architecture.md) §2.
     - `simulation` stops importing `optimization` for display constants;
     - `scipy_stiff` with explicit tolerances and a Jacobian;
     - `compile(verbose=True)` in order;
-    - one set of Monte Carlo defaults for `evaluate` and `Planner.evaluate` (`MonteCarloEvaluator`
+    - one set of Monte Carlo defaults for `evaluate` and `planner_evidence` (`MonteCarloEvaluator`
       is gone);
     - flat-kwarg keys derived from the option dataclasses;
     - one owner of the sets between `StateSpaceGrid` and its planner;

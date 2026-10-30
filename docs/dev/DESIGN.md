@@ -1301,10 +1301,14 @@ backends for an integer key, while a deterministic problem runs each block's own
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
 grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
-a planner's score (`Planner.evaluate`) holds a feedback law with no clock of its own over
-each period, `policy % dt` on the plant's own clock (R159), so value iteration's or a
-learner's policy gets the face's `J`; an open-loop source keeps the interpolation its planner
-states. `problem.compile(law)` called directly closes a continuous law as a continuous loop.
+a planner's evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
+`planning/planner.py`, an internal helper the seven planners' `solve()` call, R181) runs on
+the real plant: a feedback law with no clock of its own held over each period, `policy % dt`
+(R159), the plant integrated at the automatic step (§5, R180), the planner's own `J` in its
+record beside it, so the evidence does not repeat the planner's own belief; an open-loop
+source keeps the interpolation its planner states. Scoring a law is the problem evaluator's:
+`problem.compile(ctl % dt).evaluate()`, `substeps=` for the planner's own physics.
+`problem.compile(law)` called directly closes a continuous law as a continuous loop.
 
 **The step face (R141, `planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
 substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
@@ -1341,6 +1345,7 @@ distributions' own parameters; the draws `ωᵢ` (starts, drawn parameters, bloc
 the `n` runs go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 
 ![The evaluator pipeline, stochastic](../_static/pipeline_stochastic.svg)
+
 
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.

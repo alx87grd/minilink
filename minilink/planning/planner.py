@@ -175,41 +175,6 @@ class Planner(ABC):
 
         return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
-    def evaluate(
-        self, policy, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
-    ) -> Evaluation | None:
-        """
-        The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on this planner's problem (or ``problem``).
-
-        One run when nothing is random, ``n_trials`` draws from key 0 otherwise;
-        ``None`` when the problem declares no cost (a search without one). A
-        feedback law with no clock of its own is held over each period of
-        ``dt`` (``policy % dt``), the loop its planner designs for; an
-        open-loop source keeps the interpolation its planner states.
-        """
-        problem = self.problem if problem is None else problem
-
-        # A problem without a cost has nothing to score
-        if problem.cost is None:
-            return None
-
-        # One run when nothing is random, n_trials draws otherwise
-        trials = int(n_trials) if problem.is_stochastic else None
-
-        # The law the run holds: a feedback law on the clock of dt, when the
-        # planner designs it on that grid
-        law = held_feedback(policy, dt) if self.holds_policy else policy
-
-        return evaluate(
-            problem,
-            law,
-            dt=dt,
-            n_trials=trials,
-            key=0,
-            backend=backend,
-            episode_length=tf,
-        )
-
     def store_solution(self, solution: PlanningSolution) -> PlanningSolution:
         """Keep ``solution`` as :attr:`last_solution`, and return it."""
         self.last_solution = solution
@@ -219,6 +184,47 @@ class Planner(ABC):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def planner_evidence(
+    planner, policy, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
+) -> Evaluation | None:
+    """
+    The evidence a planner's ``solve(evaluate=True)`` records: its law scored on the real plant.
+
+    The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on the
+    planner's problem (or ``problem``): one run when nothing is random,
+    ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
+    no cost (a search without one). A feedback law with no clock of its own
+    is held over each period of ``dt`` (``policy % dt``), the loop its planner
+    designs for, and the plant is integrated at the automatic step; an
+    open-loop source keeps the interpolation its planner states. The public
+    way to score a law is the problem's evaluator,
+    ``problem.compile(ctl % dt).evaluate()``, with ``substeps=`` for the
+    planner's own physics.
+    """
+    problem = planner.problem if problem is None else problem
+
+    # A problem without a cost has nothing to score
+    if problem.cost is None:
+        return None
+
+    # One run when nothing is random, n_trials draws otherwise
+    trials = int(n_trials) if problem.is_stochastic else None
+
+    # The law the run holds: a feedback law on the clock of dt, when the
+    # planner designs it on that grid
+    law = held_feedback(policy, dt) if planner.holds_policy else policy
+
+    return evaluate(
+        problem,
+        law,
+        dt=dt,
+        n_trials=trials,
+        key=0,
+        backend=backend,
+        episode_length=tf,
+    )
 
 
 def held_feedback(policy, dt):

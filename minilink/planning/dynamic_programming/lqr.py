@@ -17,7 +17,7 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.roles import command_port
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
@@ -164,7 +164,7 @@ class LQRPlanner(Planner):
         evaluation = None
         if evaluate:
             trajectory = nominal_trajectory(problem, policy, dt=dt)
-            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials)
+            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
 
         # The solution: the law, the record, the rollout, the quadratic cost-to-go
         solution = PlanningSolution(

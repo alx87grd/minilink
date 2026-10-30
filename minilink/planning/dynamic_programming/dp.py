@@ -14,7 +14,7 @@ from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_problems import StepPlanningProblem
@@ -536,7 +536,7 @@ class DynamicProgrammingPlanner(Planner):
         evaluation = None
         if evaluate:
             trajectory = nominal_trajectory(self.problem, policy, dt=dt)
-            evaluation = self.evaluate(policy, dt=dt, n_trials=n_trials)
+            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
 
         # The solution: the law, the record, the rollout, the cost-to-go interpolated
         # as the planner's options say
