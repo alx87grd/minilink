@@ -1134,7 +1134,9 @@ unbounded one with the line to write. Offline entry is
 for the trajectory family — `solution.open_loop` — or a time-varying feedback
 `u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
-names it), the
+names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
+bounds the command, since the Riccati law never reads `U` (R21, amended by R186: LQR never
+warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
 `cost_to_go` where the method produces one (the DP and tabular tables; the

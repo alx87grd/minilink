@@ -67,7 +67,6 @@ maintainer would and logged in the run's record.
 | Behavior cloning | — | after v1.0 | the game mode and the fitting planner |
 | A plant that owns its noise ports | — | later | the example (R57), then the two noisy plants revisited |
 | Simon's curve speed scaler | — | later | into the path-tracking project, or the cap `v ≤ √(a_y,max / κ)` |
-| The LQR warning on a declared `U` | V1.2 rest | v0.3 (the clean-up lane) | warn, or "U ignored" in the record (amends R21) |
 | Three hand gradient-loop demos | S74 rest | v0.3 (the clean-up lane) | convert all, two, or none |
 | `DynamicBicycle`'s base | S32 | v0.3 (the clean-up lane) | rename `M` → `H` now, the base with K8 |
 | The compile-time flatten default | — | standing | after one benchmark: off, on, or always |
@@ -316,11 +315,8 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
 - [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
-  bound landed 2026-10-24): LQR warns once when `U` is declared (the U sweep wrote
-  `U=plant.input_box` on lessons that never needed it, so the warning waits for the maintainer's
-  pass on those lines; the options: drop the line from the LQR lessons then warn, keep it and warn,
-  or never warn and say "U ignored" in the Riccati record's `str`, which amends R21, the
-  reviewers' choice) **[ask — student-facing]**; `ReinforcementLearningPlanner` sizes its default `NeuralPolicy`
+  bound landed 2026-10-24; LQR's "U ignored" in its record, no warning, landed 2026-10-31,
+  R186): `ReinforcementLearningPlanner` sizes its default `NeuralPolicy`
   from `problem.U.bounding_box()` and refuses an unbounded `problem.U` (R21), and
   `StateSpaceGrid.state_bounds` aligns with `input_bounds`.
 - [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand

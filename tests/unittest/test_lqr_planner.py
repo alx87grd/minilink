@@ -52,6 +52,23 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     assert "closed-loop poles" in str(solution.solver)
 
 
+@pytest.mark.parametrize("tf", [np.inf, 2.0])
+def test_the_record_says_U_ignored_and_nothing_warns(tf):
+    """LQR never reads U: its record's printout says so when U bounds the command, silently."""
+    import warnings
+
+    bounded = pendulum_problem(tf=tf)
+    free = bounded.replace(U=None)
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        bounded_record = LQRPlanner(bounded).solve().solver
+        free_record = LQRPlanner(free).solve().solver
+
+    assert bounded_record.U_ignored and "U ignored" in str(bounded_record)
+    assert not free_record.U_ignored and "U ignored" not in str(free_record)
+    np.testing.assert_array_equal(bounded_record.K, free_record.K)
+
+
 def test_finite_horizon_is_the_riccati_differential_equation():
     tf, S_f = 2.0, np.diag([5.0, 1.0])
     planner = LQRPlanner(pendulum_problem(tf=tf, S=S_f), n_steps=201)
