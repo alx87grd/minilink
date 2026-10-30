@@ -193,7 +193,7 @@ The baseline audit (2026-09-07) and the step-level plan doc retired, their steps
 | Closed-loop analysis — poles, root locus, Bode, margins, step specs | `pzmap`, `root_locus`, `bode`, `margins`, `step_info`, `P` / `PI` / `PD` / `PID` | green | every compensator form reports the poles and zeros of the hand calculation, and margins are found wherever the crossover sits |
 | Design to specification — rise time, overshoot, final error, phase margin | `PI`, `PD`, `PID`, `Lead`, `step_info`, `margins` (`Lag` removed, R54) | green | the Table 2 specs of the guide are checkable in one notebook |
 | Loop-shaping specs — disturbance and measurement-noise sensitivity in dB at a frequency | `sensitivity`, `complementary_sensitivity`, `load_sensitivity`, `noise_sensitivity` | green (2026-10-10) | the `sensitivity_functions` teaching notebook |
-| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | green (2026-10-17) | the law is designed in continuous time, discretized, and the sampled loop validated by simulation; no z-domain analysis family (ruled 2026-10-17, [the record](../reviews/2026-10-17-z-tier-dropped.md)) |
+| Digital implementation — difference equations on the Arduino | `discretize` (Euler / RK4 step models) | green (2026-10-17) | the law is designed in continuous time, discretized, and the sampled loop validated by simulation; no z-domain analysis family |
 | State-space MIMO — bicycle model, controllability at every nominal speed | `KinematicBicycle`, `controllability`, `observability` | green | — |
 | Optimal control — LQR on the guide's cost, closed-loop poles, nonlinear check | `lqr(plant, Q, R, x_bar=)`, `StateFeedback` | green | — |
 | Pole placement — `K_sta` for a prescribed pole set | `place` (on a linear model or the plant; `place_gain` on arrays) | green | — |
@@ -256,14 +256,12 @@ the new v0.3 core is ready; the gate read "by January" before.
 - Each rung names its open steps, one line each. The steps themselves, with files, order and
   "done when", are the rows of [docs/plans/TODO.md](../plans/TODO.md).
 - A rung is done when every step in it has landed or the maintainer has dropped it.
-- Landed work leaves this section; its history is in git and in [docs/reviews/](../reviews/).
+- Landed work leaves this section; its history is in git.
 - Wave D's rows (the T rows, D1–D3, S43, S67–S69, A4, P4) are named in TODO only, beyond §5.2's
   summary.
 
-**The order is the commitment; the course calendar is secondary** (ruled 2026-10-22,
-[record](../reviews/2026-10-22-second-roadmap-review-rulings.md)). **From 2026-10-26 no course
-calendar shapes a step** (the maintainer's direction,
-[record](../reviews/2026-10-26-core-consolidation.md)).
+**The order is the commitment; the course calendar is secondary** (ruled 2026-10-22). **From 2026-10-26 no course
+calendar shapes a step** (the maintainer's direction).
 - The class material stays on `main` until the new v0.3 core is ready, and the releases carry
   no dates.
 - GRO860 runs in the fall term and GMC714 in the winter term.
@@ -326,7 +324,7 @@ AC-7, AC-8, S65, S66) joined v0.3's core (TODO §1).
 
 **Wave D — the code reads like the textbook, and the demos like the API.** Standing work,
 behaviour-preserving, one module per step.
-- The textbook pass landed 2026-10-16/17 ([rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)); its behaviour and API
+- The textbook pass landed 2026-10-16/17; its behaviour and API
   leftovers are TODO §3's T rows (T1 and T2 in the core, TODO §1.1).
 - **D1** Demos and notebooks to the minimal rule (RULES 6.1 / 6.10 / 6.11). **[ask per
   file]**
@@ -338,19 +336,14 @@ behaviour-preserving, one module per step.
 
 ### 5.3 v0.3 — the complete core
 
-**The direction (2026-10-26, [record](../reviews/2026-10-26-core-consolidation.md)).** v0.3 is
+**The direction (2026-10-26).** v0.3 is
 the complete core: one architecture from the plant to the evaluation and the optimizer,
 supporting stochastic problems and the hybrid sampled loop, built in the natural order of the
 code, with no date. It supersedes R86's "v0.3 stays continuous". Where the pieces live:
 - **The design home:** the workstream table below, the contracts in DESIGN §3–§6.
 - **The rows:** TODO §1.
-- **The design questions:** QUESTIONS.md; the choices of 2026-10-27 and 2026-10-28, the
-  architecture of record (R166, [record](../reviews/2026-10-28-session-rulings.md)),
-  [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
-  [R141–R153](../reviews/2026-10-27-core-vision-decisions.md), the latter taking the fourteen
-  decisions of [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md).
-- **The history of how v0.3 got here:** [the simplification record](../reviews/2026-10-26-plan-simplification.md)
-  §4.
+- **The design questions:** QUESTIONS.md; the choices of 2026-10-27 and 2026-10-28 are the
+  architecture of record (R166), recorded in the plan docs and DESIGN.
 
 **Landed, pending the maintainer's review (R79):**
 - 2026-10-24/25 (DESIGN §4–§6): the step model (S75); the path to the cost (V1's steps 1–6 and
@@ -360,8 +353,8 @@ code, with no date. It supersedes R86's "v0.3 stays continuous". Where the piece
   rows of every workstream below, acceptance scripts 1–7 and 10–12 as tests, the budget
   (script 9) as `benchmarks/v03_budget.py`.
 
-The decisions those runs took without the maintainer are sorted for one sitting in
-[the triage](../reviews/2026-10-30-merge-review-triage.md); that review, then `dev-v0.3` into
+The decisions those runs took without the maintainer were sorted for one sitting in
+the merge-review triage; that review, then `dev-v0.3` into
 `dev` and the tag, are what v0.3 waits on.
 
 **The workstreams** (each with the go, R166). One number per workstream, the same as TODO
@@ -538,10 +531,9 @@ each item; agents execute only what was picked.
 ## 6. Decisions
 
 The open design questions live in [QUESTIONS.md](QUESTIONS.md), one entry each; details and
-the rows waiting for the maintainer's go are in TODO. A decision leaves it when it is taken: its ruling goes to the plan doc it shapes and to
-a dated record in [docs/reviews/](../reviews/), and its contract to DESIGN when the code lands.
-
-Past rulings: the dated records in [docs/reviews/](../reviews/), named by date and subject.
+the rows waiting for the maintainer's go are in TODO. A decision leaves it when it is taken: a ruling the maintainer takes updates the doc it
+changes (DESIGN, ROADMAP, TODO or the plan doc it shapes) in the same change, and the commit
+message carries its why.
 
 ## 7. Out of scope
 

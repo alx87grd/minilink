@@ -421,7 +421,7 @@ concrete formatting, ordered by the cost of being wrong:
   contract as a textbook would. They never name the design process (step ids, audits, dates,
   "decided", "landed", "for now", "currently", "until pipeline B", a ROADMAP or TODO
   section), the course or its exercises, or what another library refuses; that history
-  lives in `docs/plans/`, `docs/reviews/` and the git log. The same holds for test
+  lives in `docs/plans/` and the git log. The same holds for test
   docstrings and comments, and for refusal and warning messages: a refusal says what is
   supported and what to pass instead.
 - **5.25 One verb family per role:** A helper's name says its role.
@@ -569,7 +569,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **7.6 Cross-link sparingly.** Every link is a maintenance edge: renames and section
   moves break them (`tests/unittest/test_repo_contract.py` checks the links of the
   governance documents, `README.md`, the `examples/`, `tests/` and
-  `benchmarks/` READMEs, and `docs/plans/`; not `docs/reviews/`). Link on first mention
+  `benchmarks/` READMEs, and `docs/plans/`). Link on first mention
   only, and only when the reader must open the target to act. Otherwise name the document in
   plain text. Documents meant to be read top to bottom (principle lists, the
   constitution) aim for zero links. A table of "related documents" inside a doc

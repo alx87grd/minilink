@@ -6,22 +6,18 @@ they sit in their workboard rows, and the rows that wait for the maintainer's go
 the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Known defects are in
 [KNOWN_ISSUES.md](KNOWN_ISSUES.md).
 
-Answers are recorded in a dated record under [docs/reviews/](../reviews/) (the latest:
-[R154–R166](../reviews/2026-10-28-session-rulings.md), 2026-10-28; before them
-[R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
-[R141–R153](../reviews/2026-10-27-core-vision-decisions.md)), in the plan doc each shapes, and in
-TODO; the entry then leaves this file. The v0.3 core's rulings are the architecture of record
+A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
+doc it shapes) in the same change; the commit message carries its why. It then leaves this
+file. The v0.3 core's rulings are the architecture of record
 (R166). `§N` names the workstream of
 [ROADMAP §5.3](ROADMAP.md#53-v03--the-complete-core), the same N as TODO §1.N.
 
 ## The core
 
 The v0.3 core's architecture is of record (2026-10-28, R166). The questions the independent
-review of the two runs raised were ruled on 2026-10-29 (R168–R179,
-[the record](../reviews/2026-10-29-consolidation-rulings.md)); they landed on
+review of the two runs raised were ruled on 2026-10-29 (R168–R179); they landed on
 `dev-v0.3` the same day. Its run's decisions taken without you, and those of the three runs before it, are sorted
-for one sitting in [the triage](../reviews/2026-10-30-merge-review-triage.md); its "To raise"
-points come first there. Nothing else is open here.
+for one sitting in the merge-review triage. Nothing else is open here.
 
 ## Toward v1.0
 

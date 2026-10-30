@@ -4,13 +4,9 @@ Every open step to v1.0, by release, in order. Each row carries a **bold plain t
 id in parentheses. The id is an anchor, not a vocabulary: prose leads with the title. Each step
 is sized at roughly one agent-hour to one agent-day and ends with a "done when" gate.
 **[ask]** marks maintainer-owned territory (AGENTS "Ask first"); unmarked rows are
-agent-managed. Landed rows leave this file; their history is git and
-[docs/reviews/](../reviews/). The pieces live elsewhere:
+agent-managed. Landed rows leave this file; their history is git. The pieces live elsewhere:
 - **Why each v0.3 row exists:** [ROADMAP §5.3](../dev/ROADMAP.md#53-v03--the-complete-core), its workstream table, the same N as §1.N here.
-- **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md); the choices
-  are [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
-  [R141–R153](../reviews/2026-10-27-core-vision-decisions.md), the latter taking the decisions of
-  [the consolidated core vision](../reviews/2026-10-27-consolidated-core-vision.md).
+- **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md).
 - **Milestones:** [ROADMAP](../dev/ROADMAP.md#5-the-path-to-v10).
 - **Pyro parity:** [pyro-port-remaining.md](pyro-port-remaining.md).
 - `scan: band#n` cites the 2026-09-22 improvement scan, which is in git history before
@@ -82,8 +78,7 @@ maintainer would and logged in the run's record.
 - **Reaching `main`:** nothing merges to `main` until every notebook has moved (R47), and when
   it does is the maintainer's call (R78). The course material stays on `main` until then.
 - **What landed overnight on 2026-10-24** (pending review with the three later runs' decisions,
-  sorted in [the triage](../reviews/2026-10-30-merge-review-triage.md); every decision taken
-  without the maintainer is in [the run's log](../reviews/2026-10-24-v03-run-decisions.md)):
+  sorted in the merge-review triage):
   - the clean-up's renames and moves (K2, K3, K10, A6, G3's moves);
   - the step model (SM-0 to SM-8);
   - the path to the cost (V1.1 to V1.5, with A2);
@@ -187,8 +182,8 @@ No open row: the block and the RL heads on it landed in the v0.3 run (acceptance
 ### 1.5 The sampled loop: a step diagram, two runners
 
 Contract: DESIGN §3 and §5 (time, the sampled loop). Ruled: R13, R14, R104, R105, R123,
-R125, R145, R146, R147 (choices of 2026-10-27, [record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
-`SampledSystem` the sampled-data kind (2026-10-28, [record](../reviews/2026-10-28-session-rulings.md)).
+R125, R145, R146, R147 (choices of 2026-10-27); R158, time in the core and
+`SampledSystem` the sampled-data kind (2026-10-28).
 
 No open row: the sampled loop, its two runners and the legacy runtime's removal landed in the
 v0.3 run; every hybrid notebook moved at its step 7. The realtime runner on the pure blocks is
@@ -259,7 +254,7 @@ The rest of the field object (`GridField`, `CallableField`, `LinearApproximator`
 
 ### 1.10 Hardening and the merge
 
-- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). Its six points raised first, ruled 2026-10-31 (R188–R193, [the record](../reviews/2026-10-31-release-review-rulings.md)) and implemented on `dev-v0.3-release-rulings`.
+- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30): landed 2026-10-31. Its six points raised first, ruled 2026-10-31 (R188–R193) and implemented on `dev-v0.3-release-rulings`.
 
 Landed in the v0.3 runs: wiring mistakes fail at wiring time (S66), DESIGN and ROADMAP §3
 brought up at each step, the showcases on the new API, and compile once in the form the call
@@ -267,7 +262,7 @@ needs (R168). K4 and the hand-loop demos (OD-32) are §2's rows.
 
 - [ ] **The merge** (every notebook moved to the new interface in the v0.3 run, R47):
   - ~~the maintainer's review of the four runs' decisions, in one sitting~~ (held 2026-10-30,
-    ruled R180–R187, [the triage](../reviews/2026-10-30-merge-review-triage.md));
+    ruled R180–R187);
   - the student-facing numbers re-pinned (notebook outputs, course figures, the pipeline figures
     of `docs/pipeline_figures.py`; the regression baselines moved with each change, §1's gates);
   - `dev-v0.3` into `dev` after that review (R79);
@@ -290,13 +285,11 @@ labelled as such. It extends D2 (whose open picks join K1's table) and runs befo
 the demo sweep touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
 
 - [ ] **One demo per feature** (K4) **[maintainer]** (R54): the maintainer's own pass on the demos,
-  with the K1 inventory's §3 (twins and proposals,
-  [the record](../reviews/2026-10-23-k1-inventory.md)) as the input; agents update `examples/README.md`'s
+  with the K1 inventory's §3 (twins and proposals) as the input; agents update `examples/README.md`'s
   map and the demo checks after each of his changes. Also, an orphan ruling (R65): one demo of
   tabular Q-learning on the pendulum grid beside value iteration, converging toward the DP
   cost-to-go (GRO860's RL row) **[ask — student-facing]**.
-- [ ] **The catalog clean-up** (K8) (ruled 2026-10-22, R2;
-  [record](../reviews/2026-10-22-rulings-session-1.md)): two import layers and support by
+- [ ] **The catalog clean-up** (K8) (ruled 2026-10-22, R2): two import layers and support by
   test. Steps, one commit each: **K8-0** the car family to three models (R55: `KinematicBicycle`,
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
@@ -304,7 +297,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   plants of R55–R60, 16 by R60, no cap; all 50 catalog plants today; the other names per R64; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
-  maintainer names from K1's table ([the record](../reviews/2026-10-23-k1-inventory.md)) moved to `minilink/experimental/catalog/` with their skins
+  maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
   and demos (the top-level `experimental/`), their tests and docs entries removed, out of the
   wheel **[ask — per plant]**; **K8-4** twins merged (R55, R59) and the dead helpers deleted
   (R54, R67: the Mermaid exporters, `camera.py`, `ProblemEnv` / `to_gymnasium`, the
@@ -312,8 +305,8 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   site's plant page. Done when the root prelude lists exactly R60's plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
-- [ ] **The kinematic car family declares its time constant** (R191, v0.4, with K8-0; [the record](../reviews/2026-10-31-release-review-rulings.md)): `KinematicBicycle` and `UdeSRacecar` get default input bounds and declare `τ = L / (v_max tan δ_max)`, so their loops leave the 1 ms default (1000 substeps a 0.1 s MPC period today). Done when the car family's automatic step reads its declared `τ` and the moved numbers sit in a ledger.
-- [ ] **The experimental tier, untested** (K9) (ruled 2026-10-22, R3; [record](../reviews/2026-10-22-rulings-session-1.md)). Landed 2026-10-23: the prototype
+- [ ] **The kinematic car family declares its time constant** (R191, v0.4, with K8-0): `KinematicBicycle` and `UdeSRacecar` get default input bounds and declare `τ = L / (v_max tan δ_max)`, so their loops leave the 1 ms default (1000 substeps a 0.1 s MPC period today). Done when the car family's automatic step reads its declared `τ` and the moved numbers sit in a ledger.
+- [ ] **The experimental tier, untested** (K9) (ruled 2026-10-22, R3). Landed 2026-10-23: the prototype
   scripts moved from `examples/experimental/` to a top-level `experimental/` (K9-1); the tier's
   tests (`test_symbolic.py`, `test_engine_jax.py`) moved to `tests/experimental/`, off the merge
   gate, run by the nightly job (`pytest tests/experimental`), `c_export`'s flagship smoke kept in
@@ -333,8 +326,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   `SlidingMode`): every other catalog plant (the arms and manipulators, the drones, the boats,
   the mass-spring-damper's nonlinear kin, the oscillators and the three-body set that declare a
   constant today) a `fastest_mode()` read from its `params`, from its linearization at the
-  nominal point by a closed formula. The kinematic bicycle declares none (a zero spectrum; the
-  run's log, M-8): an input box would give it one. Done when a sweep of the catalog shows no
+  nominal point by a closed formula. The kinematic bicycle declares none (a zero spectrum): an input box would give it one. Done when a sweep of the catalog shows no
   plant on the 1 ms default but the undeclared custom ones.
 
 **GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
@@ -395,7 +387,7 @@ then the P4 follow-ups. P11 and P6 were dropped (2026-10-15, 2026-10-17); TB-b l
 textbook pass.
 
 - [ ] **Automation by convention** (P10) (decided 2026-10-11, amended 2026-10-13 by
-  [the second-opinion record](../reviews/2026-10-13-automation-by-convention-second-opinion.md)):
+  a second opinion):
   standard port names drive the wiring, three reserved names (`plant`, `controller`,
   `observer`) are the roles every tool reads, and the cost is scored on the plant. Its
   steps, in build order:
@@ -430,8 +422,7 @@ textbook pass.
   AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
   `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
   Also, later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
-  `plant=, controller=` ([the 2026-10-15 analysis record](../reviews/2026-10-15-linear-analysis-rulings.md),
-  last note).
+  `plant=, controller=` (the 2026-10-15 analysis rulings).
 - [ ] **follow-ups** (P4) (design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md)):
   named input ports on the state-space base so observers and sensitivity blocks share one
   `f` (scan: analysis#13); the review of the `observer` role against the real blocks when
@@ -447,8 +438,7 @@ file by file; D2, D3, S67 and S68 as picked (S65 and S66 moved to §1).
 pass (PR #125, 2026-10-16), behaviour- and
 backend-preserving; its style sheet lives in RULES §5 (5.3's six blocks, 5.8, 5.10, 5.22,
 5.25–5.27) and §7.8. The pass's recorded bugs and open questions were ruled the next day and
-fixed one commit each with a regression test (PR #126, 2026-10-17,
-[rulings](../reviews/2026-10-17-textbook-pass-follow-up-rulings.md)): the plants' `tf` and
+fixed one commit each with a regression test (PR #126, 2026-10-17): the plants' `tf` and
 geometry read their `params`, the MPC blocks take plain hook names and one mixin
 constructor, the wiring core keeps no shadow state, every helper name says its role. The
 rows below hold what neither PR touched, each a behaviour, backend or API item verified open
@@ -479,7 +469,7 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   closes when that §1.8 row lands.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
-foundations review, docs/reviews/2026-09-15-foundations-review.md).
+2026-09-15 foundations review, in git history).
 
 - [ ] **Native reporting the demos hand-roll** (D1.1) (agent lane, plotting): an `Optimizer`
   convergence plot (`optim_plot.py`); two planners' trees or solutions side by side
@@ -810,8 +800,7 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.
 - [ ] **The pinned Colab cell** (V6) **[ask — student-facing]**: conda from `environment.yml`
   is the recommended install and README leads with it; `pip install minilink` is the light
-  alternative, one `full` extra beside it (one install story, ruled 2026-10-17,
-  [record](../reviews/2026-10-17-one-install-story.md)). What remains: the Colab setup cell
+  alternative, one `full` extra beside it (one install story, ruled 2026-10-17). What remains: the Colab setup cell
   clones a pinned release (`git clone --depth 1 -b vX.Y`, R113: the notebooks' relative
   imports of the examples tree keep working) instead of `git clone main`;
   `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows. `showcase_jax.ipynb`

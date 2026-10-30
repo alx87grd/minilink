@@ -5,8 +5,7 @@
 `kalman`, `luenberger`, `lqg`), the observer role, and the review that made the verbs
 system-only, split the output reference out of `StateFeedback` and put `LQRPlanner` on the
 command port (rulings R14–R17). Its contract is DESIGN §3 (the package map and the
-dependency law) and §4 (the observer role); the rulings and their reasons are in
-[2026-10-14-state-space-design-rulings.md](../reviews/2026-10-14-state-space-design-rulings.md).
+dependency law) and §4 (the observer role).
 This doc holds the design of what comes next: `LQGPlanner` (v0.4; §5) and the estimation
 follow-ups of v0.9, each in its slot (the time-varying and trajectory filters, the extended
 Kalman filter, the sampled filters, and Layer 3, the estimation problem and its tools; §3,

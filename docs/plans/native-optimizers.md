@@ -11,10 +11,10 @@ arrays, §4.5's open point); `iterations=None` stays the host loop to a toleranc
 **Choices of 2026-10-27** (the architecture of record since 2026-10-28, R166):
 - the two-layer split of §3: a pure kernel run by `Optimizer`, a step-system view for the
   lesson; §4.1–§4.2's categories and algorithms added only with the first solver that needs them
-  ([R132](../reviews/2026-10-27-design-questions-rulings.md));
+  (R132);
 - the fixed-count solve: `Optimizer(program, method=, iterations=K)`, exactly `K` steps in one
   `lax.scan`; `iterations=None` runs to a tolerance, `maxiter` its cap; a cap and a fixed count
-  stay two things ([R149](../reviews/2026-10-27-core-vision-decisions.md));
+  stay two things (R149);
 - the fixed-iteration MPC is a planner under the planner's compiled-face contract
   (R148, DESIGN §6): this doc holds its solver, DESIGN its tick;
 - programs, parameters and randomness: §7's convention (R131), on one program noun,
@@ -314,7 +314,7 @@ whole class of `J`: the integral quadratic constraints of Lessard, Recht and Pac
 to wire the law to the oracle (R126).
 
 **Ruled 2026-10-25 (R122): the slice comes back, later, when solver stability needs it.** The
-2026-10-17 ruling ([the record](../reviews/2026-10-17-z-tier-dropped.md)) dropped the z-domain
+2026-10-17 ruling dropped the z-domain
 analysis family (exact `c2d`, the z-plane pole map, discrete Bode and root locus) for GRO501,
 and that stands. Goal 2 needs only the linearization of a step system at a fixed point
 (`A = ∂step/∂x`, from the `jacobian` that exists) and its eigenvalues against the unit circle,
@@ -357,8 +357,7 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
    **yes (R132).**
 2. Which categories and native algorithms (§4.1, §4.2): **added with the first solver that
    needs them, minimalist (R132).**
-3. The rung: **answered 2026-10-26** by the maintainer's direction
-   ([the record](../reviews/2026-10-26-core-consolidation.md) §2): a proof of concept in v0.3,
+3. The rung: **answered 2026-10-26** by the maintainer's direction: a proof of concept in v0.3,
    the rest in v0.4.
 4. The fixed-count keyword: **`iterations=K` on `Optimizer` (R149)**; rejected, an `iterate`
    verb and `solve(iterations=K)`.
@@ -368,7 +367,7 @@ comes back with NS-5 (R122, §4.7).
 
 ## 7. Parametric and stochastic programs
 
-**Choice, 2026-10-27 (R131, [record](../reviews/2026-10-27-design-questions-rulings.md)),
+**Choice, 2026-10-27 (R131),
 on one program noun (R130):**
 - inside, a program's functions always see a complete tree (R121); at the user boundary
   (`solve(params=...)`) a partial tree is merged once onto the defaults; no `bind` on programs

@@ -89,7 +89,7 @@ ReinforcementLearningPlanner(problem, ..., reward_scale="auto")  # or a float, o
   - the particle task reproduces the last row of §2's table;
   - a test shows that scaling the cost leaves the greedy law of a converged tabular or LQR-like case unchanged;
   - the learning-curve units are unchanged.
-- **RS-2** A small benchmark: particle, pendulum swing-up, planar drone hover; 3 seeds each, raw vs `"auto"`, scored with one evaluator per task. Record it in `docs/reviews/`. It shows whether the hyperparameters tuned in the existing demos were compensating for the scale (the pendulum notebook's `learning_rate=3e-3` and `n_envs=64`, for example).
+- **RS-2** A small benchmark: particle, pendulum swing-up, planar drone hover; 3 seeds each, raw vs `"auto"`, scored with one evaluator per task. Record it in this doc. It shows whether the hyperparameters tuned in the existing demos were compensating for the scale (the pendulum notebook's `learning_rate=3e-3` and `n_envs=64`, for example).
 - **RS-3** **[ask — student-facing]** Re-baseline the RL notebooks and `examples/demos/rl/` once the default lands, between cohorts.
 - **RS-4** Option B, only when a task without a finite box needs it.
 

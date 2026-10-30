@@ -143,7 +143,7 @@ demo than human driving, and free of hardware (a pointer, R136).
 
 ### 5.1 D29, the standard stochastic policy as a seeded block
 
-**Choice, 2026-10-27 (R129, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+**Choice, 2026-10-27 (R129):**
 - one block, `GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, a plain `System`
   whose `h` is `u = μ_θ(x) + σ_θ(x) · ε(t)`;
 - its noise internal and deterministic given the seed: `ε(t)` the `WhiteNoise` signal at the
@@ -166,7 +166,7 @@ in place, both are additive features rather than redesigns.
 
 ## 7. Questions for the maintainer
 
-**Choices, 2026-10-27 (R136, [record](../reviews/2026-10-27-design-questions-rulings.md)):**
+**Choices, 2026-10-27 (R136):**
 - how fitting enters the API (a `fit` verb and a dataset noun, or the program export with a
   data-mismatch cost) is decided at the behavior-cloning row, identification (C4) flagging its
   route for it;
