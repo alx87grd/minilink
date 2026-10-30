@@ -32,16 +32,6 @@ lands. Last checked against the code: 2026-10-31.
   `plant.params` into a new plant.
 - **Fix:** none planned yet (TODO §1.10, the core's hardening).
 
-### A held block inside a nested sub-diagram reads the RK4 stage time
-- **Symptom:** a noise source (`WhiteNoise`, `NoiseSource`, a stochastic policy) wired directly
-  in the diagram RK4 integrates is read once per step, at its start, so the four stages read one
-  sample (fourth order). Inside a nested sub-diagram, inside a plant a sampled loop integrates
-  (`(ctl % dt) @ (noise >> plant)`), or behind a problem's step face, it is still read at each
-  stage's time: the last stage reads the next draw at a switch, a first-order bias in the step.
-- **Workaround:** wire the noise at the top level of the loop, or compile with `flatten=True`.
-- **Fix:** none planned yet: the held time reaches the compiled diagram's own port operations
-  (the merge-review run's log, M-1); the plant view and the step face call the plant's own `f`.
-
 ## Planning and learning
 
 ### `ReinforcementLearningPlanner` sizes its default `NeuralPolicy` from the plant's port bounds instead of `problem.U`
