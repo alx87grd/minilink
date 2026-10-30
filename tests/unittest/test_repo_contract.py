@@ -41,8 +41,7 @@ PROSE_NOTEBOOKS = (
     "examples/tutorial/showcase_from_rl_to_bode.ipynb",
 )
 
-# 7.6 — documents whose internal links must resolve.  Dated audits under
-# docs/reviews/ are history and are deliberately excluded.
+# 7.6 — documents whose internal links must resolve.
 LINKED_DOCS = (
     "CLAUDE.md",
     "AGENTS.md",
