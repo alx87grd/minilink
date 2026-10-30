@@ -474,13 +474,15 @@ class TestNestedDiagramPlot(unittest.TestCase):
         )
         self.assertEqual(topology.clusters, ())
 
-    def test_expand_leaves_a_diagram_without_nesting_unchanged(self):
+    def test_expand_nested_diagram_inside_sampled_system(self):
         pytest.importorskip("graphviz")
-        diagram = TestDiagrams._make_diagram()
-        self.assertEqual(
-            get_diagram(diagram, expand=True).source,
-            get_diagram(diagram, expand=False).source,
-        )
+        inner = _build_closed_loop()
+        inner.connect_new_output_port("plant", "y", "y")
+        sampled = (P(1.0) % 0.1) @ inner
+        source = get_diagram(sampled, expand=True).source
+        self.assertIn("cluster_plant", source)
+        self.assertIn("plant__controller", source)
+        self.assertIn("plant__plant", source)
 
 
 import numpy as np
