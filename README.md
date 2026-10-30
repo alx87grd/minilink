@@ -251,8 +251,8 @@ print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 
 ## 8. What Minilink is NOT
  
-1. **Not a Heavy Multibody Contact Engine:** For complex contact or high-DoF meshes, wrap external simulators (such as Drake or MuJoCo) as a `System` leaf. Minilink focuses on control architecture, analytical derivatives, and trajectory optimization.
-2. **Not a 100+ Knot Sparse NLP Modeling Language:** Minilink programs and solvers do not exploit sparse Jacobian structure, unlike specialized modeling packages such as CasADi.
+1. **Not a Heavy Multibody Contact Engine:** For complex contact or high-DoF meshes, wrap an external multibody simulator as a `System` leaf. Minilink focuses on control architecture, analytical derivatives, and trajectory optimization.
+2. **Not a 100+ Knot Sparse NLP Modeling Language:** Minilink programs and solvers do not exploit sparse Jacobian structure, unlike dedicated sparse modeling packages.
 3. **Continuous-Time is Primary:** Dynamics $f$ represent instantaneous rates ($\dot{x} = dx/dt$), not discrete next-step maps.
  
 ---
