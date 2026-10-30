@@ -1,6 +1,7 @@
 """The compiled trajectory-optimization planner: the planner's pure face, ``pv = planner.compile()``."""
 
 import copy
+from functools import cached_property
 
 import numpy as np
 
@@ -122,13 +123,9 @@ class CompiledTrajectoryPlanner:
 
         return np.concatenate([z_dec, [problem.t_start]])
 
-    @property
+    @cached_property
     def start_sensitivity(self):
         """``(z(x̄), M, x̄)``: the default guess at the compiled start and its derivative in the start, one column per state (the guess is affine in it)."""
-        cached = self.__dict__.get("start_sensitivity_cache")
-        if cached is not None:
-            return cached
-
         x_default = np.asarray(self.defaults["x_start"], dtype=float).reshape(-1)
         z_default = self.host_initial(self.defaults)
 
@@ -141,10 +138,7 @@ class CompiledTrajectoryPlanner:
             columns.append(z_i[:-1] - z_default[:-1])
         sensitivity = np.stack(columns, axis=1) if columns else np.zeros((0, 0))
 
-        cached = (z_default, sensitivity, x_default)
-        self.__dict__["start_sensitivity_cache"] = cached
-
-        return cached
+        return z_default, sensitivity, x_default
 
     def solve(self, params=None, z0=None):
         """
@@ -257,11 +251,7 @@ class CompiledTrajectoryPlanner:
 
     def planned_trajectory(self, z, params=None) -> Trajectory:
         """The plan as a trajectory: its state and input knots from its origin (collocation and multiple shooting carry them in ``z``)."""
-        if self.n_z - 1 != (self.n + self.m) * self.offsets.size:
-            raise NotImplementedError(
-                "the plan carries no state knots (single shooting): read "
-                "pv.solution(z).trajectory for its planned states"
-            )
+        require_state_knots(self)
 
         rows = np.asarray(z[:-1], dtype=float).reshape(-1, self.offsets.size)
         t = float(z[-1]) + self.offsets
