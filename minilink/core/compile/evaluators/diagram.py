@@ -96,19 +96,19 @@ class DiagramEvaluator(ContinuousEvaluator):
         """Whether a block holds a signal over a sample period: a noise source, a stochastic policy."""
         return any(self.op_holds)
 
-    def f_held(self, x, u, t, t_held, params=None):
-        """``dx`` with the held blocks read at ``t_held``, the step's start, and every other block at ``t``."""
+    def f_held(self, x, u, t, held, params=None):
+        """``dx`` with the held blocks read at the step's start (``held``, :meth:`held_at`), every other block at ``t``."""
         self.require_params(params)
         dtype = self.dtype_of(x, u)
-        signals = self.port_signals(x, u, t, dtype, params, t_held=t_held)
+        signals = self.port_signals(x, u, t, dtype, params, held=held)
         return self.dx_from_signals(x, u, t, dtype, params, signals)
 
-    def f_and_block(self, x, u, t, params, sys_id, t_held=None):
+    def f_and_block(self, x, u, t, params, sys_id, held=None):
         """``(dx, x_b, u_b)``: the loop's ``dx`` and one block's own state and input, from one signal pass."""
         self.require_params(params)
         xp = self.xp
         dtype = self.dtype_of(x, u)
-        signals = self.port_signals(x, u, t, dtype, params, t_held=t_held)
+        signals = self.port_signals(x, u, t, dtype, params, held=held)
         dx = self.dx_from_signals(x, u, t, dtype, params, signals)
 
         # The block's state slice and its gathered input, read off the same buffer
@@ -122,8 +122,10 @@ class DiagramEvaluator(ContinuousEvaluator):
         """``ż = [dx; rate(x_b, u_b, t)]`` of the loop augmented with one block's stage cost; the held blocks read at ``t_held`` when given."""
         xp = self.xp
 
+        held = None if t_held is None else self.held_at(t_held, params)
+
         def f_aug(z, u, t):
-            dx, x_b, u_b = self.f_and_block(z[:-1], u, t, params, sys_id, t_held)
+            dx, x_b, u_b = self.f_and_block(z[:-1], u, t, params, sys_id, held)
             c_dot = xp.reshape(rate(x_b, u_b, t), (1,))
             z_dot = xp.concatenate([dx, c_dot])
             return z_dot
@@ -206,16 +208,19 @@ class DiagramEvaluator(ContinuousEvaluator):
         # An integer x0 still gets float dx; float inputs keep their width.
         return xp.result_type(dtype, float)
 
-    def port_signals(self, x, u, t, dtype, params, inject=None, t_held=None):
-        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire; a held block reads ``t_held`` when given."""
+    def port_signals(self, x, u, t, dtype, params, inject=None, held=None):
+        """Fill the signal buffer; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire; ``held`` (:meth:`held_at`) reads the held blocks at the step's start."""
         xp = self.xp
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
         params = self._frozen_params if params is None else params
-        times = self.op_times(t, t_held)
+        times, samples = self.op_times(t, held)
 
         # NumPy: the buffer written in place, the hot path of a host integration
         if xp is np and inject is None:
-            for op, t_op in zip(self.plan.port_ops, times):
+            for i, (op, t_op) in enumerate(zip(self.plan.port_ops, times)):
+                if i in samples:
+                    signals[op.out_slice] = samples[i]
+                    continue
                 local_u = gathered_on_host(
                     op.gather_sources, op.u_dim, signals, u, dtype
                 )
@@ -224,28 +229,58 @@ class DiagramEvaluator(ContinuousEvaluator):
                 )
             return signals
 
-        for op, t_op in zip(self.plan.port_ops, times):
+        for i, (op, t_op) in enumerate(zip(self.plan.port_ops, times)):
             local_x = x[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
-            y_out = op.compute_func(local_x, local_u, t_op, params[op.sys_id])
+            if i in samples:
+                y_out = samples[i]
+            else:
+                y_out = op.compute_func(local_x, local_u, t_op, params[op.sys_id])
             signals = assigned(xp, signals, op.out_slice, y_out)
             if inject is not None and op.out_slice == inject[0]:
                 signals = added(xp, signals, op.out_slice, inject[1])
         return signals
 
-    def op_times(self, t, t_held):
-        """The time each port operation reads: ``t_held`` for a held block when given, ``t`` otherwise."""
-        if t_held is None:
-            return [t] * len(self.op_holds)
+    def held_at(self, t_held, params):
+        """
+        ``(t_held, samples)``: the held blocks read at the step's start ``t_held``.
 
-        return [t_held if holds else t for holds in self.op_holds]
+        A held block that reads no input and has no state is a function of time
+        alone: ``samples`` holds its output, evaluated once (the step's one draw);
+        a held block that reads its input (a stochastic policy) is evaluated at
+        each stage with the time ``t_held``.
+        """
+        params = self._frozen_params if params is None else params
+        empty = self.xp.zeros(0)
+
+        samples = {
+            i: op.compute_func(empty, empty, t_held, params[op.sys_id])
+            for i, (op, holds) in enumerate(zip(self.plan.port_ops, self.op_holds))
+            if holds
+            and op.u_dim == 0
+            and op.local_x_slice.start == op.local_x_slice.stop
+        }
+
+        return t_held, samples
+
+    def op_times(self, t, held):
+        """``(times, samples)``: the time each port operation reads (``t_held`` for a held block) and the held samples (none without ``held``)."""
+        if held is None:
+            return [t] * len(self.op_holds), {}
+
+        t_held, samples = held
+        times = [t_held if holds else t for holds in self.op_holds]
+
+        return times, samples
 
     def rhs_of(self, params, t_held=None):
-        """``f(x, u, t)`` on the compiled parameters, or on ``params``; the held blocks read at ``t_held`` when given."""
+        """``f(x, u, t)`` on the compiled parameters, or on ``params``; the held blocks read once at ``t_held`` when given."""
         if t_held is None:
             return super().rhs_of(params)
 
-        return lambda x, u, t: self.f_held(x, u, t, t_held, params)
+        held = self.held_at(t_held, params)
+
+        return lambda x, u, t: self.f_held(x, u, t, held, params)
 
     def dx_from_signals(self, x, u, t, dtype, params, signals):
         """Every block's ``dx`` from the filled signal buffer."""
