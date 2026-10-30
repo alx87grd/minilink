@@ -10,22 +10,27 @@ asked, each written in its log with the context and the alternative:
 | The v0.3 core run, 2026-10-28 (the lanes and the two joins) | [2026-10-29-v03-run-log.md](2026-10-29-v03-run-log.md) | RD-1 … RD-69 |
 | The night run, 2026-10-29 (MPPI, recording, the MPC's speed) | [2026-10-29-night-run-log.md](2026-10-29-night-run-log.md) | N-1 … N-22 |
 | The consolidation, 2026-10-29 (your rulings R168–R179) | [2026-10-29-consolidation-run-log.md](2026-10-29-consolidation-run-log.md) | C-1 … C-43 |
+| After the night run, 2026-10-29 and -30 (MPPI's fans and verbose line, `1df28c76`; the consolidation's two speed regressions fixed, `a648534c`) | [the consolidation log's §8](2026-10-29-consolidation-run-log.md#8-after-the-consolidation-the-speed-recheck-2026-10-30) | P-1 … P-3 (§2.3 items 27–28, §4) |
 
 This sheet sorts them by what your answer changes, so the review row of TODO §1.10 ("The
 merge") closes in one sitting. Many early decisions were overtaken by later rulings; §5 lists
 them so you can skip them. The recommendations are the agent's (2026-10-30), checked against
-the code at `9e98b74a`; nothing here rules anything.
+the code at `9e98b74a`; nothing here rules anything. **Updated the same day** against the merged
+head (`01a6289f`, which adds `a648534c`) and every ruling of record: the items a ruling already
+decides (R53, R125, R142, R144, R148, R159, R160, R171–R174, R176–R178) left §1–§3 for §5 under
+their original numbers, so the numbers below have gaps on purpose; the work after the night run
+joined §2.3 and §4.
 
 **How to answer.** Per line: **yes** (keep it as landed), **no** (take the log's alternative),
 or **later** (it becomes a TODO row). §5 needs no answer.
 
 | § | What | Lines | What you give |
 | --- | --- | --- | --- |
-| 1 | Numbers that moved on purpose | 14 | one yes for the block; three to look at |
-| 2 | Behaviour and names a user meets | 26 | one answer each |
-| 3 | Student-facing material (yours by AGENTS) | 12 | one answer each |
-| 4 | Internal choices | about 110 | one yes for the block |
-| 5 | Already settled by a later ruling | about 30 | nothing |
+| 1 | Numbers that moved on purpose | 3 | one yes for the block |
+| 2 | Behaviour and names a user meets | 24 | one answer each |
+| 3 | Student-facing material (yours by AGENTS) | 11 | one answer each |
+| 4 | Internal choices | about 115 | one yes for the block |
+| 5 | Already settled by a ruling | about 45 | nothing |
 
 ## 1. Numbers that moved on purpose
 
@@ -36,20 +41,9 @@ moved in its own commit. The size is the relative difference from its log's ledg
 | --- | --- | --- | --- | --- |
 | 1.1 | A sampled input to the fixed-step RK4 run is held over each period (it was interpolated); a callable input is read at the RK4 stage times | 4.4e-3 (sampled), 9.5e-5 (callable) | nowhere pinned | OD §3, SM-7 |
 | 1.2 | `evaluate` runs the continuous loop to `tf` (the old Monte Carlo held the law over each period and cut at the first exit) | median 7.7 % for a stiff PD at `dt = 0.05`, 2.8 % for a weak one | the Monte Carlo scores of the RL and evaluation lessons | OD §3 |
-| **1.3** | **Value iteration's failure cost: `1e6` became the problem's cost bound**, now one formula, `problem.cost_bound(tf, dt=)` (R172) | median 1e-4 on the cost-to-go; up to 0.64 at cells next to the boundary | **the value-iteration notebooks' cost-to-go colour scale now tops at the bound, not at 1e6** | OD §3, C-11 |
-| 1.4 | The sampled loop's same-tick semantic: a filter's output reaches the gain at the same tick (the old `Computer` read it one tick late) | the multi-rate demo's final state 4.9e-3 → 6.7e-4 | the hybrid tutorial | RD §3 |
-| 1.5 | One integer key draws the same trials on NumPy and JAX, each consumer from its own named stream | means within one standard error; single trials differ | any seeded Monte Carlo number | RD §3 |
-| 1.6 | Value iteration's stage cost is the integral of `g` over the period (it was `g·dt`) | Euler grids byte-identical; RK4 grids median 2.1 %, 2 of 441 policy cells | value iteration on an RK4 grid only | RD §3 |
-| 1.7 | The judge's running cost is integrated with the state (it was the trapezoid on the samples) | 1.5e-3 | `evaluate` numbers | RD §3 |
-| 1.8 | A planner's score holds its feedback law over each period (`policy % dt`; the LQR stays continuous) | 0.35 % | `solution.evaluation` of value iteration and the learners | RD-41, RD-45 |
-| 1.9 | RL: the exploration drawn at the episode's policy seed; the training reward `−g·dt` again (R171), recorded beside the score | other draws; the training gate passed before R171 | the RL notebooks' learning curves (see 3.1) | RD §3, C ledger |
-| 1.10 | The MPC's one-period delay is opt-in (`delay=True`); the default is the warm-started box, `delay=False` | the delayed form moved once more on the box (4e-7) | only `native_mpc_tuning` and `terminal_field_mpc`, which ask for the delay | RD §3, C-34 |
-| **1.11** | **The default first guess aims at the cost's target** (`xbar`, when inside `X`) when the problem has no `Xf`; before, the straight line ran from the start to the start | single shooting 6e-4; **the MPC parity gates up to 0.36 in the bicycle's states**, `e4.bicycle_parametric` 0.12 | the bicycle and racecar MPC demos and notebooks | C-19, C-21 |
-| **1.12** | A sampled loop run without `dt` on a plant that declares no time constant integrates at the automatic step (it took one RK4 step per period) | more accurate, slower | **`examples/tutorial/showcase_minilink.ipynb`'s `(ctl % 0.1) @ plant`** (see 3.6) | C-26 |
-| 1.13 | The judge on such a plant follows the same rule | 7e-5 on acceptance script 6 | planners' `evaluate` | C-30 (see 2.1) |
 | 1.14 | The Lyapunov certificate's `P` is symmetrized after the solve | 1.8e-16 | nowhere | N §3 |
 
-**Recommendation:** yes to all fourteen, after a look at 1.3, 1.11 and 1.12.
+**Recommendation:** yes to the three left. The eleven others follow a ruling (§5).
 
 ## 2. Behaviour and names a user meets
 
@@ -66,8 +60,6 @@ moved in its own commit. The size is the relative difference from its log's ledg
    noise demos' numbers (`lqg_cartpole`, `lqg_monte_carlo`, the state-space notebooks) and make
    them about 100× slower. *Recommendation:* keep it in v0.3, named in DESIGN §5 as the one
    exception; give those demos an explicit `dt` in a later row if you want one rule everywhere.
-3. **The first guess toward the target** (C-19, with 1.11). *Recommendation:* yes; check that
-   the racecar demos still lap before the merge.
 4. **The dual-rate plan one slow period late** (C-33). The MPC's `z` port is now the plan
    solved at this tick, so the late form needs
    `(mpc % slow) >> (UnitDelay(dim=n_z).rename_ports(u="z") % slow) >> (PlanFollower(planner) % fast)`.
@@ -85,42 +77,50 @@ moved in its own commit. The size is the relative difference from its log's ledg
    an edit of `plant.params` after the law is built no longer reaches the law. A GMC714 lab that
    tunes the plant after building its controller now sees a model mismatch.
    *Recommendation:* yes (the model and the plant are two things, and the mismatch is written
-   `law.params["model"]["m"] = …`); say it in the lab text.
+   `law.params["model"]["m"] = …`); say it in the lab text. *Ruled in substance by R169* (a
+   law's model is its own leaves); what is left is the lab text.
 8. **The RL planner's tree is a report** (C-9). `planner.params` shows the training numbers and
    the seed, but `solve(params=)` does not rebind them. *Recommendation:* yes for v0.3; a later
    RL row if a training run should take its numbers as an argument.
 9. **Value iteration's bound** (C-11) is taken over its sweeps to convergence, not over the
-   problem's finite horizon. *Recommendation:* yes (it is the sum value iteration computes).
-10. **RRT's `goal_tolerance` removed** (C-17): the goal is the region, `Xf=BallSet(goal, tol)`.
-    It follows from R177 (`x_goal` gone) but R177 did not name this keyword.
-    *Recommendation:* yes.
-
+   problem's finite horizon. *Recommendation:* yes (it is the sum value iteration computes);
+   R173 (a tool's own discount and its sums are internal) already covers it.
 ### 2.3 New or changed public names
 
 11. `disconnect(sys_id, port_id)`, a new verb; `connect` refuses to rewire a connected input
     (RD-60). *Recommendation:* yes.
 12. `certificate.V` is an attribute, a `QuadraticField` (`V(x)` still works) (RD-57).
     *Recommendation:* yes.
-13. `planner.solve(params=None, *, guess=None)`; `initial_guess=` and `warm_start=` are gone
-    (RD-53). *Recommendation:* yes.
 14. `compute_trajectory(record=(…))` records signals during the run; the last sample holds the
-    last tick's value (N-1, N-11, N-12). *Recommendation:* yes.
+    last tick's value (N-1, N-11, N-12). The tool is your decision 6 of 2026-10-28 and its form
+    your words ("an argument to pass to compute_trajectory"); what is left is the end-sample rule
+    (N-11). *Recommendation:* yes.
 15. `StepPlanningProblem` on the root prelude, `StepCost` and `SampledCost` on the root and
     `minilink.core` (RD-42). The root is the course set (R64, K8-1) and no course teaches these
     yet. *Recommendation:* **no**: keep them on `minilink.planning` and `minilink.core` only.
 16. `NoiseSource` on `minilink.blocks`, not on the root (RD-26). *Recommendation:* yes.
 17. `Sys2Gym(x_start=law)`; with no start it starts at `sys.x0` (the old default, a uniform
     tenth of the state bounds, was a law nobody wrote and refused an unbounded plant). The
-    GRO860 SB3 notebooks moved to `x_start=Uniform(…)` (RD-27). *Recommendation:* yes.
+    GRO860 SB3 notebooks moved to `x_start=Uniform(…)` (RD-27). R177 (`x_start` a point or a
+    law) decides the argument; what is left is the default at `sys.x0`. *Recommendation:* yes.
 18. `transcription="single_shooting"` beside the two other strings (RD-50). *Recommendation:* yes.
 19. The MPC refuses a planner whose problem has a point start beside an explicit `X0` set
     (N-4). *Recommendation:* yes.
 20. `compare` keeps two forms by its first argument: solutions only, or
     `compare(problem, …, dt=)` that also scores each entry (OD-28). *Recommendation:* yes.
-21. A cost term's id is its class name (`QuadraticCost`, `QuadraticCost2`), as a block's (R53),
-    not the plan doc's snake case (OD-22). *Recommendation:* yes.
 22. `pe.program(wrt, …, params=)` overrides the base point (OD-14); `problem.replace(**fields)`
     builds a new problem (OD-23). *Recommendation:* yes.
+
+27. **MPPI's fan of sampled futures** (P-1, `1df28c76`): `pv.samples(params, z0, n_shown)` on
+    MPPI's face redraws a solve's own samples on its key (the seed and the tick);
+    `mpc_sampled_futures(run, mpc, loop=)` rebuilds every tick's fan after a run,
+    `mpc_animation_overlays(..., samples=n)` draws it, `plot_sampled_futures(run, mpc, loop=,
+    ticks=, axes=)` gives the static figure (all on `minilink.planning.trajectory_optimization.mpc`,
+    the provisional band of R178). *Recommendation:* yes, provisional with MPPI.
+28. **Each face reads its plan as a trajectory** (P-2): `pv.planned_trajectory(z, params)` on
+    the collocation face (its knots) and on MPPI's (its plan rolled out on the model); the MPC's
+    `verbose=True` line appends a planner's own account (MPPI: `S_min`, `S_weighted`,
+    `effective_samples=…/K`, `exit_rate`). *Recommendation:* yes.
 
 ### 2.4 Small leftovers
 
@@ -167,8 +167,6 @@ These are yours by AGENTS ("Ask first": demos, notebooks, lessons).
    a look at the diff.
 9. **ROADMAP §4.1's RL row** still names `StochasticPlanningProblem`, which is gone (§4 is
    yours). *Recommendation:* "`PlanningProblem` with laws".
-10. **ROADMAP §2's two drafts** (the consolidation log's §7): MPPI's provisional names, and the
-    breaking-changes entry of 2026-10-29. *Recommendation:* paste them as drafted.
 11. **Three demos' style** (OD §7): in K4's row (TODO §2), for your demo pass.
 12. **The pipeline figures** (`docs/pipeline_figures.py`) still show the old labels; they are
     regenerated with the student-facing numbers at the merge. Nothing to decide.
@@ -196,11 +194,32 @@ alternative.
   protocol (N-20); `readme_examples` 6 % slower, explained (N-21).
 - **The consolidation:** C-1 to C-6, C-8, C-10, C-12 to C-16, C-20, C-21, C-24 to C-29, C-32,
   C-34 to C-43.
+- **After the night run** (the consolidation log's §8): the fans rebuilt from the run on the
+  solve's own key instead of recorded in the loop (P-1); `SampledDiagramEvaluator.block_input`,
+  a signal pass over a block's ancestors alone, and one `solve_inputs` per MPC block shared by
+  its solve and the read-back (P-1); a table's stage cost built once per sweep
+  (`stage_cost_law`) and an undiscounted rate `g` itself (P-3); the frozen value objects'
+  `params` a `cached_property`, built once per object under R169 (P-3).
 
-## 5. Already settled by a later ruling: no answer needed
+## 5. Already settled by a ruling: no answer needed
 
 | Old decision | What settled it |
 | --- | --- |
+| 1.3 Value iteration's failure cost: `1e6` became the cost bound | R172: one cost bound, `problem.cost_bound(tf, dt=)`; the value-iteration notebooks' colour scale now tops at the bound |
+| 1.4 The sampled loop's same-tick semantic | R125: the same-tick semantic |
+| 1.5 One integer key draws the same trials on NumPy and JAX | R144: one tree drawn by named streams from one key |
+| 1.6 Value iteration's stage cost the integral of `g` over the period | R142: the stage cost integrated in the step |
+| 1.7 The judge's running cost integrated with the state | R142, R159: the judge's running cost is the stage cost |
+| 1.8 A planner's score holds its feedback law over each period | R159: the run priced to the horizon with the input held |
+| 1.9 RL: the exploration at the episode's seed; the training reward | R160 (the seeded heads), R171 (the training reward `−g·dt` beside the score); the re-measure is 3.1 |
+| 1.10 The MPC's default the warm-started box | R176 and its amendment (one MPC box, `delay=False, warm_start=True` the default), your call of 2026-10-29 for the demos and notebooks |
+| 1.11, 2.1 item 3 The default first guess aims at the cost's target | R177: a guess aims at `Xf`'s point, else the cost's target |
+| 1.12 A sampled loop's undeclared plant at the automatic step | R174: the plant a loop closes on is integrated at the continuous simulator's step; the showcase's explicit `dt=` is 3.6 |
+| 1.13 The judge on such a plant | R174 (the judge follows the same rule); the follow-up question is 2.1's item 1 |
+| 2.2 item 10 RRT's `goal_tolerance` removed | R177 and its amendment, which names it (RRT's goal is an `Xf` region) |
+| 2.3 item 13 `planner.solve(params=None, *, guess=None)` | R148 (the planner's pure face; `planner.solve` with no mutation) |
+| 2.3 item 21 A cost term's id is its class name | R53 (a part's id is its class name, as a block's) |
+| 3.10 ROADMAP §2's drafts: MPPI's provisional names | R178 (named provisional in ROADMAP §2); the breaking-changes entry is yours to paste |
 | The engine first, in its own module (OD-12) | history: the order of a finished run |
 | The recorded plant input `plant.u` (OD-13) | `plant:u`, R134 (RD-4) |
 | The price switch `infeasible_cost` (OD-21), and the failure cost's value at a finite horizon (OD §6, §7) | `penalize_failure` and `failure_cost`, one `cost_bound` (R172, the consolidation's amendments) |
@@ -233,9 +252,9 @@ alternative.
 
 ## 6. One sitting, in order
 
-1. §1 as a block, after the three looks (about 15 minutes).
-2. §2.1 and §2.2, the consolidation's points: ten answers.
-3. §2.3 and §2.4: sixteen answers, most of them yes.
+1. §1 as a block: three numbers (about 5 minutes).
+2. §2.1 and §2.2, the consolidation's points: eight answers.
+3. §2.3 and §2.4: sixteen answers, most of them yes (items 27–28 new).
 4. §3: your material calls; 3.1's re-measure can run while you read the rest.
 5. §4 as a block.
 

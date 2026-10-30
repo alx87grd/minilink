@@ -428,3 +428,49 @@ Every math diff was read beside `planning/dynamic_programming/dp.py`.
 >   system is a `DiscreteLTISystem` (R174, R175); the MPC is one box, `delay=False,
 >   warm_start=True` by default, `lookahead` gone, its tuning path `controller.solve.cost`
 >   (R176).
+
+## 8. After the consolidation: the speed recheck (2026-10-30)
+
+A local recheck on the M4 Max, after the maintainer's MPPI visualization commit (`1df28c76`),
+timed the flagship demos on three versions in one session (the pre-run code `8db211c4`, the
+night run's merge `7ba1b924`, the head `9e98b74a`), 3 interleaved reps for the five that moved.
+The Mac ran 8–13 % slower than the night before on every version, so only the ratios count.
+
+| Demo | night merge | head | change | after `a648534c` |
+| --- | --- | --- | --- | --- |
+| `mpc_car_circuit` | 9.37 s | 10.51 s | +12 % | not re-timed |
+| `mpc_racecar_dynamic` | 16.76 s | 18.08 s | +8 % | not re-timed |
+| `vi_quadratic` | 7.74 s | 8.41 s | +9 % | 7.2 s |
+| `rrt_holonomic_obstacles` | 17.02 s | 18.34 s | +8 % | 15.9 s |
+| `vi_pendulum_swingup` | 21.26 s | 22.63 s | +7 % | not re-timed |
+
+The head stayed faster than the pre-run code on the MPC demos (the circuit 0.87×, the dynamic
+racecar 0.79×, the kinematic racecar 0.60×). The rest of the flagship set did not move, one rep
+each. The MPPI demos are not comparable: they now draw the fan figures and two animations.
+
+**The two causes, both from the consolidation, and their fix (`a648534c`):**
+
+- **P-3a, value iteration's stage cost.** The shared `euler_stage_cost` wrapped `g` in the
+  discounted rate and rebuilt it at every grid pair. Now `SampledCost.stage_cost_law(t_k,
+  params, plant_params, discount_rate)` returns `cost(x, u)` once per table (`dp.py`,
+  `policy_eval.py`, the discretizer, the step face), and an undiscounted rate is `g` itself
+  (`laws_at`, `is_zero_number`). Read beside `dp.py`: the sweep's line is the same Bellman
+  update with its stage cost bound before the loop.
+- **P-3b, the parameter trees.** R169 made every shape, path, track, scene and field number a
+  `params` leaf, built as a fresh dict on every read. The frozen value objects now build it
+  once (`cached_property`: `Sphere`, `Box`, `Union`, `Inflated`, the scene, the track, the
+  paths, the state and workspace fields, `FieldSet`, `FieldInputSet`, `MarginField`,
+  `QuadraticField`, `EllipsoidSet`).
+
+`benchmarks/v03_baseline.py` stays byte-identical. On the merged head (`01a6289f`), the full
+`pytest` gives 2162 passed and 1 failed: `test_the_compiled_tick_solves_with_ipopt` (Ipopt's
+tick plan 0.023 from its reference). It fails the same way on `f36fdd3b`, before the speed fixes,
+so it comes from the consolidation; not fixed here. The regression gates (CI flags) all pass.
+
+**P-1 and P-2, the MPPI visualization (`1df28c76`, the maintainer's commit):** the fans are
+redrawn after the run from each solve's own key (`pv.samples`, `mpc_sampled_futures`), not
+recorded in the loop, so a run records nothing extra; `SampledDiagramEvaluator.block_input`
+computes a block's input from its ancestors alone, and each MPC block has one `solve_inputs`
+shared by its solve and the read-back; `pv.planned_trajectory` reads a plan as a trajectory on
+both faces; the MPC's `verbose` line appends the planner's own account. These are triaged in
+the merge review (its §2.3 items 27–28 and §4).
