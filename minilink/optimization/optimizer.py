@@ -328,10 +328,7 @@ class Optimizer:
         print(DISP_RULE_DIV)
         print("Running solver...")
 
-    def print_solve_report(
-        self,
-        result: OptimizationResult,
-    ) -> None:
+    def print_solve_report(self, result: OptimizationResult) -> None:
         """Print the **After solve** section and close the solve panel."""
         print(DISP_RULE_DIV)
         for line in inspect_text(result).splitlines():

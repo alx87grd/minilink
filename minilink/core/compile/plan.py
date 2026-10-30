@@ -398,13 +398,7 @@ def boundary_output_slices(diagram, output_slices):
         src = out_conns.get(out_port_id)
         if src is None:
             continue
-        source_sys_id, source_port_id = src
-        key = (source_sys_id, source_port_id)
-        if key not in output_slices:
-            raise RuntimeError(
-                f"Diagram output {out_port_id!r} source {key} missing from output_slices"
-            )
-        external_output_slices[out_port_id] = output_slices[key]
+        external_output_slices[out_port_id] = output_slices[tuple(src)]
 
     return external_output_slices
 
@@ -416,9 +410,6 @@ def gather_sources_of(
     dependencies="all",
 ) -> tuple[list[tuple[int, object, int]], int]:
     """Build the gather-source recipe for a subsystem's input ports.
-
-    This is the **single implementation** of the signal-gathering logic that
-    was previously duplicated across the codebase.
 
     Parameters
     ----------
@@ -442,29 +433,24 @@ def gather_sources_of(
     u_dim = 0
 
     for in_port_id, in_port in sys.inputs.items():
-        # If this input port is not a dependency, use the nominal value
-        if dependencies != "all" and in_port_id not in dependencies:
+        source = diagram.connections[sys_id].get(in_port_id)
+        is_dependency = dependencies == "all" or in_port_id in dependencies
+
+        # Not a dependency, or not connected: the port's nominal value
+        if source is None or not is_dependency:
             source_type = NOMINAL
             source_val = in_port.nominal_value
+        elif source[0] == "input":
+            source_type = EXTERNAL_INPUT
+            u_idx = 0
+            for input_port_id, input_port in diagram.inputs.items():
+                if input_port_id == source[1]:
+                    source_val = slice(u_idx, u_idx + input_port.dim)
+                    break
+                u_idx += input_port.dim
         else:
-            source = diagram.connections[sys_id].get(in_port_id)
-            if source is None:
-                # Not connected → use nominal value
-                source_type = NOMINAL
-                source_val = in_port.nominal_value
-            else:
-                src_sys_id, src_port_id = source
-                if src_sys_id == "input":
-                    source_type = EXTERNAL_INPUT
-                    u_idx = 0
-                    for input_port_id, input_port in diagram.inputs.items():
-                        if input_port_id == src_port_id:
-                            source_val = slice(u_idx, u_idx + input_port.dim)
-                            break
-                        u_idx += input_port.dim
-                else:
-                    source_type = INTERNAL_SIGNAL
-                    source_val = output_slices[(src_sys_id, src_port_id)]
+            source_type = INTERNAL_SIGNAL
+            source_val = output_slices[tuple(source)]
 
         dim = in_port.dim
         gather_sources.append((source_type, source_val, dim))
@@ -643,12 +629,6 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
             )
         )
 
-    external = {}
-    for out_port_id in diagram.outputs:
-        src = flat.connections.get("output", {}).get(out_port_id)
-        if src is not None:
-            external[out_port_id] = output_slices[tuple(src)]
-
     plan = SampledExecutionPlan(
         state_dim=diagram.n,
         signal_dim=signal_dim,
@@ -656,7 +636,7 @@ def build_sampled_execution_plan(diagram) -> SampledExecutionPlan:
         port_ops=tuple(port_ops),
         step_ops=tuple(step_ops),
         output_slices=output_slices,
-        external_output_slices=external,
+        external_output_slices=boundary_output_slices(flat, output_slices),
         paths=paths,
     )
 

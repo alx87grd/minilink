@@ -118,9 +118,7 @@ class DiscreteEvaluator(Evaluator):
         u_nominal = np.asarray(self._u_nominal, dtype=float).reshape(self.m)
 
         if u is None:
-            u_steps = (
-                np.tile(u_nominal, (n_steps, 1)) if n_steps else np.zeros((0, self.m))
-            )
+            u_steps = np.tile(u_nominal, (n_steps, 1))
         elif callable(u):
             u_steps = np.asarray(
                 [np.asarray(u(k), dtype=float).reshape(self.m) for k in range(n_steps)]
@@ -142,14 +140,13 @@ class DiscreteEvaluator(Evaluator):
                     "u must be None, a constant vector, a sequence, or callable(k)"
                 )
 
-        n_samples = n_steps + 1
-        u_samples = np.zeros((self.m, n_samples), dtype=float)
-        if n_samples:
-            if n_steps:
-                u_samples[:, :n_steps] = u_steps.T
-                u_samples[:, -1] = u_samples[:, n_steps - 1]
-            elif self.m:
-                u_samples[:, 0] = u_nominal
+        # The last sample holds the last step's input (the nominal one with no step)
+        u_samples = np.zeros((self.m, n_steps + 1), dtype=float)
+        if n_steps:
+            u_samples[:, :n_steps] = u_steps.T
+            u_samples[:, -1] = u_samples[:, n_steps - 1]
+        else:
+            u_samples[:, 0] = u_nominal
 
         return u_samples
 
@@ -271,21 +268,14 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         x, u = self.float_arrays(x, u)
         signals = self.port_signals(x, u, k, params)
         x_next = self.next_from_signals(x, u, k, params, signals)
-        outputs = {
-            port_id: signals[sl]
-            for port_id, sl in self.plan.external_output_slices.items()
-        }
-        return x_next, outputs
+        return x_next, self.boundary_outputs(signals)
 
     @compiled
     def outputs(self, x, u, k=0, params=None):
         self.require_params(params)
         x, u = self.float_arrays(x, u)
         signals = self.port_signals(x, u, k, params)
-        return {
-            port_id: signals[sl]
-            for port_id, sl in self.plan.external_output_slices.items()
-        }
+        return self.boundary_outputs(signals)
 
     def compute_internal_signals_dict(self, x, u, k=0, params=None) -> dict:
         """Every block output at ``(x, u, k)``, keyed ``"block:port"``."""
@@ -299,6 +289,13 @@ class StepDiagramEvaluator(DiscreteEvaluator):
     ###########################################################################
     # Internal machinery
     ###########################################################################
+
+    def boundary_outputs(self, signals):
+        """The diagram's output ports read off the filled signal buffer."""
+        return {
+            port_id: signals[sl]
+            for port_id, sl in self.plan.external_output_slices.items()
+        }
 
     def require_params(self, params):
         """Refuse a params tree naming a block the diagram does not hold."""
@@ -457,21 +454,14 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         x, u = self.float_arrays(x, u)
         signals = self.port_signals(x, u, k, params, t_start=t_start)
         x_next = self.next_from_signals(x, u, k, params, signals, t_start=t_start)
-        outputs = {
-            port_id: signals[sl]
-            for port_id, sl in self.plan.external_output_slices.items()
-        }
-        return x_next, outputs
+        return x_next, self.boundary_outputs(signals)
 
     @compiled
     def outputs(self, x, u, k=0, params=None, *, t_start=0.0):
         self.require_params(params)
         x, u = self.float_arrays(x, u)
         signals = self.port_signals(x, u, k, params, t_start=t_start)
-        return {
-            port_id: signals[sl]
-            for port_id, sl in self.plan.external_output_slices.items()
-        }
+        return self.boundary_outputs(signals)
 
     @compiled(static=("n_steps", "record"))
     def rollout_dense(
@@ -703,7 +693,6 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         the measurement it reads) is not run.
         """
         x, u = self.float_arrays(x, u)
-        params = self._frozen_params if params is None else params
         op = self.operation_of(path)
 
         signals = self.port_signals(
@@ -743,7 +732,6 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
     def plant_input(self, x, u, k=0, params=None, *, t_start=0.0):
         """The input the loop feeds its plant at tick ``k``: the plant's gathered ``u``, held over the period."""
         x, u = self.float_arrays(x, u)
-        params = self._frozen_params if params is None else params
         signals = self.port_signals(x, u, k, params, t_start=t_start)
 
         return self.plant_input_from(signals, u)
@@ -782,9 +770,6 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             return fire() if k % d == 0 else hold()
 
         return self.jax.lax.cond(k % d == 0, fire, hold)
-
-    def _jac_validate_params(self, params):
-        check_diagram_params(params, self._subsystem_ids)
 
 
 def record_layout(plan, record) -> tuple:

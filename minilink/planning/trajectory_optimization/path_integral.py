@@ -252,8 +252,9 @@ class CompiledMPPIPlanner:
         # U: the nominal action held over the horizon, the origin t_start appended
         U = xp.tile(xp.asarray(u_nominal), (self.N, 1))
         t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
+        z0 = xp.concatenate([xp.reshape(U, (-1,)), t_start])
 
-        return xp.concatenate([xp.reshape(U, (-1,)), t_start])
+        return z0
 
     def solve(self, params=None, z0=None):
         """
@@ -398,10 +399,11 @@ class CompiledMPPIPlanner:
         # 10⁻⁹ puts a time on a knot inside that knot's period
         j = xp.floor((t - origin) / dt + 1e-9) + xp.arange(N)
         U_new = U[xp.clip(j, 0, N - 1).astype(int)]
-
-        return xp.concatenate(
+        z_new = xp.concatenate(
             [xp.reshape(U_new, (-1,)), xp.reshape(xp.asarray(t, dtype=float), (1,))]
         )
+
+        return z_new
 
     def predict_start(self, x, u, t, delta, params=None):
         """``x̂(t + Δ)``: the planner's model from ``x`` at ``t``, the command ``u`` held over ``delta`` (RK4, a quarter of ``dt`` apart)."""
@@ -544,8 +546,9 @@ class CompiledMPPIPlanner:
 
         x0 = jnp.asarray(P["x_start"], dtype=float)
         _, xs = jax.lax.scan(period, (x0, P["t_start"]), U)
+        x_path = jnp.concatenate([x0[None, :], xs], axis=0)
 
-        return jnp.concatenate([x0[None, :], xs], axis=0)
+        return x_path
 
 
 def problem_leaves(P):
