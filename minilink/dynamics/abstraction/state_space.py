@@ -5,7 +5,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import latex_inspect
-from minilink.core.system import DynamicSystem
+from minilink.core.system import DynamicSystem, fastest_time_constant
 
 ###############################################################################
 # Public API
@@ -61,6 +61,20 @@ class StateSpaceSystem(DynamicSystem):
     def D(self, t=0.0, params=None):
         """Feedthrough matrix ``D``; defaults to zero."""
         return zeros_on(self.B(t, params), (self.p, self.m))
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant ``1 / max |λᵢ(A)|`` at ``t = 0``, read from the current ``params``."""
+        eigenvalues = np.linalg.eigvals(np.asarray(self.A(), dtype=float))
+
+        info = self.own_solver_info
+        info["smallest_time_constant"] = fastest_time_constant(eigenvalues)
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params

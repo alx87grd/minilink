@@ -171,6 +171,24 @@ class SlidingMode(ComputedTorque):
         # Solver hints: the sign(s) term switches
         self.solver_info["discontinuous_behavior"] = True
 
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params``.
+
+        On the surface the error decays as ``ė = −λ e``: the law sets a time
+        constant of its own, ``τ = 1 / max λᵢ``, often faster than the plant's.
+        """
+        lam = np.asarray(self.params["lam"])
+
+        info = self.own_solver_info
+        info["smallest_time_constant"] = 1.0 / float(np.max(lam))
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
     def ctl_regulation(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)

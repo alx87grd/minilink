@@ -13,12 +13,7 @@ from minilink.core.compile.evaluators.stepping import (
     step_with_cost,
 )
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.system import (
-    AUTO_DT_SCALE,
-    DEFAULT_SMALLEST_TIME_CONSTANT,
-    DynamicSystem,
-    System,
-)
+from minilink.core.system import DynamicSystem, System, automatic_step_of
 
 SAMPLED_SOLVERS = ("rk4", "euler", "exact")
 
@@ -432,14 +427,13 @@ def sampled_substeps(plant, sample_period) -> int:
     """
     The integration steps per period of a plant on a clock: the continuous simulator's step rule.
 
-    ``Δt = AUTO_DT_SCALE · τ_min``, the plant's smallest time constant (the
-    catalog default 1 ms when it declares none), so ``n = ⌈Δ / Δt⌉``.
+    ``Δt`` is the plant's automatic step (:func:`~minilink.core.system.automatic_step_of`:
+    ``0.1 τ_min`` from its physics, the default 1 ms when it declares none), so
+    ``n = ⌈Δ / Δt⌉``.
     """
-    tau = plant.solver_info.get(
-        "smallest_time_constant", DEFAULT_SMALLEST_TIME_CONSTANT
-    )
+    dt = automatic_step_of(plant.solver_info)
 
-    return steps_per_period(sample_period, AUTO_DT_SCALE * tau)
+    return steps_per_period(sample_period, dt)
 
 
 def steps_per_period(sample_period, dt) -> int:

@@ -23,6 +23,7 @@ from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.evaluators.jacobian import JacobianMixin
 from minilink.core.compile.evaluators.stepping import (
     held_inputs,
+    held_step_body,
     iterate,
     require_step_knobs,
     step_body,
@@ -236,6 +237,9 @@ class Evaluator(JacobianMixin):
 class ContinuousEvaluator(Evaluator):
     """A compiled continuous-time system: ``f``, ``outputs`` and the step model on ``f``."""
 
+    #: Whether a block holds a signal over a sample period (a diagram's noise source)
+    holds = False
+
     def f(self, x, u, t=0.0, params=None):
         """``dx = f(x, u, t; p)``; ``params=None`` reads the compiled parameters."""
         raise NotImplementedError
@@ -248,9 +252,8 @@ class ContinuousEvaluator(Evaluator):
         ``"euler"``) and ``substeps`` are static.
         """
         require_step_knobs(solver, substeps)
-        f = self.rhs_of(params)
 
-        x_next = step_body(f, x, u, u, t, dt, solver, substeps)
+        x_next = self.period_step(params, x, u, u, t, dt, solver, substeps)
 
         return x_next
 
@@ -277,7 +280,6 @@ class ContinuousEvaluator(Evaluator):
         xp = self.xp
         require_step_knobs(solver, substeps, hold)
 
-        f = self.rhs_of(params)
         x0 = xp.asarray(x0, dtype=float).reshape(self.n)
         u_seq = self.input_sequence_of(u_seq, n_steps, hold)
         u_start, u_end = held_inputs(u_seq, hold)
@@ -285,7 +287,8 @@ class ContinuousEvaluator(Evaluator):
 
         # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t_start + k dt
         def period(x, k, ua, ub):
-            return step_body(f, x, ua, ub, t_start + k * dt, dt, solver, substeps)
+            t_k = t_start + k * dt
+            return self.period_step(params, x, ua, ub, t_k, dt, solver, substeps)
 
         x_samples = iterate(self, period, x0, (ks, u_start, u_end))
 
@@ -333,11 +336,22 @@ class ContinuousEvaluator(Evaluator):
     # Internal machinery
     ###########################################################################
 
-    def rhs_of(self, params):
-        """``f(x, u, t)`` on the compiled parameters, or on ``params``."""
+    def rhs_of(self, params, t_held=None):
+        """``f(x, u, t)`` on the compiled parameters, or on ``params``; a diagram reads its held blocks at ``t_held`` when given."""
         f = self.f
 
         return lambda x, u, t: f(x, u, t, params)
+
+    def period_step(self, params, x, ua, ub, t, dt, solver, substeps):
+        """``x(t + dt)`` by :func:`step_body`; with held blocks, each substep reads them once, at its start (:func:`held_step_body`)."""
+        if self.holds:
+
+            def rhs_at(s):
+                return self.rhs_of(params, t_held=s)
+
+            return held_step_body(rhs_at, x, ua, ub, t, dt, solver, substeps)
+
+        return step_body(self.rhs_of(params), x, ua, ub, t, dt, solver, substeps)
 
     def input_sequence_of(self, u_seq, n_steps, hold):
         """The input sequence as a ``(rows, m)`` array; the nominal input repeated when None."""

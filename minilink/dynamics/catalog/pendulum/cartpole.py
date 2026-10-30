@@ -61,6 +61,37 @@ class CartPole(MechanicalSystem):
         self.line_width = 1.5
         self.camera_scale = 10.0
 
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
+        info = self.own_solver_info
+        info["smallest_time_constant"] = self.fastest_mode()
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
+
+    def fastest_mode(self) -> float:
+        """The solver hint: the time constant of the pole's unstable mode about the upright, in seconds.
+
+        Linearized about ``θ = π`` the pole falls as ``e^{λt}``, ``λ = √(g (m₁ + m₂) / (m₁ l))``,
+        ``l`` the distance to the pole's centre of gravity: ``τ = 1 / λ``.
+        """
+        params = self.params
+
+        m1 = params["m1"]
+        m2 = params["m2"]
+        lcg = params["lcg"]
+        gravity = params["gravity"]
+
+        # λ² = g (m₁ + m₂) / (m₁ l), the unstable pole of the upright
+        lam = float(np.sqrt(gravity * (m1 + m2) / (m1 * lcg)))
+        tau = 1.0 / lam
+
+        return tau
+
     def H(self, q, params=None):
         params = self.params if params is None else params
         xp = array_module(q)

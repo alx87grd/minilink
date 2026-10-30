@@ -4,7 +4,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.roles import ErrorDriven
-from minilink.core.system import DynamicSystem, System
+from minilink.core.system import DynamicSystem, System, fastest_time_constant
 
 ###############################################################################
 # Public API
@@ -176,6 +176,25 @@ class PID(ErrorDriven, DynamicSystem):
         self.add_output_port(
             "u", dim=n, function=self.ctl, dependencies=self.error_dependencies
         )
+
+    @property
+    def solver_info(self) -> dict:
+        """The solver hints, the smallest time constant read from the current ``params``.
+
+        The compensator's own poles: the integrators at the origin, each filter at
+        ``−1 / τ``; the fastest is the shortest filter time constant.
+        """
+        tau = self.params["tau"] if self.has_filter else np.zeros(0)
+        poles = np.concatenate([np.zeros(self.n_int), -1.0 / np.asarray(tau)])
+
+        info = self.own_solver_info
+        info["smallest_time_constant"] = fastest_time_constant(poles)
+
+        return info
+
+    @solver_info.setter
+    def solver_info(self, value: dict):
+        self.own_solver_info = dict(value)
 
     def f(self, x, u, t=0, params=None):
         params = self.params if params is None else params

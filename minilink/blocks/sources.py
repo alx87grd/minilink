@@ -286,12 +286,11 @@ class NoiseSource(Source):
 
     @property
     def solver_info(self) -> dict:
-        """The solver hints, the sample period among them, read from the current ``params``."""
+        """The solver hints: the sample period, read from the current ``params``, places the grid's points; it is not a time constant."""
         period = float(self.params["sample_period"])
 
         info = self.own_solver_info
         info["sample_period"] = period
-        info["smallest_time_constant"] = period
 
         return info
 
