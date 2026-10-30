@@ -100,7 +100,7 @@ state-feedback block):
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium extra); cosimulation / MJX planned |
+| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium in the `full` extra; stable-baselines3 from `environment.yml`); cosimulation / MJX planned |
 
 **Experimental tier** — unproven modules under `experimental/`:
 
@@ -115,7 +115,7 @@ state-feedback block):
 - Libraries import only `core`, plus `dynamics/abstraction` interfaces —
   never catalog content. (The abstraction modules are the shared mathematical
   bases of the library band: `blocks/` builds LTI wiring on them, `control/`
-  computed torque, `estimation/` EKFs.)
+  computed torque.)
 - **Exception:** the `minilink.control` facade re-exports `ModelPredictiveController` and `PlanFollower`
   from `planning/trajectory_optimization/mpc/` (the receding-horizon block wraps a
   trajectory optimization planner, so it lives with it).
@@ -317,7 +317,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **Path integral control:** `MPPIPlanner(problem, *, dt, n_samples, temperature, noise,
   control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
   JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
-  rolls each out on `RolloutEnvironment.step(reward="stage")` (the one owner of the stage cost, the exit cost
+  rolls each out on `RolloutEnvironment(reward="stage")`'s `step(x, t, u, key, params=None, *, t_origin=None)` (the one owner of the stage cost, the exit cost
   and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
   weighted noise. Its compiled face (`n_z = N m + 1`, `shift` holding the last input,
   `command` the held input, `predicts = False`) is the trajectory face, so
@@ -782,8 +782,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
   an optional `Set`. **No key, no draw:** `sample(None)` is the mean at the law's numbers
   (`mean_at(params)`; `(n, dim)` tiled with `n`), as a noise block's `seed=None` is its mean
-  signal: the design point (the maintainer, 2026-10-28). A library law's numbers are its `params` and `cov` is the covariance of
-  one draw (RD-R1): `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
+  signal: the design point. A library law's numbers are its `params`, and `cov` is the covariance of
+  one draw: `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
   `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`
   (its `BoxSet`'s bounds, `cov = diag((b − a)² / 12)`), `Particles(points)` (`{"points"}`, the
   law's own covariance); so a family of noise levels vmaps like a family of masses. Sets are
@@ -812,7 +812,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
   continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
-  `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise (RD-D3): `w_k` the law drawn
+  `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise: `w_k` the law drawn
   at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
   draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample
   covariance keeps each sample when `Δ` is edited (a datasheet sensor,
@@ -914,8 +914,9 @@ block):
     ev.rollout(x0, u_seq, t_start, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
     ev.rollout_batch(x0s, u_sequences=None, *, t_start=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
 
-A step evaluator has `step(x, u, k=0, params=None)` (the system's own map on the integer
-tick, no knobs), `outputs` and a state-only `rollout(x0, *, n_steps, u=None, params=None)`;
+A step evaluator has `step(x, u, k=0, params=None, *, t_start=0.0)` (the system's own map on
+the integer tick, no knobs), `outputs` and
+`rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)`;
 a static evaluator has `outputs` only.   On NumPy each method is its plain body. On JAX each
 is marked `@compiled` (a step evaluator's `rollout` through its scan, returning native
 `(N + 1, n)` arrays) (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
@@ -1020,7 +1021,8 @@ shows it as unconnected. Time-varying sources belong in the diagram; forcing
 via `compute_forced`. Facades default `backend="numpy"`.
 
 **Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
-(user choice, else `euler` for discontinuous plants, else `scipy`) and the grid
+(user choice, else `euler` for discontinuous plants, else `rk4_fixedsteps` when a block
+holds a signal over a `sample_period`, else `scipy`) and the grid
 is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
 step at the automatic step, one rule wherever a fixed-step run picks its own step (a
@@ -1055,7 +1057,7 @@ evaluator's tree gives every other stateful block its start as a leaf (`controll
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
 model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout: a sampled input held over
-each period, a function of time read at the stage times; auto-picked on JAX only for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
+each period, a function of time read at the stage times; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
 
 ### Discontinuous closed loops
 
@@ -1259,15 +1261,15 @@ untouched), the random sources kept with seed `None`, their mean signal. The eva
 `Sum` on the command or the measurement when the plant has no such port), any other port's
 under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
 trial for every random block of the loop, the problem's sources or the loop's own, even on a
-deterministic problem: a block's own seed is only its default realization (RD-R4b). The stepped
-environment reads each source at `t_k` with the episode's seed (RD-D21). A deterministic planner given a stochastic problem plans
+deterministic problem: a block's own seed is only its default realization, never the trials' seed. The stepped
+environment reads each source at `t_k` with the episode's seed. A deterministic planner given a stochastic problem plans
 from the mean start and warns; `Sys2Gym(sys, cost, x_start=law)` draws each episode's start
 from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
-`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto")` closes
+`pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto", episode_length=None)` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once. The
 controller's kind decides the loop: a continuous law runs the continuous diagram on the
@@ -1341,8 +1343,8 @@ face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit 
 of a continuous one, its cost a `SampledCost`, compiling to the same face to the bit.
 Value iteration, the RL environment and a planner's evidence read only this face.
 
-The pipeline in two pictures. Every object carries its own parameters `p` (the amber tab on
-its edge), and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
+The pipeline (its map: [docs/pipelines.md](../pipelines.md)). Every object carries its own
+parameters `p`, and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
 cost, sets and start (or, on a stochastic problem, the distributions) belong to the problem,
 and the controller closes the loop on the problem's plant at compile. The problem evaluator
 is its own object: it simulates the closed loop (integrated forward from `x₀` to `tf`),
@@ -1446,8 +1448,8 @@ known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds th
 of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
 one-time speed warning is emitted only when a JAX planner omits parametric compile. The
 reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
-tree costs 1.34× the compile, 1.14× the solve and 1.51× an evaluator call of the same program
-with it frozen on the bicycle MPC (the bar is 2×). Every transcription's objective is the
+tree stays under 2× the compile, the solve and an evaluator call of the same program with it
+frozen (the bicycle MPC is the check). Every transcription's objective is the
 problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
 `w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
@@ -1594,7 +1596,7 @@ quadratic weights), fields, `PlanningProblem` (a stochastic one with its
 laws and criterion), `PlanningSolution`, `MathematicalProgram`,
 `Optimizer`, `OptimizationResult`, and `Simulator`.
 Subclasses may append a deep block after the hub summary (`LTISystem`
-matrices, `TransferFunction` `G(s)`, `Observer` gain and poles).
+matrices, `TransferFunction` `G(s)`, `StateObserver` gain and poles).
 
 **Notebook-rich repr.** A bare last expression on a `System` prefers
 `_repr_mimebundle_`: `text/plain` inspect plus `image/svg+xml` diagram
@@ -1605,7 +1607,7 @@ and `MathematicalProgram` renders the textbook equation shape (not the
 callable bodies). Optimizer `verbose=True` frames the same inspect lines
 inside the solve panel (`optimization/reporting.py` rules).
 
-Plotly under `plotting` extra.
+Plotly under the `full` extra.
 
 **Camera:** plain `camera_*` hints on `System` resolve to a 4×4 matrix
 (`camera_matrix`) each frame via `resolve_camera_from_hints`; pass

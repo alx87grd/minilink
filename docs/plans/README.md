@@ -29,8 +29,7 @@ Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) 
 its own steps locally (geometry-module.md's steps 1–6, cited as "steps 1–6 of geometry-module.md") or with a
 prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare workboard-style id. The prefix
 also marks a plan's rulings and the ids it cites from an audit, so they never collide with a
-workboard id: the retired randomness plan's rules, rulings and amendments (`RD-R5`, `RD-D13`, `RD-A2`), the
-2026-09-15 foundations review's findings and comments (`FD-F9`, `FD-C6`). Workboard ids (`A5`,
+workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 `P4`, `G1`, …) stay bare. The decision ids `D13`–`D30`, kept inside the plan docs that hold them,
 are anchors only; TODO and QUESTIONS cite them by their heading. In prose, an id never opens a
 sentence: the plain title comes first.

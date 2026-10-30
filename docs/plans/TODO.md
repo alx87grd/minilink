@@ -951,8 +951,7 @@ One line each; open a plan doc only when a design needs a writeup.
 - Colored noise, as a demo and its twin test: white noise of intensity `W` through the
   shaping filter `τ ż = −z + w`, its state started from `N(0, W / 2τ)` so it is stationary
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
-  `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`
-  (RD-D23).
+  `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
 - Multiple shooting with the problem's parameters: shooting and collocation take the
   parametric program's tree; `MultipleShootingTranscription.transcribe_parametric` refuses.
 - A training run that rebinds its numbers: the RL planner's `params` is a report for

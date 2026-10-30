@@ -52,7 +52,7 @@ The maintainer does not carry the workboard's label system in his head. Step ids
   planned for the v0.3 core"), then the id in parentheses as a
   pointer, never the id as the subject of a sentence;
 - give the overview before the detail: which release, which part of the plan, what it unlocks;
-- the same for file-local jargon (a plan doc's own prefixes such as `RD-D12`, `FD-F9`).
+- the same for file-local jargon (a plan doc's own prefixes such as `NS-1`, `CBF-1`).
 
 ## Commit messages
 
@@ -83,7 +83,7 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
 | ROADMAP §5.3 and TODO §1 | The v0.3 core: the workstreams (§N in ROADMAP §5.3's table, the same N as TODO §1.N), the order (three lanes), and the open rows. Update in place when a workstream's status or rows change |
 | docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says where each sits and holds the "one fact, one home" rule. A plan doc holds design detail only, never a rung or a restated status |
-| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), the pipeline figures (gallery `docs/pipelines.md`, two of them in DESIGN §6) by `docs/pipeline_figures.py` |
+| docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), the pipeline map (`docs/pipelines.md`, one figure, `docs/_static/pipeline_map.svg`) by `docs/pipeline_figures.py` |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |
 
 Keep DESIGN.md call chains minimal.

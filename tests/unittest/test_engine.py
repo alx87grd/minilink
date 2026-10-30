@@ -574,7 +574,7 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
 
     # An evaluation draws a seed per trial: a block's own seed is only its default
-    # realization (RD-R4b), so another seed on the block scores the same trials
+    # realization, never the trials' seed, so another seed on the block scores the same trials
     other = problem.compile(noisy_loop(seed=4), dt=0.01, backend="numpy")
     np.testing.assert_array_equal(
         other.evaluate(n_trials=2, key=0).J, pe.evaluate(n_trials=2, key=0).J

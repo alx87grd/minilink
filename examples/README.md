@@ -16,7 +16,7 @@ examples/
   teaching/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
-  demos/<chapter>/             # Canonical single-file textbook scripts (1:1 with tutorial chapters)
+  demos/<chapter>/             # Canonical single-file textbook scripts, by topic (the chapters' areas)
   demos/udes_racecar/          # Plant folder: MPC on the 1/10 car (kinematic and dynamic models)
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
@@ -165,8 +165,9 @@ use the `minilink` conda env (the [README's Install](../README.md#install)).
 
 ## By chapter
 
-One demo folder per tutorial chapter (the tutorial notebooks are the Colab table above); the
-research lane sits apart.
+The demo folders grouped by tutorial chapter (a chapter may span several folders, and the
+simulation chapter's demos sit in `demos/graphical/`; the tutorial notebooks are the Colab table
+above); the research lane sits apart.
 
 | Chapter | Demos | Teaching notebooks / projects |
 | --- | --- | --- |
@@ -183,7 +184,7 @@ research lane sits apart.
 | Reinforcement learning | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](../experimental/rl/) |
 | Graphical | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard/gamepad game mode: `game_cartpole.py`, `game_car.py`, `game_ur5_setpoint.py`) | |
 | UdeS racecar | [`demos/udes_racecar/`](demos/udes_racecar/) (MPC on the kinematic model, MPC on the dynamic model) | [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5: kinematic MPC, then the same MPC on the dynamic car) |
-| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO, `mppi/` pendulum and racecar MPPI, `rl/` Lyapunov check, `random/` noise and seeds) | not nightly-swept; `c_export` is TRL 1 (flagship smoke in the JAX regression job); C export demos: `experimental/c_export/c_export_proportional.py`, `experimental/c_export/c_export.py` |
+| Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `compile/` diagram flattening, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO, `mppi/` pendulum and racecar MPPI, `rl/` Lyapunov check, `random/` noise and seeds) | not nightly-swept; C export demos: `experimental/c_export/c_export_proportional.py`, `experimental/c_export/c_export.py` |
 
 Run demos from the repo root, e.g.
 `PYTHONPATH=. python examples/demos/core/readme_examples.py`.
