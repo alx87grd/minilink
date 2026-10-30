@@ -15,25 +15,58 @@ class OneLinkArm(Manipulator):
     def __init__(self):
         super().__init__(dof=1, task_dim=2)
 
+        # Parameters
+        self.params = {"m": M, "l": L, "d": D, "gravity": G}
+
     def H(self, q, params=None):
-        # H = m l²
-        return np.array([[M * L**2]])
+        params = self.params if params is None else params
+
+        m = params["m"]
+        l = params["l"]
+
+        H = np.array([[m * l**2]])
+
+        return H
 
     def g(self, q, params=None):
-        # g(q) = m g l sin(q)
-        return np.array([M * G * L * np.sin(q[0])])
+        params = self.params if params is None else params
+
+        m = params["m"]
+        l = params["l"]
+        gravity = params["gravity"]
+
+        g = np.array([m * gravity * l * np.sin(q[0])])
+
+        return g
 
     def d(self, q, v, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        b = params["d"]
+
         # d = b q̇
-        return D * v
+        d = b * v
+
+        return d
 
     def forward_kinematics(self, q, params=None):
-        # p = [l sin(q), −l cos(q)]
-        return np.array([L * np.sin(q[0]), -L * np.cos(q[0])])
+        params = self.params if params is None else params
+
+        l = params["l"]
+
+        p = np.array([l * np.sin(q[0]), -l * np.cos(q[0])])
+
+        return p
 
     def J(self, q, params=None):
+        params = self.params if params is None else params
+
+        l = params["l"]
+
         # J = ∂p/∂q
-        return np.array([[L * np.cos(q[0])], [L * np.sin(q[0])]])
+        J = np.array([[l * np.cos(q[0])], [l * np.sin(q[0])]])
+
+        return J
 
 
 arm = OneLinkArm()
