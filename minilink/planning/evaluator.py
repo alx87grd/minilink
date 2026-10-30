@@ -30,6 +30,7 @@ from minilink.core.params import (
     split_path,
     with_leaf,
 )
+from minilink.core.sets import is_bounded
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
     RUNNING_COST,
@@ -144,7 +145,7 @@ class ProblemEvaluator:
 
         # The forms generated once: the batched trial, jitted on JAX; the failure
         # and bound of each value of the cost's numbers
-        self.trials_fn = None
+        self.trials_fn = {}
         self.run_fn = None
         self.failure_cost_cache = {}
         self.on_device = DeviceTree()
@@ -375,9 +376,7 @@ class ProblemEvaluator:
         jax = ensure_jax_x64()
 
         parts = problem_parts(self.problem)
-        if self.run_fn is None or any(
-            a is not b for a, b in zip(self.run_fn[1], parts)
-        ):
+        if self.run_fn is None or replaced(self.run_fn[1], parts):
             self.run_fn = (jax.jit(self.run), parts)
         run, _ = self.run_fn
 
@@ -409,7 +408,7 @@ class ProblemEvaluator:
         parts = problem_parts(problem)
         key = (problem.penalize_failure, problem.failure_cost, rate, numbers)
         cached = self.failure_cost_cache.get(key)
-        if cached is None or any(a is not b for a, b in zip(cached[0], parts)):
+        if cached is None or replaced(cached[0], parts):
             failure_cost = failure_cost_of(problem, self.tf, cost_params, rate)
             bound = diverged_cost_of(problem, self.tf, failure_cost, cost_params, rate)
             cached = self.failure_cost_cache[key] = (parts, failure_cost, bound)
@@ -612,9 +611,6 @@ class ProblemEvaluator:
         jax = ensure_jax_x64()
         register_evaluation_pytree()
 
-        if self.trials_fn is None:
-            self.trials_fn = {}
-
         # The batched axes: a drawn leaf carries the trial axis, the others are shared.
         # The trace reads the problem's cost and sets, so a part replaced on the
         # problem traces anew, in place of the entry it replaces
@@ -623,7 +619,7 @@ class ProblemEvaluator:
         parts = problem_parts(self.problem)
         layout = (record, tree_signature(axes))
         cached = self.trials_fn.get(layout)
-        if cached is None or any(a is not b for a, b in zip(cached[1], parts)):
+        if cached is None or replaced(cached[1], parts):
             batched = jax.vmap(
                 lambda p, x0, c, b: self.score(p, x0, record, c, b),
                 in_axes=(axes, 0, None, None),
@@ -1133,6 +1129,11 @@ def problem_parts(problem):
     )
 
 
+def replaced(cached_parts, parts) -> bool:
+    """Whether a part of the problem was replaced since a form was generated on ``cached_parts`` (by identity)."""
+    return any(a is not b for a, b in zip(cached_parts, parts))
+
+
 def horizon_of(problem, episode_length):
     """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
     if problem.horizon_kind() == "finite":
@@ -1262,14 +1263,6 @@ def declared_rows(problem):
         rows.append("reachability_margin")
 
     return rows
-
-
-def is_bounded(box):
-    """Whether a box has any finite face (``None``, no box, counts as bounded: a general set)."""
-    if box is None:
-        return True
-
-    return bool(np.any(np.isfinite(box.lower)) or np.any(np.isfinite(box.upper)))
 
 
 def box_of(bounds, wrt, base):
@@ -1405,16 +1398,13 @@ def index_tree(tree, axes, i):
 
 def unbatch(trajs, n):
     """The batched trajectory of the runs as a list of NumPy trajectories."""
-    out = []
-    for i in range(n):
-        out.append(
-            Trajectory(
-                t=np.asarray(trajs.t[i]),
-                x=np.asarray(trajs.x[i]),
-                u=np.asarray(trajs.u[i]),
-                signals={k: np.asarray(v[i]) for k, v in trajs.signals.items()},
-                roles=dict(trajs.roles),
-            )
+    return [
+        Trajectory(
+            t=np.asarray(trajs.t[i]),
+            x=np.asarray(trajs.x[i]),
+            u=np.asarray(trajs.u[i]),
+            signals={k: np.asarray(v[i]) for k, v in trajs.signals.items()},
+            roles=dict(trajs.roles),
         )
-
-    return out
+        for i in range(n)
+    ]
