@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 import time
 from pathlib import Path
 
@@ -870,8 +871,6 @@ class MeshcatRenderer(AnimationRenderer):
         # the viewer is always 3-D: ``is_3d`` only picks the axes of flat renderers
         self.canvas = MeshcatCanvas(self.vis, is_3d=True)
         if show:
-            import sys
-
             if "google.colab" in sys.modules:
                 from google.colab import output
 
@@ -907,8 +906,6 @@ class MeshcatRenderer(AnimationRenderer):
 
     def present(self, *, block: bool, interval_s: float | None = None) -> None:
         if block:
-            import sys
-
             if "google.colab" in sys.modules:
                 from IPython.display import display
 

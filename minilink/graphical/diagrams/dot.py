@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import io
+import tempfile
 import warnings
 from dataclasses import replace
 
@@ -353,8 +355,6 @@ def render_diagram_graph(
     show_mpl = show and (not show_inline) and (not show_pdf)
     if show_mpl:
         try:
-            import io
-
             import matplotlib.pyplot as plt
 
             # Graphviz default DPI is ~96; bump for a sharper Matplotlib window.
@@ -395,8 +395,6 @@ def render_diagram_graph(
         return drawn
 
     if filename is None:
-        import tempfile
-
         with tempfile.NamedTemporaryFile(
             suffix="_" + graph.name + ".gv",
             delete=False,

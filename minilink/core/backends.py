@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import functools
+import importlib.util
 import os
 import types
 
@@ -119,7 +120,6 @@ def array_module(*values) -> types.ModuleType:
 @functools.lru_cache(maxsize=1)
 def jax_installed() -> bool:
     """Return True when the ``jax`` package is importable (without importing it)."""
-    import importlib.util
 
     return importlib.util.find_spec("jax") is not None
 

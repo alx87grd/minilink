@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 
 from minilink.core.geometry import Box, Inflated, Sphere, Union
@@ -434,7 +436,6 @@ def plot_cost_field_exports(
     dict
         ``{name: {"2d": (fig, ax), "3d": (fig, ax)}}``.
     """
-    from pathlib import Path
 
     import matplotlib.pyplot as plt
 
