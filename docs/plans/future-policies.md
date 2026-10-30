@@ -2,15 +2,14 @@
 
 **Status:** an independent analysis of 2026-10-21, aligned to the rulings since. What it asked
 of the core is decided: controller memory as a sampled block's state and its draws from its seed
-and the tick (D14, R104), the compiled problem dispatching on the policy's kind (D15, R105), the
+and the tick (R104), the compiled problem dispatching on the policy's kind (R105), the
 seeded stochastic policy (D29, R129, §5.1), the planner's compiled face that the MPC block reads
-(R148, [planner-and-mpc.md](planner-and-mpc.md)), a problem stochastic by its parts (R143), and
+(R148, DESIGN §6), a problem stochastic by its parts (R143), and
 `NeuralPolicy` as the deterministic face (R151). Fitting to data waits for the behavior-cloning
 row (R136, §7).
 **Lane:** maintainer-owned.
-**Rows:** the seeded policy is [TODO.md](TODO.md) §1.4 ([core-architecture.md](core-architecture.md)
-§4); the sampled loop TODO §1.5 ([sampled-path.md](sampled-path.md)); MPPI S72
-([mppi.md](mppi.md)); behavior cloning ROADMAP §5.6.
+**Rows:** the seeded policy is [TODO.md](TODO.md) §1.4; the sampled loop TODO §1.5 (DESIGN
+§5); MPPI S72 (TODO §4, DESIGN §6); behavior cloning ROADMAP §5.6.
 
 The question: do the core's designs (the step model, the sampled loop, the compiled problem and
 its program export, the planner's compiled face, planners returning a `PlanningSolution`) carry
@@ -41,7 +40,7 @@ optimizer. Two of the three gaps this analysis found are now closed by design:
 - **The receding horizon is the one MPC block** (R148): MPPI implements the planner's compiled
   face (its `z` the nominal sequence and its origin, `shift` the shifted sequence, `seed` a leaf),
   and the MPC's state `z` is the shifted warm start (R155); its fresh samples come from the
-  block's seed and `⌊t/Δ⌋` (R104, R158). [mppi.md](mppi.md) §6.
+  block's seed and `⌊t/Δ⌋` (R104, R158); DESIGN §6, "Path integral control".
 - **A payoff.** MPPI's update is a weighted average, so it is differentiable end to end: its
   temperature and noise level (`controller.method.*`) can be optimized by gradient through the
   same program export (`pe.program(wrt=[...])` solved by `Optimizer`) as a PID gain.
@@ -104,12 +103,12 @@ demo than human driving, and free of hardware (a pointer, R136).
    params = pe.unpack(Optimizer(pe.program(wrt=[...])).solve().z, wrt=[...])
    cloned   = fit(policy, demos, wrt="policy", loss="action")                 # a dataset loss (open, R136)
    ```
-2. **Controller memory is state** (D14, R104): MPPI's shifted sequence, a diffusion policy's
+2. **Controller memory is state** (R104): MPPI's shifted sequence, a diffusion policy's
    observation history and action chunk live in the block's `x`, carried by the sampled loop
    (a `SampledDiagramSystem`, R146). No random key is threaded: a controller's draws come from
    its own seed and the tick, the noise block's counter-based pattern
-   ([randomness.md](randomness.md)).
-3. **The compiled problem dispatches on the policy's kind** (D15, R105): a continuous law runs
+   (DESIGN §4, "Randomness").
+3. **The compiled problem dispatches on the policy's kind** (R105): a continuous law runs
    the continuous closed loop; a sampled controller runs `policy @ plant` as one scan of the
    step face (R141), so MPPI and diffusion policies get the same batched `evaluate` and program
    export. Today the evaluator refuses a sampled controller (`require_continuous`,
@@ -174,5 +173,5 @@ in place, both are additive features rather than redesigns.
 - diffusion policy is research-lane only, JAX-only, after behavior cloning;
 - distilling MPC or MPPI into a neural policy as the first imitation demo stays a pointer.
 
-The other questions are answered: controller memory on the tick (D14, R104) and the seeded
+The other questions are answered: controller memory on the tick (R104) and the seeded
 policy's contract (D29, R129).

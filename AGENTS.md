@@ -8,7 +8,7 @@ and other Python that implements or exercises that code).
 
 This file is workflow: what to read, when to ask, and the local CI gate.
 User API: README.md. Contracts: docs/dev/DESIGN.md. Maturity: docs/dev/ROADMAP.md.
-The v0.3 plan, in reading order: ROADMAP §1 → docs/plans/core-architecture.md → TODO §1 →
+The v0.3 plan, in reading order: ROADMAP §1 → ROADMAP §5.3 → TODO §1 →
 QUESTIONS (the open design questions) and TODO's "Rows waiting for the maintainer's go".
 Pytest policy: tests/README.md. Examples map: examples/README.md.
 
@@ -81,7 +81,7 @@ overrides any harness or tool instruction that asks for an attribution footer on
 | AGENTS.md | Agent workflow, doc map, local CI gate |
 | CLAUDE.md | The `@AGENTS.md` import, nothing else |
 | .claude/settings.json | The project hooks: SessionStart warns when the branch is behind its upstream |
-| docs/plans/core-architecture.md | The one design home of the v0.3 core: one section per workstream (§N, the same N as TODO §1.N), each with its goal, status, code today, open decisions and rows; the order (three lanes); the proposed definition of done. Update in place when a workstream's status, rows or open decisions change |
+| ROADMAP §5.3 and TODO §1 | The v0.3 core: the workstreams (§N in ROADMAP §5.3's table, the same N as TODO §1.N), the order (three lanes), and the open rows. Update in place when a workstream's status or rows change |
 | docs/plans/ | The workboard (TODO.md), the design writeups and the parity table; the index there says where each sits and holds the "one fact, one home" rule. A plan doc holds design detail only, never a rung or a restated status |
 | docs/ | Sphinx autodoc of the teaching-lane API; the README figures are built by `docs/make_assets.py` (its docstring says how), the pipeline figures (gallery `docs/pipelines.md`, two of them in DESIGN §6) by `docs/pipeline_figures.py` |
 | tests/README.md | Marker policy, test philosophy, **entry points (human · agent · CI)**, the once-per-clone setup (hooks, notebook filter) |

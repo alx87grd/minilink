@@ -81,7 +81,7 @@ ReinforcementLearningPlanner(problem, ..., reward_scale="auto")  # or a float, o
 - `"auto"` sets `c = 1 / (g_max dt)` from the same bound as the failure price (`problem.cost_bound()`). The algorithm sees `c r` and `c` times the failure price.
 - Everything reported to the user stays in cost units: the learning curve, "mean episode cost", the solver record and `evaluate`. The solver record also carries `c`.
 - With no finite box, `"auto"` falls back to `c = 1` and prints one line saying so. Option B can come later if a consumer needs it.
-- Whether `"auto"` is the default is the maintainer's call. It moves every RL demo's numbers once, so it lands between cohorts, like RN-4 and RN-5 of [randomness.md](randomness.md).
+- Whether `"auto"` is the default is the maintainer's call. It moves every RL demo's numbers once, so it lands between cohorts, like the draws' changes of v0.3 (RN-4, RN-5).
 
 ## 7. Steps
 

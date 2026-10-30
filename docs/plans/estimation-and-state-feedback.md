@@ -14,7 +14,7 @@ Kalman filter, the sampled filters, and Layer 3, the estimation problem and its 
 follow-ups). P4's build plan, its ask-first list and its verification were cut once it
 landed (the history is in git). **Where it sits:** `LQGPlanner` stays a v0.4 feature
 ([TODO.md](TODO.md) §4), the follow-ups v0.9 rows; the sampled filters read the core's hybrid
-loop and the draws ([core-architecture.md](core-architecture.md) §3, §5, §12).
+loop and the draws (TODO §1.3, §1.5).
 
 ## 1. Vision
 
@@ -107,7 +107,7 @@ verb for how it is obtained. The names reserved for later:
   `estimators.py`;
 - noise: `Q_n`, `R_n` everywhere in the estimation band, gains included, so `Q`, `R` keep
   their one meaning as LQR weights (RULES 5.4): `Q_n` the n×n state-noise intensity, `R_n`
-  the p×p measurement intensity (randomness.md: `Q_n = B_w W B_wᵀ`, `R_n = D_v V D_vᵀ`);
+  the p×p measurement intensity (DESIGN §4, "Randomness": `Q_n = B_w W B_wᵀ`, `R_n = D_v V D_vᵀ`);
 - the Layer 3 tools take the noun `Estimator` (`KalmanEstimator(problem)` beside
   `LQRPlanner(problem)`), which the role name `observer` left free.
 

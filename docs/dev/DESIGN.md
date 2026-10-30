@@ -1275,7 +1275,7 @@ loop is taken when its block `plant` is the problem's system) and compiles it on
 controller's kind decides the loop (R105): a continuous law runs the continuous diagram on the
 grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
-refused (D15), `solver` and `substeps` its plant's integration per base period (`None`, the
+refused, naming the period (R158), `solver` and `substeps` its plant's integration per base period (`None`, the
 automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
 them) with no clock is refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the

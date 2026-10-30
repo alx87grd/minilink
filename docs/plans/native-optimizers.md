@@ -2,8 +2,7 @@
 
 Status: written 2026-10-25 from the maintainer's vision (§1), with the state of the code (§2)
 and the agent's read (§3–§4). Lane: research. The rows: the proof of concept (NS-1, NS-2's
-fixed-`K` form, NS-8, NS-9) is [TODO.md](TODO.md) §1.8 ([core-architecture.md](core-architecture.md)
-§8); the rest is TODO §4. **Landed in the v0.3 run:** NS-1 and NS-2's fixed-`K` form (the
+fixed-`K` form, NS-8, NS-9) is [TODO.md](TODO.md) §1.8; the rest is TODO §4. **Landed in the v0.3 run:** NS-1 and NS-2's fixed-`K` form (the
 laws `GradientDescentLaw` and `AdamLaw` in `optimizers/first_order.py`, `Optimizer(...,
 iterations=K)`, `as_step_system`; a traced solve returns its `OptimizationResult` with JAX
 arrays, §4.5's open point); `iterations=None` stays the host loop to a tolerance, its
@@ -16,8 +15,8 @@ arrays, §4.5's open point); `iterations=None` stays the host loop to a toleranc
 - the fixed-count solve: `Optimizer(program, method=, iterations=K)`, exactly `K` steps in one
   `lax.scan`; `iterations=None` runs to a tolerance, `maxiter` its cap; a cap and a fixed count
   stay two things ([R149](../reviews/2026-10-27-core-vision-decisions.md));
-- the fixed-iteration MPC is a planner under the contract of [planner-and-mpc.md](planner-and-mpc.md)
-  (R148): this doc holds its solver, that doc its tick;
+- the fixed-iteration MPC is a planner under the planner's compiled-face contract
+  (R148, DESIGN §6): this doc holds its solver, DESIGN its tick;
 - programs, parameters and randomness: §7's convention (R131), on one program noun,
   `MathematicalProgram(..., params=None)` (R130).
 
@@ -27,14 +26,14 @@ arrays, §4.5's open point); `iterations=None` stays the host loop to a toleranc
 | --- | --- |
 | Native solvers as pure laws, program categories, the solve as a rollout, the three ways to differentiate a solve | this doc, §3–§4 |
 | The fixed-iteration MPC's solver (goal 1) | this doc, §4.6, NS-8 |
-| The planner's compiled face, the MPC block and its tick | [planner-and-mpc.md](planner-and-mpc.md) (R148) |
-| MPPI, the planner | [mppi.md](mppi.md) (S72); its tick as a pure planner, this doc §4.6b |
+| The planner's compiled face, the MPC block and its tick | DESIGN §6 (R148) |
+| MPPI, the planner | DESIGN §6; its rest TODO's S72; its tick as a pure planner, this doc §4.6b |
 | Convergence analysed as stability (goal 2), with the discrete step analysis it needs | this doc, §4.7, NS-5 (R122) |
-| The program's parameters and one backend table | [parametric-program.md](parametric-program.md) (S76, OPW-1–OPW-5) |
-| The sampled loop as one scan (`SampledDiagramSystem`, R146; the two run verbs, R147) | [sampled-path.md](sampled-path.md), [core-architecture.md](core-architecture.md) §5 |
-| The differentiable evaluation of a sampled loop (`problem.compile` of a sampled controller) | [differentiable-problem.md](differentiable-problem.md), step 7b (R105) |
+| The program's parameters and one backend table | DESIGN §6 (S76, OPW-1–OPW-5, landed) |
+| The sampled loop as one scan (`SampledDiagramSystem`, R146; the two run verbs, R147) | DESIGN §5 |
+| The differentiable evaluation of a sampled loop (`problem.compile` of a sampled controller) | DESIGN §6, the problem evaluator (R105) |
 | A gradient-descent tutorial on the extended `Optimizer` | [TODO.md](TODO.md) §6 (R91) |
-| Parametric and stochastic programs in the solvers: seeds, the convention | this doc, §7; randomness in simulation [randomness.md](randomness.md) |
+| Parametric and stochastic programs in the solvers: seeds, the convention | this doc, §7; randomness in simulation DESIGN §4 |
 
 Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 
@@ -73,7 +72,7 @@ Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 | Program evaluators | `optimization/evaluators/` | NumPy and JAX; the JAX one jits `J`, `∇J`, `∇²J`, the Jacobians, then **returns NumPy arrays** to the solver | the derivatives are; the solve is not |
 | Parameters | `planning/trajectory_optimization/parametric_program.py` | `ParametricMathematicalProgram`: only `x0` varies between solves (it folds into `MathematicalProgram(..., params=)`, R130, S76) | partly (the JAX MPC path) |
 | `Adam` | `optimizers/first_order.py` | Optax-style `init` / `update` on a pytree; also the RL learners' optimizer (`sac.py`, `algorithms/base.py`) | **yes**: the RL planner runs its gradient steps in one `lax.scan` (`planner.py`), PPO too |
-| The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet | yes (open point: `DiscreteEvaluator.rollout` returns host NumPy, core-architecture.md §2) |
+| The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet | yes (open point: `DiscreteEvaluator.rollout` returns host NumPy) |
 | Other solvers in disguise | `planning/dynamic_programming/dp_jax.py` (value iteration in a `lax.while_loop`), `learning/.../ppo.py` (scan of minibatch steps), MPPI (planned, S72) | each owns its own loop | yes |
 
 Nothing in the library differentiates *through* a solve today: no `custom_vjp`, no implicit
@@ -201,7 +200,7 @@ is a later step.
 
 Unchanged in contract: an adapter takes a compiled evaluator and `z0` and returns an
 `OptimizationResult`. They stay host code; their improvements are OPW-1–OPW-5 (one backend
-table for the offline and the compiled paths, [parametric-program.md](parametric-program.md) §6).
+table for the offline and the compiled paths, landed in v0.3).
 
 ### 4.5 The surface, sketched
 
@@ -235,7 +234,7 @@ settled with NS-2.
 planner whose method is native and whose `iterations=K` is forwarded to its `Optimizer` (R149),
 wrapped by `ModelPredictiveController` like any planner. Its compiled face's `pv.solve(params,
 z0)` is `K` iterations of the method from the shifted plan; the tick (shift, solve, command), the
-delay, tick 0 and the bindings are [planner-and-mpc.md](planner-and-mpc.md) §6. In the solver's
+delay, tick 0 and the bindings are DESIGN §6's MPC. In the solver's
 terms one tick is
 
 ```text
@@ -249,7 +248,7 @@ and the closed loop `(mpc % 0.05) @ plant` is one `lax.scan` (R146, R147).
 **Today, for contrast:** `MPCStatefulController` (`planning/trajectory_optimization/mpc/controller.py`)
 already keeps the packed plan as its state (R104), but its `step` is a host solve (SciPy SLSQP)
 through a tick latch with side effects; R148 drops the stateful and stateless pair and the latch
-(planner-and-mpc.md §9).
+(landed).
 
 **Why a fixed `K` is the right contract here**, not a tolerance:
 - The tick's cost is known in advance: a real-time budget, the same on every tick.
@@ -278,17 +277,16 @@ whose dynamics are equality rows, stays on Ipopt and SciPy.
 
 **What it needs first.** The parametric program (S76: the solve binds `x_start` and the plant
 without a recompile); NS-1 and NS-2's fixed-`K` form; the planner's compiled face
-(planner-and-mpc.md §10); for the closed loop, the sampled loop as one scan and its
-differentiable evaluation (step 7b of [differentiable-problem.md](differentiable-problem.md),
-R105). Today `HybridSimulator` steps the ticks in a Python loop, and the problem evaluator
+(R148); for the closed loop, the sampled loop as one scan and its
+differentiable evaluation (R105). Today `HybridSimulator` steps the ticks in a Python loop, and the problem evaluator
 refuses a `StepSystem` controller (`require_continuous` in `planning/evaluator.py`). The sampled
 loop's first consumers are a digital PID and a held neural policy, so it is built and checked
 before NS-8. A host-solver MPC (Ipopt, SLSQP) runs the same block on the NumPy face.
 
 ### 4.6b MPPI: the same tick, already pure
 
-The path-integral planner (MPPI, S72, [mppi.md](mppi.md)) fits the same template with a
-derivative-free iteration: a planner under planner-and-mpc.md's contract, its `z` the nominal
+The path-integral planner (MPPI, S72) fits the same template with a
+derivative-free iteration: a planner under the compiled-face contract, its `z` the nominal
 `U` and `t_start`, its `seed` a leaf of `planner.params` that the MPC draws from the block's seed
 and the tick (R104). The prototype (`experimental/mppi/pendulum_mppi.py`, `racecar_mppi.py`)
 already writes its tick as one jitted pure function `mppi_tick(U, x0, key)`: sample perturbed
@@ -345,7 +343,7 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
 - **NS-7 The stochastic category**: the optimizer seed strategies (R131), SGD and Adam advancing
   the seed, the problem evaluator's Monte Carlo objective their first consumer.
 - **NS-8 The fixed-iteration planner** (§4.6): single-shooting trajectory optimization with a
-  native method and `iterations=K`, its compiled face (planner-and-mpc.md §3) pure; one
+  native method and `iterations=K`, its compiled face (DESIGN §6) pure; one
   `pv.solve` jits, the MPC on it matches the host SLSQP plan within a tolerance on the pendulum
   and the cart-pole after enough ticks, and `jax.grad` of one tick's input with respect to a
   cost weight matches finite differences.

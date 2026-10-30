@@ -6,8 +6,7 @@ is sized at roughly one agent-hour to one agent-day and ends with a "done when" 
 **[ask]** marks maintainer-owned territory (AGENTS "Ask first"); unmarked rows are
 agent-managed. Landed rows leave this file; their history is git and
 [docs/reviews/](../reviews/). The pieces live elsewhere:
-- **Why each v0.3 row exists:** [core-architecture.md](core-architecture.md) §N, the same N as
-  §1.N here.
+- **Why each v0.3 row exists:** [ROADMAP §5.3](../dev/ROADMAP.md#53-v03--the-complete-core), its workstream table, the same N as §1.N here.
 - **Its open design questions:** [QUESTIONS.md](../dev/QUESTIONS.md); the choices
   are [R124–R140](../reviews/2026-10-27-design-questions-rulings.md) and
   [R141–R153](../reviews/2026-10-27-core-vision-decisions.md), the latter taking the decisions of
@@ -77,8 +76,7 @@ maintainer would and logged in the run's record.
 ## 1. v0.3 — the complete core
 
 **How the work flows.**
-- **Order:** three lanes and two joins, a proposal ([core-architecture.md](core-architecture.md)
-  §10).
+- **Order:** three lanes and two joins, a proposal ([ROADMAP §5.3](../dev/ROADMAP.md#53-v03--the-complete-core)).
 - **Where the work lands:** `dev-v0.3`, a temporary branch, merged into `dev` after the
   maintainer's review (R79).
 - **Reaching `main`:** nothing merges to `main` until every notebook has moved (R47), and when
@@ -115,8 +113,6 @@ the rows below are what is left, each small. Landed rows left this file on 2026-
 
 ### 1.1 Every object pure, every number a parameter
 
-Why: [core-architecture.md](core-architecture.md) §1.
-
 - [ ] **Later nouns, each with its first consumer** (A5; `Set.as_cost`, the library shapes and
   fields reading `params`, and `log_prob` on the seeded policy, R129, landed in the v0.3 runs):
   - parameter-dictionary support on sets and distributions (one flatten rule, with
@@ -128,7 +124,7 @@ Why: [core-architecture.md](core-architecture.md) §1.
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
     (scan: examples#10).
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
-  step 8; [differentiable-problem.md](differentiable-problem.md) §8):
+  step 8):
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.4 row.
 - [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
@@ -137,8 +133,6 @@ Why: [core-architecture.md](core-architecture.md) §1.
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
 
 ### 1.2 The step algebra first-class
-
-Why: [core-architecture.md](core-architecture.md) §2.
 
 - [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
   family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
@@ -175,9 +169,6 @@ Why: [core-architecture.md](core-architecture.md) §2.
 
 ### 1.3 The draws
 
-Why: [core-architecture.md](core-architecture.md) §3. Design and the per-step files and "done
-when": [randomness.md](randomness.md) §9.
-
 - [ ] **The draws' contract in DESIGN** (RN-6; the per-block seeds, the disturbance sources and
   the problem stochastic by its parts landed in the v0.3 run): DESIGN §4's distributions entry
   (the convention, the three periods, the bridge table, the solver hint) and §6 (the problem's
@@ -189,16 +180,14 @@ when": [randomness.md](randomness.md) §9.
 
 ### 1.4 The seeded stochastic policy
 
-Why: [core-architecture.md](core-architecture.md) §4. Design:
-[future-policies.md](future-policies.md) §5 point 4 and §5.1 (D29).
+Design: [future-policies.md](future-policies.md) §5 point 4 and §5.1 (D29).
 
 No open row: the block and the RL heads on it landed in the v0.3 run (acceptance script 13).
 
 ### 1.5 The sampled loop: a step diagram, two runners
 
-Why: [core-architecture.md](core-architecture.md) §5. Design: [sampled-path.md](sampled-path.md).
-Ruled: R13, R14, R104, R105, R123, R125, R145, R146, R147 (choices of 2026-10-27,
-[record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
+Contract: DESIGN §3 and §5 (time, the sampled loop). Ruled: R13, R14, R104, R105, R123,
+R125, R145, R146, R147 (choices of 2026-10-27, [record](../reviews/2026-10-27-core-vision-decisions.md)); R158, time in the core and
 `SampledSystem` the sampled-data kind (2026-10-28, [record](../reviews/2026-10-28-session-rulings.md)).
 
 No open row: the sampled loop, its two runners and the legacy runtime's removal landed in the
@@ -208,8 +197,7 @@ construction (R163).
 
 ### 1.6 One score
 
-Why: [core-architecture.md](core-architecture.md) §6. Design:
-[differentiable-problem.md](differentiable-problem.md) §9. Ruled: R141, R142, R150, R154, and the
+Contract: DESIGN §6 (the problem evaluator, the step face). Ruled: R141, R142, R150, R154, and the
 three points (R159, 2026-10-28): the sampled check accepted, the run priced to the horizon with
 the input held, a solver's own objective allowed but the score always the problem's cost.
 
@@ -226,21 +214,20 @@ the input held, a solver's own objective allowed but the score always the proble
 
 ### 1.7 The parametric program; the stochastic program its seed case
 
-Why: [core-architecture.md](core-architecture.md) §7. Design:
-[parametric-program.md](parametric-program.md), [native-optimizers.md](native-optimizers.md) §7.
+Design: [native-optimizers.md](native-optimizers.md) §7.
 
 - [ ] **The friction-aware MPC example from a port** (S76's rest; the program with parameters,
   its online binding of every leaf, the performance gate, the failure cost under overrides and
   the stochastic program as the seed case landed in the v0.3 run, and the MPC's `inputs=`
   bindings with its rebuild): an MPC that plans with the latest friction estimate of a port,
   `ModelPredictiveController(planner, inputs={"x_start": "y", "plant.mu": "mu_hat"})`
-  ([parametric-program.md](parametric-program.md)). Done when the example runs as a demo and
+  Done when the example runs as a demo and
   its plan follows a moved `mu_hat` without a recompile.
 
 ### 1.8 The native proof of concept: the planner's pure face and an MPC on it
 
-Why: [core-architecture.md](core-architecture.md) §8. Design:
-[native-optimizers.md](native-optimizers.md), [planner-and-mpc.md](planner-and-mpc.md). Better
+Design: [native-optimizers.md](native-optimizers.md); the face and the MPC's contract are
+DESIGN §6. Better
 solvers are v0.4 (§4); MPPI landed on the face in the night run of 2026-10-29 (its rest is S72).
 
 - [ ] **The compiled face beyond trajectory optimization** (the rest of R148; the face on
@@ -262,19 +249,17 @@ solvers are v0.4 (§4); MPPI landed on the face in the night run of 2026-10-29 (
 
 ### 1.9 Fields
 
-Why: [core-architecture.md](core-architecture.md) §9. Design: [fields.md](fields.md). Baselines
-first.
+Contract: DESIGN §4, "Fields". Baselines first.
 
 No open row: `Field`, `QuadraticField` and the four conversions landed in the v0.3 run
 (acceptance script 7).
 
-The rest of the field plan (steps 4.4–4.7: `GridField`, `CallableField`, `LinearApproximator`
-and `PolicyEvaluator`'s field-shaped result) is a row of §4,
-after the core (R153). Step 4.7, the CBF plan's, is done.
+The rest of the field object (`GridField`, `CallableField`, `LinearApproximator` and
+`PolicyEvaluator`'s field-shaped result) is a row of §4, after the core (R153).
 
 ### 1.10 Hardening and the merge
 
-- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). The plan: [merge-review-run.md](merge-review-run.md). Its six points raised first, ruled 2026-10-31 (R188–R193, [the record](../reviews/2026-10-31-release-review-rulings.md)) and implemented on `dev-v0.3-release-rulings`.
+- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). Its six points raised first, ruled 2026-10-31 (R188–R193, [the record](../reviews/2026-10-31-release-review-rulings.md)) and implemented on `dev-v0.3-release-rulings`.
 
 Landed in the v0.3 runs: wiring mistakes fail at wiring time (S66), DESIGN and ROADMAP §3
 brought up at each step, the showcases on the new API, and compile once in the form the call
@@ -409,15 +394,14 @@ core, §1.3 and §1.5),
 then the P4 follow-ups. P11 and P6 were dropped (2026-10-15, 2026-10-17); TB-b landed with the
 textbook pass.
 
-- [ ] **Automation by convention** (P10) ([automation-by-convention.md](automation-by-convention.md),
-  decided 2026-10-11, amended 2026-10-13 by
+- [ ] **Automation by convention** (P10) (decided 2026-10-11, amended 2026-10-13 by
   [the second-opinion record](../reviews/2026-10-13-automation-by-convention-second-opinion.md)):
   standard port names drive the wiring, three reserved names (`plant`, `controller`,
   `observer`) are the roles every tool reads, and the cost is scored on the plant. Its
-  steps, in build order, are the plan's §7, each with its "done when":
+  steps, in build order:
   - AC-0 no controller classes, AC-2a the resolver, AC-OP the operators, AC-3
     composition on standard names and AC-2b/c the one-time rename and the ports `d` / `n`
-    (all landed 2026-10-13; the MPC's `u_ff` → `u` trails with AC-8a, plan §10). Wave B
+    (all landed 2026-10-13; the MPC's `u_ff` → `u` with AC-8a). Wave B
     of P10 is done.
   - AC-4 the loop inputs and `observer=` (landed 2026-10-14; rulings R18, R19); AC-5
     plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, the v0.3 core
@@ -451,7 +435,8 @@ textbook pass.
 - [ ] **follow-ups** (P4) (design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md)):
   named input ports on the state-space base so observers and sensitivity blocks share one
   `f` (scan: analysis#13); the review of the `observer` role against the real blocks when
-  the EKF lands ([automation-by-convention.md](automation-by-convention.md) §10).
+  the EKF lands (what else a filter gives, a covariance or an innovation; how plots compare
+  the estimate with the plant's state; how Monte Carlo starts x̂0).
 
 ### Wave D — textbook code, minimal demos, consolidation
 
@@ -486,7 +471,7 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   `_total_length` through `object.__setattr__` without declaring them as fields.
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
   method table went with OPW-1, in the v0.3 run.)
-- [ ] **the MPC block's contract** (T6): answered by R148 ([planner-and-mpc.md](planner-and-mpc.md));
+- [ ] **the MPC block's contract** (T6): answered by R148 (DESIGN §6);
   the work is TODO §1.8's "The MPC rebuilt on the planner's face", which removes the `hasattr`
   probing (`validate_mpc_planner`, `export_mpc_dual_rate_computer`'s `replan_divisor` and
   `set_after_solve` checks), `Command` and `MPCTickSolve`. The rebuilt MPC's ports are `u`, `z`, `x_ref` and
@@ -634,8 +619,7 @@ pillar names it.
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
 
-- [ ] **The rest of the field object** **[ask — core]** (A1's steps 4.4–4.8 of
-  [fields.md](fields.md), after the minimal `Field` of §1.9, R133): `GridField(grid, values)`
+- [ ] **The rest of the field object** **[ask — core]** (A1, after the minimal `Field` of §1.9, R133): `GridField(grid, values)`
   (`value(x)` interpolates a `StateSpaceGrid` table with `grid.interpolate`'s `fill_value=0`
   outside, so the DP numbers hold; a leading time axis, the per-sweep tables of
   `record_history=True` / `solve_steps`, gives `value(x, t)`, the finite-horizon `J(x, t)`; a
@@ -667,7 +651,7 @@ pillar names it.
 
 **On the spine.**
 
-- [ ] **The path-integral planner (MPPI), the rest** (S72) (design [mppi.md](mppi.md)). Landed in the
+- [ ] **The path-integral planner (MPPI), the rest** (S72) (contract: DESIGN §6, "Path integral control"). Landed in the
   night run of 2026-10-29: `MPPIPlanner` / `MPPIRecord` on the `minilink.planning` facade
   (`planning/trajectory_optimization/path_integral.py`), its compiled face on
   `RolloutEnvironment` (moved to `planning/environment.py`, R108), the `method` and `seed`
@@ -750,8 +734,7 @@ pillar names it.
   bound for NLP gain tuning. Independent of V1 (needs
   only the jacobian), self-contained for a cloud agent. Done when `jax.grad` of the phase
   margin and of each closed-loop pole of `PID() @ Pendulum()` with respect to a gain and to
-  the mass matches a central difference, and the NumPy callers see no change. Design:
-  [differentiable-problem.md](differentiable-problem.md) §4.6.
+  the mass matches a central difference, and the NumPy callers see no change.
 - [ ] **Native solvers beyond the proof of concept** **[ask — core]** (moved from §6, where it
   was a Later idea; the proof of concept, NS-1, NS-2's fixed-`K` form, NS-8 and NS-9, is §1.8):
   native optimizers, the solve as a rollout (the maintainer's vision, 2026-10-25): native
@@ -869,7 +852,7 @@ after the v0.3 tag (planned for December 2026 when v0.3 had that date); the v1.0
   `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);
   online parameter estimators (recursive least squares, gradient laws) under a role of their
   own. Each revisits the observer conventions of
-  [automation-by-convention.md](automation-by-convention.md) §10.
+  the P4 row (§3).
 - [ ] **The classic first plants** (S71): DC motor, tank / thermal first-order-plus-delay
   process, ball and beam, differential drive, 3-D quadrotor, each with `tf`, a skin and the
   catalog both-backends contract test; LQI beside the `N` matrix of P8. Done when each has a
@@ -955,7 +938,8 @@ One line each; open a plan doc only when a design needs a writeup.
 - The CBF safety filter ([cbf-safety-filter.md](cbf-safety-filter.md)): research lane until a
   course asks; after the minimal `Field` and the workspace geometry (A3).
 - The automatic `d` / `n` plant wrapper of P10, deferred until someone needs it
-  ([automation-by-convention.md](automation-by-convention.md) §10).
+  (`closed_loop`'s `disturbance=` and `noise=` add summing junctions today, so the cost sees
+  `u + d` as the plant's command, a known limit).
 - Vehicle view ports (`pose` / `bodyvel` on `DynamicBicycle` for impedance / PID).
 - **[ask]** Simon's curve speed scaler in the path-tracking project: `PathTracking` in
   `examples/projects/pathtracking/bicycle_los_v2/path_tracking.py` holds `vx_ref` constant;
@@ -973,7 +957,7 @@ One line each; open a plan doc only when a design needs a writeup.
 - Cross-fidelity `lift` / `project` maps on the car ladder (a July 2026 draft, in git history).
 - `RobustPlanningProblem` (set-bounded uncertainty, minimax criterion) only when a minimax
   consumer exists; the path-integral planner's `"worst_case"` branch (CVaR over plant draws,
-  [mppi.md](mppi.md) §4) would be that consumer; the two decisions go together.
+  S72) would be that consumer; the two decisions go together.
 - Diffusion policy (research lane only, JAX-only, after behavior cloning, R136): a sampled
   controller with memory and a seeded draw; see [future-policies.md](future-policies.md).
 - `MjxPlant` (`interfaces/mjx.py`) and `torch` / `flax` model wrappers in `interfaces/`;
