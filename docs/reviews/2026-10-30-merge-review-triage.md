@@ -254,6 +254,11 @@ alternative.
 
 ## 6. One sitting, in order
 
+**Done on 2026-10-30:** the sitting was held and ruled R180–R187
+([the record](2026-10-30-merge-review-rulings.md)); [the plan](../plans/merge-review-run.md)
+implements them, and [the run's log](2026-10-31-merge-review-run-log.md) records how. The
+order below is kept as it was.
+
 1. §1 as a block: three numbers (about 5 minutes).
 2. §2.1 and §2.2, the consolidation's points: eight answers.
 3. §2.3 and §2.4: sixteen answers, most of them yes (items 27–28 new).

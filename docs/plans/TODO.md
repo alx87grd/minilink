@@ -67,7 +67,6 @@ maintainer would and logged in the run's record.
 | Behavior cloning | — | after v1.0 | the game mode and the fitting planner |
 | A plant that owns its noise ports | — | later | the example (R57), then the two noisy plants revisited |
 | Simon's curve speed scaler | — | later | into the path-tracking project, or the cap `v ≤ √(a_y,max / κ)` |
-| Three hand gradient-loop demos | S74 rest | v0.3 (the clean-up lane) | convert all, two, or none |
 | `DynamicBicycle`'s base | S32 | v0.3 (the clean-up lane) | rename `M` → `H` now, the base with K8 |
 | The compile-time flatten default | — | standing | after one benchmark: off, on, or always |
 | Which pyro demos the courses need | C1 | v0.4 | your pick |
@@ -250,16 +249,15 @@ after the core (R153). Step 4.7, the CBF plan's, is done.
 
 ### 1.10 Hardening and the merge
 
-- [ ] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): the step rule from the physics, the evidence the problem evaluator's, the step-problem names off the root, LQR's "U ignored", the gradient demos on `Optimizer`, the closing example, the MPC notebooks' prose, the pipeline map, the Ipopt test. The plan, its order and its done-whens: [merge-review-run.md](merge-review-run.md).
+- [x] **The merge review's rulings, implemented** (R180–R187, the maintainer's sitting of 2026-10-30, [the record](../reviews/2026-10-30-merge-review-rulings.md)): landed 2026-10-31, [the run's log](../reviews/2026-10-31-merge-review-run-log.md) (its decisions M-1… to raise with the maintainer). The plan: [merge-review-run.md](merge-review-run.md).
 
 Landed in the v0.3 runs: wiring mistakes fail at wiring time (S66), DESIGN and ROADMAP §3
 brought up at each step, the showcases on the new API, and compile once in the form the call
 needs (R168). K4 and the hand-loop demos (OD-32) are §2's rows.
 
 - [ ] **The merge** (every notebook moved to the new interface in the v0.3 run, R47):
-  - the maintainer's review of the four runs' decisions, in one sitting:
-    [the triage](../reviews/2026-10-30-merge-review-triage.md) (the number changes, about forty
-    answers, the internal choices as a block);
+  - ~~the maintainer's review of the four runs' decisions, in one sitting~~ (held 2026-10-30,
+    ruled R180–R187, [the triage](../reviews/2026-10-30-merge-review-triage.md));
   - the student-facing numbers re-pinned (notebook outputs, course figures, the pipeline figures
     of `docs/pipeline_figures.py`; the regression baselines moved with each change, §1's gates);
   - `dev-v0.3` into `dev` after that review (R79);
@@ -283,10 +281,7 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   [the record](../reviews/2026-10-23-k1-inventory.md)) as the input; agents update `examples/README.md`'s
   map and the demo checks after each of his changes. Also, an orphan ruling (R65): one demo of
   tabular Q-learning on the pendulum grid beside value iteration, converging toward the DP
-  cost-to-go (GRO860's RL row) **[ask — student-facing]**. Also for this pass, three demos' style
-  (the run's log §7): `pid_autotuning_jax.py` keeps two helpers, prints that carry arithmetic
-  and a hand-made last figure; `diagram_shortcuts.py` labels `NoisyPendulum()` as `Pendulum()`
-  (a wrong label, fixable now); `custom_one_link_arm.py` reads module constants, not `params`.
+  cost-to-go (GRO860's RL row) **[ask — student-facing]**.
 - [ ] **The catalog clean-up** (K8) (ruled 2026-10-22, R2;
   [record](../reviews/2026-10-22-rulings-session-1.md)): two import layers and support by
   test. Steps, one commit each: **K8-0** the car family to three models (R55: `KinematicBicycle`,
@@ -319,13 +314,14 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   R186): `ReinforcementLearningPlanner` sizes its default `NeuralPolicy`
   from `problem.U.bounding_box()` and refuses an unbounded `problem.U` (R21), and
   `StateSpaceGrid.state_bounds` aligns with `input_bounds`.
-- [ ] **S74, the rest** (the method table and the first-order backend landed 2026-10-24): the hand
-  descent loops of `examples/demos/compile/` other than the closing example's first section
-  (`cartpole_rollout_gradients`, `neural_controller_jax`, `params_gradient`) moved onto
-  `Optimizer` **[ask — student-facing]**: each teaches the hand loop today, and R90 kept that
-  loop in two places on purpose; the open-loop schedule needs a source whose samples are
-  parameters first. The options: convert all three; convert two and the schedule demo later
-  (reviewers A and B); keep all three (reviewer C, R90).
+- [ ] **The rest of the catalog declares its time constant** (R180's first scope landed
+  2026-10-31: the linear blocks, the pendulum, the cart-pole, the dynamic bicycle, the racecar,
+  `SlidingMode`): every other catalog plant (the arms and manipulators, the drones, the boats,
+  the mass-spring-damper's nonlinear kin, the oscillators and the three-body set that declare a
+  constant today) a `fastest_mode()` read from its `params`, from its linearization at the
+  nominal point by a closed formula. The kinematic bicycle declares none (a zero spectrum; the
+  run's log, M-8): an input box would give it one. Done when a sweep of the catalog shows no
+  plant on the 1 ms default but the undeclared custom ones.
 
 **GMC714** (R48, 2026-10-23): no new feature; the teaching surface covers every lab (ROADMAP
 §4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this
@@ -596,7 +592,7 @@ pillar names it.
   tables, a per-sweep time axis); `CallableField` (RL critics); `LinearApproximator` as a field;
   `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the field (its
   `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon` handing out
-  `QuadraticField(x̄, S, t)` beside its controller; `PolicyEvaluator` takes the evaluators' verb and returns a
+  `QuadraticField(x̄, S, t)` beside its controller (R185: later, with the fields' consumers); `PolicyEvaluator` takes the evaluators' verb and returns a
   field-shaped result (scan: planning#4). Done when the DP baselines `cmp` and
   `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass.
 
@@ -930,10 +926,9 @@ One line each; open a plan doc only when a design needs a writeup.
   `optimizer_method="auto"` picking Ipopt when installed (scan: examples#11).
 - `LowPassFilter(tau=)`: the shaping filter of the colored-noise recipe parameterized by its
   time constant, beside `cutoff_hz` (randomness.md RD-D23, RN-4).
-- A fixed-step RK4 that samples held sources once per step, so the four stages read one
-  sample and the block route equals the port route (randomness.md RD-A8, RD-D18): fourth order
-  with no boundary error at `dt = Δ`, one draw per step instead of four. Worth it only if a
-  twin test shows the first-order bias.
+- A training run that rebinds its numbers (R182): the RL planner's `params` is a report for
+  v0.3, with no `solve(params=)`; a run that trains on a moved plant or reward, if research needs
+  one.
 - A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
   where diagram params are validated): today a typo or a retired key in any block's params is
   ignored silently; a question for the whole library.
