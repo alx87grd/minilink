@@ -105,6 +105,6 @@ This is consistent with the rule that port bounds are information, not saturatio
 
 The runs used `git archive origin/main` of 2026-09-27 in a clean venv (gymnasium, stable-baselines3, jax[cpu]).
 
-- **Scaled cost.** `QuadraticCost.from_system(plant, xbar=..., Q=c * Q, R=c * R)` with `infeasible_cost=c * PENALTY` on the `PlanningProblem`.
+- **Scaled cost.** `QuadraticCost.from_system(plant, xbar=..., Q=c * Q, R=c * R)` with `failure_cost=c * PENALTY` on the `PlanningProblem`.
 - **Gradient norms.** From `algorithm.loss` on minibatches built exactly as `PPO.update` builds them (`collect.advantages`, `collect.flatten`).
 - **The scripts** lived in a session scratchpad and are not kept. They are about 150 lines and easy to rebuild from this description.
