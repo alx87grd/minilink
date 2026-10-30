@@ -35,9 +35,9 @@ scene for fast RRT contract tests.
 | [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | Thin wrapper → `--suite e4` (capture/compare) |
 | [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
 | [`baselines/*.json`](baselines/) | Committed golden metrics |
-| [`step_model_baseline.py`](step_model_baseline.py) | The step model's before/after check: every sampled consumer's numbers to JSON (no timings, so two captures are byte-identical), `--compare REF.json --rtol` against a capture (AGENTS' refactor recipe) |
-| [`v03_budget.py`](v03_budget.py) | The v0.3 core's budget (acceptance script 9), a report and not a gate: the one score (1000 starts × 200 RK4 steps), the sampled loop (100 starts × 3000 ticks), the native MPC's closed loop (60 ticks × 15 iterations × 20 steps), the parametric solve against the frozen one, a parameter family against the plain batch, each against 2× its bar; `OUT.json` keeps the numbers |
-| [`v03_baseline.py`](v03_baseline.py) | The v0.3 core run's before/after check: the step model's entries plus the sampled loop, the problem evaluator, the draws, the optimizer, RL and the fields, to JSON with no timings; `--compare REF.json [--rtol R]` against [`baselines/v03_core.json`](baselines/v03_core.json) (byte-identical by default) |
+| [`step_model_baseline.py`](step_model_baseline.py) | Captures every sampled consumer of the step model to JSON for a behaviour-preserving refactor check (no timings, so two captures are byte-identical); `--compare REF.json --rtol` against a capture (AGENTS' refactor recipe) |
+| [`v03_budget.py`](v03_budget.py) | The v0.3 core's budget, a report and not a gate: the one score (1000 starts × 200 RK4 steps), the sampled loop (100 starts × 3000 ticks), the native MPC's closed loop (60 ticks × 15 iterations × 20 steps), the parametric solve against the frozen one, a parameter family against the plain batch, each against 2× its bar; `OUT.json` keeps the numbers |
+| [`v03_baseline.py`](v03_baseline.py) | Captures the v0.3 core's numbers to JSON for a behaviour-preserving refactor check: the step model's entries plus the sampled loop, the problem evaluator, the draws, the optimizer, RL and the fields, to JSON with no timings; `--compare REF.json [--rtol R]` against [`baselines/v03_core.json`](baselines/v03_core.json) (byte-identical by default) |
 | [`params_binding.py`](params_binding.py) | Frozen step vs `params` as an argument vs bound parameters, on JAX: the evidence of the step model's parameter binding |
 | [`public_names.py`](public_names.py) | The public-name inventory: every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
 
@@ -91,7 +91,7 @@ Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI*
 | `solve_speed` | [`baselines/solve_speed.json`](baselines/solve_speed.json) | **`Optimizer.solve_s`** on textbook NLPs + **NumPy pendulum trajopt `solve_s`** |
 | `dp_speed` | [`baselines/dp_speed.json`](baselines/dp_speed.json) | Value-iteration **`solve_s`** (numpy table + jax device loop), jax **`speedup`**, and jax-vs-numpy `J` / policy agreement |
 | `e4` | [`baselines/e4_trajopt_parity.json`](baselines/e4_trajopt_parity.json) | TOP rebuild + MPC parametric JAX trajopt trajectories + **`solve_s` / `total_s`** |
-| `f_mpc` | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | MPC hybrid/hand-loop/dual-rate trajectories + **`nlp_s`** (factor **2×** locally) |
+| `f_mpc` | [`baselines/f_mpc_parity.json`](baselines/f_mpc_parity.json) | MPC trajectories (the sampled loop `(mpc % dt) @ plant`, a host loop on the planner's face, dual rate) + **`nlp_s`** (factor **2×** locally) |
 
 **Speed** metrics use a multiplicative factor (default **4×** per baseline JSON, override
 with `--factor` or `MINILINK_BENCH_REGRESSION_FACTOR`). A **4×** ceiling catches a **10×**

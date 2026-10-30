@@ -596,7 +596,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
 
     # The RL environment's discounted return of the same law, on the stage reward
-    # (the score's; its training default −g dt is a modified copy, R171)
+    # (the score's; its training default −g dt is a modified copy)
     env = RolloutEnvironment(problem, dt=dt, backend="numpy", reward="stage")
     x, t, J_env = problem.x_start, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
@@ -606,7 +606,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
 
     # One J, the planner's own score among them (the law held over each period): the
     # environment's on the face's model to the bit; the judge integrates the plant at
-    # the continuous simulator's step, the face in one RK4 step a period (R174)
+    # the continuous simulator's step, the face in one RK4 step a period
     J_planner = float(np.squeeze(solution.evaluation.J))
     assert J_judge == J_planner
     np.testing.assert_allclose(J_env, J_face, rtol=1e-14, atol=0.0)

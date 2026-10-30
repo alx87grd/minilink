@@ -2,7 +2,7 @@
 
 Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) local checkout (2026-06-29).
 
-Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.4 (moved from v0.3 by R48). Open rows plus the landed name map; re-audit against the code before the migration guide.
+Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.4 (moved from v0.3). Open rows plus the landed name map; re-audit against the code before the migration guide.
 
 Status legend: **Done** = equivalent landed · **Partial** = framework exists, gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal
 
@@ -18,7 +18,7 @@ once in the name map at the end. Counts recounted from the tables below on 2026-
 | Library symbols | 105 | 85 | 10 | 4 | 6 |
 | Example scripts | 195 | 29 | 47 | 83 | 36 |
 
-Parity is part of the **v0.4** milestone (moved from v0.3 by R48; [ROADMAP.md §5.4](../dev/ROADMAP.md#5-the-path-to-v10)); v0.1 is GRO860 end to end.
+Parity is part of the **v0.4** milestone (moved from v0.3; [ROADMAP.md §5.4](../dev/ROADMAP.md#5-the-path-to-v10)); v0.1 is GRO860 end to end.
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink
@@ -148,7 +148,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_system/mass_spring_damper/two_mass_with_pid.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/mountain_car/mountain_car_with_valueiteration_quadratic.py` | **Partial** | DP done; plant-specific demo TODO |
 | `demos_by_system/pendulum_double/double_pendulum.py` | **TODO** | Representative closed-loop for pendulum_double |
-| `demos_by_system/pendulum_double/double_pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/pendulum_double/double_pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand |
 | `demos_by_system/pendulum_double/double_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
 | `demos_by_system/pendulum_double/double_pendulum_with_computed_torque.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_computed_torque_and_sinus_ref.py` | **TODO** | control/modelbased.py |
@@ -161,7 +161,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_system/pendulum_double/double_pendulum_with_trajectory_following_sliding_mode_controller.py` | **TODO** | control/modelbased.py |
 | `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
 | `demos_by_system/pendulum_double/double_pendulum_with_trajectory_optimization_and_computed_torque.py` | **TODO** | control/modelbased.py |
-| `demos_by_system/pendulum_simple/pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/pendulum_simple/pendulum_game.py` | **Drop** | sys2game interactive game; ported on demand |
 | `demos_by_system/pendulum_simple/simple_pendulum.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_custom_parameters.py` | **TODO** | Representative closed-loop for pendulum_simple |
 | `demos_by_system/pendulum_simple/simple_pendulum_modes.py` | **Partial** | Use examples/demos/analysis/analysis_modal.py + open-loop sim |
@@ -189,7 +189,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_kinematic_controller.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_load_plan.py` | **TODO** | control/robotic.py + manipulator rebase |
 | `demos_by_system/robot_arm_5dof/fivelinkrobot_with_obstacles_path_planning.py` | **TODO** | control/robotic.py + manipulator rebase |
-| `demos_by_system/rocket/rocket_game.py` | **Drop** | sys2game interactive game; ported on demand (R109) |
+| `demos_by_system/rocket/rocket_game.py` | **Drop** | sys2game interactive game; ported on demand |
 | `demos_by_system/rocket/rocket_landing_with_lqr.py` | **Partial** | Controller exists; plant demo TODO |
 | `demos_by_system/suspension/suspension.py` | **TODO** | Representative closed-loop for suspension |
 
@@ -238,10 +238,10 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `projects/asimov/asimov_endeffector_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_joint_pid_controller.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/asimov/asimov_kinematic_controller.py` | **Drop** | Research/course project; out of library demo scope |
-| `projects/pygame/boat_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
-| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
-| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
-| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it (R109) |
+| `projects/pygame/boat_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it |
+| `projects/pygame/double_pendulum_game.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it |
+| `projects/pygame/test_double_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it |
+| `projects/pygame/test_pendulum_joy.py` | **Drop** | sys2game; ported on `simulation/realtime/` only when a course or behavior cloning needs it |
 | `projects/tmotor_robot/tmotor_robot_controller_simulation_tests.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_backup.py` | **Drop** | Research/course project; out of library demo scope |
 | `projects/ugv/ugv_dubins.py` | **Drop** | Research/course project; out of library demo scope |
@@ -261,8 +261,8 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | --- | --- | --- |
 | Discrete-time / ZOH library | **Done** (2026-10-24) | The exact zero-order hold on `discretize(sys, dt, solver="exact")` (`analysis/discretization.py`), S75's step SM-2 (the contract in DESIGN §5); the z tier itself (Tustin `c2d`, z-plane tools) is not planned, ruled 2026-10-17 |
 | RNN / recurrent blocks | **Drop** | — |
-| Mixed-rate sim (a sampled controller on a continuous plant) | **Done** | the sampled loop (`SampledDiagramSystem`, the `%` operator, `simulation/discrete/clock_runner.py`); R110, 2026-10-25; the v0.3 run |
-| Hybrid events (guards and resets, event-driven switching) | **Drop** | out of scope (ROADMAP §7); R110 |
+| Mixed-rate sim (a sampled controller on a continuous plant) | **Done** | the sampled loop (`SampledDiagramSystem`, the `%` operator, `simulation/discrete/clock_runner.py`); the v0.3 run |
+| Hybrid events (guards and resets, event-driven switching) | **Drop** | out of scope (ROADMAP §7) |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
 | Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |
 | `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + bind() |
@@ -308,7 +308,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | StateObserver | StateObserver; `kalman()` / `luenberger()` replace the `kalman` / `kalman_from_ss` classmethods, pyro's `G=` is the caller's `Q_n = B W Bᵀ` (2026-10-14) | `minilink/estimation/observer.py`, `minilink/estimation/design.py` |
 | ObservedSystem | `lqg(...) @ plant`, the observer + gain box (2026-10-14) | `minilink/control/design.py` |
 | VanderPol | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` |
-| SimpleIntegrator | the `Integrator` block (the plant deleted 2026-10-24, R54) | `minilink/blocks/basic.py` |
+| SimpleIntegrator | the `Integrator` block (the plant deleted 2026-10-24) | `minilink/blocks/basic.py` |
 | DoubleIntegrator | DoubleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
 | TripleIntegrator | TripleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
 | SinglePendulum | Pendulum | `minilink/dynamics/catalog/pendulum/pendulum.py` |

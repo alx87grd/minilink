@@ -15,7 +15,7 @@ lands. Last checked against the code: 2026-10-31.
   are refused as not mechanical.
 - **Workaround:** a fully actuated plant, or the allocation `u = B⁺ τ` in a custom block.
 - **Fix:** the one-mechanical-family work (S32, postponed): a model-based law will refuse an
-  underactuated plant at construction, with a clear message (R102).
+  underactuated plant at construction, with a clear message.
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
@@ -35,7 +35,7 @@ lands. Last checked against the code: 2026-10-31.
 ## Planning and learning
 
 ### `ReinforcementLearningPlanner` sizes its default `NeuralPolicy` from the plant's port bounds instead of `problem.U`
-- **Symptom:** a user subclass of `MechanicalSystem` has unbounded port bounds (`[-inf, inf]`, R68); declaring finite bounds on the problem (`U=BoxInputSet.from_bounds(...)`) and calling `ReinforcementLearningPlanner(problem)` raises `ValueError: NeuralPolicy needs finite bounds on the plant's action port` because `NeuralPolicy` in `control/neural.py` reads `sys.inputs[command_port(sys)].box` instead of `problem.U`. Conversely, omitting `U` on a catalog plant lets `ReinforcementLearningPlanner` scale actions to the plant's port bounds while `problem.U` is unconstrained, and omitting `X` lets `StateSpaceGrid.state_bounds` in `planning/dynamic_programming/discretizer.py` silently fall back to `sys.state.box` (against R21).
+- **Symptom:** a user subclass of `MechanicalSystem` has unbounded port bounds (`[-inf, inf]`); declaring finite bounds on the problem (`U=BoxInputSet.from_bounds(...)`) and calling `ReinforcementLearningPlanner(problem)` raises `ValueError: NeuralPolicy needs finite bounds on the plant's action port` because `NeuralPolicy` in `control/neural.py` reads `sys.inputs[command_port(sys)].box` instead of `problem.U`. Conversely, omitting `U` on a catalog plant lets `ReinforcementLearningPlanner` scale actions to the plant's port bounds while `problem.U` is unconstrained, and omitting `X` lets `StateSpaceGrid.state_bounds` in `planning/dynamic_programming/discretizer.py` silently fall back to `sys.state.box` (against the rule that `X` and `U` are unconstrained unless declared).
 - **Workaround:** set `plant.inputs["u"].lower_bound` and `upper_bound` on custom plants before calling `ReinforcementLearningPlanner`, and pass `X=plant.state.box, U=plant.input_box` explicitly on `PlanningProblem`.
 - **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) §2 (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`).
 

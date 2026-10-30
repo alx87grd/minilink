@@ -2,9 +2,7 @@
 
 **Status:** ideas to review, not decided — options and a recommendation, 2026-10-20. The
 package question (A) is settled: `minilink.planning` regrouped by pillar and reinforcement
-learning moved to `minilink.learning` (R66, 2026-10-23), the `identification/` stub removed
-(R67), and the package folders restructured on 2026-10-24 (the run log
-[2026-10-24-v03-run-decisions.md](../reviews/2026-10-24-v03-run-decisions.md) §10). Still open,
+learning moved to `minilink.learning`, the `identification/` stub removed, and the package folders restructured on 2026-10-24. Still open,
 and maintainer-owned: the examples tree (B, §3) and where the course material lives (C, §4).  
 **Lane:** maintainer-owned (student-facing paths and public names; AGENTS.md "Ask first").  
 **Rung:** serves the decision "Where the course material and the projects live"
@@ -42,11 +40,11 @@ textbook chapter, or flatten to literal bands) was reopened by the maintainer on
 and settled by pillar. `minilink.planning` keeps the problem and its solutions with
 `dynamic_programming/`, `trajectory_optimization/` (MPC moved in from `control/`) and
 `search/`; reinforcement learning moved to `minilink.learning`, the home of identification
-and imitation when they land (R66); the `identification/` stub was deleted (R67); the
-catalog is `minilink.catalog`, the flat index of tested plants (R2, step K8);
+and imitation when they land; the `identification/` stub was deleted; the
+catalog is `minilink.catalog`, the flat index of tested plants (step K8);
 `planning/spatial/` goes to `core/geometry/` with step A3
 ([geometry-module.md](geometry-module.md)). The hot spots were split on 2026-10-24
-(`composition.py`, `engine.py`, `facades.py`, the discrete-time pieces; the run log §10).
+(`composition.py`, `engine.py`, `facades.py`, the discrete-time pieces).
 DESIGN §3 is the package map.
 
 ## 3. The examples tree (B)
@@ -111,7 +109,7 @@ on it"); the course axis belongs in `courses/<id>/` and nowhere else.
 `examples/README.md`; (2) move `demos/<chapter>/` and `teaching/topics/` into the chapters,
 one commit per chapter, `git mv`; (3) leave `courses/` paths untouched (the GRO860 freeze);
 (4) `projects/` under `research/` (the prototype scripts already left `examples/` for the
-top-level `experimental/` folder, R3). B1's renames are a fallback that
+top-level `experimental/` folder). B1's renames are a fallback that
 keeps the option open if B2 has to wait a term.
 
 ## 4. Where the teaching material lives (C)
@@ -171,11 +169,11 @@ research material is a separate call (§6, ask 3).
 1. **The chapter list** for B2: the twelve tutorial chapters as the spine, and a home for
    `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder (a chapter each, or
    folded into `05_simulation`, `09_planning`, `02_dynamics`).
-2. **The pin form** for C3, ruled 2026-10-25 (R113): `git clone -b v<tag>` (keeps the
+2. **The pin form** for C3, ruled 2026-10-25: `git clone -b v<tag>` (keeps the
    notebooks' relative imports of the examples tree), not `pip install minilink==<tag>`.
 3. **`projects/`**: research material that stays (`research/projects/`), or course material
    that moves with the course repo at v1.0.
 
-When the maintainer rules, the ruling goes to a dated record under
-[../reviews/](../reviews/) and the steps to [TODO.md](TODO.md); the row then
-records it (one fact, one home: [README.md](README.md)).
+When the maintainer rules, the ruling updates this doc and the steps go to
+[TODO.md](TODO.md) in the same change; the commit message carries its why (one fact, one
+home: [README.md](README.md)).
