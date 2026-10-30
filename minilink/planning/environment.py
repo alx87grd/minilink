@@ -207,6 +207,7 @@ class RolloutEnvironment:
         X = self.X
         U = self.U
         zone = self.training_zone
+        failure_cost = self.failure_cost
         X_params = (params or {}).get("X", self.set_params)
         U_params = self.set_params
         tree = self.episode_tree(params)
@@ -244,7 +245,7 @@ class RolloutEnvironment:
         # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
         # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
-        reward = reward - xp.where(failed, self.failure_cost, 0.0)
+        reward = reward - xp.where(failed, failure_cost, 0.0)
         if finite_horizon:
             h_N = face.terminal(x_next, t_next, tree)
             reward = reward - horizon_reached * gamma * h_N
