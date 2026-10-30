@@ -2,13 +2,10 @@
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
-import numpy as np
+from jax.flatten_util import ravel_pytree
 
-from minilink import DiagramSystem, Integrator, Mux
+from minilink import DiagramSystem, Integrator, MathematicalProgram, Mux, Optimizer
 from minilink.blocks import MLP
-from minilink.graphical.common.environment import is_blocking_needed
-from minilink.graphical.common.matplotlib_style import DPI_FIGURE
 
 # Part 1: build a neural closed-loop controller
 plant = Integrator()
@@ -27,11 +24,7 @@ diagram.connect("mux", "y", "nn", "u")
 diagram.connect("nn", "y", "plant", "u")
 diagram.connect_new_output_port("plant", "y", "y")
 
-diagram.plot_diagram()
-
 plant.x0[0] = 2.0
-diagram.compute_trajectory()
-diagram.plot_trajectory()
 
 evaluator = diagram.compile(backend="jax")
 f = evaluator.f
@@ -76,84 +69,22 @@ def batch_loss(nn_params):
     return jnp.mean(losses) + 1e-8 * l2_norm(nn_params)
 
 
-loss_and_grad = jax.jit(jax.value_and_grad(batch_loss))
+# The network's weights as one decision vector z, and the loss as its program
 nn_params = {key: jnp.asarray(value) for key, value in controller.params.items()}
-initial_params = jax.tree_util.tree_map(lambda param: param.copy(), nn_params)
-
-learning_rate = 0.8
-
-initial_loss = batch_loss(nn_params)
-
-print(f"{'iter':>6} {'loss':>12}")
-for i in range(10000):
-    value, grad = loss_and_grad(nn_params)
-    if i % 1000 == 0:
-        print(f"{i:>6} {float(value):>12.5f}")
-    nn_params = jax.tree_util.tree_map(
-        lambda param, dparam: param - learning_rate * dparam,
-        nn_params,
-        grad,
-    )
-
-final_loss = batch_loss(nn_params)
-learned_params = {key: jax.device_get(value) for key, value in nn_params.items()}
-
-print(f"batch loss: {float(initial_loss):.5f} -> {float(final_loss):.5f}")
-
-assert final_loss < initial_loss, "training did not reduce the batched rollout loss"
-
-
-# Part 3: the control law u = f(r, y) before and after training
-
-R_MIN, R_MAX = -0.5, 1.0
-Y_MIN, Y_MAX = -3.0, 3.0
-
-# The generic port-map tool replaces the hand-rolled jit/vmap surface sweep:
-# params= evaluates alternative weights, ax= draws side by side.
-controller.inputs["u"].labels = [r"$r$ (reference)", r"$y$ (plant output)"]
-
-
-def surface_max(nn_p):
-    return max(
-        abs(float(controller.compute([], np.array([r, y]), params=nn_p)[0]))
-        for r in np.linspace(R_MIN, R_MAX, 15)
-        for y in np.linspace(Y_MIN, Y_MAX, 15)
-    )
-
-
-u_lim = max(surface_max(jax.device_get(initial_params)), surface_max(learned_params))
-
-fig, axes = plt.subplots(
-    1,
-    2,
-    figsize=(10.0, 4.2),
-    dpi=DPI_FIGURE,
-    sharey=True,
-    constrained_layout=True,
+z0, weights_of = ravel_pytree(nn_params)
+program = MathematicalProgram(
+    n_z=z0.size, J=lambda z: batch_loss(weights_of(z)), backend="jax"
 )
-for ax, nn_p, title in zip(
-    axes,
-    (jax.device_get(initial_params), learned_params),
-    ("Before training", "After training"),
-):
-    controller.plot_input_output_map(
-        x_axis=0,
-        y_axis=1,
-        bounds=((R_MIN, R_MAX), (Y_MIN, Y_MAX)),
-        params=nn_p,
-        cmap="RdBu_r",
-        vmin=-u_lim,
-        vmax=u_lim,
-        title=title,
-        ax=ax,
-        show=False,
-    )
-    for r_train in np.unique(np.asarray(r_batch)):
-        ax.axvline(float(r_train), color="k", ls="--", lw=0.8, alpha=0.7)
-plt.show(block=is_blocking_needed())
+result = Optimizer(
+    program, z0=z0, method="gd", iterations=10000, options={"learning_rate": 0.8}
+).solve()
+print(result)
+
+assert result.cost < batch_loss(nn_params), "training did not reduce the loss"
 
 
-# Part 4: simulate with the learned controller
+# Part 3: simulate with the learned controller
+learned_params = jax.device_get(weights_of(result.z))
 diagram.params = {**diagram.params, "nn": learned_params}
 diagram.compute_trajectory()
 diagram.plot_trajectory()

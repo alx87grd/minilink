@@ -4,7 +4,13 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from minilink import DiagramSystem, DynamicSystem, System
+from minilink import (
+    DiagramSystem,
+    DynamicSystem,
+    MathematicalProgram,
+    Optimizer,
+    System,
+)
 from minilink.core.backends import array_module
 
 
@@ -114,25 +120,10 @@ def loss(theta):
     return jnp.mean((dx_hat - dxs) ** 2)
 
 
-loss_and_grad = jax.jit(jax.value_and_grad(loss))
+program = MathematicalProgram(n_z=2, J=loss, backend="jax")
+result = Optimizer(program, z0=jnp.array([7.0, 1.0]), method="l-bfgs").solve()
+print(result)  # z* = (gravity, damping), from the guess (7.0, 1.0); true (9.81, 0.20)
 
-theta = jnp.array([7.0, 1.0])  # initial guess: gravity=7.0, d=1.0
-learning_rate = 2.0
-
-print(f"{'iter':>6} {'loss':>14} {'gravity':>10} {'damping':>10}")
-for i in range(151):
-    value, grad = loss_and_grad(theta)
-    if i % 25 == 0:
-        print(
-            f"{i:>6} {float(value):>14.3e} {float(theta[0]):>10.4f} "
-            f"{float(theta[1]):>10.4f}"
-        )
-    theta = theta - learning_rate * grad
-
-print()
-print(f"Identified gravity = {float(theta[0]):.4f}  (true: 9.81)")
-print(f"Identified damping = {float(theta[1]):.4f}  (true: 0.20)")
-
+theta = result.z
 assert abs(float(theta[0]) - 9.81) < 1e-2, "gravity did not converge"
 assert abs(float(theta[1]) - 0.20) < 1e-2, "damping did not converge"
-print("Identification converged.")
