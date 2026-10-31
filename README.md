@@ -41,10 +41,9 @@
   </tr>
 </table>
 
-Minilink is an open-source Python framework for dynamical systems, control, and optimization.
-Engineers, students, and researchers write a physical model once as a continuous `DynamicSystem`.
-The same model powers simulation, classical and modern control, optimal control (MPC, MPPI, etc.), machine learning (neural nets, reinforcement learning), and parameter optimization.
-NumPy and SciPy provide a zero-friction default for courses; the identical equations compile, batch, and differentiate under JAX for high performance.
+Minilink is an open-source Python framework for dynamical systems, control, optimization, and learning.
+Write a physical model once in pure textbook ODE equations as the core object in Minilink: a System. Compose models and blocks into complex block diagrams, which are also just new Systems. This unified System is the standard interface to all tools: classical and modern control, optimal control (MPC, MPPI), machine learning (neural networks, reinforcement learning), and parameter optimization.
+All core equation paths are pure functions—arrays in, arrays out—allowing the exact same code to work with either a minimalist NumPy/SciPy/Matplotlib setup or a high-performance JAX backend to compile, batch, and autodifferentiate the same equations.
 
 ---
 
