@@ -38,6 +38,7 @@ sentence: the plain title comes first.
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
+| [tutorials.md](tutorials.md) | **Draft.** The tutorials in three layers (basics, core, advanced), most important first; the audit of the 15 current notebooks, what each new one holds and absorbs, the order | proposed new v0.4 |
 | [minimal-surface.md](minimal-surface.md) | **Draft, decisions open.** Demos, notebooks, tests and CI redrafted on the v0.3 core: the audit, seven decisions with options (D1–D7), the order | proposed new v0.4 |
 | [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.4 (the proof of concept landed in v0.3) |
 | [future-policies.md](future-policies.md) | The API projected onto MPPI, behavior cloning and diffusion policy; the seeded policy (D29, §5.1); questions for discussion (§7) | after v1.0 |
