@@ -65,16 +65,32 @@ course notebook breaks a student's link unless the PDF changes with it.
 
 ### D2. The test layers
 
-Proposed, each with one job and one budget:
+**Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder
+per layer; two are essential, the contract and the textbook math. What the other kinds
+become is open below.
 
-| Layer | What | When | Budget |
-| --- | --- | --- | --- |
-| Checks | ruff, the repository tests (textbook style, repo contract, public names, imports, packaging) | every change | < 1 min |
-| Unit | the library, JAX installed (JAX is part of the core) | every change | < 5 min |
-| Acceptance | the core's end-to-end scripts (`test_v03_core.py`), one smoke run of each kept demo | every pull request | < 10 min |
-| Nightly | notebooks, regression and speed gates, Python 3.10–3.13, macOS, Windows | nightly | unbounded |
+| Layer | The question it answers | Status |
+| --- | --- | --- |
+| `tests/contract/` | Does every public object build, wire and run: each catalog plant, block, law, planner, solver, its ports and its `params`? | **essential** |
+| `tests/math/` | Are the numbers right against a textbook worked example or a closed form: Riccati and LQR gains, an RK4 convergence order, a known optimum, a value-iteration fixed point, a Kalman covariance? | **essential** |
+| Backend parity | Does NumPy equal JAX, and does a gradient exist through a loop, a planner, a solver? | open (D2a) |
+| Composition | Do the pieces work together: diagrams, sampled loops, problem → evaluator → optimizer? | open (D2b) |
+| Examples | Do the kept demos and the course notebooks run? | open (D2c) |
+| Repo rules | Textbook style, prose, public names, imports, packaging | open (D2d) |
 
-**Answer:**
+- **D2a. Backend parity.** A. one clause of the contract (each object also runs on JAX, its
+  outputs equal to NumPy's on one input); B. its own layer; C. none beyond what the math
+  layer runs on both backends. *Agent:* A. **Answer:**
+- **D2b. Composition.** A. the core's end-to-end scripts only (`test_v03_core.py`, a dozen
+  cases) as a third layer; B. inside the contract (a composition is a public object);
+  C. none, the demos show it. *Agent:* A. **Answer:**
+- **D2c. Examples.** A. a runner, outside pytest, nightly and before a release; B. inside
+  pytest; C. none in CI, the maintainer runs them. *Agent:* A. **Answer:**
+- **D2d. Repo rules.** A. a pre-commit and CI check outside pytest (seconds); B. a test
+  layer; C. drop the ones nobody acts on. *Agent:* A, with C for any rule the maintainer
+  does not want enforced. **Answer:**
+- **D2e. When each runs.** *Agent's proposal:* contract and repo rules on every change, math
+  and composition on every pull request, examples nightly and before a release. **Answer:**
 
 ### D3. CI shape
 
@@ -156,13 +172,14 @@ ROADMAP §1 is the maintainer's. **Answer:**
 5. Benchmarks (D6), docs (README, `examples/README.md`, `tests/README.md`, DESIGN's package
    map), the release.
 
-## 5. The test files, by proposed layer
+## 5. The test files, by layer
 
-For D1 = B or C. **Checks:** `test_textbook_style`, `test_repo_contract`,
-`test_public_names`, `test_public_imports`, `test_teaching_imports`, `test_teaching_surface`,
-`test_packaging`, `test_inspect`. **Acceptance:** `test_v03_core`, `test_demo_check_runners`
-(reduced to the kept demos), `test_flagship_graphics_contract`. **Delete with their subject:**
-`test_benchmark_helpers` (with D6), the pyro-port cases inside `test_mechanical_robotics` and
-`test_dynamics_catalog` (with the catalog clean-up). **Unit:** every other file; the ~40
-slowest cases (over 4 s each, listed by `pytest --durations=40`) move to Acceptance or
-Nightly.
+To be written once D1 and D2a–D2e are answered: each of the 67 files of `tests/unittest/`
+sorted case by case into contract, math, the open layers, or deletion. The obvious ones:
+**repo rules** `test_textbook_style`, `test_repo_contract`, `test_public_names`,
+`test_public_imports`, `test_teaching_imports`, `test_teaching_surface`, `test_packaging`;
+**composition** `test_v03_core`, `test_loop_grammar`, `test_sampled_loop`; **contract**
+`test_contract`, `test_catalog_backends`, `test_blocks`; **deleted with their subject**
+`test_benchmark_helpers` (D6), `test_demo_check_runners` (D2c), the pyro-port cases inside
+`test_mechanical_robotics` and `test_dynamics_catalog`. The ~40 slowest cases (over 4 s,
+`pytest --durations=40`) are flagged in the sort.
