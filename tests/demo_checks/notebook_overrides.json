@@ -19,33 +19,64 @@
     ],
     "timeout": 300
   },
-  "examples/tutorial/06_hybrid.ipynb": {
+  "examples/tutorial/basics/01_minilink.ipynb": {
     "requires": [
-      "graphviz"
+      "plotly"
     ]
   },
-  "examples/tutorial/07_compile.ipynb": {
+  "examples/tutorial/basics/03_plan_and_sample.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/09_planning.ipynb": {
-    "timeout": 300
-  },
-  "examples/tutorial/11_reinforcement_learning.ipynb": {
+  "examples/tutorial/core/02_parameters.ipynb": {
     "requires": [
       "jax"
     ]
   },
-  "examples/tutorial/10_graphical.ipynb": {
+  "examples/tutorial/core/04_costs.ipynb": {
     "requires": [
-      "meshcat",
-      "plotly"
+      "jax"
     ]
   },
-  "examples/tutorial/04_analysis.ipynb": {
+  "examples/tutorial/core/05_problem.ipynb": {
     "requires": [
-      "plotly"
+      "jax"
+    ]
+  },
+  "examples/tutorial/core/06_compile_and_evaluate.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/core/07_program.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/core/08_planners.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/advanced/02_optimal_control.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/advanced/03_mpc_and_mppi.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/advanced/04_reinforcement_learning.ipynb": {
+    "requires": [
+      "jax"
+    ]
+  },
+  "examples/tutorial/advanced/05_differentiable.ipynb": {
+    "requires": [
+      "jax"
     ]
   },
   "examples/teaching/topics/optimal_control/cartpole_rollout_gradients.ipynb": {

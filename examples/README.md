@@ -12,7 +12,7 @@ Start in Colab:
 ```
 examples/
   # --- Teaching Lane (Pedagogical contract: curated, canonical, CI-checked) ---
-  tutorial/                    # Numbered minilink API walk: 00_core … 11_reinforcement_learning + showcases
+  tutorial/                    # basics/ (students), core/ (the foundation), advanced/ (tools) + showcases
   teaching/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
@@ -85,18 +85,35 @@ folders on GitHub, then open a notebook badge.
 | [showcase_minilink](tutorial/showcase_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) |
 | [showcase_jax](tutorial/showcase_jax.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb) |
 | [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) |
-| [00_core](tutorial/00_core.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/00_core.ipynb) |
-| [01_blocks](tutorial/01_blocks.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/01_blocks.ipynb) |
-| [02_dynamics](tutorial/02_dynamics.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/02_dynamics.ipynb) |
-| [03_control](tutorial/03_control.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/03_control.ipynb) |
-| [04_analysis](tutorial/04_analysis.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/04_analysis.ipynb) |
-| [05_simulation](tutorial/05_simulation.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/05_simulation.ipynb) |
-| [06_hybrid](tutorial/06_hybrid.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/06_hybrid.ipynb) |
-| [07_compile](tutorial/07_compile.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/07_compile.ipynb) |
-| [08_optimization](tutorial/08_optimization.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/08_optimization.ipynb) |
-| [09_planning](tutorial/09_planning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/09_planning.ipynb) |
-| [10_graphical](tutorial/10_graphical.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/10_graphical.ipynb) |
-| [11_reinforcement_learning](tutorial/11_reinforcement_learning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/11_reinforcement_learning.ipynb) |
+
+#### Basics — students: model, connect, simulate first; each notebook one step deeper
+
+| Notebook | Colab |
+| --- | --- |
+| [01_minilink](tutorial/basics/01_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/basics/01_minilink.ipynb) |
+| [02_analyze_and_control](tutorial/basics/02_analyze_and_control.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/basics/02_analyze_and_control.ipynb) |
+| [03_plan_and_sample](tutorial/basics/03_plan_and_sample.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/basics/03_plan_and_sample.ipynb) |
+#### Core — the foundation and the pipeline: systems, parameters, sets, fields, distributions, costs, the problem, compile and evaluate, programs, planners
+
+| Notebook | Colab |
+| --- | --- |
+| [01_systems](tutorial/core/01_systems.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/01_systems.ipynb) |
+| [02_parameters](tutorial/core/02_parameters.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/02_parameters.ipynb) |
+| [03_sets_fields_distributions](tutorial/core/03_sets_fields_distributions.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/03_sets_fields_distributions.ipynb) |
+| [04_costs](tutorial/core/04_costs.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/04_costs.ipynb) |
+| [05_problem](tutorial/core/05_problem.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/05_problem.ipynb) |
+| [06_compile_and_evaluate](tutorial/core/06_compile_and_evaluate.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/06_compile_and_evaluate.ipynb) |
+| [07_program](tutorial/core/07_program.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/07_program.ipynb) |
+| [08_planners](tutorial/core/08_planners.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/core/08_planners.ipynb) |
+#### Advanced — tools: discrete and hybrid loops, optimal control, MPC and MPPI, reinforcement learning, differentiable loops
+
+| Notebook | Colab |
+| --- | --- |
+| [01_discrete_and_hybrid](tutorial/advanced/01_discrete_and_hybrid.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/advanced/01_discrete_and_hybrid.ipynb) |
+| [02_optimal_control](tutorial/advanced/02_optimal_control.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/advanced/02_optimal_control.ipynb) |
+| [03_mpc_and_mppi](tutorial/advanced/03_mpc_and_mppi.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/advanced/03_mpc_and_mppi.ipynb) |
+| [04_reinforcement_learning](tutorial/advanced/04_reinforcement_learning.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/advanced/04_reinforcement_learning.ipynb) |
+| [05_differentiable](tutorial/advanced/05_differentiable.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/advanced/05_differentiable.ipynb) |
 
 ### Teaching — topics
 

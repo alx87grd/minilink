@@ -302,7 +302,7 @@ import sys; sys.path.insert(0, "/content/minilink")
 - [Showcase Notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) — the complete tool ladder demonstrated on real plants.
 - [JAX Showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb) — write $f$ once, get exact derivatives and batched GPU rollouts.
 - [From RL to Bode Showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) — 6-axis robot, impedance loop, neural policy, and frequency response.
-- [Tutorial Series 00–11](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) — 12 guided notebooks covering core dynamics through reinforcement learning.
+- [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) — three layers: `basics/` (model, connect, simulate; start with `01_minilink`), `core/` (the foundation objects and the problem pipeline), `advanced/` (discrete and hybrid loops, optimal control, MPC, RL, differentiable loops).
 - [Teaching Notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching) — swing-up control, dynamic programming, and PPO.
 
 Minilink is the successor of [pyro](https://github.com/SherbyRobotics/pyro).

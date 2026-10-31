@@ -465,7 +465,7 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   Also: teaching code stops rebinding `sys` (scan: examples#7); one owner for the
   teaching-facade list the two teaching tests share (scan: tests-ci#7).
 - [ ] **The sweep** (D1.3), one file per step, maintainer reviews each diff **[ask per file]**:
-  the tutorial chapters (`11_reinforcement_learning.ipynb` and `showcase_jax.ipynb` first;
+  the showcases (`showcase_jax.ipynb` first;
   `showcase_jax` rewritten, awaiting review), then the non-clean demos, then the teaching
   notebooks; the three `compile/` demos wait for V1 (their helpers *are* that feature). Done when
   the D1.2 allowlist is empty and the notebook checks pass.
@@ -665,7 +665,7 @@ pillar names it.
     courses still need is the maintainer's pick (of pyro's 195 example scripts: 29 done, 47
     partial, 83 to do, 36 dropped).
   - [ ] **Modelling ladder** (C2): manipulators + the four-rung vehicle ladder as a
-    `02_dynamics` tutorial lesson (not a GMC714 lab); robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
+    tutorial lesson (not a GMC714 lab); robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
     Also: one constructor contract for the robotic laws (scan: control#6).
   - [ ] **Blocks** (C3): `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `UnitDelay` take
     a `dim` like every static block (scan: graphics#11).

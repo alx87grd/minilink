@@ -196,17 +196,6 @@ class TestDemoCheckManifests(unittest.TestCase):
                     [row] = flagship_runner.run_flagship_demos(demo_filter=demo_id)
                     self.assertEqual(row.status, "skip")
 
-    def test_hybrid_diagram_notebook_skips_without_graphviz(self):
-        """``06_hybrid`` calls ``hybrid.plot_diagram()`` too."""
-        execute = mock.patch.object(
-            notebook_runner, "_execute_notebook", return_value=("pass", "")
-        )
-        with _without_graphviz(), execute:
-            [row] = notebook_runner.run_notebook_checks(
-                notebook_filter="tutorial_06_hybrid"
-            )
-        self.assertEqual(row.status, "skip")
-
     def test_notebook_ids_are_unique(self):
         ids = notebook_runner.notebook_ids(notebook_runner._discover_notebooks())
         repeated = sorted(
@@ -217,7 +206,9 @@ class TestDemoCheckManifests(unittest.TestCase):
         self.assertEqual(
             ids["examples/tutorial/showcase_minilink.ipynb"], "showcase_minilink"
         )
-        self.assertEqual(ids["examples/tutorial/00_core.ipynb"], "tutorial_00_core")
+        self.assertEqual(
+            ids["examples/tutorial/basics/01_minilink.ipynb"], "tutorial_01_minilink"
+        )
 
     def test_unknown_ids_are_cli_errors(self):
         """A stale ``--demo`` or ``--notebook`` id fails and names the close ids."""
@@ -231,7 +222,11 @@ class TestDemoCheckManifests(unittest.TestCase):
                     "teaching_topics_reinforcement_learning_drone_ppo",
                 ],
             ),
-            (notebook_runner, ["--notebook", "intro_00_core"], ["tutorial_00_core"]),
+            (
+                notebook_runner,
+                ["--notebook", "intro_01_minilink"],
+                ["tutorial_01_minilink"],
+            ),
         )
         for runner, argv, close_ids in cases:
             with self.subTest(argv=argv):

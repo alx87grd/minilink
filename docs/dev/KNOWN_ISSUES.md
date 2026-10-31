@@ -39,6 +39,30 @@ lands. Last checked against the code: 2026-10-31.
 - **Workaround:** set `plant.inputs["u"].lower_bound` and `upper_bound` on custom plants before calling `ReinforcementLearningPlanner`, and pass `X=plant.state.box, U=plant.input_box` explicitly on `PlanningProblem`.
 - **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) §2 (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`).
 
+### A value-iteration policy overshoots the input bound by rounding
+- **Symptom:** a `DynamicProgrammingPlanner` policy (`LookupPolicy`) interpolates grid
+  corners that all sit at the torque limit and returns `u = u_max + 1e-15`; scored on a
+  problem with `U`, the run reports "failed" with a feasibility margin of about -9e-16.
+- **Workaround:** read the margin, not the flag, or score the policy on the problem without
+  `U`.
+- **Fix:** none planned yet (clip the interpolated command to the grid's input box).
+
+### A Gaussian start leaves `X0` at the system's `x0`
+- **Symptom:** `PlanningProblem(sys, x_start=Gaussian(...))` keeps `X0` as the singleton at
+  `sys.x0` (a Gaussian has no support to take it from); `replace(x_start=law)` also keeps
+  the old `X0`.
+- **Workaround:** give `X0` explicitly, or use a `Uniform` start.
+- **Fix:** none planned yet.
+
+### Direct collocation fails on a ball-shaped goal set
+- **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
+  problem whose `Xf` is a `BallSet` stops with SLSQP's "Inequality constraints
+  incompatible"; a point `Xf` solves. A failed solve still returns its initial guess as an
+  open-loop policy, and `compare` scores it like a solution.
+- **Workaround:** `problem.replace(Xf=SingletonSet(x_goal))` for the trajectory optimizer;
+  check `solution.success` before comparing.
+- **Fix:** none planned yet.
+
 ## Tooling
 
 ### The RL-to-Bode showcase notebook runs close to the notebook checker's time limit

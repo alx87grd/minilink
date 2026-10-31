@@ -53,7 +53,7 @@ DESIGN §3 is the package map.
 
 | Folder | Content |
 | --- | --- |
-| `tutorial/` | 12 numbered API chapters (`00_core` … `11_reinforcement_learning`) + 3 showcases |
+| `tutorial/` | three layers, `basics/` (3), `core/` (8), `advanced/` (5), + 3 showcases |
 | `teaching/topics/<domain>/` | 7 notebooks in four domains |
 | `teaching/courses/udes_gro860/`, `udes_gro501/` | 14 + 6 notebooks, cited by the course documents |
 | `demos/<chapter>/` | scripts in 17 chapters: the package names plus `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `udes_racecar` |
@@ -166,9 +166,9 @@ research material is a separate call (§6, ask 3).
 
 ## 6. The asks
 
-1. **The chapter list** for B2: the twelve tutorial chapters as the spine, and a home for
-   `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder (a chapter each, or
-   folded into `05_simulation`, `09_planning`, `02_dynamics`).
+1. **The chapter list** for B2: the three tutorial layers as the spine, and a home for
+   `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder (a notebook each, or
+   folded into the existing layers).
 2. **The pin form** for C3, ruled 2026-10-25: `git clone -b v<tag>` (keeps the
    notebooks' relative imports of the examples tree), not `pip install minilink==<tag>`.
 3. **`projects/`**: research material that stays (`research/projects/`), or course material

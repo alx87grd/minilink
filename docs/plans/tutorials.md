@@ -1,6 +1,6 @@
 # Tutorials in three layers: basics, core, advanced
 
-**Status:** draft for the maintainer's review; nothing written or deleted yet.
+**Status:** implemented on `tutorials-three-layers` (16 notebooks, the 12 numbered chapters deleted), awaiting the maintainer's review.
 
 ## Context
 

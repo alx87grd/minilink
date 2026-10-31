@@ -216,7 +216,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--notebook",
         default=None,
-        help="Run one notebook id (e.g. showcase_minilink, tutorial_00_core)",
+        help="Run one notebook id (e.g. showcase_minilink, tutorial_01_minilink)",
     )
     parser.add_argument(
         "--timeout",
