@@ -255,7 +255,7 @@ from minilink import Gaussian
 
 g = Gaussian([0.0, 0.0], std=[0.1, 0.2])
 g.with_params({"mean": [1.0, 0.0]})
-# ValueError: Gaussian needs std or cov.
+# ValueError: Gaussian takes one spread: std= (diagonal) or cov= (full)
 ```
 
 #### Why it is worth doing & design/rule evolution
