@@ -58,7 +58,7 @@ planner = ReinforcementLearningPlanner(
     dt=DT,
     features=features,
     hidden=(32, 32),
-    algorithm="ppo",
+    method="ppo",
     n_envs=64,
     n_steps=32,
     batch_size=256,
@@ -66,7 +66,7 @@ planner = ReinforcementLearningPlanner(
     gamma=0.97,
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(solution.solver)
+print(solution.record)
 planner.plot_learning_curve()
 
 # The learned law is a controller block: draw it, score it, close the loop

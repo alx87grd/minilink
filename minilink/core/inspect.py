@@ -287,7 +287,7 @@ def solution_text(solution):
             "cost_to_go",
             "yes" if solution.cost_to_go is not None else "no",
         ),
-        body_line("solver", str(solution.solver)),
+        body_line("record", str(solution.record)),
     ]
 
     return format_inspect(headline, body)

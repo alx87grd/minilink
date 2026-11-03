@@ -38,7 +38,7 @@ class PlanningSolution:
         :class:`~minilink.blocks.sources.TrajectorySource`, ``policy >> plant``
         drives the plant; a finite-horizon design is feedback in time,
         ``u = pi(x, t)``.
-    solver : record
+    record : record
         The planner's account of the solve, one dataclass per planner
         (``TrajectoryOptimizationRecord``, ``TreeSearchRecord``,
         ``ValueIterationRecord``, ``TabularLearningRecord``,
@@ -65,15 +65,15 @@ class PlanningSolution:
 
     problem: PlanningProblem
     policy: System
-    solver: object
+    record: object
     trajectory: Trajectory | None
     evaluation: Evaluation | None
     cost_to_go: Callable | None = None
 
     @property
     def success(self) -> bool:
-        """The solver record's own success: feasible, converged, goal reached, finite weights, stable."""
-        return bool(self.solver.success)
+        """The record's own success: feasible, converged, goal reached, finite weights, stable."""
+        return bool(self.record.success)
 
     @property
     def open_loop(self) -> bool:
@@ -82,9 +82,9 @@ class PlanningSolution:
 
     @property
     def method(self) -> str:
-        """The planning method, read from the solver record (``"value iteration"``, ``"riccati"``, ...)."""
+        """The planning method, read from the record (``"value iteration"``, ``"riccati"``, ...)."""
         # The record's class name without its suffix, one lowercase word per capital
-        name = type(self.solver).__name__.removesuffix("Record")
+        name = type(self.record).__name__.removesuffix("Record")
 
         return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
 

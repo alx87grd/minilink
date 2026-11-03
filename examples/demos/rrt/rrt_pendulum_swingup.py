@@ -29,7 +29,7 @@ planner = RRTPlanner(
     options=RRTOptions(seed=0, goal_bias=0.05, max_nodes=20000),
 )
 solution = planner.solve()
-print(solution.solver)
+print(solution.record)
 
 planner.plot_tree(x_axis=0, y_axis=1)
 planner.animate_search(x_axis=0, y_axis=1)

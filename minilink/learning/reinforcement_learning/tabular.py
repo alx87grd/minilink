@@ -52,7 +52,7 @@ class TabularLearningPlanner(Planner):
     x_grid, u_grid, dt
         Grid levels per state and input axis and the control period, as for
         value iteration; or pass ``grid=`` instead, never both.
-    algorithm : {"q_learning", "sarsa", "monte_carlo"} or object
+    method : {"q_learning", "sarsa", "monte_carlo"} or object
         The target of the moving average, or an instance of :class:`QLearning`,
         :class:`SARSA` or :class:`MonteCarloControl`.
     exploration : EpsilonGreedy or UCB, optional
@@ -104,7 +104,7 @@ class TabularLearningPlanner(Planner):
         x_grid=None,
         u_grid=None,
         dt=None,
-        algorithm="q_learning",
+        method="q_learning",
         exploration=None,
         eta=0.1,
         alpha=None,
@@ -142,7 +142,7 @@ class TabularLearningPlanner(Planner):
         # the discount
         require_rounding(rounding)
         self.rounding = rounding
-        self.algorithm = self.build_algorithm(algorithm)
+        self.algorithm = self.build_algorithm(method)
         self.exploration = EpsilonGreedy() if exploration is None else exploration
         self.eta = None if eta is None else float(eta)
         self.alpha = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
@@ -357,14 +357,14 @@ class TabularLearningPlanner(Planner):
     # Internal machinery
     ###########################################################################
 
-    def build_algorithm(self, algorithm):
+    def build_algorithm(self, method):
         """The target of the moving average: an instance as given, or one built by name."""
-        if isinstance(algorithm, TabularAlgorithm):
-            return algorithm
-        if algorithm in TABULAR_ALGORITHMS:
-            return TABULAR_ALGORITHMS[algorithm]()
+        if isinstance(method, TabularAlgorithm):
+            return method
+        if method in TABULAR_ALGORITHMS:
+            return TABULAR_ALGORITHMS[method]()
         raise ValueError(
-            f"algorithm must be one of {sorted(TABULAR_ALGORITHMS)} or a TabularAlgorithm"
+            f"method must be one of {sorted(TABULAR_ALGORITHMS)} or a TabularAlgorithm"
         )
 
     def start(self):
@@ -480,7 +480,7 @@ class MonteCarloControl(TabularAlgorithm):
             Q[s, a] += eta * (q - Q[s, a])
 
 
-# The algorithms ``algorithm=`` names
+# The algorithms ``method=`` names
 TABULAR_ALGORITHMS = {
     "q_learning": QLearning,
     "sarsa": SARSA,

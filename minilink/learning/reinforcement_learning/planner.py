@@ -36,7 +36,7 @@ from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
-#: The update rule of each name ``algorithm=`` accepts.
+#: The update rule of each name ``method=`` accepts.
 ALGORITHMS = {
     "reinforce": REINFORCE,
     "actor_critic": ActorCritic,
@@ -86,7 +86,7 @@ class ReinforcementLearningPlanner(Planner):
     policy : NeuralPolicy, optional
         The law to train; default built from ``features``, ``hidden``,
         ``activation`` and ``normalize`` on the problem's plant.
-    algorithm : str or Algorithm
+    method : str or Algorithm
         ``"reinforce"``, ``"actor_critic"``, ``"ppo"`` (on-policy) or
         ``"sac"`` (off-policy), or an :class:`Algorithm` instance; keyword
         arguments not listed here go to the algorithm (``learning_rate``,
@@ -139,7 +139,7 @@ class ReinforcementLearningPlanner(Planner):
         hidden=(64, 64),
         activation="tanh",
         normalize=True,
-        algorithm="ppo",
+        method="ppo",
         n_envs=16,
         n_steps=128,
         episode_length=None,
@@ -185,7 +185,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The update rule, and its collection length: one whole episode for an
         # episodic method
-        self.algorithm = self.build_algorithm(algorithm, algorithm_kwargs)
+        self.algorithm = self.build_algorithm(method, algorithm_kwargs)
         self.n_steps = (
             self.env.n_steps_per_episode if self.algorithm.episodic else int(n_steps)
         )
@@ -429,17 +429,15 @@ class ReinforcementLearningPlanner(Planner):
                 f"criterion={criterion!r} is only reported by evaluate"
             )
 
-    def build_algorithm(self, algorithm, algorithm_kwargs):
+    def build_algorithm(self, method, algorithm_kwargs):
         """An algorithm instance as given, or the named one built from the keyword arguments."""
-        if isinstance(algorithm, Algorithm):
-            return algorithm
+        if isinstance(method, Algorithm):
+            return method
 
-        if algorithm in ALGORITHMS:
-            return ALGORITHMS[algorithm](**algorithm_kwargs)
+        if method in ALGORITHMS:
+            return ALGORITHMS[method](**algorithm_kwargs)
 
-        raise ValueError(
-            f"algorithm must be one of {sorted(ALGORITHMS)} or an Algorithm"
-        )
+        raise ValueError(f"method must be one of {sorted(ALGORITHMS)} or an Algorithm")
 
     def build_head(self, hidden, activation, log_std_init, seed):
         """The exploration head of the algorithm's family."""
@@ -633,7 +631,7 @@ class ReinforcementLearningPlanner(Planner):
         return PlanningSolution(
             problem=self.problem,
             policy=policy,
-            solver=record,
+            record=record,
             trajectory=trajectory,
             evaluation=evaluation,
             cost_to_go=cost_to_go,

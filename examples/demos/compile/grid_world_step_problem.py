@@ -75,7 +75,7 @@ vi = DynamicProgrammingPlanner(
     problem, x_grid=(SIZE, SIZE), u_grid=(3, 3), tol=1e-9, max_iterations=100
 )
 solution = vi.solve()
-print(solution.solver)
+print(solution.record)
 
 # The greedy walk on the same face: J = Σ c_k, the moves to the goal
 face = problem.compile()

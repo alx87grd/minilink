@@ -144,7 +144,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
     solution = planner.solve(timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert solution.solver.timesteps == 256 and solution.solver.algorithm == "PPO"
+    assert solution.record.timesteps == 256 and solution.record.algorithm == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
     ctl = planner.get_controller()
@@ -222,7 +222,7 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
-        ReinforcementLearningPlanner(prob, dt=0.1, algorithm="sac?", verbose=0)
+        ReinforcementLearningPlanner(prob, dt=0.1, method="sac?", verbose=0)
 
 
 def test_the_discount_has_one_owner_and_an_announced_default():
@@ -252,12 +252,12 @@ def test_the_discount_has_one_owner_and_an_announced_default():
     assert not announced
     planner, announced = build(undiscounted, gamma=0.95)
     assert planner.gamma == 0.95 and not announced
-    planner, announced = build(undiscounted, algorithm=PPO(gamma=0.9, batch_size=32))
+    planner, announced = build(undiscounted, method=PPO(gamma=0.9, batch_size=32))
     assert planner.gamma == planner.algorithm.gamma == 0.9 and not announced
     assert "gamma" not in vars(planner)  # the planner keeps no second copy
 
     with pytest.raises(ValueError, match="two discounts"):
-        build(undiscounted, algorithm=PPO(gamma=0.9, batch_size=32), gamma=0.95)
+        build(undiscounted, method=PPO(gamma=0.9, batch_size=32), gamma=0.95)
 
 
 def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
@@ -305,8 +305,8 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
     assert solution.evaluation.J.shape == (4,)
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     np.testing.assert_array_equal(solution.trajectory.x, planner.nominal_trajectory().x)
-    assert np.isfinite(solution.solver.cost) and "plant steps" in str(solution.solver)
-    assert solution.solver.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
+    assert np.isfinite(solution.record.cost) and "plant steps" in str(solution.record)
+    assert solution.record.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
     assert "feedback" in str(solution)
     # the critic estimates the training discount, not the problem's: no cost-to-go
     assert solution.cost_to_go is None
@@ -363,7 +363,7 @@ def test_sac_trains_through_the_same_planner_loop():
         prob,
         dt=0.1,
         hidden=(8, 8),
-        algorithm="sac",
+        method="sac",
         n_envs=2,
         n_steps=8,
         batch_size=16,
@@ -427,7 +427,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
             prob,
             dt=0.1,
             hidden=(8,),
-            algorithm=sac,
+            method=sac,
             gamma=0.99,
             n_envs=2,
             n_steps=8,
@@ -629,7 +629,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
         problem(tf=np.inf),
         dt=0.1,
         hidden=(8, 8),
-        algorithm=algorithm,
+        method=algorithm,
         n_envs=4,
         n_steps=16,
         episode_length=0.5,
@@ -648,7 +648,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     solution = planner.solve(timesteps=planner.n_steps * planner.n_envs)
     assert (
         solution.success
-        and solution.solver.algorithm == type(planner.algorithm).__name__
+        and solution.record.algorithm == type(planner.algorithm).__name__
     )
 
 
@@ -835,12 +835,12 @@ def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
     """The problem's discount by default; an override is a training choice the record names."""
     kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16, verbose=0)
     prob = problem(tf=np.inf, discount_rate=0.5)
-    derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).solver
+    derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).record
     assert derived.gamma == derived.scored_gamma == np.exp(-prob.discount_rate * 0.1)
     assert not derived.discount_differs and "scored at" not in str(derived)
 
     override = ReinforcementLearningPlanner(prob, gamma=0.9, **kwargs)
-    record = override.solve(timesteps=16).solver
+    record = override.solve(timesteps=16).record
     assert record.gamma == 0.9 and record.discount_differs
     assert "trained at gamma=0.9" in str(record)
 

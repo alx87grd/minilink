@@ -405,7 +405,7 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
     late, early = plan(100.0, 0.0), plan(0.0, 200.0)
     np.testing.assert_allclose(late.trajectory.t, 100.0 + early.trajectory.t)
     np.testing.assert_allclose(late.trajectory.u, early.trajectory.u, atol=1e-6)
-    assert late.solver.cost == pytest.approx(early.solver.cost, rel=1e-6)
+    assert late.record.cost == pytest.approx(early.record.cost, rel=1e-6)
 
 
 def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"):
@@ -474,7 +474,7 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
             x_start, params=values
         )
         # (SLSQP on finite differences: the same optimum on a flat valley)
-        assert numpy_plan.solver.cost == pytest.approx(plan.solver.cost, rel=1e-6)
+        assert numpy_plan.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
         np.testing.assert_allclose(
             numpy_plan.trajectory.x, plan.trajectory.x, atol=1e-3
         )
@@ -531,7 +531,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     reference = pendulum_planner(1.3).solve()
     assert plan.success
     np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)
-    assert plan.solver.cost == pytest.approx(reference.solver.cost, rel=1e-6)
+    assert plan.record.cost == pytest.approx(reference.record.cost, rel=1e-6)
 
 
 # Script 6

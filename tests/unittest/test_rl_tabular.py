@@ -66,7 +66,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     assert isinstance(solution, PlanningSolution) and solution.success
     assert isinstance(solution.policy, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
-    assert solution.solver.episodes == 2000 and len(learner.history) == 2000
+    assert solution.record.episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.value_at(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
@@ -119,7 +119,7 @@ def test_the_learner_steps_with_its_grids_solver_unless_told_otherwise():
 def test_every_tabular_algorithm_learns_from_the_same_loop(algorithm):
     learner = TabularLearningPlanner(
         double_integrator_problem(stochastic=True),
-        algorithm=algorithm,
+        method=algorithm,
         alpha=0.9,
         exploring_starts=False,
         **GRID,
@@ -157,13 +157,13 @@ def test_sample_average_step_and_the_planner_arguments():
     assert learner.alpha == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
     assert solution.evaluation.n_trials == 1 and solution.trajectory is not None
-    assert "episodes" in str(solution.solver)
+    assert "episodes" in str(solution.record)
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, x_grid=(5, 5))
     with pytest.raises(ValueError, match="not both"):  # value iteration's rule
         TabularLearningPlanner(problem, grid=learner.grid, x_grid=(5, 5))
     with pytest.raises(ValueError):
-        TabularLearningPlanner(problem, algorithm="dqn", **GRID)
+        TabularLearningPlanner(problem, method="dqn", **GRID)
 
 
 def test_numpy_environment_steps_like_the_problem():

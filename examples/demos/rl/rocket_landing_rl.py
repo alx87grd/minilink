@@ -66,7 +66,7 @@ planner = ReinforcementLearningPlanner(
     dt=DT,
     features=lambda x: (x - X_LANDED) * FEATURE_SCALE,
     hidden=(64, 64),
-    algorithm="ppo",
+    method="ppo",
     n_envs=64,
     n_steps=32,
     batch_size=256,
@@ -75,7 +75,7 @@ planner = ReinforcementLearningPlanner(
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(solution.solver)
+print(solution.record)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()

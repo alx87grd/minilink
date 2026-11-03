@@ -153,7 +153,7 @@ class MPPIPlanner(Planner):
             solution = PlanningSolution(
                 solution.problem,
                 solution.policy,
-                solution.solver,
+                solution.record,
                 solution.trajectory,
                 evaluation,
             )

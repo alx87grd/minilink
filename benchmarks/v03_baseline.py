@@ -351,7 +351,7 @@ def rl_entries(out):
         problem,
         dt=DT,
         hidden=(8,),
-        algorithm="ppo",
+        method="ppo",
         n_envs=4,
         n_steps=16,
         batch_size=32,

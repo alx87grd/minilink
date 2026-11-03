@@ -460,7 +460,7 @@ def gif_rocket() -> None:
         dt=DT,
         features=lambda x: (x - X_LANDED) * FEATURE_SCALE,
         hidden=(64, 64),
-        algorithm="ppo",
+        method="ppo",
         n_envs=64,
         n_steps=32,
         batch_size=256,

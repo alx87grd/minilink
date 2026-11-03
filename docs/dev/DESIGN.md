@@ -1134,7 +1134,7 @@ unbounded one with the line to write. Offline entry is
 `problem` it solved (a reference), the
 `policy` (a controller block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
 for the trajectory family — `solution.open_loop` — or a time-varying feedback
-`u = pi(x, t)` for a finite-horizon LQR), the `solver` record (one
+`u = pi(x, t)` for a finite-horizon LQR), the `record` (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
 names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
 bounds the command, since the Riccati law never reads `U` (LQR never
@@ -1360,7 +1360,7 @@ go in one `vmap`, and the criterion `C` reduces their `Jᵢ`.
 **Reinforcement learning (`learning/reinforcement_learning/`):** two
 policy-family planners beside DP, one per representation of the law.
 
-`TabularLearningPlanner(problem, x_grid=, u_grid=, dt=, algorithm=)` learns
+`TabularLearningPlanner(problem, x_grid=, u_grid=, dt=, method=)` learns
 the cost-to-go table `Q(x, u)` on a `StateSpaceGrid` from transitions alone,
 NumPy only: the state is rounded to its nearest node, the action taken among
 the grid's input levels, and every algorithm is a moving average toward its
@@ -1375,7 +1375,7 @@ returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
 are those of value iteration, and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
-`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, algorithm=)`
+`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
 learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
 (the controller as `policy`, a `ReinforcementLearningRecord`, the critic as
 `cost_to_go` when the discounts match), `get_controller()` →

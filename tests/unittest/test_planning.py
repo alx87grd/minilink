@@ -828,7 +828,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     solution = planner.solve()
     traj = solution.trajectory
     assert planner.reached_goal and solution.success
-    assert solution.solver.reached_goal and solution.solver.nodes == len(
+    assert solution.record.reached_goal and solution.record.nodes == len(
         planner.tree.nodes
     )
     assert (
@@ -1215,8 +1215,8 @@ def test_rrt_star_reaches_goal():
     solution = planner.solve()
     traj = solution.trajectory
     assert planner.reached_goal and solution.success
-    assert solution.solver.cost == planner.best_goal_cost
-    assert solution.solver.converged == planner.converged
+    assert solution.record.cost == planner.best_goal_cost
+    assert solution.record.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -2102,7 +2102,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             transcription="direct_collocation",
             backend="numpy",
         ).solve()
-        md = plan.solver
+        md = plan.record
         self.assertTrue(md.success)
         self.assertTrue(md.feasible)
         self.assertIsNotNone(md.max_equality_violation)
@@ -2116,7 +2116,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             transcription="direct_collocation",
             backend="numpy",
         ).solve()
-        md = plan.solver
+        md = plan.record
         self.assertFalse(md.feasible)
         self.assertFalse(md.success)
         self.assertGreater(md.max_equality_violation, 1e-3)
@@ -2140,9 +2140,9 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
                 transcription="direct_collocation",
                 backend="numpy",
             ).solve()
-        self.assertEqual(plan.solver.message, "solver claims success")
-        self.assertTrue(plan.solver.solver_success)
-        self.assertFalse(plan.solver.feasible)
+        self.assertEqual(plan.record.message, "solver claims success")
+        self.assertTrue(plan.record.solver_success)
+        self.assertFalse(plan.record.feasible)
         self.assertFalse(plan.success)
 
 
@@ -2432,7 +2432,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     face = pv.solution(z, status=status)
     np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
     np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
-    assert face.solver.cost == solved.solver.cost
+    assert face.record.cost == solved.record.cost
     assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
     assert set(pv.params) >= {"x_start", "t_start", "plant", "cost"}
 
@@ -2450,7 +2450,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     # record of a planner built at that start, on the same z
     start = {"x_start": np.array([0.05, 0.0])}
     moved, moved_status = pv.solve(start)
-    record = pv.solution(moved, start, moved_status).solver
+    record = pv.solution(moved, start, moved_status).record
     at_start = TrajectoryOptimizationPlanner(
         face_swing_up().replace(x_start=start["x_start"]),
         n_steps=11,
@@ -2458,7 +2458,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
         backend=backend,
         optimizer_options={"maxiter": 60},
     ).compile()
-    oracle = at_start.solution(moved, None, moved_status).solver
+    oracle = at_start.solution(moved, None, moved_status).record
     assert record.max_equality_violation == pytest.approx(
         oracle.max_equality_violation, rel=1e-9, abs=1e-12
     )

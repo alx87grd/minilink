@@ -60,14 +60,14 @@ planner = ReinforcementLearningPlanner(
     dt=DT,
     features=features,
     hidden=(64, 64),
-    algorithm="ppo",
+    method="ppo",
     n_envs=16,
     n_steps=256,
     batch_size=512,
     gamma=0.99,
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(solution.solver)
+print(solution.record)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()

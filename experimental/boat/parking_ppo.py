@@ -47,7 +47,7 @@ planner = ReinforcementLearningPlanner(
     dt=DT,
     features=dock_features,
     hidden=POLICY_HIDDEN,
-    algorithm="ppo",
+    method="ppo",
     n_envs=64,
     n_steps=32,
     batch_size=256,
@@ -56,7 +56,7 @@ planner = ReinforcementLearningPlanner(
     log_std_init=-1.5,  # gentle exploration: a 10 t hull answers slowly
 )
 solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
-print(solution.solver)
+print(solution.record)
 planner.plot_learning_curve()
 
 ppo_ctl = planner.get_controller()

@@ -38,7 +38,7 @@ problem = PlanningProblem(
     plant, cost=SwingUpCost(), tf=HORIZON, x_start=[0.0, 0.0], U=plant.input_box
 )
 planner = MPPIPlanner(problem, dt=DT, n_samples=K, temperature=LAMBDA, noise=SIGMA**2)
-print(planner.solve().solver)
+print(planner.solve().record)
 
 mpc = ModelPredictiveController(planner, delay=False, verbose=True)
 loop = (mpc % DT) @ plant

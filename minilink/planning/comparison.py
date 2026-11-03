@@ -206,7 +206,7 @@ class Comparison:
     # Display
 
     def __str__(self) -> str:
-        # One row per entry: its name, success, solver record and evaluation
+        # One row per entry: its name, success, record and evaluation
         scores = self.evaluations or {}
         names = list(dict.fromkeys([*self.solutions, *scores]))
         rows = []
@@ -217,11 +217,11 @@ class Comparison:
                 (
                     name,
                     "-" if solution is None else ("yes" if solution.success else "no"),
-                    "-" if solution is None else str(solution.solver),
+                    "-" if solution is None else str(solution.record),
                     "-" if evaluation is None else str(evaluation),
                 )
             )
-        header = ("", "success", "solver", "evaluation")
+        header = ("", "success", "record", "evaluation")
 
         # Each column as wide as its widest cell
         widths = [
@@ -447,7 +447,7 @@ def solution_of(problem, entry):
     return PlanningSolution(
         problem=problem,
         policy=entry,
-        solver=GivenPolicy(),
+        record=GivenPolicy(),
         trajectory=None,
         evaluation=None,
     )

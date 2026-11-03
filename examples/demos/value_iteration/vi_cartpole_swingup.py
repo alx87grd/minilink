@@ -66,7 +66,7 @@ planner = DynamicProgrammingPlanner(
     verbose=True,
 )
 solution = planner.solve_steps(N_STEPS)
-print(solution.solver)
+print(solution.record)
 
 # planner.plot_cost2go(jmax=INF, axes=(1, 3), anchor=UPRIGHT)
 # planner.plot_policy(axis=0, axes=(1, 3), anchor=UPRIGHT)

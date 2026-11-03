@@ -39,17 +39,17 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     A, B = planner.linear_model()
     P = solve_continuous_are(A, B, Q, R)
 
-    assert isinstance(solution.solver, RiccatiRecord) and solution.success
+    assert isinstance(solution.record, RiccatiRecord) and solution.success
     assert solution.problem is problem and solution.method == "riccati"
-    np.testing.assert_allclose(solution.solver.K, lqr_gain(A, B, Q, R))
-    np.testing.assert_allclose(solution.solver.P, P)
-    assert np.all(np.real(solution.solver.poles) < 0.0)
+    np.testing.assert_allclose(solution.record.K, lqr_gain(A, B, Q, R))
+    np.testing.assert_allclose(solution.record.P, P)
+    assert np.all(np.real(solution.record.poles) < 0.0)
     assert isinstance(solution.policy, StateFeedback)
     np.testing.assert_allclose(solution.policy.inputs["r"].nominal_value, UPRIGHT)
     x = UPRIGHT + [0.4, -0.2]
     assert solution.cost_to_go(x) == pytest.approx((x - UPRIGHT) @ P @ (x - UPRIGHT))
     assert solution.trajectory is None and solution.evaluation is None
-    assert "closed-loop poles" in str(solution.solver)
+    assert "closed-loop poles" in str(solution.record)
 
 
 @pytest.mark.parametrize("tf", [np.inf, 2.0])
@@ -61,8 +61,8 @@ def test_the_record_says_U_ignored_and_nothing_warns(tf):
     free = bounded.replace(U=None)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
-        bounded_record = LQRPlanner(bounded).solve().solver
-        free_record = LQRPlanner(free).solve().solver
+        bounded_record = LQRPlanner(bounded).solve().record
+        free_record = LQRPlanner(free).solve().record
 
     assert bounded_record.U_ignored and "U ignored" in str(bounded_record)
     assert not free_record.U_ignored and "U ignored" not in str(free_record)
@@ -79,7 +79,7 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     assert isinstance(solution.policy, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop
     np.testing.assert_allclose(solution.policy.params["K"], K)
-    np.testing.assert_allclose(solution.solver.K, K[0])
+    np.testing.assert_allclose(solution.record.K, K[0])
     x = UPRIGHT + [0.1, 0.3]
     for k in (0, 100, 200):
         dx = x - UPRIGHT

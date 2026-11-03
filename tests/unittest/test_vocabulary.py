@@ -25,7 +25,10 @@ PLANT_PACKAGE = "minilink.dynamics"
 # A retired word: the word of RULES 2.7 that replaced it, and the owners it is retired on
 # (None: everywhere). A word keeps its other textbook meanings elsewhere: alpha is the CVaR
 # level of Evaluation.cvar, N the reference gain of OutputReference. Each sweep adds its own.
-RETIRED = {}
+RETIRED = {
+    "solver": ("record", ("PlanningSolution",)),
+    "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
+}
 
 
 def public_objects():

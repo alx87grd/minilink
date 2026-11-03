@@ -131,7 +131,7 @@ class Optimizer:
         program: MathematicalProgram,
         z0=None,
         *,
-        method: str = "scipy_slsqp",
+        method: str = "auto",
         backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,

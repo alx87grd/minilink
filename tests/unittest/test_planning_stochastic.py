@@ -169,7 +169,7 @@ def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_perio
     # At rest at the bottom: J = c + α J, c = ∫₀^dt e^{−ρτ} dτ = (1 − α) / ρ, so J = 1 / ρ
     J = planner.result.J[planner.grid.nearest_node(np.zeros(2))]
     np.testing.assert_allclose(J, 1.0 / rho, rtol=1e-6)
-    assert solution.solver.discount_rate == pytest.approx(rho)
+    assert solution.record.discount_rate == pytest.approx(rho)
     assert planner.problem.discount_rate == 1.0
 
 

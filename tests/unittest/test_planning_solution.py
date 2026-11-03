@@ -159,15 +159,15 @@ def test_trajopt_evaluation_is_one_trial_deterministic_and_n_trials_stochastic()
     assert str(solution.evaluation).startswith("J = ")
     # the replayed schedule scores the optimizer's cost up to the discretization gap
     assert (
-        abs(solution.evaluation.mean - solution.solver.cost)
-        < 0.05 * solution.solver.cost
+        abs(solution.evaluation.mean - solution.record.cost)
+        < 0.05 * solution.record.cost
     )
 
     with pytest.warns(UserWarning):  # a deterministic planner on a stochastic problem
         planner = trajopt(move_problem(stochastic=True), shooting)
     solution = planner.solve(evaluate=True, n_trials=5)
     assert solution.evaluation.n_trials == 5
-    assert "open loop" in str(solution) and "feasible" in str(solution.solver)
+    assert "open loop" in str(solution) and "feasible" in str(solution.record)
 
 
 def test_rrt_policy_holds_each_control_and_reproduces_the_path():
@@ -185,7 +185,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
         options=RRTOptions(seed=0, max_nodes=4000),
     )
     solution = planner.solve()
-    assert solution.success and solution.solver.reached_goal
+    assert solution.success and solution.record.reached_goal
     assert solution.open_loop and solution.policy.interpolation == "previous"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
@@ -388,7 +388,7 @@ def test_compare_reads_the_solutions_side_by_side():
     race = compare(VI=vi, LQR=lqr)
     assert len(race) == 2 and race["LQR"] is lqr and list(race) == ["VI", "LQR"]
     table = str(race)
-    assert table.splitlines()[0].split() == ["success", "solver", "evaluation"]
+    assert table.splitlines()[0].split() == ["success", "record", "evaluation"]
     assert "converged" in table and "closed-loop poles" in table and "J = " in table
 
     fig, axes = race.plot_control_law(show=False)

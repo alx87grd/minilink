@@ -812,16 +812,16 @@ class TestDpOneObjectSetup(unittest.TestCase):
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, max_iterations=2
         ).solve()
         self.assertFalse(capped.success)
-        self.assertIn("max_iterations", str(capped.solver))
-        self.assertEqual(capped.solver.iterations, 2)
+        self.assertIn("max_iterations", str(capped.record))
+        self.assertEqual(capped.record.iterations, 2)
 
         planner = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
         )
         converged = planner.solve()
         self.assertTrue(converged.success)
-        self.assertIn("converged", str(converged.solver))
-        self.assertLessEqual(converged.solver.delta, 1.0)
+        self.assertIn("converged", str(converged.record))
+        self.assertLessEqual(converged.record.delta, 1.0)
         # the solution is the pair: the greedy lookup law and the interpolated cost-to-go
         self.assertIs(converged.policy, planner.get_controller())
         self.assertEqual(
@@ -833,7 +833,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
         ).solve_steps(3, evaluate=True)
         self.assertTrue(fixed.success)
-        self.assertEqual(fixed.solver.iterations, 3)
+        self.assertEqual(fixed.record.iterations, 3)
         self.assertEqual(
             fixed.evaluation.n_trials, 1
         )  # a deterministic problem: one trial

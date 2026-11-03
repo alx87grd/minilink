@@ -129,7 +129,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         traj = plan.trajectory
         np.testing.assert_allclose(traj.x[:, 0], problem.x_start, atol=1e-05)
         self.assertIs(planner.last_solution, plan)
-        self.assertIsInstance(plan.solver, TrajectoryOptimizationRecord)
+        self.assertIsInstance(plan.record, TrajectoryOptimizationRecord)
 
 
 from minilink.planning.initial_guess import default_initial_trajectory
@@ -185,9 +185,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         planner = self.make_planner(self.make_problem(0.1))
         plan = planner.solve_trajectory_from(np.array([0.1]))
         self.assertIsInstance(plan.success, bool)
-        self.assertIsNotNone(plan.solver.message)
-        self.assertIsNone(plan.solver.feasible)  # an online tick runs no residual check
-        self.assertEqual(plan.success, plan.solver.solver_success)
+        self.assertIsNotNone(plan.record.message)
+        self.assertIsNone(plan.record.feasible)  # an online tick runs no residual check
+        self.assertEqual(plan.success, plan.record.solver_success)
         self.assertIsNone(plan.evaluation)  # not asked
         self.assertIsNotNone(planner.last_optimization_result.z)
 
