@@ -2539,3 +2539,16 @@ def test_every_planner_has_one_tree_shape():
     assert {"temperature", "noise", "control_cost"} <= set(mppi["method"])
     assert "cost" in mppi and "discount_rate" in mppi
     assert "gamma" in rl["method"] and rl["seed"] == 0
+
+
+def test_an_unseeded_search_is_reproducible():
+    """RRT's seed defaults to 0, as every other planner's: two runs grow one tree."""
+    problem, _ = make_holonomic_obstacle_problem()
+    extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6)
+    trees = []
+    for _ in range(2):
+        planner = RRTPlanner(problem, extender=extender, max_nodes=200)
+        planner.solve()
+        trees.append(np.array([node.x for node in planner.tree.nodes]))
+
+    np.testing.assert_array_equal(trees[0], trees[1])

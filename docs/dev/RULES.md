@@ -111,7 +111,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Discount rate ρ (1/s) | `discount_rate` | |
   | Discount factor γ per tick | `gamma` | `alpha` (the CVaR level `alpha` stays) |
   | A per-call draw | `key` | |
-  | A seed stored at construction, default `0`; `None` means the mean | `seed` | `rng` (internal only) |
+  | A seed stored at construction (`0` by default where a run draws; `None` is a random block's mean, never fresh entropy) | `seed` | `rng` (internal only) |
   | The verb's algorithm | `method` | `algorithm` |
   | A planner's record | `solution.record` | `solution.solver` |
   | A solver's own settings | `options=` (a dict) | `optimizer_options`, an options dataclass |

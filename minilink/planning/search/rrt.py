@@ -455,7 +455,7 @@ class RRTOptions:
 
     max_nodes: int = 5000
     goal_bias: float = 0.1
-    seed: int | None = None
+    seed: int = 0
     edge_resolution: float | None = None
     max_sample_attempts: int = 100
     return_best_effort: bool = True
