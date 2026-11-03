@@ -185,7 +185,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     cells = np.arange(7.0)
     distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     np.testing.assert_array_equal(J, distance)
-    assert vi.grid.dt == 1.0 and vi.options.alpha == 1.0
+    assert vi.grid.dt == 1.0 and vi.options.gamma == 1.0
 
 
 class TimedTerminal(QuadraticCost):
