@@ -1,5 +1,6 @@
 """Reinforcement learning as a planner: a neural law trained on a stochastic planning problem."""
 
+import copy
 import math
 import time
 import warnings
@@ -624,13 +625,14 @@ class ReinforcementLearningPlanner(Planner):
         return self.learned_solution(trajectory, evaluation)
 
     def learned_solution(self, trajectory, evaluation) -> PlanningSolution:
-        """The learned law as a solution: its training record, the rollout and score given, the critic's cost-to-go."""
+        """The learned law as a solution: a copy of the law at its weights when solved (training again moves only the planner's own), its training record, the rollout and score given, the critic's cost-to-go."""
         record = self.training_record()
         cost_to_go = self.critic_cost_to_go()
+        policy = snapshot_of(self.controller)
 
         return PlanningSolution(
             problem=self.problem,
-            policy=self.controller,
+            policy=policy,
             solver=record,
             trajectory=trajectory,
             evaluation=evaluation,
@@ -785,3 +787,18 @@ class ReinforcementLearningRecord:
             )
 
         return line
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def snapshot_of(controller):
+    """The law at its current weights, as its own block: the plant it reads and its last run shared, everything else copied."""
+    shared = [controller.sys, controller.traj]
+    memo = {id(obj): obj for obj in shared if obj is not None}
+
+    snapshot = copy.deepcopy(controller, memo)
+
+    return snapshot

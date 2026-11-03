@@ -472,3 +472,19 @@ def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():
         "LQR",
     ]
     assert race.difference("VI", "LQR").shape == race.evaluations["VI"].J.shape
+
+
+def test_compare_scores_a_sampled_loop_as_evaluate_does():
+    """The plant inside a clocked law keeps its own integration steps in both."""
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    problem = PlanningProblem(plant, x_start=np.array([0.3, 0.0]), cost=cost, tf=5.0)
+    law = lqr_design(plant, np.eye(2), np.eye(1)) % 0.2
+
+    alone = evaluate(problem, law, dt=0.2)
+    compared = compare(problem, LQR=law, dt=0.2).evaluations["LQR"]
+
+    np.testing.assert_allclose(compared.J, alone.J)

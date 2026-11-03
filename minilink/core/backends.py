@@ -185,13 +185,20 @@ def ensure_jax_x64() -> types.ModuleType:
 
 
 def configure_jax(*, enable_x64: bool | None = None) -> types.ModuleType:
-    """Configure process-wide JAX options used by Minilink JAX code paths."""
+    """
+    Configure process-wide JAX options used by Minilink JAX code paths.
+
+    ``enable_x64`` sets the precision policy itself (``MINILINK_JAX_X64``), the
+    one switch :func:`ensure_jax_x64` reads, so the evaluators built afterwards
+    keep the choice instead of restoring the default.
+    """
     try:
         import jax
     except ImportError as e:
         raise ImportError(_JAX_REQUIRED) from e
 
     if enable_x64 is not None:
+        os.environ["MINILINK_JAX_X64"] = "1" if enable_x64 else "0"
         jax.config.update("jax_enable_x64", bool(enable_x64))
 
     return jax

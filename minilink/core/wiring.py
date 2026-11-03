@@ -65,6 +65,34 @@ class WiredDiagramMixin:
     def x0(self, value):
         write_through_x0(self, value, self.n)
 
+    def h(self, x, u, t=0, params=None):
+        """
+        Output ``y = h(x, u, t; p)``: the diagram's ``y`` port, evaluated through its wiring.
+
+        The same value the compiled evaluator and ``outputs["y"]`` give, so a
+        tool that reads ``h`` sees a diagram exactly as it sees a leaf; a
+        diagram without a ``y`` port has the empty output.
+
+        Parameters
+        ----------
+        x : array of shape (n,)
+        u : array of shape (m,)
+        t : float, or the tick ``k`` on a step diagram
+        params : dict, optional
+
+        Returns
+        -------
+        y : array of shape (p,)
+        """
+        xp = array_module(x, u)
+
+        if "y" not in self.outputs:
+            return xp.zeros(0)
+
+        y = self.outputs["y"].compute(x, u, t, params)
+
+        return y
+
     @property
     def solver_info(self):
         """The diagram's solver hints, derived from its blocks at each read (set a hint on the block it describes)."""

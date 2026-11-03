@@ -710,3 +710,47 @@ def test_a_saved_trajectory_keeps_its_roles(tmp_path):
     loaded = Trajectory.load(tmp_path / "run.npz")
     assert dict(loaded.roles) == {"plant": {"x": (0, 1), "u": "plant:u"}}
     np.testing.assert_array_equal(loaded.of("plant").u, np.ones((1, 3)))
+
+
+from minilink.blocks.step import UnitDelay
+from minilink.control.siso import PID
+
+
+# A diagram's h is its y port, on every kind of diagram
+
+
+def flow_loop():
+    return PID(Kp=1.0) @ Pendulum()
+
+
+def series_chain():
+    return Pendulum() >> Gain(2.0, dim=2)
+
+
+def sampled_loop():
+    return (PID(Kp=1.0) % 0.01) @ Pendulum()
+
+
+def step_chain():
+    return UnitDelay(dim=1) >> UnitDelay(dim=1)
+
+
+@pytest.mark.parametrize(
+    "build",
+    [flow_loop, series_chain, sampled_loop, step_chain],
+    ids=lambda b: b.__name__,
+)
+def test_a_diagram_h_is_its_output_port(build):
+    diagram = build()
+    x = 0.1 * np.arange(1, diagram.n + 1)
+    u = np.zeros(diagram.m)
+    y = diagram.compile().outputs(x, u, 0)["y"]
+    np.testing.assert_allclose(diagram.h(x, u, 0), y)
+    np.testing.assert_allclose(diagram.outputs["y"].compute(x, u, 0), y)
+
+
+def test_renaming_the_ports_of_a_sampled_view_keeps_the_source_ports():
+    plant = Pendulum()
+    view = plant.discretize(0.01).rename_ports(y="theta")
+    assert list(view.outputs) == ["theta", "x"] and view.outputs["theta"].id == "theta"
+    assert list(plant.outputs) == ["y", "x"] and plant.outputs["y"].id == "y"

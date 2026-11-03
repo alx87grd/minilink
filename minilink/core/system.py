@@ -1,5 +1,6 @@
 """The System contract: the base class every block, plant and controller extends."""
 
+import copy
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -304,9 +305,11 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         """
         require_port_renames(self, names)
 
+        # Each port renamed as a copy: a view sharing the source's ports keeps them
         def renamed(table):
             renamed_table = {}
             for old, port in table.items():
+                port = copy.copy(port)
                 port.id = names.get(old, old)
                 renamed_table[port.id] = port
             return renamed_table

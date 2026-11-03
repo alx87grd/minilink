@@ -103,6 +103,25 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return x_next
 
+    def h(self, x, u, k=0, params=None):
+        """
+        Output ``y_k`` of the loop at its tick ``k``, the clock's origin at 0.
+
+        The compiled plan hands each block its own time (seconds or its count),
+        as in :meth:`step`; a loop without a ``y`` port has the empty output.
+        """
+        xp = array_module(x, u)
+
+        if "y" not in self.outputs:
+            return xp.zeros(0)
+
+        backend = "numpy" if xp is np else "jax"
+        ev = self.compile(backend=backend)
+
+        y = ev.outputs(x, u, k, params)["y"]
+
+        return y
+
     def compile(self, backend="numpy", verbose=False, *, substeps=None, solver=None):
         """
         Compile the sampled diagram into its stateless evaluator, the schedule in its plan.

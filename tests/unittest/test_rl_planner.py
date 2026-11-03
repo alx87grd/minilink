@@ -148,10 +148,13 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
     ctl = planner.get_controller()
-    assert isinstance(ctl, NeuralPolicy) and solution.policy is ctl
-    # the controller carries the trained weights
+    assert isinstance(ctl, NeuralPolicy) and isinstance(solution.policy, NeuralPolicy)
+    # the controller and the solution's law carry the trained weights
     actor = planner.algorithm.params(planner.train_state)["policy"]["mlp"]
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
+    np.testing.assert_allclose(
+        solution.policy.params["mlp"]["W0"], np.asarray(actor["W0"])
+    )
     rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.5, evaluate=True)
     assert isinstance(rollout, PlanningSolution) and rollout.trajectory.n_samples == 6
     J = evaluate_trajectory(prob, rollout.trajectory).J
@@ -852,3 +855,26 @@ def test_environment_reward_stays_finite_when_a_step_blows_up():
     x = np.array([0.1, 0.0])
     x_next, _, reward, terminated, _ = env.step(x, 0.0, np.array([0.0]), None)
     assert np.all(np.isfinite(x_next)) and np.isfinite(reward) and bool(terminated)
+
+
+def test_training_again_leaves_an_earlier_solution_as_it_was():
+    """Each solution keeps the law it was solved with; the planner trains its own."""
+    planner = ReinforcementLearningPlanner(
+        problem(tf=np.inf),
+        dt=0.1,
+        hidden=(8, 8),
+        n_envs=4,
+        n_steps=32,
+        batch_size=32,
+        verbose=0,
+    )
+    first = planner.solve(timesteps=128)
+    W0 = np.array(first.policy.params["mlp"]["W0"])
+    second = planner.solve(timesteps=128)
+
+    assert first.policy is not second.policy
+    np.testing.assert_array_equal(first.policy.params["mlp"]["W0"], W0)
+    assert not np.array_equal(second.policy.params["mlp"]["W0"], W0)
+    x = np.array([0.3, 0.0])
+    u_first = first.policy.outputs["u"].compute(None, x, 0.0)
+    np.testing.assert_allclose(u_first, first.policy.action(x))

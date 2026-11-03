@@ -28,7 +28,7 @@ def compare(
     n_trials=None,
     key=0,
     solver="rk4",
-    substeps=1,
+    substeps=None,
     backend="auto",
     episode_length=None,
     **entries,

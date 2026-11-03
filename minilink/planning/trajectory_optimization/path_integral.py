@@ -13,6 +13,7 @@ from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.problems import nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
 # A solve between two knots folds its offset in, in this many parts of dt
@@ -108,12 +109,15 @@ class MPPIPlanner(Planner):
 
     @property
     def params(self) -> dict:
-        """The planner's tree: the problem's leaves (the start, its time, the plant's, the cost's, the discount, ``X``'s), the method's numbers and the seed."""
+        """The planner's tree: the problem's leaves (the start, its time, the plant's at its design point, the cost's, the discount, ``X``'s), the method's numbers and the seed."""
         problem = self.problem
+        plant = nominal_plant_params(problem)
         tree = {
             "x_start": np.asarray(problem.x_start, dtype=float),
             "t_start": float(problem.t_start),
-            "plant": copy.deepcopy(problem.sys.params or {}),
+            "plant": copy.deepcopy(
+                (problem.sys.params if plant is None else plant) or {}
+            ),
             "cost": copy.deepcopy(problem.require_cost().params),
             "discount_rate": float(problem.discount_rate),
         }

@@ -13,6 +13,7 @@ from minilink import (  # noqa: E402
     Pendulum,
     PlanningProblem,
     QuadraticCost,
+    Uniform,
 )
 from minilink.control import ModelPredictiveController  # noqa: E402
 from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
@@ -304,3 +305,20 @@ def test_two_solves_between_the_knots_draw_their_own_keys():
     np.testing.assert_array_equal(on_knots[1], expected)
     assert not np.array_equal(halfway, on_knots[0])
     assert not np.array_equal(halfway, on_knots[1])
+
+
+def test_the_plan_is_made_at_the_plant_design_point():
+    """A law on a plant number plans at its mean, as trajectory optimization does."""
+    plant = Pendulum()
+    plant.params["m"] = 1.0
+    problem = PlanningProblem(
+        plant,
+        cost=SwingUpCost(),
+        tf=0.5,
+        x_start=[0.0, 0.0],
+        U=plant.input_box,
+        params={"plant": {"m": Uniform([2.5], [3.5])}},
+    )
+    planner = MPPIPlanner(problem, dt=DT, n_samples=8)
+    np.testing.assert_allclose(planner.params["plant"]["m"], 3.0)
+    assert plant.params["m"] == 1.0

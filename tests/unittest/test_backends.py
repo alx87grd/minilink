@@ -344,3 +344,19 @@ def test_the_default_output_stub_is_on_the_arrays_module():
     sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
     y = sys.h(jnp.zeros(2), jnp.zeros(1))
     assert type(y).__module__.startswith("jax") and y.shape == (1,)
+
+
+@pytest.mark.jax
+def test_an_explicit_precision_choice_survives_the_next_jax_evaluator(monkeypatch):
+    jax = pytest.importorskip("jax")
+    from minilink.core.backends import configure_jax
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    # The variable restored by monkeypatch at teardown, the precision by finally
+    monkeypatch.setenv("MINILINK_JAX_X64", "1")
+    try:
+        configure_jax(enable_x64=False)
+        Pendulum().compile(backend="jax")
+        assert jax.config.read("jax_enable_x64") is False
+    finally:
+        configure_jax(enable_x64=True)
