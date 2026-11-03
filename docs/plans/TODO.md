@@ -216,8 +216,8 @@ solvers are v0.4 (§4); MPPI runs on the face (its rest is S72).
 - [ ] **The compiled face beyond trajectory optimization** (the rest of the compiled face; the face on
   trajectory optimization, its `"method"` and `seed` leaves, the MPC as one box on it and its
   closed loop tuned by gradient landed in the v0.3 runs): `planner.compile()` for the LQR and
-  value-iteration planners, the others as they are wrapped; `last_solution` leaves with the
-  plotting shortcuts' move to the solution (D1.4, §3). What each face holds (`z`; `initial`;
+  value-iteration planners, the others as they are wrapped; whether `last_solution` stays is
+  an open question (QUESTIONS, "Does a planner keep its last solution?"). What each face holds (`z`; `initial`;
   `shift`; `command`):
   - LQR: `K`, `x̄`, `ū`; the gain at the operating point; identity; `ū − K(x − x̄)`;
   - value iteration: the `J` and `π` tables; `J` from the terminal cost (or zeros); identity;
@@ -355,9 +355,18 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
 - [ ] **Naming, the rest** (A4) (any time, agent; the naming quick wins landed:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
   documented): one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
-  `Comparison`, with S54's clipping (scan: planning#3, examples#5); `plot_cost2go` keeps its
-  name to v1.0 and its rename to `plot_cost_to_go` (the name the solution and `Comparison`
-  already use) is on V4's list; the operators' named forms exported together (scan: core#9).
+  `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
+  exported together (scan: core#9).
+- [ ] **The vocabulary sweeps** (RN-V) (ruled 2026-11-03; agent, one commit per group, every
+  call site and the course notebooks in the same commit, no alias): RULES 2.7's table, in the
+  order seeds, choice keywords (`algorithm=` → `method=`, `solution.solver` → `.record`, the
+  `Optimizer`'s default `"auto"`), the discount (`alpha` → `gamma`), counts (`N` → `n_steps`,
+  MPPI's `n_rollouts` and `iterations`), output and plots (`verbose=False` defaults,
+  `plot_cost2go` → `plot_cost_to_go`, `plot_policy` → `plot_control_law`, the `solve_*`
+  aliases removed), the operating point (`xbar` → `x_bar` with its keys and attributes,
+  `TimeCost`'s `radius`), time (`tf` absolute, `compute_trajectory(tf, *, t_start)`,
+  `Trajectory.t_start`), the settings bags (flat keywords; `options=` the solver's dict).
+  Done when `test_vocabulary.py` lists every retired word and passes.
 
 ### Wave B — GRO501, the carry-over (0.2.0 shipped)
 
@@ -764,11 +773,8 @@ after the v0.3 tag; the v1.0 rows after two cohorts.
   amended for v1.0 on). A snapshot of the export list is a test; changing it fails until the
   snapshot and the CHANGELOG line move together. Done when RULES, ROADMAP §2 and the
   snapshot test agree.
-  The rename list, applied with shims under the policy (the names hold until then, with no
-  alias before): `xbar` / `ubar` → `x_bar` / `u_bar`, the name everywhere else, on the costs
-  (`QuadraticCost.from_system(xbar=, ubar=)`, `cost.xbar`, `cost.ubar`, `TimeCost`'s
-  `xbar`); `plot_cost2go` → `plot_cost_to_go` (A4). (`NeuralPolicy` is renamed in v0.3.) The policy
-  itself is open (QUESTIONS).
+  The pending renames land before the freeze (the vocabulary sweeps, RN-V); the policy is for
+  the names changed after v1.0, and is open (QUESTIONS).
 - [ ] **`CHANGELOG.md`** (V5): user-facing, one entry per release from v0.9 (back-filled for
   0.1.0 / 0.1.1 from ROADMAP §2's breaking changes); `pyproject.toml` `Changelog` URL points
   there. Done when `publish.yml` refuses a tag without its CHANGELOG heading.

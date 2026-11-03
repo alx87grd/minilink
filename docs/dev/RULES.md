@@ -91,6 +91,33 @@ concrete formatting, ordered by the cost of being wrong:
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
   `compute_forced`, `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
+  The whole vocabulary, one word per idea and one idea per word
+  (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):
+
+  | Idea | The word | Not |
+  | --- | --- | --- |
+  | Final time, absolute (a run, a problem's window `[t_start, tf]`) | `tf` | `final_time`, a horizon length |
+  | Start time | `t_start` | `t0` |
+  | A problem's length, read-only | `problem.horizon` (`tf − t_start`) | |
+  | A tool's step or period | `dt` | |
+  | A clocked block's own period | `sample_period` | |
+  | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
+  | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
+  | Iterations, an exact count (a fixed scan) | `iterations` | `n_iterations` |
+  | Iterations, a cap | `max_iterations` | |
+  | Operating point, target | `x_bar`, `u_bar`, `y_bar` (keyword, `params` key, attribute) | `xbar`, `ubar`, `ybar` |
+  | A system's or a run's initial state | `x0` | |
+  | A problem's start (a point or a law) | `x_start` | |
+  | Discount rate ρ (1/s) | `discount_rate` | |
+  | Discount factor γ per tick | `gamma` | `alpha` (the CVaR level `alpha` stays) |
+  | A per-call draw | `key` | |
+  | A seed stored at construction, default `0`; `None` means the mean | `seed` | `rng` (internal only) |
+  | The verb's algorithm | `method` | `algorithm` |
+  | A planner's record | `solution.record` | `solution.solver` |
+  | A solver's own settings | `options=` (a dict) | `optimizer_options`, an options dataclass |
+  | Print text / draw a figure | `verbose` (default `False`) / `show` | |
+  | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
+  | Cost-to-go and control-law plots | `plot_cost_to_go`, `plot_control_law` | `plot_cost2go`, `plot_policy` |
 
 ---
 
