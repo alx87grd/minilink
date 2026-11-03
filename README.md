@@ -108,10 +108,10 @@ Code is the single source of truth. Minilink replaces GUI wiring and opaque bina
 - **Auto-Generated Diagrams:** `loop.plot_diagram()` generates clean, read-only visual inspection diagrams directly from code.
 
 ```python
-from minilink import PID, MassSpringDamper
+from minilink import PID
 
-plant = MassSpringDamper()
-ctrl = PID(kp=10.0, ki=1.0, kd=2.0)
+plant = MassSpringDamper()  # the model written above
+ctrl = PID(Kp=10.0, Ki=1.0, Kd=2.0)
 
 # Feedback composition: loop is itself a pure DynamicSystem
 loop = ctrl @ plant
@@ -121,7 +121,7 @@ loop.plot_diagram()
 
 ![closed-loop diagram](https://raw.githubusercontent.com/alx87grd/minilink/main/docs/_static/diagram_closed_loop.png)
 
-Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**: `loop.linearize()`, `loop.bode()`, `loop.nyquist()`, `loop.root_locus()`, `loop.pzmap()`, `loop.step_response()`, and `loop.kalman()`.
+Because a composite diagram is itself a `DynamicSystem`, **every analysis verb works identically on closed loops**: `loop.linearize()`, `loop.transfer_function()`, `loop.plot_bode()`, `loop.plot_root_locus()`, `loop.plot_pzmap()`, and `loop.plot_step_response()`.
 
 ---
 
@@ -160,6 +160,7 @@ import numpy as np
 from minilink import PID, Optimizer, Pendulum, PlanningProblem, QuadraticCost
 
 plant = Pendulum()
+x_eq = np.array([np.pi, 0.0])  # the upright equilibrium
 
 # Exact machine-precision Jacobians
 A = plant.jacobian("f", "x", x_eq)
