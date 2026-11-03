@@ -220,11 +220,11 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
     problem = double_integrator_problem()
     grid = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
     if make == "dp":
-        planner = DynamicProgrammingPlanner(problem, alpha=0.9, tol=1e-6, **grid)
+        planner = DynamicProgrammingPlanner(problem, gamma=0.9, tol=1e-6, **grid)
         solution = planner.solve(evaluate=True)
     else:
         planner = TabularLearningPlanner(
-            problem, alpha=0.9, solver="euler", seed=0, **grid
+            problem, gamma=0.9, solver="euler", seed=0, **grid
         )
         solution = planner.solve(episodes=300, evaluate=True)
     assert not solution.open_loop and solution.evaluation.n_trials == 1
@@ -248,7 +248,7 @@ def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws
     with pytest.warns(UserWarning):
         open_loop = trajopt(problem, shooting).solve()
     feedback = DynamicProgrammingPlanner(
-        problem.nominal(), x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.1
+        problem.nominal(), x_grid=(21, 21), u_grid=(3,), dt=0.1, gamma=0.95, tol=0.1
     ).solve()
     scored = [
         evaluate(problem, s, dt=0.1, n_trials=4, backend="numpy", key=3)
@@ -319,7 +319,7 @@ def solved_pendulum():
         U=plant.input_box,
     )
     vi = DynamicProgrammingPlanner(
-        problem, x_grid=(21, 21), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
+        problem, x_grid=(21, 21), u_grid=(3,), dt=0.1, gamma=0.95, tol=0.5
     )
     return (
         problem,
@@ -363,7 +363,7 @@ def test_solution_verbs_draw_what_the_planner_produced():
     with pytest.raises(ValueError, match="cost_to_go"):
         plan.plot_cost_to_go()
     unrolled = DynamicProgrammingPlanner(
-        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, alpha=0.9, tol=1.0
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, gamma=0.9, tol=1.0
     ).solve()
     with pytest.raises(ValueError, match="evaluate=True"):
         unrolled.plot_trajectory()
@@ -372,7 +372,7 @@ def test_solution_verbs_draw_what_the_planner_produced():
 def test_planner_shortcuts_draw_the_latest_solution():
     problem, vi, lqr = solved_pendulum()
     planner = DynamicProgrammingPlanner(
-        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, alpha=0.9, tol=1.0
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, gamma=0.9, tol=1.0
     )
     with pytest.raises(ValueError):
         planner.plot_control_law()

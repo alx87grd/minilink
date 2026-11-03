@@ -134,11 +134,11 @@ def test_dp_reads_the_problem_discount_rate():
     plant = pendulum()
     problem = PlanningProblem(plant, cost=Zero(), U=plant.input_box, discount_rate=1.0)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
-    np.testing.assert_allclose(planner.options.alpha, np.exp(-0.05))
+    np.testing.assert_allclose(planner.options.gamma, np.exp(-0.05))
     explicit = DynamicProgrammingPlanner(
-        problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, alpha=0.9
+        problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, gamma=0.9
     )
-    assert explicit.options.alpha == 0.9
+    assert explicit.options.gamma == 0.9
 
 
 def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_periods():
@@ -158,7 +158,7 @@ def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_perio
         u_grid=(3,),
         dt=dt,
         solver="rk4",
-        alpha=alpha,
+        gamma=alpha,
         tol=1e-12,
         max_iterations=5000,
         clean_infeasible=False,
@@ -551,7 +551,7 @@ def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
         failure_cost=500.0,
     )
     vi = DynamicProgrammingPlanner(
-        problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, alpha=0.95, tol=0.5
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, gamma=0.95, tol=0.5
     ).solve()
 
     auto = ProblemEvaluator(problem, vi, 0.1)

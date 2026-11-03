@@ -28,6 +28,14 @@ PLANT_PACKAGE = "minilink.dynamics"
 RETIRED = {
     "solver": ("record", ("PlanningSolution",)),
     "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
+    "alpha": (
+        "gamma",
+        (
+            "DynamicProgrammingPlanner",
+            "DynamicProgrammingOptions",
+            "TabularLearningPlanner",
+        ),
+    ),
 }
 
 

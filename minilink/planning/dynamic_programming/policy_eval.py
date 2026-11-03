@@ -44,7 +44,7 @@ class PolicyEvaluator:
         the grid state feeds that port, the reference stays pinned at its
         nominal value, and the control port supplies ``u``.
     options : DynamicProgrammingOptions, optional
-        Shared workflow options (``alpha``, ``tol``, ``interpolation``, ...),
+        Shared workflow options (``gamma``, ``tol``, ``interpolation``, ...),
         used as given: pass the planner's resolved ``planner.options``. ``None``
         takes the problem's discount, horizon and failure cost, as the planner does.
     """
@@ -72,7 +72,7 @@ class PolicyEvaluator:
         if options is None:
             options = options_of(problem, grid, None)
         if options.out_of_bound_cost is None:
-            failure_cost = grid_failure_cost(grid, options.alpha)
+            failure_cost = grid_failure_cost(grid, options.gamma)
             options = replace(options, out_of_bound_cost=failure_cost)
         self.options = options
 
@@ -84,7 +84,7 @@ class PolicyEvaluator:
         grid = self.grid
         opt = self.options
         tf = opt.final_time
-        alpha = opt.alpha
+        gamma = opt.gamma
         method = opt.interpolation
         tol = opt.tol
         max_iterations = opt.max_iterations
@@ -103,10 +103,10 @@ class PolicyEvaluator:
             k = k + 1
 
             # Bellman expectation backup, the action fixed by the policy:
-            # J(x_k) = c(x_k, π(x_k)) + α J_next(x_{k+1}), the face's stage cost and step
+            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the face's stage cost and step
             J_next = J
             J_arrival = grid.interpolate(J_next, x_next, method)
-            J = G + alpha * J_arrival
+            J = G + gamma * J_arrival
 
             # Largest change of the cost-to-go: the convergence measure
             delta = float(np.max(np.abs(J - J_next)))

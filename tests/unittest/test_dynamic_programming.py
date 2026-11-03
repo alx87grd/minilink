@@ -59,7 +59,7 @@ def solve(problem, *, precompute=True, **opt_kwargs):
         problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
     )
     options = DynamicProgrammingOptions(
-        alpha=0.95, tol=0.001, max_iterations=400, **opt_kwargs
+        gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs
     )
     planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
     planner.solve()
@@ -263,7 +263,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
         from minilink.planning.dynamic_programming.dp import grid_failure_cost
 
-        # solve() sweeps to convergence: its sum is Σₖ αᵏ dt = dt / (1 − α), tf or not
+        # solve() sweeps to convergence: its sum is Σₖ γᵏ dt = dt / (1 − γ), tf or not
         sys = DoubleIntegrator()
         X, U = sys.state.box, sys.input_box.box
         cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
@@ -386,7 +386,7 @@ class TestBackends(unittest.TestCase):
         try:
             import jax  # noqa: F401
 
-            cases.append(("jax", "alpha", 0.9))
+            cases.append(("jax", "gamma", 0.9))
         except ModuleNotFoundError:
             pass
         problem = make_pendulum_problem()
@@ -396,7 +396,7 @@ class TestBackends(unittest.TestCase):
                 problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
             )
             return DynamicProgrammingPlanner(
-                problem, grid=grid, backend=backend, alpha=0.95
+                problem, grid=grid, backend=backend, gamma=0.95
             )
 
         for backend, name, value in cases:
@@ -431,7 +431,7 @@ class TestBackends(unittest.TestCase):
                 precompute=False,
             )
             planner = DynamicProgrammingPlanner(
-                problem, grid=grid, backend=backend, alpha=0.95, clean_infeasible=False
+                problem, grid=grid, backend=backend, gamma=0.95, clean_infeasible=False
             )
             tables = planner.value_iteration(4, stop_on_tol=False)
             solution = planner.solve_steps(4)
@@ -454,7 +454,7 @@ class TestBackends(unittest.TestCase):
                 dt=0.1,
                 precompute=False,
             )
-            options = DynamicProgrammingOptions(backend=backend, alpha=0.95)
+            options = DynamicProgrammingOptions(backend=backend, gamma=0.95)
             planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
             planner.solve_steps(15)
             results[backend] = planner.result
@@ -484,7 +484,7 @@ class TestBackends(unittest.TestCase):
                 precompute=False,
             )
             planner = DynamicProgrammingPlanner(
-                problem, grid=grid, backend="jax", alpha=0.95, tol=0.01, **options
+                problem, grid=grid, backend="jax", gamma=0.95, tol=0.01, **options
             )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
@@ -926,7 +926,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             u_grid=(5,),
             dt=0.1,
             backend=backend,
-            alpha=0.95,
+            gamma=0.95,
             tol=1e-3,
             max_iterations=200,
             **kwargs,
@@ -1042,12 +1042,12 @@ class TestDpFlatConstructor(unittest.TestCase):
         nested = DynamicProgrammingPlanner(
             problem,
             grid=grid,
-            options=DynamicProgrammingOptions(alpha=0.9, tol=0.2, max_iterations=10),
+            options=DynamicProgrammingOptions(gamma=0.9, tol=0.2, max_iterations=10),
         )
         flat = DynamicProgrammingPlanner(
-            problem, grid=grid, alpha=0.9, tol=0.2, max_iterations=10
+            problem, grid=grid, gamma=0.9, tol=0.2, max_iterations=10
         )
-        self.assertEqual(flat.options.alpha, nested.options.alpha)
+        self.assertEqual(flat.options.gamma, nested.options.gamma)
         self.assertEqual(flat.options.tol, nested.options.tol)
         self.assertEqual(flat.options.max_iterations, nested.options.max_iterations)
 

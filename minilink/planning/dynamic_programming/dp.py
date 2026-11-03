@@ -55,11 +55,11 @@ class DynamicProgrammingPlanner(Planner):
         ``x_grid``, ``u_grid`` and ``dt`` instead and the planner builds it.
     options : DynamicProgrammingOptions, optional
         Workflow options. The flat keyword arguments below overlay matching
-        fields: ``backend``, ``alpha``, ``tol``, ``max_iterations``,
+        fields: ``backend``, ``gamma``, ``tol``, ``max_iterations``,
         ``interpolation``, ``out_of_bound_cost``, ``final_time``,
-        ``record_history``, ``verbose``, ``clean_infeasible``. ``alpha`` given
+        ``record_history``, ``verbose``, ``clean_infeasible``. ``gamma`` given
         on a continuous problem is the planner's own discount per step: the
-        sweeps plan on a copy of the problem at ``ρ = −ln α / dt`` (the stage
+        sweeps plan on a copy of the problem at ``ρ = −ln γ / dt`` (the stage
         integral and the backup both), the record names it, and the score of
         the policy stays the problem's.
     """
@@ -75,7 +75,7 @@ class DynamicProgrammingPlanner(Planner):
         solver="euler",
         options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
-        alpha=_UNSET,
+        gamma=_UNSET,
         tol=_UNSET,
         max_iterations=_UNSET,
         interpolation=_UNSET,
@@ -89,9 +89,9 @@ class DynamicProgrammingPlanner(Planner):
         self.require_cost()
 
         # Discretized state and input spaces, on the planner's own discount when
-        # alpha overrides the problem's: one rate inside and between the periods
+        # gamma overrides the problem's: one rate inside and between the periods
         grid = grid_of(problem, grid, x_grid, u_grid, dt, solver)
-        self.discount_rate = tool_rate_of(problem, alpha, grid.dt)
+        self.discount_rate = tool_rate_of(problem, gamma, grid.dt)
         self.grid = grid_on_rate(grid, self.discount_rate)
 
         # Workflow options: the flat keywords over the bag, then the problem's defaults
@@ -100,7 +100,7 @@ class DynamicProgrammingPlanner(Planner):
             self.grid,
             options,
             backend=backend,
-            alpha=alpha,
+            gamma=gamma,
             tol=tol,
             max_iterations=max_iterations,
             interpolation=interpolation,
@@ -208,7 +208,7 @@ class DynamicProgrammingPlanner(Planner):
             t = tf - k * dt
 
             # Bellman backup from the cost-to-go one step ahead:
-            # J(x_k) = min_u [ c(x_k, u) + α J_next(x_{k+1}) ], the face's stage cost and step
+            # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and step
             J_next = J
             J, pi = backward_step(J_next, t)
 
@@ -241,7 +241,7 @@ class DynamicProgrammingPlanner(Planner):
         params = face.params
         X = self.problem.X
         U = self.problem.U
-        alpha = self.options.alpha
+        gamma = self.options.gamma
         INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         # Interpolation of the cost-to-go one step ahead
@@ -272,8 +272,8 @@ class DynamicProgrammingPlanner(Planner):
                         # (the interpolator takes a batch of states: [0] is this one)
                         J_arrival = J_interpol(x_next)[0]
 
-                        # Cost-to-go of a given action: Q = c + α J(x_{k+1})
-                        Q[a] = c + alpha * J_arrival
+                        # Cost-to-go of a given action: Q = c + γ J(x_{k+1})
+                        Q[a] = c + gamma * J_arrival
 
                     else:
                         # The next state leaves the admissible states: the penalty
@@ -292,7 +292,7 @@ class DynamicProgrammingPlanner(Planner):
     def backward_step_table(self, J_next, t):
         """The same backward step, vectorized over the successor and running-cost tables."""
         grid = self.grid
-        alpha = self.options.alpha
+        gamma = self.options.gamma
         method = self.options.interpolation
         n = grid.n  # State dimension
         N = grid.nodes_n  # Number of nodes
@@ -311,8 +311,8 @@ class DynamicProgrammingPlanner(Planner):
         J_arrival = grid.interpolate(J_next, x_next.reshape(-1, n), method)
         J_arrival = J_arrival.reshape(N, A)
 
-        # Q(x, u) = c(x, u, t) + alpha J_next(x_next), for every pair at once
-        Q = G + alpha * J_arrival
+        # Q(x, u) = c(x, u, t) + γ J_next(x_next), for every pair at once
+        Q = G + gamma * J_arrival
 
         # Best action at every node
         J = Q.min(axis=1)
@@ -560,8 +560,8 @@ class DynamicProgrammingOptions:
         table, ``"loop"`` the per-node Python reference, ``"jax"`` the jitted
         device version (linear/nearest interpolation only; traceable cost/sets;
         its tables are built once, so ``f`` and ``g`` must not depend on time).
-    alpha : float
-        Discount (exponential forgetting) factor; use ``alpha < 1`` for
+    gamma : float
+        Discount (exponential forgetting) factor; use ``gamma < 1`` for
         guaranteed contraction in infinite-horizon value iteration.
         When omitted, the problem's ``discount_factor(dt)`` is used if the
         problem declares a positive ``discount_rate``; otherwise ``1`` (undiscounted).
@@ -598,7 +598,7 @@ class DynamicProgrammingOptions:
     """
 
     backend: str = BACKEND_NUMPY
-    alpha: float = 1.0
+    gamma: float = 1.0
     tol: float = 0.1
     max_iterations: int = 1000
     interpolation: str = "linear"
@@ -659,7 +659,7 @@ class DynamicProgrammingResult:
 
 @dataclass(frozen=True)
 class ValueIterationRecord:
-    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, and the planner's own discount rate when ``alpha`` overrode the problem's (``None``: the problem's)."""
+    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, and the planner's own discount rate when ``gamma`` overrode the problem's (``None``: the problem's)."""
 
     iterations: int
     delta: float
@@ -677,7 +677,7 @@ class ValueIterationRecord:
         rate = (
             ""
             if self.discount_rate is None
-            else f"; planned at rho={self.discount_rate:.4g}/s (alpha), scored at the problem's"
+            else f"; planned at rho={self.discount_rate:.4g}/s (gamma), scored at the problem's"
         )
         if self.fixed_horizon:
             return f"{self.iterations} backward sweeps (fixed horizon){rate}"
@@ -727,13 +727,13 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
 
     face = grid.face
 
-    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless alpha is set
-    if "alpha" not in given and face.gamma < 1.0:
-        opt = replace(opt, alpha=face.gamma)
+    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is set
+    if "gamma" not in given and face.gamma < 1.0:
+        opt = replace(opt, gamma=face.gamma)
 
     # The cost of leaving the grid, unless set: the problem's, else the face's cost bound
     if opt.out_of_bound_cost is None:
-        opt = replace(opt, out_of_bound_cost=grid_failure_cost(grid, opt.alpha))
+        opt = replace(opt, out_of_bound_cost=grid_failure_cost(grid, opt.gamma))
 
     # The horizon's end (t_start + tf, or a step problem's last tick) is the
     # terminal time unless final_time is set
@@ -748,21 +748,21 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     return opt
 
 
-def tool_rate_of(problem, alpha, dt):
+def tool_rate_of(problem, gamma, dt):
     """
-    The planner's own discount rate ``ρ = −ln α / dt`` when ``alpha`` overrides a continuous problem's, else ``None``.
+    The planner's own discount rate ``ρ = −ln γ / dt`` when ``gamma`` overrides a continuous problem's, else ``None``.
 
-    ``α = 1`` is ``ρ = 0``; ``α = 0`` (one step counts) keeps the problem's
+    ``γ = 1`` is ``ρ = 0``; ``γ = 0`` (one step counts) keeps the problem's
     rate, which an Euler step never reads inside its period.
     """
-    if alpha is _UNSET or not isinstance(problem, PlanningProblem):
+    if gamma is _UNSET or not isinstance(problem, PlanningProblem):
         return None
-    alpha = float(alpha)
-    if alpha <= 0.0:
+    gamma = float(gamma)
+    if gamma <= 0.0:
         return None
 
-    # α = e^{−ρ dt}
-    rho = -np.log(alpha) / dt if alpha < 1.0 else 0.0
+    # γ = e^{−ρ dt}
+    rho = -np.log(gamma) / dt if gamma < 1.0 else 0.0
     if rho == problem.discount_rate:
         return None
 
@@ -784,28 +784,28 @@ def grid_on_rate(grid, rate):
     )
 
 
-def grid_failure_cost(grid, alpha):
+def grid_failure_cost(grid, gamma):
     """
-    The cost of an inadmissible pair at the discount ``alpha`` per step: the face's failure cost over the sweeps' horizon.
+    The cost of an inadmissible pair at the discount ``gamma`` per step: the face's failure cost over the sweeps' horizon.
 
-    With ``α < 1`` the sweeps of a continuous (or discretized) problem run to
+    With ``γ < 1`` the sweeps of a continuous (or discretized) problem run to
     convergence, so the face's sum is its geometric limit
-    ``g_max dt / (1 − α)``; with ``α = 1``, and on a native step problem, it is
+    ``g_max dt / (1 − γ)``; with ``γ = 1``, and on a native step problem, it is
     over the problem's own horizon.
     """
     face = grid.face
     native = (
         isinstance(face.problem, StepPlanningProblem) and face.problem.origin is None
     )
-    N = None if alpha < 1.0 and not native else face.N
+    N = None if gamma < 1.0 and not native else face.N
 
-    return face.failure_cost_over(N, alpha)
+    return face.failure_cost_over(N, gamma)
 
 
 def cached_options_of(options) -> tuple:
-    """The options the cached tables and compiled loops bake in: ``alpha``, ``tol``, ``interpolation``, ``final_time``, ``out_of_bound_cost``."""
+    """The options the cached tables and compiled loops bake in: ``gamma``, ``tol``, ``interpolation``, ``final_time``, ``out_of_bound_cost``."""
     return (
-        options.alpha,
+        options.gamma,
         options.tol,
         options.interpolation,
         options.final_time,

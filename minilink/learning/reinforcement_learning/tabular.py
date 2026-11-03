@@ -35,7 +35,7 @@ class TabularLearningPlanner(Planner):
 
         Q(x, u) <- Q(x, u) + eta (q - Q(x, u)),
 
-    Q-learning with the Bellman target ``q = c + alpha min_u' Q(x', u')``,
+    Q-learning with the Bellman target ``q = c + gamma min_u' Q(x', u')``,
     SARSA with the action actually taken next, Monte Carlo control with the
     cost observed to the end of the episode. The result is the cost-to-go
     field and greedy policy that value iteration returns, so ``plot_cost2go``,
@@ -61,7 +61,7 @@ class TabularLearningPlanner(Planner):
     eta : float, optional
         Learning rate of the moving average; ``None`` averages the samples of
         each cell (the step ``1/N(x, u)``).
-    alpha : float, optional
+    gamma : float, optional
         Discount per control period; default the problem's
         ``discount_factor(dt)``, which is 1 for an undiscounted problem, as for
         value iteration.
@@ -107,7 +107,7 @@ class TabularLearningPlanner(Planner):
         method="q_learning",
         exploration=None,
         eta=0.1,
-        alpha=None,
+        gamma=None,
         episode_length=None,
         exploring_starts=True,
         rounding="stochastic",
@@ -125,8 +125,8 @@ class TabularLearningPlanner(Planner):
         # The world is the grid: leaving it is infeasible, at value iteration's
         # failure cost, and the reward its stage cost, so the learner approaches the
         # same table
-        alpha_dp = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
-        failure_cost = grid_failure_cost(grid, alpha_dp)
+        gamma_dp = problem.discount_factor(grid.dt) if gamma is None else float(gamma)
+        failure_cost = grid_failure_cost(grid, gamma_dp)
         self.env = RolloutEnvironment(
             problem.replace(X=problem.X & grid.X, failure_cost=failure_cost),
             dt=grid.dt,
@@ -145,7 +145,7 @@ class TabularLearningPlanner(Planner):
         self.algorithm = self.build_algorithm(method)
         self.exploration = EpsilonGreedy() if exploration is None else exploration
         self.eta = None if eta is None else float(eta)
-        self.alpha = problem.discount_factor(grid.dt) if alpha is None else float(alpha)
+        self.gamma = problem.discount_factor(grid.dt) if gamma is None else float(gamma)
         self.exploring_starts = bool(exploring_starts)
         self.rng = np.random.default_rng(seed)
 
@@ -223,7 +223,7 @@ class TabularLearningPlanner(Planner):
         algorithm = self.algorithm
         explore = self.exploration
         eta = self.eta
-        alpha = self.alpha
+        gamma = self.gamma
         rng = self.rng
 
         for episode in range(episodes):
@@ -260,7 +260,7 @@ class TabularLearningPlanner(Planner):
 
                 # Temporal-difference methods update the cell now, from this transition
                 algorithm.update(
-                    Q, s, a, c, s_next, a_next, bool(terminated), eta_k, alpha
+                    Q, s, a, c, s_next, a_next, bool(terminated), eta_k, gamma
                 )
 
                 # The episode so far, until it terminates or runs out of time
@@ -273,7 +273,7 @@ class TabularLearningPlanner(Planner):
                 x, t, s, a = x_next, t_next, s_next, a_next
 
             # Monte Carlo methods update the visited cells once the episode's cost is known
-            algorithm.update_episode(Q, visited, alpha)
+            algorithm.update_episode(Q, visited, gamma)
 
             self.record_episode(episode_cost, len(visited), explore.epsilon(progress))
 
@@ -438,19 +438,19 @@ class TabularLearningRecord:
 class TabularAlgorithm:
     """The target of the moving average: one of two hooks, per step or per episode."""
 
-    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, alpha):
+    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, gamma):
         """Update after one transition (temporal-difference methods)."""
 
-    def update_episode(self, Q, visited, alpha):
+    def update_episode(self, Q, visited, gamma):
         """Update once the episode ended, from its ``(s, a, c, eta)`` steps (Monte Carlo methods)."""
 
 
 class QLearning(TabularAlgorithm):
     """Off-policy temporal-difference control: the target takes the best next action, whatever the agent does next."""
 
-    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, alpha):
-        # Target: q = c + α min_u' Q(x', u'), nothing beyond a terminal state
-        q = c + alpha * (1.0 - terminated) * Q[s_next].min()
+    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, gamma):
+        # Target: q = c + γ min_u' Q(x', u'), nothing beyond a terminal state
+        q = c + gamma * (1.0 - terminated) * Q[s_next].min()
 
         # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
         Q[s, a] += eta * (q - Q[s, a])
@@ -459,9 +459,9 @@ class QLearning(TabularAlgorithm):
 class SARSA(TabularAlgorithm):
     """On-policy temporal-difference control: the target takes the action the agent really takes next."""
 
-    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, alpha):
-        # Target: q = c + α Q(x', u'), with u' the next action, exploration included
-        q = c + alpha * (1.0 - terminated) * Q[s_next, a_next]
+    def update(self, Q, s, a, c, s_next, a_next, terminated, eta, gamma):
+        # Target: q = c + γ Q(x', u'), with u' the next action, exploration included
+        q = c + gamma * (1.0 - terminated) * Q[s_next, a_next]
 
         # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
         Q[s, a] += eta * (q - Q[s, a])
@@ -470,11 +470,11 @@ class SARSA(TabularAlgorithm):
 class MonteCarloControl(TabularAlgorithm):
     """On-policy Monte Carlo control: the target is the cost actually observed to the end of the episode."""
 
-    def update_episode(self, Q, visited, alpha):
-        # Observed cost-to-go of each visited cell, backwards: q_k = c_k + α q_{k+1}
+    def update_episode(self, Q, visited, gamma):
+        # Observed cost-to-go of each visited cell, backwards: q_k = c_k + γ q_{k+1}
         q = 0.0
         for s, a, c, eta in reversed(visited):
-            q = c + alpha * q
+            q = c + gamma * q
 
             # Moving average toward the target: Q(x, u) ← Q(x, u) + η (q − Q(x, u))
             Q[s, a] += eta * (q - Q[s, a])

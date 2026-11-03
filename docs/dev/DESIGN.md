@@ -1175,7 +1175,7 @@ infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long t
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
 The discount rate `rho` is the problem's, `problem.discount_rate`; planners convert it
-with `problem.discount_factor(dt)` (DP `alpha`, RL `gamma`). `X` and `U` are hard
+with `problem.discount_factor(dt)` (the per-tick `gamma` of DP and RL). `X` and `U` are hard
 constraints in every tool: a run that leaves them is a failure. **The failure switch**
 `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
 facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
@@ -1187,7 +1187,7 @@ own sum, `g_max dt Σ_{k<N} γᵏ + γᴺ h_max`, `γ = e^{−ρ dt}` (it bounds
 `failure_cost` when no bound exists). The step face reads it at its period
 (`face.cost_bound`, `face.cost_bound_over(N, γ)`), each tool over the horizon its own sum runs:
 the RL environment over its episode, value iteration over its sweeps (to convergence: the
-geometric limit `g_max dt/(1 − α)`), the face over its `N`; on a finite undiscounted problem
+geometric limit `g_max dt/(1 − γ)`), the face over its `N`; on a finite undiscounted problem
 the judge's integral and the three sums are one number. Trajopt and RRT keep the sets exact;
 value iteration, tabular learning, the RL environment and the Gym bridge always charge a
 failure the failure cost (`failure_cost`, else that bound), and DP treats
@@ -1235,8 +1235,8 @@ the modification, but the score is always the problem's. RL *trains* on `r_k = �
 dt`, one call of the cost's `g` at the period's start (`reward="stage"`: `−c_k`, the face's stage
 cost `∫₀^dt e^{−ρτ} g dτ`, the score's), with per-step factor `gamma`; `exp(-rho t)` is not folded
 into the reward (that would discount twice); its record says "trained on −g dt, scored on the
-problem's cost". A tool's own discount (value iteration's `alpha`, RL's `gamma` with the stage
-reward) is internal and consistent: the tool plans on the problem at `ρ_tool = −ln α / dt`, the
+problem's cost". A tool's own discount (value iteration's `gamma`, RL's `gamma` with the stage
+reward) is internal and consistent: the tool plans on the problem at `ρ_tool = −ln γ / dt`, the
 stage integral and the step both, names it in its record, and its policy is scored at the
 problem's `ρ`.
 
@@ -1503,7 +1503,7 @@ step face (`grid.face`): the successors are one period of the step model, forwar
 Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
 step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
 `c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
-the discount `α` the face's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
+the discount the face's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`

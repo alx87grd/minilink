@@ -197,7 +197,7 @@ def run_minilink_pendulum_dp(
         grid=grid,
         options=DynamicProgrammingOptions(
             backend=backend,
-            alpha=1.0,
+            gamma=1.0,
             tol=tol,
             max_iterations=n_steps,
             out_of_bound_cost=INF_PENDULUM,
@@ -265,7 +265,7 @@ def run_minilink_double_pendulum_dp(
         grid=grid,
         options=DynamicProgrammingOptions(
             backend=backend,
-            alpha=1.0,
+            gamma=1.0,
             max_iterations=n_steps,
             out_of_bound_cost=INF_DOUBLE,
             verbose=False,

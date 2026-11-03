@@ -55,12 +55,12 @@ def double_integrator_problem(stochastic=False):
 
 def test_q_learning_approaches_value_iteration_on_the_same_grid():
     problem = double_integrator_problem()
-    vi = DynamicProgrammingPlanner(problem, alpha=0.9, tol=1e-6, **GRID)
+    vi = DynamicProgrammingPlanner(problem, gamma=0.9, tol=1e-6, **GRID)
     vi.solve()
 
     # The same grid, Euler step and exit failure_cost; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
-        problem, alpha=0.9, eta=0.1, solver="euler", seed=0, **GRID
+        problem, gamma=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
     solution = learner.solve(episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
@@ -120,7 +120,7 @@ def test_every_tabular_algorithm_learns_from_the_same_loop(algorithm):
     learner = TabularLearningPlanner(
         double_integrator_problem(stochastic=True),
         method=algorithm,
-        alpha=0.9,
+        gamma=0.9,
         exploring_starts=False,
         **GRID,
     )
@@ -154,7 +154,7 @@ def test_sample_average_step_and_the_planner_arguments():
     problem = double_integrator_problem()
     learner = TabularLearningPlanner(problem, eta=None, **GRID)
     solution = learner.solve(episodes=5, evaluate=True)
-    assert learner.alpha == 1.0  # an undiscounted cost, as for value iteration
+    assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
     assert solution.evaluation.n_trials == 1 and solution.trajectory is not None
     assert "episodes" in str(solution.record)

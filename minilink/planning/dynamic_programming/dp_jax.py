@@ -327,7 +327,7 @@ def jitted_step(planner):
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
     N = planner.grid.nodes_n
     A = planner.grid.actions_n
-    alpha = float(planner.options.alpha)
+    gamma = float(planner.options.gamma)
     order = 0 if planner.options.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds):
@@ -338,8 +338,8 @@ def jitted_step(planner):
         )
         J_arrival = jnp.where(in_bounds, J_arrival, 0.0)
 
-        # Q(x, u) = g(x, u) dt + α J_next(x_next), for every pair at once
-        Q = G + alpha * J_arrival.reshape(N, A)
+        # Q(x, u) = g(x, u) dt + γ J_next(x_next), for every pair at once
+        Q = G + gamma * J_arrival.reshape(N, A)
 
         # Best action at every node
         J = Q.min(axis=1)

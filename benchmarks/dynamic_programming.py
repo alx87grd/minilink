@@ -80,7 +80,7 @@ def benchmark_backend(
     )
     build_s = time.perf_counter() - t0
 
-    options = DynamicProgrammingOptions(backend=backend, alpha=alpha)
+    options = DynamicProgrammingOptions(backend=backend, gamma=alpha)
     planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
 
     cold_solve_s = None
