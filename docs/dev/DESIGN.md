@@ -314,8 +314,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   by `sys.game()`. `PygameInput` maps held keys or a connected gamepad (`joystick_axes`,
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
-- **Path integral control:** `MPPIPlanner(problem, *, dt, n_samples, temperature, noise,
-  control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
+- **Path integral control:** `MPPIPlanner(problem, *, dt, n_rollouts, temperature, noise,
+  control_cost, iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
   JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
   rolls each out on `RolloutEnvironment(reward="stage")`'s `step(x, t, u, key, params=None, *, t_origin=None)` (the one owner of the stage cost, the exit cost
   and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the

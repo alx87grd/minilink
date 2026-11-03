@@ -65,7 +65,7 @@ problem = PlanningProblem(
 planner = MPPIPlanner(
     problem,
     dt=DT,
-    n_samples=K,
+    n_rollouts=K,
     temperature=LAMBDA,
     noise=np.square(SIGMA),
     control_cost=ALPHA,

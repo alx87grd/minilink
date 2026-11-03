@@ -60,7 +60,7 @@ class Moves(StepCost):
 walker = Walker()
 problem = StepPlanningProblem(
     walker,
-    N=None,
+    n_steps=None,
     gamma=1.0,
     cost=Moves(GOAL),
     x_start=[0.0, 8.0],

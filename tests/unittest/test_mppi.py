@@ -46,7 +46,7 @@ def swing_up_planner(**options):
     problem = PlanningProblem(
         plant, cost=SwingUpCost(), tf=2.0, x_start=[0.0, 0.0], U=plant.input_box
     )
-    settings = dict(dt=DT, n_samples=512, temperature=0.1, noise=9.0)
+    settings = dict(dt=DT, n_rollouts=512, temperature=0.1, noise=9.0)
     return MPPIPlanner(problem, **{**settings, **options})
 
 
@@ -59,7 +59,7 @@ def double_integrator_planner():
         plant, cost=cost, tf=1.0, x_start=[1.0, 0.0], U=plant.input_box
     )
     return MPPIPlanner(
-        problem, dt=DT, n_samples=2048, temperature=0.01, noise=1.0, n_iterations=8
+        problem, dt=DT, n_rollouts=2048, temperature=0.01, noise=1.0, iterations=8
     )
 
 
@@ -135,7 +135,7 @@ def test_the_mpc_runs_mppi_in_every_form(form, blocks):
 
 
 def test_the_zero_delay_mppi_swings_the_pendulum_up():
-    planner = swing_up_planner(n_samples=1024)
+    planner = swing_up_planner(n_rollouts=1024)
     mpc = ModelPredictiveController(planner, delay=False)
     loop = (mpc % DT) @ planner.problem.sys
     run = loop.compute_trajectory(tf=6.0, dt=DT)
@@ -263,7 +263,7 @@ def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():
     problem = PlanningProblem(
         plant, cost=cost, tf=0.5, x_start=[1.0, 0.0], U=plant.input_box
     )
-    planner = MPPIPlanner(problem, dt=DT, n_samples=256, temperature=0.1, noise=4.0)
+    planner = MPPIPlanner(problem, dt=DT, n_rollouts=256, temperature=0.1, noise=4.0)
     mpc = ModelPredictiveController(planner, delay=False)
     pe = problem.replace(tf=0.3).compile(mpc % DT, backend="numpy")
     base = pe.params
@@ -319,6 +319,6 @@ def test_the_plan_is_made_at_the_plant_design_point():
         U=plant.input_box,
         params={"plant": {"m": Uniform([2.5], [3.5])}},
     )
-    planner = MPPIPlanner(problem, dt=DT, n_samples=8)
+    planner = MPPIPlanner(problem, dt=DT, n_rollouts=8)
     np.testing.assert_allclose(planner.params["plant"]["m"], 3.0)
     assert plant.params["m"] == 1.0

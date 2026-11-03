@@ -23,7 +23,8 @@ class StepPlanningProblem:
     A planning problem on a step system: ``x_{k+1} = step(x_k, u_k, k)``, ``N`` ticks, a discount ``γ`` per tick.
 
     The objective is ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``, ``c`` and
-    ``h`` a :class:`~minilink.core.costs.StepCost`. ``N=None`` is the infinite
+    ``h`` a :class:`~minilink.core.costs.StepCost`, with ``N`` the ``n_steps``
+    ticks. ``n_steps=None`` is the infinite
     horizon (no ``h``). The start, the sets and the laws are a
     :class:`~minilink.planning.problems.PlanningProblem`'s, shared by
     composition (:attr:`parts`). ``t_start`` is the tick offset, an integer,
@@ -38,7 +39,7 @@ class StepPlanningProblem:
         self,
         sys,
         *,
-        N=None,
+        n_steps=None,
         cost: StepCost | None = None,
         gamma: float = 1.0,
         x_start=None,
@@ -57,7 +58,7 @@ class StepPlanningProblem:
 
         # The task: the step system, its horizon, its cost and discount per tick
         self.sys = sys
-        self.N = coerce_horizon(N)
+        self.n_steps = coerce_horizon(n_steps)
         self.cost = cost
         self.gamma = coerce_gamma(gamma)
         self.dt = None if dt is None else float(dt)
@@ -179,9 +180,9 @@ class StepPlanningProblem:
 
     def horizon_kind(self) -> str:
         """``"finite"`` with a horizon ``N`` (``h`` is charged there), ``"infinite"`` without."""
-        return "infinite" if self.N is None else "finite"
+        return "infinite" if self.n_steps is None else "finite"
 
-    def cost_bound(self, N=None, *, gamma=None, params=None):
+    def cost_bound(self, n_steps=None, *, gamma=None, params=None):
         """
         An upper bound of the cost of any run that stays in the boxes: ``Σ_{k<N} γᵏ c_max + γᴺ h_max``.
 
@@ -196,7 +197,7 @@ class StepPlanningProblem:
         """
         cost = self.require_cost()
         gamma = self.gamma if gamma is None else float(gamma)
-        N = self.N if N is None else N
+        N = self.n_steps if n_steps is None else n_steps
 
         # A discretized problem: the continuous problem's sum at dt, γ = e^{−ρ dt}
         if self.origin is not None:
@@ -230,11 +231,11 @@ class StepPlanningProblem:
 
         return float(bound)
 
-    def failure_cost_at(self, N=None, *, gamma=None, params=None):
+    def failure_cost_at(self, n_steps=None, *, gamma=None, params=None):
         """The cost a failure is charged: :attr:`failure_cost` when a number, else :meth:`cost_bound` (its arguments)."""
         failure_cost = self.failure_cost
         if failure_cost is None:
-            return self.cost_bound(N, gamma=gamma, params=params)
+            return self.cost_bound(n_steps, gamma=gamma, params=params)
 
         return failure_cost
 
@@ -273,7 +274,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
 
     step = StepPlanningProblem(
         SampledSystem(problem.sys, dt, solver=solver, substeps=substeps),
-        N=N,
+        n_steps=N,
         cost=SampledCost(
             cost,
             problem.sys,
@@ -335,7 +336,7 @@ def coerce_horizon(N):
         return None
     if isinstance(N, bool) or int(N) != N or N < 1:
         raise ValueError(
-            f"N must be a positive whole number of ticks or None, got {N!r}"
+            f"n_steps must be a positive whole number of ticks or None, got {N!r}"
         )
 
     return int(N)

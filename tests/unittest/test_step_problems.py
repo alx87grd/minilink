@@ -42,7 +42,7 @@ def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
         if solver == "euler":
             assert c == problem.cost.g(x, u, t_k, None) * 0.05
 
-    assert face.N == 40 and face.gamma == np.exp(-0.4 * 0.05)
+    assert face.n_steps == 40 and face.gamma == np.exp(-0.4 * 0.05)
 
 
 @pytest.mark.parametrize("solver", ["euler", "rk4"])
@@ -55,7 +55,7 @@ def test_the_discretized_problem_compiles_to_the_same_face(solver):
         sampled.cost, SampledCost
     )
     other = sampled.compile()
-    assert (other.N, other.gamma, other.dt) == (face.N, face.gamma, face.dt)
+    assert (other.n_steps, other.gamma, other.dt) == (face.n_steps, face.gamma, face.dt)
 
     rng = np.random.default_rng(5)
     for k in range(10):
@@ -114,7 +114,7 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
             return np.clip(x + u, 0.0, 5.0)
 
     problem = StepPlanningProblem(
-        Walk(), N=6, cost=Moves([4.0]), gamma=0.9, x_start=[1.0], t_start=2
+        Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x_start=[1.0], t_start=2
     )
     face = problem.compile()
     xs, us, cs, J = face.run(lambda x, t: np.ones(1))
@@ -124,9 +124,11 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
     assert set(problem.params) >= {"plant", "cost", "x_start", "t_start", "gamma"}
 
     with pytest.raises(TypeError, match="SampledCost"):
-        StepPlanningProblem(Walk(), N=3, cost=QuadraticCost.from_system(Pendulum()))
+        StepPlanningProblem(
+            Walk(), n_steps=3, cost=QuadraticCost.from_system(Pendulum())
+        )
     with pytest.raises(ValueError, match="tick offset"):
-        StepPlanningProblem(Walk(), N=3, cost=Moves([4.0]), t_start=0.5)
+        StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]), t_start=0.5)
 
 
 def test_the_state_only_step_is_the_transitions_state_on_both_faces():

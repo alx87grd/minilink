@@ -2525,7 +2525,7 @@ def test_every_planner_has_one_tree_shape():
     )
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
-        MPPIPlanner(problem, dt=0.1, n_samples=16),
+        MPPIPlanner(problem, dt=0.1, n_rollouts=16),
         ReinforcementLearningPlanner(
             problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,), verbose=False
         ),

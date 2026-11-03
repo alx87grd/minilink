@@ -797,7 +797,7 @@ def grid_failure_cost(grid, gamma):
     native = (
         isinstance(face.problem, StepPlanningProblem) and face.problem.origin is None
     )
-    N = None if gamma < 1.0 and not native else face.N
+    N = None if gamma < 1.0 and not native else face.n_steps
 
     return face.failure_cost_over(N, gamma)
 

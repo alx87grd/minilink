@@ -30,7 +30,7 @@ class StepFace:
       :class:`~minilink.core.costs.SampledCost` fused into the same one step,
       so its face equals the continuous problem's).
 
-    ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``. :attr:`N` is the horizon in ticks
+    ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``. :attr:`n_steps` (``N``) is the horizon in ticks
     (``None`` infinite), :attr:`gamma` the discount per tick, :attr:`params`
     the tree every call reads (``params=None``: these numbers),
     :meth:`time_of` the time of tick ``k`` (``t_start + k dt``, or the tick for
@@ -48,7 +48,7 @@ class StepFace:
         # A step problem: its own horizon, discount and stage
         if isinstance(problem, StepPlanningProblem):
             self.dt = problem.dt
-            self.N = problem.N
+            self.n_steps = problem.n_steps
             self.gamma = problem.gamma
             self.solver = None
             self.substeps = None
@@ -66,7 +66,7 @@ class StepFace:
             self.substeps = int(substeps)
             rho = problem.discount_rate
             finite = problem.horizon_kind() == "finite"
-            self.N = steps_of(problem.tf, self.dt) if finite else None
+            self.n_steps = steps_of(problem.tf, self.dt) if finite else None
             self.gamma = float(np.exp(-rho * self.dt))
             self.stage = None
             if problem.cost is not None:
@@ -177,7 +177,7 @@ class StepFace:
 
     def horizon_end(self):
         """The time of the horizon's end, ``t_start + tf`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
-        if self.N is None:
+        if self.n_steps is None:
             return None
         t_start = self.t_start
 
@@ -186,7 +186,7 @@ class StepFace:
             t_end = t_start + tf
             return t_end
 
-        t_end = self.time_of(self.N)
+        t_end = self.time_of(self.n_steps)
 
         return t_end
 
@@ -224,10 +224,10 @@ class StepFace:
         """The terminal cost ``h(x)`` at the horizon's end (or at ``t``); ``0`` on an infinite horizon."""
         params = self.params if params is None else params
         xp = array_module(x)
-        if self.N is None and t is None:
+        if self.n_steps is None and t is None:
             return xp.asarray(0.0)
 
-        t = self.time_of(self.N, params) if t is None else t
+        t = self.time_of(self.n_steps, params) if t is None else t
 
         # A sampled stage: the continuous cost's h at the time t
         if self.stage is not None:
@@ -263,12 +263,12 @@ class StepFace:
         problem's is ``Σ γᵏ c_max + γᴺ h_max``. The judge on the face, the RL
         environment and value iteration read it.
         """
-        return self.cost_bound_over(self.N, self.gamma)
+        return self.cost_bound_over(self.n_steps, self.gamma)
 
     @property
     def failure_cost(self) -> float:
         """What a failure is charged on the face: the problem's ``failure_cost`` when a number, else :attr:`cost_bound`."""
-        return self.failure_cost_over(self.N, self.gamma)
+        return self.failure_cost_over(self.n_steps, self.gamma)
 
     def cost_bound_over(self, N, gamma) -> float:
         """
@@ -276,7 +276,7 @@ class StepFace:
 
         One formula, each tool over the horizon its own sum runs: the RL
         environment over its episode, value iteration over its sweeps (to
-        convergence: the geometric limit), the face's own over :attr:`N`.
+        convergence: the geometric limit), the face's own over :attr:`n_steps`.
         """
         problem = self.problem
 
@@ -301,13 +301,13 @@ class StepFace:
         """
         The face's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
 
-        ``n_steps`` defaults to :attr:`N`. The states ``(n_steps + 1, n)``, the
+        ``n_steps`` defaults to the face's :attr:`n_steps`. The states ``(n_steps + 1, n)``, the
         inputs and stage costs ``(n_steps,)``-long, on the array module of the
         start: the one sum every tool's score is.
         """
         params = self.params if params is None else params
         x = np.asarray(params["x_start"] if x_start is None else x_start, dtype=float)
-        N = self.N if n_steps is None else int(n_steps)
+        N = self.n_steps if n_steps is None else int(n_steps)
         require_horizon(N)
         gamma = float(self.gamma_at(params))
         m = self.m
