@@ -216,8 +216,8 @@ solvers are v0.4 (§4); MPPI runs on the face (its rest is S72).
 - [ ] **The compiled face beyond trajectory optimization** (the rest of the compiled face; the face on
   trajectory optimization, its `"method"` and `seed` leaves, the MPC as one box on it and its
   closed loop tuned by gradient landed in the v0.3 runs): `planner.compile()` for the LQR and
-  value-iteration planners, the others as they are wrapped; whether `last_solution` stays is
-  an open question (QUESTIONS, "Does a planner keep its last solution?"). What each face holds (`z`; `initial`;
+  value-iteration planners, the others as they are wrapped; the face keeps no last solution
+  (RULES 2.4: only the offline planner's shortcuts keep one). What each face holds (`z`; `initial`;
   `shift`; `command`):
   - LQR: `K`, `x̄`, `ū`; the gain at the operating point; identity; `ū − K(x − x̄)`;
   - value iteration: the `J` and `π` tables; `J` from the terminal cost (or zeros); identity;
@@ -485,6 +485,9 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   `@dataclass` rows become `solution.plot_*` and `compare(...)` (a runnable draft of
   `vi_pendulum_lqr.py` exists).
   Also: `Planner.plot_solution` is the solution's own `plot_trajectory` (scan: planning#7).
+  Also: the Simulator under RULES 2.4, which keeps `last_traj` and `last_solve_time_s`
+  besides the `sys.traj` shortcut (the maintainer held it, 2026-11-04); its `last_debug`
+  stays a diagnostic.
 
 **D2 — consolidation picks** still open from
 the 2026-09-05 consolidation inventory, in git history (nothing removed without the maintainer's

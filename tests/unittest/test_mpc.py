@@ -99,7 +99,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         traj = planner.step(np.array([0.0]))
         self.assertEqual(traj.x.shape, (1, 5))
         self.assertEqual(traj.u.shape, (1, 5))
-        self.assertIsNotNone(planner.last_optimization_result)
+        self.assertIsNotNone(planner.last_solution.record.optimization_result)
         traj2 = planner.step(np.array([0.2]))
         self.assertEqual(traj2.x.shape, (1, 5))
 
@@ -109,9 +109,9 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertIsNotNone(compile_s)
         self.assertGreater(compile_s, 0.0)
         planner.step(np.array([0.0]))
-        first_step_s = planner.last_step_time_s
+        first_step_s = planner.last_solution.record.step_time_s
         planner.step(np.array([0.15]))
-        second_step_s = planner.last_step_time_s
+        second_step_s = planner.last_solution.record.step_time_s
         self.assertIsNotNone(first_step_s)
         self.assertIsNotNone(second_step_s)
         self.assertLess(second_step_s, first_step_s)
@@ -178,8 +178,8 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         np.testing.assert_allclose(plan.trajectory.x, traj.x, atol=1e-08)
         np.testing.assert_allclose(plan.trajectory.u, traj.u, atol=1e-08)
         np.testing.assert_allclose(
-            planner_from.last_optimization_result.z,
-            planner_step.last_optimization_result.z,
+            planner_from.last_solution.record.optimization_result.z,
+            planner_step.last_solution.record.optimization_result.z,
             atol=1e-08,
         )
         self.assertIs(planner_from.last_solution, plan)
@@ -192,7 +192,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNone(plan.record.feasible)  # an online tick runs no residual check
         self.assertEqual(plan.success, plan.record.solver_success)
         self.assertIsNone(plan.evaluation)  # not asked
-        self.assertIsNotNone(planner.last_optimization_result.z)
+        self.assertIsNotNone(planner.last_solution.record.optimization_result.z)
 
     def test_params_none_and_empty_ok(self):
         planner = self.make_planner(self.make_problem(0.0))
@@ -329,7 +329,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         )
         plan = planner.solve_trajectory_from(np.array([0.05]), guess=guess)
         np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.05], atol=1e-05)
-        self.assertIsNotNone(planner.last_optimization_result.z)
+        self.assertIsNotNone(planner.last_solution.record.optimization_result.z)
 
 
 class SingleIntegrator(DynamicSystem):

@@ -101,7 +101,7 @@ def run_showcase_cartpole_trajopt(
         total_s = time.perf_counter() - t0
         total_times.append(total_s)
 
-        optimization_result = planner.last_optimization_result
+        optimization_result = planner.last_solution.record.optimization_result
         optimizer = planner.last_optimizer
         if optimization_result is None or optimizer is None:
             raise RuntimeError("trajectory optimization did not store a solution")

@@ -1428,7 +1428,10 @@ means *the returned plan satisfies the program constraints to
 `feasibility_tol`* — nothing else: an iteration-limit stop on a feasible plan
 is not a failure, a solver that reports convergence on an infeasible plan is,
 and the solver's own flag stays in `message` / `stats`. The worst equality
-residual / inequality margin / bound violation are recorded on the record.
+residual / inequality margin / bound violation are recorded on the record, with the
+solve's whole account (`optimization_result`, the per-iteration `history` when
+`record_history=True`, `solve_time_s`, `step_time_s`); the planner keeps only the
+diagnostics `last_program` and `last_optimizer` (RULES 2.4).
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `backend=…`) like `Simulator` /
@@ -1483,8 +1486,8 @@ planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
 planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
 with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
 last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
-report) and keeps `last_solution` for its plotting shortcuts only (`plot_solution`,
-`animate_solution`), until they move to the solution (D1.4); no solve reads it. Single backend-native
+report) and keeps `last_solution` for its shortcuts only (`plot_solution`,
+`animate_solution`, `get_controller`, RULES 2.4); no solve and no tool reads it. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
@@ -1505,7 +1508,8 @@ callable `out_of_bound_cost` has no single saturation level, so it leaves the ta
 solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a
 fixed-horizon `solve_steps` always succeeds); the record carries the sweep
-count and the last cost-to-go change.
+count, the last cost-to-go change and the tables themselves (`record.tables`, the
+`J` and `pi` the planner's `result`, `value_at` and plots read).
 
 **Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*

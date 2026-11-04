@@ -316,6 +316,7 @@ class CompiledTrajectoryPlanner:
             max_bound_violation=float(max_bound),
             feasible=feasible,
             stats=dict(result.stats),
+            optimization_result=result,
         )
         policy = self.planner.open_loop_policy(trajectory)
 

@@ -152,7 +152,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         t0 = time.perf_counter()
         traj = planner.solve().trajectory
         total_times.append(time.perf_counter() - t0)
-        optimization_result = planner.last_optimization_result
+        optimization_result = planner.last_solution.record.optimization_result
         if optimization_result is None:
             raise RuntimeError("pendulum numpy trajopt did not store a solution")
         solve_times.append(float(optimization_result.solve_time_s))

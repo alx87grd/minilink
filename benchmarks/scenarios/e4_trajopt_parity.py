@@ -143,7 +143,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         t0 = time.perf_counter()
         traj = planner.solve().trajectory
         total_times.append(time.perf_counter() - t0)
-        optimization_result = planner.last_optimization_result
+        optimization_result = planner.last_solution.record.optimization_result
         if optimization_result is None:
             raise RuntimeError("pendulum trajopt did not store a solution")
         solve_times.append(float(optimization_result.solve_time_s))
@@ -257,8 +257,8 @@ def run_bicycle_parametric(
         traj = plan.trajectory
         cost_val = float(plan.record.cost)
         success = bool(plan.success)
-        if planner.last_solve_time_s is not None:
-            solve_times.append(float(planner.last_solve_time_s))
+        if planner.last_solution.record.solve_time_s is not None:
+            solve_times.append(float(planner.last_solution.record.solve_time_s))
         elif plan.record.solve_time_s is not None:
             solve_times.append(float(plan.record.solve_time_s))
         else:
