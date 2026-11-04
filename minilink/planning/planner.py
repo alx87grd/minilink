@@ -143,8 +143,8 @@ class Planner(ABC):
         """The solution's policy: a feedback block, or the open-loop source of a trajectory planner."""
         return self.require_solution().policy
 
-    def nominal_trajectory(self, tf=None) -> Trajectory:
-        """The solution's policy from the problem's start on the planner's grid (feedback planners)."""
+    def nominal_trajectory(self, tf=None, *, solution=None) -> Trajectory:
+        """``solution``'s policy from the problem's start on the planner's grid (feedback planners); the latest solution when none is given."""
         raise NotImplementedError(f"{type(self).__name__} has no nominal_trajectory")
 
     def require_cost(self) -> CostFunction:
@@ -187,7 +187,7 @@ class Planner(ABC):
         if solution.trajectory is not None:
             return solution.trajectory
 
-        return self.nominal_trajectory()
+        return self.nominal_trajectory(solution=solution)
 
     # What a family's solve builds its solution from
 

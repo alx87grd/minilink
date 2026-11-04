@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 
 import numpy as np
@@ -137,7 +137,6 @@ class DynamicProgrammingPlanner(Planner):
         self.verbose = bool(verbose)
 
         # Memory
-        self.result: DynamicProgrammingResult | None = None  # Latest solve's tables
         self._G = None  # Running-cost table, built once when the grid is precomputed
         self._jax_cache = {}  # The JAX engine's device tables and compiled loops
         self._cached_numbers = None  # The numbers those two were built with
@@ -179,6 +178,14 @@ class DynamicProgrammingPlanner(Planner):
         return self.dp_result_to_planning_solution(
             result, fixed_horizon=True, evaluate=evaluate, n_trials=n_trials
         )
+
+    @property
+    def result(self) -> DynamicProgrammingResult | None:
+        """The latest solution's tables, ``J`` and ``pi`` (a shortcut: a tool reads ``solution.record.tables``)."""
+        if self.last_solution is None:
+            return None
+
+        return self.last_solution.record.tables
 
     # Value iteration
 
@@ -467,25 +474,26 @@ class DynamicProgrammingPlanner(Planner):
         self.require_solution()
         return self.result.value_at(x, self.interpolation)
 
-    def nominal_trajectory(self, tf=None):
-        """The greedy law from the problem's start on the grid's control period."""
-        return nominal_trajectory(
-            self.problem, self.get_controller(), dt=self.grid.dt, tf=tf
-        )
+    def nominal_trajectory(self, tf=None, *, solution=None):
+        """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
+        solution = self.require_solution() if solution is None else solution
+        return nominal_trajectory(self.problem, solution.policy, dt=self.grid.dt, tf=tf)
 
-    def clean_infeasible_set(self, tol: float = 1.0) -> DynamicProgrammingResult:
+    def clean_infeasible_set(
+        self, tol: float = 1.0, *, tables=None
+    ) -> DynamicProgrammingResult:
         """
         Flag states whose cost-to-go has saturated at ``out_of_bound_cost``.
 
         Their value is pinned to the penalty and their policy to the action
         nearest the system's nominal input, mirroring pyro's cleanup pass. A
         callable ``out_of_bound_cost(x_next, t)`` has no single saturation
-        level: the tables are then left as solved.
+        level: the tables are then left as solved. ``tables`` defaults to the
+        latest solution's; a solve passes its own before building its solution.
         """
-        # The tables, not the solution: a solve cleans them before storing its solution
-        require_tables(self.result)
+        result = self.result if tables is None else tables
+        require_tables(result)
 
-        result = self.result
         INF = self.out_of_bound_cost
 
         # A cost that varies with the exit state saturates at no single level
@@ -543,19 +551,16 @@ class DynamicProgrammingPlanner(Planner):
         """
         Turn the value-iteration tables into the planner's :class:`PlanningSolution`.
 
-        Keeps the tables on ``planner.result``, cleans the infeasible cells,
-        builds the greedy lookup law, records how the sweeps ended, optionally
-        rolls the law out, and stores the solution.
+        Cleans the infeasible cells, builds the greedy lookup law, records how
+        the sweeps ended with the tables themselves, optionally rolls the law
+        out, and stores the solution.
         """
         tol = float(self.tol)
         dt = self.grid.dt
 
-        # Keep the raw tables on the planner (plots and cleanup read them there)
-        self.result = result
-
         # Pin the saturated cells to the penalty, before the law is built from them
         if self.clean_infeasible:
-            self.clean_infeasible_set()
+            self.clean_infeasible_set(tables=result)
 
         # The greedy policy: the minimizing action of every node, interpolated between
         # nodes
@@ -570,6 +575,7 @@ class DynamicProgrammingPlanner(Planner):
             converged=fixed_horizon or result.delta <= tol,
             fixed_horizon=fixed_horizon,
             discount_rate=self.discount_rate,
+            tables=result,
         )
 
         # Optionally, roll the law out from the problem's start and score it over
@@ -640,7 +646,7 @@ class DynamicProgrammingResult:
 
 @dataclass(frozen=True)
 class ValueIterationRecord:
-    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, and the planner's own discount rate when ``gamma`` overrode the problem's (``None``: the problem's)."""
+    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, the planner's own discount rate when ``gamma`` overrode the problem's (``None``: the problem's), and the tables ``J`` and ``pi`` the sweeps ended on."""
 
     iterations: int
     delta: float
@@ -648,6 +654,9 @@ class ValueIterationRecord:
     converged: bool
     fixed_horizon: bool
     discount_rate: float | None = None
+    tables: DynamicProgrammingResult | None = field(
+        default=None, repr=False, compare=False
+    )
 
     @property
     def success(self) -> bool:

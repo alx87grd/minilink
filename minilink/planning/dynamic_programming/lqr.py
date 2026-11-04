@@ -204,11 +204,10 @@ class LQRPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def nominal_trajectory(self, tf=None):
-        """The law from the problem's start on the nonlinear plant, sampled every ``dt``."""
-        return nominal_trajectory(
-            self.problem, self.get_controller(), dt=self.dt, tf=tf
-        )
+    def nominal_trajectory(self, tf=None, *, solution=None):
+        """``solution``'s law (the latest when none is given) from the problem's start on the nonlinear plant, sampled every ``dt``."""
+        solution = self.require_solution() if solution is None else solution
+        return nominal_trajectory(self.problem, solution.policy, dt=self.dt, tf=tf)
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""

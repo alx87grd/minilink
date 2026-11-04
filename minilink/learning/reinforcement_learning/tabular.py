@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -166,7 +166,11 @@ class TabularLearningPlanner(Planner):
     @property
     def result(self) -> DynamicProgrammingResult:
         """
-        The table as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
+        The table as it stands, as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
+
+        The learner's own model, updated by every episode; the shortcuts
+        (:meth:`get_controller`, :meth:`value_at`, the plots) read the latest
+        solution's tables instead, ``solution.record.tables``.
 
         A cell never visited keeps its initial value, zero: the optimistic
         start that makes untried actions worth trying (``visits`` tells which).
@@ -207,7 +211,7 @@ class TabularLearningPlanner(Planner):
 
         # The greedy law of the learned table
         result = self.result
-        policy = self.get_controller()
+        policy = plotting.get_controller(result)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -220,7 +224,7 @@ class TabularLearningPlanner(Planner):
             evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials, tf=tf)
 
         # The solution: the law, the record, the rollout, the interpolated cost-to-go
-        record = self.learning_record()
+        record = self.learning_record(result)
         solution = PlanningSolution(
             self.problem, policy, record, trajectory, evaluation, result.value_at
         )
@@ -314,7 +318,7 @@ class TabularLearningPlanner(Planner):
 
         return self
 
-    def learning_record(self) -> TabularLearningRecord:
+    def learning_record(self, tables=None) -> TabularLearningRecord:
         """The solver record: episodes, coverage of the grid, and the cost of the last episodes."""
         history = self.history
         visits = self.visits
@@ -337,35 +341,43 @@ class TabularLearningPlanner(Planner):
             cost=cost,
             table_finite=table_finite,
             history=list(history),
+            tables=tables,
         )
 
     # Controller and plots
 
     def get_controller(self, **kwargs):
-        """The greedy policy as a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupPolicy`."""
-        return plotting.get_controller(self.result, **kwargs)
+        """The latest solution's greedy policy; ``interpolation=`` builds a variant of it."""
+        solution = self.require_solution()
+        if not kwargs:
+            return solution.policy
+
+        return plotting.get_controller(solution.record.tables, **kwargs)
 
     def value_at(self, x) -> float:
-        """Interpolate the learned cost-to-go at a state ``x``."""
-        return self.result.value_at(x)
+        """Interpolate the latest solution's cost-to-go at a state ``x``."""
+        return self.require_solution().record.tables.value_at(x)
 
-    def nominal_trajectory(self, tf=None):
-        """The greedy law from the problem's start on the grid's control period."""
+    def nominal_trajectory(self, tf=None, *, solution=None):
+        """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
+        solution = self.require_solution() if solution is None else solution
         return nominal_trajectory(
             self.problem,
-            self.get_controller(),
+            solution.policy,
             dt=self.grid.dt,
             tf=self.env.tf if tf is None else tf,
         )
 
     def plot_cost_to_go(self, **kwargs):
-        """The learned cost-to-go table on the grid itself, as value iteration draws it."""
+        """The latest solution's cost-to-go table on the grid itself, as value iteration draws it."""
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
-        return plotting.plot_cost_to_go(self.result, **kwargs)
+        return plotting.plot_cost_to_go(self.require_solution().record.tables, **kwargs)
 
     def plot_control_law(self, **kwargs):
-        """The greedy policy table on the grid itself, as value iteration draws it."""
-        return plotting.plot_control_law(self.result, **kwargs)
+        """The latest solution's greedy policy table on the grid itself, as value iteration draws it."""
+        return plotting.plot_control_law(
+            self.require_solution().record.tables, **kwargs
+        )
 
     def plot_learning_curve(self, ax=None, window=20):
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
@@ -449,7 +461,7 @@ class TabularLearningPlanner(Planner):
 
 @dataclass(frozen=True)
 class TabularLearningRecord:
-    """Episodes run, how much of the grid was visited, and the mean episode cost at the end of learning."""
+    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from."""
 
     algorithm: str
     episodes: int
@@ -457,6 +469,9 @@ class TabularLearningRecord:
     cost: float
     table_finite: bool
     history: list
+    tables: DynamicProgrammingResult | None = field(
+        default=None, repr=False, compare=False
+    )
 
     @property
     def success(self) -> bool:
