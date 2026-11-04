@@ -48,7 +48,7 @@ So the same student gesture, "change one number", works on a plant, does nothing
 set or a law, fails on a diagram with a partial tree, and fails on a Gaussian with a partial
 `with_params`.
 
-## 2. What being frozen buys today: checked, nothing load-bearing
+## 2. What being frozen buys today (as first written; §8 corrects it)
 
 | Claimed reason | What the code shows |
 | --- | --- |
@@ -240,8 +240,16 @@ An independent reviewer checked §2 and §3 against the code; the two findings m
 
 **Decisions for the maintainer.**
 1. **`problem.params = {"X": ...}`**: edit the set in place (needs PM-0), or keep replacing it.
+   *Recommendation:* in place, one model everywhere; replacing is what the frozen model forced.
 2. **`PlanningProblem.replace`**: copy its sets (a derived problem never touches the original),
    or keep sharing and fix tutorial 05's wording.
+   *Recommendation:* keep sharing: one rule for plants, costs and sets ("`replace` changes the
+   named parts and shares the rest"); full independence is `copy.deepcopy`.
 3. **The three partial-tree semantics** above, written into DESIGN §4 and RULES 2.3, the diagram
    bullet ("names every block") amended.
+   *Recommendation:* as listed: the setter takes a partial tree, a call's `params=` is a complete
+   tree (JAX needs the whole structure), `solve(params=)` merges.
+
+**Next, on the maintainer's go:** PM-0 first (it fixes defects that exist today and changes no
+public API), then PM-6, then PM-1 to PM-5 family by family, the sets' diff shown before the rest.
 
