@@ -854,7 +854,7 @@ print(result.success, result.x, result.fun)</div>
             <span>Clean Problem &amp; Solvers</span>
           </div>
           <div class="code-body"><span class="token-com"># One problem definition</span>
-problem = <span class="token-cls">PlanningProblem</span>(sys=plant, x_start=x0, Xf=Xf, cost=cost)
+problem = <span class="token-cls">PlanningProblem</span>(sys=plant, x0=x0, Xf=Xf, cost=cost)
 
 <span class="token-com"># Solved by value iteration, collocation, or RL</span>
 vi_sol  = <span class="token-cls">DynamicProgrammingPlanner</span>(problem).<span class="token-fn">solve</span>()

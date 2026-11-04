@@ -97,7 +97,10 @@ class Planner(ABC):
 
         A new planner, built from this one's keywords (the numbers it was
         given, never the defaults it derived, so a changed problem derives its
-        own); this one is unchanged.
+        own); this one is unchanged. The host planners build it (value
+        iteration, tabular learning, LQR, RRT, RRT*); a planner with a compiled
+        face (trajectory optimization, MPPI) solves at a tree through the face,
+        ``solve(params=...)``.
         """
         problem_leaves, method, seed = planner_tree_parts(params)
         require_known_numbers(self, method)

@@ -494,7 +494,7 @@ concrete formatting, ordered by the cost of being wrong:
   from the top level, with constants at the top, a one-line title docstring and the story in
   short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
   themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
-  `plot_solution`, `plot_control_law`, `plot_cost2go`, `plot_learning_curve`, `plot_tree`,
+  `plot_solution`, `plot_control_law`, `plot_cost_to_go`, `plot_learning_curve`, `plot_tree`,
   `scene.plot`, ...). That is `print(solution)` or `planner.plot_learning_curve()`, not an
   f-string of fields (6.13). A report the library cannot give is first a library gap — a
   missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.

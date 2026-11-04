@@ -1493,9 +1493,9 @@ uncompiled (escape hatch). A `MathematicalProgram` carries the native backend of
 its callables in its `backend` field, and the `Optimizer` compiles with it by
 default.
 
-**RRT / DP:** same two-tier idea — flat routine knobs on
-`RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, with
-`options=` as the advanced escape. Keep fundamental seams explicit
+**RRT / DP:** the four kinds of argument above — keywords on
+`RRTPlanner` / `RRTStarPlanner` / `DynamicProgrammingPlanner`, read back as
+attributes, their numbers in `params["method"]`. Keep fundamental seams explicit
 (`extender`, `StateSpaceGrid`). The textbook DP setup
 `DynamicProgrammingPlanner(problem, x_grid=, u_grid=, dt=)` builds that grid
 itself (`grid=` for a custom one), and `solve()` then pins saturated

@@ -532,7 +532,7 @@ class TestBackends(unittest.TestCase):
 
 
 class TestDynamicProgrammingPlotting(unittest.TestCase):
-    def test_plot_cost2go_smoke(self):
+    def test_plot_cost_to_go_smoke(self):
         import matplotlib
 
         matplotlib.use("Agg")
@@ -577,7 +577,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
             ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
         )
 
-    def test_animate_cost2go_colours_up_to_jmax(self):
+    def test_animate_cost_to_go_colours_up_to_jmax(self):
         import matplotlib
 
         matplotlib.use("Agg")

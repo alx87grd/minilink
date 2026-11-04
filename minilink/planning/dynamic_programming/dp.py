@@ -140,7 +140,7 @@ class DynamicProgrammingPlanner(Planner):
         self.result: DynamicProgrammingResult | None = None  # Latest solve's tables
         self._G = None  # Running-cost table, built once when the grid is precomputed
         self._jax_cache = {}  # The JAX engine's device tables and compiled loops
-        self._cached_options = None  # The options those two were built with
+        self._cached_numbers = None  # The numbers those two were built with
 
         # The JAX engine builds the grid's transition tables with JAX
         if self.backend == BACKEND_JAX:
@@ -530,12 +530,12 @@ class DynamicProgrammingPlanner(Planner):
 
     def forget_stale_caches(self) -> None:
         """Clear the running-cost table and the JAX engine's caches when an option they bake in has changed."""
-        snapshot = cached_options_of(self)
+        snapshot = cached_numbers_of(self)
 
-        if snapshot != self._cached_options:
+        if snapshot != self._cached_numbers:
             self._G = None
             self._jax_cache = {}
-            self._cached_options = snapshot
+            self._cached_numbers = snapshot
 
     def dp_result_to_planning_solution(
         self, result: DynamicProgrammingResult, *, fixed_horizon, evaluate, n_trials
@@ -782,7 +782,7 @@ def grid_failure_cost(grid, gamma):
     return face.failure_cost_over(N, gamma)
 
 
-def cached_options_of(options) -> tuple:
+def cached_numbers_of(options) -> tuple:
     """The numbers the cached tables and compiled loops bake in: ``gamma``, ``tol``, ``interpolation``, ``final_time``, ``out_of_bound_cost``."""
     return (
         options.gamma,
