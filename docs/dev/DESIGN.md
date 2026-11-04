@@ -1468,7 +1468,8 @@ the `seed`), given as flat keywords and held in `planner.params` (`params["metho
 overridden per call by `solve(params=…)`; **an external solver's knobs** (SciPy `maxiter`,
 `ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
 **workflow** (`verbose`, `callback`, `live_plot`, `record_history`), keywords that change what
-is shown, never what is computed. There is no settings record on a planner.
+is shown, never what is computed. There is no settings record on a planner. One exception:
+the RL planner's `params` is a report, and its `solve` trains without `params=` (TODO §6).
 
 **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:

@@ -58,8 +58,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `full` and `dev` only (`[jax]`, `[plotting]`, `[visualization]`, `[diagrams]`,
   `[symbolic]`, `[rl]`, `[ipopt]` are gone); `install.md` and `environment-basic.yml` are
   gone, the install story is the README's.
-- 2026-10-24 (on `dev-v0.3`, pending the maintainer's merge; every lesson migrated in the same
-  commits): the removals (`ProblemEnv` off the facade, `to_gymnasium`, the camera
+- 2026-10-24 (`0.3.0`; every lesson migrated in the same commits): the removals (`ProblemEnv` off the facade, `to_gymnasium`, the camera
   helpers, `Replay`, `Sampler`, `RateLimiter`, `Lag`, `DeadZone`, `Relay`, `NotchFilter`,
   `Washout`, `SimpleIntegrator`; `ZOHHold` is `UnitDelay`, `NeuralNetwork` folded into `MLP`);
   the package moves (`planning/dynamic_programming/`, `minilink.learning`, MPC under
@@ -82,6 +81,19 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `l-bfgs`, `method="auto"`, `z0` optional; `MechanicalSystem` and `GeneralizedMechanicalSystem`
   invent no bounds (each catalog plant states its own, the same numbers), so a user's own
   mechanical subclass starts unbounded.
+- 2026-11-04 (on `dev`, for `0.4.0`; every notebook migrated in the same commits, no alias):
+  the vocabulary of RULES 2.7: `x_start` → `x0`, `t_start` → `t0`, a problem's `tf` →
+  `horizon` (`tf` is an absolute end time), `N` → `n_steps`, MPPI's `n_samples` →
+  `n_rollouts`, `iterations` → `n_iterations`, the discount `alpha` → `gamma` (RRT*'s
+  `gamma` → `radius_constant`), `algorithm=` → `method=`, `solution.solver` →
+  `solution.record`, `xbar` / `ubar` / `ybar` → `x_bar` / `u_bar` / `y_bar`, `TimeCost(eps=)`
+  → `radius=`, `plot_cost2go` / `plot_policy` → `plot_cost_to_go` / `plot_control_law`, the
+  `solve_*` aliases gone, `verbose=False` by default, the `Optimizer`'s default method
+  `"auto"`; the option records (`DynamicProgrammingOptions`, `RRTOptions`, `RRTStarOptions`,
+  `TrajectoryOptimizationOptions`) gone for flat keywords, `options=` only the external
+  solver's dict; every planner's `params` tree and `solve(params=)`; trajectory
+  optimization's `last_optimization_result`, `iteration_history`, `last_solve_time_s` and
+  `last_step_time_s` gone for `solution.record` (RULES 2.4).
 
 ## 3. Maturity (TRL)
 
@@ -232,12 +244,12 @@ release's part is that the teaching surface covers every lab, checked the same d
 | 8 | To come | — | — | — |
 | 10–13 | Projects | "a new system or controller integrated into the library" | the `System` contract | on the surface |
 
-Not a week of the syllabus: MPC (its teaching name stable all the same, when v0.3 merges),
+Not a week of the syllabus: MPC (its teaching name stable all the same, when v0.4 merges),
 robust control as a topic of its own
 (one section of week 5, the sliding mode), the draws and Monte Carlo, gradient tuning.
 
-**The gate:** every row above stays on the teaching surface through the v0.3 changes, so a lab
-written against the v0.3 interface needs nothing more; and the tools the labs use carry
+**The gate:** every row above stays on the teaching surface through the v0.3 and v0.4 changes,
+so a lab written against the release its notebook pins needs nothing more; and the tools the labs use carry
 one public, stable teaching name when v0.4 merges (RRT, MPC, trajectory optimization, computed
 torque, sliding mode, the task- and joint-space impedance laws, task-space position control
 with a nullspace posture, `Manipulator`), frozen for the term (TODO §2, G3). The lab notebooks themselves are the

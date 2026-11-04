@@ -988,8 +988,8 @@ One line each; open a plan doc only when a design needs a writeup.
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
 - Multiple shooting with the problem's parameters: shooting and collocation take the
   parametric program's tree; `MultipleShootingTranscription.transcribe_parametric` refuses.
-- A training run that rebinds its numbers: the RL planner's `params` is a report for
-  v0.3, with no `solve(params=)`; a run that trains on a moved plant or reward, if research needs
+- A training run that rebinds its numbers: the RL planner's `params` is a report
+  today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.
 - A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
   where diagram params are validated): today a typo or a retired key in any block's params is
