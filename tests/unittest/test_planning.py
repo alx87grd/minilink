@@ -561,7 +561,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription="direct_collocation",
             options={"maxiter": 100, "ftol": 1e-09},
         )
-        moved = planner.solve({"x0": np.array([0.4])})
+        moved = planner.solve(params={"x0": np.array([0.4])})
         np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
         np.testing.assert_allclose(planner.problem.x0, problem.x0)
 

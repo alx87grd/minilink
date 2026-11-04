@@ -207,8 +207,8 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def solve(
         self,
-        params=None,
         *,
+        params=None,
         guess=None,
         evaluate: bool = False,
         n_trials: int = 50,

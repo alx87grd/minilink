@@ -132,7 +132,7 @@ class MPPIPlanner(Planner):
         """The planner's pure face, ``pv``: its solve as one jitted function of ``(params, z)``."""
         return CompiledMPPIPlanner(self)
 
-    def solve(self, params=None, *, guess=None, evaluate=False, n_trials=50):
+    def solve(self, *, params=None, guess=None, evaluate=False, n_trials=50):
         """
         One path-integral solve from the problem's start: a :class:`~minilink.planning.results.PlanningSolution`.
 

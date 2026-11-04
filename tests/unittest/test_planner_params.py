@@ -151,3 +151,24 @@ def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
         planner.nominal_trajectory(1.0).x,
         planner.nominal_trajectory(1.0, solution=solution).x,
     )
+
+
+def test_every_planner_takes_params_by_keyword_only():
+    """One ``solve`` shape (DESIGN §6): ``params=`` by keyword on every planner that takes it."""
+    import inspect
+
+    from minilink import TrajectoryOptimizationPlanner
+    from minilink.planning import MPPIPlanner
+
+    planners = (
+        DynamicProgrammingPlanner,
+        LQRPlanner,
+        RRTPlanner,
+        RRTStarPlanner,
+        TabularLearningPlanner,
+        TrajectoryOptimizationPlanner,
+        MPPIPlanner,
+    )
+    for planner in planners:
+        parameter = inspect.signature(planner.solve).parameters["params"]
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
