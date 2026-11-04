@@ -104,7 +104,7 @@ def test_an_evaluation_draws_the_policys_seed_per_trial():
         plant,
         cost=QuadraticCost.from_system(plant),
         x_start=Uniform([0.1, -0.1], [0.3, 0.1]),
-        tf=1.0,
+        horizon=1.0,
     )
     feedback = StateFeedback(np.array([[2.0, 1.0]]))
     pi = GaussianPolicy(feedback, np.log([0.5]), sample_period=DT, seed=3)

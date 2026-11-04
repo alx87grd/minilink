@@ -31,7 +31,7 @@ cost = QuadraticCost.from_system(
 )
 problem = PlanningProblem(
     sys=sys,
-    tf=4.0,
+    horizon=4.0,
     x_start=x_start,
     Xf=SingletonSet(x_goal),
     cost=cost,

@@ -710,7 +710,7 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
         x_start=x_start,
         Xf=SingletonSet(x_goal),
         cost=cost,
-        tf=float(tf),
+        horizon=float(tf),
         X=sys.state.box,
         U=sys.input_box,
     )

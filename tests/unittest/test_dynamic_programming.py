@@ -270,7 +270,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         g_max = cost.g_max(X, U)
         for tf in (np.inf, 2.0):
             problem = PlanningProblem(
-                sys, cost=cost, tf=tf, X=sys.state.box, U=sys.input_box
+                sys, cost=cost, horizon=tf, X=sys.state.box, U=sys.input_box
             )
             grid = StateSpaceGrid(
                 problem, x_grid_shape=(3, 3), u_grid_shape=(3,), dt=0.1
@@ -847,7 +847,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
 
         sys = DoubleIntegrator()
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
-        timed = PlanningProblem(sys, cost=cost, tf=2.0, U=sys.input_box)
+        timed = PlanningProblem(sys, cost=cost, horizon=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         self.assertEqual(planner.options.final_time, 2.0)
         explicit = DynamicProgrammingPlanner(

@@ -639,7 +639,7 @@ class TestTheClockOperator(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             PlanningProblem(
                 sys=sys,
-                tf=1.0,
+                horizon=1.0,
                 x_start=x0,
                 cost=QuadraticCost.from_system(sys, x_bar=x0),
                 U=sys.input_box,

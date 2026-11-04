@@ -56,7 +56,7 @@ def digital_pid_problem():
     """A digital PID on the pendulum, its setpoint 1 rad, scored over 2 s."""
     plant = FastPendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([1.0, 0.0]))
-    problem = PlanningProblem(plant, cost=cost, x_start=np.zeros(2), tf=2.0)
+    problem = PlanningProblem(plant, cost=cost, x_start=np.zeros(2), horizon=2.0)
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)
     pid.inputs["e"].nominal_value = np.zeros(1)
     return problem, pid
@@ -90,7 +90,7 @@ def lqg_problem():
         plant,
         cost=cost,
         x_start=np.zeros(2),
-        tf=LQG_TF,
+        horizon=LQG_TF,
         disturbances={
             "d": WhiteNoise(1, psd=PROCESS_PSD, sample_period=LQG_DT, seed=1),
             "n": NoiseSource(
@@ -332,7 +332,7 @@ def tracking_problem(t_start, phase):
         plant,
         x_start=[0.2, 0.0],
         cost=SineTracking(phase),
-        tf=2.0,
+        horizon=2.0,
         t_start=t_start,
         discount_rate=0.3,
     )
@@ -434,7 +434,7 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
     )
     x_start = np.array([0.0, 1.0, 0.0, 0.9 * speed, 0.0, 0.0, 0.9 * speed / r_r, 0.0])
     problem = PlanningProblem(
-        sys, x_start=x_start, cost=cost, tf=1.0, X=sys.state.box, U=sys.input_box
+        sys, x_start=x_start, cost=cost, horizon=1.0, X=sys.state.box, U=sys.input_box
     )
     options = (
         {"max_iter": 300, "tol": 1e-10}
@@ -497,7 +497,7 @@ def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
     plant.params["m"] = m
     problem = PlanningProblem(
         plant,
-        tf=2.0,
+        horizon=2.0,
         x_start=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
@@ -574,7 +574,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         plant,
         cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
         x_start=np.array([0.5, 0.0]),
-        tf=3.0,
+        horizon=3.0,
         U=plant.input_box,
         discount_rate=0.5,
     )
@@ -633,7 +633,7 @@ def native_mpc_problem():
     plant = Pendulum()
     problem = PlanningProblem(
         plant,
-        tf=2.0,
+        horizon=2.0,
         x_start=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
@@ -762,7 +762,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     x_start = np.array([0.4, 0.0])
     score = QuadraticCost.from_system(plant, Q=Q, R=R)
     problem = PlanningProblem(
-        plant, cost=score, x_start=x_start, tf=4.0, U=plant.input_box
+        plant, cost=score, x_start=x_start, horizon=4.0, U=plant.input_box
     )
     model = linearize(plant)
     V = QuadraticField(model.x_bar, solve_continuous_are(model.A(), model.B(), Q, R))
@@ -770,7 +770,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     def J_of(cost):
         planner = TrajectoryOptimizationPlanner(
             PlanningProblem(
-                plant, cost=cost, x_start=x_start, tf=0.3, U=plant.input_box
+                plant, cost=cost, x_start=x_start, horizon=0.3, U=plant.input_box
             ),
             n_steps=3,
             transcription="single_shooting",
@@ -798,7 +798,7 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
         plant,
         cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
         x_start=np.array([0.5, 0.0]),
-        tf=3.0,
+        horizon=3.0,
         U=plant.input_box,
         discount_rate=0.5,
     )

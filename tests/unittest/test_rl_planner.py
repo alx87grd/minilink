@@ -65,7 +65,7 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
     free = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
     )
     env = RolloutEnvironment(free, dt=0.1, episode_length=0.3)
@@ -315,7 +315,7 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
 def test_plain_planning_problem_trains_from_its_single_start():
     plant = bounded_pendulum()
     prob = PlanningProblem(
-        plant, x_start=[0.2, 0.0], cost=HangCost(), tf=np.inf, U=plant.input_box
+        plant, x_start=[0.2, 0.0], cost=HangCost(), horizon=np.inf, U=plant.input_box
     )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
@@ -605,7 +605,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
             return 0.0
 
     prob = PlanningProblem(
-        Explosive(), cost=Zero(), tf=np.inf, x_start=Uniform([1.0], [2.0])
+        Explosive(), cost=Zero(), horizon=np.inf, x_start=Uniform([1.0], [2.0])
     )
     env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
     x_next, t, r, terminated, truncated = env.step(

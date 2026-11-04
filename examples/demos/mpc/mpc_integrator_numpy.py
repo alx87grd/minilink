@@ -40,7 +40,7 @@ sys.x0 = x0.copy()
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
-        tf=1.0,
+        horizon=1.0,
         x_start=x0,
         Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(

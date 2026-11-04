@@ -79,7 +79,7 @@ class Accumulator(StepSystem):
 def pendulum_problem(tf=2.0, x_start=X0, **kwargs):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    return PlanningProblem(plant, cost=cost, x_start=x_start, tf=tf, **kwargs)
+    return PlanningProblem(plant, cost=cost, x_start=x_start, horizon=tf, **kwargs)
 
 
 def pd_controller():
@@ -178,7 +178,7 @@ def mpc_entries(out):
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
             sys=plant,
-            tf=1.0,
+            horizon=1.0,
             x_start=x0,
             Xf=SingletonSet(x_goal),
             cost=QuadraticCost.from_system(
@@ -283,7 +283,7 @@ def draw_entries(out):
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        tf=1.0,
+        horizon=1.0,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         params={"plant": {"m": Uniform([0.8], [1.2])}},
         U=plant.input_box,
@@ -343,7 +343,7 @@ def rl_entries(out):
     problem = PlanningProblem(
         plant,
         cost=SwingUpCost(),
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         U=plant.input_box,
     )
@@ -377,7 +377,7 @@ def gym_problem_entries(out):
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        tf=1.0,
+        horizon=1.0,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )

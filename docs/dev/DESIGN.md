@@ -1114,7 +1114,7 @@ among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous horizon `tf` and its start `t_start` (the
+`U=plant.input_box`), cost, the continuous `horizon` and its start `t_start` (the
 horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
 transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
@@ -1169,8 +1169,8 @@ infinite `tf`, the differential one swept from `S` for a finite `tf`; its
 the finite-horizon schedule. `control.design` stays the array-in / block-out
 factory the planner calls.
 
-**Horizon and the constraint set:** the horizon has one owner, `problem.tf` — a
-finite length is a finite horizon and `h` is charged at `tf`; `+inf` or unset is an
+**Horizon and the constraint set:** the horizon has one owner, `problem.horizon` — a
+finite length is a finite horizon and `h` is charged at `t_start + horizon`; `+inf` or unset is an
 infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long to run
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
@@ -1180,7 +1180,7 @@ constraints in every tool: a run that leaves them is a failure. **The failure sw
 `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
 facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
 number, `None` for the cost bound). **The cost bound** is one formula owned by the problem,
-`cost_bound(tf=None, *, discount_rate=None, dt=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
+`cost_bound(horizon=None, *, discount_rate=None, dt=None)`: `g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max`
 over the declared boxes for the continuous judge, and with a tool's `dt` the same maxima on its
 own sum, `g_max dt Σ_{k<N} γᵏ + γᴺ h_max`, `γ = e^{−ρ dt}` (it bounds every stage,
 `c_k ≤ g_max dt`), else the plant's declared ranges; always finite (`1e6` with a warning naming
@@ -1454,7 +1454,7 @@ problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N
 `w_k = e^{−ρ(t_k − t_start)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t_start + linspace(0, problem.tf, n_steps)` for finite `tf`. **The compiled face**:
+`t_start + linspace(0, problem.horizon, n_steps)` for a finite `horizon`. **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
 `z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
 `pv.params` the tree (`planner.params`: **one shape for every planner**, the problem's

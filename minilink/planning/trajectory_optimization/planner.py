@@ -487,7 +487,7 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         key = (
             tuple(id(part) for part in parts),
-            problem.tf,
+            problem.horizon,
             tree_digest(params_of(problem)),
         )
 

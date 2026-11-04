@@ -580,7 +580,7 @@ class DynamicProgrammingOptions:
         on this discount (:func:`grid_failure_cost`).
     final_time : float
         Terminal time ``tf``; sweeps step backward as ``t = tf - k dt``. Left
-        at ``0.0``, the planner reads ``problem.tf`` when the problem sets one.
+        at ``0.0``, the planner reads ``problem.horizon`` when the problem sets one.
     record_history : bool
         Keep ``(t, J, pi)`` per sweep for animation.
     verbose : bool

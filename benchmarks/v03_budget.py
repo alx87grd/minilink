@@ -69,7 +69,7 @@ def pendulum_task(tf, x_start, params=None):
         plant,
         cost=cost,
         x_start=x_start,
-        tf=tf,
+        horizon=tf,
         U=plant.input_box,
         params=params or {},
     )

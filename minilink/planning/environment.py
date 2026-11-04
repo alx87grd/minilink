@@ -58,7 +58,7 @@ class RolloutEnvironment:
         Control period (one integration step, input held).
     episode_length : float, optional
         Episode duration for an infinite-horizon problem (default 10 s);
-        ignored for a finite horizon, whose episodes end at ``problem.tf``.
+        ignored for a finite horizon, whose episodes end at ``problem.horizon``.
     solver : {"rk4", "euler"}
         Integration scheme of the step model.
     substeps : int
@@ -98,7 +98,7 @@ class RolloutEnvironment:
         # Horizon: a finite one ends at tf, an infinite one runs episodes of fixed length
         self.finite_horizon = problem.horizon_kind() == "finite"
         if self.finite_horizon:
-            self.tf = float(problem.tf)
+            self.tf = float(problem.horizon)
         else:
             self.tf = 10.0 if episode_length is None else float(episode_length)
         self.n_steps_per_episode = int(round(self.tf / self.dt))

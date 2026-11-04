@@ -43,7 +43,7 @@ def pendulum_problem(stochastic=False):
         return PlanningProblem(
             plant,
             cost=cost,
-            tf=2.0,
+            horizon=2.0,
             x_start=Uniform([-0.2, -0.2], [0.2, 0.2]),
             U=plant.input_box,
         )
@@ -52,7 +52,7 @@ def pendulum_problem(stochastic=False):
         x_start=[0.0, 0.0],
         Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
-        tf=2.0,
+        horizon=2.0,
         U=plant.input_box,
     )
 
@@ -67,7 +67,7 @@ def move_problem(stochastic=False):
         return PlanningProblem(
             plant,
             cost=cost,
-            tf=2.0,
+            horizon=2.0,
             Xf=SingletonSet([0.0, 0.0]),
             x_start=Uniform([0.8, -0.2], [1.2, 0.2]),
             U=plant.input_box,
@@ -77,7 +77,7 @@ def move_problem(stochastic=False):
         x_start=[1.0, 0.0],
         Xf=SingletonSet([0.0, 0.0]),
         cost=cost,
-        tf=2.0,
+        horizon=2.0,
         U=plant.input_box,
     )
 
@@ -208,7 +208,7 @@ def double_integrator_problem():
         plant,
         x_start=[1.0, 0.0],
         cost=cost,
-        tf=np.inf,
+        horizon=np.inf,
         penalize_failure=True,
         failure_cost=20.0,
         U=plant.input_box,
@@ -271,7 +271,7 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
     problem = PlanningProblem(
         plant,
         cost=cost,
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )
@@ -312,7 +312,7 @@ def solved_pendulum():
         x_start=[0.0, 0.0],
         Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
-        tf=np.inf,
+        horizon=np.inf,
         X=plant.state.box,
         penalize_failure=True,
         failure_cost=500.0,
@@ -450,7 +450,7 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     spread = PlanningProblem(
         problem.sys,
         cost=problem.cost,
-        tf=np.inf,
+        horizon=np.inf,
         X=problem.X,
         penalize_failure=True,
         failure_cost=500.0,
@@ -495,7 +495,9 @@ def test_compare_scores_a_sampled_loop_as_evaluate_does():
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    problem = PlanningProblem(plant, x_start=np.array([0.3, 0.0]), cost=cost, tf=5.0)
+    problem = PlanningProblem(
+        plant, x_start=np.array([0.3, 0.0]), cost=cost, horizon=5.0
+    )
     law = lqr_design(plant, np.eye(2), np.eye(1)) % 0.2
 
     alone = evaluate(problem, law, dt=0.2)

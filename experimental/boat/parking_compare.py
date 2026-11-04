@@ -39,7 +39,7 @@ for water, current in WATERS.items():
         sys=boat,
         x_start=X_START,
         cost=parking_cost(boat),
-        tf=TF,
+        horizon=TF,
         X=boat.state.box,
         U=boat.input_box,
     )
@@ -59,7 +59,7 @@ for water, current in WATERS.items():
             sys=boat,
             x_start=X_START,
             cost=parking_cost(boat, terminal=MPC_TERMINAL),
-            tf=MPC_HORIZON,
+            horizon=MPC_HORIZON,
             X=boat.state.box,
             U=boat.input_box,
         ),

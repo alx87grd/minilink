@@ -121,7 +121,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     )
     problem = PlanningProblem(
         sys=sys,
-        tf=PENDULUM_TF,
+        horizon=PENDULUM_TF,
         x_start=x_start,
         Xf=SingletonSet(x_goal),
         cost=cost,

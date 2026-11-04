@@ -49,7 +49,7 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     )
     return PlanningProblem(
         sys=sys,
-        tf=SHOWCASE_TRAJOPT_TF,
+        horizon=SHOWCASE_TRAJOPT_TF,
         x_start=x_start,
         Xf=SingletonSet(x_goal),
         cost=cost,

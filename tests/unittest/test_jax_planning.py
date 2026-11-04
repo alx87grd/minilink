@@ -62,7 +62,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
-            tf=1.0,
+            horizon=1.0,
             x_start=np.array([0.0]),
             Xf=SingletonSet(np.array([1.0])),
             cost=cost,
@@ -163,7 +163,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         base = self.make_single_integrator_problem()
         problem = PlanningProblem(
             sys=base.sys,
-            tf=1.0,
+            horizon=1.0,
             x_start=np.array([0.0]),
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,

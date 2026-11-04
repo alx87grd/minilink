@@ -70,7 +70,7 @@ def _bicycle_planner():
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
             sys=sys,
-            tf=HORIZON,
+            horizon=HORIZON,
             x_start=x0,
             cost=QuadraticCost.from_system(
                 sys,

@@ -59,7 +59,7 @@ def pendulum_problem(tf=2.0):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
     return PlanningProblem(
-        plant, cost=cost, x_start=np.array([0.5, 0.0]), tf=tf, U=plant.input_box
+        plant, cost=cost, x_start=np.array([0.5, 0.0]), horizon=tf, U=plant.input_box
     )
 
 
@@ -113,7 +113,7 @@ def test_a_repeated_solve_compiles_nothing():
         plant,
         cost=QuadraticCost.from_system(plant),
         x_start=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
-        tf=2.0,
+        horizon=2.0,
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
@@ -395,7 +395,7 @@ def test_a_new_horizon_before_a_solve_is_a_new_program():
         optimizer_options={"maxiter": 10},
     )
     assert planner.solve(evaluate=False).trajectory.t[-1] == pytest.approx(1.0)
-    problem.tf = 2.0
+    problem.horizon = 2.0
     assert planner.solve(evaluate=False).trajectory.t[-1] == pytest.approx(2.0)
 
 

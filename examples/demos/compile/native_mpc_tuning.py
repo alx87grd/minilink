@@ -15,7 +15,7 @@ ITERATIONS = 30  # Adam steps per tick: a fixed count, so the tick traces
 plant = Pendulum()
 score = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=0.01 * np.eye(1))
 problem = PlanningProblem(
-    plant, cost=score, x_start=np.array([1.0, 0.0]), tf=TF, U=plant.input_box
+    plant, cost=score, x_start=np.array([1.0, 0.0]), horizon=TF, U=plant.input_box
 )
 
 # The MPC's own plan: a shorter horizon and its own weights, the ones to tune
@@ -25,7 +25,7 @@ planner = TrajectoryOptimizationPlanner(
         plant,
         cost=plan_cost,
         x_start=np.array([1.0, 0.0]),
-        tf=HORIZON,
+        horizon=HORIZON,
         U=plant.input_box,
     ),
     n_steps=10,

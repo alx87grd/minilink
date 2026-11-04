@@ -50,7 +50,7 @@ sys.x0 = x0.copy()
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
-        tf=TF_MPC,
+        horizon=TF_MPC,
         x_start=x0,
         cost=QuadraticCost.from_system(
             sys,

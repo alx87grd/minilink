@@ -173,7 +173,7 @@ lengths = np.linspace(0.5, 2.0, 1000)
 xs = ev.rollout_batch(x0s, n_steps=1000, dt=0.005, params=dict(plant.params, l=lengths))
 
 # Closed-loop gradient descent on gains and physical parameters
-tuning = PlanningProblem(plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), tf=4.0)
+tuning = PlanningProblem(plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0)
 pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
 dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
 best = Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()
@@ -227,7 +227,7 @@ plant = Pendulum()
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 
 problem = PlanningProblem(
-    sys=plant, x_start=x_down, Xf=BallSet(x_up, 0.2), tf=4.0,
+    sys=plant, x_start=x_down, Xf=BallSet(x_up, 0.2), horizon=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up),
     X=plant.state.box, U=plant.input_box,
 )

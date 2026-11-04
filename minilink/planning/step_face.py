@@ -66,7 +66,7 @@ class StepFace:
             self.substeps = int(substeps)
             rho = problem.discount_rate
             finite = problem.horizon_kind() == "finite"
-            self.n_steps = steps_of(problem.tf, self.dt) if finite else None
+            self.n_steps = steps_of(problem.horizon, self.dt) if finite else None
             self.gamma = float(np.exp(-rho * self.dt))
             self.stage = None
             if problem.cost is not None:
@@ -176,14 +176,13 @@ class StepFace:
         return step_body(dynamics, x, u, u, t, dt, solver, substeps)
 
     def horizon_end(self):
-        """The time of the horizon's end, ``t_start + tf`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
+        """The time of the horizon's end, ``t_start + horizon`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
         if self.n_steps is None:
             return None
         t_start = self.t_start
 
         if is_continuous(self.problem):
-            tf = self.problem.tf
-            t_end = t_start + tf
+            t_end = t_start + self.problem.horizon
             return t_end
 
         t_end = self.time_of(self.n_steps)

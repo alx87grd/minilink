@@ -89,7 +89,7 @@ def pipelines():
     sampled_ev = sampled.compile(backend="jax")
 
     problem = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), tf=5.0, U=pend.input_box
+        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
     )
     pe = problem.compile(StateFeedback(np.array([[2.0, 0.5]])), dt=0.01, backend="jax")
 
@@ -97,7 +97,7 @@ def pipelines():
         cart,
         cost=QuadraticCost.from_system(cart),
         x_start=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
-        tf=2.0,
+        horizon=2.0,
     )
     collocation = TrajectoryOptimizationPlanner(
         swing,
@@ -108,7 +108,7 @@ def pipelines():
         optimizer_options={"maxiter": 50},
     )
     horizon = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), tf=1.0, U=pend.input_box
+        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
     )
     native = TrajectoryOptimizationPlanner(
         horizon,
@@ -162,14 +162,14 @@ def forms():
     pend = Pendulum()
     cost = QuadraticCost.from_system(pend, R=0.1 * np.eye(1))
     problem = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), tf=5.0, U=pend.input_box
+        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
     )
     law = StateFeedback(np.array([[2.0, 0.5]]))
     pe = problem.compile(law, dt=0.01, backend="jax")
     tree = pe.params
 
     horizon = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), tf=1.0, U=pend.input_box
+        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
     )
     pv = TrajectoryOptimizationPlanner(
         horizon,

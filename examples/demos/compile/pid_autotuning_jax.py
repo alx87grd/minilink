@@ -48,7 +48,7 @@ cost = QuadraticCost.from_system(
     x_bar=np.array([R_REF, 0.0]),
     u_bar=np.array([U_SS]),
 )
-problem = PlanningProblem(plant, cost=cost, tf=N_STEPS * DT)
+problem = PlanningProblem(plant, cost=cost, horizon=N_STEPS * DT)
 
 # The run compiled once, and its program: z = (Kp, Ki, Kd), J(z) the run's cost
 pe = problem.compile(diagram, DT)

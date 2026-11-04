@@ -44,7 +44,7 @@ def swing_up_planner(**options):
     plant.inputs["u"].lower_bound = np.array([-4.0])
     plant.inputs["u"].upper_bound = np.array([4.0])
     problem = PlanningProblem(
-        plant, cost=SwingUpCost(), tf=2.0, x_start=[0.0, 0.0], U=plant.input_box
+        plant, cost=SwingUpCost(), horizon=2.0, x_start=[0.0, 0.0], U=plant.input_box
     )
     settings = dict(dt=DT, n_rollouts=512, temperature=0.1, noise=9.0)
     return MPPIPlanner(problem, **{**settings, **options})
@@ -56,7 +56,7 @@ def double_integrator_planner():
     plant.inputs["u"].upper_bound = np.array([5.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     problem = PlanningProblem(
-        plant, cost=cost, tf=1.0, x_start=[1.0, 0.0], U=plant.input_box
+        plant, cost=cost, horizon=1.0, x_start=[1.0, 0.0], U=plant.input_box
     )
     return MPPIPlanner(
         problem, dt=DT, n_rollouts=2048, temperature=0.01, noise=1.0, iterations=8
@@ -147,11 +147,11 @@ def test_the_zero_delay_mppi_swings_the_pendulum_up():
 def test_mppi_refuses_an_unboxed_input_and_a_ragged_horizon():
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    problem = PlanningProblem(plant, cost=cost, tf=2.0, x_start=[0.0, 0.0])
+    problem = PlanningProblem(plant, cost=cost, horizon=2.0, x_start=[0.0, 0.0])
     with pytest.raises(ValueError, match="input box"):
         MPPIPlanner(problem)
     boxed = PlanningProblem(
-        plant, cost=cost, tf=2.02, x_start=[0.0, 0.0], U=plant.input_box
+        plant, cost=cost, horizon=2.02, x_start=[0.0, 0.0], U=plant.input_box
     )
     plant.inputs["u"].lower_bound = np.array([-1.0])
     plant.inputs["u"].upper_bound = np.array([1.0])
@@ -261,11 +261,11 @@ def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():
     plant.inputs["u"].upper_bound = np.array([4.0])
     cost = QuadraticCost.from_system(plant, R=0.01 * np.eye(1))
     problem = PlanningProblem(
-        plant, cost=cost, tf=0.5, x_start=[1.0, 0.0], U=plant.input_box
+        plant, cost=cost, horizon=0.5, x_start=[1.0, 0.0], U=plant.input_box
     )
     planner = MPPIPlanner(problem, dt=DT, n_rollouts=256, temperature=0.1, noise=4.0)
     mpc = ModelPredictiveController(planner, delay=False)
-    pe = problem.replace(tf=0.3).compile(mpc % DT, backend="numpy")
+    pe = problem.replace(horizon=0.3).compile(mpc % DT, backend="numpy")
     base = pe.params
     solve = base["controller"]["solve"]
     heavy = {
@@ -314,7 +314,7 @@ def test_the_plan_is_made_at_the_plant_design_point():
     problem = PlanningProblem(
         plant,
         cost=SwingUpCost(),
-        tf=0.5,
+        horizon=0.5,
         x_start=[0.0, 0.0],
         U=plant.input_box,
         params={"plant": {"m": Uniform([2.5], [3.5])}},

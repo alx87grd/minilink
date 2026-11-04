@@ -199,7 +199,7 @@ class TestSys2Gym(unittest.TestCase):
             plant,
             x_start=np.array([0.2, 0.0]),
             cost=cost,
-            tf=1.0,
+            horizon=1.0,
             U=plant.input_box,
         )
         env = Sys2Gym.from_problem(problem, backend="numpy")
@@ -209,7 +209,7 @@ class TestSys2Gym(unittest.TestCase):
         # The start is the problem's first draw on the seeded generator
         start = Uniform([-1.0, -0.5], [1.0, 0.5])
         problem = PlanningProblem(
-            make_bounded_pendulum(), cost=cost, tf=1.0, x_start=start
+            make_bounded_pendulum(), cost=cost, horizon=1.0, x_start=start
         )
         env = Sys2Gym.from_problem(problem, backend="numpy")
         for seed in (0, 7):
@@ -243,7 +243,7 @@ class TestSys2Gym(unittest.TestCase):
                 plant,
                 x_start=[0.0, 0.0],
                 cost=cost,
-                tf=np.inf,
+                horizon=np.inf,
                 X=Band(r),
                 penalize_failure=True,
                 failure_cost=50.0,

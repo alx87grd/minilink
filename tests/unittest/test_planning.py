@@ -82,7 +82,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         return PlanningProblem(
             sys=sys,
-            tf=1.0,
+            horizon=1.0,
             x_start=np.array([0.0]),
             Xf=SingletonSet(np.array([1.0])),
             cost=cost,
@@ -112,7 +112,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
         )
         np.testing.assert_allclose(problem.x_start, sys.x0)
-        self.assertIsNone(problem.tf)
+        self.assertIsNone(problem.horizon)
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
         self.assertTrue(problem.U.contains(np.array([0.0])))
         self.assertFalse(problem.U.contains(np.array([10.0])))
@@ -121,24 +121,27 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_planning_problem_tf_validation_and_grid(self):
         sys = self.make_system()
-        with self.assertRaisesRegex(ValueError, "tf must be positive"):
+        with self.assertRaisesRegex(ValueError, "horizon must be positive"):
             PlanningProblem(
-                sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), tf=0.0, U=sys.input_box
+                sys=sys,
+                Xf=SingletonSet(np.array([0.0, 0.0])),
+                horizon=0.0,
+                U=sys.input_box,
             )
         infinite = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
-            tf=float("inf"),
+            horizon=float("inf"),
             U=sys.input_box,
         )
         self.assertTrue(np.isposinf(infinite.tf))
-        with self.assertRaisesRegex(ValueError, "finite problem.tf"):
-            infinite.require_finite_tf()
+        with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
+            infinite.require_finite_horizon()
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
             cost=QuadraticCost.from_system(sys),
-            tf=2.0,
+            horizon=2.0,
             U=sys.input_box,
         )
         options = DirectCollocationOptions(n_steps=5)
@@ -148,7 +151,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         unset = PlanningProblem(
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
         )
-        with self.assertRaisesRegex(ValueError, "finite problem.tf"):
+        with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
             options.t(unset)
 
     def test_planning_problem_open_boundary_sets_and_the_goal_point(self):
@@ -282,7 +285,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
             cost=cost,
-            tf=1.0,
+            horizon=1.0,
             U=sys.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
@@ -326,7 +329,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
             cost=cost,
-            tf=1.0,
+            horizon=1.0,
             U=sys.input_box,
         )
         to = TrajectoryOptimizationPlanner(
@@ -627,7 +630,7 @@ def _trajopt_problem():
     sys = _SingleIntegrator()
     return PlanningProblem(
         sys=sys,
-        tf=1.0,
+        horizon=1.0,
         x_start=np.array([0.0]),
         cost=QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
@@ -716,7 +719,7 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
         sys = Integrator()
         problem = PlanningProblem(
             sys=sys,
-            tf=1.0,
+            horizon=1.0,
             x_start=np.array([0.0]),
             cost=QuadraticCost.from_system(sys),
             X=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
@@ -2062,7 +2065,7 @@ class TestParametricCapabilityFlag(unittest.TestCase):
             plant,
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
-            tf=2.0,
+            horizon=2.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
@@ -2090,7 +2093,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             plant,
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
-            tf=tf,
+            horizon=tf,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
@@ -2161,7 +2164,7 @@ class TestTextbookOptions(unittest.TestCase):
             plant,
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
-            tf=1.0,
+            horizon=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
@@ -2185,7 +2188,7 @@ class TestTextbookOptions(unittest.TestCase):
             plant,
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
-            tf=1.0,
+            horizon=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
@@ -2268,7 +2271,7 @@ def test_collocation_bounds_survive_an_intersection():
         x_start=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         X=sys.state.box,
         U=sys.input_box,
     )
@@ -2277,7 +2280,7 @@ def test_collocation_bounds_survive_an_intersection():
         x_start=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         X=sys.state.box & free,
         U=sys.input_box,
     )
@@ -2389,7 +2392,7 @@ def test_a_set_as_a_cost_is_its_margin_through_a_hinge():
 def test_a_field_set_in_an_intersection_survives_a_params_write():
     plant = Integrator()
     X = BoxSet([-5.0], [5.0]) & _ConstField(0.5).as_set(lower=0.0)
-    problem = PlanningProblem(plant, X=X, tf=1.0)
+    problem = PlanningProblem(plant, X=X, horizon=1.0)
 
     problem.params = problem.params  # a frozen field set has no numbers to write
     assert problem.X.contains(np.zeros(1))
@@ -2405,7 +2408,7 @@ def face_swing_up():
     goal = np.array([np.pi, 0.0])
     return PlanningProblem(
         plant,
-        tf=2.0,
+        horizon=2.0,
         x_start=np.zeros(2),
         Xf=SingletonSet(goal),
         cost=QuadraticCost.from_system(plant, x_bar=goal, R=0.1 * np.eye(1)),
@@ -2479,7 +2482,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     plant = Pendulum()
     problem = PlanningProblem(
         plant,
-        tf=2.0,
+        horizon=2.0,
         x_start=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
@@ -2521,7 +2524,7 @@ def test_every_planner_has_one_tree_shape():
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
     problem = PlanningProblem(
-        plant, cost=cost, tf=1.0, x_start=np.array([0.5, 0.0]), U=plant.input_box
+        plant, cost=cost, horizon=1.0, x_start=np.array([0.5, 0.0]), U=plant.input_box
     )
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),

@@ -96,9 +96,9 @@ concrete formatting, ordered by the cost of being wrong:
 
   | Idea | The word | Not |
   | --- | --- | --- |
-  | Final time, absolute (a run, a problem's window `[t_start, tf]`) | `tf` | `final_time`, a horizon length |
+  | Final time, absolute (a run's end, `Trajectory.tf`) | `tf` | `tf` as a length |
   | Start time | `t_start` | `t0` |
-  | A problem's length, read-only | `problem.horizon` (`tf − t_start`) | |
+  | A problem's length, from `t_start` (`[t_start, t_start + horizon]`) | `horizon` | `tf` on a problem |
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |

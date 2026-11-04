@@ -20,7 +20,9 @@ Q = np.diag([10.0, 1.0])
 R = 0.1 * np.eye(1)
 x_start = np.array([0.4, 0.0])
 score = QuadraticCost.from_system(plant, Q=Q, R=R)
-problem = PlanningProblem(plant, cost=score, x_start=x_start, tf=TF, U=plant.input_box)
+problem = PlanningProblem(
+    plant, cost=score, x_start=x_start, horizon=TF, U=plant.input_box
+)
 
 # The LQR value about the top, V(x) = xᵀ S x, S the Riccati solution of the linearized plant
 model = linearize(plant)
@@ -32,7 +34,7 @@ def mpc_ended_by(cost):
     """The MPC planning ``HORIZON`` seconds ahead on ``cost``."""
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
-            plant, cost=cost, x_start=x_start, tf=HORIZON, U=plant.input_box
+            plant, cost=cost, x_start=x_start, horizon=HORIZON, U=plant.input_box
         ),
         n_steps=3,
         transcription="single_shooting",

@@ -84,7 +84,7 @@ class MPPIPlanner(Planner):
     ):
         require_jax()
         super().__init__(problem)
-        tf = problem.require_finite_tf()
+        tf = problem.require_finite_horizon()
 
         # The structure: the grid, the sample count, the passes, the scheme
         self.dt = float(dt)

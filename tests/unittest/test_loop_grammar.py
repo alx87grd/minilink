@@ -137,7 +137,7 @@ def test_the_models_for_the_discrete_tools():
     plant = Pendulum()
     exact = discretize(linearize(plant), 0.1, solver="exact")
     assert isinstance(exact, SampledSystem) and exact.kind == "model"
-    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
     face = problem.compile(dt=0.1)
     step_problem = problem.discretize(0.1)
     x, u = np.array([0.2, 0.0]), np.zeros(1)
@@ -157,7 +157,7 @@ def test_a_cascade_is_one_flat_plan_on_one_base_clock():
 def test_a_sampled_problem_takes_the_plants_substeps():
     plant = pendulum()
     problem = PlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x_start=plant.x0, tf=0.2
+        plant, cost=QuadraticCost.from_system(plant), x_start=plant.x0, horizon=0.2
     )
     pe = problem.compile(pid() % 0.01, substeps=5)
     run = pe.trajectory()

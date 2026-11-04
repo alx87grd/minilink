@@ -1137,7 +1137,7 @@ def replaced(cached_parts, parts) -> bool:
 def horizon_of(problem, episode_length):
     """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
     if problem.horizon_kind() == "finite":
-        return float(problem.tf)
+        return float(problem.horizon)
 
     return EPISODE_LENGTH if episode_length is None else float(episode_length)
 

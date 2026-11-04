@@ -227,7 +227,7 @@ def test_the_problem_refuses_the_pure_mpc_naming_its_clock():
 
     plant = Pendulum()
     problem = PlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), tf=1.0
+        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(2), horizon=1.0
     )
     planner = TrajectoryOptimizationPlanner(problem, n_steps=5, verbose=False)
     mpc = ModelPredictiveController(planner, warm_start=False)
@@ -243,7 +243,7 @@ def test_a_tick_law_with_no_clock_is_refused_by_the_problem():
     from minilink import PlanningProblem, QuadraticCost
 
     plant = Pendulum()
-    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
     with pytest.raises(TypeError, match="%"):
         problem.compile(LowPass(), dt=0.01)
 
@@ -561,7 +561,7 @@ def test_the_held_outputs_start_is_a_leaf_of_the_run():
     assert loop.state.labels[-1] == "controller:u (memory)"
     plant = Integrator()
     problem = PlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(1), tf=0.2
+        plant, cost=QuadraticCost.from_system(plant), x_start=np.zeros(1), horizon=0.2
     )
     built = closed_loop_with_holds()
     pe = problem.compile(built)

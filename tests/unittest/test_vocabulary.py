@@ -26,6 +26,8 @@ PLANT_PACKAGE = "minilink.dynamics"
 # (None: everywhere). A word keeps its other textbook meanings elsewhere: alpha is the CVaR
 # level of Evaluation.cvar, N the reference gain of OutputReference. Each sweep adds its own.
 RETIRED = {
+    "tf": ("horizon", ("PlanningProblem",)),
+    "require_finite_tf": ("require_finite_horizon", None),
     "t0": ("t_start", ("Trajectory",)),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),

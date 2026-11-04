@@ -224,7 +224,7 @@ def problem_parts(problem):
     name = getattr(sys, "name", type(sys).__name__)
     headline = (
         f"{type(problem).__name__}, {name}, "
-        f"tf={planning_horizon_text(problem.tf)}, rho={problem.discount_rate:g}"
+        f"horizon={planning_horizon_text(problem.horizon)}, rho={problem.discount_rate:g}"
     )
     body = []
     for label, item in (

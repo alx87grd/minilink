@@ -98,7 +98,7 @@ class Transcription(ABC):
 
 @dataclass
 class FixedGridOptions:
-    """Uniform fixed-grid options — knot count only; horizon is ``problem.tf``."""
+    """Uniform fixed-grid options — knot count only; horizon is ``problem.horizon``."""
 
     n_steps: int
 
@@ -108,17 +108,19 @@ class FixedGridOptions:
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
         """The time grid on the horizon ``[t_start, t_start + tf]``: ``t_start`` plus ``linspace(0, tf, n_steps)``."""
-        t = problem.t_start + fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+        t = problem.t_start + fixed_grid_t(
+            problem.require_finite_horizon(), self.n_steps
+        )
 
         return t
 
     def offsets(self, problem: PlanningProblem) -> np.ndarray:
         """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t_start + offset_k``."""
-        return fixed_grid_t(problem.require_finite_tf(), self.n_steps)
+        return fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
-        """Step size from finite ``problem.tf`` and ``n_steps``."""
-        return fixed_grid_dt(problem.require_finite_tf(), self.n_steps)
+        """Step size from finite ``problem.horizon`` and ``n_steps``."""
+        return fixed_grid_dt(problem.require_finite_horizon(), self.n_steps)
 
 
 # Shared transcription math: the textbook pieces every fixed-grid transcription
@@ -315,7 +317,7 @@ def fixed_grid_dt(tf: float, n_steps: int) -> float:
 def require_fixed_grid_horizon(tf):
     """Refuse a fixed-grid horizon that is not positive and finite."""
     if not np.isfinite(tf) or tf <= 0.0:
-        raise ValueError("fixed-grid tf must be positive and finite")
+        raise ValueError("fixed-grid horizon must be positive and finite")
 
 
 def require_jax_compile_backend(backend):

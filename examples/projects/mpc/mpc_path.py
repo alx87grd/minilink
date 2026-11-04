@@ -109,7 +109,7 @@ planner = TrajectoryOptimizationPlanner(
         sys=sys_mpc,
         x_start=x0,
         cost=cost,
-        tf=MPC_HORIZON,
+        horizon=MPC_HORIZON,
         X=sys_mpc.state.box,
         U=sys_mpc.input_box,
     ),

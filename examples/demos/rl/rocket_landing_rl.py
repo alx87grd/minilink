@@ -50,7 +50,7 @@ class LandingCost(CostFunction):
 problem = PlanningProblem(
     plant,
     cost=LandingCost(),
-    tf=TF,
+    horizon=TF,
     x_start=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
     penalize_failure=True,
     failure_cost=100.0,

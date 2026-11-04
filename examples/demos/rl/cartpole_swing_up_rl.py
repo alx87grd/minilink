@@ -44,7 +44,7 @@ class SwingUpCost(CostFunction):
 problem = PlanningProblem(
     plant,
     cost=SwingUpCost(),
-    tf=np.inf,
+    horizon=np.inf,
     x_start=Uniform([-1.0, -np.pi, -1.0, -1.0], [1.0, np.pi, 1.0, 1.0]),
     U=plant.input_box,
 )

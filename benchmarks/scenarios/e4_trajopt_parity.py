@@ -112,7 +112,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
     )
     problem = PlanningProblem(
         sys=sys,
-        tf=PENDULUM_TF,
+        horizon=PENDULUM_TF,
         x_start=x_start,
         Xf=SingletonSet(x_goal),
         cost=cost,
@@ -227,7 +227,7 @@ def run_bicycle_parametric(
         sys=sys,
         x_start=x_start,
         cost=cost,
-        tf=BICYCLE_TF,
+        horizon=BICYCLE_TF,
         X=sys.state.box,
         U=sys.input_box,
     )

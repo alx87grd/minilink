@@ -20,7 +20,7 @@ cost = QuadraticCost.from_system(
     x_bar=np.array([R_REF, 0.0]),
     u_bar=np.array([U_SS]),
 )
-problem = PlanningProblem(plant, cost=cost, tf=TF)
+problem = PlanningProblem(plant, cost=cost, horizon=TF)
 
 # The digital PID: its difference equation on a 100 Hz clock, closed on the plant
 pid = PID(Kp=1.0, Ki=0.0, Kd=1.0)

@@ -109,7 +109,7 @@ path_cost = track.distance_field(body).as_cost(
 )
 problem = PlanningProblem(
     sys=sys,
-    tf=TF,
+    horizon=TF,
     x_start=X_START,
     X=X,
     Xf=SingletonSet(X_GOAL),

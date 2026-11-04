@@ -285,7 +285,7 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
         return PlanningProblem(
             sys,
             cost=QuadraticCost.from_system(sys),
-            tf=1.0,
+            horizon=1.0,
             x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
             disturbances=disturbances or None,
             U=sys.input_box,
@@ -510,7 +510,7 @@ def test_the_rollout_refuses_a_source_it_cannot_feed():
     problem = PlanningProblem(
         sys,
         cost=QuadraticCost.from_system(sys),
-        tf=1.0,
+        horizon=1.0,
         disturbances={"n": WhiteNoise(2, psd=0.1)},
     )
     with pytest.raises(ValueError, match="no port on"):
@@ -556,7 +556,7 @@ def test_the_nominal_problem_is_the_problem_at_its_means():
     m_own = plant.params["m"]
     problem = PlanningProblem(
         plant,
-        tf=1.0,
+        horizon=1.0,
         cost=QuadraticCost.from_system(plant),
         x_start=Gaussian([0.5, 0.0], [0.1, 0.1]),
         params={"plant": {"m": Uniform([1.2], [1.6])}},

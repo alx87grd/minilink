@@ -87,7 +87,7 @@ def test_the_fixed_step_run_matches_the_adaptive_simulator():
 def test_the_score_is_the_integral_plus_the_terminal_cost():
     sys = plant()
     cost = QuadraticCost.from_system(sys, S=np.eye(2))
-    problem = PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box)
+    problem = PlanningProblem(sys, cost=cost, horizon=1.0, U=sys.input_box)
     t = np.linspace(0.0, 1.0, 101)
     x = np.vstack([np.ones_like(t), np.zeros_like(t)])
     u = np.zeros((1, t.size))
@@ -109,7 +109,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
 
     # Off: J is the cost; the run left U (|u| > 5) and missed the goal
     off = score_run(
-        PlanningProblem(sys, cost=cost, tf=1.0, Xf=goal, U=sys.input_box), run
+        PlanningProblem(sys, cost=cost, horizon=1.0, Xf=goal, U=sys.input_box), run
     )
     assert off["failed"] and not off["reached"]
     assert off["J"] == pytest.approx(off["cost"])
@@ -121,7 +121,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
         PlanningProblem(
             sys,
             cost=cost,
-            tf=1.0,
+            horizon=1.0,
             Xf=goal,
             penalize_failure=True,
             failure_cost=1000.0,
@@ -140,13 +140,13 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
     x[0, -1] = np.nan
     run = Trajectory(t, x, np.zeros((1, t.size)))
 
-    off = score_run(PlanningProblem(sys, cost=cost, tf=1.0, U=sys.input_box), run)
+    off = score_run(PlanningProblem(sys, cost=cost, horizon=1.0, U=sys.input_box), run)
     assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
 
     problem = PlanningProblem(
         sys,
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         penalize_failure=True,
         failure_cost=50.0,
         U=sys.input_box,
@@ -161,7 +161,7 @@ def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     problem = PlanningProblem(
         sys,
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         penalize_failure=True,
         failure_cost=50.0,
         X=sys.state.box,
@@ -201,7 +201,7 @@ def stochastic_problem(**fields):
     return PlanningProblem(
         sys=sys,
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         U=BoxInputSet.from_bounds([-50.0], [50.0]),
         x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
         params={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
@@ -360,7 +360,7 @@ def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergen
     problem = PlanningProblem(
         sys,
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         U=sys.input_box,
         penalize_failure=True,
         failure_cost=100.0,
@@ -481,7 +481,7 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
         sys, x_bar=np.array([np.pi, 0.0]), R=0.001 * np.eye(1)
     )
     X = BoxSet([-1.0, -20.0], [np.pi + 0.05, 20.0])  # no overshoot past upright
-    problem = PlanningProblem(sys, cost=cost, tf=3.0, X=X)
+    problem = PlanningProblem(sys, cost=cost, horizon=3.0, X=X)
     pe = problem.compile(PID(Kp=60.0, Ki=0.0, Kd=2.0), dt=0.01, backend="jax")
     assert pe.evaluate(UPRIGHT).failed[0]  # the start overshoots
 
@@ -522,7 +522,7 @@ def point_start_problem():
     return PlanningProblem(
         sys=sys,
         cost=QuadraticCost.from_system(sys),
-        tf=1.0,
+        horizon=1.0,
         x_start=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.0, 0.0])),
     )
 
@@ -560,7 +560,7 @@ def test_numpy_and_jax_draw_the_same_noise_for_an_integer_key():
 def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     sys = plant()
     problem = PlanningProblem(
-        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), horizon=1.0
     )
     loop = noisy_loop(seed=3)
     pe = problem.compile(loop, dt=0.01, backend="numpy")
@@ -591,11 +591,11 @@ def test_the_disturbance_shortcut_is_the_loop_closed_loop_builds():
 
     # Explicit: the loop built with its source (a Sum on the command, the plant has
     # no d); the shortcut: the problem's d, wired the same way under the same ids
-    explicit = PlanningProblem(sys, x_start=start, cost=cost, tf=1.0).compile(
+    explicit = PlanningProblem(sys, x_start=start, cost=cost, horizon=1.0).compile(
         closed_loop(ctl, sys, disturbance=noise), dt=0.01, backend="numpy"
     )
     problem = PlanningProblem(
-        sys, x_start=start, cost=cost, tf=1.0, disturbances={"d": noise}
+        sys, x_start=start, cost=cost, horizon=1.0, disturbances={"d": noise}
     )
     shortcut = problem.compile(ctl, dt=0.01, backend="numpy")
     assert list(shortcut.loop.subsystems) == list(explicit.loop.subsystems)
@@ -617,7 +617,7 @@ def test_a_plant_input_left_unwired_reads_its_nominal_value():
     J = {}
     for sys in (NoisyPendulum(), Pendulum()):
         problem = PlanningProblem(
-            sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+            sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), horizon=1.0
         )
         pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.01, backend="numpy")
         J[type(sys).__name__] = pe.evaluate().J
@@ -677,7 +677,7 @@ def test_a_disturbance_source_runs_in_the_evaluated_loop_with_a_seed_per_trial()
         sys,
         cost=QuadraticCost.from_system(sys),
         x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
-        tf=1.0,
+        horizon=1.0,
         disturbances={"d": WhiteNoise(1, psd=1.0, sample_period=0.05)},
     )
     pe = problem.compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="numpy")
@@ -734,7 +734,7 @@ def test_the_step_refuses_a_substep_count_that_is_not_a_positive_integer(substep
 def test_each_stateful_block_has_its_start_as_a_leaf():
     sys = plant()
     problem = PlanningProblem(
-        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), tf=1.0
+        sys, x_start=[0.5, 0.0], cost=QuadraticCost.from_system(sys), horizon=1.0
     )
     controller = pid()
     pe = problem.compile(controller, dt=0.01, backend="numpy")
@@ -765,7 +765,7 @@ def test_the_gradient_reaches_an_observers_start():
     observer = StateObserver(A, B, C, np.array([[3.0], [2.0]]))
     loop = closed_loop(StateFeedback(np.array([[1.0, 1.5]])), plant_, observer=observer)
     problem = PlanningProblem(
-        plant_, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), tf=2.0
+        plant_, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), horizon=2.0
     )
     pe = problem.compile(loop, dt=0.01, backend="jax")
     params = pe.params
@@ -798,7 +798,7 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
     sys = DoubleIntegrator()
     cost = QuadraticCost.from_system(sys, Q=np.zeros((2, 2)), R=np.eye(1))
     goal = BallSet(center=[1.0, 0.0], radius=0.05)
-    problem = PlanningProblem(sys, x_start=np.zeros(2), cost=cost, tf=2.0, Xf=goal)
+    problem = PlanningProblem(sys, x_start=np.zeros(2), cost=cost, horizon=2.0, Xf=goal)
     source = TrajectorySource(np.linspace(0.0, 2.0, 11), np.zeros(11))
     pe = problem.compile(source, dt=0.01, backend="jax")
     assert pe.params["controller"]["values"].shape == (1, 11)
@@ -859,7 +859,7 @@ def test_a_diagram_source_draws_a_seed_per_noise_block_per_trial():
         sys,
         cost=QuadraticCost.from_system(sys),
         x_start=[0.1, 0.0],
-        tf=1.0,
+        horizon=1.0,
         disturbances={"d": two_noise_source()},
     )
     assert problem.drawn_paths() == [
@@ -885,7 +885,7 @@ def test_a_point_start_reads_the_start_the_params_give():
 
 def test_a_start_set_that_cannot_draw_is_refused():
     with pytest.raises(ValueError, match="cannot draw a start"):
-        PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), tf=1.0)
+        PlanningProblem(plant(), x_start=BallSet(np.zeros(2), 1.0), horizon=1.0)
 
 
 def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
@@ -895,7 +895,7 @@ def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
         sys,
         x_start=[0.5, 0.0],
         cost=cost,
-        tf=1.0,
+        horizon=1.0,
         X=sys.state.box,
         U=sys.input_box,
         penalize_failure=True,
@@ -960,7 +960,7 @@ def test_the_failure_cost_follows_the_evaluations_discount_rate():
     problem = PlanningProblem(
         plant,
         cost=cost,
-        tf=2.0,
+        horizon=2.0,
         x_start=np.array([0.5, 0.0]),
         U=plant.input_box,
         penalize_failure=True,

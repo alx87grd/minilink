@@ -647,7 +647,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
     )
     problem = PlanningProblem(
         sys=sys,
-        tf=OBS_TF,
+        horizon=OBS_TF,
         x_start=x_start,
         cost=tracking_cost + obstacle_cost,
         X=sys.state.box,
@@ -692,7 +692,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
     )
     problem = PlanningProblem(
         sys=sys,
-        tf=CORNER_TF,
+        horizon=CORNER_TF,
         x_start=x_start,
         cost=tracking_cost + path_cost + corridor_cost,
         X=sys.state.box,

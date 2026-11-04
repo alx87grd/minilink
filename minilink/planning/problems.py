@@ -41,7 +41,7 @@ class PlanningProblem:
     but feasibility/search planners may leave it unset.
 
     The problem is the continuous task: the system, the admissible and boundary
-    sets, the continuous horizon ``tf``, the optional cost. The knot count and
+    sets, the continuous ``horizon``, the optional cost. The knot count and
     the other discretization choices belong to the solvers, not to the problem.
     The parameters live on the parts; :attr:`params` is their live view by role,
     as a diagram's are by block.
@@ -101,20 +101,21 @@ class PlanningProblem:
         (a hard terminal equality for collocation and shooting); ``None``
         (default) is a free end.
 
-    tf : float, optional
-        Continuous planning horizon length in seconds. ``None`` means unset
-        (RRT / some DP tasks). ``+inf`` means infinite-horizon. Finite trajopt /
-        MPC grids require a finite ``tf`` — demos should always set it
-        explicitly. Knot count ``N`` lives on transcription options.
+    horizon : float, optional
+        Continuous planning horizon length in seconds, measured from
+        ``t_start``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
+        infinite-horizon. Finite trajopt / MPC grids require a finite
+        ``horizon`` — demos should always set it explicitly. Knot count ``N``
+        lives on transcription options.
     t_start : float, optional
-        The start time of the horizon, ``[t_start, t_start + tf]``: a run
+        The start time of the horizon, ``[t_start, t_start + horizon]``: a run
         starts at ``t_start``, its costs, sets and references read absolute
         time, and the discount counts from it. ``0`` (default) is today's
         horizon; it is a leaf of :attr:`params`, so an MPC binds the time of its
         tick and ``jax.grad`` differentiates it.
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
-        ``∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h``, applied by every consumer (value
+        ``∫ e^{−ρ(t − t_start)} g dt + e^{−ρ T} h`` (``T`` the horizon), applied by every consumer (value
         iteration's ``α`` and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     penalize_failure : bool, optional
@@ -153,7 +154,7 @@ class PlanningProblem:
         "U",
         "X0",
         "Xf",
-        "tf",
+        "horizon",
         "t_start",
         "penalize_failure",
         "failure_cost",
@@ -184,7 +185,7 @@ class PlanningProblem:
         U: InputSet | None = None,
         X0: Set | None = None,
         Xf: Set | None = None,
-        tf: float | None = None,
+        horizon: float | None = None,
         t_start: float = 0.0,
         penalize_failure: bool = False,
         failure_cost: float | None = None,
@@ -208,7 +209,7 @@ class PlanningProblem:
         self.U = U
         self.X0 = boundary_set_of(X0)
         self.Xf = boundary_set_of(Xf)
-        self.tf = tf
+        self.horizon = horizon
         self.t_start = coerce_start_time(t_start)
         self.penalize_failure = penalize_failure
         self.failure_cost = failure_cost
@@ -216,7 +217,7 @@ class PlanningProblem:
         n = int(self.sys.n)
 
         # The horizon and the discount rate, and the failure's switch and cost
-        tf = self.coerce_tf(self.tf)
+        horizon = self.coerce_horizon(self.horizon)
         self.discount_rate = coerce_rate(self.discount_rate)
         self.penalize_failure = coerce_switch(self.penalize_failure)
         self.failure_cost = coerce_failure_cost(self.failure_cost)
@@ -252,7 +253,7 @@ class PlanningProblem:
         )
 
         # The coerced fields
-        self.tf = tf
+        self.horizon = horizon
         self.start_point = x_start
         self.X = X
         self.U = U
@@ -541,14 +542,14 @@ class PlanningProblem:
 
         return float(gamma)
 
-    def cost_bound(self, tf=None, *, discount_rate=None, dt=None, params=None):
+    def cost_bound(self, horizon=None, *, discount_rate=None, dt=None, params=None):
         """
         An upper bound of the cost of any run that stays in the boxes: always finite.
 
         ``g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max``, with ``g_max`` and ``h_max`` the
         cost's bounds over the boxes of ``X`` and ``U`` (the declared sets', else
         the plant's declared state and input ranges), ``T`` the run's length
-        (``tf``, default the problem's horizon) and ``ρ`` the problem's rate (or
+        (``horizon``, default the problem's) and ``ρ`` the problem's rate (or
         ``discount_rate``, a planner's own). A stepped tool passes its period
         ``dt``: the integral is then its sum ``Σ_{k<N} γᵏ dt``, ``γ = e^{−ρ dt}``,
         ``N = T / dt``, which is larger. An infinite horizon charges no ``h``; one
@@ -559,9 +560,9 @@ class PlanningProblem:
         cost = self.require_cost()
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
         T = (
-            (self.tf if self.horizon_kind() == "finite" else np.inf)
-            if tf is None
-            else float(tf)
+            (self.horizon if self.horizon_kind() == "finite" else np.inf)
+            if horizon is None
+            else float(horizon)
         )
 
         # The boxes: the declared sets', else the plant's declared ranges
@@ -578,28 +579,34 @@ class PlanningProblem:
 
         # ∫₀ᵀ e^{−ρt} dt = (1 − e^{−ρT}) / ρ, or T when ρ = 0
         if dt is None:
-            horizon = (1.0 - np.exp(-rho * T)) / rho if rho > 0.0 else T
+            discounted_time = (1.0 - np.exp(-rho * T)) / rho if rho > 0.0 else T
 
         # Σ_{k<N} γᵏ dt = dt (1 − γᴺ) / (1 − γ), or N dt when γ = 1
         else:
             dt = float(dt)
             gamma = np.exp(-rho * dt)
             N = max(1, round(T / dt)) if np.isfinite(T) else np.inf
-            horizon = dt * (1.0 - gamma**N) / (1.0 - gamma) if gamma < 1.0 else N * dt
+            discounted_time = (
+                dt * (1.0 - gamma**N) / (1.0 - gamma) if gamma < 1.0 else N * dt
+            )
 
         # J_max = g_max ∫₀ᵀ e^{−ρt} dt + e^{−ρT} h_max
-        bound = g_max * horizon + (np.exp(-rho * T) * h_max if np.isfinite(T) else 0.0)
+        bound = g_max * discounted_time + (
+            np.exp(-rho * T) * h_max if np.isfinite(T) else 0.0
+        )
         if not np.isfinite(bound):
             return fallback_bound("the cost has no finite bound on the boxes")
 
         return float(bound)
 
-    def failure_cost_at(self, tf=None, *, discount_rate=None, dt=None, params=None):
+    def failure_cost_at(
+        self, horizon=None, *, discount_rate=None, dt=None, params=None
+    ):
         """The cost a failure is charged: :attr:`failure_cost` when a number, else :meth:`cost_bound` (its arguments)."""
         failure_cost = self.failure_cost
         if failure_cost is None:
             return self.cost_bound(
-                tf, discount_rate=discount_rate, dt=dt, params=params
+                horizon, discount_rate=discount_rate, dt=dt, params=params
             )
 
         return failure_cost
@@ -655,7 +662,7 @@ class PlanningProblem:
         The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem`.
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
-        ``N = tf / dt``, ``γ = e^{−ρ dt}``; its face equals
+        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; its face equals
         ``self.compile(dt=dt, solver=solver, substeps=substeps)``'s.
         """
         # Lazy import: the step problem imports this module
@@ -664,8 +671,12 @@ class PlanningProblem:
         return discretize_problem(self, dt, solver=solver, substeps=substeps)
 
     def horizon_kind(self) -> str:
-        """``"finite"`` when ``tf`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
-        return "infinite" if self.tf is None or not np.isfinite(self.tf) else "finite"
+        """``"finite"`` when ``horizon`` is a finite length (``h`` is charged there), ``"infinite"`` for ``+inf`` or unset."""
+        return (
+            "infinite"
+            if self.horizon is None or not np.isfinite(self.horizon)
+            else "finite"
+        )
 
     def require_cost(self) -> CostFunction:
         """Refuse a problem without a cost; return the cost."""
@@ -683,17 +694,17 @@ class PlanningProblem:
 
         return self.Xf
 
-    def require_finite_tf(self) -> float:
-        """Refuse an unset or infinite horizon; return ``tf`` as a float."""
-        if self.tf is None:
-            raise ValueError("This planner requires a finite problem.tf")
-        if not np.isfinite(self.tf):
+    def require_finite_horizon(self) -> float:
+        """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
+        if self.horizon is None:
+            raise ValueError("This planner requires a finite problem.horizon")
+        if not np.isfinite(self.horizon):
             raise ValueError(
-                "This planner requires a finite problem.tf "
+                "This planner requires a finite problem.horizon "
                 "(got +inf for infinite-horizon)"
             )
 
-        return float(self.tf)
+        return float(self.horizon)
 
     # Display
 
@@ -708,19 +719,19 @@ class PlanningProblem:
     ###########################################################################
 
     @staticmethod
-    def coerce_tf(tf: object) -> float | None:
+    def coerce_horizon(horizon: object) -> float | None:
         """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
-        if tf is None:
+        if horizon is None:
             return None
 
-        value = float(tf)
+        value = float(horizon)
         if np.isnan(value) or value <= 0.0:
             raise ValueError(
-                "tf must be positive, None (unset), or +inf (infinite-horizon)"
+                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
             )
         if not (np.isfinite(value) or np.isposinf(value)):
             raise ValueError(
-                "tf must be positive, None (unset), or +inf (infinite-horizon)"
+                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
             )
 
         return value

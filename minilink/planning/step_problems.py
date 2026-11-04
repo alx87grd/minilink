@@ -267,7 +267,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     cost = problem.require_cost()
     dt = float(dt)
     rho = problem.discount_rate
-    N = steps_of(problem.tf, dt) if problem.horizon_kind() == "finite" else None
+    N = steps_of(problem.horizon, dt) if problem.horizon_kind() == "finite" else None
 
     # γ = e^{−ρ dt}, the discount of one period
     gamma = float(np.exp(-rho * dt))

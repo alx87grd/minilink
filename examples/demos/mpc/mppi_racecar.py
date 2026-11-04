@@ -59,7 +59,11 @@ cone = scene.clearance_field(probe).as_cost(
     weight=40.0, shaping=quadratic_hinge(threshold=0.2)
 )
 problem = PlanningProblem(
-    sys=car, x_start=car.x0, cost=quad + corridor + cone, tf=HORIZON, U=car.input_box
+    sys=car,
+    x_start=car.x0,
+    cost=quad + corridor + cone,
+    horizon=HORIZON,
+    U=car.input_box,
 )
 
 planner = MPPIPlanner(

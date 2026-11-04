@@ -84,7 +84,7 @@ obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
 )
 cost = tracking_cost + obstacle_cost
 
-problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, tf=TF)
+problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, horizon=TF)
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,

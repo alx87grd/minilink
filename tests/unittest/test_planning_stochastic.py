@@ -29,11 +29,13 @@ def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
     plant = pendulum()
     cost = quadratic(plant)
     assert (
-        PlanningProblem(plant, cost=cost, tf=5.0, U=plant.input_box).horizon_kind()
+        PlanningProblem(plant, cost=cost, horizon=5.0, U=plant.input_box).horizon_kind()
         == "finite"
     )
     assert (
-        PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box).horizon_kind()
+        PlanningProblem(
+            plant, cost=cost, horizon=np.inf, U=plant.input_box
+        ).horizon_kind()
         == "infinite"
     )
     assert (
@@ -43,7 +45,7 @@ def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
     assert not hasattr(CostFunction, "horizon")  # one owner: the problem's tf
 
     # The discount has one owner too: the problem
-    discounted = PlanningProblem(plant, cost=cost, tf=np.inf, discount_rate=0.5)
+    discounted = PlanningProblem(plant, cost=cost, horizon=np.inf, discount_rate=0.5)
     np.testing.assert_allclose(discounted.discount_factor(0.1), np.exp(-0.05))
     assert PlanningProblem(plant, cost=cost).discount_factor(0.1) == 1.0
     assert not hasattr(CostFunction, "discount_rate")
@@ -54,14 +56,14 @@ def test_horizon_is_the_problem_tf_and_the_cost_only_discounts():
 def test_problem_exit_rule_and_penalty():
     plant = pendulum()
     problem = PlanningProblem(
-        plant, cost=quadratic(plant), tf=np.inf, U=plant.input_box
+        plant, cost=quadratic(plant), horizon=np.inf, U=plant.input_box
     )
     assert problem.penalize_failure is False and problem.failure_cost is None
     assert problem.X.contains(np.array([1e9, -1e9]))  # unconstrained by default
     assert problem.horizon_kind() == "infinite"
 
     scalar = PlanningProblem(
-        plant, tf=2.0, penalize_failure=True, failure_cost=50, U=plant.input_box
+        plant, horizon=2.0, penalize_failure=True, failure_cost=50, U=plant.input_box
     )
     assert scalar.failure_cost == 50.0
     assert scalar.failure_cost_at() == 50.0
@@ -84,7 +86,7 @@ def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
 
     # Finite horizon: g_max T + h_max
     finite = PlanningProblem(
-        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
+        plant, cost=cost, horizon=2.0, X=plant.state.box, U=plant.input_box
     )
     assert finite.cost_bound() == pytest.approx(2.0 * g_max + h_max)
     assert finite.failure_cost_at() == pytest.approx(2.0 * g_max + h_max)
@@ -93,7 +95,7 @@ def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
     discounted = PlanningProblem(
         plant,
         cost=cost,
-        tf=np.inf,
+        horizon=np.inf,
         X=plant.state.box,
         U=plant.input_box,
         discount_rate=0.5,
@@ -101,7 +103,7 @@ def test_the_cost_bound_integrates_the_cost_maximum_over_the_horizon():
     assert discounted.cost_bound() == pytest.approx(g_max / 0.5)
 
     # Undiscounted infinite horizon: no bound, 1e6 announced
-    undiscounted = PlanningProblem(plant, cost=cost, tf=np.inf, U=plant.input_box)
+    undiscounted = PlanningProblem(plant, cost=cost, horizon=np.inf, U=plant.input_box)
     with pytest.warns(UserWarning, match="failure_cost"):
         assert undiscounted.cost_bound() == 1.0e6
 
@@ -217,7 +219,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         params={"plant": {"m": Uniform([0.8], [1.2])}},
         penalize_failure=True,
@@ -258,7 +260,7 @@ def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
         plant,
         x_start=[0.3, -0.1],
         cost=quadratic(plant),
-        tf=5.0,
+        horizon=5.0,
         penalize_failure=True,
         failure_cost=10.0,
         U=plant.input_box,
@@ -321,7 +323,7 @@ def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
 
     box = dict(X=plant.state.box, U=plant.input_box)
     finite = PlanningProblem(
-        plant, cost=Unit(), tf=1.0, penalize_failure=True, failure_cost=50.0, **box
+        plant, cost=Unit(), horizon=1.0, penalize_failure=True, failure_cost=50.0, **box
     )
     report = evaluate_trajectory(finite, inside)
     assert not report.failed[0] and np.isclose(report.J[0], 1.0 + 7.0)  # ∫ g + h
@@ -332,12 +334,12 @@ def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
     assert np.isclose(report.feasibility_margin[0], -1.0)
 
     # The switch off: the plain cost, the failure reported beside it
-    uncharged = PlanningProblem(plant, cost=Unit(), tf=np.inf, **box)
+    uncharged = PlanningProblem(plant, cost=Unit(), horizon=np.inf, **box)
     report = evaluate_trajectory(uncharged, exits)
     assert report.failed[0] and np.isclose(
         report.J[0], 1.0
     )  # no h on an infinite horizon
-    free = PlanningProblem(plant, cost=Unit(), tf=np.inf, U=plant.input_box)
+    free = PlanningProblem(plant, cost=Unit(), horizon=np.inf, U=plant.input_box)
     assert not evaluate_trajectory(free, exits).failed[0]  # X unconstrained: no failure
 
 
@@ -371,7 +373,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
             plant,
             x_start=[0.1, 0.0],
             cost=quadratic(plant),
-            tf=1.0,
+            horizon=1.0,
             X=Band(r),
             penalize_failure=True,
             failure_cost=1.0,
@@ -453,7 +455,7 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
     problem = PlanningProblem(
         plant,
         cost=Effort(),
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Particles([[0.5, 0.0]]),
         U=plant.input_box,
     )
@@ -473,7 +475,7 @@ def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
-        tf=np.inf,
+        horizon=np.inf,
         X=plant.state.box,
         x_start=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
     )
@@ -497,7 +499,7 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
     problem = PlanningProblem(
         mass,
         cost=quadratic(mass),
-        tf=np.inf,
+        horizon=np.inf,
         x_start=Particles([[0.5, 0.0]]),
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=2.0, backend="numpy")
@@ -544,7 +546,7 @@ def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
         plant,
         x_start=[0.5, 0.0],
         cost=quadratic(plant),
-        tf=1.0,
+        horizon=1.0,
         X=plant.state.box,
         U=plant.input_box,
         penalize_failure=True,
@@ -639,7 +641,7 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
-        tf=2.0,
+        horizon=2.0,
         x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
@@ -658,7 +660,7 @@ def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
-        tf=2.0,
+        horizon=2.0,
         x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
@@ -680,7 +682,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
-        tf=1.0,
+        horizon=1.0,
         X=plant.state.box,
         x_start=Particles([[0.3, 0.0], [-0.3, 0.0]]),
         penalize_failure=True,
@@ -712,7 +714,7 @@ def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
     from minilink.planning import evaluate, evaluate_trajectory
 
     plant = pendulum()
-    problem = PlanningProblem(plant, cost=quadratic(plant), tf=1.0)
+    problem = PlanningProblem(plant, cost=quadratic(plant), horizon=1.0)
     t = np.linspace(0.0, 1.0, 6)
     traj = Trajectory(t=t, x=np.vstack([0.1 * t, np.zeros(6)]), u=np.zeros((1, 6)))
     single = evaluate_trajectory(problem, traj)
@@ -730,7 +732,9 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     from minilink.planning import evaluate, evaluate_trajectory
 
     plant = pendulum()
-    problem = PlanningProblem(plant, x_start=[0.3, 0.0], cost=quadratic(plant), tf=1.0)
+    problem = PlanningProblem(
+        plant, x_start=[0.3, 0.0], cost=quadratic(plant), horizon=1.0
+    )
     dt, n_steps = 0.1, 10
     t = dt * np.arange(n_steps + 1)
     u = 2.0 * np.sin(3.0 * t)[None, :]
@@ -796,7 +800,7 @@ def test_a_time_varying_law_scores_alike_on_every_backend():
         pendulum(),
         cost=QuadraticCost.from_system(pendulum()),
         x_start=Particles([[0.5, 0.0]]),
-        tf=1.0,
+        horizon=1.0,
     )
     settings = dict(dt=0.01, n_trials=1)
     on_jax = evaluate(problem, ctl, backend="jax", **settings)
@@ -825,7 +829,7 @@ def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        tf=1.0,
+        horizon=1.0,
         x_start=np.zeros(2),
         X=IntersectionSet([box, ball]),
     )
@@ -863,7 +867,12 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
     problem = PlanningProblem(
-        plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, tf=2.0, t_start=1.5
+        plant,
+        x_start=[0.3, 0.0],
+        cost=cost,
+        U=plant.input_box,
+        horizon=2.0,
+        t_start=1.5,
     )
     t_grid = 1.5 + 0.1 * np.arange(21)
     source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
@@ -877,7 +886,7 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
     plant = pendulum()
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), S=np.eye(2))
     problem = PlanningProblem(
-        plant, cost=cost, tf=2.0, X=plant.state.box, U=plant.input_box
+        plant, cost=cost, horizon=2.0, X=plant.state.box, U=plant.input_box
     )
     dt = 0.1
     face = problem.compile(dt=dt)

@@ -74,7 +74,11 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         return PlanningProblem(
-            sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+            sys=sys,
+            horizon=1.0,
+            x_start=np.array([x_start]),
+            cost=cost,
+            U=sys.input_box,
         )
 
     def make_planner(self, problem):
@@ -147,7 +151,11 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         )
         return PlanningProblem(
-            sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+            sys=sys,
+            horizon=1.0,
+            x_start=np.array([x_start]),
+            cost=cost,
+            U=sys.input_box,
         )
 
     def make_planner(self, problem):
@@ -243,7 +251,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             )
             return PlanningProblem(
                 sys=sys,
-                tf=1.0,
+                horizon=1.0,
                 t_start=t_start,
                 x_start=np.array([0.0]),
                 cost=cost,
@@ -283,7 +291,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(sys, Q=np.eye(1), R=0.1 * np.eye(1))
         problem = PlanningProblem(
-            sys=sys, tf=1.0, x_start=np.array([0.0]), cost=cost, U=sys.input_box
+            sys=sys, horizon=1.0, x_start=np.array([0.0]), cost=cost, U=sys.input_box
         )
         values = {"t_start": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
         x0 = np.array([0.3])
@@ -359,7 +367,7 @@ def _make_numpy_planner(x_start=0.0):
         sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
     )
     problem = PlanningProblem(
-        sys=sys, x_start=np.array([x_start]), cost=cost, tf=1.0, U=sys.input_box
+        sys=sys, x_start=np.array([x_start]), cost=cost, horizon=1.0, U=sys.input_box
     )
     return TrajectoryOptimizationPlanner(
         problem,
@@ -379,7 +387,7 @@ def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
         sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([goal])
     )
     problem = PlanningProblem(
-        sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+        sys=sys, horizon=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
     )
     return TrajectoryOptimizationPlanner(
         problem,
@@ -593,7 +601,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         boxed = PlanningProblem(
             sys=problem.sys,
             cost=problem.cost,
-            tf=problem.tf,
+            horizon=problem.horizon,
             x_start=np.array([0.5]),
             X0=BoxSet(np.array([0.4]), np.array([0.6])),
             U=problem.U,
@@ -641,7 +649,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
         sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([2.0])
     )
     problem = PlanningProblem(
-        sys=sys, tf=1.0, x_start=np.array([0.5]), cost=cost, U=sys.input_box
+        sys=sys, horizon=1.0, x_start=np.array([0.5]), cost=cost, U=sys.input_box
     )
     planner = TrajectoryOptimizationPlanner(
         problem,

@@ -125,7 +125,7 @@ class LQRPlanner(Planner):
         u_bar = command_block(sys, self.u_bar)
 
         if problem.horizon_kind() == "finite":
-            tf = problem.require_finite_tf()
+            tf = problem.require_finite_horizon()
 
             # −Ṡ = Aᵀ S + S A − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t)
@@ -319,7 +319,7 @@ if __name__ == "__main__":
         plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), x_bar=x_bar
     )
     problem = PlanningProblem(
-        plant, x_start=x0, cost=cost, tf=np.inf, U=plant.input_box
+        plant, x_start=x0, cost=cost, horizon=np.inf, U=plant.input_box
     )
 
     solution = LQRPlanner(problem).solve(evaluate=True)

@@ -27,7 +27,7 @@ def pendulum_problem(tf=np.inf, S=None):
         plant,
         x_start=UPRIGHT + [0.3, 0.0],
         cost=cost,
-        tf=tf,
+        horizon=tf,
         U=plant.input_box,
     )
 
@@ -107,7 +107,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
         K, lqr(plant, Q_x, R_all[:1, :1], x_bar=x_up).params["K"]
     )
     finite = LQRPlanner(
-        PlanningProblem(plant, cost=cost, tf=2.0, U=plant.input_box), n_steps=51
+        PlanningProblem(plant, cost=cost, horizon=2.0, U=plant.input_box), n_steps=51
     ).solve()
     assert finite.policy.params["K"].shape == (51, 1, 4)
 
@@ -115,7 +115,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
 def test_lqr_needs_a_quadratic_cost():
     plant = Pendulum()
     problem = PlanningProblem(
-        plant, cost=TimeCost.from_system(plant), tf=np.inf, U=plant.input_box
+        plant, cost=TimeCost.from_system(plant), horizon=np.inf, U=plant.input_box
     )
     with pytest.raises(TypeError, match="QuadraticCost"):
         LQRPlanner(problem)

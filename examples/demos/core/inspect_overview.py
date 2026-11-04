@@ -44,12 +44,12 @@ print(Gaussian([0.0], [0.2]))
 print(cost)
 print(cost + QuadraticCost.from_system(DoubleIntegrator()))
 
-print(PlanningProblem(plant, tf=2.0, cost=cost))
+print(PlanningProblem(plant, horizon=2.0, cost=cost))
 
 print(
     PlanningProblem(
         plant,
-        tf=1.0,
+        horizon=1.0,
         x_start=Gaussian([0.0], [0.1]),
         cost=cost,
         criterion="expectation",
@@ -61,7 +61,7 @@ print(linearize(plant))
 di = DoubleIntegrator()
 di_problem = PlanningProblem(
     di,
-    tf=5.0,
+    horizon=5.0,
     cost=QuadraticCost.from_system(di),
     U=di.input_box,
 )

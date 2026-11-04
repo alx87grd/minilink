@@ -203,7 +203,7 @@ def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
         plant,
         cost=TimedTerminal.from_system(plant),
         x_start=[0.3, 0.0],
-        tf=2.0,
+        horizon=2.0,
         t_start=0.5,
     )
     face = problem.compile(dt=0.05)
@@ -242,7 +242,7 @@ def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize()
         plant,
         cost=QuadraticCost.from_system(plant),
         x_start=[0.3, 0.0],
-        tf=1.0,
+        horizon=1.0,
         disturbances={"d": WhiteNoise(1, psd=0.5, sample_period=0.01, seed=1)},
     )
     with pytest.raises(ValueError, match="disturbance sources"):
@@ -278,7 +278,7 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
         plant,
         cost=QuadraticCost.from_system(plant),
         x_start=[0.3, 0.0],
-        tf=1.0,
+        horizon=1.0,
         params={"plant": {"m": Uniform(1.5, 2.5)}},
     )
     assert problem.sample_params(None)["plant"]["m"] == 2.0
@@ -293,6 +293,6 @@ def test_the_rollout_environment_refuses_a_step_problem_naming_the_way():
     with pytest.raises(TypeError, match="step its face"):
         RolloutEnvironment(grid_world(), backend="numpy")
     plant = Pendulum()
-    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), tf=1.0)
+    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
     with pytest.raises(TypeError, match=r"RolloutEnvironment\(origin, dt=0.1\)"):
         RolloutEnvironment(problem.discretize(0.1), backend="numpy")

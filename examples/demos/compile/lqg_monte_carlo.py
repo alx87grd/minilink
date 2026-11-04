@@ -31,7 +31,7 @@ disturbances = {
     "n": NoiseSource(Gaussian([0.0], [SENSOR_STD]), sample_period=DT, seed=2),
 }
 problem = PlanningProblem(
-    plant, cost=cost, x_start=np.zeros(2), tf=TF, disturbances=disturbances
+    plant, cost=cost, x_start=np.zeros(2), horizon=TF, disturbances=disturbances
 )
 
 # Monte Carlo: N_TRIALS closed-loop runs, each source with its own seed per trial

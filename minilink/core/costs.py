@@ -33,7 +33,7 @@ class CostFunction(ABC):
 
     Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
     ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
-    The horizon is the planning problem's: a finite ``tf`` ends the integral
+    The horizon is the planning problem's: a finite ``horizon`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
     set is charged by the problem (``failure_cost``), not by the cost.
 

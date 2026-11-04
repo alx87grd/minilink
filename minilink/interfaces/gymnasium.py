@@ -158,7 +158,7 @@ class Sys2Gym(gym.Env):
         A problem with a point start starts every episode at its ``x_start``.
         """
         finite = problem.horizon_kind() == "finite"
-        tf = float(problem.tf) if finite else float(episode_length or 10.0)
+        tf = float(problem.horizon) if finite else float(episode_length or 10.0)
 
         kwargs.setdefault("t_start", float(problem.t_start))
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)

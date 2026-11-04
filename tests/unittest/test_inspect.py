@@ -74,11 +74,11 @@ class TestInspectPrint(unittest.TestCase):
         plant = Integrator()
         problem = PlanningProblem(
             plant,
-            tf=2.0,
+            horizon=2.0,
             cost=QuadraticCost.from_system(plant),
         )
         text = str(problem)
-        self.assertIn("PlanningProblem, Integrator, tf=2, rho=0", text)
+        self.assertIn("PlanningProblem, Integrator, horizon=2, rho=0", text)
         self.assertIn("X0:", text)
         self.assertIn("cost: QuadraticCost", text)
 
@@ -87,7 +87,7 @@ class TestInspectPrint(unittest.TestCase):
         law = Gaussian([0.0], [0.1])
         problem = PlanningProblem(
             plant,
-            tf=1.0,
+            horizon=1.0,
             x_start=law,
             cost=QuadraticCost.from_system(plant),
         )

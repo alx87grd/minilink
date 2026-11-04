@@ -79,7 +79,9 @@ obstacle = scene.clearance_field(probe).as_cost(
     weight=40.0, shaping=quadratic_hinge(threshold=0.2)
 )
 cost = quad + corridor + obstacle
-problem = PlanningProblem(sys=car, x_start=x0, cost=cost, tf=N * DT, U=car.input_box)
+problem = PlanningProblem(
+    sys=car, x_start=x0, cost=cost, horizon=N * DT, U=car.input_box
+)
 
 # --- MPPI: the pieces it reads, and one jitted tick ---
 ev = car.compile(backend="jax")
