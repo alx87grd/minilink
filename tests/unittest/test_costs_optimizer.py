@@ -13,7 +13,7 @@ from minilink.core.trajectory import Trajectory
 
 
 def test_time_cost_is_unity_off_target_zero_on_target():
-    cost = TimeCost(x_bar=np.zeros(2), eps=0.1)
+    cost = TimeCost(x_bar=np.zeros(2), radius=0.1)
     assert cost.g(np.array([1.0, 0.0]), np.zeros(1)) == 1.0
     assert cost.g(np.array([0.02, 0.0]), np.zeros(1)) == 0.0
     assert cost.h(np.array([1.0, 0.0])) == 0.0
@@ -36,7 +36,7 @@ def test_time_cost_jax_matches_numpy():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
 
-    cost = TimeCost(x_bar=np.zeros(2), eps=0.1)
+    cost = TimeCost(x_bar=np.zeros(2), radius=0.1)
     states = jnp.array([[1.0, 0.0], [0.02, 0.0], [0.0, 0.0]])
     u = jnp.zeros(1)
 
