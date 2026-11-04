@@ -6,7 +6,7 @@ import time
 import warnings
 from collections.abc import Callable
 from copy import deepcopy
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 
 import numpy as np
 
@@ -20,6 +20,7 @@ from minilink.optimization.mathematical_program import (
     OptimizationResult,
 )
 from minilink.optimization.optimizer import (
+    NATIVE_METHODS,
     OptimizationProgressCallback,
     Optimizer,
     make_optimizer_backend,
@@ -42,21 +43,6 @@ from minilink.planning.trajectory_optimization.transcription import (
 )
 
 _UNSET = object()  # Marks a keyword the caller did not pass
-
-_TRAJOPT_OPTION_KEYS = (
-    "backend",
-    "guess",
-    "method",
-    "optimizer_options",
-    "use_hessian",
-    "record_history",
-    "callback",
-    "record_solve_time",
-    "verbose",
-    "feasibility_tol",
-    "live_plot",
-    "n_iterations",
-)
 
 _TRANSCRIPTION_PRESETS = frozenset(
     {"direct_collocation", "multiple_shooting", "single_shooting"}
@@ -89,18 +75,19 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         transcription: Transcription | str | None = None,
         n_steps: int | None = None,
-        backend=_UNSET,
-        guess=_UNSET,
-        method=_UNSET,
-        options=_UNSET,
-        use_hessian=_UNSET,
-        record_history=_UNSET,
-        callback=_UNSET,
-        record_solve_time=_UNSET,
-        verbose=_UNSET,
-        feasibility_tol=_UNSET,
-        live_plot=_UNSET,
-        n_iterations=_UNSET,
+        method: str = "scipy_slsqp",
+        backend: str = BACKEND_NUMPY,
+        n_iterations: int | None = None,
+        use_hessian: bool = False,
+        feasibility_tol: float = 1e-6,
+        guess=None,
+        options: dict | None = None,
+        verbose: bool = False,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        record_history: bool = False,
+        record_solve_time: bool = False,
+        **method_numbers,
     ) -> None:
         """
         Parameters
@@ -115,13 +102,23 @@ class TrajectoryOptimizationPlanner(Planner):
             Knot count when ``transcription`` is omitted or a string preset.
             Required in those cases; ignored when a ``Transcription`` instance
             already carries its grid (must not conflict if also passed).
+        method, backend, n_iterations, use_hessian, feasibility_tol, guess
+            Structure: the optimizer's method, the array backend, a native
+            method's exact step count (``None`` runs to its tolerance), the
+            dense Hessian, the plan's constraint tolerance (``success`` is the
+            returned plan satisfying the program to it, even after an iteration
+            limit), and the default initial guess.
         options : dict, optional
-            The optimizer's own settings (``maxiter``, ``learning_rate``, ...),
-            passed to its method.
-        backend, guess, method, use_hessian, record_history, callback,
-        record_solve_time, verbose, feasibility_tol, live_plot, n_iterations
-            The workflow settings, as keywords; the resolved set is
-            :attr:`settings`.
+            An external solver's own knobs (SciPy's ``maxiter``, ``ftol``;
+            Ipopt's), passed through untouched.
+        verbose, callback, live_plot, record_history, record_solve_time
+            Workflow: the preamble and report, a per-iterate callback (it takes
+            precedence over ``live_plot``), the live redraw, a full
+            :class:`Trajectory` per iterate (one rollout each: leave it off for
+            production solves), and the solve's wall time.
+        **method_numbers
+            A native method's own numbers (``learning_rate``, ``b1``, ``b2``,
+            ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``.
         """
         super().__init__(problem)
         self.require_cost()
@@ -129,22 +126,24 @@ class TrajectoryOptimizationPlanner(Planner):
         # Discretization: a transcription instance, or a preset on n_steps knots
         self.transcription = resolve_transcription(transcription, n_steps)
 
-        # Workflow options: the flat keywords over the bag
-        self.settings = trajopt_options_of(
-            None,
-            backend=backend,
-            guess=guess,
-            method=method,
-            optimizer_options=options,
-            use_hessian=use_hessian,
-            record_history=record_history,
-            callback=callback,
-            record_solve_time=record_solve_time,
-            verbose=verbose,
-            feasibility_tol=feasibility_tol,
-            live_plot=live_plot,
-            n_iterations=n_iterations,
-        )
+        # Structure
+        self.method = method
+        self.backend = backend
+        self.n_iterations = n_iterations
+        self.use_hessian = bool(use_hessian)
+        self.feasibility_tol = float(feasibility_tol)
+        self.guess = guess
+
+        # The numbers: a native law's, as keywords; options= the external solver's knobs
+        self.options = dict(options or {})
+        self.method_numbers = method_numbers_of(method, self.options, method_numbers)
+
+        # Workflow
+        self.verbose = bool(verbose)
+        self.callback = callback
+        self.live_plot = bool(live_plot)
+        self.record_history = bool(record_history)
+        self.record_solve_time = bool(record_solve_time)
 
         # Memory of the latest solve
         self.last_program: MathematicalProgram | None = None
@@ -181,8 +180,7 @@ class TrajectoryOptimizationPlanner(Planner):
         and tolerances are structure); ``"seed"`` ``None`` (a gradient method
         draws nothing).
         """
-        options = self.settings
-        method = method_params_of(options.method, dict(options.optimizer_options))
+        method = method_params_of(self.method, self.method_numbers)
 
         return {
             **self.transcription.program_params(self.problem),
@@ -202,7 +200,7 @@ class TrajectoryOptimizationPlanner(Planner):
             CompiledTrajectoryPlanner,
         )
 
-        backend = self.settings.backend if backend is None else backend
+        backend = self.backend if backend is None else backend
 
         return CompiledTrajectoryPlanner(self, backend)
 
@@ -243,7 +241,7 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store."""
         workflow_t0 = time.perf_counter()
-        backend = self.settings.backend
+        backend = self.backend
         seed = self.resolve_guess(problem, guess)
 
         # The problem transcribed into a program and compiled into an optimizer, or
@@ -270,7 +268,7 @@ class TrajectoryOptimizationPlanner(Planner):
             z0 = self.transcription.pack_initial_guess(problem, seed)
             transcribe_s = compile_s = 0.0
 
-        if self.settings.verbose:
+        if self.verbose:
             self.print_solve_preamble(
                 program=program,
                 optimizer=optimizer,
@@ -286,7 +284,7 @@ class TrajectoryOptimizationPlanner(Planner):
             params=None if method is None else {"method": method},
             z0=z0,
             callback=self.build_callback(optimizer, backend),
-            record_solve_time=self.settings.record_solve_time or self.settings.verbose,
+            record_solve_time=self.record_solve_time or self.verbose,
             verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
@@ -312,7 +310,7 @@ class TrajectoryOptimizationPlanner(Planner):
         max_eq, min_ineq, max_bound = optimizer.program_evaluator.constraint_violations(
             optimization_result.z
         )
-        tol = float(self.settings.feasibility_tol)
+        tol = float(self.feasibility_tol)
         feasible = bool(
             max_eq <= tol
             and (min_ineq is None or min_ineq >= -tol)
@@ -326,7 +324,7 @@ class TrajectoryOptimizationPlanner(Planner):
             message=str(optimization_result.message),
             iterations=dict(optimization_result.stats).get("nit"),
             solve_time_s=optimization_result.solve_time_s,
-            feasibility_tol=float(self.settings.feasibility_tol),
+            feasibility_tol=float(self.feasibility_tol),
             max_equality_violation=float(max_eq),
             min_inequality_margin=(None if min_ineq is None else float(min_ineq)),
             max_bound_violation=float(max_bound),
@@ -339,7 +337,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.settings.verbose:
+        if self.verbose:
             self.print_solve_report(
                 record=record,
                 result=optimization_result,
@@ -362,8 +360,8 @@ class TrajectoryOptimizationPlanner(Planner):
         if self.has_parametric_program:
             return
 
-        backend = normalize_backend(self.settings.backend, allow_direct=True)
-        require_jax_compile_backend(self.settings.backend)
+        backend = normalize_backend(self.backend, allow_direct=True)
+        require_jax_compile_backend(self.backend)
         require_parametric_transcription(self.transcription)
 
         # The program with the start x0 as its parameter
@@ -456,7 +454,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def resolve_guess(self, problem, guess) -> np.ndarray | Trajectory:
         """The seed: the given guess (a solution's trajectory), the options' guess, else the default on ``problem``."""
         if guess is None:
-            guess = self.settings.guess
+            guess = self.guess
         if guess is not None:
             return getattr(guess, "trajectory", guess)
 
@@ -500,10 +498,11 @@ class TrajectoryOptimizationPlanner(Planner):
         return Optimizer(
             program,
             z0=z0,
-            method=self.settings.method,
-            use_hessian=self.settings.use_hessian,
-            options=dict(self.settings.optimizer_options),
-            n_iterations=self.settings.n_iterations,
+            method=self.method,
+            use_hessian=self.use_hessian,
+            options=dict(self.options),
+            n_iterations=self.n_iterations,
+            **self.method_numbers,
         )
 
     def print_solve_preamble(
@@ -534,7 +533,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_DIV)
         print("transcription:", type(self.transcription).__name__)
         print("transcription_options:", self.transcription_options())
-        print(f"backend={self.settings.backend!r}")
+        print(f"backend={self.backend!r}")
         print(f"program_backend={optimizer.program_evaluator.backend!r}")
         print("n_z:", int(program.n_z))
         print(
@@ -543,7 +542,7 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print("z0:", preview_vector(z0))
         print(DISP_RULE_DIV)
-        print(f"method={self.settings.method!r}")
+        print(f"method={self.method!r}")
         print("options:", getattr(optimizer.adapter, "options", {}))
         print(f"setup: transcribe={transcribe_s:.6g}s compile={compile_s:.6g}s")
         print(DISP_RULE_DIV)
@@ -563,10 +562,10 @@ class TrajectoryOptimizationPlanner(Planner):
         backend: str,
     ) -> OptimizationProgressCallback | None:
         """The optimizer's progress hook (history, live plot, user callback), or ``None``."""
-        callback = self.settings.callback
+        callback = self.callback
 
         # The live figure, beside the user's callback when there is one
-        if self.settings.live_plot:
+        if self.live_plot:
             # Lazy import: the graphics load on first use, not with the core
             from minilink.planning.trajectory_optimization.live_plot import (
                 LiveTrajectoryPlotCallback,
@@ -582,7 +581,7 @@ class TrajectoryOptimizationPlanner(Planner):
                     live_callback(iteration)
                     user_callback(iteration)
 
-        if not self.settings.record_history and callback is None:
+        if not self.record_history and callback is None:
             return None
 
         # One dynamics callable for every iterate (reconstruct_result would
@@ -605,7 +604,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 cost=J,
                 dynamics=dynamics,
             )
-            if self.settings.record_history:
+            if self.record_history:
                 self.iteration_history.append(iteration)
             if callback is not None:
                 callback(iteration)
@@ -682,7 +681,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(
             "success:",
             record.success,
-            f"(plan feasible to tol={self.settings.feasibility_tol:g})",
+            f"(plan feasible to tol={self.feasibility_tol:g})",
         )
         print("solver success:", result.success)
         print("message:", result.message)
@@ -710,8 +709,8 @@ class TrajectoryOptimizationPlanner(Planner):
 
     def build_parametric_optimizer_backend(self):
         """The solver of the online ticks: the method's preset from the one table, the planner's options over it."""
-        method = method_for(self.program, self.settings.method)
-        options = dict(self.settings.optimizer_options)
+        method = method_for(self.program, self.method)
+        options = {**self.options, **self.method_numbers}
 
         return make_optimizer_backend(method, options=options)
 
@@ -746,7 +745,7 @@ class TrajectoryOptimizationPlanner(Planner):
         z0 = self.transcription.pack_initial_guess(problem_k, seed)
 
         # z* = argmin J(z; x0), timed when asked
-        record_solve_time = self.settings.record_solve_time or self.settings.verbose
+        record_solve_time = self.record_solve_time or self.verbose
         if record_solve_time:
             solve_t0 = time.perf_counter()
 
@@ -786,7 +785,7 @@ class TrajectoryOptimizationPlanner(Planner):
             message=str(result.message),
             iterations=dict(result.stats).get("nit"),
             solve_time_s=result.solve_time_s,
-            feasibility_tol=float(self.settings.feasibility_tol),
+            feasibility_tol=float(self.feasibility_tol),
             max_equality_violation=None,
             min_inequality_margin=None,
             max_bound_violation=None,
@@ -799,7 +798,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.settings.verbose:
+        if self.verbose:
             self.print_step_report(result)
 
         return solution
@@ -826,7 +825,7 @@ class TrajectoryOptimizationPlanner(Planner):
         """One online tick by an offline solve from ``x0`` and the tick's values (warns once, on JAX, to compile instead)."""
         # Once: on JAX, a compiled parametric program would skip the rebuild
         if not self._warned_uncompiled_from:
-            backend = normalize_backend(self.settings.backend, allow_direct=True)
+            backend = normalize_backend(self.backend, allow_direct=True)
             if backend == BACKEND_JAX:
                 warnings.warn(
                     "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
@@ -845,44 +844,6 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         return self.solve_on(problem_k, guess, evaluate, n_trials)
-
-
-@dataclass
-class TrajectoryOptimizationOptions:
-    """Generic trajectory-optimization workflow options.
-
-    ``verbose`` prints the Minilink trajectory-optimization preamble and report
-    on :meth:`TrajectoryOptimizationPlanner.solve`, and one timing line per tick
-    on the online :meth:`TrajectoryOptimizationPlanner.solve_trajectory_from`
-    path. It is separate from SciPy's per-iteration ``options['disp']``.
-
-    ``record_history=True`` reconstructs a full :class:`Trajectory` per
-    optimizer iterate — convenient for live plots and teaching, but it adds
-    one rollout/unpack per iteration; leave it off for production solves.
-
-    Parametric compile (:meth:`TrajectoryOptimizationPlanner.compile_parametric_program`)
-    requires ``backend='jax'``.
-    """
-
-    backend: str = BACKEND_NUMPY
-    guess: np.ndarray | Trajectory | None = None
-    method: str = "scipy_slsqp"
-    optimizer_options: dict[str, object] = field(default_factory=dict)
-    use_hessian: bool = False
-    record_history: bool = False
-    callback: Callable[[TrajectoryOptimizationIteration], None] | None = None
-    record_solve_time: bool = False
-    verbose: bool = False
-    #: ``success`` is granted when the returned plan satisfies the program
-    #: constraints (equality residuals, inequality margins, bounds) to this
-    #: tolerance, even if the solver stopped on an iteration limit.
-    feasibility_tol: float = 1e-6
-    #: Redraw the iterate trajectory during the solve (matplotlib); a
-    #: custom ``callback`` takes precedence.
-    live_plot: bool = False
-    #: A native method's fixed step count, forwarded to its ``Optimizer``
-    #:: exactly this many steps; ``None`` runs to the method's tolerance.
-    n_iterations: int | None = None
 
 
 @dataclass(frozen=True)
@@ -1093,21 +1054,24 @@ def resolve_transcription(
     )
 
 
-def trajopt_options_of(
-    options: TrajectoryOptimizationOptions | None,
-    **flat,
-) -> TrajectoryOptimizationOptions:
-    """The options bag with the passed flat keywords laid over it (flats win)."""
-    base = TrajectoryOptimizationOptions() if options is None else options
-    updates = {key: value for key, value in flat.items() if value is not _UNSET}
-    unknown = sorted(k for k in updates if k not in _TRAJOPT_OPTION_KEYS)
+def method_numbers_of(method, options, numbers):
+    """Refuse a native law's number in ``options`` or a keyword the method does not take; return the numbers."""
+    own = method_params_of(method) if method in NATIVE_METHODS else {}
+    hidden = sorted(key for key in options if key in own)
+    if hidden:
+        raise ValueError(
+            f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
+            f"(TrajectoryOptimizationPlanner(..., {hidden[0]}=...)); options= holds an "
+            "external solver's knobs"
+        )
+    unknown = sorted(key for key in numbers if key not in own)
     if unknown:
-        raise ValueError(f"Unknown TrajectoryOptimizationPlanner kwargs: {unknown}.")
+        raise TypeError(
+            f"TrajectoryOptimizationPlanner got unexpected keyword(s) {unknown}; "
+            f"method {method!r} takes the numbers {sorted(own) or 'none'}"
+        )
 
-    if not updates:
-        return base
-
-    return replace(base, **updates)
+    return dict(numbers)
 
 
 def type_name(value: object | None) -> str | None:

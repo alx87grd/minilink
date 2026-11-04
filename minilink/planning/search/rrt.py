@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Callable
 
 import numpy as np
@@ -20,9 +20,6 @@ from minilink.planning.search.tree import (
     Node,
     Tree,
 )
-
-_UNSET = object()  # Marks a keyword the caller did not pass
-
 
 ###############################################################################
 # Public API
@@ -50,7 +47,7 @@ class RRTPlanner(Planner):
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     Notes
     -----
-    The workflow settings are keywords (the resolved set is :attr:`settings`): ``max_nodes``,
+    The search's settings are keywords, read back as attributes: ``max_nodes``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
     ``max_sample_attempts``, ``return_best_effort``, ``callback``,
     ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
@@ -72,19 +69,19 @@ class RRTPlanner(Planner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes=_UNSET,
-        goal_bias=_UNSET,
-        seed=_UNSET,
-        edge_resolution=_UNSET,
-        max_sample_attempts=_UNSET,
-        return_best_effort=_UNSET,
-        callback=_UNSET,
-        live_plot=_UNSET,
-        live_plot_every=_UNSET,
-        live_plot_pause=_UNSET,
-        live_plot_after_goal_only=_UNSET,
-        live_plot_ax=_UNSET,
-        nearest_backend=_UNSET,
+        max_nodes: int = 5000,
+        goal_bias: float = 0.1,
+        seed: int = 0,
+        edge_resolution: float | None = None,
+        max_sample_attempts: int = 100,
+        return_best_effort: bool = True,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        live_plot_every: int = 5,
+        live_plot_pause: float = 0.001,
+        live_plot_after_goal_only: bool = False,
+        live_plot_ax: object | None = None,
+        nearest_backend: str = "brute_force",
     ) -> None:
         super().__init__(problem)
 
@@ -95,23 +92,20 @@ class RRTPlanner(Planner):
         self.extender = extender
         self.metric = metric
 
-        # Workflow options: the flat keywords over the bag
-        self.settings = rrt_options_of(
-            None,
-            max_nodes=max_nodes,
-            goal_bias=goal_bias,
-            seed=seed,
-            edge_resolution=edge_resolution,
-            max_sample_attempts=max_sample_attempts,
-            return_best_effort=return_best_effort,
-            callback=callback,
-            live_plot=live_plot,
-            live_plot_every=live_plot_every,
-            live_plot_pause=live_plot_pause,
-            live_plot_after_goal_only=live_plot_after_goal_only,
-            live_plot_ax=live_plot_ax,
-            nearest_backend=nearest_backend,
-        )
+        # The search's structure and numbers, and its workflow
+        self.max_nodes = int(max_nodes)
+        self.goal_bias = float(goal_bias)
+        self.seed = int(seed)
+        self.edge_resolution = edge_resolution
+        self.max_sample_attempts = int(max_sample_attempts)
+        self.return_best_effort = bool(return_best_effort)
+        self.nearest_backend = nearest_backend
+        self.callback = callback
+        self.live_plot = bool(live_plot)
+        self.live_plot_every = int(live_plot_every)
+        self.live_plot_pause = float(live_plot_pause)
+        self.live_plot_after_goal_only = bool(live_plot_after_goal_only)
+        self.live_plot_ax = live_plot_ax
 
         # The search, refreshed by every solve
         self.tree: Tree | None = None
@@ -133,25 +127,24 @@ class RRTPlanner(Planner):
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
         """
-        options = self.settings
         metric = self.metric
         self.require_nearest_backend()
 
-        rng = np.random.default_rng(options.seed)
+        rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
         x0 = np.asarray(self.problem.x0, dtype=float)
 
         # The tree, rooted at the start
         self.tree = Tree(
             Node(x=x0, parent=None, edge=None, cost=0.0),
-            nearest_backend=options.nearest_backend,
+            nearest_backend=self.nearest_backend,
         )
         self.reached_goal = False
         self.solution_node = None
         self.iterations = 0
         self.search_callback = self.resolve_search_callback()
 
-        for _ in range(options.max_nodes):
+        for _ in range(self.max_nodes):
             # Sample a state, and extend the nearest node toward it
             x_rand = self.sample_state(rng)
             near = self.tree.nearest(x_rand, metric)
@@ -179,7 +172,7 @@ class RRTPlanner(Planner):
         goal_point = self.goal_point(goal_region)
         closest = self.tree.nearest(goal_point, metric)
         self.solution_node = closest
-        if not options.return_best_effort:
+        if not self.return_best_effort:
             raise RuntimeError("RRT failed to reach goal within max_nodes")
 
         return self.finish_trajectory(
@@ -230,7 +223,7 @@ class RRTPlanner(Planner):
 
     def require_nearest_backend(self) -> None:
         """Refuse an unknown backend, and the k-d tree under a non-Euclidean metric."""
-        backend = self.settings.nearest_backend
+        backend = self.nearest_backend
         if backend not in NEAREST_BACKENDS:
             raise ValueError(
                 f"nearest_backend must be one of {NEAREST_BACKENDS}, got {backend!r}"
@@ -254,9 +247,9 @@ class RRTPlanner(Planner):
 
     def resolve_search_callback(self):
         """The solve's step callback: the option's, a live plot, or ``None``."""
-        if self.settings.callback is not None:
-            return self.settings.callback
-        if not self.settings.live_plot:
+        if self.callback is not None:
+            return self.callback
+        if not self.live_plot:
             return None
 
         # Lazy import: the graphics load on first use, not with the core
@@ -264,16 +257,16 @@ class RRTPlanner(Planner):
 
         return LiveSearchPlotCallback(
             self,
-            ax=self.settings.live_plot_ax,
-            every=self.settings.live_plot_every,
-            pause=self.settings.live_plot_pause,
-            after_goal_only=self.settings.live_plot_after_goal_only,
+            ax=self.live_plot_ax,
+            every=self.live_plot_every,
+            pause=self.live_plot_pause,
+            after_goal_only=self.live_plot_after_goal_only,
         )
 
     def sample_state(self, rng):
         """The goal region's point with probability ``goal_bias``, otherwise a free state."""
         x_goal = self.problem.goal_point()
-        goal_bias = self.settings.goal_bias
+        goal_bias = self.goal_bias
 
         if rng.random() < goal_bias:
             return x_goal
@@ -294,14 +287,14 @@ class RRTPlanner(Planner):
             pass
 
         # Otherwise by rejection: at most max_sample_attempts draws from the box
-        for _ in range(self.settings.max_sample_attempts):
+        for _ in range(self.max_sample_attempts):
             candidate = self.sample_box.sample(rng)
             if X.contains(candidate):
                 return np.asarray(candidate, dtype=float)
 
         raise RuntimeError(
             f"Could not sample a collision-free state from X after "
-            f"{self.settings.max_sample_attempts} attempts"
+            f"{self.max_sample_attempts} attempts"
         )
 
     def try_extend(self, from_node, toward, rng):
@@ -346,7 +339,7 @@ class RRTPlanner(Planner):
 
     def edge_states(self, edge) -> np.ndarray:
         """The edge's states, densified to ``edge_resolution`` when it is set."""
-        resolution = self.settings.edge_resolution
+        resolution = self.edge_resolution
         if resolution is None:
             return edge.states
 
@@ -374,9 +367,9 @@ class RRTPlanner(Planner):
         callback = self.search_callback
         if callback is None:
             return
-        if self.settings.live_plot_after_goal_only and not self.reached_goal:
+        if self.live_plot_after_goal_only and not self.reached_goal:
             return
-        if self.iterations % max(1, self.settings.live_plot_every) != 0:
+        if self.iterations % max(1, self.live_plot_every) != 0:
             return
 
         # Lazy import: the graphics load on first use, not with the core
@@ -441,43 +434,6 @@ class RRTPlanner(Planner):
         return np.asarray(states)
 
 
-@dataclass
-class RRTOptions:
-    """Workflow options for :class:`RRTPlanner` (step/resolution are extender-owned)."""
-
-    max_nodes: int = 5000
-    goal_bias: float = 0.1
-    seed: int = 0
-    edge_resolution: float | None = None
-    max_sample_attempts: int = 100
-    return_best_effort: bool = True
-    callback: Callable | None = None
-    live_plot: bool = False
-    live_plot_every: int = 5
-    live_plot_pause: float = 0.001
-    live_plot_after_goal_only: bool = False
-    live_plot_ax: object | None = None
-    nearest_backend: str = "brute_force"
-
-
-#: The flat keywords :class:`RRTPlanner` overlays on :class:`RRTOptions`.
-_RRT_OPTION_KEYS = (
-    "max_nodes",
-    "goal_bias",
-    "seed",
-    "edge_resolution",
-    "max_sample_attempts",
-    "return_best_effort",
-    "callback",
-    "live_plot",
-    "live_plot_every",
-    "live_plot_pause",
-    "live_plot_after_goal_only",
-    "live_plot_ax",
-    "nearest_backend",
-)
-
-
 @dataclass(frozen=True)
 class TreeSearchRecord:
     """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come."""
@@ -510,21 +466,3 @@ class TreeSearchRecord:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def rrt_options_of(
-    options: RRTOptions | None,
-    *,
-    default_factory=RRTOptions,
-    allowed_keys=_RRT_OPTION_KEYS,
-    **flat,
-) -> RRTOptions:
-    """The options bag (or a default one) with the passed flat keywords laid over it."""
-    base = default_factory() if options is None else options
-    updates = {key: value for key, value in flat.items() if value is not _UNSET}
-    unknown = sorted(k for k in updates if k not in allowed_keys)
-    if unknown:
-        raise ValueError(f"Unknown RRT planner kwargs: {unknown}.")
-    if not updates:
-        return base
-    return replace(base, **updates)

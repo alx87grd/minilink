@@ -479,7 +479,7 @@ def _run_trajopt_variant(
     transcribe_t0 = time.perf_counter()
     program = planner.transcription.transcribe(
         planner.problem,
-        backend=planner.settings.backend,
+        backend=planner.backend,
     )
     z0 = planner.transcription.pack_initial_guess(planner.problem, guess)
     transcribe_s = time.perf_counter() - transcribe_t0

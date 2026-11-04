@@ -67,7 +67,8 @@ print(pe.evaluate(pe.unpack(z, wrt, start)))
 descent = Optimizer(
     program,
     method="gd",
-    options={"learning_rate": LR, "maxiter": N_LEARN_STEPS},
+    options={"maxiter": N_LEARN_STEPS},
+    learning_rate=LR,
 ).solve()
 np.testing.assert_allclose(descent.z, z, rtol=1e-6)
 print(descent)

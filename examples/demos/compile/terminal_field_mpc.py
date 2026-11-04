@@ -37,7 +37,7 @@ def mpc_ended_by(cost):
         backend="jax",
         method="adam",
         n_iterations=ITERATIONS,
-        options={"learning_rate": 0.2},
+        learning_rate=0.2,
     )
     return ModelPredictiveController(planner, delay=True)
 

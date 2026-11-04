@@ -117,7 +117,7 @@ def pipelines():
         backend="jax",
         method="adam",
         n_iterations=15,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     mpc_loop = (ModelPredictiveController(native, delay=True) % 0.05) @ pend
     mpc_ev = mpc_loop.compile(backend="jax", substeps=1)
@@ -176,7 +176,7 @@ def forms():
         backend="jax",
         method="adam",
         n_iterations=200,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     ).compile()
     start = {"x0": horizon.x0, "t0": 0.0}
     z0 = pv.initial()

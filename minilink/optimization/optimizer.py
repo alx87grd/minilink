@@ -114,7 +114,9 @@ class Optimizer:
         For JAX program evaluators, auto-generate a dense objective Hessian
         when no ``hess_J`` is supplied.
     options : dict, optional
-        Solver options merged into the preset's ``options`` dict (user keys win).
+        An external solver's own knobs (SciPy's ``maxiter``, ``ftol``; Ipopt's),
+        merged into the preset's ``options`` dict (user keys win). A native
+        method's numbers (``learning_rate``, ...) are keywords instead.
     n_iterations : int, optional
         For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
         no tolerance. On a JAX program the solve is one ``lax.scan``,
@@ -585,8 +587,14 @@ def require_named_method(method):
 
 
 def method_options_of(method, options, method_kwargs):
-    """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept."""
+    """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept; refuse such a number given in ``options``."""
     numbers = method_params_of(method) if method in NATIVE_METHODS else {}
+    hidden = sorted(key for key in (options or {}) if key in numbers)
+    if hidden:
+        raise ValueError(
+            f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
+            f"(Optimizer(..., {hidden[0]}=...)); options= holds an external solver's knobs"
+        )
     own = {key: value for key, value in method_kwargs.items() if key in numbers}
     rest = {key: value for key, value in method_kwargs.items() if key not in numbers}
     if not own:

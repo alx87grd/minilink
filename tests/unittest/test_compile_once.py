@@ -130,7 +130,7 @@ def test_a_repeated_solve_compiles_nothing():
         backend="jax",
         method="adam",
         n_iterations=20,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     pv = native.compile()
     start = {"x0": np.array([0.5, 0.0]), "t0": 0.0}

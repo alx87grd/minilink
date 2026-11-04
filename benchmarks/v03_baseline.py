@@ -236,15 +236,14 @@ def optimizer_entries(out):
 
     program = MathematicalProgram(n_z=2, J=rosenbrock)
     for method in ("gd", "adam", "scipy_slsqp", "l-bfgs"):
-        options = {"maxiter": 50}
-        if method in ("gd", "adam"):
-            options["learning_rate"] = 1e-3
+        numbers = {"learning_rate": 1e-3} if method in ("gd", "adam") else {}
         result = Optimizer(
             program,
             z0=np.array([-1.0, 1.0]),
             method=method,
             backend="jax",
-            options=options,
+            options={"maxiter": 50},
+            **numbers,
         ).solve()
         out[f"optimizer.rosenbrock.{method}"] = np.asarray(result.z)
 
@@ -254,7 +253,8 @@ def optimizer_entries(out):
     result = Optimizer(
         pe.program(wrt=wrt),
         method="gd",
-        options={"maxiter": 10, "learning_rate": 1e-3},
+        options={"maxiter": 10},
+        learning_rate=1e-3,
     ).solve()
     out["optimizer.pe.gd"] = np.asarray(result.z)
 

@@ -118,7 +118,7 @@ def mpc_planner(problem, n_steps, iterations):
         backend="jax",
         method="adam",
         n_iterations=iterations,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     return planner
 

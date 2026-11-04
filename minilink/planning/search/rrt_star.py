@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, fields, replace
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -10,11 +11,7 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.rrt import (
-    _RRT_OPTION_KEYS,
-    _UNSET,
-    RRTOptions,
     RRTPlanner,
-    rrt_options_of,
 )
 from minilink.planning.search.tree import Node, Tree
 
@@ -30,9 +27,19 @@ class RRTStarPlanner(RRTPlanner):
     Extends :class:`~minilink.planning.search.rrt.RRTPlanner` with a
     near-neighbour parent search and cost-based rewiring; it reuses the same
     ``TrajectoryExtender`` and ``metric`` seams, and only the attach step
-    changes. Same constructor as :class:`RRTPlanner`, plus RRT* flat kwargs /
-    :class:`RRTStarOptions`. A plain :class:`RRTOptions` still works with
-    rewiring defaults.
+    changes. Same constructor as :class:`RRTPlanner`, plus the RRT* keywords:
+
+    - ``radius_constant``: the scale ``γ`` of the rewiring radius
+      ``r_n = min(γ (log n / n)^(1/d), η)``; unset, ``2 (1 + 1/d)^(1/d)
+      vol(X)^(1/d)`` from the sampling box;
+    - ``rewire_eta``: the longest connection ``η``; unset, the extender's step
+      (``SteeringExtender.max_distance`` or ``KinodynamicExtender.horizon``);
+    - ``rewire``: ``False`` keeps the parent selection and skips the rewiring;
+    - ``optimize_after_goal``, ``cost_tol``, ``convergence_patience``: keep
+      searching after the first goal connection until the best goal cost has
+      not improved by ``cost_tol`` for ``convergence_patience`` extensions;
+    - ``record_history``, ``history_stride``: record an :class:`RRTStarSnapshot`
+      every ``history_stride`` extensions, for the animation.
 
     Attributes
     ----------
@@ -52,34 +59,32 @@ class RRTStarPlanner(RRTPlanner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes=_UNSET,
-        goal_bias=_UNSET,
-        seed=_UNSET,
-        edge_resolution=_UNSET,
-        max_sample_attempts=_UNSET,
-        return_best_effort=_UNSET,
-        callback=_UNSET,
-        live_plot=_UNSET,
-        live_plot_every=_UNSET,
-        live_plot_pause=_UNSET,
-        live_plot_after_goal_only=_UNSET,
-        live_plot_ax=_UNSET,
-        nearest_backend=_UNSET,
-        gamma=_UNSET,
-        rewire_eta=_UNSET,
-        rewire=_UNSET,
-        optimize_after_goal=_UNSET,
-        cost_tol=_UNSET,
-        convergence_patience=_UNSET,
-        record_history=_UNSET,
-        history_stride=_UNSET,
+        max_nodes: int = 5000,
+        goal_bias: float = 0.1,
+        seed: int = 0,
+        edge_resolution: float | None = None,
+        max_sample_attempts: int = 100,
+        return_best_effort: bool = True,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        live_plot_every: int = 5,
+        live_plot_pause: float = 0.001,
+        live_plot_after_goal_only: bool = False,
+        live_plot_ax: object | None = None,
+        nearest_backend: str = "brute_force",
+        radius_constant: float | None = None,
+        rewire_eta: float | None = None,
+        rewire: bool = True,
+        optimize_after_goal: bool = False,
+        cost_tol: float = 0.05,
+        convergence_patience: int = 500,
+        record_history: bool = False,
+        history_stride: int = 1,
     ) -> None:
-        # Workflow options: the flat keywords over the bag, a plain RRTOptions
-        # completed with the RRT* defaults
-        star_options = rrt_options_of(
-            rrt_star_options_of(None),
-            default_factory=RRTStarOptions,
-            allowed_keys=_RRT_STAR_OPTION_KEYS,
+        super().__init__(
+            problem,
+            extender,
+            metric=metric,
             max_nodes=max_nodes,
             goal_bias=goal_bias,
             seed=seed,
@@ -93,17 +98,21 @@ class RRTStarPlanner(RRTPlanner):
             live_plot_after_goal_only=live_plot_after_goal_only,
             live_plot_ax=live_plot_ax,
             nearest_backend=nearest_backend,
-            gamma=gamma,
-            rewire_eta=rewire_eta,
-            rewire=rewire,
-            optimize_after_goal=optimize_after_goal,
-            cost_tol=cost_tol,
-            convergence_patience=convergence_patience,
-            record_history=record_history,
-            history_stride=history_stride,
         )
-        super().__init__(problem, extender, metric=metric)
-        self.settings = star_options
+
+        # The rewiring: its radius constant and longest connection, and its switch
+        self.radius_constant = radius_constant
+        self.rewire_eta = rewire_eta
+        self.rewire = bool(rewire)
+
+        # The post-goal refinement and its stopping rule
+        self.optimize_after_goal = bool(optimize_after_goal)
+        self.cost_tol = float(cost_tol)
+        self.convergence_patience = int(convergence_patience)
+
+        # Workflow: the snapshots for the animation
+        self.record_history = bool(record_history)
+        self.history_stride = int(history_stride)
 
         # The search's convergence, refreshed by every solve
         self.converged: bool = False
@@ -113,28 +122,24 @@ class RRTStarPlanner(RRTPlanner):
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s)."""
-        options = self.settings
         metric = self.metric
         self.require_nearest_backend()
 
-        rng = np.random.default_rng(options.seed)
+        rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
 
-        # The RRT* options, or their defaults when the planner holds a plain RRTOptions
-        star_options = options if isinstance(options, RRTStarOptions) else None
-        optimize_after_goal = (
-            star_options.optimize_after_goal if star_options else False
-        )
-        cost_tol = star_options.cost_tol if star_options else 0.05
-        patience = star_options.convergence_patience if star_options else 500
-        record_history = star_options.record_history if star_options else False
-        history_stride = max(1, star_options.history_stride if star_options else 1)
+        # The post-goal refinement and the snapshots
+        optimize_after_goal = self.optimize_after_goal
+        cost_tol = self.cost_tol
+        patience = self.convergence_patience
+        record_history = self.record_history
+        history_stride = max(1, self.history_stride)
         x0 = np.asarray(self.problem.x0, dtype=float)
 
         # The tree, rooted at the start
         self.tree = Tree(
             Node(x=x0, parent=None, edge=None, cost=0.0),
-            nearest_backend=options.nearest_backend,
+            nearest_backend=self.nearest_backend,
         )
         self.reached_goal = False
         self.solution_node = None
@@ -147,7 +152,7 @@ class RRTStarPlanner(RRTPlanner):
         best_goal_node = None
         stale_extensions = 0
 
-        for _ in range(options.max_nodes):
+        for _ in range(self.max_nodes):
             # Extend: steer toward a sample, attach through the cheapest near
             # parent, rewire the near nodes
             if not self.extend_once(rng):
@@ -196,7 +201,7 @@ class RRTStarPlanner(RRTPlanner):
             goal_point = self.goal_point(goal_region)
             closest = self.tree.nearest(goal_point, metric)
             self.solution_node = closest
-            if not options.return_best_effort:
+            if not self.return_best_effort:
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
         return self.finish_trajectory(
@@ -260,7 +265,7 @@ class RRTStarPlanner(RRTPlanner):
         )
 
         # The near nodes that are cheaper to reach through it are rewired
-        if getattr(self.settings, "rewire", True):
+        if self.rewire:
             self.rewire_near(new_node, near_nodes, rng)
 
         return True
@@ -279,10 +284,9 @@ class RRTStarPlanner(RRTPlanner):
         return r
 
     def radius_scale(self) -> float:
-        """The radius scale γ: the ``gamma`` option, or the default from the volume of the sampling box."""
-        gamma = getattr(self.settings, "gamma", None)
-        if gamma is not None:
-            return float(gamma)
+        """The radius scale γ: :attr:`radius_constant`, or the default from the volume of the sampling box."""
+        if self.radius_constant is not None:
+            return float(self.radius_constant)
 
         d = int(self.problem.sys.n)
         lower = self.sample_box.lower
@@ -297,7 +301,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def max_connection(self) -> float:
         """The longest connection η: the ``rewire_eta`` option, or the extender's step."""
-        eta = getattr(self.settings, "rewire_eta", None)
+        eta = self.rewire_eta
         if eta is not None:
             return float(eta)
 
@@ -308,7 +312,7 @@ class RRTStarPlanner(RRTPlanner):
             return float(extender.horizon)
 
         raise ValueError(
-            "RRTStarOptions.rewire_eta is required when the extender has no "
+            "rewire_eta= is required when the extender has no "
             "max_distance or horizon attribute"
         )
 
@@ -398,66 +402,6 @@ class RRTStarPlanner(RRTPlanner):
 
 
 @dataclass
-class RRTStarOptions(RRTOptions):
-    """
-    Workflow options for :class:`RRTStarPlanner`.
-
-    When ``optimize_after_goal`` is set, the search keeps running after the
-    first feasible goal connection and stops once the best goal cost-to-come
-    has not improved by at least ``cost_tol`` for ``convergence_patience``
-    consecutive successful extensions.
-
-    Parameters
-    ----------
-    gamma : float, optional
-        Scale in the rewiring radius ``r_n = min(gamma * (log(n)/n)^(1/d), eta)``.
-        When omitted, ``gamma = 2 (1 + 1/d)^(1/d) volume(X)^(1/d)`` from the
-        problem state bounding box.
-    rewire_eta : float, optional
-        Maximum connection length ``eta``. Defaults to the extender step
-        (``SteeringExtender.max_distance`` or ``KinodynamicExtender.horizon``).
-    rewire : bool
-        When ``False``, skip the rewiring pass (parent selection only).
-    optimize_after_goal : bool
-        When ``True``, continue searching after the first goal connection until
-        the best goal cost stops improving (see ``cost_tol`` and
-        ``convergence_patience``). When ``False``, return at the first goal hit.
-    cost_tol : float
-        Minimum goal cost improvement that resets the convergence counter.
-    convergence_patience : int
-        Stop after this many successful extensions without a goal-cost
-        improvement of at least ``cost_tol`` once a goal has been reached.
-    record_history : bool
-        Record :class:`RRTStarSnapshot` frames for animation (every
-        ``history_stride`` extensions).
-    history_stride : int
-        Snapshot interval in successful extension steps.
-    """
-
-    gamma: float | None = None
-    rewire_eta: float | None = None
-    rewire: bool = True
-    optimize_after_goal: bool = False
-    cost_tol: float = 0.05
-    convergence_patience: int = 500
-    record_history: bool = False
-    history_stride: int = 1
-
-
-#: The flat keywords :class:`RRTStarPlanner` overlays on :class:`RRTStarOptions`.
-_RRT_STAR_OPTION_KEYS = _RRT_OPTION_KEYS + (
-    "gamma",
-    "rewire_eta",
-    "rewire",
-    "optimize_after_goal",
-    "cost_tol",
-    "convergence_patience",
-    "record_history",
-    "history_stride",
-)
-
-
-@dataclass
 class RRTStarSnapshot:
     """
     One recorded frame of an RRT* search for convergence animation.
@@ -486,14 +430,3 @@ class RRTStarSnapshot:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def rrt_star_options_of(options: RRTOptions | None) -> RRTStarOptions:
-    """The options as an :class:`RRTStarOptions`: a plain bag's fields under the RRT* defaults."""
-    if options is None:
-        return RRTStarOptions()
-    if isinstance(options, RRTStarOptions):
-        return options
-    return RRTStarOptions(
-        **{f.name: getattr(options, f.name) for f in fields(RRTOptions)}
-    )

@@ -639,7 +639,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
         backend="jax",
         method="adam",
         n_iterations=20,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     mpc = ModelPredictiveController(planner, delay=False)
     pe = problem.compile(mpc % DT, backend="jax")

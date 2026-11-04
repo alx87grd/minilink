@@ -644,7 +644,7 @@ def native_mpc_problem():
         backend="jax",
         method="adam",
         n_iterations=30,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     return problem, planner
 
@@ -773,7 +773,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
             backend="jax",
             method="adam",
             n_iterations=40,
-            options={"learning_rate": 0.2},
+            learning_rate=0.2,
         )
         mpc = ModelPredictiveController(planner, delay=True)
         pe = problem.compile(mpc % 0.1, backend="jax")

@@ -593,11 +593,11 @@ def test_auto_picks_by_class_and_a_method_the_class_refuses_is_refused():
 def test_each_method_reaches_the_minimum(method):
     from minilink.optimization.optimizer import Optimizer
 
-    options = (
-        {"learning_rate": 0.1, "maxiter": 2000} if method in ("gd", "adam") else {}
-    )
+    native = method in ("gd", "adam")
+    options = {"maxiter": 2000} if native else {}
+    numbers = {"learning_rate": 0.1} if native else {}
     result = Optimizer(
-        quadratic_program(), z0=np.zeros(2), method=method, options=options
+        quadratic_program(), z0=np.zeros(2), method=method, options=options, **numbers
     ).solve()
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-4)
 
@@ -606,9 +606,7 @@ def test_gradient_descent_is_projected_on_the_box():
     from minilink.optimization.optimizer import Optimizer
 
     program = quadratic_program(lower=[-np.inf, 0.0])
-    result = Optimizer(
-        program, z0=np.ones(2), method="gd", options={"learning_rate": 0.1}
-    ).solve()
+    result = Optimizer(program, z0=np.ones(2), method="gd", learning_rate=0.1).solve()
     np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
     assert result.stats["algorithm"] == "gd"
 
@@ -623,7 +621,8 @@ def test_gradient_descent_at_its_floating_point_fixed_point_is_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"learning_rate": 0.1, "maxiter": 3000},
+        options={"maxiter": 3000},
+        learning_rate=0.1,
     ).solve()
     assert result.success and result.stats["nit"] < 3000
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-12)
@@ -636,7 +635,8 @@ def test_gradient_descent_out_of_steps_is_not_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"learning_rate": 0.1, "maxiter": 5},
+        options={"maxiter": 5},
+        learning_rate=0.1,
     ).solve()
     assert not result.success
     np.testing.assert_allclose(
@@ -656,7 +656,8 @@ def test_gradient_descent_steps_like_the_hand_loop():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"learning_rate": 0.1, "maxiter": 5},
+        options={"maxiter": 5},
+        learning_rate=0.1,
     ).solve()
     np.testing.assert_allclose(result.z, z, rtol=1e-12)
 
@@ -797,9 +798,8 @@ def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
     import jax.numpy as jnp
 
     program = parametric_quadratic("jax")
-    options = {"learning_rate": 0.05}
     opt = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, n_iterations=40
+        program, z0=[0.0, 0.0], method=method, learning_rate=0.05, n_iterations=40
     )
 
     # Exactly K steps: the iterates of the step-system view end where the solve does
@@ -838,11 +838,18 @@ def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
 
     program = parametric_quadratic("numpy")
     program = type(program)(**{**program.__dict__, "grad_J": grad})
-    options = {"learning_rate": 0.05, "maxiter": 25}
+    options = {"maxiter": 25}
     fixed = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, n_iterations=25
+        program,
+        z0=[0.0, 0.0],
+        method=method,
+        options=options,
+        learning_rate=0.05,
+        n_iterations=25,
     )
-    loop = Optimizer(program, z0=[0.0, 0.0], method=method, options=options)
+    loop = Optimizer(
+        program, z0=[0.0, 0.0], method=method, options=options, learning_rate=0.05
+    )
     np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
 
     # A count is for the native methods, and a whole number

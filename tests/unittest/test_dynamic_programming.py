@@ -176,7 +176,7 @@ class TestValueIteration(unittest.TestCase):
 
     def test_out_of_bound_penalty_and_cleanup(self):
         planner, result = solve(make_problem())
-        penalty = planner.settings.out_of_bound_cost
+        penalty = planner.out_of_bound_cost
         self.assertTrue(np.any(result.J > penalty - 1.0))
         planner.clean_infeasible_set()
         self.assertTrue(np.all(result.J[result.J > penalty - 1.0] == penalty))
@@ -253,10 +253,13 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem,
             grid=result.grid,
             policy=controller.action,
-            settings=planner.settings,
+            **planner.params["method"],
+            tol=planner.tol,
+            max_iterations=planner.max_iterations,
+            interpolation=planner.interpolation,
         )
         J_pi = evaluator.solve()
-        failure_cost = planner.settings.out_of_bound_cost
+        failure_cost = planner.out_of_bound_cost
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
@@ -393,10 +396,10 @@ class TestBackends(unittest.TestCase):
             with self.subTest(backend=backend):
                 reused = planner_of(backend)
                 reused.solve_steps(5)
-                setattr(reused.settings, name, value)
+                setattr(reused, name, value)
                 reused.solve_steps(5)
                 fresh = planner_of(backend)
-                setattr(fresh.settings, name, value)
+                setattr(fresh, name, value)
                 fresh.solve_steps(5)
                 np.testing.assert_allclose(
                     reused.result.J, fresh.result.J, rtol=0, atol=1e-12
@@ -501,9 +504,12 @@ class TestBackends(unittest.TestCase):
 
         sys = DrivenIntegrator()
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
-        problem = PlanningProblem(sys, cost=cost, U=sys.input_box)
 
         def fixed_horizon(backend, final_time):
+            # The sweeps end at the problem's t0 + horizon
+            problem = PlanningProblem(
+                sys, cost=cost, U=sys.input_box, horizon=1.0, t0=final_time - 1.0
+            )
             grid = StateSpaceGrid(
                 problem,
                 x_grid_shape=(15, 15),
@@ -511,8 +517,7 @@ class TestBackends(unittest.TestCase):
                 dt=0.1,
                 precompute=False,
             )
-            options = dict(backend=backend, final_time=final_time)
-            planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
+            planner = DynamicProgrammingPlanner(problem, grid=grid, backend=backend)
             planner.solve_steps(6)
             return planner.result
 
@@ -656,12 +661,23 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         controller = planner.get_controller()
-        options = planner.settings
         J_callable = PolicyEvaluator(
-            problem, grid=result.grid, policy=controller.action, settings=options
+            problem,
+            grid=result.grid,
+            policy=controller.action,
+            **planner.params["method"],
+            tol=planner.tol,
+            max_iterations=planner.max_iterations,
+            interpolation=planner.interpolation,
         ).solve()
         J_block = PolicyEvaluator(
-            problem, grid=result.grid, policy=controller, settings=options
+            problem,
+            grid=result.grid,
+            policy=controller,
+            **planner.params["method"],
+            tol=planner.tol,
+            max_iterations=planner.max_iterations,
+            interpolation=planner.interpolation,
         ).solve()
         np.testing.assert_allclose(J_block, J_callable)
 
@@ -729,7 +745,10 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
             problem,
             grid=result.grid,
             policy=planner.get_controller(),
-            settings=planner.settings,
+            **planner.params["method"],
+            tol=planner.tol,
+            max_iterations=planner.max_iterations,
+            interpolation=planner.interpolation,
         )
         with self.assertRaisesRegex(ValueError, "solve"):
             evaluator.value_at(np.zeros(2))
@@ -763,7 +782,10 @@ class TestValueAtInterpolation(unittest.TestCase):
             problem,
             grid=result.grid,
             policy=planner.get_controller(),
-            settings=planner.settings,
+            **planner.params["method"],
+            tol=planner.tol,
+            max_iterations=planner.max_iterations,
+            interpolation=planner.interpolation,
         )
         evaluator.solve()
         J = evaluator.last_J
@@ -837,15 +859,15 @@ class TestDpOneObjectSetup(unittest.TestCase):
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         timed = PlanningProblem(sys, cost=cost, horizon=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
-        self.assertEqual(planner.settings.final_time, 2.0)
-        explicit = DynamicProgrammingPlanner(
-            timed, x_grid=(5, 5), u_grid=(3,), dt=0.1, final_time=0.5
+        self.assertEqual(planner.final_time, 2.0)
+        later = DynamicProgrammingPlanner(
+            timed.replace(t0=1.0), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
-        self.assertEqual(explicit.settings.final_time, 0.5)
+        self.assertEqual(later.final_time, 3.0)  # t0 + horizon
         untimed = DynamicProgrammingPlanner(
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
-        self.assertEqual(untimed.settings.final_time, 0.0)
+        self.assertEqual(untimed.final_time, 0.0)
 
     def test_grid_and_shapes_are_exclusive(self):
         from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
@@ -866,8 +888,8 @@ class TestCleanInfeasible(unittest.TestCase):
 
     def test_dp_solve_cleans_infeasible_by_default(self):
         planner, result = solve(make_problem())
-        penalty = planner.settings.out_of_bound_cost
-        self.assertTrue(planner.settings.clean_infeasible)
+        penalty = planner.out_of_bound_cost
+        self.assertTrue(planner.clean_infeasible)
         saturated = result.J > penalty - 1.0
         self.assertTrue(np.all(result.J[saturated] == penalty))
 
@@ -884,7 +906,7 @@ class TestCleanInfeasible(unittest.TestCase):
             clean_infeasible=False,
             verbose=False,
         )
-        self.assertFalse(planner.settings.clean_infeasible)
+        self.assertFalse(planner.clean_infeasible)
         from unittest import mock
 
         with mock.patch.object(
@@ -892,7 +914,7 @@ class TestCleanInfeasible(unittest.TestCase):
         ) as cleanup:
             planner.solve()
         cleanup.assert_not_called()
-        planner.settings.clean_infeasible = True
+        planner.clean_infeasible = True
         with mock.patch.object(
             DynamicProgrammingPlanner, "clean_infeasible_set"
         ) as cleanup:
@@ -924,7 +946,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
 
     def test_numpy_table_charges_the_failure_cost_of_each_successor(self):
         planner = self.planner(exit_failure_cost)
-        self.assertIs(planner.settings.out_of_bound_cost, exit_failure_cost)
+        self.assertIs(planner.out_of_bound_cost, exit_failure_cost)
         x_next, action_ok, x_next_ok = planner.grid.transition(0.0)
         inadmissible = ~(action_ok & x_next_ok)
         self.assertTrue(np.any(inadmissible))
@@ -935,7 +957,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
 
         # A scalar failure_cost (an int like a float) keeps the scalar table
         scalar = self.planner(500)
-        self.assertEqual(scalar.settings.out_of_bound_cost, 500.0)
+        self.assertEqual(scalar.out_of_bound_cost, 500.0)
         G_scalar = scalar.running_cost_table(0.0)
         np.testing.assert_array_equal(G_scalar[~inadmissible], G[~inadmissible])
         self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
@@ -990,7 +1012,10 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             table.problem,
             grid=table.grid,
             policy=table.get_controller().action,
-            settings=table.settings,
+            **table.params["method"],
+            tol=table.tol,
+            max_iterations=table.max_iterations,
+            interpolation=table.interpolation,
         )
         J_pi = evaluator.solve()
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
@@ -1039,9 +1064,9 @@ class TestDpFlatConstructor(unittest.TestCase):
         flat = DynamicProgrammingPlanner(
             problem, grid=grid, gamma=0.9, tol=0.2, max_iterations=10
         )
-        self.assertEqual(flat.settings.gamma, nested.settings.gamma)
-        self.assertEqual(flat.settings.tol, nested.settings.tol)
-        self.assertEqual(flat.settings.max_iterations, nested.settings.max_iterations)
+        self.assertEqual(flat.gamma, nested.gamma)
+        self.assertEqual(flat.tol, nested.tol)
+        self.assertEqual(flat.max_iterations, nested.max_iterations)
 
 
 def test_grid_exposes_the_boxes_it_spans():

@@ -453,7 +453,7 @@ concrete formatting, ordered by the cost of being wrong:
   - `require_*` raises when a precondition fails; its docstring opens with "Refuse".
   - `check_*` validates and returns nothing.
   - `build_*` constructs a runtime object (an evaluator, a simulator, a computer).
-  - `*_of` resolves an object's options or attributes (`trajopt_options_of`).
+  - `*_of` resolves an object's options or attributes (`method_params_of`).
   - `plot_*` draws.
 
   A check that returns a value is a `require_*` when it refuses, or an `*_of` when it

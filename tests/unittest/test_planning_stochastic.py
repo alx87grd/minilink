@@ -118,11 +118,11 @@ def test_dp_reads_the_problem_failure_cost():
         U=plant.input_box,
     )
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
-    assert planner.settings.out_of_bound_cost == 42.0
+    assert planner.out_of_bound_cost == 42.0
     explicit = DynamicProgrammingPlanner(
         problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, out_of_bound_cost=7.0
     )
-    assert explicit.settings.out_of_bound_cost == 7.0
+    assert explicit.out_of_bound_cost == 7.0
 
 
 def test_dp_reads_the_problem_discount_rate():
@@ -136,11 +136,11 @@ def test_dp_reads_the_problem_discount_rate():
     plant = pendulum()
     problem = PlanningProblem(plant, cost=Zero(), U=plant.input_box, discount_rate=1.0)
     planner = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.05)
-    np.testing.assert_allclose(planner.settings.gamma, np.exp(-0.05))
+    np.testing.assert_allclose(planner.gamma, np.exp(-0.05))
     explicit = DynamicProgrammingPlanner(
         problem, x_grid=(5, 5), u_grid=(3,), dt=0.05, gamma=0.9
     )
-    assert explicit.settings.gamma == 0.9
+    assert explicit.gamma == 0.9
 
 
 def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_periods():
@@ -894,7 +894,7 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
     # Undiscounted and finite: the integral g_max T and the sum g_max dt N agree
     bound = problem.cost_bound()
     np.testing.assert_allclose(
-        [face.cost_bound, env.failure_cost, vi.settings.out_of_bound_cost],
+        [face.cost_bound, env.failure_cost, vi.out_of_bound_cost],
         bound,
         rtol=1e-12,
     )

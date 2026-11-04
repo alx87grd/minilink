@@ -76,7 +76,7 @@ program = MathematicalProgram(
     n_z=z0.size, J=lambda z: batch_loss(weights_of(z)), backend="jax"
 )
 result = Optimizer(
-    program, z0=z0, method="gd", n_iterations=10000, options={"learning_rate": 0.8}
+    program, z0=z0, method="gd", n_iterations=10000, learning_rate=0.8
 ).solve()
 print(result)
 

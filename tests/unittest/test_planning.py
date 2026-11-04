@@ -335,11 +335,11 @@ class TestPlanningArchitecture(unittest.TestCase):
             backend="numpy",
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
-        self.assertEqual(to.settings.backend, "numpy")
+        self.assertEqual(to.backend, "numpy")
         guess = default_initial_trajectory(
             problem, to.transcription.initial_guess_time_grid(problem)
         )
-        program = to.transcription.transcribe(problem, backend=to.settings.backend)
+        program = to.transcription.transcribe(problem, backend=to.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)
@@ -643,13 +643,9 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
-        self.assertEqual(flat.settings.backend, nested.settings.backend)
-        self.assertEqual(
-            flat.settings.record_solve_time, nested.settings.record_solve_time
-        )
-        self.assertEqual(
-            flat.settings.optimizer_options, nested.settings.optimizer_options
-        )
+        self.assertEqual(flat.backend, nested.backend)
+        self.assertEqual(flat.record_solve_time, nested.record_solve_time)
+        self.assertEqual(flat.options, nested.options)
 
     def test_string_presets(self):
         problem = _trajopt_problem()
@@ -737,9 +733,9 @@ class TestRrtFlatConstructor(unittest.TestCase):
         )
         nested = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
         flat = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
-        self.assertEqual(flat.settings.max_nodes, nested.settings.max_nodes)
-        self.assertEqual(flat.settings.goal_bias, nested.settings.goal_bias)
-        self.assertEqual(flat.settings.seed, nested.settings.seed)
+        self.assertEqual(flat.max_nodes, nested.max_nodes)
+        self.assertEqual(flat.goal_bias, nested.goal_bias)
+        self.assertEqual(flat.seed, nested.seed)
 
 
 from minilink.core.sets import BallSet, BoxSet
@@ -2166,9 +2162,9 @@ class TestTextbookOptions(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
-        self.assertTrue(planner.settings.live_plot)
+        self.assertTrue(planner.live_plot)
         self.assertIsNotNone(planner.build_callback(None, "numpy"))
-        planner.settings.live_plot = False
+        planner.live_plot = False
         self.assertIsNone(planner.build_callback(None, "numpy"))
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
@@ -2488,7 +2484,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
         backend="jax",
         method="adam",
         n_iterations=200,
-        options={"learning_rate": 0.05},
+        learning_rate=0.05,
     )
     pv = planner.compile()
 
