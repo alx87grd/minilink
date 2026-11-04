@@ -93,7 +93,7 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
 
 def test_environment_finite_horizon_charges_h_and_the_failure_cost():
     env = RolloutEnvironment(
-        problem(tf=0.2, penalize_failure=True, failure_cost=50.0), dt=0.1
+        problem(horizon=0.2, penalize_failure=True, failure_cost=50.0), dt=0.1
     )
     assert env.finite_horizon and env.failure_cost == 50.0
     x, t, r1, terminated, _ = env.step(
@@ -136,7 +136,7 @@ def test_neural_policy_controller_normalizes_and_composes():
 
 
 def test_planner_learns_returns_a_policy_plan_and_a_controller():
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=32, batch_size=32, verbose=0
     )
@@ -166,7 +166,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
 
 def test_predict_draws_unless_deterministic():
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf), dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, verbose=0
+        problem(horizon=np.inf), dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, verbose=0
     )
     x = np.array([[0.1, 0.0], [-0.2, 0.3], [0.4, -0.1], [0.0, 0.2]])
     mean_1, _ = planner.predict(x)
@@ -183,7 +183,7 @@ def test_predict_draws_unless_deterministic():
 
 def test_learn_and_solve_verbose_override_the_constructor(capsys):
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
         n_envs=4,
@@ -226,7 +226,7 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
 
 
 def test_the_discount_has_one_owner_and_an_announced_default():
-    undiscounted = problem(tf=np.inf)
+    undiscounted = problem(horizon=np.inf)
     discounted = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
@@ -264,7 +264,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
 
     # no disturbance port: the same law on the same plant as a trajectory solve
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(prob, **small)
     key = np.asarray(planner.key)
     nominal = planner.nominal_trajectory(tf=0.5)
@@ -292,7 +292,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
 
 def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
         n_envs=4,
@@ -329,7 +329,7 @@ def test_plain_planning_problem_trains_from_its_single_start():
 
 
 def test_the_backends_score_a_fixed_law_on_their_own_draws():
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     plant = prob.sys
 
     ctl = NeuralPolicy(plant, hidden=(8,), seed=3)  # any fixed static law
@@ -345,7 +345,7 @@ def test_the_backends_score_a_fixed_law_on_their_own_draws():
 
 
 def test_the_evaluation_refuses_a_period_that_does_not_divide_the_horizon():
-    prob = problem(tf=0.25)
+    prob = problem(horizon=0.25)
     ctl = NeuralPolicy(prob.sys, hidden=(8,), seed=3)
     for backend in ("numpy", "jax"):
         with pytest.raises(ValueError, match="divide"):
@@ -358,7 +358,7 @@ def test_the_evaluation_refuses_a_period_that_does_not_divide_the_horizon():
 def test_sac_trains_through_the_same_planner_loop():
     from minilink.learning.reinforcement_learning import SAC
 
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
         prob,
         dt=0.1,
@@ -438,7 +438,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
         return SAC(batch_size=16, learning_starts=16, buffer_size=64, gradient_steps=2)
 
     reused = sac()
-    sac_planner(problem(tf=np.inf), reused)  # bound first to a one-input pendulum
+    sac_planner(problem(horizon=np.inf), reused)  # bound first to a one-input pendulum
     assert reused.target_entropy is None  # the user's choice, kept
     planner = sac_planner(three_inputs, reused)
     fresh = sac_planner(three_inputs, sac())
@@ -491,7 +491,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
 
 
 def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
     )
@@ -626,7 +626,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     from minilink.learning.reinforcement_learning import REINFORCE, ActorCritic
 
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
         method=algorithm,
@@ -682,7 +682,7 @@ def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
 
 def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         hidden=(8,),
         n_envs=2,
@@ -709,7 +709,7 @@ def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
 
 
 def test_numpy_and_jax_environments_take_the_same_step():
-    prob = problem(tf=np.inf)
+    prob = problem(horizon=np.inf)
     env_jax = RolloutEnvironment(prob, dt=0.1, episode_length=1.0)
     env_np = RolloutEnvironment(prob, dt=0.1, episode_length=1.0, backend="numpy")
     x, u = np.array([0.3, -0.2]), np.array([1.5])
@@ -758,7 +758,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
 def test_the_planner_trains_on_a_substepped_step_model():
     """Two RK4 substeps per control period: the environment's step is the step model's."""
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         substeps=2,
         hidden=(8, 8),
@@ -816,7 +816,7 @@ def test_the_heads_draw_at_a_counter_key_as_the_seeded_policy_block_does():
 def test_the_collector_draws_each_episode_at_its_own_policy_seed():
     """The carry holds one policy seed per plant; a finished episode draws a fresh one."""
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         episode_length=0.3,
         hidden=(8, 8),
@@ -834,7 +834,7 @@ def test_the_collector_draws_each_episode_at_its_own_policy_seed():
 def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
     """The problem's discount by default; an override is a training choice the record names."""
     kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16, verbose=0)
-    prob = problem(tf=np.inf, discount_rate=0.5)
+    prob = problem(horizon=np.inf, discount_rate=0.5)
     derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).record
     assert derived.gamma == derived.scored_gamma == np.exp(-prob.discount_rate * 0.1)
     assert not derived.discount_differs and "scored at" not in str(derived)
@@ -847,7 +847,7 @@ def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
 
 def test_environment_reward_stays_finite_when_a_step_blows_up():
     env = RolloutEnvironment(
-        problem(tf=0.2, penalize_failure=True, failure_cost=50.0),
+        problem(horizon=0.2, penalize_failure=True, failure_cost=50.0),
         dt=0.1,
         backend="numpy",
     )
@@ -860,7 +860,7 @@ def test_environment_reward_stays_finite_when_a_step_blows_up():
 def test_training_again_leaves_an_earlier_solution_as_it_was():
     """Each solution keeps the law it was solved with; the planner trains its own."""
     planner = ReinforcementLearningPlanner(
-        problem(tf=np.inf),
+        problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
         n_envs=4,

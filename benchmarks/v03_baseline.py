@@ -76,10 +76,10 @@ class Accumulator(StepSystem):
         return x
 
 
-def pendulum_problem(tf=2.0, x_start=X0, **kwargs):
+def pendulum_problem(horizon=2.0, x_start=X0, **kwargs):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    return PlanningProblem(plant, cost=cost, x_start=x_start, horizon=tf, **kwargs)
+    return PlanningProblem(plant, cost=cost, x_start=x_start, horizon=horizon, **kwargs)
 
 
 def pd_controller():
@@ -248,7 +248,7 @@ def optimizer_entries(out):
         ).solve()
         out[f"optimizer.rosenbrock.{method}"] = np.asarray(result.z)
 
-    problem = pendulum_problem(tf=1.0)
+    problem = pendulum_problem(horizon=1.0)
     pe = problem.compile(pd_controller(), dt=DT, backend="jax")
     wrt = ["controller.K"]
     result = Optimizer(

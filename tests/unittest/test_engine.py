@@ -26,7 +26,7 @@ def upright_problem(**fields):
     cost = QuadraticCost.from_system(
         sys, x_bar=np.array([np.pi, 0.0]), R=0.01 * np.eye(1)
     )
-    fields.setdefault("tf", 2.0)
+    fields.setdefault("horizon", 2.0)
     fields.setdefault("U", BoxInputSet.from_bounds([-50.0], [50.0]))
     return PlanningProblem(sys, cost=cost, **fields)
 
@@ -318,7 +318,7 @@ def test_a_built_loop_is_taken_as_it_is_and_a_step_system_refused():
 
 def test_dt_must_divide_the_horizon():
     with pytest.raises(ValueError, match="divide"):
-        upright_problem(tf=1.0).compile(pid(), dt=0.3)
+        upright_problem(horizon=1.0).compile(pid(), dt=0.3)
 
 
 # --- a trajectory you already hold ---

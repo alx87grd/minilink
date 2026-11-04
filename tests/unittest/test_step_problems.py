@@ -13,7 +13,7 @@ from minilink.planning.step_problems import StepPlanningProblem
 def swing_problem(**fields):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
-    fields.setdefault("tf", 2.0)
+    fields.setdefault("horizon", 2.0)
     return PlanningProblem(
         plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, **fields
     )
@@ -217,7 +217,7 @@ def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
 def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
     from minilink.planning import DynamicProgrammingPlanner
 
-    problem = swing_problem(tf=3.0, discount_rate=0.5)
+    problem = swing_problem(horizon=3.0, discount_rate=0.5)
     kwargs = dict(x_grid=(21, 21), u_grid=(5,), solver="rk4")
     vi = DynamicProgrammingPlanner(problem, dt=0.1, **kwargs)
     vd = DynamicProgrammingPlanner(problem.discretize(0.1, solver="rk4"), **kwargs)
@@ -253,7 +253,7 @@ def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
     from minilink.planning import DynamicProgrammingPlanner
     from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 
-    problem = swing_problem(tf=np.inf, discount_rate=0.5)
+    problem = swing_problem(horizon=np.inf, discount_rate=0.5)
     vi = DynamicProgrammingPlanner(
         problem,
         x_grid=(21, 21),

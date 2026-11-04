@@ -134,7 +134,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             horizon=float("inf"),
             U=sys.input_box,
         )
-        self.assertTrue(np.isposinf(infinite.tf))
+        self.assertTrue(np.isposinf(infinite.horizon))
         with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
             infinite.require_finite_horizon()
         problem = PlanningProblem(

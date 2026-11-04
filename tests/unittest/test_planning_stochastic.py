@@ -412,8 +412,8 @@ def test_the_backends_share_the_score_on_identical_starts():
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)  # bounded by construction
     one_start = Particles([[2.5, 0.0]])
     for kwargs in (
-        {"tf": np.inf},
-        {"tf": 1.0, "penalize_failure": True, "failure_cost": 20.0},
+        {"horizon": np.inf},
+        {"horizon": 1.0, "penalize_failure": True, "failure_cost": 20.0},
     ):
         problem = PlanningProblem(
             plant,
@@ -521,7 +521,7 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     plant.inputs["u"].upper_bound = np.array([4.0])
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
-    task = dict(cost=quadratic(plant), tf=np.inf, x_start=start)
+    task = dict(cost=quadratic(plant), horizon=np.inf, x_start=start)
     heavy = PlanningProblem(plant, params={"plant": {"m": Particles([[3.0]])}}, **task)
     nominal = PlanningProblem(plant, **task)
     settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
@@ -613,7 +613,7 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     plant = pendulum()
     law = StateFeedback(K=[[5.0, 1.0]])
     task = dict(
-        tf=1.0,
+        horizon=1.0,
         x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
         penalize_failure=True,
         failure_cost=5.0,
