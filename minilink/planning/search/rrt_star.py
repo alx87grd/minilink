@@ -53,6 +53,8 @@ class RRTStarPlanner(RRTPlanner):
         Recorded frames when ``record_history`` is enabled.
     """
 
+    number_names = RRTPlanner.number_names + ("radius_constant", "rewire_eta")
+
     def __init__(
         self,
         problem,
@@ -120,8 +122,17 @@ class RRTStarPlanner(RRTPlanner):
         self.best_goal_cost: float | None = None
         self.history: list[RRTStarSnapshot] = []
 
-    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s)."""
+    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
+        """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
+        ``params`` (a partial tree of :attr:`params`) solves the planner
+        :meth:`at` it instead, this one unchanged.
+        """
+
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            return self.store_solution(solution)
+
         metric = self.metric
         self.require_nearest_backend()
 
@@ -207,6 +218,20 @@ class RRTStarPlanner(RRTPlanner):
         return self.finish_trajectory(
             self.tree.extract_trajectory(self.solution_node), evaluate, n_trials
         )
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: RRT's, and the rewiring's."""
+        kwargs = super().build_kwargs()
+        kwargs["radius_constant"] = self.radius_constant
+        kwargs["rewire_eta"] = self.rewire_eta
+        kwargs["rewire"] = self.rewire
+        kwargs["optimize_after_goal"] = self.optimize_after_goal
+        kwargs["cost_tol"] = self.cost_tol
+        kwargs["convergence_patience"] = self.convergence_patience
+        kwargs["record_history"] = self.record_history
+        kwargs["history_stride"] = self.history_stride
+
+        return kwargs
 
     def search_record(self):
         """The RRT* record: the best goal cost, and whether patience declared convergence."""

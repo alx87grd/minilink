@@ -12,6 +12,7 @@ from minilink.core.params import merge_known
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
+from minilink.planning.planner import host_tree, problem_with
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
@@ -360,11 +361,6 @@ class CompiledTrajectoryPlanner:
 
     def problem_at(self, params):
         """A copy of the problem holding the compiled tree with ``params`` merged over it (its parts copied): the face's values, never a later edit of the problem's."""
-        # Lazy import: the planner module imports this one
-        from minilink.planning.trajectory_optimization.planner import (
-            host_tree,
-            problem_with,
-        )
 
         problem_params, _ = planner_parts(self.merged(params))
 
@@ -386,9 +382,6 @@ def planner_parts(params):
 
 def has_values(tree) -> bool:
     """Whether every leaf of a tree has a value (none is a tracer)."""
-    # Lazy import: the planner module imports this one
-    from minilink.planning.trajectory_optimization.planner import host_tree
-
     if not tree:
         return False
     try:

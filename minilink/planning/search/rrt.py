@@ -63,6 +63,8 @@ class RRTPlanner(Planner):
         Tree node whose parent chain defines the returned trajectory.
     """
 
+    number_names = ("goal_bias", "edge_resolution")
+
     def __init__(
         self,
         problem: PlanningProblem,
@@ -119,14 +121,22 @@ class RRTPlanner(Planner):
         box = problem.X.bounding_box()
         self.sample_box = problem.sys.state.box if not is_finite_box(box) else box
 
-    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
         """
         Grow the tree until the goal region is reached or the budget is spent.
 
         The solution's policy is the path's input held by a source block,
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
+        ``params`` (a partial tree of :attr:`params`) solves the planner
+        :meth:`at` it instead, this one unchanged.
         """
+
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            return self.store_solution(solution)
+
         metric = self.metric
         self.require_nearest_backend()
 
@@ -178,6 +188,25 @@ class RRTPlanner(Planner):
         return self.finish_trajectory(
             self.tree.extract_trajectory(closest), evaluate, n_trials
         )
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: the extender and metric, the search's settings and numbers."""
+        kwargs = dict(extender=self.extender, metric=self.metric)
+        kwargs["max_nodes"] = self.max_nodes
+        kwargs["goal_bias"] = self.goal_bias
+        kwargs["seed"] = self.seed
+        kwargs["edge_resolution"] = self.edge_resolution
+        kwargs["max_sample_attempts"] = self.max_sample_attempts
+        kwargs["return_best_effort"] = self.return_best_effort
+        kwargs["callback"] = self.callback
+        kwargs["live_plot"] = self.live_plot
+        kwargs["live_plot_every"] = self.live_plot_every
+        kwargs["live_plot_pause"] = self.live_plot_pause
+        kwargs["live_plot_after_goal_only"] = self.live_plot_after_goal_only
+        kwargs["live_plot_ax"] = self.live_plot_ax
+        kwargs["nearest_backend"] = self.nearest_backend
+
+        return kwargs
 
     def search_record(self) -> TreeSearchRecord:
         """The search's account: goal reached or not, the budget it took, the path's cost-to-come."""

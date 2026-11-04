@@ -13,7 +13,7 @@ from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, given_numbers, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_problems import StepPlanningProblem
@@ -89,6 +89,8 @@ class DynamicProgrammingPlanner(Planner):
     end (``t0 + horizon``, or a step problem's last tick); ``0`` without one.
     """
 
+    number_names = ("gamma", "out_of_bound_cost")
+
     def __init__(
         self,
         problem: PlanningProblem,
@@ -128,6 +130,7 @@ class DynamicProgrammingPlanner(Planner):
         self.gamma, self.out_of_bound_cost, self.final_time = grid_numbers_of(
             self.grid, gamma, out_of_bound_cost
         )
+        self.given = given_numbers(gamma=gamma, out_of_bound_cost=out_of_bound_cost)
 
         # Workflow
         self.record_history = bool(record_history)
@@ -143,19 +146,7 @@ class DynamicProgrammingPlanner(Planner):
         if self.backend == BACKEND_JAX:
             self.grid.ensure_jax_transition(self.final_time)
 
-    @property
-    def params(self) -> dict:
-        """
-        The planner's tree: ``"method"`` its numbers (the discount ``gamma`` and the failure cost ``out_of_bound_cost``), ``"seed"`` ``None``.
-
-        A :class:`PolicyEvaluator` shares them,
-        ``PolicyEvaluator(problem, grid=vi.grid, policy=pi, **vi.params["method"])``.
-        """
-        method = {"gamma": self.gamma, "out_of_bound_cost": self.out_of_bound_cost}
-
-        return {"method": method, "seed": None}
-
-    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
         """
         Infinite horizon: sweep backward until the cost-to-go stops changing.
 
@@ -163,8 +154,14 @@ class DynamicProgrammingPlanner(Planner):
         ``max_iterations`` sweeps. The solution's policy is the greedy lookup
         table and its ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
-        problem's draws.
+        problem's draws. ``params`` (a partial tree of :attr:`params`) solves the
+        planner :meth:`at` it instead, this one unchanged.
         """
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            return self.store_solution(solution)
+
         # Backward sweeps until the cost-to-go stops changing
         result = self.value_iteration(self.max_iterations, stop_on_tol=True)
 
@@ -184,6 +181,25 @@ class DynamicProgrammingPlanner(Planner):
         )
 
     # Value iteration
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: the grid's shape, the engine, the stopping rules, the workflow, the numbers it was given."""
+        grid = self.grid
+        kwargs = dict(
+            x_grid=grid.x_grid_shape,
+            u_grid=grid.u_grid_shape,
+            dt=grid.dt,
+            solver=grid.solver,
+            backend=self.backend,
+            tol=self.tol,
+            max_iterations=self.max_iterations,
+            interpolation=self.interpolation,
+            clean_infeasible=self.clean_infeasible,
+            record_history=self.record_history,
+            verbose=self.verbose,
+        )
+
+        return {**kwargs, **self.given}
 
     def value_iteration(
         self, max_sweeps: int, *, stop_on_tol: bool = True

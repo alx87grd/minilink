@@ -2,9 +2,13 @@
 
 import warnings
 from abc import ABC
+from copy import deepcopy
+
+import numpy as np
 
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.costs import CostFunction
+from minilink.core.params import merge_known
 from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
@@ -53,8 +57,9 @@ class Planner(ABC):
     holds_policy = True
 
     def __init__(self, problem: PlanningProblem) -> None:
-        # The declarative problem
+        # The declarative problem, and the seed of a planner that draws (None: none)
         self.problem = problem
+        self.seed = None
 
         # Memory
         self.last_solution: PlanningSolution | None = None
@@ -69,6 +74,44 @@ class Planner(ABC):
                 "the mean start alone.",
                 stacklevel=2,
             )
+
+    #: The constructor keywords that are the method's numbers, ``params["method"]``
+    number_names: tuple = ()
+
+    @property
+    def params(self) -> dict:
+        """
+        The planner's tree: the problem's leaves by role, ``"method"`` its numbers, ``"seed"`` its seed.
+
+        ``solve(params=...)`` solves at a partial tree of it, and :meth:`at`
+        builds the planner there; the seed is ``None`` for a planner that draws
+        nothing.
+        """
+        method = {name: getattr(self, name) for name in self.number_names}
+
+        return {**self.problem.parts_view(), "method": method, "seed": self.seed}
+
+    def at(self, params) -> "Planner":
+        """
+        A planner of the same kind at a partial tree of :attr:`params`: on the problem holding its leaves, with its numbers and seed.
+
+        A new planner, built from this one's keywords (the numbers it was
+        given, never the defaults it derived, so a changed problem derives its
+        own); this one is unchanged.
+        """
+        problem_leaves, method, seed = planner_tree_parts(params)
+        require_known_numbers(self, method)
+        problem = problem_with(self.problem, host_tree(problem_leaves))
+
+        kwargs = {**self.build_kwargs(), **(method or {})}
+        if seed is not None:
+            kwargs["seed"] = seed
+
+        return type(self)(problem, **kwargs)
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: its structure, its workflow, the numbers it was given."""
+        raise NotImplementedError(f"{type(self).__name__} has no build_kwargs")
 
     # Solve entries: each family overrides its own
 
@@ -229,3 +272,64 @@ def held_feedback(policy, dt):
         return policy % float(dt)
 
     return policy
+
+
+def given_numbers(**numbers) -> dict:
+    """The numbers the caller gave (``None``: derived from the problem, left out)."""
+    return {name: value for name, value in numbers.items() if value is not None}
+
+
+def planner_tree_parts(params):
+    """``(problem, method, seed)``: a planner's tree split into the problem's leaves, the method's numbers and the seed."""
+    if not params:
+        return None, None, None
+    problem = {
+        key: value for key, value in params.items() if key not in ("method", "seed")
+    }
+
+    return problem, params.get("method"), params.get("seed")
+
+
+def require_known_numbers(planner, method):
+    """Refuse a number the planner's method does not have."""
+    unknown = sorted(set(method or {}) - set(planner.number_names))
+    if unknown:
+        raise ValueError(
+            f"{type(planner).__name__} has no number(s) {unknown} under "
+            f'params["method"]; its numbers are {list(planner.number_names)}'
+        )
+
+
+def host_tree(tree):
+    """A tree with every leaf a NumPy value (``None`` kept, an empty subtree kept empty), or ``None`` for none."""
+    if not tree:
+        return None
+    if not isinstance(tree, dict):
+        return tree
+
+    return host_subtree(tree)
+
+
+def host_subtree(tree):
+    """Every leaf of ``tree`` a NumPy value, its subtrees kept, the empty ones too."""
+    return {
+        key: host_subtree(value) if isinstance(value, dict) else host_leaf(value)
+        for key, value in tree.items()
+    }
+
+
+def host_leaf(value):
+    """One leaf on the host: a NumPy value, ``None`` kept."""
+    return None if value is None else np.asarray(value)
+
+
+def problem_with(problem, params):
+    """The problem itself for no values, else a copy holding them: its parts copied, so the caller's stay as they are."""
+    if not params:
+        return problem
+
+    merged = merge_known(problem.parts_view(), params)
+    copy = deepcopy(problem)
+    copy.params = merged
+
+    return copy

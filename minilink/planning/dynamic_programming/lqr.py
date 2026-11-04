@@ -18,7 +18,7 @@ from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, given_numbers, planner_evidence
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
@@ -70,6 +70,8 @@ class LQRPlanner(Planner):
     # The law is continuous: its score closes it as a continuous loop
     holds_policy = False
 
+    number_names = ("x_bar", "u_bar", "t")
+
     def __init__(
         self,
         problem: PlanningProblem,
@@ -92,6 +94,7 @@ class LQRPlanner(Planner):
         # Operating point of the linearization, the cost's target by default
         self.x_bar = np.asarray(cost.x_bar if x_bar is None else x_bar, dtype=float)
         self.u_bar = np.asarray(cost.u_bar if u_bar is None else u_bar, dtype=float)
+        self.given = given_numbers(x_bar=x_bar, u_bar=u_bar)
 
         # The rollout's period, the schedule's samples, the linearization options
         self.dt = float(dt)
@@ -100,7 +103,7 @@ class LQRPlanner(Planner):
         self.method = method
         self.eps = float(eps)
 
-    def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
         """
         Solve the Riccati equation of the linearized problem.
 
@@ -108,7 +111,15 @@ class LQRPlanner(Planner):
         the quadratic form of the linear model. ``evaluate=True`` also rolls
         the law out from the problem's start on the nonlinear plant and scores
         it over the problem's draws.
+        ``params`` (a partial tree of :attr:`params`) solves the planner
+        :meth:`at` it instead, this one unchanged.
         """
+
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            return self.store_solution(solution)
+
         problem = self.problem
         sys = problem.sys
         n_steps = self.n_steps
@@ -184,6 +195,14 @@ class LQRPlanner(Planner):
         )
 
         return self.store_solution(solution)
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: the schedule and the linearization, the operating point it was given."""
+        kwargs = dict(
+            dt=self.dt, n_steps=self.n_steps, t=self.t, method=self.method, eps=self.eps
+        )
+
+        return {**kwargs, **self.given}
 
     def nominal_trajectory(self, tf=None):
         """The law from the problem's start on the nonlinear plant, sampled every ``dt``."""

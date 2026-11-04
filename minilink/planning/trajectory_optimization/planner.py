@@ -5,13 +5,12 @@ from __future__ import annotations
 import time
 import warnings
 from collections.abc import Callable
-from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
-from minilink.core.params import merge_known, tree_digest
+from minilink.core.params import tree_digest
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -33,7 +32,7 @@ from minilink.optimization.reporting import (
     preview_vector,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, host_tree, planner_evidence, problem_with
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
@@ -943,29 +942,6 @@ def warm_bound_form(optimizer) -> None:
         warm()
 
 
-def host_tree(tree):
-    """A tree with every leaf a NumPy value (``None`` kept, an empty subtree kept empty), or ``None`` for none."""
-    if not tree:
-        return None
-    if not isinstance(tree, dict):
-        return tree
-
-    return host_subtree(tree)
-
-
-def host_subtree(tree):
-    """Every leaf of ``tree`` a NumPy value, its subtrees kept, the empty ones too."""
-    return {
-        key: host_subtree(value) if isinstance(value, dict) else host_leaf(value)
-        for key, value in tree.items()
-    }
-
-
-def host_leaf(value):
-    """One leaf on the host: a NumPy value, ``None`` kept."""
-    return None if value is None else np.asarray(value)
-
-
 def planner_parts(params):
     """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the seed dropped: a gradient method draws nothing)."""
     if not params:
@@ -975,18 +951,6 @@ def planner_parts(params):
     }
 
     return problem, params.get("method")
-
-
-def problem_with(problem, params):
-    """The problem itself for no values, else a copy holding them: its parts copied, so the caller's stay as they are."""
-    if not params:
-        return problem
-
-    merged = merge_known(problem.parts_view(), params)
-    copy = deepcopy(problem)
-    copy.params = merged
-
-    return copy
 
 
 ###############################################################################

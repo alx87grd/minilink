@@ -14,7 +14,7 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, given_numbers, planner_evidence
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -96,6 +96,8 @@ class TabularLearningPlanner(Planner):
 
     accepts_stochastic = True
 
+    number_names = ("eta", "gamma")
+
     def __init__(
         self,
         problem,
@@ -146,8 +148,15 @@ class TabularLearningPlanner(Planner):
         self.exploration = EpsilonGreedy() if exploration is None else exploration
         self.eta = None if eta is None else float(eta)
         self.gamma = problem.discount_factor(grid.dt) if gamma is None else float(gamma)
+        self.given = given_numbers(gamma=gamma)
         self.exploring_starts = bool(exploring_starts)
+        self.seed = int(seed)
         self.rng = np.random.default_rng(seed)
+
+        # The episodes' length and the plant's integration, as given
+        self.episode_length = episode_length
+        self.solver = solver
+        self.substeps = int(substeps)
 
         # Memory: the table, its visit counts, one record per episode
         self.Q = np.zeros((grid.nodes_n, grid.actions_n))
@@ -174,13 +183,25 @@ class TabularLearningPlanner(Planner):
             grid=grid, J=J, pi=pi, iterations=episodes, delta=float("nan")
         )
 
-    def solve(self, episodes=1000, *, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(
+        self, episodes=1000, *, params=None, evaluate=False, n_trials=50
+    ) -> PlanningSolution:
         """
         Learn for ``episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
         ``evaluate=True`` also rolls the law out from the problem's start and
         scores it over the problem's draws.
+        ``params`` (a partial tree of :attr:`params`) solves the planner
+        :meth:`at` it instead, this one unchanged.
         """
+
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = self.at(params).solve(
+                episodes, evaluate=evaluate, n_trials=n_trials
+            )
+            return self.store_solution(solution)
+
         # Episodes of interaction, learning as they go
         self.learn(episodes)
 
@@ -207,6 +228,26 @@ class TabularLearningPlanner(Planner):
         return self.store_solution(solution)
 
     # Learning
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another problem: the grid's shape, the learning's structure, the step, the seed, the discount it was given."""
+        grid = self.grid
+        kwargs = dict(
+            x_grid=grid.x_grid_shape,
+            u_grid=grid.u_grid_shape,
+            dt=grid.dt,
+            method=self.algorithm,
+            exploration=self.exploration,
+            eta=self.eta,
+            episode_length=self.episode_length,
+            exploring_starts=self.exploring_starts,
+            rounding=self.rounding,
+            solver=self.solver,
+            substeps=self.substeps,
+            seed=self.seed,
+        )
+
+        return {**kwargs, **self.given}
 
     def learn(self, episodes):
         """Run ``episodes`` episodes of interaction, learning as they go; returns ``self``."""
