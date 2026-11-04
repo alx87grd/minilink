@@ -100,7 +100,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
         traj = planner.solve().trajectory
-        self.assertTrue(planner.last_optimization_result.success)
+        self.assertTrue(planner.last_solution.record.optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
 
@@ -125,7 +125,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_jacobian_h)
         self.assertTrue(program_evaluator.has_jacobian_g)
         traj = planner.solve().trajectory
-        self.assertTrue(planner.last_optimization_result.success)
+        self.assertTrue(planner.last_solution.record.optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
 
@@ -151,7 +151,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
         traj = planner.solve().trajectory
-        self.assertTrue(planner.last_optimization_result.success)
+        self.assertTrue(planner.last_solution.record.optimization_result.success)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
 

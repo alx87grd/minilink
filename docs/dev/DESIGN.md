@@ -1365,14 +1365,14 @@ the cost-to-go table `Q(x, u)` on a `StateSpaceGrid` from transitions alone,
 NumPy only: the state is rounded to its nearest node, the action taken among
 the grid's input levels, and every algorithm is a moving average toward its
 own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
-`c + alpha min Q(x', .)`, off-policy), `SARSA` (the action taken next,
+`c + gamma min Q(x', .)`, off-policy), `SARSA` (the action taken next,
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
-`J = min Q` as `cost_to_go`); `planner.result` is the table as a
-`DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), so
-`plot_cost_to_go`, `plot_control_law` and `get_controller` (a `LookupPolicy`)
-are those of value iteration, and the same grid solved by
+`J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.result` is the
+table as it stands, a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), and
+`plot_cost_to_go`, `plot_control_law`, `value_at` and `get_controller` (a `LookupPolicy`)
+are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
@@ -1428,7 +1428,10 @@ means *the returned plan satisfies the program constraints to
 `feasibility_tol`* — nothing else: an iteration-limit stop on a feasible plan
 is not a failure, a solver that reports convergence on an infeasible plan is,
 and the solver's own flag stays in `message` / `stats`. The worst equality
-residual / inequality margin / bound violation are recorded on the record.
+residual / inequality margin / bound violation are recorded on the record, with the
+solve's whole account (`optimization_result`, the per-iteration `history` when
+`record_history=True`, `solve_time_s`, `step_time_s`); the planner keeps only the
+diagnostics `last_program` and `last_optimizer` (RULES 2.4).
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `backend=…`) like `Simulator` /
@@ -1483,8 +1486,8 @@ planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
 planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
 with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
 last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
-report) and keeps `last_solution` for its plotting shortcuts only (`plot_solution`,
-`animate_solution`), until they move to the solution (D1.4); no solve reads it. Single backend-native
+report) and keeps `last_solution` for its shortcuts only (`plot_solution`,
+`animate_solution`, `get_controller`, RULES 2.4); no solve and no tool reads it. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
@@ -1505,7 +1508,8 @@ callable `out_of_bound_cost` has no single saturation level, so it leaves the ta
 solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a
 fixed-horizon `solve_steps` always succeeds); the record carries the sweep
-count and the last cost-to-go change.
+count, the last cost-to-go change and the tables themselves (`record.tables`, the
+`J` and `pi` the planner's `result`, `value_at` and plots read).
 
 **Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -1520,8 +1524,8 @@ the discount the face's `γ` and the failure cost its rule; a `StepPlanningProbl
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
-interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
-`planner.result`); out-of-domain
+interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
+`solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable

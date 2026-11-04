@@ -133,3 +133,21 @@ def test_an_unknown_number_is_refused_with_the_known_ones():
     vi = DynamicProgrammingPlanner(regulation(), max_iterations=30, **GRID)
     with pytest.raises(ValueError, match="its numbers are"):
         vi.solve(params={"method": {"learning_rate": 0.1}})
+
+
+@pytest.mark.parametrize("name", ["value iteration", "tabular"])
+def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
+    """One last answer (RULES 2.4): the planner's shortcuts follow ``last_solution``, never older tables."""
+    build, numbers = PLANNERS[name]
+    planner = build()
+    solve_of(planner)
+    solution = solve_of(planner, params={"method": numbers})
+    x = np.array([0.5, 0.0])
+
+    assert solution is planner.last_solution
+    assert planner.value_at(x) == solution.cost_to_go(x)
+    assert planner.get_controller() is solution.policy
+    np.testing.assert_array_equal(
+        planner.nominal_trajectory(1.0).x,
+        planner.nominal_trajectory(1.0, solution=solution).x,
+    )

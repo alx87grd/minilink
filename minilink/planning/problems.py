@@ -60,8 +60,8 @@ class PlanningProblem:
     =========== =========================================== =====================================
     ``X0``      the start constraint ``x(0) ∈ X0``          from ``x0``, else ``sys.x0``
     ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
-    ``x0`` the evaluation start (a point or a law)     from ``X0``
-    ``x_bar``    the objective's target, the cost's number   the cost's
+    ``x0``      the evaluation start (a point or a law)     from ``X0``
+    ``x_bar``   the objective's target, the cost's number   the cost's
     =========== =========================================== =====================================
 
     :meth:`goal_point` is the point a heuristic aims at (an initial guess's

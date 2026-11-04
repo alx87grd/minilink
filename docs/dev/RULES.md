@@ -66,9 +66,23 @@ concrete formatting, ordered by the cost of being wrong:
   models where a student hard-codes constants directly into equations must simulate without friction.
   Costs, sets, fields and shapes owe the same signature; the library ones do not read
   `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
-- **2.4 No run state on a System.** A `System` does not store simulation trajectories, solver state,
-  or run history. Exception: `self.traj` is the one daily-use shortcut; a new exception needs a
-  reason of that weight. `StepSystem.rollout` goes with the sampled loop (TODO §1.5).
+- **2.4 One last answer, read only by the shortcuts.** A run returns its result, and the result
+  carries its whole account: the answer with its timings, its history and the solver's raw
+  output (`Trajectory`, `PlanningSolution` and its `record`, `OptimizationResult`,
+  `Evaluation`). An object stores no other run state, with one exception: an object whose
+  convenience verbs need a default (plot, animate, `get_controller`) keeps the last result it
+  returned, once, as the same object, never a copy. That is `sys.traj` on a `System`,
+  `last_solution` on a `Planner` (value iteration's `result` reads through it), `last_J` on a
+  `PolicyEvaluator`; a new one is named `last_<what the run returns>`. Only those verbs read
+  it, as a default; library code never does. A tool takes the result it needs, or uses the one
+  its run returned (`tests/unittest/test_last_answer.py` lists every reader). An engine that
+  tools call (`Optimizer`, `ProblemEvaluator`, `Simulator`) keeps none. Two other kinds of
+  state are not run state: what a method learned and reuses on its next run (the RL weights,
+  the tabular `Q`, the RRT tree), and diagnostics of the machinery that no tool reads
+  (`last_program` and `last_optimizer` on trajectory optimization, `Simulator.last_debug`). The
+  Simulator's `last_traj` and `last_solve_time_s` predate the rule (TODO, D1.4). A new
+  exception needs a reason of `sys.traj`'s weight. `StepSystem.rollout` goes with the sampled
+  loop (TODO §1.5).
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new

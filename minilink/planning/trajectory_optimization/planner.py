@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 import warnings
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
@@ -144,11 +144,10 @@ class TrajectoryOptimizationPlanner(Planner):
         self.record_history = bool(record_history)
         self.record_solve_time = bool(record_solve_time)
 
-        # Memory of the latest solve
+        # Diagnostics: the machinery of the latest offline solve, never read by a tool
+        # (its answer, timings and history are in solution.record)
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
-        self.last_optimization_result: OptimizationResult | None = None
-        self.iteration_history: list[TrajectoryOptimizationIteration] = []
 
         # The offline program and its optimizer, kept with the key they were built on and
         # the problem's parts the key names (held, so no identity in it is reused)
@@ -160,10 +159,8 @@ class TrajectoryOptimizationPlanner(Planner):
         self.optimizer_backend = None
         self._dynamics = None
 
-        # Wall-clock times of the latest compile, solve and step
+        # Wall-clock time of the latest compile
         self.compile_time_s: float | None = None
-        self.last_solve_time_s: float | None = None
-        self.last_step_time_s: float | None = None
 
         # The rebuild path warns once, on JAX, that a compiled program is faster
         self._warned_uncompiled_from = False
@@ -278,11 +275,11 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # z* = argmin J(z) subject to the program's constraints, then the plan read
         # back from z*
-        self.iteration_history = []
+        history = []
         optimization_result = optimizer.solve(
             params=None if method is None else {"method": method},
             z0=z0,
-            callback=self.build_callback(optimizer, backend),
+            callback=self.build_callback(optimizer, backend, history),
             record_solve_time=self.record_solve_time or self.verbose,
             verbose=False,
         )
@@ -295,12 +292,9 @@ class TrajectoryOptimizationPlanner(Planner):
         reconstruct_s = time.perf_counter() - reconstruct_t0
         total_s = time.perf_counter() - workflow_t0
 
-        # Memory of this solve
+        # Diagnostics of this solve
         self.last_program = program
         self.last_optimizer = optimizer
-        self.last_optimization_result = optimization_result
-        self.last_solve_time_s = optimization_result.solve_time_s
-        self.last_step_time_s = total_s
 
         # Success is the plan's feasibility, not the solver's flag: an iteration-limit
         # stop on a feasible plan is not a failure, and a solver that reports
@@ -329,6 +323,9 @@ class TrajectoryOptimizationPlanner(Planner):
             max_bound_violation=float(max_bound),
             feasible=feasible,
             stats=dict(optimization_result.stats),
+            step_time_s=total_s,
+            optimization_result=optimization_result,
+            history=history,
         )
         solution = self.store_solution(
             self.trajectory_solution(
@@ -559,8 +556,9 @@ class TrajectoryOptimizationPlanner(Planner):
         self,
         optimizer: Optimizer,
         backend: str,
+        history: list,
     ) -> OptimizationProgressCallback | None:
-        """The optimizer's progress hook (history, live plot, user callback), or ``None``."""
+        """The optimizer's progress hook (``history`` appended to, live plot, user callback), or ``None``."""
         callback = self.callback
 
         # The live figure, beside the user's callback when there is one
@@ -604,7 +602,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 dynamics=dynamics,
             )
             if self.record_history:
-                self.iteration_history.append(iteration)
+                history.append(iteration)
             if callback is not None:
                 callback(iteration)
             iteration_index += 1
@@ -754,17 +752,14 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         if record_solve_time:
-            self.last_solve_time_s = time.perf_counter() - solve_t0
             result = OptimizationResult(
                 z=result.z,
                 success=result.success,
                 cost=result.cost,
                 message=result.message,
                 stats=result.stats,
-                solve_time_s=self.last_solve_time_s,
+                solve_time_s=time.perf_counter() - solve_t0,
             )
-        else:
-            self.last_solve_time_s = None
 
         # The plan read back from z* with the compiled dynamics on the tick's plant
         plant = bound["plant"]
@@ -774,8 +769,7 @@ class TrajectoryOptimizationPlanner(Planner):
             dynamics=lambda x, u, t: self._dynamics(x, u, t, plant),
             params=bound,
         )
-        self.last_step_time_s = time.perf_counter() - step_t0
-        self.last_optimization_result = result
+        step_time_s = time.perf_counter() - step_t0
 
         # An online tick runs no residual check: its success is the solver's flag
         record = TrajectoryOptimizationRecord(
@@ -790,6 +784,8 @@ class TrajectoryOptimizationPlanner(Planner):
             max_bound_violation=None,
             feasible=None,
             stats=dict(result.stats),
+            step_time_s=step_time_s,
+            optimization_result=result,
         )
         solution = self.store_solution(
             self.trajectory_solution(
@@ -798,18 +794,18 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
         if self.verbose:
-            self.print_step_report(result)
+            self.print_step_report(record)
 
         return solution
 
-    def print_step_report(self, result: OptimizationResult) -> None:
+    def print_step_report(self, record: TrajectoryOptimizationRecord) -> None:
         """One line per online tick: the solver's flag, the cost and the timings."""
-        j_txt = "n/a" if result.cost is None else f"{float(result.cost):.6g}"
+        j_txt = "n/a" if record.cost is None else f"{float(record.cost):.6g}"
         print(
-            f"TOP step: success={result.success} "
+            f"TOP step: success={record.solver_success} "
             f"J={j_txt} "
-            f"solve={self.last_solve_time_s:.6g}s "
-            f"step={self.last_step_time_s:.6g}s"
+            f"solve={record.solve_time_s:.6g}s "
+            f"step={record.step_time_s:.6g}s"
         )
 
     def solve_trajectory_from_rebuild(
@@ -869,6 +865,11 @@ class TrajectoryOptimizationRecord:
     max_bound_violation: float | None
     feasible: bool | None
     stats: dict
+    step_time_s: float | None = None
+    optimization_result: OptimizationResult | None = field(
+        default=None, repr=False, compare=False
+    )
+    history: list = field(default_factory=list, repr=False, compare=False)
 
     @property
     def success(self) -> bool:

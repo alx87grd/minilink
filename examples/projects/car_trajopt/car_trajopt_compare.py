@@ -652,9 +652,10 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         options={"maxiter": 500, "ftol": 1e-1},
     )
     t0 = time.perf_counter()
-    traj = planner.solve().trajectory
+    solution = planner.solve()
+    traj = solution.trajectory
     total_s = time.perf_counter() - t0
-    result = planner.last_optimization_result
+    result = solution.record.optimization_result
     return SolveRun(
         case=case,
         sys=sys,
@@ -696,9 +697,10 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         options={"maxiter": 150, "ftol": 0.1},
     )
     t0 = time.perf_counter()
-    traj = planner.solve().trajectory
+    solution = planner.solve()
+    traj = solution.trajectory
     total_s = time.perf_counter() - t0
-    result = planner.last_optimization_result
+    result = solution.record.optimization_result
     return SolveRun(
         case=case,
         sys=sys,
