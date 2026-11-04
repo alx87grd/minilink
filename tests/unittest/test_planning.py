@@ -28,7 +28,6 @@ from minilink.planning.trajectory_optimization.multiple_shooting import (
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationIteration,
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
@@ -337,7 +336,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(backend="numpy"),
+            backend="numpy",
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
         self.assertEqual(to.options.backend, "numpy")
@@ -357,10 +356,8 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="numpy",
-                optimizer_options={"maxiter": 100, "ftol": 1e-09},
-            ),
+            backend="numpy",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
@@ -382,11 +379,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="numpy",
-                optimizer_options={"maxiter": 100, "ftol": 1e-09},
-                verbose=True,
-            ),
+            backend="numpy",
+            options={"maxiter": 100, "ftol": 1e-09},
+            verbose=True,
         )
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
@@ -406,11 +401,9 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                backend="direct",
-                optimizer_options={"maxiter": 100, "ftol": 1e-09},
-                record_history=True,
-            ),
+            backend="direct",
+            options={"maxiter": 100, "ftol": 1e-09},
+            record_history=True,
         )
         traj = planner.solve().trajectory
         warm_started = planner.solve(guess=planner.last_solution).trajectory
@@ -426,10 +419,8 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                backend="numpy",
-                optimizer_options={"maxiter": 100, "ftol": 1e-09},
-            ),
+            backend="numpy",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
@@ -448,10 +439,8 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                backend="numpy",
-                optimizer_options={"maxiter": 100, "ftol": 1e-09},
-            ),
+            backend="numpy",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_optimization_result.success)
@@ -558,9 +547,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                optimizer_options={"maxiter": 100, "ftol": 1e-09}
-            ),
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         first = planner.solve()
         planner.solve(guess=first)
@@ -576,7 +563,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             problem,
             n_steps=5,
             transcription="direct_collocation",
-            optimizer_options={"maxiter": 100, "ftol": 1e-09},
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         moved = planner.solve({"x_start": np.array([0.4])})
         np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
@@ -588,12 +575,11 @@ from minilink.blocks.basic import Integrator
 from minilink.core.sets import CallableSet, InputSet
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.multiple_shooting import (
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
@@ -647,11 +633,9 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="numpy",
-                record_solve_time=True,
-                optimizer_options={"maxiter": 20, "ftol": 0.001},
-            ),
+            backend="numpy",
+            record_solve_time=True,
+            options={"maxiter": 20, "ftol": 0.001},
         )
         flat = TrajectoryOptimizationPlanner(
             problem,
@@ -659,16 +643,16 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             transcription="direct_collocation",
             backend="numpy",
             record_solve_time=True,
-            optimizer_options={"maxiter": 20, "ftol": 0.001},
+            options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
-        self.assertEqual(flat.options.backend, nested.options.backend)
+        self.assertEqual(flat.settings.backend, nested.settings.backend)
         self.assertEqual(
-            flat.options.record_solve_time, nested.options.record_solve_time
+            flat.settings.record_solve_time, nested.settings.record_solve_time
         )
         self.assertEqual(
-            flat.options.optimizer_options, nested.options.optimizer_options
+            flat.settings.optimizer_options, nested.settings.optimizer_options
         )
 
     def test_string_presets(self):
@@ -755,13 +739,11 @@ class TestRrtFlatConstructor(unittest.TestCase):
         extender = KinodynamicExtender(
             controls=[np.array([1.0, 0.0])], horizon=0.5, n_substeps=4
         )
-        nested = RRTPlanner(
-            problem, extender, options=RRTOptions(max_nodes=100, goal_bias=0.2, seed=1)
-        )
+        nested = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
         flat = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
-        self.assertEqual(flat.options.max_nodes, nested.options.max_nodes)
-        self.assertEqual(flat.options.goal_bias, nested.options.goal_bias)
-        self.assertEqual(flat.options.seed, nested.options.seed)
+        self.assertEqual(flat.settings.max_nodes, nested.settings.max_nodes)
+        self.assertEqual(flat.settings.goal_bias, nested.settings.goal_bias)
+        self.assertEqual(flat.settings.seed, nested.settings.seed)
 
 
 from minilink.core.sets import BallSet, BoxSet
@@ -769,7 +751,7 @@ from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
 from minilink.planning.search.edge import Edge
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import euclidean
-from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
+from minilink.planning.search.rrt_star import RRTStarPlanner
 from minilink.planning.search.steering import DubinsSteering, StraightLineSteering
 from minilink.planning.search.tree import NEAREST_KD_TREE, Node, Tree
 from tests.unittest.planning_helpers import (
@@ -826,7 +808,9 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
+        seed=0,
+        max_nodes=4000,
+        nearest_backend="kd_tree",
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -855,7 +839,8 @@ def test_kdtree_requires_euclidean_metric():
         problem,
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
         metric=dubins.distance,
-        options=RRTOptions(seed=0, nearest_backend="kd_tree"),
+        seed=0,
+        nearest_backend="kd_tree",
     )
     with pytest.raises(ValueError, match="metric=euclidean"):
         planner.solve()
@@ -866,7 +851,8 @@ def test_unknown_nearest_backend_raises():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, nearest_backend="invalid"),
+        seed=0,
+        nearest_backend="invalid",
     )
     with pytest.raises(ValueError, match="nearest_backend"):
         planner.solve()
@@ -877,7 +863,8 @@ def test_kinodynamic_reaches_goal_and_stays_free():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, max_nodes=4000),
+        seed=0,
+        max_nodes=4000,
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -894,7 +881,8 @@ def test_kinodynamic_random_controls_reaches_goal():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=1, max_nodes=6000),
+        seed=1,
+        max_nodes=6000,
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -911,7 +899,8 @@ def test_seeded_run_is_deterministic():
                 extender=KinodynamicExtender(
                     controls=COMPASS, horizon=0.6, n_substeps=6
                 ),
-                options=RRTOptions(seed=7, max_nodes=4000),
+                seed=7,
+                max_nodes=4000,
             )
             .solve()
             .trajectory
@@ -929,7 +918,8 @@ def test_steering_reaches_goal_and_stays_free():
         extender=SteeringExtender(
             StraightLineSteering(speed=1.0), max_distance=0.6, resolution=0.05
         ),
-        options=RRTOptions(seed=0, max_nodes=4000),
+        seed=0,
+        max_nodes=4000,
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -1007,7 +997,9 @@ def test_dubins_rrt_reaches_goal_pose():
         problem,
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
         metric=dubins.distance,
-        options=RRTOptions(seed=0, goal_bias=0.2, max_nodes=8000),
+        seed=0,
+        goal_bias=0.2,
+        max_nodes=8000,
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -1020,7 +1012,7 @@ def test_select_rejects_colliding_candidate_for_free_one():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(seed=0),
+        seed=0,
     )
     x_rand = np.array([4.0, 4.0])
     colliding = Edge(
@@ -1043,7 +1035,9 @@ def test_reached_goal_false_on_budget_exhaustion():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(seed=0, max_nodes=10, goal_bias=0.0),
+        seed=0,
+        max_nodes=10,
+        goal_bias=0.0,
     )
     planner.solve()
     assert not planner.reached_goal
@@ -1055,9 +1049,10 @@ def test_return_best_effort_false_raises():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
-        options=RRTOptions(
-            seed=0, max_nodes=5, goal_bias=0.0, return_best_effort=False
-        ),
+        seed=0,
+        max_nodes=5,
+        goal_bias=0.0,
+        return_best_effort=False,
     )
     with pytest.raises(RuntimeError, match="failed to reach goal"):
         planner.solve()
@@ -1068,7 +1063,7 @@ def test_free_state_sampling_stays_in_X():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(goal_bias=0.0),
+        goal_bias=0.0,
     )
     rng = np.random.default_rng(42)
     samples = [planner.sample_free_state(rng) for _ in range(40)]
@@ -1081,12 +1076,12 @@ def test_edge_resolution_rejects_segment_through_obstacle():
     planner_fine = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(edge_resolution=0.05),
+        edge_resolution=0.05,
     )
     planner_coarse = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(edge_resolution=None),
+        edge_resolution=None,
     )
     edge = Edge(
         states=np.array([[-2.0, 0.0], [2.0, 0.0]]),
@@ -1186,7 +1181,8 @@ def test_plot_tree_and_animate_search_smoke():
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
-        options=RRTOptions(seed=0, max_nodes=2000),
+        seed=0,
+        max_nodes=2000,
     )
     planner.solve()
     fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
@@ -1213,7 +1209,8 @@ def test_rrt_star_reaches_goal():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(seed=0, max_nodes=4000),
+        seed=0,
+        max_nodes=4000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -1229,7 +1226,9 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(seed=0, max_nodes=4000, nearest_backend="kd_tree"),
+        seed=0,
+        max_nodes=4000,
+        nearest_backend="kd_tree",
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -1243,10 +1242,10 @@ def test_rrt_star_improves_path_cost_over_rrt():
     star_costs = []
     rrt_costs = []
     for seed in range(12):
-        options = RRTStarOptions(seed=seed, max_nodes=3000)
-        rrt = RRTPlanner(problem, extender=extender, options=options)
+        options = dict(seed=seed, max_nodes=3000)
+        rrt = RRTPlanner(problem, extender=extender, **options)
         rrt.solve()
-        star = RRTStarPlanner(problem, extender=extender, options=options)
+        star = RRTStarPlanner(problem, extender=extender, **options)
         star.solve()
         if rrt.reached_goal and star.reached_goal:
             rrt_costs.append(path_cost(rrt))
@@ -1262,12 +1261,16 @@ def test_rewire_false_is_at_least_as_costly():
     with_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=True),
+        seed=5,
+        max_nodes=2500,
+        rewire=True,
     )
     without_rewire = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(seed=5, max_nodes=2500, rewire=False),
+        seed=5,
+        max_nodes=2500,
+        rewire=False,
     )
     with_rewire.solve()
     without_rewire.solve()
@@ -1279,10 +1282,10 @@ def test_rewire_false_is_at_least_as_costly():
 def test_rrt_star_is_deterministic():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    options = RRTStarOptions(seed=11, max_nodes=2000)
+    options = dict(seed=11, max_nodes=2000)
 
     def run():
-        planner = RRTStarPlanner(problem, extender=extender, options=options)
+        planner = RRTStarPlanner(problem, extender=extender, **options)
         traj = planner.solve().trajectory
         return (traj, path_cost(planner))
 
@@ -1296,7 +1299,8 @@ def test_rrt_star_infers_rewire_eta_from_extender():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(seed=0, max_nodes=10),
+        seed=0,
+        max_nodes=10,
     )
     assert planner.max_connection() == pytest.approx(0.6)
 
@@ -1308,9 +1312,7 @@ def test_rrt_star_requires_rewire_eta_for_unknown_extender():
         def propose(self, *args, **kwargs):
             return []
 
-    planner = RRTStarPlanner(
-        problem, extender=DummyExtender(), options=RRTStarOptions(seed=0)
-    )
+    planner = RRTStarPlanner(problem, extender=DummyExtender(), seed=0)
     with pytest.raises(ValueError, match="rewire_eta"):
         planner.max_connection()
 
@@ -1326,12 +1328,10 @@ def test_search_callback_invoked_on_rrt():
     planner = RRTPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=0,
-            max_nodes=200,
-            callback=RecordingCallback(),
-            live_plot_every=1,
-        ),
+        seed=0,
+        max_nodes=200,
+        callback=RecordingCallback(),
+        live_plot_every=1,
     )
     planner.solve()
     assert calls
@@ -1350,15 +1350,13 @@ def test_live_plot_after_goal_only_skips_explore_phase():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=1,
-            max_nodes=2500,
-            optimize_after_goal=True,
-            convergence_patience=100,
-            callback=RecordingCallback(),
-            live_plot_every=1,
-            live_plot_after_goal_only=True,
-        ),
+        seed=1,
+        max_nodes=2500,
+        optimize_after_goal=True,
+        convergence_patience=100,
+        callback=RecordingCallback(),
+        live_plot_every=1,
+        live_plot_after_goal_only=True,
     )
     planner.solve()
     assert planner.reached_goal
@@ -1371,7 +1369,10 @@ def test_live_plot_option_builds_callback():
     planner = RRTPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTOptions(seed=0, max_nodes=10, live_plot=True, live_plot_every=1),
+        seed=0,
+        max_nodes=10,
+        live_plot=True,
+        live_plot_every=1,
     )
     callback = planner.resolve_search_callback()
     from minilink.planning.search.live_plot import LiveSearchPlotCallback
@@ -1386,14 +1387,16 @@ def test_optimize_after_goal_runs_longer_and_refines_cost():
     first_hit = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(**base, optimize_after_goal=False),
+        **base,
+        optimize_after_goal=False,
     )
     optimized = RRTStarPlanner(
         problem,
         extender=extender,
-        options=RRTStarOptions(
-            **base, optimize_after_goal=True, cost_tol=0.05, convergence_patience=400
-        ),
+        **base,
+        optimize_after_goal=True,
+        cost_tol=0.05,
+        convergence_patience=400,
     )
     first_hit.solve()
     optimized.solve()
@@ -1408,13 +1411,11 @@ def test_convergence_patience_stops_search():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=6,
-            max_nodes=8000,
-            optimize_after_goal=True,
-            cost_tol=0.05,
-            convergence_patience=50,
-        ),
+        seed=6,
+        max_nodes=8000,
+        optimize_after_goal=True,
+        cost_tol=0.05,
+        convergence_patience=50,
     )
     planner.solve()
     assert planner.reached_goal
@@ -1427,12 +1428,10 @@ def test_record_history_for_animation():
     planner = RRTStarPlanner(
         problem,
         extender=make_steering_extender(),
-        options=RRTStarOptions(
-            seed=0,
-            max_nodes=800,
-            record_history=True,
-            history_stride=25,
-        ),
+        seed=0,
+        max_nodes=800,
+        record_history=True,
+        history_stride=25,
     )
     planner.solve()
     assert len(planner.history) >= 2
@@ -2171,9 +2170,9 @@ class TestTextbookOptions(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
-        self.assertTrue(planner.options.live_plot)
+        self.assertTrue(planner.settings.live_plot)
         self.assertIsNotNone(planner.build_callback(None, "numpy"))
-        planner.options.live_plot = False
+        planner.settings.live_plot = False
         self.assertIsNone(planner.build_callback(None, "numpy"))
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
@@ -2218,7 +2217,7 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     from minilink.planning.search.extenders import bang_bang_controls
 
     problem, X = make_holonomic_obstacle_problem()
-    planner = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    planner = RRTPlanner(problem, seed=0, max_nodes=50)
     assert isinstance(planner.extender, KinodynamicExtender)
     controls = planner.extender.candidate_controls(problem, np.random.default_rng(0))
     lower, upper = problem.U.box.lower, problem.U.box.upper
@@ -2234,8 +2233,8 @@ def test_rrt_star_defaults_its_extender_and_metric_like_rrt():
     from minilink.planning.search.metric import euclidean
 
     problem, _ = make_holonomic_obstacle_problem()
-    star = RRTStarPlanner(problem, options=RRTStarOptions(seed=0, max_nodes=50))
-    plain = RRTPlanner(problem, options=RRTOptions(seed=0, max_nodes=50))
+    star = RRTStarPlanner(problem, seed=0, max_nodes=50)
+    plain = RRTPlanner(problem, seed=0, max_nodes=50)
     assert isinstance(star.extender, KinodynamicExtender)
     assert star.metric is euclidean and plain.metric is euclidean
     rng = np.random.default_rng(0)
@@ -2425,7 +2424,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
         n_steps=11,
         transcription="direct_collocation",
         backend=backend,
-        optimizer_options={"maxiter": 60},
+        options={"maxiter": 60},
     )
     solved = planner.solve()
     pv = planner.compile()
@@ -2459,7 +2458,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
         n_steps=11,
         transcription="direct_collocation",
         backend=backend,
-        optimizer_options={"maxiter": 60},
+        options={"maxiter": 60},
     ).compile()
     oracle = at_start.solution(moved, None, moved_status).record
     assert record.max_equality_violation == pytest.approx(
@@ -2493,7 +2492,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
         backend="jax",
         method="adam",
         iterations=200,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     )
     pv = planner.compile()
 

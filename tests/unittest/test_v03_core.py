@@ -398,7 +398,7 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
             n_steps=11,
             transcription=transcription,
             backend=backend,
-            optimizer_options={"maxiter": 100},
+            options={"maxiter": 100},
         )
         return planner.solve()
 
@@ -447,7 +447,7 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
         transcription="direct_collocation",
         backend=backend,
         method=method,
-        optimizer_options=options,
+        options=options,
     )
 
 
@@ -513,7 +513,7 @@ def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
         transcription="direct_collocation",
         backend="jax",
         method=method,
-        optimizer_options=options,
+        options=options,
     )
 
 
@@ -644,7 +644,7 @@ def native_mpc_problem():
         backend="jax",
         method="adam",
         iterations=30,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     )
     return problem, planner
 
@@ -777,7 +777,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
             backend="jax",
             method="adam",
             iterations=40,
-            optimizer_options={"learning_rate": 0.2},
+            options={"learning_rate": 0.2},
         )
         mpc = ModelPredictiveController(planner, delay=True)
         pe = problem.compile(mpc % 0.1, backend="jax")

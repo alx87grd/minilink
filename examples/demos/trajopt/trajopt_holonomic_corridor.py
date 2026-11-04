@@ -122,7 +122,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     backend="numpy",
-    optimizer_options={"maxiter": 500, "ftol": 1e-1},
+    options={"maxiter": 500, "ftol": 1e-1},
 )
 
 t_grid = planner.transcription.initial_guess_time_grid(problem)

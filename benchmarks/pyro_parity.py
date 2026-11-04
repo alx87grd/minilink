@@ -25,13 +25,12 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.edge import Edge
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTPlanner
 
 INF_PENDULUM = 500.0
 INF_DOUBLE = 1000.0
@@ -195,14 +194,12 @@ def run_minilink_pendulum_dp(
     planner = DynamicProgrammingPlanner(
         problem,
         grid=grid,
-        options=DynamicProgrammingOptions(
-            backend=backend,
-            gamma=1.0,
-            tol=tol,
-            max_iterations=n_steps,
-            out_of_bound_cost=INF_PENDULUM,
-            verbose=False,
-        ),
+        backend=backend,
+        gamma=1.0,
+        tol=tol,
+        max_iterations=n_steps,
+        out_of_bound_cost=INF_PENDULUM,
+        verbose=False,
     )
     t_build = time.perf_counter()
     with _quiet():
@@ -263,13 +260,11 @@ def run_minilink_double_pendulum_dp(
     planner = DynamicProgrammingPlanner(
         problem,
         grid=grid,
-        options=DynamicProgrammingOptions(
-            backend=backend,
-            gamma=1.0,
-            max_iterations=n_steps,
-            out_of_bound_cost=INF_DOUBLE,
-            verbose=False,
-        ),
+        backend=backend,
+        gamma=1.0,
+        max_iterations=n_steps,
+        out_of_bound_cost=INF_DOUBLE,
+        verbose=False,
     )
     t_build = time.perf_counter()
     with _quiet():
@@ -326,12 +321,10 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
     planner = RRTPlanner(
         problem,
         extender=extender,
-        options=RRTOptions(
-            seed=seed,
-            goal_bias=0.1,
-            max_nodes=max_nodes,
-            nearest_backend="kd_tree",
-        ),
+        seed=seed,
+        goal_bias=0.1,
+        max_nodes=max_nodes,
+        nearest_backend="kd_tree",
     )
     traj = planner.solve().trajectory
     elapsed = time.perf_counter() - t0

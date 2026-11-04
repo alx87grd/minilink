@@ -105,7 +105,7 @@ def pipelines():
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        optimizer_options={"maxiter": 50},
+        options={"maxiter": 50},
     )
     horizon = PlanningProblem(
         pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
@@ -117,7 +117,7 @@ def pipelines():
         backend="jax",
         method="adam",
         iterations=15,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     )
     mpc_loop = (ModelPredictiveController(native, delay=True) % 0.05) @ pend
     mpc_ev = mpc_loop.compile(backend="jax", substeps=1)
@@ -178,7 +178,7 @@ def forms():
         backend="jax",
         method="adam",
         iterations=200,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     ).compile()
     start = {"x_start": horizon.x_start, "t_start": 0.0}
     z0 = pv.initial()

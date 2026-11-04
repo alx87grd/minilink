@@ -190,7 +190,7 @@ def mpc_entries(out):
         n_steps=8,
         transcription="direct_collocation",
         backend="numpy",
-        optimizer_options={"maxiter": 80, "ftol": 1e-6},
+        options={"maxiter": 80, "ftol": 1e-6},
         verbose=False,
     )
     mpc = ModelPredictiveController(planner, delay=True)

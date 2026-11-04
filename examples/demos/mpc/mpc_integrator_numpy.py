@@ -55,7 +55,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=8,
     transcription="direct_collocation",
     backend="numpy",
-    optimizer_options={"maxiter": 80, "ftol": 1e-6},
+    options={"maxiter": 80, "ftol": 1e-6},
 )
 
 mpc = ModelPredictiveController(planner, delay=False)

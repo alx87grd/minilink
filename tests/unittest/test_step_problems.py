@@ -187,7 +187,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     cells = np.arange(7.0)
     distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     np.testing.assert_array_equal(J, distance)
-    assert vi.grid.dt == 1.0 and vi.options.gamma == 1.0
+    assert vi.grid.dt == 1.0 and vi.settings.gamma == 1.0
 
 
 class TimedTerminal(QuadraticCost):
@@ -221,7 +221,7 @@ def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
     kwargs = dict(x_grid=(21, 21), u_grid=(5,), solver="rk4")
     vi = DynamicProgrammingPlanner(problem, dt=0.1, **kwargs)
     vd = DynamicProgrammingPlanner(problem.discretize(0.1, solver="rk4"), **kwargs)
-    assert vi.options.out_of_bound_cost == vd.options.out_of_bound_cost
+    assert vi.settings.out_of_bound_cost == vd.options.out_of_bound_cost
     vi.solve()
     vd.solve()
     np.testing.assert_array_equal(vi.result.J, vd.result.J)
@@ -265,7 +265,7 @@ def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
     )
     vi.solve()
     pe = PolicyEvaluator(
-        problem, grid=vi.grid, policy=vi.get_controller(), options=vi.options
+        problem, grid=vi.grid, policy=vi.get_controller(), settings=vi.settings
     )
     np.testing.assert_allclose(pe.solve(), vi.result.J, atol=1e-6)
 

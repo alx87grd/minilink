@@ -46,7 +46,7 @@ planner = TrajectoryOptimizationPlanner(
     backend="jax",
     method=OPTIMIZER,
     # method="scipy_slsqp",
-    # optimizer_options={"maxiter": 500, "ftol": 1e-2},
+    # options={"maxiter": 500, "ftol": 1e-2},
     verbose=PRINT_SOLVE_REPORT,
     live_plot=LIVE_PLOT,
 )

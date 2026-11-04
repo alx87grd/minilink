@@ -659,7 +659,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         transcription="direct_collocation",
         backend="jax",
         record_solve_time=True,
-        optimizer_options={"maxiter": 500, "ftol": 1e-1},
+        options={"maxiter": 500, "ftol": 1e-1},
     )
     t0 = time.perf_counter()
     traj = planner.solve().trajectory
@@ -705,7 +705,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         backend=backend,
         record_solve_time=True,
         method="scipy_slsqp",
-        optimizer_options={"maxiter": 150, "ftol": 0.1},
+        options={"maxiter": 150, "ftol": 0.1},
     )
     t0 = time.perf_counter()
     traj = planner.solve().trajectory

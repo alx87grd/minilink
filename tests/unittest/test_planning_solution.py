@@ -16,7 +16,7 @@ from minilink.planning import (
 )
 from minilink.planning.evaluator import held_law, nominal_trajectory
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
+from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -26,7 +26,6 @@ from minilink.planning.trajectory_optimization.multiple_shooting import (
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
@@ -86,9 +85,8 @@ def trajopt(problem, transcription, n_steps=10):
     return TrajectoryOptimizationPlanner(
         problem,
         transcription=transcription(n_steps),
-        options=TrajectoryOptimizationOptions(
-            backend="numpy", optimizer_options={"maxiter": 200, "ftol": 1e-10}
-        ),
+        backend="numpy",
+        options={"maxiter": 200, "ftol": 1e-10},
     )
 
 
@@ -182,7 +180,8 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
             horizon=0.6,
             n_substeps=6,
         ),
-        options=RRTOptions(seed=0, max_nodes=4000),
+        seed=0,
+        max_nodes=4000,
     )
     solution = planner.solve()
     assert solution.success and solution.record.reached_goal

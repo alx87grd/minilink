@@ -149,7 +149,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "ProblemEvaluator",
         "RRTPlanner",
         "RRTStarPlanner",
-        "RRTOptions",
         "KinodynamicExtender",
         "SteeringExtender",
     ),

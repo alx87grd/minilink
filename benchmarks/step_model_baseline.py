@@ -227,7 +227,7 @@ def compute_forced_entries(out):
 
 def rrt_entries(out):
     """One seeded RRT search on the pendulum."""
-    from minilink import BallSet, KinodynamicExtender, RRTOptions, RRTPlanner
+    from minilink import BallSet, KinodynamicExtender, RRTPlanner
 
     plant = Pendulum()
     x_goal = np.array([np.pi, 0.0])
@@ -242,7 +242,9 @@ def rrt_entries(out):
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=torques, horizon=0.3, n_substeps=6),
-        options=RRTOptions(seed=0, goal_bias=0.05, max_nodes=200),
+        seed=0,
+        goal_bias=0.05,
+        max_nodes=200,
     )
     solution = planner.solve()
     out["rrt.x"] = solution.trajectory.x

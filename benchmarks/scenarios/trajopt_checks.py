@@ -22,7 +22,6 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -79,17 +78,15 @@ def run_showcase_cartpole_trajopt(
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=n_steps)
         ),
-        options=TrajectoryOptimizationOptions(
-            backend="jax",
-            method="scipy_slsqp",
-            optimizer_options={
-                "maxiter": maxiter,
-                "ftol": SHOWCASE_TRAJOPT_FTOL,
-                "disp": False,
-            },
-            record_solve_time=True,
-            verbose=False,
-        ),
+        backend="jax",
+        method="scipy_slsqp",
+        options={
+            "maxiter": maxiter,
+            "ftol": SHOWCASE_TRAJOPT_FTOL,
+            "disp": False,
+        },
+        record_solve_time=True,
+        verbose=False,
     )
 
     total_times: list[float] = []

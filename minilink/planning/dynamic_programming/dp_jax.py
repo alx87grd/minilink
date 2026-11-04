@@ -35,7 +35,7 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
     """
     jax = ensure_jax_x64()
 
-    opt = planner.options
+    opt = planner.settings
 
     # Device tables and the cost-to-go at the final time
     G, coords, in_bounds = device_tables(planner)
@@ -70,7 +70,7 @@ def terminal_cost(planner, t) -> np.ndarray:
     grid = planner.grid
     face = grid.face
     N = grid.nodes_n
-    verbose = planner.options.verbose
+    verbose = planner.settings.verbose
 
     states = jnp.asarray(grid.states)
 
@@ -109,8 +109,8 @@ def running_cost_table(planner, t) -> np.ndarray:
     params = face.params
     N = grid.nodes_n
     A = grid.actions_n
-    verbose = planner.options.verbose
-    failure_cost = planner.options.out_of_bound_cost
+    verbose = planner.settings.verbose
+    failure_cost = planner.settings.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
     inputs = jnp.asarray(grid.inputs)
@@ -186,8 +186,8 @@ def device_tables(planner):
     jnp = ensure_jax_x64().numpy
 
     grid = planner.grid
-    tf = planner.options.final_time
-    interpolation = planner.options.interpolation
+    tf = planner.settings.final_time
+    interpolation = planner.settings.interpolation
     n = grid.n
 
     require_device_interpolation(interpolation)
@@ -222,7 +222,7 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
-    opt = planner.options
+    opt = planner.settings
     tf = opt.final_time
     dt = planner.grid.dt
     N = planner.grid.nodes_n
@@ -280,7 +280,7 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
     jnp = jax.numpy
 
     N = planner.grid.nodes_n
-    tol = float(planner.options.tol)
+    tol = float(planner.settings.tol)
     step = jitted_step(planner)
 
     def run(J0, G, coords, in_bounds):
@@ -327,8 +327,8 @@ def jitted_step(planner):
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
     N = planner.grid.nodes_n
     A = planner.grid.actions_n
-    gamma = float(planner.options.gamma)
-    order = 0 if planner.options.interpolation == "nearest" else 1
+    gamma = float(planner.settings.gamma)
+    order = 0 if planner.settings.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds):
         # Estimated (interpolation) cost-to-go of all the arrival states, zero off

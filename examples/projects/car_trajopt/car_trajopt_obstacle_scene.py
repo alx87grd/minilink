@@ -91,7 +91,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     verbose=True,
-    optimizer_options={
+    options={
         "maxiter": 500,
         "ftol": 1e-1,
     },

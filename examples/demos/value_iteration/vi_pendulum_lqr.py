@@ -46,7 +46,7 @@ planner.plot_cost_to_go(jmax=INF, show_3d=True)
 
 # The LQR law measured on the nonlinear plant: the Bellman expectation equation on VI's grid
 J_lqr = PolicyEvaluator(
-    problem, grid=grid, policy=sol_lqr, options=planner.options
+    problem, grid=grid, policy=sol_lqr, settings=planner.settings
 ).solve()
 grid.plot_value(J_lqr, vmax=INF, title="LQR cost-to-go, measured")
 

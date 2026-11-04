@@ -170,7 +170,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     method="scipy_slsqp",
-    optimizer_options={"maxiter": 40, "ftol": 0.05},
+    options={"maxiter": 40, "ftol": 0.05},
 )
 mpc = ModelPredictiveController(planner)
 loop = (mpc % DT) @ car

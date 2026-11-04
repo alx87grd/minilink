@@ -48,12 +48,9 @@ class RRTPlanner(Planner):
         Proposes candidate edges; the orchestrator selects the best collision-free one.
     metric : callable
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
-    options : RRTOptions
-        Tier-2 workflow bag. Flat kwargs below overlay matching fields.
-
     Notes
     -----
-    Flat keyword arguments overlay :class:`RRTOptions`: ``max_nodes``,
+    The workflow settings are keywords (the resolved set is :attr:`settings`): ``max_nodes``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
     ``max_sample_attempts``, ``return_best_effort``, ``callback``,
     ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
@@ -75,7 +72,6 @@ class RRTPlanner(Planner):
         extender=None,
         *,
         metric=euclidean,
-        options: RRTOptions | None = None,
         max_nodes=_UNSET,
         goal_bias=_UNSET,
         seed=_UNSET,
@@ -100,8 +96,8 @@ class RRTPlanner(Planner):
         self.metric = metric
 
         # Workflow options: the flat keywords over the bag
-        self.options = rrt_options_of(
-            options,
+        self.settings = rrt_options_of(
+            None,
             max_nodes=max_nodes,
             goal_bias=goal_bias,
             seed=seed,
@@ -137,7 +133,7 @@ class RRTPlanner(Planner):
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
         """
-        options = self.options
+        options = self.settings
         metric = self.metric
         self.require_nearest_backend()
 
@@ -234,7 +230,7 @@ class RRTPlanner(Planner):
 
     def require_nearest_backend(self) -> None:
         """Refuse an unknown backend, and the k-d tree under a non-Euclidean metric."""
-        backend = self.options.nearest_backend
+        backend = self.settings.nearest_backend
         if backend not in NEAREST_BACKENDS:
             raise ValueError(
                 f"nearest_backend must be one of {NEAREST_BACKENDS}, got {backend!r}"
@@ -258,9 +254,9 @@ class RRTPlanner(Planner):
 
     def resolve_search_callback(self):
         """The solve's step callback: the option's, a live plot, or ``None``."""
-        if self.options.callback is not None:
-            return self.options.callback
-        if not self.options.live_plot:
+        if self.settings.callback is not None:
+            return self.settings.callback
+        if not self.settings.live_plot:
             return None
 
         # Lazy import: the graphics load on first use, not with the core
@@ -268,16 +264,16 @@ class RRTPlanner(Planner):
 
         return LiveSearchPlotCallback(
             self,
-            ax=self.options.live_plot_ax,
-            every=self.options.live_plot_every,
-            pause=self.options.live_plot_pause,
-            after_goal_only=self.options.live_plot_after_goal_only,
+            ax=self.settings.live_plot_ax,
+            every=self.settings.live_plot_every,
+            pause=self.settings.live_plot_pause,
+            after_goal_only=self.settings.live_plot_after_goal_only,
         )
 
     def sample_state(self, rng):
         """The goal region's point with probability ``goal_bias``, otherwise a free state."""
         x_goal = self.problem.goal_point()
-        goal_bias = self.options.goal_bias
+        goal_bias = self.settings.goal_bias
 
         if rng.random() < goal_bias:
             return x_goal
@@ -298,14 +294,14 @@ class RRTPlanner(Planner):
             pass
 
         # Otherwise by rejection: at most max_sample_attempts draws from the box
-        for _ in range(self.options.max_sample_attempts):
+        for _ in range(self.settings.max_sample_attempts):
             candidate = self.sample_box.sample(rng)
             if X.contains(candidate):
                 return np.asarray(candidate, dtype=float)
 
         raise RuntimeError(
             f"Could not sample a collision-free state from X after "
-            f"{self.options.max_sample_attempts} attempts"
+            f"{self.settings.max_sample_attempts} attempts"
         )
 
     def try_extend(self, from_node, toward, rng):
@@ -350,7 +346,7 @@ class RRTPlanner(Planner):
 
     def edge_states(self, edge) -> np.ndarray:
         """The edge's states, densified to ``edge_resolution`` when it is set."""
-        resolution = self.options.edge_resolution
+        resolution = self.settings.edge_resolution
         if resolution is None:
             return edge.states
 
@@ -378,9 +374,9 @@ class RRTPlanner(Planner):
         callback = self.search_callback
         if callback is None:
             return
-        if self.options.live_plot_after_goal_only and not self.reached_goal:
+        if self.settings.live_plot_after_goal_only and not self.reached_goal:
             return
-        if self.iterations % max(1, self.options.live_plot_every) != 0:
+        if self.iterations % max(1, self.settings.live_plot_every) != 0:
             return
 
         # Lazy import: the graphics load on first use, not with the core

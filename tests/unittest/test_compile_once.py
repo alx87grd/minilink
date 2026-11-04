@@ -121,7 +121,7 @@ def test_a_repeated_solve_compiles_nothing():
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        optimizer_options={"maxiter": 20},
+        options={"maxiter": 20},
     )
     native = TrajectoryOptimizationPlanner(
         pendulum_problem(tf=1.0),
@@ -130,7 +130,7 @@ def test_a_repeated_solve_compiles_nothing():
         backend="jax",
         method="adam",
         iterations=20,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     )
     pv = native.compile()
     start = {"x_start": np.array([0.5, 0.0]), "t_start": 0.0}
@@ -392,7 +392,7 @@ def test_a_new_horizon_before_a_solve_is_a_new_program():
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        optimizer_options={"maxiter": 10},
+        options={"maxiter": 10},
     )
     assert planner.solve(evaluate=False).trajectory.t[-1] == pytest.approx(1.0)
     problem.horizon = 2.0

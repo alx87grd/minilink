@@ -67,7 +67,7 @@ for water, current in WATERS.items():
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        optimizer_options={"maxiter": 40, "ftol": 1e-3},
+        options={"maxiter": 40, "ftol": 1e-3},
     )
     mpc = ModelPredictiveController(planner)
     boat.x0 = X_START

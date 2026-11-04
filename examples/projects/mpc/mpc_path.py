@@ -118,7 +118,7 @@ planner = TrajectoryOptimizationPlanner(
     backend=BACKEND,
     record_solve_time=True,
     method="scipy_slsqp",
-    optimizer_options={"maxiter": 100, "ftol": 0.1},
+    options={"maxiter": 100, "ftol": 0.1},
 )
 pv = planner.compile()  # the planner's pure face: solve, shift, command, prediction
 z = pv.initial()  # the plan, its origin t_start inside

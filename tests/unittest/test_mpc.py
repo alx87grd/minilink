@@ -36,7 +36,6 @@ from minilink.planning.trajectory_optimization.compiled import (
     CompiledTrajectoryPlanner,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
     TrajectoryOptimizationRecord,
 )
@@ -88,11 +87,9 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                backend="jax",
-                record_solve_time=True,
-                optimizer_options={"maxiter": 50, "ftol": 0.0001},
-            ),
+            backend="jax",
+            record_solve_time=True,
+            options={"maxiter": 50, "ftol": 0.0001},
         )
         planner.compile_parametric_program()
         return planner
@@ -165,11 +162,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
-            options=TrajectoryOptimizationOptions(
-                backend="jax",
-                record_solve_time=True,
-                optimizer_options={"maxiter": 50, "ftol": 0.0001},
-            ),
+            backend="jax",
+            record_solve_time=True,
+            options={"maxiter": 50, "ftol": 0.0001},
         )
         planner.compile_parametric_program()
         return planner
@@ -230,11 +225,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="jax",
-                record_solve_time=True,
-                optimizer_options={"maxiter": 50, "ftol": 0.0001},
-            ),
+            backend="jax",
+            record_solve_time=True,
+            options={"maxiter": 50, "ftol": 0.0001},
         )
         plan_off = planner_off.solve()
         np.testing.assert_allclose(
@@ -303,9 +296,8 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="numpy", optimizer_options={"maxiter": 50, "ftol": 0.0001}
-            ),
+            backend="numpy",
+            options={"maxiter": 50, "ftol": 0.0001},
         ).solve_trajectory_from(x0, params=values, evaluate=True)
         self.assertEqual(compiled.problem.t_start, 3.0)
         np.testing.assert_allclose(compiled.problem.x_start, x0)
@@ -322,9 +314,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="jax", method="ipopt", optimizer_options={"max_iter": 100}
-            ),
+            backend="jax",
+            method="ipopt",
+            options={"max_iter": 100},
         )
         planner.compile_parametric_program()
         plan = planner.solve_trajectory_from(np.array([0.2]))
@@ -374,7 +366,7 @@ def _make_numpy_planner(x_start=0.0):
         n_steps=5,
         transcription="direct_collocation",
         backend="numpy",
-        optimizer_options={"maxiter": 50, "ftol": 0.0001},
+        options={"maxiter": 50, "ftol": 0.0001},
     )
 
 
@@ -394,7 +386,7 @@ def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
         n_steps=5,
         transcription="direct_collocation",
         backend=backend,
-        optimizer_options={"maxiter": 100, "ftol": 1e-10},
+        options={"maxiter": 100, "ftol": 1e-10},
     )
 
 
@@ -657,7 +649,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
         backend="jax",
         method="adam",
         iterations=20,
-        optimizer_options={"learning_rate": 0.05},
+        options={"learning_rate": 0.05},
     )
     mpc = ModelPredictiveController(planner, delay=False)
     pe = problem.compile(mpc % DT, backend="jax")

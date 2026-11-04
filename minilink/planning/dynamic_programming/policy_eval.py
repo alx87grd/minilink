@@ -43,9 +43,9 @@ class PolicyEvaluator:
         ``y``) and commands ``u`` (:func:`minilink.core.roles.block_roles`):
         the grid state feeds that port, the reference stays pinned at its
         nominal value, and the control port supplies ``u``.
-    options : DynamicProgrammingOptions, optional
-        Shared workflow options (``gamma``, ``tol``, ``interpolation``, ...),
-        used as given: pass the planner's resolved ``planner.options``. ``None``
+    settings : DynamicProgrammingOptions, optional
+        Shared workflow settings (``gamma``, ``tol``, ``interpolation``, ...),
+        used as given: pass the planner's resolved ``planner.settings``. ``None``
         takes the problem's discount, horizon and failure cost, as the planner does.
     """
 
@@ -55,7 +55,7 @@ class PolicyEvaluator:
         *,
         grid,
         policy,
-        options: DynamicProgrammingOptions | None = None,
+        settings: DynamicProgrammingOptions | None = None,
     ) -> None:
         require_problem_cost(problem)
 
@@ -67,14 +67,14 @@ class PolicyEvaluator:
         policy = policy_of(policy)
         self.policy = policy if callable(policy) else policy_from_block(policy)
 
-        # Workflow options, shared with the dynamic-programming planner (its own
-        # options are resolved); unset, the problem's discount, horizon and failure cost
-        if options is None:
-            options = options_of(problem, grid, None)
-        if options.out_of_bound_cost is None:
-            failure_cost = grid_failure_cost(grid, options.gamma)
-            options = replace(options, out_of_bound_cost=failure_cost)
-        self.options = options
+        # Workflow settings, shared with the dynamic-programming planner (its own
+        # are resolved); unset, the problem's discount, horizon and failure cost
+        if settings is None:
+            settings = options_of(problem, grid, None)
+        if settings.out_of_bound_cost is None:
+            failure_cost = grid_failure_cost(grid, settings.gamma)
+            settings = replace(settings, out_of_bound_cost=failure_cost)
+        self.settings = settings
 
         # Memory
         self.last_J = None  # The latest solve's cost-to-go
@@ -82,7 +82,7 @@ class PolicyEvaluator:
     def solve(self) -> np.ndarray:
         """Iterate the fixed-policy Bellman update to tolerance and return ``J``."""
         grid = self.grid
-        opt = self.options
+        opt = self.settings
         tf = opt.final_time
         gamma = opt.gamma
         method = opt.interpolation
@@ -116,10 +116,10 @@ class PolicyEvaluator:
         return J
 
     def value_at(self, x) -> float:
-        """Interpolate the policy's cost-to-go at an arbitrary state ``x``, by the options' interpolation."""
+        """Interpolate the policy's cost-to-go at an arbitrary state ``x``, by the settings' interpolation."""
         require_solved(self.last_J, "value_at")
 
-        method = self.options.interpolation
+        method = self.settings.interpolation
         J = self.grid.interpolate(self.last_J, np.atleast_2d(x), method)
 
         return float(J[0])
@@ -128,7 +128,7 @@ class PolicyEvaluator:
         """Draw the policy's cost-to-go field; options as in :meth:`StateSpaceGrid.plot_value`."""
         require_solved(self.last_J, "plot_cost_to_go")
 
-        kwargs.setdefault("vmax", cost_scale_limit(self.options.out_of_bound_cost))
+        kwargs.setdefault("vmax", cost_scale_limit(self.settings.out_of_bound_cost))
 
         return self.grid.plot_value(self.last_J, **kwargs)
 
@@ -147,7 +147,7 @@ class PolicyEvaluator:
         set_params = None
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
-        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
+        INF = self.settings.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         successors = np.empty((N, n), dtype=float)
         G = np.empty(N, dtype=float)

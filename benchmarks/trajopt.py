@@ -35,7 +35,6 @@ from minilink.planning.trajectory_optimization.multiple_shooting import (
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
@@ -480,7 +479,7 @@ def _run_trajopt_variant(
     transcribe_t0 = time.perf_counter()
     program = planner.transcription.transcribe(
         planner.problem,
-        backend=planner.options.backend,
+        backend=planner.settings.backend,
     )
     z0 = planner.transcription.pack_initial_guess(planner.problem, guess)
     transcribe_s = time.perf_counter() - transcribe_t0
@@ -575,12 +574,10 @@ def _planner(
     return TrajectoryOptimizationPlanner(
         _problem(variant, config),
         transcription=_transcription(variant, config),
-        options=TrajectoryOptimizationOptions(
-            backend=variant.backend,
-            method=variant.optimizer_method,
-            use_hessian=variant.use_hessian,
-            optimizer_options=_optimizer_options(variant, config),
-        ),
+        backend=variant.backend,
+        method=variant.optimizer_method,
+        use_hessian=variant.use_hessian,
+        options=_optimizer_options(variant, config),
     )
 
 
@@ -670,10 +667,8 @@ def _warm_initial_trajectory(
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=transcription,
-        options=TrajectoryOptimizationOptions(
-            backend=backend,
-            optimizer_options=_warm_optimizer_options(config),
-        ),
+        backend=backend,
+        options=_warm_optimizer_options(config),
     )
     traj = planner.solve().trajectory
     if config.warm_guess_path:

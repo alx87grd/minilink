@@ -1431,10 +1431,10 @@ and the solver's own flag stays in `message` / `stats`. The worst equality
 residual / inequality margin / bound violation are recorded on the record.
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
-(`n_steps=…`, `transcription="direct_collocation"`, `backend=…`,
-`optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
-`transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
-and/or `options=TrajectoryOptimizationOptions(...)`. Offline
+(`n_steps=…`, `transcription="direct_collocation"`, `backend=…`, and
+`options={…}`, the optimizer's own settings) like `Simulator` / `Optimizer`; teach
+demos pass `transcription=` explicitly. Tier-2 still accepts a `Transcription`
+instance; the resolved workflow settings are `planner.settings`. Offline
 `solve` always rebuilds a fresh
 `MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
 (PP-2, PP-3): `x_start` (the start's residual when `X0` is the start's singleton),
@@ -1578,7 +1578,7 @@ with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `optimize_after_goal`, the search continues after the first goal connection until
 the best goal cost stops improving for `convergence_patience` extensions;
 `record_history` + `animate_convergence` replay tree growth and path refinement.
-``live_plot`` / ``callback`` redraw the tree during ``solve``; `RRTOptions.nearest_backend`
+``live_plot`` / ``callback`` redraw the tree during ``solve``; the `nearest_backend` setting
 selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 ## 7. Graphics And Benchmarks

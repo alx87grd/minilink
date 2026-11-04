@@ -27,7 +27,6 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -133,17 +132,15 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
         ),
-        options=TrajectoryOptimizationOptions(
-            backend="numpy",
-            method="scipy_slsqp",
-            optimizer_options={
-                "maxiter": PENDULUM_MAXITER,
-                "ftol": PENDULUM_FTOL,
-                "disp": False,
-            },
-            record_solve_time=True,
-            verbose=False,
-        ),
+        backend="numpy",
+        method="scipy_slsqp",
+        options={
+            "maxiter": PENDULUM_MAXITER,
+            "ftol": PENDULUM_FTOL,
+            "disp": False,
+        },
+        record_solve_time=True,
+        verbose=False,
     )
 
     total_times: list[float] = []

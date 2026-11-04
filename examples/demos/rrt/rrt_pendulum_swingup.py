@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink import BallSet, Pendulum, PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
-from minilink.planning.search.rrt import RRTOptions
 
 sys = Pendulum()  # state [theta, dtheta]; theta=0 hangs down, theta=pi inverted
 sys.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
@@ -26,7 +25,9 @@ torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 planner = RRTPlanner(
     problem,
     extender=KinodynamicExtender(controls=torques, horizon=0.3, n_substeps=6),
-    options=RRTOptions(seed=0, goal_bias=0.05, max_nodes=20000),
+    seed=0,
+    goal_bias=0.05,
+    max_nodes=20000,
 )
 solution = planner.solve()
 print(solution.record)

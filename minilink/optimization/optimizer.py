@@ -154,7 +154,9 @@ class Optimizer:
             use_hessian=use_hessian,
         )
 
-        # The solver adapter: the method's preset, the caller's keywords and options over it
+        # The solver adapter: the method's preset, the caller's keywords and options
+        # over it; a native law's own numbers may come as keywords (learning_rate=)
+        options, method_kwargs = method_options_of(method, options, method_kwargs)
         self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
 
     def __str__(self):
@@ -576,6 +578,19 @@ def require_named_method(method):
             "method='auto' picks from a program's class: give the program to "
             "Optimizer, or name the method"
         )
+
+
+def method_options_of(method, options, method_kwargs):
+    """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept."""
+    numbers = method_params_of(method) if method in NATIVE_METHODS else {}
+    own = {key: value for key, value in method_kwargs.items() if key in numbers}
+    rest = {key: value for key, value in method_kwargs.items() if key not in numbers}
+    if not own:
+        return options, rest
+
+    merged = {**(options or {}), **own}
+
+    return merged, rest
 
 
 def backend_kwargs_of(preset, method_kwargs, options):

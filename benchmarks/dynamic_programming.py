@@ -20,7 +20,6 @@ from minilink.core.costs import QuadraticCost
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
 )
 from minilink.planning.problems import PlanningProblem
@@ -80,8 +79,8 @@ def benchmark_backend(
     )
     build_s = time.perf_counter() - t0
 
-    options = DynamicProgrammingOptions(backend=backend, gamma=alpha)
-    planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
+    options = dict(backend=backend, gamma=alpha)
+    planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
 
     cold_solve_s = None
     best_solve_s = np.inf

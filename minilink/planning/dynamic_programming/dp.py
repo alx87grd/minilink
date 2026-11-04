@@ -53,11 +53,9 @@ class DynamicProgrammingPlanner(Planner):
     grid : StateSpaceGrid, optional
         Discretization of ``problem``'s state and input spaces. Give
         ``x_grid``, ``u_grid`` and ``dt`` instead and the planner builds it.
-    options : DynamicProgrammingOptions, optional
-        Workflow options. The flat keyword arguments below overlay matching
-        fields: ``backend``, ``gamma``, ``tol``, ``max_iterations``,
-        ``interpolation``, ``out_of_bound_cost``, ``final_time``,
-        ``record_history``, ``verbose``, ``clean_infeasible``. ``gamma`` given
+    backend, gamma, tol, max_iterations, interpolation, out_of_bound_cost, final_time, record_history, verbose, clean_infeasible
+        The workflow settings, as keywords; the resolved set is
+        :attr:`settings`, which a :class:`PolicyEvaluator` can share. ``gamma`` given
         on a continuous problem is the planner's own discount per step: the
         sweeps plan on a copy of the problem at ``ρ = −ln γ / dt`` (the stage
         integral and the backup both), the record names it, and the score of
@@ -73,7 +71,6 @@ class DynamicProgrammingPlanner(Planner):
         u_grid=None,
         dt=None,
         solver="euler",
-        options: DynamicProgrammingOptions | None = None,
         backend=_UNSET,
         gamma=_UNSET,
         tol=_UNSET,
@@ -95,10 +92,10 @@ class DynamicProgrammingPlanner(Planner):
         self.grid = grid_on_rate(grid, self.discount_rate)
 
         # Workflow options: the flat keywords over the bag, then the problem's defaults
-        self.options = options_of(
+        self.settings = options_of(
             problem,
             self.grid,
-            options,
+            None,
             backend=backend,
             gamma=gamma,
             tol=tol,
@@ -118,8 +115,8 @@ class DynamicProgrammingPlanner(Planner):
         self._cached_options = None  # The options those two were built with
 
         # The JAX engine builds the grid's transition tables with JAX
-        if self.options.backend == BACKEND_JAX:
-            self.grid.ensure_jax_transition(self.options.final_time)
+        if self.settings.backend == BACKEND_JAX:
+            self.grid.ensure_jax_transition(self.settings.final_time)
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """
@@ -132,7 +129,7 @@ class DynamicProgrammingPlanner(Planner):
         problem's draws.
         """
         # Backward sweeps until the cost-to-go stops changing
-        result = self.value_iteration(self.options.max_iterations, stop_on_tol=True)
+        result = self.value_iteration(self.settings.max_iterations, stop_on_tol=True)
 
         # The cost-to-go and policy tables as a planning solution
         return self.dp_result_to_planning_solution(
@@ -163,7 +160,7 @@ class DynamicProgrammingPlanner(Planner):
         the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
         solution.
         """
-        opt = self.options
+        opt = self.settings
         tf = opt.final_time
         dt = self.grid.dt
         tol = opt.tol
@@ -237,11 +234,11 @@ class DynamicProgrammingPlanner(Planner):
         params = face.params
         X = self.problem.X
         U = self.problem.U
-        gamma = self.options.gamma
-        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
+        gamma = self.settings.gamma
+        INF = self.settings.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         # Interpolation of the cost-to-go one step ahead
-        J_interpol = grid.build_interpolator(J_next, self.options.interpolation)
+        J_interpol = grid.build_interpolator(J_next, self.settings.interpolation)
 
         # New cost-to-go and policy to be computed
         J = np.zeros(grid.nodes_n)
@@ -288,8 +285,8 @@ class DynamicProgrammingPlanner(Planner):
     def backward_step_table(self, J_next, t):
         """The same backward step, vectorized over the successor and running-cost tables."""
         grid = self.grid
-        gamma = self.options.gamma
-        method = self.options.interpolation
+        gamma = self.settings.gamma
+        method = self.settings.interpolation
         n = grid.n  # State dimension
         N = grid.nodes_n  # Number of nodes
         A = grid.actions_n  # Number of actions
@@ -324,7 +321,7 @@ class DynamicProgrammingPlanner(Planner):
 
         J = np.empty(N, dtype=float)
         nodes = progress(
-            range(N), "Computing h(x,t) terminal cost", self.options.verbose
+            range(N), "Computing h(x,t) terminal cost", self.settings.verbose
         )
 
         # For all state nodes
@@ -360,7 +357,7 @@ class DynamicProgrammingPlanner(Planner):
         params = grid.face.params
         N = grid.nodes_n
         A = grid.actions_n
-        INF = self.options.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
+        INF = self.settings.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         # The grid's mask, and its successors when a callable cost needs them
         if admissible is None or (x_next is None and callable(INF)):
@@ -372,7 +369,7 @@ class DynamicProgrammingPlanner(Planner):
         nodes = progress(
             range(N),
             "Computing g(x,u,t) look-up table",
-            self.options.verbose,
+            self.settings.verbose,
             unit="pairs",
             per_item=A,
         )
@@ -417,7 +414,7 @@ class DynamicProgrammingPlanner(Planner):
     def value_at(self, x) -> float:
         """Interpolate the cost-to-go at the latest solve, by the options' interpolation."""
         self.require_solution()
-        return self.result.value_at(x, self.options.interpolation)
+        return self.result.value_at(x, self.settings.interpolation)
 
     def nominal_trajectory(self, tf=None):
         """The greedy law from the problem's start on the grid's control period."""
@@ -438,7 +435,7 @@ class DynamicProgrammingPlanner(Planner):
         require_tables(self.result)
 
         result = self.result
-        INF = self.options.out_of_bound_cost
+        INF = self.settings.out_of_bound_cost
 
         # A cost that varies with the exit state saturates at no single level
         if callable(INF):
@@ -460,7 +457,7 @@ class DynamicProgrammingPlanner(Planner):
         """The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...)."""
         self.require_solution()
         kwargs.setdefault(
-            "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
+            "jmax", plotting.cost_scale_limit(self.settings.out_of_bound_cost)
         )
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
@@ -472,7 +469,7 @@ class DynamicProgrammingPlanner(Planner):
     def animate_cost_to_go(self, **kwargs):
         self.require_solution()
         kwargs.setdefault(
-            "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
+            "jmax", plotting.cost_scale_limit(self.settings.out_of_bound_cost)
         )
         return plotting.animate_cost_to_go(self.result, **kwargs)
 
@@ -486,7 +483,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def forget_stale_caches(self) -> None:
         """Clear the running-cost table and the JAX engine's caches when an option they bake in has changed."""
-        snapshot = cached_options_of(self.options)
+        snapshot = cached_options_of(self.settings)
 
         if snapshot != self._cached_options:
             self._G = None
@@ -503,14 +500,14 @@ class DynamicProgrammingPlanner(Planner):
         builds the greedy lookup law, records how the sweeps ended, optionally
         rolls the law out, and stores the solution.
         """
-        tol = float(self.options.tol)
+        tol = float(self.settings.tol)
         dt = self.grid.dt
 
         # Keep the raw tables on the planner (plots and cleanup read them there)
         self.result = result
 
         # Pin the saturated cells to the penalty, before the law is built from them
-        if self.options.clean_infeasible:
+        if self.settings.clean_infeasible:
             self.clean_infeasible_set()
 
         # The greedy policy: the minimizing action of every node, interpolated between
@@ -538,7 +535,7 @@ class DynamicProgrammingPlanner(Planner):
 
         # The solution: the law, the record, the rollout, the cost-to-go interpolated
         # as the planner's options say
-        cost_to_go = partial(result.value_at, method=self.options.interpolation)
+        cost_to_go = partial(result.value_at, method=self.settings.interpolation)
         solution = PlanningSolution(
             self.problem, policy, record, trajectory, evaluation, cost_to_go
         )

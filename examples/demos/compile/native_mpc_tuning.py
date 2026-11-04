@@ -33,7 +33,7 @@ planner = TrajectoryOptimizationPlanner(
     backend="jax",
     method="adam",
     iterations=ITERATIONS,
-    optimizer_options={"learning_rate": 0.05},
+    options={"learning_rate": 0.05},
 )
 mpc = ModelPredictiveController(planner, delay=True)
 

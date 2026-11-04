@@ -58,7 +58,7 @@ planner = TrajectoryOptimizationPlanner(
     backend="jax",
     # method="ipopt",
     verbose=PRINT_SOLVE_REPORT,
-    optimizer_options={
+    options={
         "disp": SCIPY_DISP,
         "maxiter": 500,
         "ftol": 1e-1,

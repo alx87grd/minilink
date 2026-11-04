@@ -15,7 +15,6 @@ from minilink.planning.dynamic_programming.approximation import (
 )
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingOptions,
     DynamicProgrammingPlanner,
     DynamicProgrammingResult,
 )
@@ -58,10 +57,8 @@ def solve(problem, *, precompute=True, **opt_kwargs):
     grid = StateSpaceGrid(
         problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
     )
-    options = DynamicProgrammingOptions(
-        gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs
-    )
-    planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
+    options = dict(gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs)
+    planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
     planner.solve()
     return (planner, planner.result)
 
@@ -79,7 +76,8 @@ class TestStateSpaceGrid(unittest.TestCase):
         DynamicProgrammingPlanner(
             problem,
             grid=grid,
-            options=DynamicProgrammingOptions(backend="jax", max_iterations=1),
+            backend="jax",
+            max_iterations=1,
         )
         self.assertTrue(grid.precomputed)
         self.assertEqual(grid.x_next.shape, (121, 5, 2))
@@ -178,7 +176,7 @@ class TestValueIteration(unittest.TestCase):
 
     def test_out_of_bound_penalty_and_cleanup(self):
         planner, result = solve(make_problem())
-        penalty = planner.options.out_of_bound_cost
+        penalty = planner.settings.out_of_bound_cost
         self.assertTrue(np.any(result.J > penalty - 1.0))
         planner.clean_infeasible_set()
         self.assertTrue(np.all(result.J[result.J > penalty - 1.0] == penalty))
@@ -252,10 +250,13 @@ class TestControllerAndEvaluation(unittest.TestCase):
         planner, result = solve(problem)
         controller = plotting.get_controller(result)
         evaluator = PolicyEvaluator(
-            problem, grid=result.grid, policy=controller.action, options=planner.options
+            problem,
+            grid=result.grid,
+            policy=controller.action,
+            settings=planner.settings,
         )
         J_pi = evaluator.solve()
-        failure_cost = planner.options.out_of_bound_cost
+        failure_cost = planner.settings.out_of_bound_cost
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
@@ -303,24 +304,16 @@ class TestJaxPrecompute(unittest.TestCase):
 
     def test_jax_g_table_matches_numpy(self):
         problem, grid = self._pendulum_grid()
-        np_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
-        )
-        jax_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
-        )
+        np_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="numpy")
+        jax_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="jax")
         G_np = np_planner.running_cost_table(0.0)
         G_jax = dp_jax.running_cost_table(jax_planner, 0.0)
         self.assertTrue(np.allclose(G_np, G_jax))
 
     def test_jax_j0_matches_numpy(self):
         problem, grid = self._pendulum_grid()
-        np_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
-        )
-        jax_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
-        )
+        np_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="numpy")
+        jax_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="jax")
         J0_np = np_planner.terminal_cost(0.0)
         J0_jax = dp_jax.terminal_cost(jax_planner, 0.0)
         self.assertTrue(np.allclose(J0_np, J0_jax))
@@ -347,14 +340,11 @@ class TestJaxPrecompute(unittest.TestCase):
         DynamicProgrammingPlanner(
             problem,
             grid=grid,
-            options=DynamicProgrammingOptions(backend="jax", max_iterations=1),
+            backend="jax",
+            max_iterations=1,
         )
-        np_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="numpy")
-        )
-        jax_planner = DynamicProgrammingPlanner(
-            problem, grid=grid, options=DynamicProgrammingOptions(backend="jax")
-        )
+        np_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="numpy")
+        jax_planner = DynamicProgrammingPlanner(problem, grid=grid, backend="jax")
         G_np = np_planner.running_cost_table(0.0)
         G_jax = dp_jax.running_cost_table(jax_planner, 0.0)
         self.assertTrue(np.allclose(G_np, G_jax))
@@ -454,8 +444,8 @@ class TestBackends(unittest.TestCase):
                 dt=0.1,
                 precompute=False,
             )
-            options = DynamicProgrammingOptions(backend=backend, gamma=0.95)
-            planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
+            options = dict(backend=backend, gamma=0.95)
+            planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
             planner.solve_steps(15)
             results[backend] = planner.result
 
@@ -521,8 +511,8 @@ class TestBackends(unittest.TestCase):
                 dt=0.1,
                 precompute=False,
             )
-            options = DynamicProgrammingOptions(backend=backend, final_time=final_time)
-            planner = DynamicProgrammingPlanner(problem, grid=grid, options=options)
+            options = dict(backend=backend, final_time=final_time)
+            planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
             planner.solve_steps(6)
             return planner.result
 
@@ -666,12 +656,12 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         controller = planner.get_controller()
-        options = planner.options
+        options = planner.settings
         J_callable = PolicyEvaluator(
-            problem, grid=result.grid, policy=controller.action, options=options
+            problem, grid=result.grid, policy=controller.action, settings=options
         ).solve()
         J_block = PolicyEvaluator(
-            problem, grid=result.grid, policy=controller, options=options
+            problem, grid=result.grid, policy=controller, settings=options
         ).solve()
         np.testing.assert_allclose(J_block, J_callable)
 
@@ -739,7 +729,7 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
             problem,
             grid=result.grid,
             policy=planner.get_controller(),
-            options=planner.options,
+            settings=planner.settings,
         )
         with self.assertRaisesRegex(ValueError, "solve"):
             evaluator.value_at(np.zeros(2))
@@ -773,7 +763,7 @@ class TestValueAtInterpolation(unittest.TestCase):
             problem,
             grid=result.grid,
             policy=planner.get_controller(),
-            options=planner.options,
+            settings=planner.settings,
         )
         evaluator.solve()
         J = evaluator.last_J
@@ -849,11 +839,11 @@ class TestDpOneObjectSetup(unittest.TestCase):
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         timed = PlanningProblem(sys, cost=cost, horizon=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
-        self.assertEqual(planner.options.final_time, 2.0)
+        self.assertEqual(planner.settings.final_time, 2.0)
         explicit = DynamicProgrammingPlanner(
             timed, x_grid=(5, 5), u_grid=(3,), dt=0.1, final_time=0.5
         )
-        self.assertEqual(explicit.options.final_time, 0.5)
+        self.assertEqual(explicit.settings.final_time, 0.5)
         untimed = DynamicProgrammingPlanner(
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
@@ -878,8 +868,8 @@ class TestCleanInfeasible(unittest.TestCase):
 
     def test_dp_solve_cleans_infeasible_by_default(self):
         planner, result = solve(make_problem())
-        penalty = planner.options.out_of_bound_cost
-        self.assertTrue(planner.options.clean_infeasible)
+        penalty = planner.settings.out_of_bound_cost
+        self.assertTrue(planner.settings.clean_infeasible)
         saturated = result.J > penalty - 1.0
         self.assertTrue(np.all(result.J[saturated] == penalty))
 
@@ -896,7 +886,7 @@ class TestCleanInfeasible(unittest.TestCase):
             clean_infeasible=False,
             verbose=False,
         )
-        self.assertFalse(planner.options.clean_infeasible)
+        self.assertFalse(planner.settings.clean_infeasible)
         from unittest import mock
 
         with mock.patch.object(
@@ -904,7 +894,7 @@ class TestCleanInfeasible(unittest.TestCase):
         ) as cleanup:
             planner.solve()
         cleanup.assert_not_called()
-        planner.options.clean_infeasible = True
+        planner.settings.clean_infeasible = True
         with mock.patch.object(
             DynamicProgrammingPlanner, "clean_infeasible_set"
         ) as cleanup:
@@ -936,7 +926,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
 
     def test_numpy_table_charges_the_failure_cost_of_each_successor(self):
         planner = self.planner(exit_failure_cost)
-        self.assertIs(planner.options.out_of_bound_cost, exit_failure_cost)
+        self.assertIs(planner.settings.out_of_bound_cost, exit_failure_cost)
         x_next, action_ok, x_next_ok = planner.grid.transition(0.0)
         inadmissible = ~(action_ok & x_next_ok)
         self.assertTrue(np.any(inadmissible))
@@ -1002,7 +992,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             table.problem,
             grid=table.grid,
             policy=table.get_controller().action,
-            options=table.options,
+            settings=table.settings,
         )
         J_pi = evaluator.solve()
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
@@ -1044,14 +1034,16 @@ class TestDpFlatConstructor(unittest.TestCase):
         nested = DynamicProgrammingPlanner(
             problem,
             grid=grid,
-            options=DynamicProgrammingOptions(gamma=0.9, tol=0.2, max_iterations=10),
+            gamma=0.9,
+            tol=0.2,
+            max_iterations=10,
         )
         flat = DynamicProgrammingPlanner(
             problem, grid=grid, gamma=0.9, tol=0.2, max_iterations=10
         )
-        self.assertEqual(flat.options.gamma, nested.options.gamma)
-        self.assertEqual(flat.options.tol, nested.options.tol)
-        self.assertEqual(flat.options.max_iterations, nested.options.max_iterations)
+        self.assertEqual(flat.settings.gamma, nested.settings.gamma)
+        self.assertEqual(flat.settings.tol, nested.settings.tol)
+        self.assertEqual(flat.settings.max_iterations, nested.settings.max_iterations)
 
 
 def test_grid_exposes_the_boxes_it_spans():

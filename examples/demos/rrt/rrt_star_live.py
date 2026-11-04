@@ -13,7 +13,6 @@ from minilink import (
 )
 from minilink.core.geometry import Sphere
 from minilink.planning.search.extenders import SteeringExtender
-from minilink.planning.search.rrt_star import RRTStarOptions
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.scene import Scene
@@ -77,7 +76,10 @@ if LIVE_PLOT:
         fontsize=11,
     )
 
-options = RRTStarOptions(
+
+planner = RRTStarPlanner(
+    problem,
+    extender=extender,
     seed=SEED,
     goal_bias=0.08,
     max_nodes=MAX_NODES,
@@ -92,8 +94,6 @@ options = RRTStarOptions(
     live_plot_pause=LIVE_PLOT_PAUSE,
     live_plot_after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
 )
-
-planner = RRTStarPlanner(problem, extender=extender, options=options)
 
 print("RRT* post-goal convergence demo")
 print(

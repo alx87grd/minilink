@@ -29,7 +29,6 @@ from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -124,17 +123,15 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=n_steps)
         ),
-        options=TrajectoryOptimizationOptions(
-            backend="jax",
-            method="scipy_slsqp",
-            optimizer_options={
-                "maxiter": maxiter,
-                "ftol": PENDULUM_FTOL,
-                "disp": False,
-            },
-            record_solve_time=True,
-            verbose=False,
-        ),
+        backend="jax",
+        method="scipy_slsqp",
+        options={
+            "maxiter": maxiter,
+            "ftol": PENDULUM_FTOL,
+            "disp": False,
+        },
+        record_solve_time=True,
+        verbose=False,
     )
 
     total_times: list[float] = []
@@ -236,16 +233,14 @@ def run_bicycle_parametric(
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=n_steps)
         ),
-        options=TrajectoryOptimizationOptions(
-            backend="jax",
-            method="scipy_slsqp",
-            record_solve_time=True,
-            optimizer_options={
-                "maxiter": maxiter,
-                "ftol": BICYCLE_FTOL,
-                "disp": False,
-            },
-        ),
+        backend="jax",
+        method="scipy_slsqp",
+        record_solve_time=True,
+        options={
+            "maxiter": maxiter,
+            "ftol": BICYCLE_FTOL,
+            "disp": False,
+        },
     )
     planner.compile_parametric_program()
 

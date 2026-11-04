@@ -296,7 +296,7 @@ class CompiledTrajectoryPlanner:
             evaluator = self.optimizer.program_evaluator
             evaluator.bind(planner_parts(params)[0])
         max_eq, min_ineq, max_bound = evaluator.constraint_violations(z_dec)
-        tol = float(self.planner.options.feasibility_tol)
+        tol = float(self.planner.settings.feasibility_tol)
         feasible = bool(
             max_eq <= tol
             and (min_ineq is None or min_ineq >= -tol)

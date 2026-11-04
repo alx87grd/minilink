@@ -629,7 +629,6 @@ class TestTheClockOperator(unittest.TestCase):
             DirectCollocationTranscription,
         )
         from minilink.planning.trajectory_optimization.planner import (
-            TrajectoryOptimizationOptions,
             TrajectoryOptimizationPlanner,
         )
 
@@ -647,12 +646,10 @@ class TestTheClockOperator(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="jax",
-                record_solve_time=True,
-                method="scipy_slsqp",
-                optimizer_options={"maxiter": 5, "ftol": 0.1},
-            ),
+            backend="jax",
+            record_solve_time=True,
+            method="scipy_slsqp",
+            options={"maxiter": 5, "ftol": 0.1},
         )
         computer = ModelPredictiveController(planner) % 0.2
         self.assertEqual(computer.sample_period, 0.2)

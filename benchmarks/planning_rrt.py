@@ -1,6 +1,6 @@
 """RRT nearest-neighbour backend timing on a holonomic obstacle scene.
 
-Times ``RRTOptions.nearest_backend`` / ``RRTStarOptions.nearest_backend`` for
+Times the ``nearest_backend`` setting of RRT / RRT* for
 ``brute_force`` vs SciPy ``cKDTree`` on the same problem fixture.
 """
 
@@ -14,8 +14,8 @@ from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
-from minilink.planning.search.rrt import RRTOptions, RRTPlanner
-from minilink.planning.search.rrt_star import RRTStarOptions, RRTStarPlanner
+from minilink.planning.search.rrt import RRTPlanner
+from minilink.planning.search.rrt_star import RRTStarPlanner
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import disc, mount
 from minilink.planning.spatial.scene import Scene
@@ -94,7 +94,7 @@ def holonomic_problem():
 
 def _make_options(planner_cls, seed, nearest_backend):
     if planner_cls is RRTStarPlanner:
-        return RRTStarOptions(
+        return dict(
             seed=seed,
             goal_bias=GOAL_BIAS,
             max_nodes=MAX_NODES,
@@ -103,7 +103,7 @@ def _make_options(planner_cls, seed, nearest_backend):
             convergence_patience=STAR_CONVERGENCE_PATIENCE,
             cost_tol=STAR_COST_TOL,
         )
-    return RRTOptions(
+    return dict(
         seed=seed,
         goal_bias=GOAL_BIAS,
         max_nodes=MAX_NODES,
@@ -117,7 +117,7 @@ def benchmark_nearest_backend(planner_cls, backend, seed):
     planner = planner_cls(
         problem,
         extender=extender,
-        options=_make_options(planner_cls, seed, backend),
+        **_make_options(planner_cls, seed, backend),
     )
     t0 = time.perf_counter()
     traj = planner.solve().trajectory

@@ -52,7 +52,6 @@ class RRTStarPlanner(RRTPlanner):
         extender=None,
         *,
         metric=euclidean,
-        options: RRTOptions | None = None,
         max_nodes=_UNSET,
         goal_bias=_UNSET,
         seed=_UNSET,
@@ -78,7 +77,7 @@ class RRTStarPlanner(RRTPlanner):
         # Workflow options: the flat keywords over the bag, a plain RRTOptions
         # completed with the RRT* defaults
         star_options = rrt_options_of(
-            rrt_star_options_of(options),
+            rrt_star_options_of(None),
             default_factory=RRTStarOptions,
             allowed_keys=_RRT_STAR_OPTION_KEYS,
             max_nodes=max_nodes,
@@ -113,7 +112,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s)."""
-        options = self.options
+        options = self.settings
         metric = self.metric
         self.require_nearest_backend()
 
@@ -260,7 +259,7 @@ class RRTStarPlanner(RRTPlanner):
         )
 
         # The near nodes that are cheaper to reach through it are rewired
-        if getattr(self.options, "rewire", True):
+        if getattr(self.settings, "rewire", True):
             self.rewire_near(new_node, near_nodes, rng)
 
         return True
@@ -280,7 +279,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def radius_scale(self) -> float:
         """The radius scale γ: the ``gamma`` option, or the default from the volume of the sampling box."""
-        gamma = getattr(self.options, "gamma", None)
+        gamma = getattr(self.settings, "gamma", None)
         if gamma is not None:
             return float(gamma)
 
@@ -297,7 +296,7 @@ class RRTStarPlanner(RRTPlanner):
 
     def max_connection(self) -> float:
         """The longest connection η: the ``rewire_eta`` option, or the extender's step."""
-        eta = getattr(self.options, "rewire_eta", None)
+        eta = getattr(self.settings, "rewire_eta", None)
         if eta is not None:
             return float(eta)
 

@@ -25,7 +25,6 @@ from minilink.planning.trajectory_optimization.multiple_shooting import (
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
@@ -87,9 +86,8 @@ class TestJaxDirectCollocation(unittest.TestCase):
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
-            ),
+            backend="jax",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
@@ -111,9 +109,8 @@ class TestJaxDirectCollocation(unittest.TestCase):
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=ShootingTranscription(ShootingOptions(n_steps=5)),
-            options=TrajectoryOptimizationOptions(
-                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
-            ),
+            backend="jax",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)
@@ -139,9 +136,8 @@ class TestJaxDirectCollocation(unittest.TestCase):
             transcription=MultipleShootingTranscription(
                 MultipleShootingOptions(n_steps=5)
             ),
-            options=TrajectoryOptimizationOptions(
-                backend="jax", optimizer_options={"maxiter": 100, "ftol": 1e-09}
-            ),
+            backend="jax",
+            options={"maxiter": 100, "ftol": 1e-09},
         )
         guess = default_initial_trajectory(
             problem, planner.transcription.initial_guess_time_grid(problem)

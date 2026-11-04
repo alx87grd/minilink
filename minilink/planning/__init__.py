@@ -30,10 +30,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.trajectory_optimization.planner",
         "TrajectoryOptimizationPlanner",
     ),
-    "TrajectoryOptimizationOptions": (
-        "minilink.planning.trajectory_optimization.planner",
-        "TrajectoryOptimizationOptions",
-    ),
     # Path integral control (MPPI)
     "MPPIPlanner": (
         "minilink.planning.trajectory_optimization.path_integral",
@@ -51,10 +47,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "DynamicProgrammingPlanner": (
         "minilink.planning.dynamic_programming.dp",
         "DynamicProgrammingPlanner",
-    ),
-    "DynamicProgrammingOptions": (
-        "minilink.planning.dynamic_programming.dp",
-        "DynamicProgrammingOptions",
     ),
     "LookupPolicy": (
         "minilink.planning.dynamic_programming.lookup_policy",
@@ -105,7 +97,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Search
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
     "RRTStarPlanner": ("minilink.planning.search.rrt_star", "RRTStarPlanner"),
-    "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
     "KinodynamicExtender": (
         "minilink.planning.search.extenders",
         "KinodynamicExtender",

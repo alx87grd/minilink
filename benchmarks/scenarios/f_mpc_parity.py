@@ -31,7 +31,6 @@ from minilink.planning.trajectory_optimization.mpc import (
     PlanFollower,
 )
 from minilink.planning.trajectory_optimization.planner import (
-    TrajectoryOptimizationOptions,
     TrajectoryOptimizationPlanner,
 )
 
@@ -85,12 +84,10 @@ def _bicycle_planner():
         transcription=DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=N_STEPS)
         ),
-        options=TrajectoryOptimizationOptions(
-            backend="jax",
-            record_solve_time=True,
-            method="scipy_slsqp",
-            optimizer_options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
-        ),
+        backend="jax",
+        record_solve_time=True,
+        method="scipy_slsqp",
+        options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
     )
     return planner, sys, x0
 

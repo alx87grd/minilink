@@ -68,7 +68,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     method="scipy_slsqp",
-    optimizer_options={"maxiter": 40, "ftol": 0.01},
+    options={"maxiter": 40, "ftol": 0.01},
 )
 mpc = ModelPredictiveController(planner, delay=False)
 

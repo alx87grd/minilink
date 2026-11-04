@@ -90,7 +90,7 @@ planner = TrajectoryOptimizationPlanner(
     backend="jax",
     record_solve_time=True,
     method="scipy_slsqp",
-    optimizer_options={"maxiter": 100, "ftol": 0.1},
+    options={"maxiter": 100, "ftol": 0.1},
 )
 mpc = ModelPredictiveController(planner, delay=False)
 

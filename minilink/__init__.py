@@ -162,7 +162,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     ),
     "Evaluation": ("minilink.planning.evaluation", "Evaluation"),
     "RRTPlanner": ("minilink.planning.search.rrt", "RRTPlanner"),
-    "RRTOptions": ("minilink.planning.search.rrt", "RRTOptions"),
     "KinodynamicExtender": (
         "minilink.planning.search.extenders",
         "KinodynamicExtender",
