@@ -587,7 +587,7 @@ class StateSpaceGrid:
         return index
 
     def default_anchor(self):
-        """The problem's goal point (``Xf``'s point, else the cost's ``xbar``, else the start)."""
+        """The problem's goal point (``Xf``'s point, else the cost's ``x_bar``, else the start)."""
         return self.problem.goal_point()
 
 

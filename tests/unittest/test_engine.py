@@ -24,7 +24,7 @@ def plant():
 def upright_problem(**fields):
     sys = plant()
     cost = QuadraticCost.from_system(
-        sys, xbar=np.array([np.pi, 0.0]), R=0.01 * np.eye(1)
+        sys, x_bar=np.array([np.pi, 0.0]), R=0.01 * np.eye(1)
     )
     fields.setdefault("tf", 2.0)
     fields.setdefault("U", BoxInputSet.from_bounds([-50.0], [50.0]))
@@ -424,7 +424,7 @@ def test_the_gradient_reaches_the_cost_weights_and_the_discount():
 
     pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
     params = pe.merged(UPRIGHT)
-    assert set(params["cost"]) == {"Q", "R", "S", "xbar", "ubar"}
+    assert set(params["cost"]) == {"Q", "R", "S", "x_bar", "u_bar"}
 
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
 
@@ -478,7 +478,7 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
 
     sys = plant()
     cost = QuadraticCost.from_system(
-        sys, xbar=np.array([np.pi, 0.0]), R=0.001 * np.eye(1)
+        sys, x_bar=np.array([np.pi, 0.0]), R=0.001 * np.eye(1)
     )
     X = BoxSet([-1.0, -20.0], [np.pi + 0.05, 20.0])  # no overshoot past upright
     problem = PlanningProblem(sys, cost=cost, tf=3.0, X=X)

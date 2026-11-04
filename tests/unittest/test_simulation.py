@@ -641,7 +641,7 @@ class TestTheClockOperator(unittest.TestCase):
                 sys=sys,
                 tf=1.0,
                 x_start=x0,
-                cost=QuadraticCost.from_system(sys, xbar=x0),
+                cost=QuadraticCost.from_system(sys, x_bar=x0),
                 U=sys.input_box,
             ),
             transcription=DirectCollocationTranscription(

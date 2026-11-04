@@ -72,8 +72,8 @@ def _quadratic_cost() -> QuadraticCost:
         Q=np.eye(2),
         R=np.eye(1),
         S=2.0 * np.eye(2),
-        xbar=np.array([1.0, -1.0]),
-        ubar=np.array([0.5]),
+        x_bar=np.array([1.0, -1.0]),
+        u_bar=np.array([0.5]),
     )
 
 
@@ -236,7 +236,7 @@ p = Pendulum()
 p.inputs["u"].lower_bound = np.array([-20.0]); p.inputs["u"].upper_bound = np.array([20.0])
 goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(p, x_start=np.zeros(2), tf=3.0,
-    cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), xbar=goal))
+    cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), x_bar=goal))
 plan = TrajectoryOptimizationPlanner(problem, n_steps=30, transcription="direct_collocation",
     backend="jax").solve()
 print(plan.success)

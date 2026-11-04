@@ -163,7 +163,7 @@ class TestJacobianSelectors(unittest.TestCase):
             plant.jacobian("f", "plant:u")
 
     def test_static_block_x_reaches_the_port(self):
-        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5])
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), x_bar=[0.0, 0.0], u_bar=[0.5])
         np.testing.assert_allclose(ctl.jacobian("u", "x"), [[-1.0, -2.0]], atol=1e-8)
         np.testing.assert_allclose(ctl.jacobian("u", "r"), [[1.0, 2.0]], atol=1e-8)
         with self.assertRaisesRegex(ValueError, "not a step system|of must be"):
@@ -393,22 +393,22 @@ class TestFamilyPattern(unittest.TestCase):
         plant = _Affine()
         x_bar, u_bar = np.array([0.1, 0.2]), np.array([0.3, 0.4])
         lti = plant.linearize(x_bar, u_bar)
-        np.testing.assert_allclose(lti.xbar, x_bar)
-        np.testing.assert_allclose(lti.ubar, u_bar)
-        np.testing.assert_allclose(lti.ybar, plant.h(x_bar, u_bar))
-        # the selected columns and rows: ubar and ybar follow B and C
+        np.testing.assert_allclose(lti.x_bar, x_bar)
+        np.testing.assert_allclose(lti.u_bar, u_bar)
+        np.testing.assert_allclose(lti.y_bar, plant.h(x_bar, u_bar))
+        # the selected columns and rows: u_bar and y_bar follow B and C
         part = linearize(plant, x_bar, u_bar, of=["z", ("y", 0)], wrt=("bias", 0))
-        np.testing.assert_allclose(part.ubar, [0.4])
-        np.testing.assert_allclose(part.ybar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
+        np.testing.assert_allclose(part.u_bar, [0.4])
+        np.testing.assert_allclose(part.y_bar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
         # the nominal state is the default point; a model from arrays sits at the origin
         plant.state.set_nominal_value(x_bar)
-        np.testing.assert_allclose(plant.linearize().xbar, x_bar)
+        np.testing.assert_allclose(plant.linearize().x_bar, x_bar)
         from minilink.dynamics.abstraction.state_space import LTISystem
 
         origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
-        np.testing.assert_allclose(origin.xbar, 0.0)
-        np.testing.assert_allclose(origin.ubar, 0.0)
-        np.testing.assert_allclose(origin.ybar, 0.0)
+        np.testing.assert_allclose(origin.x_bar, 0.0)
+        np.testing.assert_allclose(origin.u_bar, 0.0)
+        np.testing.assert_allclose(origin.y_bar, 0.0)
 
     def test_linearize_selects_rows_and_columns(self):
         plant = _Affine()
@@ -453,7 +453,7 @@ class TestFamilyPattern(unittest.TestCase):
         )
 
     def test_static_channel_is_a_pure_gain(self):
-        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.0, 0.0], ubar=[0.5])
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), x_bar=[0.0, 0.0], u_bar=[0.5])
         G = transfer_function(ctl, of="u", wrt=("x", 1))
         np.testing.assert_allclose(G.numerator, [-2.0])
         np.testing.assert_allclose(G.denominator, [1.0])

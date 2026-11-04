@@ -26,6 +26,10 @@ PLANT_PACKAGE = "minilink.dynamics"
 # (None: everywhere). A word keeps its other textbook meanings elsewhere: alpha is the CVaR
 # level of Evaluation.cvar, N the reference gain of OutputReference. Each sweep adds its own.
 RETIRED = {
+    "xbar": ("x_bar", None),
+    "ubar": ("u_bar", None),
+    "ybar": ("y_bar", None),
+    "eps": ("radius", ("TimeCost",)),
     "plot_cost2go": ("plot_cost_to_go", None),
     "plot_policy": ("plot_control_law", None),
     "animate_cost2go": ("animate_cost_to_go", None),

@@ -146,7 +146,7 @@ def other_cases():
     from minilink.planning.spatial import ReferenceTrack, from_waypoints
 
     plant = Pendulum()
-    quadratic = QuadraticCost.from_system(plant, xbar=np.array([1.0, 0.0]))
+    quadratic = QuadraticCost.from_system(plant, x_bar=np.array([1.0, 0.0]))
     V = QuadraticField([0.1, -0.1], [[2.0, 0.3], [0.3, 1.0]])
     schedule = QuadraticField(
         [0.0, 0.0], np.stack([np.eye(2), 3.0 * np.eye(2)]), t=np.array([0.0, 1.0])
@@ -190,7 +190,7 @@ def other_cases():
 
     return [
         ("QuadraticCost", quadratic, cost_call),
-        ("TimeCost", TimeCost([1.0, 0.0], eps=0.5), cost_call),
+        ("TimeCost", TimeCost([1.0, 0.0], radius=0.5), cost_call),
         ("SumCost", quadratic + 2.0 * QuadraticCost.from_system(plant), cost_call),
         ("Set.as_cost", box.as_cost(weight=3.0), cost_call),
         ("Field.as_cost", V.as_cost(weight=2.0), cost_call),

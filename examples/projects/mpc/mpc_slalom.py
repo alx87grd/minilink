@@ -69,8 +69,8 @@ cost = QuadraticCost.from_system(
     Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
     R=np.diag([1.0, 25.0]),
     S=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
-    xbar=x_ref,
-    ubar=np.zeros(2),
+    x_bar=x_ref,
+    u_bar=np.zeros(2),
 ) + scene.clearance_field(body).as_cost(
     weight=OBSTACLE_REPULSION_WEIGHT,
     shaping=inverse_barrier(epsilon=OBSTACLE_REPULSION_EPS),

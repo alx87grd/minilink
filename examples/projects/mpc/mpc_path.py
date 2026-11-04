@@ -94,8 +94,8 @@ cost = (
         Q=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
         R=np.diag([1.0, 22.0]),
         S=np.diag([0.0, 0.0, 0.0, 0.5, 4.0, 6.0, 0.1, 80.0]),
-        xbar=x_cruise,
-        ubar=np.zeros(2),
+        x_bar=x_cruise,
+        u_bar=np.zeros(2),
     )
     + path_cost
     + corridor_cost

@@ -124,7 +124,7 @@ def boundary_states_of(problem):
 
     The start is the point of a singleton ``X0``, else ``x_start``; the goal is
     the problem's :meth:`~minilink.planning.problems.PlanningProblem.goal_point`
-    (``Xf``'s point, else the cost's ``xbar``, else the start).
+    (``Xf``'s point, else the cost's ``x_bar``, else the start).
     """
     x0 = boundary_point(problem.X0)
     if x0 is None:

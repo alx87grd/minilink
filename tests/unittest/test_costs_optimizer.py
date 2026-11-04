@@ -13,7 +13,7 @@ from minilink.core.trajectory import Trajectory
 
 
 def test_time_cost_is_unity_off_target_zero_on_target():
-    cost = TimeCost(xbar=np.zeros(2), eps=0.1)
+    cost = TimeCost(x_bar=np.zeros(2), eps=0.1)
     assert cost.g(np.array([1.0, 0.0]), np.zeros(1)) == 1.0
     assert cost.g(np.array([0.02, 0.0]), np.zeros(1)) == 0.0
     assert cost.h(np.array([1.0, 0.0])) == 0.0
@@ -24,19 +24,19 @@ def test_time_cost_from_system_targets_the_nominal_state():
 
     sys = DynamicSystem(n=2, input_dim=1)
     sys.state.nominal_value = np.array([np.pi, 0.0])
-    cost = TimeCost.from_system(sys, eps=0.1)
-    np.testing.assert_array_equal(cost.xbar, [np.pi, 0.0])
+    cost = TimeCost.from_system(sys, radius=0.1)
+    np.testing.assert_array_equal(cost.x_bar, [np.pi, 0.0])
     assert cost.g(np.array([np.pi, 0.0]), np.zeros(1)) == 0.0
     assert cost.g(np.zeros(2), np.zeros(1)) == 1.0
-    target = TimeCost.from_system(sys, xbar=[1.0, 2.0])
-    np.testing.assert_array_equal(target.xbar, [1.0, 2.0])
+    target = TimeCost.from_system(sys, x_bar=[1.0, 2.0])
+    np.testing.assert_array_equal(target.x_bar, [1.0, 2.0])
 
 
 def test_time_cost_jax_matches_numpy():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
 
-    cost = TimeCost(xbar=np.zeros(2), eps=0.1)
+    cost = TimeCost(x_bar=np.zeros(2), eps=0.1)
     states = jnp.array([[1.0, 0.0], [0.02, 0.0], [0.0, 0.0]])
     u = jnp.zeros(1)
 
@@ -50,7 +50,11 @@ def test_time_cost_jax_matches_numpy():
 
 def make_quadratic(n: int = 2, m: int = 1) -> QuadraticCost:
     return QuadraticCost(
-        Q=np.eye(n), R=np.eye(m), S=np.zeros((n, n)), xbar=np.zeros(n), ubar=np.zeros(m)
+        Q=np.eye(n),
+        R=np.eye(m),
+        S=np.zeros((n, n)),
+        x_bar=np.zeros(n),
+        u_bar=np.zeros(m),
     )
 
 
@@ -148,7 +152,11 @@ def total(cost, traj, discount_rate=0.0):
 
 def test_scaled_and_summed_costs_take_the_discount_as_an_argument():
     d = QuadraticCost(
-        Q=np.eye(2), R=np.eye(1), S=np.zeros((2, 2)), xbar=np.zeros(2), ubar=np.zeros(1)
+        Q=np.eye(2),
+        R=np.eye(1),
+        S=np.zeros((2, 2)),
+        x_bar=np.zeros(2),
+        u_bar=np.zeros(1),
     )
     t = np.linspace(0.0, 2.0, 21)
     traj = Trajectory(t=t, x=np.ones((2, t.size)), u=np.ones((1, t.size)))
@@ -176,7 +184,7 @@ def test_params_reach_each_term_by_its_id():
 def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
     q = make_quadratic()
     other = make_quadratic()
-    obstacle = 5.0 * TimeCost(xbar=np.zeros(2))
+    obstacle = 5.0 * TimeCost(x_bar=np.zeros(2))
     cost = q + obstacle + other
     x, u = np.array([1.0, 2.0]), np.array([1.0])
 
@@ -184,7 +192,7 @@ def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
     assert list(cost.terms) == ["QuadraticCost", "TimeCost", "QuadraticCost2"]
     assert cost.params["TimeCost"] == {
         "weight": 5.0,
-        "cost": {"xbar": obstacle.cost.xbar, "eps": obstacle.cost.eps},
+        "cost": {"x_bar": obstacle.cost.x_bar, "radius": obstacle.cost.radius},
     }
 
     # A partial override changes its term only; the attributes are views
@@ -211,7 +219,7 @@ def test_the_gradient_reaches_every_cost_weight():
     import jax
     import jax.numpy as jnp
 
-    cost = make_quadratic() + 5.0 * TimeCost(xbar=np.zeros(2))
+    cost = make_quadratic() + 5.0 * TimeCost(x_bar=np.zeros(2))
     x, u = jnp.array([1.0, 2.0]), jnp.array([1.0])
     params = jax.tree_util.tree_map(jnp.asarray, cost.params)
     grad = jax.grad(lambda p: cost.g(x, u, params=p))(params)
@@ -267,8 +275,8 @@ def test_a_quadratic_cost_targets_the_operating_point_by_default():
     plant.state.set_nominal_value(np.array([np.pi, 0.0]))
     plant.inputs["u"].set_nominal_value(np.array([0.2]))
     cost = QuadraticCost.from_system(plant)
-    np.testing.assert_allclose(cost.xbar, [np.pi, 0.0])
-    np.testing.assert_allclose(cost.ubar, [0.2])
+    np.testing.assert_allclose(cost.x_bar, [np.pi, 0.0])
+    np.testing.assert_allclose(cost.u_bar, [0.2])
 
 
 def test_compute_cost_needs_a_trajectory_and_a_diagram_for_of():

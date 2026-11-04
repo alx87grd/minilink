@@ -105,8 +105,8 @@ def linearize(
 
     Same arguments as :func:`linearize_matrices`; ``x_bar=None`` defaults to
     the nominal state like every tool of the analysis family. The model
-    carries the operating point it was taken at (``xbar``, ``ubar`` for the
-    selected inputs, ``ybar`` for the selected outputs), so a design made on
+    carries the operating point it was taken at (``x_bar``, ``u_bar`` for the
+    selected inputs, ``y_bar`` for the selected outputs), so a design made on
     it (``lqr``, ``kalman``) knows where it applies. A step or sampled system
     gives a :class:`~minilink.dynamics.abstraction.state_space.DiscreteLTISystem`,
     ``x_{k+1} = A_d x_k + B_d u_k``, with the period it runs at (``None`` for a
@@ -122,12 +122,14 @@ def linearize(
     x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
     inputs = input_selectors(sys, wrt)
     outputs = output_selectors(sys, of)
-    ubar = point_inputs(sys, u_bar, inputs)
-    ybar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
+    u_selected = point_inputs(sys, u_bar, inputs)
+    y_bar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
 
     # The model, its state the deviation from the point: a difference equation
     # with its period for a step system
-    point = dict(name=f"Linearized {sys.name}", xbar=x_bar, ubar=ubar, ybar=ybar)
+    point = dict(
+        name=f"Linearized {sys.name}", x_bar=x_bar, u_bar=u_selected, y_bar=y_bar
+    )
     if isinstance(sys, StepSystem):
         lti = DiscreteLTISystem(A, B, C, D, period=period_of(sys), **point)
     else:
@@ -214,7 +216,7 @@ def require_own_point(sys, x_bar, u_bar):
     if linear_model and (x_bar is not None or u_bar is not None):
         raise ValueError(
             f"{sys.name!r} is a linear model and carries its operating point "
-            f"(xbar = {sys.xbar}); linearize the plant at x_bar instead of passing "
+            f"(x_bar = {sys.x_bar}); linearize the plant at x_bar instead of passing "
             "it here"
         )
 
@@ -337,9 +339,9 @@ def point_inputs(sys, u_bar, inputs):
             values = np.zeros(wire_dim(sys, name))
         pieces.append(values if index is None else values[[index]])
 
-    ubar = np.concatenate(pieces) if pieces else np.zeros(0)
+    u_selected = np.concatenate(pieces) if pieces else np.zeros(0)
 
-    return ubar
+    return u_selected
 
 
 def wire_dim(sys, wire):
@@ -367,9 +369,9 @@ def point_outputs(sys, outputs, x_bar, u_bar, t, params):
         values = np.asarray(ports[name] if name in ports else wires[name], dtype=float)
         pieces.append(values if index is None else values[[index]])
 
-    ybar = np.concatenate(pieces)
+    y_bar = np.concatenate(pieces)
 
-    return ybar
+    return y_bar
 
 
 def require_design_system(sys):

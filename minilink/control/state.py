@@ -13,74 +13,74 @@ from minilink.dynamics.abstraction.state_space import point_component
 
 
 class StateFeedback(System):
-    """Full-state feedback ``u = ubar - K (x - r)`` on a state reference.
+    """Full-state feedback ``u = u_bar - K (x - r)`` on a state reference.
 
     The reference ``r`` is a state (dimension ``n``); left unconnected it holds
-    ``xbar``, so the law regulates to ``xbar``. This is the block
+    ``x_bar``, so the law regulates to ``x_bar``. This is the block
     :func:`minilink.control.design.lqr` and :func:`minilink.control.design.place`
     return. A reference on the output is :class:`OutputReference`.
 
     Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
-    ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
+    ``K`` has shape ``(m, n)``; ``u_bar`` is the feedforward command.
 
     This is *state* feedback on the full ``x`` port. For *output* feedback on a
     measured ``y`` (and ``@``-operator wiring), use :class:`~minilink.control.siso.P`.
     """
 
-    def __init__(self, K, xbar=None, ubar=None):
+    def __init__(self, K, x_bar=None, u_bar=None):
         super().__init__()
 
         # Parameters: the gain and the operating point
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape
-        xbar = point_component(xbar, n, "xbar")
-        ubar = point_component(ubar, m, "ubar")
-        self.params = {"K": K, "ubar": ubar}
+        x_bar = point_component(x_bar, n, "x_bar")
+        u_bar = point_component(u_bar, m, "u_bar")
+        self.params = {"K": K, "u_bar": u_bar}
 
         # Ports: the state x, and the reference r, which holds x̄ when unconnected
         self.add_input_port("x", dim=n)
-        self.add_input_port("r", dim=n, nominal_value=xbar)
+        self.add_input_port("r", dim=n, nominal_value=x_bar)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
         K = params["K"]
-        ubar = params["ubar"]
+        u_bar = params["u_bar"]
 
         n = K.shape[1]
         x_meas = u[:n]
         r = u[n:]
 
         # u = ū − K (x − r)
-        u_cmd = ubar - K @ (x_meas - r)
+        u_cmd = u_bar - K @ (x_meas - r)
 
         return u_cmd
 
 
 class OutputReference(System):
-    """Full-state feedback ``u = ubar - K (x - xbar) + N r`` on an output reference.
+    """Full-state feedback ``u = u_bar - K (x - x_bar) + N r`` on an output reference.
 
     The reference ``r`` is a desired output (dimension ``p``, zero when
     unconnected), and ``N`` of shape ``(m, p)`` scales it to a command: the
     textbook's ``N = -(C (A - B K)^-1 B)^-1`` gives ``y = r`` at steady state
-    for the plant ``(A, B, C)`` linearized about ``(xbar, ubar)``. A reference
+    for the plant ``(A, B, C)`` linearized about ``(x_bar, u_bar)``. A reference
     on the state is :class:`StateFeedback`.
 
     Ports: the plant state ``x`` (dimension ``n``) and the reference ``r``.
-    ``K`` has shape ``(m, n)``; ``ubar`` is the feedforward command.
+    ``K`` has shape ``(m, n)``; ``u_bar`` is the feedforward command.
     """
 
-    def __init__(self, K, N, xbar=None, ubar=None):
+    def __init__(self, K, N, x_bar=None, u_bar=None):
         super().__init__()
 
         # Parameters: the gain, the operating point and the reference gain
         K = np.atleast_2d(np.asarray(K, dtype=float))
         m, n = K.shape
-        xbar = point_component(xbar, n, "xbar")
-        ubar = point_component(ubar, m, "ubar")
+        x_bar = point_component(x_bar, n, "x_bar")
+        u_bar = point_component(u_bar, m, "u_bar")
         N = reference_gain(N, m)
-        self.params = {"K": K, "ubar": ubar, "xbar": xbar, "N": N}
+        self.params = {"K": K, "u_bar": u_bar, "x_bar": x_bar, "N": N}
 
         # Ports: the state x, and the output reference r, zero when unconnected
         self.add_input_port("x", dim=n)
@@ -92,21 +92,21 @@ class OutputReference(System):
 
         K = params["K"]
         N = params["N"]
-        xbar = params["xbar"]
-        ubar = params["ubar"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
 
         n = K.shape[1]
         x_meas = u[:n]
         r = u[n:]
 
         # u = ū − K (x − x̄) + N r
-        u_cmd = ubar - K @ (x_meas - xbar) + N @ r
+        u_cmd = u_bar - K @ (x_meas - x_bar) + N @ r
 
         return u_cmd
 
 
 class TimeVaryingFeedback(System):
-    """Full-state feedback with a gain schedule ``u = ubar - K(t) (x - r)``.
+    """Full-state feedback with a gain schedule ``u = u_bar - K(t) (x - r)``.
 
     ``t`` holds ``N`` increasing sample times and ``K`` the matching gains,
     shape ``(N, m, n)``. Between samples the gain is interpolated linearly;
@@ -117,7 +117,7 @@ class TimeVaryingFeedback(System):
     :func:`minilink.control.design.lqr_finite_horizon` returns.
     """
 
-    def __init__(self, t, K, xbar=None, ubar=None, K_after=None):
+    def __init__(self, t, K, x_bar=None, u_bar=None, K_after=None):
         super().__init__()
 
         # Parameters: the schedule (t, K(t)), the operating point and the gain past
@@ -126,18 +126,18 @@ class TimeVaryingFeedback(System):
         K = np.asarray(K, dtype=float)
         require_gain_schedule(t, K, K_after)
         _, m, n = K.shape
-        xbar = point_component(xbar, n, "xbar")
-        ubar = point_component(ubar, m, "ubar")
+        x_bar = point_component(x_bar, n, "x_bar")
+        u_bar = point_component(u_bar, m, "u_bar")
         K_after = (
             K[-1]
             if K_after is None
             else np.atleast_2d(np.asarray(K_after, dtype=float))
         )
-        self.params = {"t": t, "K": K, "K_after": K_after, "ubar": ubar}
+        self.params = {"t": t, "K": K, "K_after": K_after, "u_bar": u_bar}
 
         # Ports: the state x, and the reference r, which holds x̄ when unconnected
         self.add_input_port("x", dim=n)
-        self.add_input_port("r", dim=n, nominal_value=xbar)
+        self.add_input_port("r", dim=n, nominal_value=x_bar)
         self.add_output_port("u", dim=m, function=self.ctl, dependencies=("x", "r"))
 
     def ctl(self, x, u, t=0, params=None):
@@ -147,7 +147,7 @@ class TimeVaryingFeedback(System):
         t_schedule = params["t"]
         K_schedule = params["K"]
         K_after = params["K_after"]
-        ubar = params["ubar"]
+        u_bar = params["u_bar"]
 
         n = K_schedule.shape[2]
         x_meas = u[:n]
@@ -158,7 +158,7 @@ class TimeVaryingFeedback(System):
         K = xp.where(t > t_schedule[-1], xp.asarray(K_after), K)
 
         # u = ū − K(t) (x − r)
-        u_cmd = ubar - K @ (x_meas - r)
+        u_cmd = u_bar - K @ (x_meas - r)
 
         return u_cmd
 

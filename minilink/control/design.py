@@ -83,7 +83,7 @@ def lqr(
     ``sys`` is a linear model (an ``LTISystem``, used as is with the operating
     point it carries) or any plant, linearized first about its command port at
     ``(x_bar, u_bar)``, the nominal state and inputs when omitted. The block
-    implements ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``, the
+    implements ``u = u_bar - K (x - r)`` with ``r`` defaulting to ``x_bar``, the
     operating point of the model; wire the plant state into its ``x`` port. On
     arrays the gain is :func:`lqr_gain`, and the model ``LTISystem(A, B)``.
     Only the command port enters ``B`` (``u``, else the one input that is not a
@@ -109,7 +109,7 @@ def lqr(
 
     K = lqr_gain(A, B, Q, R)
 
-    return StateFeedback(K, xbar=model.xbar, ubar=model.ubar)
+    return StateFeedback(K, x_bar=model.x_bar, u_bar=model.u_bar)
 
 
 def place(
@@ -120,7 +120,7 @@ def place(
     ``sys`` is a linear model or any plant, linearized first about its command
     port at ``(x_bar, u_bar)``, as in :func:`lqr`, with ``poles`` (``n`` of
     them, complex ones in conjugate pairs) in place of ``Q, R``. The block
-    implements ``u = ubar - K (x - r)`` with ``r`` defaulting to ``xbar``. On
+    implements ``u = u_bar - K (x - r)`` with ``r`` defaulting to ``x_bar``. On
     arrays the gain is :func:`place_gain`.
     """
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
@@ -129,7 +129,7 @@ def place(
 
     K = place_gain(A, B, poles)
 
-    return StateFeedback(K, xbar=model.xbar, ubar=model.ubar)
+    return StateFeedback(K, x_bar=model.x_bar, u_bar=model.u_bar)
 
 
 def lqg(
@@ -244,7 +244,7 @@ def lqr_finite_horizon(
     """Design a finite-horizon LQR on ``sys`` and return a ``TimeVaryingFeedback``.
 
     ``sys`` is a linear model or any plant, as in :func:`lqr`. The block
-    implements ``u = ubar - K(t) (x - r)`` with
+    implements ``u = u_bar - K(t) (x - r)`` with
     ``K(t)`` from :func:`lqr_gain_schedule`, minimizing
     ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model. Past the
     horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
@@ -262,7 +262,7 @@ def lqr_finite_horizon(
     K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
 
     return TimeVaryingFeedback(
-        t_schedule, K, xbar=model.xbar, ubar=model.ubar, K_after=K_after
+        t_schedule, K, x_bar=model.x_bar, u_bar=model.u_bar, K_after=K_after
     )
 
 

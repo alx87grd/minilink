@@ -39,7 +39,7 @@ class DoubleIntegrator(DynamicSystem):
 
 def make_problem():
     sys = DoubleIntegrator()
-    cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+    cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
     return PlanningProblem(sys, cost=cost, U=sys.input_box)
 
 
@@ -266,7 +266,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         # solve() sweeps to convergence: its sum is Σₖ γᵏ dt = dt / (1 − γ), tf or not
         sys = DoubleIntegrator()
         X, U = sys.state.box, sys.input_box.box
-        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         g_max = cost.g_max(X, U)
         for tf in (np.inf, 2.0):
             problem = PlanningProblem(
@@ -338,7 +338,7 @@ class TestJaxPrecompute(unittest.TestCase):
         sys.inputs["u"].upper_bound = np.array([1.0])
         problem = PlanningProblem(
             sys,
-            cost=TimeCost.from_system(sys, eps=0.1),
+            cost=TimeCost.from_system(sys, radius=0.1),
             U=sys.input_box,
         )
         grid = StateSpaceGrid(
@@ -510,7 +510,7 @@ class TestBackends(unittest.TestCase):
                 return np.array([x[1], u[0] + 0.5 * np.sin(2.0 * t)])
 
         sys = DrivenIntegrator()
-        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         problem = PlanningProblem(sys, cost=cost, U=sys.input_box)
 
         def fixed_horizon(backend, final_time):
@@ -686,15 +686,15 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
 class TestFunctionApproximation(unittest.TestCase):
     def test_quadratic_features_recover_an_exact_quadratic(self):
-        xbar = np.array([1.0, -2.0])
+        x_bar = np.array([1.0, -2.0])
         S = np.array([[2.0, 0.5], [0.5, 3.0]])
         b = np.array([0.3, -0.7])
         rng = np.random.default_rng(0)
         X = rng.uniform(-3.0, 3.0, size=(60, 2))
-        dx = X - xbar
+        dx = X - x_bar
         y = 4.0 + dx @ b + np.einsum("ij,jk,ik->i", dx, S, dx)
 
-        features = QuadraticFeatures(xbar)
+        features = QuadraticFeatures(x_bar)
         approx = LinearApproximator(features)
         w = approx.fit(X, y)
 
@@ -792,7 +792,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         return PlanningProblem(
             plant,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
 
@@ -846,7 +846,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         sys = DoubleIntegrator()
-        cost = QuadraticCost.from_system(sys, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         timed = PlanningProblem(sys, cost=cost, tf=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         self.assertEqual(planner.options.final_time, 2.0)

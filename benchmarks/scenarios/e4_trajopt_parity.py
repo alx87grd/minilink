@@ -108,7 +108,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         Q=np.diag([1.0, 0.1]),
         R=np.array([[0.01]]),
         S=np.diag([10.0, 1.0]),
-        xbar=x_goal,
+        x_bar=x_goal,
     )
     problem = PlanningProblem(
         sys=sys,
@@ -208,8 +208,8 @@ def run_bicycle_parametric(
         Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
         R=np.diag([1.0, 25.0]),
         S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
-        xbar=x_ref,
-        ubar=np.zeros(2),
+        x_bar=x_ref,
+        u_bar=np.zeros(2),
     )
     x_start = np.array(
         [

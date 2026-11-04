@@ -1763,9 +1763,9 @@ class TestPlotControlLaw(unittest.TestCase):
 
     def test_state_space_surface_values(self):
         K = np.array([[3.0, 1.0]])
-        xbar = np.array([np.pi, 0.0])
-        ubar = np.array([0.5])
-        lqr = StateFeedback(K, xbar=xbar, ubar=ubar)
+        x_bar = np.array([np.pi, 0.0])
+        u_bar = np.array([0.5])
+        lqr = StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
         spec_bounds = ((0.0, 2 * np.pi), (-4.0, 4.0))
         res = lqr.plot_control_law(bounds=spec_bounds, grid_shape=(5, 5), show=False)
         mesh = res.axes.collections[0]
@@ -1775,7 +1775,7 @@ class TestPlotControlLaw(unittest.TestCase):
         for row, x1 in enumerate(x1_vals):
             for col, x0 in enumerate(x0_vals):
                 x = np.array([x0, x1])
-                expected = ubar - K @ (x - xbar)
+                expected = u_bar - K @ (x - x_bar)
                 self.assertAlmostEqual(U[row, col], expected[0])
         plt.close(res.figure)
 

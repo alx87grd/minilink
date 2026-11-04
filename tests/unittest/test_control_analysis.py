@@ -287,7 +287,7 @@ class TestLQR(unittest.TestCase):
                 controller.params["K"], lqr_gain(lti.A(), lti.B(), Q, R)
             )
             np.testing.assert_allclose(controller.inputs["r"].nominal_value, x_bar)
-            np.testing.assert_allclose(controller.params["ubar"], lti.ubar)
+            np.testing.assert_allclose(controller.params["u_bar"], lti.u_bar)
         # keywords for the weights, and the nominal state when x_bar is omitted
         np.testing.assert_allclose(
             lqr(plant, Q=Q, R=R, x_bar=x_bar).params["K"], on_plant.params["K"]
@@ -306,7 +306,7 @@ class TestLQR(unittest.TestCase):
         model = design_model(NoisyCartPole(), x_up)
         self.assertEqual(model.B().shape, (4, 1))
         self.assertEqual(model.D().shape, (4, 1))
-        np.testing.assert_allclose(model.ubar, [0.0])
+        np.testing.assert_allclose(model.u_bar, [0.0])
         quiet = design_model(CartPole(), x_up)
         np.testing.assert_allclose(model.A(), quiet.A())
         np.testing.assert_allclose(model.B(), quiet.B())
@@ -317,7 +317,7 @@ class TestLQR(unittest.TestCase):
         )  # positions measured, state on the edge
         sensed = design_model(box, x_up)
         self.assertEqual(sensed.C().shape, (2, 4))
-        np.testing.assert_allclose(sensed.ybar, x_up[:2])
+        np.testing.assert_allclose(sensed.y_bar, x_up[:2])
         Q, R = np.diag([1.0, 10.0, 1.0, 1.0]), np.array([[0.1]])
         K_noisy = lqr(NoisyCartPole(), Q, R, x_bar=x_up).params["K"]
         K_quiet = lqr(CartPole(), Q, R, x_bar=x_up).params["K"]
@@ -560,20 +560,20 @@ class TestP(unittest.TestCase):
 
 
 class TestStateFeedbackController(unittest.TestCase):
-    def test_reference_defaults_to_xbar(self):
-        ctl = StateFeedback(np.array([[1.0, 2.0]]), xbar=[0.5, 0.0], ubar=[0.1])
+    def test_reference_defaults_to_x_bar(self):
+        ctl = StateFeedback(np.array([[1.0, 2.0]]), x_bar=[0.5, 0.0], u_bar=[0.1])
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.5, 0.0])
 
     def test_an_operating_point_of_the_wrong_size_is_refused(self):
         K = np.array([[1.0, 2.0]])
-        with self.assertRaisesRegex(ValueError, r"ubar must have shape \(1,\)"):
-            StateFeedback(K, ubar=[0.5, 0.5])
-        with self.assertRaisesRegex(ValueError, r"xbar must have shape \(2,\)"):
-            TimeVaryingFeedback([0.0, 1.0], [K, K], xbar=[0.0])
+        with self.assertRaisesRegex(ValueError, r"u_bar must have shape \(1,\)"):
+            StateFeedback(K, u_bar=[0.5, 0.5])
+        with self.assertRaisesRegex(ValueError, r"x_bar must have shape \(2,\)"):
+            TimeVaryingFeedback([0.0, 1.0], [K, K], x_bar=[0.0])
 
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
-        ctl = StateFeedback(K, xbar=[0.0, 0.0], ubar=[0.5])
+        ctl = StateFeedback(K, x_bar=[0.0, 0.0], u_bar=[0.5])
         u = ctl.ctl(None, np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [0.5 - 3.0])
 
@@ -1877,10 +1877,10 @@ class TestOutputReference(unittest.TestCase):
     def test_the_state_reference_is_the_other_block(self):
         from minilink.control.state import StateFeedback
 
-        ctl = StateFeedback(self.K, xbar=[0.1, 0.0])
+        ctl = StateFeedback(self.K, x_bar=[0.1, 0.0])
         self.assertEqual(ctl.inputs["r"].dim, 2)
         np.testing.assert_allclose(ctl.inputs["r"].nominal_value, [0.1, 0.0])
-        self.assertEqual(set(ctl.params), {"K", "ubar"})
+        self.assertEqual(set(ctl.params), {"K", "u_bar"})
         x, r = np.array([0.3, -0.2]), np.array([0.1, 0.0])
         np.testing.assert_allclose(
             ctl.ctl(None, np.concatenate([x, r])), -self.K @ (x - r)

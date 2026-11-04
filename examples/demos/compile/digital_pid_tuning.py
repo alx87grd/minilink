@@ -17,8 +17,8 @@ cost = QuadraticCost.from_system(
     plant,
     Q=np.diag([1.0 / TF, 0.0]),
     R=RHO / TF * np.eye(1),
-    xbar=np.array([R_REF, 0.0]),
-    ubar=np.array([U_SS]),
+    x_bar=np.array([R_REF, 0.0]),
+    u_bar=np.array([U_SS]),
 )
 problem = PlanningProblem(plant, cost=cost, tf=TF)
 

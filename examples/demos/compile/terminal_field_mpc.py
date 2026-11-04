@@ -25,7 +25,7 @@ problem = PlanningProblem(plant, cost=score, x_start=x_start, tf=TF, U=plant.inp
 # The LQR value about the top, V(x) = xᵀ S x, S the Riccati solution of the linearized plant
 model = linearize(plant)
 S = solve_continuous_are(model.A(), model.B(), Q, R)
-V = QuadraticField(model.xbar, S)
+V = QuadraticField(model.x_bar, S)
 
 
 def mpc_ended_by(cost):

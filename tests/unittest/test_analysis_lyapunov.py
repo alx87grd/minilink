@@ -118,7 +118,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         # A law with a steady offset settles beside the state it was aimed at.
         plant = saturated_pendulum()
         ctl = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2))
-        ctl.params["ubar"] = np.array([0.5])  # a bias the design did not intend
+        ctl.params["u_bar"] = np.array([0.5])  # a bias the design did not intend
         roa = region_of_attraction(ctl @ plant, np.zeros(2))
 
         self.assertGreater(abs(float(roa.x_bar[0])), 1e-3)

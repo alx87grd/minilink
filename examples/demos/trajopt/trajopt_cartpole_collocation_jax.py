@@ -27,7 +27,7 @@ cost = QuadraticCost.from_system(
     sys,
     Q=np.diag([1.0, 1.0, 0.0, 0.0]),
     R=np.diag([0.01]),
-    xbar=x_goal,
+    x_bar=x_goal,
 )
 problem = PlanningProblem(
     sys=sys,

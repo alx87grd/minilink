@@ -182,11 +182,11 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_the_goal_point_falls_back_to_the_costs_target_then_the_start(self):
         sys = self.make_system()
-        xbar = np.array([0.3, 0.0])
-        cost = QuadraticCost.from_system(sys, xbar=xbar)
+        x_bar = np.array([0.3, 0.0])
+        cost = QuadraticCost.from_system(sys, x_bar=x_bar)
         x_start = np.array([0.1, 0.1])
         with_cost = PlanningProblem(sys=sys, x_start=x_start, cost=cost)
-        np.testing.assert_allclose(with_cost.goal_point(), xbar)
+        np.testing.assert_allclose(with_cost.goal_point(), x_bar)
         bare = PlanningProblem(sys=sys, x_start=x_start)
         np.testing.assert_allclose(bare.goal_point(), x_start)
 
@@ -2063,7 +2063,7 @@ class TestParametricCapabilityFlag(unittest.TestCase):
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
             tf=2.0,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
@@ -2091,7 +2091,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
             tf=tf,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
 
@@ -2162,7 +2162,7 @@ class TestTextbookOptions(unittest.TestCase):
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
             tf=1.0,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
@@ -2186,7 +2186,7 @@ class TestTextbookOptions(unittest.TestCase):
             x_start=np.zeros(2),
             Xf=SingletonSet(goal),
             tf=1.0,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=goal),
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
             U=plant.input_box,
         )
         seen = []
@@ -2408,7 +2408,7 @@ def face_swing_up():
         tf=2.0,
         x_start=np.zeros(2),
         Xf=SingletonSet(goal),
-        cost=QuadraticCost.from_system(plant, xbar=goal, R=0.1 * np.eye(1)),
+        cost=QuadraticCost.from_system(plant, x_bar=goal, R=0.1 * np.eye(1)),
         U=plant.input_box,
     )
 

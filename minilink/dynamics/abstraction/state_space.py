@@ -114,7 +114,7 @@ class LTISystem(StateSpaceSystem):
 
     A model obtained by :func:`~minilink.analysis.linearization.linearize`
     describes deviations about an operating point, which it carries as
-    ``xbar``, ``ubar`` and ``ybar`` (the state, the inputs of its ``B``
+    ``x_bar``, ``u_bar`` and ``y_bar`` (the state, the inputs of its ``B``
     columns, and the outputs of its ``C`` rows), so a design made on it knows
     where it applies. A model built from arrays sits at the origin.
     """
@@ -129,9 +129,9 @@ class LTISystem(StateSpaceSystem):
         name=None,
         declare_ports=True,
         expose_state=True,
-        xbar=None,
-        ubar=None,
-        ybar=None,
+        x_bar=None,
+        u_bar=None,
+        y_bar=None,
     ):
         # The matrices, as passed: C = I and D = 0 when omitted
         C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
@@ -161,13 +161,13 @@ class LTISystem(StateSpaceSystem):
 
         # The operating point the deviations are measured from (the origin by
         # default), its output ȳ = C x̄ + D ū unless given
-        self.xbar = point_component(xbar, n, "xbar")
-        self.ubar = point_component(ubar, m, "ubar")
-        self.ybar = (
-            np.asarray(C, dtype=float) @ self.xbar
-            + np.asarray(D, dtype=float) @ self.ubar
-            if ybar is None
-            else point_component(ybar, p, "ybar")
+        self.x_bar = point_component(x_bar, n, "x_bar")
+        self.u_bar = point_component(u_bar, m, "u_bar")
+        self.y_bar = (
+            np.asarray(C, dtype=float) @ self.x_bar
+            + np.asarray(D, dtype=float) @ self.u_bar
+            if y_bar is None
+            else point_component(y_bar, p, "y_bar")
         )
 
     def A(self, t=0.0, params=None):
@@ -218,9 +218,9 @@ class DiscreteLTISystem(StepSystem):
         *,
         period=None,
         name=None,
-        xbar=None,
-        ubar=None,
-        ybar=None,
+        x_bar=None,
+        u_bar=None,
+        y_bar=None,
     ):
         # The matrices: C = I and D = 0 when omitted
         C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
@@ -245,13 +245,13 @@ class DiscreteLTISystem(StepSystem):
         self.params = {"A": A, "B": B, "C": C, "D": D}
 
         # The operating point the deviations are measured from
-        self.xbar = point_component(xbar, n, "xbar")
-        self.ubar = point_component(ubar, m, "ubar")
-        self.ybar = (
-            np.asarray(C, dtype=float) @ self.xbar
-            + np.asarray(D, dtype=float) @ self.ubar
-            if ybar is None
-            else point_component(ybar, p, "ybar")
+        self.x_bar = point_component(x_bar, n, "x_bar")
+        self.u_bar = point_component(u_bar, m, "u_bar")
+        self.y_bar = (
+            np.asarray(C, dtype=float) @ self.x_bar
+            + np.asarray(D, dtype=float) @ self.u_bar
+            if y_bar is None
+            else point_component(y_bar, p, "y_bar")
         )
 
     def A(self, t=0.0, params=None):

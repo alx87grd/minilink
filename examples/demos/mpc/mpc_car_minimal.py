@@ -36,7 +36,7 @@ planner = TrajectoryOptimizationPlanner(
             Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
             R=np.diag([1.0, 25.0]),
             S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
-            xbar=x_ref,
+            x_bar=x_ref,
         ),
     ),
     n_steps=5,

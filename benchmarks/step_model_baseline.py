@@ -183,7 +183,7 @@ def trajopt_entries(out):
         plant = Pendulum()
         plant.inputs["u"].lower_bound = np.array([-5.0])
         plant.inputs["u"].upper_bound = np.array([5.0])
-        cost = QuadraticCost.from_system(plant, xbar=np.array([np.pi, 0.0]))
+        cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
         problem = PlanningProblem(
             plant, cost=cost, x_start=np.zeros(2), tf=1.0, U=plant.input_box
         )

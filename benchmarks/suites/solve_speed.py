@@ -117,7 +117,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
         Q=np.diag([1.0, 0.1]),
         R=np.array([[0.01]]),
         S=np.diag([10.0, 1.0]),
-        xbar=x_goal,
+        x_bar=x_goal,
     )
     problem = PlanningProblem(
         sys=sys,

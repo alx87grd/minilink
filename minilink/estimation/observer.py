@@ -31,7 +31,7 @@ class StateObserver(DynamicSystem):
     """
 
     def __init__(
-        self, A, B, C, L, D=None, *, xbar=None, ubar=None, ybar=None, labels=None
+        self, A, B, C, L, D=None, *, x_bar=None, u_bar=None, y_bar=None, labels=None
     ):
         # The model (A, B, C, D), the gain L and the operating point (x̄, ū, ȳ),
         # with ȳ = C x̄ + D ū by default: the linear model's own output
@@ -43,9 +43,13 @@ class StateObserver(DynamicSystem):
         p = C.shape[0]
         D = np.zeros((p, m)) if D is None else np.atleast_2d(np.asarray(D, dtype=float))
         check_dimensions(A, B, C, D, L)
-        xbar = point_component(xbar, n, "xbar")
-        ubar = point_component(ubar, m, "ubar")
-        ybar = C @ xbar + D @ ubar if ybar is None else point_component(ybar, p, "ybar")
+        x_bar = point_component(x_bar, n, "x_bar")
+        u_bar = point_component(u_bar, m, "u_bar")
+        y_bar = (
+            C @ x_bar + D @ u_bar
+            if y_bar is None
+            else point_component(y_bar, p, "y_bar")
+        )
 
         super().__init__(n)
         self.id = "observer"
@@ -57,9 +61,9 @@ class StateObserver(DynamicSystem):
             "C": C,
             "D": D,
             "L": L,
-            "xbar": xbar,
-            "ubar": ubar,
-            "ybar": ybar,
+            "x_bar": x_bar,
+            "u_bar": u_bar,
+            "y_bar": y_bar,
         }
 
         # Signal labels: the estimate x̂, each entry with a hat
@@ -68,12 +72,12 @@ class StateObserver(DynamicSystem):
         )
 
         # Initial estimate: the operating point, where the model holds
-        self.state.set_nominal_value(xbar)
-        self.x0 = xbar.copy()
+        self.state.set_nominal_value(x_bar)
+        self.x0 = x_bar.copy()
 
         # Ports: the command u and the measurement y in, the estimate x̂ out
-        self.add_input_port("u", dim=m, nominal_value=ubar)
-        self.add_input_port("y", dim=p, nominal_value=ybar)
+        self.add_input_port("u", dim=m, nominal_value=u_bar)
+        self.add_input_port("y", dim=p, nominal_value=y_bar)
         self.add_output_port(
             "x",
             dim=n,
@@ -113,9 +117,9 @@ class StateObserver(DynamicSystem):
         C = params["C"]
         D = params["D"]
         L = params["L"]
-        xbar = params["xbar"]
-        ubar = params["ubar"]
-        ybar = params["ybar"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
+        y_bar = params["y_bar"]
 
         m = B.shape[1]
         x_hat = x
@@ -123,8 +127,8 @@ class StateObserver(DynamicSystem):
         y = u[m:]
 
         # The predicted output ŷ, then the model corrected by the innovation y − ŷ
-        y_hat = ybar + C @ (x_hat - xbar) + D @ (u_in - ubar)
-        dx_hat = A @ (x_hat - xbar) + B @ (u_in - ubar) + L @ (y - y_hat)
+        y_hat = y_bar + C @ (x_hat - x_bar) + D @ (u_in - u_bar)
+        dx_hat = A @ (x_hat - x_bar) + B @ (u_in - u_bar) + L @ (y - y_hat)
 
         return dx_hat
 

@@ -702,8 +702,8 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
         Q=np.diag([1.0, 1.0, 0.0, 0.0]),
         R=np.diag([1.0]),
         S=np.zeros((sys.n, sys.n)),
-        xbar=x_goal,
-        ubar=np.zeros(sys.m),
+        x_bar=x_goal,
+        u_bar=np.zeros(sys.m),
     )
     return PlanningProblem(
         sys=sys,

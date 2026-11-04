@@ -182,7 +182,7 @@ def mpc_entries(out):
             x_start=x0,
             Xf=SingletonSet(x_goal),
             cost=QuadraticCost.from_system(
-                plant, Q=np.eye(1), R=0.1 * np.eye(1), xbar=x_goal
+                plant, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=x_goal
             ),
             X=plant.state.box,
             U=plant.input_box,

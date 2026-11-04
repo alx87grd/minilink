@@ -35,7 +35,7 @@ def test_ports_params_and_labels():
     assert obs.id == "observer" and obs.n == 2
     assert obs.state.labels == ["x̂[0]", "x̂[1]"] == obs.outputs["x"].labels
     np.testing.assert_allclose(obs.params["L"], L)
-    np.testing.assert_allclose(obs.params["ybar"], 0.0)
+    np.testing.assert_allclose(obs.params["y_bar"], 0.0)
     x_hat = np.array([0.3, -0.2])
     np.testing.assert_allclose(obs.estimate(x_hat, np.zeros(2)), x_hat)
     np.testing.assert_allclose(np.sort(obs.poles.real), np.sort(POLES))
@@ -50,16 +50,16 @@ def test_the_innovation_form():
 
 
 def test_the_operating_point_is_an_equilibrium_of_the_estimate():
-    xbar, ubar = np.array([0.7, 0.0]), np.array([0.0])
-    obs = StateObserver(A, B, C, L, xbar=xbar, ubar=ubar, ybar=C @ xbar + 0.1)
-    np.testing.assert_allclose(obs.params["ybar"], C @ xbar + 0.1)
-    dx_hat = obs.f(xbar, np.concatenate([ubar, C @ xbar + 0.1]))
+    x_bar, u_bar = np.array([0.7, 0.0]), np.array([0.0])
+    obs = StateObserver(A, B, C, L, x_bar=x_bar, u_bar=u_bar, y_bar=C @ x_bar + 0.1)
+    np.testing.assert_allclose(obs.params["y_bar"], C @ x_bar + 0.1)
+    dx_hat = obs.f(x_bar, np.concatenate([u_bar, C @ x_bar + 0.1]))
     np.testing.assert_allclose(dx_hat, 0.0, atol=1e-12)
     # a shape that describes no plant is refused
     with pytest.raises(ValueError, match="L must be"):
         StateObserver(A, B, C, np.ones((3, 1)))
-    with pytest.raises(ValueError, match=r"xbar must have shape \(2,\)"):
-        StateObserver(A, B, C, L, xbar=[0.7, 0.0, 0.0])
+    with pytest.raises(ValueError, match=r"x_bar must have shape \(2,\)"):
+        StateObserver(A, B, C, L, x_bar=[0.7, 0.0, 0.0])
 
 
 def test_the_estimate_converges_on_the_plant():
@@ -170,8 +170,8 @@ def test_the_model_and_the_plant_give_one_observer():
         np.testing.assert_allclose(
             obs.params["L"], kalman_gain(model.A(), model.C(), Q_n, R_n)
         )
-        np.testing.assert_allclose(obs.params["xbar"], x_bar)
-        np.testing.assert_allclose(obs.params["ybar"], plant.h(x_bar, model.ubar))
+        np.testing.assert_allclose(obs.params["x_bar"], x_bar)
+        np.testing.assert_allclose(obs.params["y_bar"], plant.h(x_bar, model.u_bar))
         assert obs.state.labels == ["theta_hat", "dtheta_hat"]
         assert obs.name == "Kalman Filter" and obs.id == "observer"
     np.testing.assert_allclose(
@@ -277,7 +277,7 @@ def test_lqg_holds_the_cart_pole_upright_from_a_disturbed_start():
         R_n=1e-3 * np.eye(4),
         x_bar=x_up,
     )
-    np.testing.assert_allclose(box.subsystems["observer"].params["xbar"], x_up)
+    np.testing.assert_allclose(box.subsystems["observer"].params["x_bar"], x_up)
     assert box.subsystems["observer"].state.labels == [
         "x̂",
         "theta_hat",

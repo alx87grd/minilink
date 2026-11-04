@@ -17,7 +17,7 @@ plant.inputs["u"].upper_bound = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(
     plant,
-    xbar=UPRIGHT,
+    x_bar=UPRIGHT,
     Q=np.eye(2),
     R=np.array([[1.0]]),
     S=np.diag([10.0, 10.0]),

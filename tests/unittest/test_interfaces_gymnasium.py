@@ -61,7 +61,7 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
 
         plant = make_bounded_pendulum()
-        cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
         return Sys2Gym(plant, cost, dt=0.05, tf=1.0, **kwargs)
 
     def test_env_checker(self):
@@ -113,7 +113,7 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
 
         plant = make_bounded_pendulum()
-        cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
         envs = [
             Sys2Gym(
                 plant,
@@ -143,7 +143,7 @@ class TestSys2Gym(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
 
         plant = make_bounded_pendulum()
-        cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
         env = Sys2Gym(plant, cost, dt=0.1, tf=1.0)
         env.reset()
 
@@ -269,7 +269,7 @@ class TestSys2GymJax(unittest.TestCase):
         from minilink.interfaces.gymnasium import Sys2Gym
 
         plant = make_bounded_pendulum()
-        cost = QuadraticCost.from_system(plant, xbar=np.zeros(2))
+        cost = QuadraticCost.from_system(plant, x_bar=np.zeros(2))
         return Sys2Gym(plant, cost, dt=0.05, tf=1.0, **kwargs)
 
     def test_jax_is_picked_when_the_plant_traces(self):
@@ -308,7 +308,7 @@ class TestSys2GymJax(unittest.TestCase):
                 return np.array([-gain * x[0] + u[0]])
 
         plant = Branching()
-        cost = QuadraticCost.from_system(plant, xbar=np.zeros(plant.n))
+        cost = QuadraticCost.from_system(plant, x_bar=np.zeros(plant.n))
         env = Sys2Gym(plant, cost, dt=0.05, tf=1.0)
         self.assertEqual(env.backend, "numpy")
         env.reset()

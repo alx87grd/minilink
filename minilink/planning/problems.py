@@ -61,12 +61,12 @@ class PlanningProblem:
     ``X0``      the start constraint ``x(0) ∈ X0``          from ``x_start``, else ``sys.x0``
     ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
     ``x_start`` the evaluation start (a point or a law)     from ``X0``
-    ``xbar``    the objective's target, the cost's number   the cost's
+    ``x_bar``    the objective's target, the cost's number   the cost's
     =========== =========================================== =====================================
 
     :meth:`goal_point` is the point a heuristic aims at (an initial guess's
     end, RRT's goal bias, a plot's anchor): ``Xf``'s point, else the cost's
-    ``xbar`` inside ``X``, else the start.
+    ``x_bar`` inside ``X``, else the start.
 
     Parameters
     ----------
@@ -336,7 +336,7 @@ class PlanningProblem:
 
     def goal_point(self) -> np.ndarray:
         """
-        The point a heuristic aims at: ``Xf``'s point, else the cost's target ``xbar`` inside ``X``, else the start.
+        The point a heuristic aims at: ``Xf``'s point, else the cost's target ``x_bar`` inside ``X``, else the start.
 
         ``Xf``'s point is a singleton's point, a ball's centre, else the centre of
         its bounding box when finite. A target outside the state constraint
@@ -348,11 +348,11 @@ class PlanningProblem:
         if point is not None:
             return point
 
-        xbar = None if self.cost is None else self.cost.params.get("xbar")
-        if xbar is not None:
-            xbar = np.asarray(xbar, dtype=float).reshape(-1).copy()
-            if self.X is None or bool(self.X.contains(xbar, self.t_start)):
-                return xbar
+        x_bar = None if self.cost is None else self.cost.params.get("x_bar")
+        if x_bar is not None:
+            x_bar = np.asarray(x_bar, dtype=float).reshape(-1).copy()
+            if self.X is None or bool(self.X.contains(x_bar, self.t_start)):
+                return x_bar
 
         return self.x_start.copy()
 

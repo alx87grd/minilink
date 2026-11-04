@@ -69,7 +69,7 @@ problem = PlanningProblem(
     x_start=x_down,
     Xf=BallSet(x_up, 0.2),
     tf=4.0,
-    cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
+    cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up),
     X=plant.state.box,
     U=plant.input_box,
 )

@@ -26,7 +26,7 @@ plant.inputs["u"].upper_bound[0] = 10.0
 
 # 1. The reference: a swing-up planned by direct collocation
 cost = QuadraticCost.from_system(
-    plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=X_GOAL
+    plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), x_bar=X_GOAL
 )
 problem = PlanningProblem(
     plant,

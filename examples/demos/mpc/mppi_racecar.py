@@ -52,7 +52,7 @@ car.x0 = np.array(
 # The cost: speed and steering near the reference, the corridor, the cone
 probe = mount(point_probe(), on=car)
 quad = QuadraticCost.from_system(
-    car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), ubar=np.array([V_REF, 0.0])
+    car, Q=np.zeros((3, 3)), R=np.diag([2.0, 1.0]), u_bar=np.array([V_REF, 0.0])
 )
 corridor = track.corridor_field(probe).as_cost(weight=20.0, shaping=quadratic_hinge())
 cone = scene.clearance_field(probe).as_cost(

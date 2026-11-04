@@ -63,7 +63,7 @@ x_ref = np.array(
         0.0,
     ]
 )
-ubar = np.array([0.0, 0.0])
+u_bar = np.array([0.0, 0.0])
 
 Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
 R = np.diag([1.0, 10.0])
@@ -74,8 +74,8 @@ tracking_cost = QuadraticCost.from_system(
     Q=Q,
     R=R,
     S=S,
-    xbar=x_ref,
-    ubar=ubar,
+    x_bar=x_ref,
+    u_bar=u_bar,
 )
 scene = Scene(obstacles=[Sphere(OBSTACLE_CENTER, keepout_radius)])
 obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(

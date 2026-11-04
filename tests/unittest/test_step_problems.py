@@ -12,7 +12,7 @@ from minilink.planning.step_problems import StepPlanningProblem
 
 def swing_problem(**fields):
     plant = Pendulum()
-    cost = QuadraticCost.from_system(plant, xbar=np.array([np.pi, 0.0]))
+    cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
     fields.setdefault("tf", 2.0)
     return PlanningProblem(
         plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, **fields

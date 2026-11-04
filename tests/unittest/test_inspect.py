@@ -58,7 +58,7 @@ class TestInspectPrint(unittest.TestCase):
         cost = QuadraticCost.from_system(Integrator())
         text = str(cost)
         self.assertIn("QuadraticCost", text)
-        self.assertIn("xbar:", text)
+        self.assertIn("x_bar:", text)
         self.assertNotIn("array(", text)
 
     def test_sum_cost(self):

@@ -47,7 +47,7 @@ class LQRPlanner(Planner):
     ----------
     problem : PlanningProblem
         Its cost must be a :class:`~minilink.core.costs.QuadraticCost`; the
-        operating point is the cost's ``(xbar, ubar)`` unless given here. A
+        operating point is the cost's ``(x_bar, u_bar)`` unless given here. A
         cost over every input stacked weighs the command by its block of
         ``R``.
         A finite ``tf`` selects the finite-horizon design with the cost's
@@ -90,8 +90,8 @@ class LQRPlanner(Planner):
         self.cost = cost
 
         # Operating point of the linearization, the cost's target by default
-        self.x_bar = np.asarray(cost.xbar if x_bar is None else x_bar, dtype=float)
-        self.u_bar = np.asarray(cost.ubar if u_bar is None else u_bar, dtype=float)
+        self.x_bar = np.asarray(cost.x_bar if x_bar is None else x_bar, dtype=float)
+        self.u_bar = np.asarray(cost.u_bar if u_bar is None else u_bar, dtype=float)
 
         # The rollout's period, the schedule's samples, the linearization options
         self.dt = float(dt)
@@ -132,7 +132,7 @@ class LQRPlanner(Planner):
             t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
 
             # The law u = ū − K(t) (x − x̄)
-            policy = TimeVaryingFeedback(t, K, xbar=x_bar, ubar=u_bar)
+            policy = TimeVaryingFeedback(t, K, x_bar=x_bar, u_bar=u_bar)
 
             # Closed-loop poles at t = 0: eig(A − B K(0))
             poles = np.linalg.eigvals(A - B @ K[0])
@@ -155,7 +155,7 @@ class LQRPlanner(Planner):
             K = np.linalg.solve(R, B.T @ P)
 
             # The law u = ū − K (x − x̄)
-            policy = StateFeedback(K, xbar=x_bar, ubar=u_bar)
+            policy = StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
 
             # Closed-loop poles: eig(A − B K)
             poles = np.linalg.eigvals(A - B @ K)
@@ -289,15 +289,15 @@ def require_quadratic_cost(cost):
     if not isinstance(cost, QuadraticCost):
         raise TypeError(
             "LQRPlanner needs a QuadraticCost, "
-            "g = (x - xbar)ᵀ Q (x - xbar) + (u - ubar)ᵀ R (u - ubar); "
+            "g = (x - x_bar)ᵀ Q (x - x_bar) + (u - u_bar)ᵀ R (u - u_bar); "
             f"got {type(cost).__name__}"
         )
 
 
 def command_block(sys, value):
-    """The command port's block of a weight ``R`` or a point ``ubar`` that spans every input of ``sys``.
+    """The command port's block of a weight ``R`` or a point ``u_bar`` that spans every input of ``sys``.
 
-    ``R[c, c]`` and ``ubar[c]`` with ``c`` the command's components; a value
+    ``R[c, c]`` and ``u_bar[c]`` with ``c`` the command's components; a value
     already of the command's size is returned as is.
     """
     value = np.asarray(value, dtype=float)
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     x_bar = np.array([0.0, np.pi, 0.0, 0.0])  # Pole inverted, cart at origin
     x0 = np.array([-1.0, np.pi + 0.3, 0.0, 0.0])
     cost = QuadraticCost.from_system(
-        plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), xbar=x_bar
+        plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), x_bar=x_bar
     )
     problem = PlanningProblem(
         plant, x_start=x0, cost=cost, tf=np.inf, U=plant.input_box

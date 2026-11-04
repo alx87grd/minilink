@@ -124,7 +124,7 @@ def tool_montage() -> None:
         x_start=np.zeros(2),
         Xf=BallSet(x_up, 0.2),
         tf=4.0,
-        cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=x_up),
+        cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up),
         X=plant.state.box,
         U=plant.input_box,
     )
@@ -195,7 +195,7 @@ def gif_cartpole() -> None:
         x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
         Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
-            plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), xbar=x_goal
+            plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), x_bar=x_goal
         ),
         U=plant.input_box,
     )
@@ -332,8 +332,8 @@ def racecar_mpc() -> None:
             Q=np.diag([0.0, 0.0, 0.0, 4.0, 1.0, 0.0, 0.0, 2.0, 0.0]),
             R=np.diag([0.0005, 60.0]),
             S=np.diag([0.0, 0.0, 0.0, 8.0, 2.0, 0.0, 0.0, 2.0, 0.0]),
-            xbar=x_cruise,
-            ubar=np.array([P_CRUISE, 0.0]),
+            x_bar=x_cruise,
+            u_bar=np.array([P_CRUISE, 0.0]),
         )
         + track.distance_field(centre).as_cost(
             weight=60.0, shaping=quadratic_excess(threshold=0.05)

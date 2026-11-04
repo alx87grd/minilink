@@ -30,7 +30,7 @@ planner = TrajectoryOptimizationPlanner(
     method="adam",
     iterations=5,
 )
-mpc = ModelPredictiveController(planner, inputs={"x_start": "y", "cost.xbar": "r"})
+mpc = ModelPredictiveController(planner, inputs={"x_start": "y", "cost.x_bar": "r"})
 
 mpc.plot_diagram()
 

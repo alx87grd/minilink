@@ -37,7 +37,7 @@ def pendulum_problem(stochastic=False):
     plant.inputs["u"].lower_bound = np.array([-5.0])
     plant.inputs["u"].upper_bound = np.array([5.0])
     cost = QuadraticCost.from_system(
-        plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), xbar=np.array([np.pi, 0.0])
+        plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), x_bar=np.array([np.pi, 0.0])
     )
     if stochastic:
         return PlanningProblem(
@@ -306,7 +306,7 @@ def solved_pendulum():
     plant.state.upper_bound = np.array([2.0 * np.pi, 8.0])
     plant.inputs["u"].lower_bound = np.array([-5.0])
     plant.inputs["u"].upper_bound = np.array([5.0])
-    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), xbar=[np.pi, 0])
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=[np.pi, 0])
     problem = PlanningProblem(
         plant,
         x_start=[0.0, 0.0],

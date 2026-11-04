@@ -720,7 +720,7 @@ def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
     assert str(single).startswith("J = ") and "runs" not in str(single)
 
     # a deterministic problem is one run for the evaluation as well
-    law = StateFeedback(K=[[1.0, 0.5]], xbar=[0.0, 0.0])
+    law = StateFeedback(K=[[1.0, 0.5]], x_bar=[0.0, 0.0])
     report = evaluate(problem, law, dt=0.1, backend="numpy")
     assert report.n_trials == 1 and np.all(report.x0[0] == problem.x_start)
 
@@ -861,7 +861,7 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     from minilink.planning.evaluator import nominal_trajectory
 
     plant = Pendulum()
-    cost = QuadraticCost.from_system(plant, xbar=np.array([np.pi, 0.0]))
+    cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
     problem = PlanningProblem(
         plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, tf=2.0, t_start=1.5
     )

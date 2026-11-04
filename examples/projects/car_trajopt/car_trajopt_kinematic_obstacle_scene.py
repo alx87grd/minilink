@@ -59,7 +59,7 @@ sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
 
 x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0])
 x_ref = np.array([U_TARGET * TF, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])
-ubar = np.array([0.0, 0.0])
+u_bar = np.array([0.0, 0.0])
 
 Q = np.diag([0.0, 10.0, 1.0, 0.1, 100.0])
 R = np.diag([1.0, 10.0])
@@ -70,8 +70,8 @@ tracking_cost = QuadraticCost.from_system(
     Q=Q,
     R=R,
     S=S,
-    xbar=x_ref,
-    ubar=ubar,
+    x_bar=x_ref,
+    u_bar=u_bar,
 )
 scene = Scene(obstacles=[Sphere(OBSTACLE_CENTER, keepout_radius)])
 obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(

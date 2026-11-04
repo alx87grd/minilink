@@ -125,7 +125,7 @@ def _pendulum_problem(*, bounds=10.0):
     sys.inputs["u"].upper_bound = np.array([5.0])
     cost = QuadraticCost.from_system(
         sys,
-        xbar=UPRIGHT_PYRO,
+        x_bar=UPRIGHT_PYRO,
         Q=np.eye(2),
         R=np.array([[1.0]]),
         S=np.diag([10.0, 10.0]),
@@ -141,7 +141,7 @@ def _double_pendulum_problem():
     plant.inputs["u"].upper_bound = np.array([12.0, 12.0])
     Q = np.diag([1.0, 0.5, 0.1, 0.05])
     R = np.diag([0.05, 0.05])
-    cost = QuadraticCost.from_system(plant, xbar=GOAL_DOUBLE, Q=Q, R=R, S=Q)
+    cost = QuadraticCost.from_system(plant, x_bar=GOAL_DOUBLE, Q=Q, R=R, S=Q)
     return PlanningProblem(plant, cost=cost, X=plant.state.box, U=plant.input_box)
 
 
@@ -399,7 +399,7 @@ def run_pyro_pendulum_dp(
         grid = discretizer.GridDynamicSystem(sys_p, list(x_grid), list(u_grid), dt=dt)
     t_build = time.perf_counter()
     qcf = costfunction.QuadraticCostFunction.from_sys(sys_p)
-    qcf.xbar = UPRIGHT_PYRO.copy()
+    qcf.x_bar = UPRIGHT_PYRO.copy()
     qcf.INF = INF_PENDULUM
     qcf.R[0, 0] = 1.0
     qcf.S[0, 0] = 10.0
@@ -464,7 +464,7 @@ def run_pyro_double_pendulum_dp(
         grid = discretizer.GridDynamicSystem(sys_p, list(x_grid), list(u_grid), dt=dt)
     t_build = time.perf_counter()
     qcf = costfunction.QuadraticCostFunction.from_sys(sys_p)
-    qcf.xbar = GOAL_DOUBLE.copy()
+    qcf.x_bar = GOAL_DOUBLE.copy()
     qcf.Q[0, 0] = 1.0
     qcf.Q[1, 1] = 0.5
     qcf.Q[2, 2] = 0.1

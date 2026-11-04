@@ -363,8 +363,8 @@ def cost_text(cost):
     if isinstance(cost, QuadraticCost):
         params = cost.params
         body = [
-            body_line("xbar", array_text(params["xbar"])),
-            body_line("ubar", array_text(params["ubar"])),
+            body_line("x_bar", array_text(params["x_bar"])),
+            body_line("u_bar", array_text(params["u_bar"])),
             body_line("Q", matrix_summary(params["Q"])),
             body_line("R", matrix_summary(params["R"])),
             body_line("S", matrix_summary(params["S"])),

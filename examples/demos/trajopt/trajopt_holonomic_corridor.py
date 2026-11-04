@@ -101,7 +101,7 @@ control_cost = QuadraticCost.from_system(
     Q=np.diag([0.0, 0.0]),
     R=np.diag([0.2, 0.2]),
     S=np.diag([80.0, 80.0]),
-    xbar=X_GOAL,
+    x_bar=X_GOAL,
 )
 path_cost = track.distance_field(body).as_cost(
     weight=PATH_COST_WEIGHT,

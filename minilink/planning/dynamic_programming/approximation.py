@@ -91,28 +91,28 @@ class Features:
 
 
 class QuadraticFeatures(Features):
-    """Quadratic form about ``xbar``: ``φ(x) = [1, δx, δx_i δx_j (i ≤ j)]``, ``δx = x - xbar``.
+    """Quadratic form about ``x_bar``: ``φ(x) = [1, δx, δx_i δx_j (i ≤ j)]``, ``δx = x - x_bar``.
 
     ``wᵀφ(x)`` spans every function ``c + bᵀδx + δxᵀ S δx``, the shape of an
     LQR cost-to-go; :meth:`quadratic_form` reads ``(c, b, S)`` back from ``w``.
     """
 
-    def __init__(self, xbar):
+    def __init__(self, x_bar):
         # The expansion point
-        self.xbar = np.asarray(xbar, dtype=float).reshape(-1)
+        self.x_bar = np.asarray(x_bar, dtype=float).reshape(-1)
 
         # One feature per monomial: the constant, the n linear terms, the pairs i ≤ j
-        n = self.xbar.size
+        n = self.x_bar.size
         self.pairs = [(i, j) for i in range(n) for j in range(i, n)]
         self.n_features = 1 + n + len(self.pairs)
 
     def phi(self, x):
-        xbar = self.xbar
+        x_bar = self.x_bar
         pairs = self.pairs
         x = np.asarray(x, dtype=float).reshape(-1)
 
         # δx = x − x̄, and φ(x) = [1, δx, δx_i δx_j (i ≤ j)]
-        dx = x - xbar
+        dx = x - x_bar
         cross = [dx[i] * dx[j] for i, j in pairs]
         phi = np.concatenate(([1.0], dx, cross))
 
@@ -120,7 +120,7 @@ class QuadraticFeatures(Features):
 
     def quadratic_form(self, w):
         """Return ``(c, b, S)`` such that ``wᵀφ(x) = c + bᵀδx + δxᵀ S δx``."""
-        n = self.xbar.size
+        n = self.x_bar.size
         pairs = self.pairs
         w = np.asarray(w, dtype=float)
 

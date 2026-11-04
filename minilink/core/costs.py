@@ -158,33 +158,33 @@ class QuadraticCost(CostFunction):
     Quadratic running and terminal cost.
 
     The running cost is
-    ``(x - xbar).T @ Q @ (x - xbar) + (u - ubar).T @ R @ (u - ubar)``.
-    The terminal cost is ``(x - xbar).T @ S @ (x - xbar)``.
+    ``(x - x_bar).T @ Q @ (x - x_bar) + (u - u_bar).T @ R @ (u - u_bar)``.
+    The terminal cost is ``(x - x_bar).T @ S @ (x - x_bar)``.
 
     The weights and the targets are :attr:`params` (``"Q"``, ``"R"``, ``"S"``,
-    ``"xbar"``, ``"ubar"``), the System pattern: ``params=None`` in :meth:`g`
+    ``"x_bar"``, ``"u_bar"``), the System pattern: ``params=None`` in :meth:`g`
     and :meth:`h` reads them, a dictionary replaces them, so ``jax.grad``
     reaches ``Q``. The attributes ``cost.Q`` … are views of the dictionary.
     """
 
-    def __init__(self, Q, R, S, xbar, ubar):
+    def __init__(self, Q, R, S, x_bar, u_bar):
         # The weights and the targets as float copies, the targets flat
         Q = np.asarray(Q, dtype=float).copy()
         R = np.asarray(R, dtype=float).copy()
         S = np.asarray(S, dtype=float).copy()
-        xbar = np.asarray(xbar, dtype=float).reshape(-1).copy()
-        ubar = np.asarray(ubar, dtype=float).reshape(-1).copy()
+        x_bar = np.asarray(x_bar, dtype=float).reshape(-1).copy()
+        u_bar = np.asarray(u_bar, dtype=float).reshape(-1).copy()
 
         # The weights sized by the targets: Q and S are n × n, R is m × m
-        check_weights(Q, R, S, xbar.size, ubar.size)
+        check_weights(Q, R, S, x_bar.size, u_bar.size)
 
-        self.params = {"Q": Q, "R": R, "S": S, "xbar": xbar, "ubar": ubar}
+        self.params = {"Q": Q, "R": R, "S": S, "x_bar": x_bar, "u_bar": u_bar}
 
     Q = param_view("Q")
     R = param_view("R")
     S = param_view("S")
-    xbar = param_view("xbar")
-    ubar = param_view("ubar")
+    x_bar = param_view("x_bar")
+    u_bar = param_view("u_bar")
 
     def _repr_latex_(self):
         return latex_inspect(self)
@@ -197,8 +197,8 @@ class QuadraticCost(CostFunction):
         Q: np.ndarray | None = None,
         R: np.ndarray | None = None,
         S: np.ndarray | None = None,
-        xbar: np.ndarray | None = None,
-        ubar: np.ndarray | None = None,
+        x_bar: np.ndarray | None = None,
+        u_bar: np.ndarray | None = None,
     ):
         """
         Create a default quadratic cost from a Minilink system.
@@ -211,17 +211,17 @@ class QuadraticCost(CostFunction):
         m = int(sys.m)
 
         # The system's operating point as the default target
-        if xbar is None:
-            xbar = sys.state.nominal_value
-        if ubar is None:
-            ubar = sys.get_u_from_input_ports()
+        if x_bar is None:
+            x_bar = sys.state.nominal_value
+        if u_bar is None:
+            u_bar = sys.get_u_from_input_ports()
 
         return cls(
             Q=np.eye(n) if Q is None else Q,
             R=np.eye(m) if R is None else R,
             S=np.zeros((n, n)) if S is None else S,
-            xbar=xbar,
-            ubar=ubar,
+            x_bar=x_bar,
+            u_bar=u_bar,
         )
 
     def g(self, x, u, t=0.0, params=None):
@@ -230,11 +230,11 @@ class QuadraticCost(CostFunction):
 
         Q = params["Q"]
         R = params["R"]
-        xbar = params["xbar"]
-        ubar = params["ubar"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
 
-        dx = x - xbar
-        du = u - ubar
+        dx = x - x_bar
+        du = u - u_bar
 
         g = dx.T @ Q @ dx + du.T @ R @ du
 
@@ -245,9 +245,9 @@ class QuadraticCost(CostFunction):
         params = self.params if params is None else params
 
         S = params["S"]
-        xbar = params["xbar"]
+        x_bar = params["x_bar"]
 
-        dx = x - xbar
+        dx = x - x_bar
 
         h = dx.T @ S @ dx
 
@@ -258,11 +258,11 @@ class QuadraticCost(CostFunction):
         params = self.params if params is None else params
         Q = params["Q"]
         R = params["R"]
-        xbar = params["xbar"]
-        ubar = params["ubar"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
 
         # max g = max (x − x̄)ᵀ Q (x − x̄) + max (u − ū)ᵀ R (u − ū), the two independent
-        g_max = quadratic_max(Q, xbar, X) + quadratic_max(R, ubar, U)
+        g_max = quadratic_max(Q, x_bar, X) + quadratic_max(R, u_bar, U)
 
         return g_max
 
@@ -270,45 +270,45 @@ class QuadraticCost(CostFunction):
         """The exact maximum of ``h`` over the box ``X``."""
         params = self.params if params is None else params
 
-        return quadratic_max(params["S"], params["xbar"], X)
+        return quadratic_max(params["S"], params["x_bar"], X)
 
 
 class TimeCost(CostFunction):
     """
     Minimum-time cost ``J = T``.
 
-    The running cost is ``g = 1`` everywhere except within ``eps`` of the target
-    ``xbar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
+    The running cost is ``g = 1`` everywhere except within ``radius`` of the target
+    ``x_bar``, where it is ``0`` (the absorbing goal); the terminal cost is ``0``.
     Under dynamic programming the cost-to-go becomes the time-to-go and the
     optimal policy is bang-bang. The target and the radius are :attr:`params`
-    (``{"xbar", "eps"}``).
+    (``{"x_bar", "radius"}``).
     """
 
-    def __init__(self, xbar, eps=1e-3):
+    def __init__(self, x_bar, radius=1e-3):
         self.params = {
-            "xbar": np.asarray(xbar, dtype=float).reshape(-1).copy(),
-            "eps": float(eps),
+            "x_bar": np.asarray(x_bar, dtype=float).reshape(-1).copy(),
+            "radius": float(radius),
         }
 
-    xbar = param_view("xbar")
-    eps = param_view("eps")
+    x_bar = param_view("x_bar")
+    radius = param_view("radius")
 
     @classmethod
-    def from_system(cls, sys, *, xbar: np.ndarray | None = None, eps: float = 1e-3):
-        """Create a time cost targeting ``xbar`` (default the system's nominal state)."""
-        xbar = sys.state.nominal_value if xbar is None else xbar
+    def from_system(cls, sys, *, x_bar: np.ndarray | None = None, radius: float = 1e-3):
+        """Create a time cost targeting ``x_bar`` (default the system's nominal state)."""
+        x_bar = sys.state.nominal_value if x_bar is None else x_bar
 
-        return cls(xbar=xbar, eps=eps)
+        return cls(x_bar=x_bar, radius=radius)
 
     def g(self, x, u, t=0.0, params=None):
         """Return unit running cost away from the target, zero on it."""
         params = self.params if params is None else params
         xp = array_module(x)
 
-        xbar = xp.asarray(params["xbar"])
-        eps = params["eps"]
+        x_bar = xp.asarray(params["x_bar"])
+        radius = params["radius"]
 
-        on_target = xp.linalg.norm(x - xbar) < eps
+        on_target = xp.linalg.norm(x - x_bar) < radius
 
         # g = 0 on the target (‖x − x̄‖ < ε), 1 elsewhere
         g = xp.where(on_target, xp.asarray(0.0), xp.asarray(1.0))

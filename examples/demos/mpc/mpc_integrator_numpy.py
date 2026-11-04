@@ -47,7 +47,7 @@ planner = TrajectoryOptimizationPlanner(
             sys,
             Q=np.eye(1),
             R=0.1 * np.eye(1),
-            xbar=x_goal,
+            x_bar=x_goal,
         ),
         X=sys.state.box,
         U=sys.input_box,

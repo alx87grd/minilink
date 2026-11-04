@@ -55,7 +55,7 @@ class FastPendulum(Pendulum):
 def digital_pid_problem():
     """A digital PID on the pendulum, its setpoint 1 rad, scored over 2 s."""
     plant = FastPendulum()
-    cost = QuadraticCost.from_system(plant, xbar=np.array([1.0, 0.0]))
+    cost = QuadraticCost.from_system(plant, x_bar=np.array([1.0, 0.0]))
     problem = PlanningProblem(plant, cost=cost, x_start=np.zeros(2), tf=2.0)
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)
     pid.inputs["e"].nominal_value = np.zeros(1)
@@ -429,8 +429,8 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
         Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
         R=np.diag([1.0, 25.0]),
         S=np.diag([0.0, 30.0, 40.0, 2.0, 12.0, 18.0, 0.1, 100.0]),
-        xbar=target,
-        ubar=np.zeros(2),
+        x_bar=target,
+        u_bar=np.zeros(2),
     )
     x_start = np.array([0.0, 1.0, 0.0, 0.9 * speed, 0.0, 0.0, 0.9 * speed / r_r, 0.0])
     problem = PlanningProblem(
@@ -461,7 +461,7 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
     for mu, target_y in ((1.0, 0.0), (0.4, 0.0), (0.4, 0.6)):
         values = {
             "plant": {"mu": np.asarray(mu)},
-            "cost": {"xbar": bicycle_planner(target_y=target_y).problem.cost.xbar},
+            "cost": {"x_bar": bicycle_planner(target_y=target_y).problem.cost.x_bar},
         }
         plan = compiled.solve_trajectory_from(x_start, params=values)
         rebuilt = bicycle_planner(mu, target_y).solve()
@@ -765,7 +765,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
         plant, cost=score, x_start=x_start, tf=4.0, U=plant.input_box
     )
     model = linearize(plant)
-    V = QuadraticField(model.xbar, solve_continuous_are(model.A(), model.B(), Q, R))
+    V = QuadraticField(model.x_bar, solve_continuous_are(model.A(), model.B(), Q, R))
 
     def J_of(cost):
         planner = TrajectoryOptimizationPlanner(

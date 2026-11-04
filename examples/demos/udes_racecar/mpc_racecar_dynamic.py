@@ -90,8 +90,8 @@ cost = (
         Q=np.diag([0.0, 0.0, 0.0, 4.0, 1.0, 0.0, 0.0, 2.0, 0.0]),
         R=np.diag([0.0005, 60.0]),
         S=np.diag([0.0, 0.0, 0.0, 8.0, 2.0, 0.0, 0.0, 2.0, 0.0]),
-        xbar=x_cruise,
-        ubar=np.array([P_CRUISE, 0.0]),
+        x_bar=x_cruise,
+        u_bar=np.array([P_CRUISE, 0.0]),
     )
     + track.distance_field(centre).as_cost(
         weight=PATH_WEIGHT, shaping=quadratic_excess(threshold=PATH_DEAD_BAND)

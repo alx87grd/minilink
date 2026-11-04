@@ -53,15 +53,15 @@ Q = np.diag([0.0, 10.0, 1.0, 10.0, 0.1, 0.1, 0.01, 1.0, 0.0])
 R = np.diag([1e-4, 10.0])
 S = np.diag([0.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.01, 1.0, 0.0])
 
-ubar = np.array([0.0, 0.0])
+u_bar = np.array([0.0, 0.0])
 
 cost = QuadraticCost.from_system(
     sys,
     Q=Q,
     R=R,
     S=S,
-    xbar=x_ref,
-    ubar=ubar,
+    x_bar=x_ref,
+    u_bar=u_bar,
 )
 problem = PlanningProblem(
     sys=sys,

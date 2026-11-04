@@ -45,7 +45,7 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     cost = QuadraticCost.from_system(
         sys,
         Q=np.diag([1.0, 1.0, 0.0, 0.0]),
-        xbar=x_goal,
+        x_bar=x_goal,
     )
     return PlanningProblem(
         sys=sys,

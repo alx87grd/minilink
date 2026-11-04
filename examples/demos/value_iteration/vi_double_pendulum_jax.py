@@ -56,7 +56,7 @@ plant.x0 = HANGING
 
 Q = np.diag([1.0, 0.5, 0.1, 0.05])
 R = np.diag([0.05, 0.05])
-cost = QuadraticCost.from_system(plant, xbar=GOAL, Q=Q, R=R, S=Q)
+cost = QuadraticCost.from_system(plant, x_bar=GOAL, Q=Q, R=R, S=Q)
 problem = PlanningProblem(plant, cost=cost, U=plant.input_box)
 
 nodes = int(np.prod(x_shape))

@@ -22,7 +22,7 @@ def pendulum_problem(tf=np.inf, S=None):
     plant = Pendulum()
     plant.inputs["u"].lower_bound = np.array([-20.0])
     plant.inputs["u"].upper_bound = np.array([20.0])
-    cost = QuadraticCost.from_system(plant, Q=Q, R=R, S=S, xbar=UPRIGHT)
+    cost = QuadraticCost.from_system(plant, Q=Q, R=R, S=S, x_bar=UPRIGHT)
     return PlanningProblem(
         plant,
         x_start=UPRIGHT + [0.3, 0.0],
@@ -96,7 +96,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
     x_up = np.array([0.0, np.pi, 0.0, 0.0])
     Q_x = np.diag([1.0, 10.0, 1.0, 1.0])
     R_all = 0.1 * np.eye(plant.m)  # a cost over every input stacked
-    cost = QuadraticCost.from_system(plant, Q=Q_x, R=R_all, xbar=x_up)
+    cost = QuadraticCost.from_system(plant, Q=Q_x, R=R_all, x_bar=x_up)
 
     stationary = LQRPlanner(
         PlanningProblem(plant, cost=cost, U=plant.input_box)

@@ -410,7 +410,7 @@ class TrajectoryOptimizationPlanner(Planner):
             Measured initial state.
         params : mapping, optional
             The values of this tick, a partial tree of the problem's leaves
-            (``{"plant": {"mu": 0.6}, "cost": {"xbar": …}, "t_start": t}``),
+            (``{"plant": {"mu": 0.6}, "cost": {"x_bar": …}, "t_start": t}``),
             merged once onto the program's defaults with ``x0`` as its
             ``x_start``: an unknown path raises naming the known ones.
             ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the

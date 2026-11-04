@@ -291,7 +291,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   the point lives: on a system, the nominal value of its signals; in a block whose law
   reads it (`OutputReference`, `StateObserver`), its `params`; in a tool, the
   `x_bar` / `u_bar` arguments, defaulting to the nominal (the target of
-  `QuadraticCost.from_system` included); on a linear model, `xbar`, `ubar` and `ybar`,
+  `QuadraticCost.from_system` included); on a linear model, `x_bar`, `u_bar` and `y_bar`,
   where its deviations are measured from.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
@@ -500,7 +500,7 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   `x_start`, and so does assigning `problem.x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
   a set that holds no parameters refuses a write). Library costs
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
-  `xbar`, `ubar`, its attributes views); a `SumCost` keys its terms by id like a diagram
+  `x_bar`, `u_bar`, its attributes views); a `SumCost` keys its terms by id like a diagram
   (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
   cost it scales) and routes a nested dictionary to them. Anonymous `+` and `sum()` flatten
   into one level of terms; `SumCost.of(**named)` and a cost with an `id` stay nested. A sum
@@ -710,7 +710,7 @@ they read and what the zero-argument sweep draws:
 | --- | --- | --- |
 | (a law on `y` used absolutely, `u = c(y, r)`: learned policies) | `y`, `r` of another size or absent | measurement, `r` pinned |
 | `impedance.py` (`Impedance`, `IntegralImpedance`) | `y = [q; dq]` dim `2n`, the rate measured so no filter state; `Kp`, `Kd` are `n×n` (a scalar or vector is diagonal, a matrix couples the axes), `Ki` per axis; the same limits and integrator hold as `siso.py`; optional robotic `+ g(q)` via `robotic.py` | `(e, de)` plane (`plot_space = "error_qdq"`) |
-| `state.py` | full state `x`; constant gain `K` (`StateFeedback`, what `lqr` returns: `u = ubar - K (x - r)` on a state reference, `r` defaulting to `xbar`; `OutputReference(K, N)`, the textbook output reference `u = ubar - K (x - xbar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingFeedback`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedback`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
+| `state.py` | full state `x`; constant gain `K` (`StateFeedback`, what `lqr` returns: `u = u_bar - K (x - r)` on a state reference, `r` defaulting to `x_bar`; `OutputReference(K, N)`, the textbook output reference `u = u_bar - K (x - x_bar) + N r`, `r` of the output's dimension) or a gain schedule `K(t)` interpolated between samples and held or replaced past its end (`TimeVaryingFeedback`, what `lqr_finite_horizon` returns; the schedule itself comes from `lqr_gain_schedule`, the Riccati differential equation propagated exactly through the Hamiltonian system); feedback around a reference trajectory `u = u_d(t) - K(t)(x - x_d(t))` (`TrajectoryFeedback`, no reference port — the trajectory is the reference; what `trajectory_lqr` returns: the plant linearized at every sample of the reference, the Riccati equation swept backward interval by interval from the stationary solution at the end point) | `(x0, x1)` |
 | `siso.py` (`P`, `PI`, `PD`, `PID`) | `e` per axis, or `y` with `r` (decoupled loops) | error per axis |
 | `robotic.py` (task laws) | Joint ``[q; dq]`` feedback; internal FK/J; optional ``+ g(q)``; optional task-force arrow | `(q0, dq0)` absolute (`plot_space = "absolute_qdq"`) |
 | `robotic.py` (kinematic laws) | Joint ``q`` only; outputs ``dq`` for speed-controlled plants | measurement (`plot_space = "measurement"`: the task reference is not a joint error) |
@@ -1124,9 +1124,9 @@ vector is its singleton; by default the start's singleton, a law's support, else
 singleton at `sys.x0`); `Xf=` the terminal constraint (a vector its singleton, a hard terminal
 equality for collocation and shooting; `None` a free end); `x_start=` the evaluation start, a
 point or a law (by default `X0`'s point: a singleton's, a region's bounding-box centre when
-finite and inside, else `sys.x0` when inside), which must belong to `X0`; the cost's `xbar` the
+finite and inside, else `sys.x0` when inside), which must belong to `X0`; the cost's `x_bar` the
 objective's target. There is no goal shortcut: `problem.goal_point()` (`Xf`'s point, else the
-cost's `xbar`, else the start) is what a heuristic aims at (an initial guess's end, RRT's goal
+cost's `x_bar`, else the start) is what a heuristic aims at (an initial guess's end, RRT's goal
 bias, a plot's anchor); it never constrains a plan. The planners pin the start from `x_start`.
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
@@ -1163,7 +1163,7 @@ entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the s
 and one backend (NumPy for all when one entry does not trace), and `difference(a, b)` is
 the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
-`B` at the cost's `(xbar, ubar)`, the algebraic Riccati equation for an
+`B` at the cost's `(x_bar, u_bar)`, the algebraic Riccati equation for an
 infinite `tf`, the differential one swept from `S` for a finite `tf`; its
 `RiccatiRecord` holds `K`, `P`, the closed-loop poles (success = Hurwitz) and
 the finite-horizon schedule. `control.design` stays the array-in / block-out
@@ -1442,7 +1442,7 @@ and/or `options=TrajectoryOptimizationOptions(...)`. Offline
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
 bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
 once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
-only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"xbar": …}, "t_start": t}`)
+only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"x_bar": …}, "t_start": t}`)
 merged once onto the defaults with `x0` as `x_start`, an unknown path raising and naming the
 known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
 of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
@@ -1522,7 +1522,7 @@ successor table for per-sweep recomputation (memory vs time-varying support); a 
 grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `get_controller()` returns a `LookupPolicy` (a static `System`); `PolicyEvaluator`
 gives the cost-to-go of any fixed law. **Function approximation**
 (`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
-features — `QuadraticFeatures(xbar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
+features — `QuadraticFeatures(x_bar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
 `(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),
 stacked with `+` — and a `LinearApproximator` that fits by least squares (`fit`) or one
 stochastic-gradient step per sample (`sgd_step`). It is the seed of approximate dynamic

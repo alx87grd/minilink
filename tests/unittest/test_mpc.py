@@ -239,7 +239,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         def problem_of(radius, t_start=0.0):
             sys = JaxSingleIntegrator()
             cost = QuadraticCost.from_system(
-                sys, Q=np.eye(1), R=0.1 * np.eye(1), xbar=np.array([2.0])
+                sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([2.0])
             )
             return PlanningProblem(
                 sys=sys,
@@ -376,7 +376,7 @@ def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
         configure_jax(enable_x64=True)
     sys = JaxSingleIntegrator() if backend == "jax" else SingleIntegrator()
     cost = QuadraticCost.from_system(
-        sys, Q=np.eye(1), R=0.1 * np.eye(1), xbar=np.array([goal])
+        sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([goal])
     )
     problem = PlanningProblem(
         sys=sys, tf=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
@@ -427,7 +427,7 @@ class TestTheDelayedMPC(unittest.TestCase):
     def test_a_bound_leaf_reads_its_port(self):
         planner = integrator_planner()
         mpc = ModelPredictiveController(
-            planner, inputs={"x_start": "y", "cost.xbar": "r"}
+            planner, inputs={"x_start": "y", "cost.x_bar": "r"}
         )
         assert list(mpc.inputs) == ["y", "r"] and mpc.inputs["r"].dim == 1
         pv = mpc.pv
@@ -441,7 +441,7 @@ class TestTheDelayedMPC(unittest.TestCase):
         assert command_at(3.0)[0] > command_at(0.6)[0]
         with pytest.raises(ValueError, match="its own port"):
             ModelPredictiveController(
-                planner, inputs={"x_start": "y", "cost.xbar": "y"}
+                planner, inputs={"x_start": "y", "cost.x_bar": "y"}
             )
 
     def test_the_face_predicts_the_start_for_a_users_compensation(self):
@@ -638,7 +638,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
     configure_jax(enable_x64=True)
     sys = JaxSingleIntegrator()
     cost = QuadraticCost.from_system(
-        sys, Q=np.eye(1), R=0.1 * np.eye(1), xbar=np.array([2.0])
+        sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([2.0])
     )
     problem = PlanningProblem(
         sys=sys, tf=1.0, x_start=np.array([0.5]), cost=cost, U=sys.input_box
@@ -807,7 +807,7 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
     def test_an_unwired_bound_port_reads_the_trees_value(self):
         planner = integrator_planner()
         mpc = ModelPredictiveController(
-            planner, inputs={"x_start": "y", "cost.xbar": "r"}
+            planner, inputs={"x_start": "y", "cost.x_bar": "r"}
         )
         np.testing.assert_array_equal(mpc.inputs["r"].nominal_value, [2.0])
         with pytest.raises(ValueError, match="subtree"):

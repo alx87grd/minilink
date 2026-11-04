@@ -133,9 +133,9 @@ def build_observer(model, L, name):
         model.C(),
         L,
         model.D(),
-        xbar=model.xbar,
-        ubar=model.ubar,
-        ybar=model.ybar,
+        x_bar=model.x_bar,
+        u_bar=model.u_bar,
+        y_bar=model.y_bar,
         labels=labels,
     )
     observer.name = name
