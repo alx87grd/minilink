@@ -4,15 +4,15 @@ Status: written 2026-10-25 from the maintainer's vision (§1), with the state of
 and the agent's read (§3–§4). Lane: research. The rows: the proof of concept (NS-1, NS-2's
 fixed-`K` form, NS-8, NS-9) is [TODO.md](TODO.md) §1.8; the rest is TODO §4. **Landed in the v0.3 run:** NS-1 and NS-2's fixed-`K` form (the
 laws `GradientDescentLaw` and `AdamLaw` in `optimizers/first_order.py`, `Optimizer(...,
-iterations=K)`, `as_step_system`; a traced solve returns its `OptimizationResult` with JAX
-arrays, §4.5's open point); `iterations=None` stays the host loop to a tolerance, its
+n_iterations=K)`, `as_step_system`; a traced solve returns its `OptimizationResult` with JAX
+arrays, §4.5's open point); `n_iterations=None` stays the host loop to a tolerance, its
 `lax.while_loop` form with NS-2's rest.
 
 **Choices of 2026-10-27** (the architecture of record since 2026-10-28):
 - the two-layer split of §3: a pure kernel run by `Optimizer`, a step-system view for the
   lesson; §4.1–§4.2's categories and algorithms added only with the first solver that needs them;
-- the fixed-count solve: `Optimizer(program, method=, iterations=K)`, exactly `K` steps in one
-  `lax.scan`; `iterations=None` runs to a tolerance, `maxiter` its cap; a cap and a fixed count
+- the fixed-count solve: `Optimizer(program, method=, n_iterations=K)`, exactly `K` steps in one
+  `lax.scan`; `n_iterations=None` runs to a tolerance, `maxiter` its cap; a cap and a fixed count
   stay two things;
 - the fixed-iteration MPC is a planner under the planner's compiled-face contract
   (DESIGN §6): this doc holds its solver, DESIGN its tick;
@@ -59,7 +59,14 @@ Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 2. **Long term: analyse the convergence of an optimization process with the control tools**:
    the algorithm as a feedback loop, its convergence as stability.
 
-## 2. What exists today
+## 2. What existed when the plan was written
+
+**Since then (TODO §1.8):** NS-1, the fixed-iteration form of NS-2, NS-8 and NS-9 landed. A
+native method (`gd`, `adam`) with `n_iterations=` on a box-bounded JAX program is a pure loop
+(`Optimizer.solve_count`, the compiled face's `pv.solve`): `jit`, `vmap` over starts, `grad`
+through the solve. Step systems have `rollout_batch`, MPPI is `planning/trajectory_optimization/
+path_integral.py`, and the parametric program folded into `MathematicalProgram(..., params=)`.
+The table and the paragraph after it are the starting point, kept for the plan's reasoning.
 
 | Piece | Where | What it does | Traceable end to end? |
 | --- | --- | --- | --- |
@@ -74,7 +81,7 @@ Contracts in code today: [DESIGN.md](../dev/DESIGN.md) §6 (Planning / NLP).
 | The step model | `core/discrete/step_system.py`, `core/compile/evaluators/discrete.py`, `stepping.py` | `step(x, u, k, params)`; `rollout` is a Python loop on NumPy, one `lax.scan` on JAX; no `rollout_batch` for step systems yet | yes (open point: `DiscreteEvaluator.rollout` returns host NumPy) |
 | Other solvers in disguise | `planning/dynamic_programming/dp_jax.py` (value iteration in a `lax.while_loop`), `learning/.../ppo.py` (scan of minibatch steps), MPPI (planned, S72) | each owns its own loop | yes |
 
-Nothing in the library differentiates *through* a solve today: no `custom_vjp`, no implicit
+At the time, nothing in the library differentiated *through* a solve: no `custom_vjp`, no implicit
 differentiation, no traceable optimizer loop outside RL. The problem evaluator's program
 export (`pe.program(wrt=…)`) does give a JAX-traceable `J(z)`, so the inputs a traceable solver
 needs already exist.
@@ -129,7 +136,7 @@ What this buys, beyond reuse:
 - **Stopping.** A rollout runs a fixed count; a solver stops on a tolerance. A fixed count is a
   `lax.scan`, traceable in every mode; a tolerance is a `lax.while_loop`, which `jit` and
   `vmap` take but reverse-mode `grad` does not. Both stay, as one structural keyword:
-  `iterations=K` the process, `iterations=None` the answer.
+  `n_iterations=K` the process, `n_iterations=None` the answer.
 - **Differentiating the answer is not differentiating the process.** Two different
   gradients, both useful (§4.3).
 - **Constraints.** A projection on the box fits the step model as is. Equality and inequality
@@ -145,7 +152,7 @@ What this buys, beyond reuse:
 1. **The kernel**: each native method is a pure law, `init(z0, params) -> state` and
    `step(state, params) -> state`, Optax-shaped (as `Adam` already is), on the array module of
    its inputs (one equation path, CONSTITUTION §2 invariant 5). `Optimizer` runs it: a Python
-   loop on NumPy, `lax.scan` (`iterations=K`) or `lax.while_loop` (`iterations=None`) on JAX.
+   loop on NumPy, `lax.scan` (`n_iterations=K`) or `lax.while_loop` (`n_iterations=None`) on JAX.
 2. **The step-system view**: `as_step_system(solver, program)`, reached as
    `optimizer.as_step_system()`, the law as a `StepSystem` update block and the oracle as
    a static block, so a lesson can wire the loop, roll it out and linearize it. A *view* of the
@@ -187,9 +194,9 @@ Optax and Optimistix on breadth. `Adam` already says any Optax-style object can 
 
 | Mode | How | Cost | When |
 | --- | --- | --- | --- |
-| **Unrolled** | `grad` through the `lax.scan` of `iterations=K` | memory grows with `K` | gradients with respect to the method's own parameters (`η`, a learned step size), a fixed small budget, the fixed-iteration MPC (§4.6) |
+| **Unrolled** | `grad` through the `lax.scan` of `n_iterations=K` | memory grows with `K` | gradients with respect to the method's own parameters (`η`, a learned step size), a fixed small budget, the fixed-iteration MPC (§4.6) |
 | **Implicit** | at the answer, `∇_z J(z*, p) = 0`, so `dz*/dp = −H⁻¹ ∂²J/∂z∂p` (the KKT system once there are constraints); a `custom_vjp` around the solve | one linear solve, memory constant | the sensitivity of the answer to the problem: a solve inside a loss, bilevel tuning (later) |
-| **None** | `lax.while_loop` to a tolerance (`iterations=None`) | cheapest | a batch of solves under `jit` and `vmap`, without gradients |
+| **None** | `lax.while_loop` to a tolerance (`n_iterations=None`) | cheapest | a batch of solves under `jit` and `vmap`, without gradients |
 
 The implicit mode needs only the converged `z*` and the program's derivatives, so it can wrap
 any solver whose answer is accurate, a wrapped one included (through `jax.pure_callback`); that
@@ -203,7 +210,7 @@ table for the offline and the compiled paths, landed in v0.3).
 
 ### 4.5 The surface, sketched
 
-`iterations=`, `backend=`, `params=` and `z0=` on the solve and
+`n_iterations=`, `backend=`, `params=` and `z0=` on the solve and
 `as_step_system` are decided; the other names are placeholders.
 
 ```python
@@ -211,7 +218,7 @@ table for the offline and the compiled paths, landed in v0.3).
 result = Optimizer(program, method="adam").solve()
 
 # A native method on JAX, exactly K steps: the whole solve one lax.scan
-opt = Optimizer(program, method="adam", backend="jax", iterations=200)
+opt = Optimizer(program, method="adam", backend="jax", n_iterations=200)
 z_star = opt.solve(params=p, z0=z0).z                       # jit-able, vmap-able, differentiable
 dz_dp = jax.jacobian(lambda p: opt.solve(params=p, z0=z0).z)(p)
 
@@ -230,24 +237,24 @@ settled with NS-2.
 ### 4.6 The first target: a fixed-iteration MPC, compiled end to end
 
 **The shape.** The fixed-iteration MPC is no special block: it is a trajectory-optimization
-planner whose method is native and whose `iterations=K` is forwarded to its `Optimizer`,
+planner whose method is native and whose `n_iterations=K` is forwarded to its `Optimizer`,
 wrapped by `ModelPredictiveController` like any planner. Its compiled face's `pv.solve(params,
 z0)` is `K` iterations of the method from the shifted plan; the tick (shift, solve, command), the
 delay, tick 0 and the bindings are DESIGN §6's MPC. In the solver's
 terms one tick is
 
 ```text
-z_k = S^K( pv.shift(z_{k−1}, t_k) ; P_k )               P_k: the planner's tree, x_start and t_start bound
+z_k = S^K( pv.shift(z_{k−1}, t_k) ; P_k )               P_k: the planner's tree, x0 and t0 bound
 ```
 
 with `S` one iteration of the method (projected fast gradient, Adam). `K` is structural, fixed at
 construction. Every piece is pure array code, so the MPC's `step` is one jitted function
 and the closed loop `(mpc % 0.05) @ plant` is one `lax.scan`.
 
-**Today, for contrast:** `MPCStatefulController` (`planning/trajectory_optimization/mpc/controller.py`)
-already keeps the packed plan as its state, but its `step` is a host solve (SciPy SLSQP)
-through a tick latch with side effects; the compiled face drops the stateful and stateless pair and
-the latch (landed).
+**Before, for contrast:** the former stateful MPC controller kept the packed plan as its
+state, but its `step` was a host solve (SciPy SLSQP) through a tick latch with side effects;
+the compiled face dropped the stateful and stateless pair and the latch (landed; the block is
+`ModelPredictiveController`).
 
 **Why a fixed `K` is the right contract here**, not a tolerance:
 - The tick's cost is known in advance: a real-time budget, the same on every tick.
@@ -274,10 +281,10 @@ whose dynamics are equality rows, stays on Ipopt and SciPy.
 - A first differentiable MPC without implicit differentiation; the implicit mode (§4.3) stays
   for a solve run to convergence.
 
-**What it needs first.** The parametric program (S76: the solve binds `x_start` and the plant
+**What it needs first.** The parametric program (S76: the solve binds `x0` and the plant
 without a recompile); NS-1 and NS-2's fixed-`K` form; the planner's compiled face; for the closed loop, the sampled loop as one scan and its
-differentiable evaluation. Today `HybridSimulator` steps the ticks in a Python loop, and the problem evaluator
-refuses a `StepSystem` controller (`require_continuous` in `planning/evaluator.py`). The sampled
+differentiable evaluation (all landed in v0.3: the sampled loop runs as one scan, and the
+problem evaluator takes a sampled controller, `require_continuous_or_clocked`). The sampled
 loop's first consumers are a digital PID and a held neural policy, so it is built and checked
 before NS-8. A host-solver MPC (Ipopt, SLSQP) runs the same block on the NumPy face.
 
@@ -285,9 +292,9 @@ before NS-8. A host-solver MPC (Ipopt, SLSQP) runs the same block on the NumPy f
 
 The path-integral planner (MPPI, S72) fits the same template with a
 derivative-free iteration: a planner under the compiled-face contract, its `z` the nominal
-`U` and `t_start`, its `seed` a leaf of `planner.params` that the MPC draws from the block's seed
-and the tick. The prototype (`experimental/mppi/pendulum_mppi.py`, `racecar_mppi.py`)
-already writes its tick as one jitted pure function `mppi_tick(U, x0, key)`: sample perturbed
+`U` and `t0`, its `seed` a leaf of `planner.params` that the MPC draws from the block's seed
+and the tick. The prototype (since landed as `planning/trajectory_optimization/path_integral.py`)
+wrote its tick as one jitted pure function `mppi_tick(U, x0, key)`: sample perturbed
 sequences, roll them out in one `vmap`, score, weigh by `exp(−S/λ)`, average. Its receding
 horizon is a hand `for` loop with the key split by hand; the MPC block replaces it. Several MPPI
 iterations per tick (`n_iterations`, structural like `K`) fit the same shape.
@@ -325,7 +332,7 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
 - **NS-1 The kernel**: `init` / `step` laws for `gd` and `adam`, on the array module of their
   input; the `Optimizer` loop on NumPy unchanged in behaviour (the AGENTS refactor recipe, a
   byte-identical baseline), and `adam` runs on NumPy without JAX.
-- **NS-2 The traced solve**: `iterations=K` as a `lax.scan` and `iterations=None` as a
+- **NS-2 The traced solve**: `n_iterations=K` as a `lax.scan` and `n_iterations=None` as a
   `lax.while_loop` for the native methods on a JAX program; a batch of starts solves in
   one `vmap` call and matches the loop.
 - **NS-3 Implicit differentiation** of the unconstrained and box-bounded answer
@@ -341,7 +348,7 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
 - **NS-7 The stochastic category**: the optimizer seed strategies, SGD and Adam advancing
   the seed, the problem evaluator's Monte Carlo objective their first consumer.
 - **NS-8 The fixed-iteration planner** (§4.6): single-shooting trajectory optimization with a
-  native method and `iterations=K`, its compiled face (DESIGN §6) pure; one
+  native method and `n_iterations=K`, its compiled face (DESIGN §6) pure; one
   `pv.solve` jits, the MPC on it matches the host SLSQP plan within a tolerance on the pendulum
   and the cart-pole after enough ticks, and `jax.grad` of one tick's input with respect to a
   cost weight matches finite differences.
@@ -356,9 +363,9 @@ The order and each row's "done when" are TODO §1.8 (the proof of concept) and �
 2. Which categories and native algorithms (§4.1, §4.2): **added with the first solver that
    needs them, minimalist.**
 3. The rung: **answered 2026-10-26** by the maintainer's direction: a proof of concept in v0.3,
-   the rest in v0.4.
-4. The fixed-count keyword: **`iterations=K` on `Optimizer`**; rejected, an `iterate`
-   verb and `solve(iterations=K)`.
+   the rest in v0.5.
+4. The fixed-count keyword: **`n_iterations=K` on `Optimizer`**; rejected, an `iterate`
+   verb and `solve(n_iterations=K)`.
 
 Ruled: the discrete step analysis
 comes back with NS-5 (§4.7).
@@ -371,7 +378,7 @@ on one program noun:**
   (`solve(params=...)`) a partial tree is merged once onto the defaults; no `bind` on programs;
 - the seed is an integer leaf found by the `seed` key, as on blocks, policies and sources; integer leaves are allowed in `params` (amending the rule that keeps switches out of `params`) and never enter `wrt`;
   the raw gradient over a whole tree is `jax.grad(f, allow_int=True)`;
-- sizes (the horizon `N`, the iterations `K`, batch sizes) are constructor arguments; only
+- sizes (the horizon `n_steps`, the iterations `K`, batch sizes) are constructor arguments; only
   values live in `params`;
 - the warm start is an argument of the solve (`z0=`), not of the program;
 - sensitivities through a solve come later, with implicit differentiation (§4.3);

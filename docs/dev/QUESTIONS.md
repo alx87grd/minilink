@@ -9,7 +9,7 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The v0.3 core's rulings are the architecture of record. `§N` names the workstream of
-[ROADMAP §5.3](ROADMAP.md#53-v03--the-complete-core), the same N as TODO §1.N.
+[ROADMAP §5.4](ROADMAP.md#54-v04--the-clean-surface), the same N as TODO §1.N.
 
 ## The core
 

@@ -20,33 +20,29 @@ maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan d
 in the same change; the commit message carries its why. It then leaves QUESTIONS.md.
 
 Pyro parity rows stay in [pyro-port-remaining.md](pyro-port-remaining.md)
-(v0.4; open rows plus the landed name map). Landed contracts move into
+(v0.5; open rows plus the landed name map). Landed contracts move into
 [DESIGN.md](../dev/DESIGN.md) and the plan doc is deleted; one-line ideas go
 to a Later bullet in [TODO.md](TODO.md) first — open a plan doc only when the
 design needs a writeup.
 
 Step ids (`A3`, `P4`, `S60`, …) are global and assigned in [TODO.md](TODO.md) only. A plan doc numbers
 its own steps locally (geometry-module.md's steps 1–6, cited as "steps 1–6 of geometry-module.md") or with a
-prefix of its own (`CBF-1`, `OPW-1`, `AM-1`), never with a bare workboard-style id. The prefix
+prefix of its own (`CBF-1`, `OPW-1`, `AM-1`, `MS-D1`), never with a bare workboard-style id. The prefix
 also marks a plan's rulings and the ids it cites from an audit, so they never collide with a
 workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
-`P4`, `G1`, …) stay bare. The decision ids `D13`–`D30`, kept inside the plan docs that hold them,
-are anchors only; TODO and QUESTIONS cite them by their heading. In prose, an id never opens a
-sentence: the plain title comes first.
+`P4`, `G1`, …) stay bare. In prose, an id never opens a sentence: the plain title comes first.
 
 ## The plan docs
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
-| [tutorials.md](tutorials.md) | **Draft.** The tutorials in three layers (basics, core, advanced), most important first; the audit of the 15 current notebooks, what each new one holds and absorbs, the order | proposed new v0.4 |
-| [core-api-improvements.md](core-api-improvements.md) | **Draft.** Seven core API improvement proposals surfaced during the `examples/tutorial/core/` review (`CA-1`–`CA-7`), with reproducers, diffs, and `DESIGN.md`/`RULES.md` evolution notes | proposed new v0.4 |
-| [minimal-surface.md](minimal-surface.md) | **Draft, decisions open.** Demos, notebooks, tests and CI redrafted on the v0.3 core: the audit, seven decisions with options (D1–D7), the order | proposed new v0.4 |
-| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.4 (the proof of concept landed in v0.3) |
-| [future-policies.md](future-policies.md) | The API projected onto MPPI, behavior cloning and diffusion policy; the seeded policy (D29, §5.1); questions for discussion (§7) | after v1.0 |
-| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.4; v0.9 |
-| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.4 (A3) |
+| [core-api-improvements.md](core-api-improvements.md) | The core API proposals from the `examples/tutorial/core/` review (`CA-1`–`CA-6` open, `CA-7` landed), with reproducers and diffs | v0.4 (TODO §1.11) |
+| [minimal-surface.md](minimal-surface.md) | **Decisions open.** Demos, notebooks, tests and CI redrafted on the core: the audit, the decisions `MS-D1`–`MS-D6` with options, the order | v0.4 (TODO §1.12) |
+| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.5 (the proof of concept landed in v0.3) |
+| [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
+| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.5 (A3) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control barrier functions: SDF interpolation, DCBF with slacks, HOCBF, the safety-filter block; the barrier a `Field` | unscheduled (TODO §6) |
-| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.4 (C1) |
+| [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.5 (C1) |
 | [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |
 

@@ -2,7 +2,7 @@
 
 Snapshot vs [SherbyRobotics/pyro](https://github.com/SherbyRobotics/pyro) local checkout (2026-06-29).
 
-Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.4 (moved from v0.3). Open rows plus the landed name map; re-audit against the code before the migration guide.
+Status: open — the parity rows and the pyro → minilink migration guide (C1), v0.5 (moved from v0.3). Open rows plus the landed name map; re-audit against the code before the migration guide.
 
 Status legend: **Done** = equivalent landed · **Partial** = framework exists, gap noted · **TODO** = planned/in-scope · **Drop** = explicit non-goal
 
@@ -18,7 +18,7 @@ once in the name map at the end. Counts recounted from the tables below on 2026-
 | Library symbols | 105 | 85 | 10 | 4 | 6 |
 | Example scripts | 195 | 29 | 47 | 83 | 36 |
 
-Parity is part of the **v0.4** milestone (moved from v0.3; [ROADMAP.md §5.4](../dev/ROADMAP.md#5-the-path-to-v10)); v0.1 is GRO860 end to end.
+Parity is part of the **v0.5** milestone (moved from v0.3; [ROADMAP.md §5.5](../dev/ROADMAP.md#55-v05--features-on-the-core)); v0.1 is GRO860 end to end.
 Release criterion carried over: every **in-scope** pyro library module has a minilink home or a documented drop; representative closed-loop demo per major plant family; README pyro → minilink migration guide (built from the name map below).
 
 ## 1. Library modules — pyro → minilink
@@ -32,7 +32,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Framework | `pyro/dynamic/stochastic.py` | StochasticSystemWrapper | `—` | — | **Drop** | Explicit non-goal unless reversed ([TODO.md](TODO.md) Later) |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | TireModel (ABC) | `minilink/dynamics/catalog/vehicles/dynamic_bicycle.py`, `minilink/dynamics/catalog/vehicles/tires.py` | `linear_tire_forces`, `brush_tire_forces` | **Partial** | The linear tire (`DynamicBicycle`) and the brush tire (`UdeSRacecar`) as pure functions; no tire ABC, no Pacejka |
 | Catalog | `pyro/dynamic/vehicle_dynamic.py` | Pacejka | `—` | — | **TODO** | [TODO.md](TODO.md) Later |
-| Catalog | `pyro/dynamic/vehicle_steering.py` | HolonomicMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene + bind() | **Partial** | Scene replaces plant wrapper |
+| Catalog | `pyro/dynamic/vehicle_steering.py` | HolonomicMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene + mount | **Partial** | Scene replaces plant wrapper |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | Holonomic3DMobileRobotwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** | Scene replaces plant wrapper |
 | Catalog | `pyro/dynamic/vehicle_steering.py` | KinematicCarModelwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
 | Catalog | `pyro/dynamic/manipulator.py` | TwoLinkManipulatorwithObstacles | `minilink/planning/spatial/` | Scene | **Partial** |  |
@@ -53,7 +53,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | `minilink/core/compile/` | `compile`, the execution plans (`plan.py`), one evaluator per system kind on either backend (`DynamicEvaluator`, `DiagramEvaluator`, `StaticEvaluator`, `StepEvaluator`, `StepDiagramEvaluator`) | Compile band; pyro has no separate compile layer |
 | `minilink/core/geometry.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
-| `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`bind()`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
+| `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`mount`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |
 | `minilink/blocks/neural.py` | MLP block (JAX) | Prototype; pyro RL is SB3-only |
 | `minilink/experimental/symbolic/` | Symbolic derivation | Quarantine; no pyro equivalent |
@@ -265,7 +265,7 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | Hybrid events (guards and resets, event-driven switching) | **Drop** | out of scope (ROADMAP §7) |
 | Pyro `sys2game` framework | **Drop** | superseded by `simulation/realtime/` (`RealtimeSimulator`) |
 | Stable-Baselines3 in-library RL | **Drop** | interfaces/gymnasium.py; train externally |
-| `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + bind() |
+| `*withObstacles` plant subclasses | **Drop** | planning/spatial/Scene + mount |
 | DynamicProgramming2DRectBivariateSpline | **Drop** | Grid DP backends |
 | RigidBody2D standalone plant | **Drop** | GeneralizedMechanicalSystem |
 | StochasticSystemWrapper | **Drop** | Noise ports only unless reversed |
@@ -294,7 +294,7 @@ Ordered by unblock count:
 
 ## Appendix — pyro → minilink name map (landed)
 
-Record of every symbol marked Done, at the 2026-09-05 shrink and since; the source for the v0.4 migration guide.
+Record of every symbol marked Done, at the 2026-09-05 shrink and since; the source for the v0.5 migration guide.
 
 | Pyro symbol | Minilink symbol | Minilink module |
 | --- | --- | --- |

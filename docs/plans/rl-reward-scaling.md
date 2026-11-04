@@ -14,7 +14,7 @@ Nothing in the problem is wrong. Scaling the cost by a positive constant leaves 
 
 ## 2. Evidence
 
-**Task.** A 2D particle in a viscous medium: `m = 10`, `b = 5`, `|F| <= 100` per axis, a 100 x 100 plane, target at the center; `g = (x - xbar)' Q (x - xbar) + u' R u` with `Q = diag(1, 1, 0.1, 0.1)` and `R = 0.01 I`. The time step is `dt = 0.1`, episodes last 20 s, and leaving the plane is a failure priced at `g_max T`. At the starts, `g dt` is of order 100 per step.
+**Task.** A 2D particle in a viscous medium: `m = 10`, `b = 5`, `|F| <= 100` per axis, a 100 x 100 plane, target at the center; `g = (x - x_bar)' Q (x - x_bar) + u' R u` with `Q = diag(1, 1, 0.1, 0.1)` and `R = 0.01 I`. The time step is `dt = 0.1`, episodes last 20 s, and leaving the plane is a failure priced at `g_max T`. At the starts, `g dt` is of order 100 per step.
 
 **Yardstick.** Every policy is scored on the same 100 fixed starts: Euler integration, `J = sum g dt`, plus the failure price. On it, LQR scores 3162, a hand-tuned PD 3172, and `u = 0` 31320.
 
@@ -79,7 +79,7 @@ ReinforcementLearningPlanner(problem, ..., reward_scale="auto")  # or a float, o
 ```
 
 - `"auto"` sets `c = 1 / (g_max dt)` from the same bound as the failure price (`problem.cost_bound()`). The algorithm sees `c r` and `c` times the failure price.
-- Everything reported to the user stays in cost units: the learning curve, "mean episode cost", the solver record and `evaluate`. The solver record also carries `c`.
+- Everything reported to the user stays in cost units: the learning curve, "mean episode cost", the record and `evaluate`. The record also carries `c`.
 - With no finite box, `"auto"` falls back to `c = 1` and prints one line saying so. Option B can come later if a consumer needs it.
 - Whether `"auto"` is the default is the maintainer's call. It moves every RL demo's numbers once, so it lands between cohorts, like the draws' changes of v0.3 (RN-4, RN-5).
 
@@ -105,6 +105,6 @@ This is consistent with the rule that port bounds are information, not saturatio
 
 The runs used `git archive origin/main` of 2026-09-27 in a clean venv (gymnasium, stable-baselines3, jax[cpu]).
 
-- **Scaled cost.** `QuadraticCost.from_system(plant, xbar=..., Q=c * Q, R=c * R)` with `failure_cost=c * PENALTY` on the `PlanningProblem`.
+- **Scaled cost.** `QuadraticCost.from_system(plant, x_bar=..., Q=c * Q, R=c * R)` with `failure_cost=c * PENALTY` on the `PlanningProblem`.
 - **Gradient norms.** From `algorithm.loss` on minibatches built exactly as `PPO.update` builds them (`collect.advantages`, `collect.flatten`).
 - **The scripts** lived in a session scratchpad and are not kept. They are about 150 lines and easy to rebuild from this description.

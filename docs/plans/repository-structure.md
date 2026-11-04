@@ -73,7 +73,7 @@ Pros: the smallest change. Cons: the four axes stay, and the README table stays 
 examples/
   <NN>_<chapter>/            # one folder per textbook chapter, in tutorial order
     README.md                # the chapter index: what each file teaches, in reading order
-    <chapter>.ipynb          # the tutorial notebook (today's tutorial/NN_<chapter>.ipynb)
+    <chapter>.ipynb          # the tutorial notebook (today's tutorial/<layer>/NN_<chapter>.ipynb)
     <plant>_<method>.py      # the canonical demos (today's demos/<chapter>/*.py)
     <plant>_<method>.ipynb   # the textbook lessons (today's teaching/topics/<domain>/*.ipynb)
   courses/<id>/              # live course pins; paths inside unchanged (see C)
@@ -128,7 +128,7 @@ one commit. Cons: a push to `main` can break a running course; the library repo 
 forty notebooks and their smoke checks; a course term and a library release are coupled.
 
 **C2 — two repos, `minilink` and a course repo pinned on a release.** The course repo's
-Colab cell does `pip install minilink==0.2.0` (or clones the tag); one term pins one
+Colab cell does `pip install minilink==0.3.0` (or clones the tag); one term pins one
 release; the library moves freely. Pros: a running course cannot break; the library repo is
 only the library; the course repo can hold solutions, slides and grading scripts that have no
 place in a library. Cons: two CIs; a notebook that needs a new feature waits for a release;
@@ -136,7 +136,7 @@ a rename needs a second commit in a second repo, after the release; co-evolution
 
 **C3 — one repo, pinned Colab cells, drift checked nightly.** Everything stays here, but
 the **course** notebooks' install cell pins the release the course runs on
-(`pip install minilink==0.2.0`, or `git clone -b v0.2.0` when the notebook needs the
+(`pip install minilink==0.3.0`, or `git clone -b 0.3.0` when the notebook needs the
 examples tree), while the tutorial and the chapter lessons keep tracking `main`. The
 nightly workflow also runs the course notebooks against `main` and reports drift without
 failing the merge gate; the term-boundary step bumps the pin. Pros: a running course is safe
@@ -160,7 +160,7 @@ research material is a separate call (§6, ask 3).
 
 | When | Examples (B) | Teaching material (C) |
 | --- | --- | --- |
-| now (docs and one-line changes) | write the three rules and the chapter list in `examples/README.md` | pin the course notebooks' install cell on `0.2.0`; the nightly drift run |
+| now (docs and one-line changes) | write the three rules and the chapter list in `examples/README.md` | pin the course notebooks' install cell on `0.3.0`; the nightly drift run |
 | between terms (after GMC714) | the chapter moves (B2), one commit per chapter; `research/` | bump the pin to the term's release |
 | v1.0 | — | the course repo (C2), forked from `courses/` with history |
 
@@ -169,7 +169,8 @@ research material is a separate call (§6, ask 3).
 1. **The chapter list** for B2: the three tutorial layers as the spine, and a home for
    `hybrid`, `mpc`, `realtime`, `robotic` and the racecar plant folder (a notebook each, or
    folded into the existing layers).
-2. **The pin form** for C3, ruled 2026-10-25: `git clone -b v<tag>` (keeps the
+2. **The pin form** for C3, ruled 2026-10-25: `git clone -b <tag>`, the tag as published
+   (bare: `0.3.0`, no `v`) (keeps the
    notebooks' relative imports of the examples tree), not `pip install minilink==<tag>`.
 3. **`projects/`**: research material that stays (`research/projects/`), or course material
    that moves with the course repo at v1.0.

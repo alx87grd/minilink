@@ -2,8 +2,8 @@
 
 **Status:** core contract — design agreed 2026-09-21, not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
-**Rung:** v0.4, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([TODO.md](TODO.md) §1.9).  
-**Depends on:** the `Field` ABC (`core/fields.py`, DESIGN §4) (can move spatial files first and rename `StateField` → `Field` in the same pass or after).
+**Rung:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([TODO.md](TODO.md) §1.9).  
+**Depends on:** the `Field` ABC (`core/fields.py`, DESIGN §4) (landed in v0.3, `StateField` renamed `Field`).
 
 Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
 
@@ -33,7 +33,7 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 | `disc`, `point_probe`, `car_outline` | [`planning/spatial/collision.py`](../../minilink/planning/spatial/collision.py) | `core/geometry/probes.py` |
 | `CollisionBody`, `mount` | same file | `core/geometry/collision.py` |
 | `Field`, `FieldSet`, `FieldCost` (was `StateField`) | [`core/fields.py`](../../minilink/core/fields.py) (moved in the v0.3 run) | stays |
-| `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | same file | `core/geometry/fields.py` (subclass `Field`) |
+| `ClearanceField`, `CostDensityField`, `PathDistanceField`, `CorridorMarginField` | `planning/spatial/state_fields.py` | `core/geometry/fields.py` (subclass `Field`) |
 | `quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy` | [`core/shaping.py`](../../minilink/core/shaping.py) (moved in the v0.3 run) | stays, beside `core/fields.py` |
 | `FieldGrid`, `sample_grid` | [`planning/spatial/grid.py`](../../minilink/planning/spatial/grid.py) | `core/geometry/grid.py` |
 | `plot_scene`, `plot_track`, cost rasters | [`planning/spatial/plotting.py`](../../minilink/planning/spatial/plotting.py) | `graphical/` (lazy; `scene.plot()` / `track.plot()` stay on the object) |
