@@ -1,29 +1,38 @@
 # CI — the jobs and their entry points are documented in tests/README.md#entry-points
+#
+# The gate on every push and pull request: `test` (Linux, py 3.12, the Basic tier),
+# `regression` (the full optional stack: JAX tests and gates), `notebooks`, `docs`,
+# `packaging`; they run side by side, pytest in parallel (pytest-xdist). The other
+# Pythons and the students' laptops run on pull requests into `main`, on demand, and
+# nightly (nightly.yml).
 name: CI
 
 on:
   push:
-    branches: [main, dev-alex, dev, dev-v0.3]
+    branches: [main, dev-alex, dev]
   pull_request:
-    branches: [main, dev-alex, dev, dev-v0.3]
+    branches: [main, dev-alex, dev]
+  workflow_dispatch:
+
+# A newer push to the same branch cancels the run it replaces
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    strategy:
-      matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
 
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.12
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.12"
 
     # The merge gate runs without JAX; gymnasium and the graphviz wrapper ride along
     - name: Install dependencies
@@ -41,22 +50,55 @@ jobs:
     # Notebooks are committed stripped (no outputs, no volatile metadata); one
     # committed without the hook or the filter fails here.
     - name: Check notebooks are stripped
-      if: matrix.python-version == '3.12'
       run: pre-commit run nbstripout --all-files --show-diff-on-failure
 
-    - name: Test with pytest
-      if: matrix.python-version != '3.12'
-      run: pytest
+    # Coverage is reported, not gated. The demo-check bridge runs its demos as
+    # subprocesses with time limits, so it runs on its own, after the parallel run.
+    - name: Test with pytest (parallel, coverage report)
+      run: pytest -n auto --ignore=tests/unittest/test_demo_check_runners.py --cov=minilink --cov-report=term --cov-report=markdown-append:"$GITHUB_STEP_SUMMARY"
 
-    # Coverage is reported, not gated: one leg, no fail-under threshold.
-    - name: Test with pytest (coverage report)
-      if: matrix.python-version == '3.12'
-      run: pytest --cov=minilink --cov-report=term --cov-report=markdown-append:"$GITHUB_STEP_SUMMARY"
+    - name: Demo-check bridge
+      if: ${{ !cancelled() }}
+      env:
+        MPLBACKEND: Agg
+      run: pytest tests/unittest/test_demo_check_runners.py
+
+  # The other supported Pythons: on pull requests into main, on demand, and nightly
+  pythons:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install gymnasium graphviz
+
+    - name: Test with pytest
+      env:
+        MPLBACKEND: Agg
+      run: pytest -n auto
 
   # Students' laptops: the Basic tier (NumPy, SciPy, Matplotlib; no Graphviz,
-  # JAX or other extras) on Windows and macOS. Tests and notebooks that need an
-  # extra skip, as they do on a Basic install.
+  # JAX or other extras) on Windows and macOS, when the other Pythons run. Tests
+  # and notebooks that need an extra skip, as they do on a Basic install.
   laptops:
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.base_ref == 'main')
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     strategy:
@@ -87,7 +129,7 @@ jobs:
         pip install -e ".[dev]"
 
     - name: Test with pytest
-      run: pytest
+      run: pytest -n auto
 
     # Teaching notebooks: the ones the Basic tier runs; the rest skip on their extra.
     - name: Notebook smoke checks
@@ -95,7 +137,7 @@ jobs:
       env:
         PYTHONPATH: ${{ github.workspace }}
       run: |
-        python tests/demo_checks/run_notebook_checks.py
+        python tests/demo_checks/run_notebook_checks.py --jobs 2
 
   packaging:
     runs-on: ubuntu-latest
@@ -128,8 +170,10 @@ jobs:
 
   regression:
     runs-on: ubuntu-latest
-    timeout-minutes: 75
-    needs: test
+    timeout-minutes: 45
+    env:
+      SDL_VIDEODRIVER: dummy
+      MPLBACKEND: Agg
 
     steps:
     - uses: actions/checkout@v4
@@ -148,14 +192,17 @@ jobs:
         pip install -e ".[dev,full]"
         pip install graphviz
 
-    # JAX tests skip in the ``test`` job (no extra); gate them here. The experimental
-    # tier's tests (symbolic mechanics, contact engines) are nightly only (ROADMAP §2).
-    - name: Test with pytest (incl. JAX)
-      env:
-        SDL_VIDEODRIVER: dummy
-      run: pytest
+    # The whole suite with the full stack: the JAX tests skip in the ``test`` job (no
+    # extra), and a JAX test without its marker still runs here. The experimental
+    # tier's tests are nightly only (ROADMAP §2).
+    - name: Test with pytest (incl. JAX, parallel)
+      run: pytest -n auto --ignore=tests/unittest/test_demo_check_runners.py
 
-    # The gates, flagships and notebooks report even when a unit test failed.
+    # The flagship demos, the JAX ones included (interactive viewer demos skip)
+    - name: Demo-check bridge (incl. JAX flagships)
+      if: ${{ !cancelled() }}
+      run: pytest tests/unittest/test_demo_check_runners.py
+
     - name: Regression gates
       if: ${{ !cancelled() }}
       env:
@@ -166,22 +213,57 @@ jobs:
           --speed-gate-suffixes solve_s,nlp_s,speedup \
           --speed-slack-s 0.1
 
-    # JAX flagships skip in the ``test`` job (no jax extra); gate them here.
-    # Interactive flagships (viewer demos) stay skipped in both jobs.
-    - name: Flagship demo checks (incl. JAX)
-      if: ${{ !cancelled() }}
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        MPLBACKEND: Agg
-      run: |
-        python tests/demo_checks/run_flagship_demos.py
+  # Teaching notebooks with the full stack: execute code cells, fail on error
+  notebooks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      MPLBACKEND: Agg
+      SDL_VIDEODRIVER: dummy
 
-    # Teaching notebooks: execute code cells; fail on error (once, with JAX).
-    - name: Notebook smoke checks
-      if: ${{ !cancelled() }}
-      env:
-        PYTHONPATH: ${{ github.workspace }}
-        MPLBACKEND: Agg
-        SDL_VIDEODRIVER: dummy
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install system dependencies
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Install dependencies (the full optional stack)
       run: |
-        python tests/demo_checks/run_notebook_checks.py
+        python -m pip install --upgrade pip
+        pip install -e ".[dev,full]"
+        pip install graphviz
+
+    - name: Notebook smoke checks
+      run: python tests/demo_checks/run_notebook_checks.py --jobs 3
+
+  # The Sphinx site, warnings as errors (the deploy is docs.yml, from main)
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install docs dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -e ".[dev]"
+
+    - name: Build docs
+      env:
+        MPLBACKEND: Agg
+        MPLCONFIGDIR: .mpl
+      run: sphinx-build -W --keep-going -b html docs docs/_build/html

@@ -96,25 +96,30 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | ruff + `pytest` (py 3.10–3.13; demo-check bridge; JAX tests and demos skip); coverage report on py 3.12, no gate; on py 3.12, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata) |
-| **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest` + **notebook smoke** (notebooks that need an extra skip) |
+| **`test`** | py 3.12, the Basic tier: ruff, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata), `pytest -n auto` with a coverage report (no gate; JAX tests and demos skip), then the demo-check bridge on its own |
+| **`regression`** | py 3.12 with the full optional stack: `pytest -n auto` (the JAX tests included; the experimental tier's tests are nightly only), the demo-check bridge (the **flagship demos**, JAX ones included), the regression gates (CI flags above) |
+| **`notebooks`** | **notebook smoke** with the full stack, three notebooks at once (`run_notebook_checks.py --jobs 3`) |
+| **`docs`** | the Sphinx build, warnings as errors (`docs.yml` deploys it from `main`) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
-| **`regression`** | `pytest` (incl. the JAX tests; the experimental tier's tests are nightly only) + regression gates (CI flags above) + **flagship demos** + **notebook smoke** (py 3.12 + JAX + viz + symbolic) |
+| **`pythons`** | py 3.10, 3.11, 3.13: `pytest -n auto`; on pull requests into `main`, on demand (`workflow_dispatch`), and nightly |
+| **`laptops`** | Basic tier (`pip install -e ".[dev]"`, no extras) on `windows-latest` and `macos-latest`, py 3.12: `pytest -n auto` + **notebook smoke** (notebooks that need an extra skip); when `pythons` runs |
+
+The jobs run side by side, and a newer push to a branch cancels the run it replaces.
 
 Not merge gates: `publish.yml` runs on a `0.*` tag, and its **`check`** job (ruff +
 `pytest`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
 uploads to PyPI; `nightly.yml` installs the full optional stack (every extra, Ipopt,
-Stable-Baselines3) and runs `pytest` (the Ipopt tests included), the experimental tier's
+Stable-Baselines3) and runs `pytest` (the Ipopt tests included), the other Pythons and the laptops, the experimental tier's
 tests (`pytest tests/experimental`: the symbolic mechanics and the contact engines), every demo
 script, and every notebook (`run_notebook_checks.py --all`: those marked `smoke: false`
 in `notebook_overrides.json` too, except those marked `nightly: false`, run only by name);
-`docs.yml` builds the Sphinx site.
+`docs.yml` deploys the Sphinx site from `main`.
 
 ### Validation layers
 
 | Layer | Purpose | Human IDE (`tests/run/`) | Agent / CI | CI job |
 | --- | --- | --- | --- | --- |
-| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `run_contract_tests.py` | `pytest` | `test` + `laptops` (Basic tier) + `regression` (w/ JAX) |
+| **Contract tests** | API types, shapes, compile/sim/MPC behavior | `run_contract_tests.py` | `pytest` | `test` (Basic tier) + `regression` (w/ JAX); `pythons` + `laptops` on PRs into `main` |
 | **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
 | **Benchmark study** | Machine/GPU exploration tables | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | (in contract tests) | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |

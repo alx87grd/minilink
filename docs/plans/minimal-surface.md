@@ -100,7 +100,10 @@ become is open below.
 - **B.** As A, plus macOS and Windows on pull requests into `main` only.
 - **C.** Keep the matrix on every run; only remove the duplicates.
 
-*Agent's recommendation:* B. **Answer:**
+*Agent's recommendation:* B. **Answer (2026-11-04):** B, with the other Pythons (3.10, 3.11,
+3.13) beside macOS and Windows on pull requests into `main` and nightly; first the critical
+path shortened (the jobs side by side, `pytest -n auto`, the notebooks three at once, the docs
+build in the gate).
 
 ### MS-D4. Demos: what the set is
 

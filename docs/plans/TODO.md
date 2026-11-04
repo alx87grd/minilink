@@ -287,7 +287,9 @@ Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, C
 benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
 **[ask]**; the order is the plan's §4.
 
-- [ ] **CI shape** (MS-D3): the fastest relief, independent of the rest.
+- [ ] **CI shape** (MS-D3, ruled 2026-11-04: option B, the critical path first): done when a
+  `workflow_dispatch` run of the new `test.yml` shows the same test counts per job as before
+  and its wall time is reported.
 - [ ] **The test layers** (MS-D1, MS-D2): the layers, then the moves and deletions, file by file.
 - [ ] **The demo set** (MS-D4), with the maintainer's pass (K4, §2).
 - [ ] **The notebooks** (MS-D5) and **the benchmarks** (MS-D6).

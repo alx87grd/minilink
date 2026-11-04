@@ -2,8 +2,8 @@
 # stack (every extra, Ipopt, Stable-Baselines3 on CPU torch): the whole pytest
 # suite (symbolic and Ipopt tests included), every example script, and every
 # teaching notebook (`--all`: the ones marked `smoke: false` in
-# notebook_overrides.json too, except `nightly: false`). Not a merge gate (see tests/README.md); CI
-# `test` / `regression` remain the per-push gates. Run on demand with
+# notebook_overrides.json too, except `nightly: false`). Not a merge gate (see tests/README.md); CI's jobs are the per-push
+# gates. Also the other Pythons (3.10, 3.11, 3.13) and the students' laptops. Run on demand with
 # workflow_dispatch.
 name: Nightly demos
 
@@ -70,3 +70,78 @@ jobs:
         SDL_VIDEODRIVER: dummy
       run: |
         python tests/demo_checks/run_notebook_checks.py --all --timeout 1800
+
+  # The other supported Pythons and the students' laptops (CI runs them on pull requests
+  # into main only)
+  pythons:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.13"]
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+        pip install gymnasium graphviz
+
+    - name: Test with pytest
+      env:
+        MPLBACKEND: Agg
+      run: pytest -n auto
+
+  # Students' laptops: the Basic tier (NumPy, SciPy, Matplotlib; no Graphviz,
+  # JAX or other extras) on Windows and macOS. Tests
+  # and notebooks that need an extra skip, as they do on a Basic install.
+  laptops:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    # UTF-8 on the runner pipes that the test harness reads from its subprocesses.
+    env:
+      PYTHONUTF8: "1"
+      MPLBACKEND: Agg
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install the Basic tier and the test tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+
+    - name: Test with pytest
+      run: pytest -n auto
+
+    # Teaching notebooks: the ones the Basic tier runs; the rest skip on their extra.
+    - name: Notebook smoke checks
+      if: ${{ !cancelled() }}
+      env:
+        PYTHONPATH: ${{ github.workspace }}
+      run: |
+        python tests/demo_checks/run_notebook_checks.py --jobs 2

@@ -191,8 +191,9 @@ per commit:
   the narrow rows only (the touched modules' test files, `test_vocabulary.py`, the touched
   notebooks and demos); the long rows once, on the finished branch, before the push that
   hands it off or the merge.
-- **Run the suite in parallel:** `pip install pytest-xdist` in the session (not a project
-  dependency), then `pytest -n auto`.
+- **Run the suite in parallel:** `pytest -n auto` (`pytest-xdist` is in the `dev` extra, as in
+  CI); the demo-check bridge (`tests/unittest/test_demo_check_runners.py`) runs its demos under
+  time limits, so run it on its own.
 - **A demo no CI job runs** runs only when the change touches it, under a `timeout`; a
   timeout counts as a failure only after the same demo, on the base branch, finishes in time.
 - **Never start a long run on a half-edited tree**, and never edit modules while one imports
