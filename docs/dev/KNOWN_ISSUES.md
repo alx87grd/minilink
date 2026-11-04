@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-10-31.
+lands. Last checked against the code: 2026-11-04.
 
 ## Composition and control
 
@@ -30,7 +30,7 @@ lands. Last checked against the code: 2026-10-31.
   does not deep-copy. The same on `main`.
 - **Workaround:** deep-copy before the run, set `plant.traj = None` first, or copy
   `plant.params` into a new plant.
-- **Fix:** none planned yet (TODO §1.10, the core's hardening).
+- **Fix:** none planned yet; it touches the `sys.traj` shortcut (RULES 2.4).
 
 ## Planning and learning
 
@@ -46,13 +46,6 @@ lands. Last checked against the code: 2026-10-31.
 - **Workaround:** read the margin, not the flag, or score the policy on the problem without
   `U`.
 - **Fix:** none planned yet (clip the interpolated command to the grid's input box).
-
-### A Gaussian start leaves `X0` at the system's `x0`
-- **Symptom:** `PlanningProblem(sys, x0=Gaussian(...))` keeps `X0` as the singleton at
-  `sys.x0` (a Gaussian has no support to take it from); `replace(x0=law)` also keeps
-  the old `X0`.
-- **Workaround:** give `X0` explicitly, or use a `Uniform` start.
-- **Fix:** none planned yet.
 
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a

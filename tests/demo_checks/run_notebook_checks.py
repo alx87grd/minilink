@@ -31,6 +31,7 @@ import json
 import os
 import re
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -145,9 +146,12 @@ def run_notebook_checks(
     notebook_filter: str | None = None,
     timeout_override: float | None = None,
     all_notebooks: bool = False,
+    jobs: int = 1,
 ) -> list[NotebookRow]:
+    """Each notebook's row, in discovery order; ``jobs`` notebooks run at once, one kernel each."""
     overrides = _load_overrides()
-    rows: list[NotebookRow] = []
+    rows: list[NotebookRow | None] = []
+    pending: list[tuple[int, str, Path, float]] = []
 
     ids = notebook_ids(_discover_notebooks())
     for rel, notebook_id in ids.items():
@@ -181,8 +185,26 @@ def run_notebook_checks(
             if timeout_override is not None
             else float(entry.get("timeout", DEFAULT_TIMEOUT))
         )
-        status, message = _execute_notebook(path, timeout=timeout)
-        rows.append(NotebookRow(notebook_id, status, message))
+        pending.append((len(rows), notebook_id, path, timeout))
+        rows.append(None)
+
+    # The executions: one after another, or a pool of worker processes
+    if jobs <= 1:
+        for index, notebook_id, path, timeout in pending:
+            status, message = _execute_notebook(path, timeout=timeout)
+            rows[index] = NotebookRow(notebook_id, status, message)
+    else:
+        with ProcessPoolExecutor(max_workers=jobs) as pool:
+            futures = {
+                pool.submit(_execute_notebook, path, timeout=timeout): (
+                    index,
+                    notebook_id,
+                )
+                for index, notebook_id, path, timeout in pending
+            }
+            for future, (index, notebook_id) in futures.items():
+                status, message = future.result()
+                rows[index] = NotebookRow(notebook_id, status, message)
     return rows
 
 
@@ -225,6 +247,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Override per-notebook timeout seconds (default: override or 180)",
     )
     parser.add_argument(
+        "--jobs",
+        type=int,
+        default=1,
+        help="Notebooks run at once, one kernel each (default: 1)",
+    )
+    parser.add_argument(
         "--all",
         action="store_true",
         help='Include the notebooks marked "smoke": false (the nightly sweep)',
@@ -240,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
         notebook_filter=args.notebook,
         timeout_override=args.timeout,
         all_notebooks=args.all,
+        jobs=args.jobs,
     )
     return _print_report(rows)
 

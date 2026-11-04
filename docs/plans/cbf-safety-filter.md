@@ -1,7 +1,7 @@
 # Control Barrier Functions (CBF) & Spatial Safety Filters
 
-**Status:** Design draft (2026-09-11), amended 2026-10-12 (§3 and CBF-2: the barrier a `Field`, DESIGN §4 "Fields"); not started; research lane, unscheduled; CBF-1 and CBF-2 after the geometry package (A3) and the `Field` object (A1).  
-**Where it sits:** unscheduled; a feature on the core's Fields pillar (v0.3) and the workspace geometry (A3, v0.4) ([TODO.md](TODO.md) §4, §6).  
+**Status:** Design draft (2026-09-11), amended 2026-10-12 (§3 and CBF-2: the barrier a `Field`, DESIGN §4 "Fields"); not started; research lane, unscheduled; CBF-1 and CBF-2 after the geometry package (A3); the `Field` object (A1) landed.  
+**Where it sits:** unscheduled; a feature on the core's Fields pillar (v0.3) and the workspace geometry (A3, v0.5) ([TODO.md](TODO.md) §4, §6).  
 **Lane:** Research lane $\to$ provisional (`minilink.control.cbf`; workspace SDF in `minilink.core.geometry`, [geometry-module.md](geometry-module.md)).  
 **Audience:** Graduate research and GRO860 advanced topics (safe control, MPC, RL deployment).
 

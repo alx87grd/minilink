@@ -1,6 +1,6 @@
 # Core API improvements from the core tutorial audit
 
-**Status:** draft plan from the `examples/tutorial/core/` (`01`–`08`) API review, saved for later execution.
+**Status:** the `examples/tutorial/core/` (`01`–`08`) API review's proposals; CA-1 to CA-6 open, scheduled in v0.4 (TODO §1.11, each **[ask — core]**); CA-7 landed. The diffs' line numbers are from the review and drift.
 
 Each item below records:
 1. **The problem and concrete reproducer**
@@ -468,7 +468,7 @@ Furthermore, `Field` and `QuadraticField` are exported from `minilink.core` but 
 ## CA-6. Derivative method aliases (`grad_J`, `hess_J`, `jac_h`, `jac_g`) on `MathematicalProgramEvaluator`
 
 ### Problem and reproducer
-On `MathematicalProgram` (`minilink/optimization/programs.py`), the 7 mathematical callables are named:
+On `MathematicalProgram` (`minilink/optimization/mathematical_program.py`), the 7 mathematical callables are named:
 - Values: `J`, `h`, `g`
 - Derivatives: `grad_J`, `hess_J`, `jac_h`, `jac_g`
 
@@ -522,15 +522,6 @@ ev.grad_J(z) # AttributeError: 'JaxProgramEvaluator' object has no attribute 'gr
 
 ---
 
-## CA-7. Target / operating-point naming (`xbar` vs `x_bar` vs `center` vs `point`)
+## CA-7. Target / operating-point naming
 
-### Problem and reproducer
-Across the core and analysis APIs, target/nominal state and input points use two spelling conventions:
-- **Without underscore (`xbar`, `ubar`):** `QuadraticCost(Q, R, S, xbar=..., ubar=...)`, `TimeCost(xbar=..., tol=...)`, `LTISystem.xbar` / `ubar` / `ybar`, `QuadraticFeatures(xbar=...)`.
-- **With underscore (`x_bar`, `u_bar`):** `sys.jacobian(x_bar=..., u_bar=...)`, `sys.linearize(x_bar=..., u_bar=...)`, `sys.transfer_function(x_bar=..., u_bar=...)`, `sys.plot_bode(x_bar=..., u_bar=...)`.
-- **Geometric nouns (`center`, `point`):** `SingletonSet(point)`, `BallSet(center, radius)`, `EllipsoidSet(center, P, level=1.0)`, `QuadraticField(center, P, t=None)`.
-
-### Why it is worth doing & design/rule evolution
-- Keeping geometric nouns (`center`, `point`) on sets and fields is natural, whereas having `xbar`/`ubar` on `QuadraticCost`/`LTISystem` and `x_bar`/`u_bar` on `linearize`/`jacobian` is a frequent keyword typo when moving between `sys.linearize(...)` and `QuadraticCost(...)`.
-- Tracked in [QUESTIONS.md](../dev/QUESTIONS.md) for the v0.9 API freeze (`DESIGN.md` §4). Can either be resolved repo-wide at the v0.9 freeze or softened now by accepting optional `x_bar` / `u_bar` keyword aliases in `QuadraticCost.__init__` and `TimeCost.__init__` while keeping `.params` keys `"xbar"` and `"ubar"`.
-
+Landed (2026-11-04): `x_bar` / `u_bar` / `y_bar` everywhere (RULES 2.7, `test_vocabulary.py`).

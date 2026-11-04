@@ -1,9 +1,9 @@
 # The minimal surface: demos, notebooks, tests and CI redrafted on the v0.3 core
 
-**Status:** draft for the maintainer's review. Nothing here is decided; each choice below
-lists its options, the agent's recommendation, and an **Answer** line for the maintainer.
-**Proposed release:** the new v0.4 ("the minimal surface"); the features planned as v0.4
-(ROADMAP §5.4) move to v0.5.
+**Status:** draft for the maintainer's review; each choice below lists its options, the
+agent's recommendation, and an **Answer** line for the maintainer. Its decision ids carry the
+`MS-` prefix (docs/plans/README.md). **Release:** v0.4, the clean surface (ROADMAP §5.4, ruled
+2026-11-04); its rows are TODO §1.12.
 
 ## 1. Why
 
@@ -49,12 +49,12 @@ course notebook breaks a student's link unless the PDF changes with it.
 
 ## 3. The decisions
 
-### D1. Tests: rewrite from scratch, or restructure
+### MS-D1. Tests: rewrite from scratch, or restructure
 
 - **A. Clean slate.** Delete `tests/`, write a new minimal suite from the core's contracts.
   Simplest result; loses the executable record of every behaviour v0.3 settled while the
   demos are also being rebuilt, so a regression has no net for the length of the rewrite.
-- **B. Restructure.** Keep the cases; sort every file into the layers of D2; delete the
+- **B. Restructure.** Keep the cases; sort every file into the layers of MS-D2; delete the
   tests of what is deleted (demos, pyro ports, benchmark studies); merge duplicates; move
   the slow tests out of the per-change layer.
 - **C. Hybrid.** Write the new layers from scratch (checks, unit, acceptance), port into them
@@ -63,7 +63,7 @@ course notebook breaks a student's link unless the PDF changes with it.
 *Agent's recommendation:* B, or C if the maintainer wants to read every test that stays.
 **Answer:**
 
-### D2. The test layers
+### MS-D2. The test layers
 
 **Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder
 per layer; two are essential, the contract and the textbook math. What the other kinds
@@ -73,26 +73,26 @@ become is open below.
 | --- | --- | --- |
 | `tests/contract/` | Does every public object build, wire and run: each catalog plant, block, law, planner, solver, its ports and its `params`? | **essential** |
 | `tests/math/` | Are the numbers right against a textbook worked example or a closed form: Riccati and LQR gains, an RK4 convergence order, a known optimum, a value-iteration fixed point, a Kalman covariance? | **essential** |
-| Backend parity | Does NumPy equal JAX, and does a gradient exist through a loop, a planner, a solver? | open (D2a) |
-| Composition | Do the pieces work together: diagrams, sampled loops, problem → evaluator → optimizer? | open (D2b) |
-| Examples | Do the kept demos and the course notebooks run? | open (D2c) |
-| Repo rules | Textbook style, prose, public names, imports, packaging | open (D2d) |
+| Backend parity | Does NumPy equal JAX, and does a gradient exist through a loop, a planner, a solver? | open (MS-D2a) |
+| Composition | Do the pieces work together: diagrams, sampled loops, problem → evaluator → optimizer? | open (MS-D2b) |
+| Examples | Do the kept demos and the course notebooks run? | open (MS-D2c) |
+| Repo rules | Textbook style, prose, public names, imports, packaging | open (MS-D2d) |
 
-- **D2a. Backend parity.** A. one clause of the contract (each object also runs on JAX, its
+- **MS-D2a. Backend parity.** A. one clause of the contract (each object also runs on JAX, its
   outputs equal to NumPy's on one input); B. its own layer; C. none beyond what the math
   layer runs on both backends. *Agent:* A. **Answer:**
-- **D2b. Composition.** A. the core's end-to-end scripts only (`test_v03_core.py`, a dozen
+- **MS-D2b. Composition.** A. the core's end-to-end scripts only (`test_v03_core.py`, a dozen
   cases) as a third layer; B. inside the contract (a composition is a public object);
   C. none, the demos show it. *Agent:* A. **Answer:**
-- **D2c. Examples.** A. a runner, outside pytest, nightly and before a release; B. inside
+- **MS-D2c. Examples.** A. a runner, outside pytest, nightly and before a release; B. inside
   pytest; C. none in CI, the maintainer runs them. *Agent:* A. **Answer:**
-- **D2d. Repo rules.** A. a pre-commit and CI check outside pytest (seconds); B. a test
+- **MS-D2d. Repo rules.** A. a pre-commit and CI check outside pytest (seconds); B. a test
   layer; C. drop the ones nobody acts on. *Agent:* A, with C for any rule the maintainer
   does not want enforced. **Answer:**
-- **D2e. When each runs.** *Agent's proposal:* contract and repo rules on every change, math
+- **MS-D2e. When each runs.** *Agent's proposal:* contract and repo rules on every change, math
   and composition on every pull request, examples nightly and before a release. **Answer:**
 
-### D3. CI shape
+### MS-D3. CI shape
 
 - **A.** One Linux job (Python 3.12, full stack) runs Checks, Unit and Acceptance on each
   pull request; pushes to a branch with a pull request do not run again; a newer push
@@ -100,9 +100,12 @@ become is open below.
 - **B.** As A, plus macOS and Windows on pull requests into `main` only.
 - **C.** Keep the matrix on every run; only remove the duplicates.
 
-*Agent's recommendation:* B. **Answer:**
+*Agent's recommendation:* B. **Answer (2026-11-04):** B, with the other Pythons (3.10, 3.11,
+3.13) beside macOS and Windows on pull requests into `main` and nightly; first the critical
+path shortened (the jobs side by side, `pytest -n auto`, the notebooks three at once, the docs
+build in the gate).
 
-### D4. Demos: what the set is
+### MS-D4. Demos: what the set is
 
 - **A. Clean slate.** Delete `examples/demos/` and `examples/projects/`; write a new set,
   one demo per core feature, against the v0.3 core.
@@ -136,19 +139,16 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 
 **Answer:** (the option, and edits to the list)
 
-### D5. Notebooks
+### MS-D5. Notebooks
 
 - **Course notebooks** (`examples/teaching/courses/`, 20): keep their paths (the PDFs link
   16); their content is the maintainer's teaching design. **Answer:**
-- **Tutorial** (`examples/tutorial/`, 12 chapters and 3 showcases):
-  - A. redraft the chapters in place on the v0.3 core, delete the three showcases;
-  - B. delete, write a new shorter tutorial;
-  - C. keep as is.
-  **Answer:**
+- **Tutorial**: settled. The tutorials were redrafted in three layers (basics, core, advanced)
+  and landed on `dev` (2026-11-01).
 - **Topics** (`examples/teaching/topics/`, 7): A. fold into the tutorial or the courses and
   delete; B. keep. **Answer:**
 
-### D6. Benchmarks
+### MS-D6. Benchmarks
 
 - **A.** Keep the regression gates the nightly layer runs (`run_regression_check.py`, its
   suites and baselines); delete the studies, the pyro parity and the one-off baselines
@@ -158,28 +158,28 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 
 *Agent's recommendation:* A. **Answer:**
 
-### D7. The release numbering
+### MS-D7. The release numbering
 
-The new v0.4 is this plan; ROADMAP §5.4's features become v0.5, v0.9 and v1.0 unchanged.
-ROADMAP §1 is the maintainer's. **Answer:**
+**Answer (2026-11-04):** the new v0.4 is this plan, with the core API proposals and the v0.3
+core's leftovers (ROADMAP §5.4); the former v0.4 features are v0.5; v0.9 and v1.0 unchanged.
 
 ## 4. Order, once the decisions are taken
 
-1. CI first (D3): the fastest relief, independent of the rest.
-2. Tests (D1, D2): the layers, then the moves and deletions, file by file.
-3. Demos and projects (D4), then their checks.
-4. Notebooks (D5), the course ones last and only with the maintainer.
-5. Benchmarks (D6), docs (README, `examples/README.md`, `tests/README.md`, DESIGN's package
+1. CI first (MS-D3): the fastest relief, independent of the rest.
+2. Tests (MS-D1, MS-D2): the layers, then the moves and deletions, file by file.
+3. Demos and projects (MS-D4), then their checks.
+4. Notebooks (MS-D5), the course ones last and only with the maintainer.
+5. Benchmarks (MS-D6), docs (README, `examples/README.md`, `tests/README.md`, DESIGN's package
    map), the release.
 
 ## 5. The test files, by layer
 
-To be written once D1 and D2a–D2e are answered: each of the 67 files of `tests/unittest/`
+To be written once MS-D1 and MS-D2a–MS-D2e are answered: each of the 67 files of `tests/unittest/`
 sorted case by case into contract, math, the open layers, or deletion. The obvious ones:
 **repo rules** `test_textbook_style`, `test_repo_contract`, `test_public_names`,
 `test_public_imports`, `test_teaching_imports`, `test_teaching_surface`, `test_packaging`;
 **composition** `test_v03_core`, `test_loop_grammar`, `test_sampled_loop`; **contract**
 `test_contract`, `test_catalog_backends`, `test_blocks`; **deleted with their subject**
-`test_benchmark_helpers` (D6), `test_demo_check_runners` (D2c), the pyro-port cases inside
+`test_benchmark_helpers` (MS-D6), `test_demo_check_runners` (MS-D2c), the pyro-port cases inside
 `test_mechanical_robotics` and `test_dynamics_catalog`. The ~40 slowest cases (over 4 s,
 `pytest --durations=40`) are flagged in the sort.

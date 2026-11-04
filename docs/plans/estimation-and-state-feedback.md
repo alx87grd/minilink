@@ -6,12 +6,12 @@
 system-only, split the output reference out of `StateFeedback` and put `LQRPlanner` on the
 command port. Its contract is DESIGN §3 (the package map and the
 dependency law) and §4 (the observer role).
-This doc holds the design of what comes next: `LQGPlanner` (v0.4; §5) and the estimation
+This doc holds the design of what comes next: `LQGPlanner` (v0.5; §5) and the estimation
 follow-ups of v0.9, each in its slot (the time-varying and trajectory filters, the extended
 Kalman filter, the sampled filters, and Layer 3, the estimation problem and its tools; §3,
 §5, §6). The open work is in TODO.md (the P4 follow-ups, `LQGPlanner`, the estimation
 follow-ups). P4's build plan, its ask-first list and its verification were cut once it
-landed (the history is in git). **Where it sits:** `LQGPlanner` stays a v0.4 feature
+landed (the history is in git). **Where it sits:** `LQGPlanner` stays a v0.5 feature
 ([TODO.md](TODO.md) §4), the follow-ups v0.9 rows; the sampled filters read the core's hybrid
 loop and the draws (TODO §1.3, §1.5).
 
@@ -54,10 +54,10 @@ Layer 0  gains on arrays            lqr_gain(A, B, Q, R) -> K                 ka
                                     place_gain(A, B, poles) -> K              luenberger_gain(A, C, poles) -> L  (= place_gain(Aᵀ, Cᵀ, poles)ᵀ)
                                     lqr_gain_schedule(..., tf) -> (t, K, S)   kalman_gain_schedule(..., P0, tf) -> (t, L, P)   [later]
 
-Layer 1  blocks                     StateFeedback(K, xbar, ubar)            x, r -> u    u = ū − K (x − r)
+Layer 1  blocks                     StateFeedback(K, x_bar, u_bar)            x, r -> u    u = ū − K (x − r)
                                     TimeVaryingFeedback(t, K, ...)    x, r -> u    u = ū − K(t)(x − r)
                                     TrajectoryFeedback(traj, K)            x -> u       u = u_d(t) − K(t)(x − x_d(t))
-                                    StateObserver(A, B, C, L, D, xbar, ubar, ybar)    u, y -> x    dx̂ = A(x̂−x̄) + B(u−ū) + L(y−ŷ)
+                                    StateObserver(A, B, C, L, D, x_bar, u_bar, y_bar)    u, y -> x    dx̂ = A(x̂−x̄) + B(u−ū) + L(y−ŷ)
                                     TimeVaryingStateObserver(t, L, A, B, C, ...)      u, y -> x    L(t)                                 [later]
                                     TrajectoryObserver(traj, L, A, B, C schedules)    u, y -> x    δx̂ about x_d(t), y_d(t)              [later]
                                     ExtendedKalmanFilter(model, Q_n, R_n, x0, P0)     u, y -> x, P  A(x̂), C(x̂) online, P a state        [later]
@@ -74,10 +74,10 @@ Layer 2  designs on a model         lqr(model, Q, R)  place(model, poles)       
 Layer 3  problems and solutions     PlanningProblem (stochastic by its parts)          EstimationProblem                                  [later]
                                     Planner(problem).solve() -> PlanningSolution      Estimator-tool(problem).solve() -> EstimationSolution
                                       policy (a controller block)                       the estimator block
-                                      solver record (RiccatiRecord: K, P, poles)        record (L, P, poles; or the P(t) schedule)
+                                      record (RiccatiRecord: K, P, poles)        record (L, P, poles; or the P(t) schedule)
                                       trajectory (nominal run), evaluation (J draws)    trajectory (x̂ along the data), evaluation (error statistics)
                                       cost_to_go J(x)                                   covariance P(t), the dual of J
-                                    LQRPlanner, LQGPlanner (v0.4)                      KalmanEstimator, ExtendedKalmanEstimator, ParticleEstimator, MovingHorizonEstimator
+                                    LQRPlanner, LQGPlanner (v0.5)                      KalmanEstimator, ExtendedKalmanEstimator, ParticleEstimator, MovingHorizonEstimator
 
 The loop  ctl @ plant       lqg(…) @ plant       a hand-built box: add_subsystem(observer, "observer"), add_subsystem(gain, "gain"),
                                                  connect x and u, expose("r", "y", "u"), then box @ plant       closed_loop(ctl, plant, observer=obs)  (AC-4)
@@ -112,10 +112,10 @@ verb for how it is obtained. The names reserved for later:
 
 ## 5. Layer 3, the long view (not built now; the architecture must allow it)
 
-`EstimationProblem(sys, x_start=Gaussian(x̂₀, P0), measured=("y",), data=None, tf=None)`
+`EstimationProblem(sys, x0=Gaussian(x̂₀, P0), measured=("y",), data=None, horizon=None)`
 shares the `PlanningProblem` spine of a problem stochastic by its parts: the system, its
 noise as source blocks (`WhiteNoise(psd=W)` on the process input, `WhiteNoise(psd=V)` on the
-measurement), the prior as the law of `x_start`; it adds the record of measurements for
+measurement), the prior as the law of `x0`; it adds the record of measurements for
 offline runs (a `Trajectory` of `(t, u, y)`) and which ports are measured. A stochastic
 `PlanningProblem` converts to it (`from_problem`), which is how `LQGPlanner` gets its filter.
 `EstimationSolution(problem, estimator, record, trajectory, evaluation, covariance)` mirrors `PlanningSolution` field for field: the block, the tool's own account
