@@ -266,6 +266,7 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
+- [ ] **One parameters model for every object** **[ask — core]** ([one-params-model.md](one-params-model.md), its option B): sets, fields, distributions and shapes hold a live `params` tree as systems do; `with_params` the copy on every object; composites take a partial tree. It replaces CA-4 below. Done when the plan's PM steps land byte-identical on the seeded baseline.
 - [ ] **Partial parameter updates** (CA-4): `Distribution.with_params` merges a partial
   dictionary (CA-4a, today it rebuilds from the given keys only, `core/distributions.py`),
   `CostFunction.with_params` (CA-4b; sets, fields and distributions have it), and a partial
