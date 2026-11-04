@@ -33,7 +33,7 @@ class StepFace:
     ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``. :attr:`n_steps` (``N``) is the horizon in ticks
     (``None`` infinite), :attr:`gamma` the discount per tick, :attr:`params`
     the tree every call reads (``params=None``: these numbers),
-    :meth:`time_of` the time of tick ``k`` (``t_start + k dt``, or the tick for
+    :meth:`time_of` the time of tick ``k`` (``t0 + k dt``, or the tick for
     a native problem), :meth:`terminal` the terminal cost, :attr:`X`,
     :attr:`U` and :attr:`Xf` the sets. Value iteration, the RL environment and
     the judge read this face only.
@@ -77,20 +77,20 @@ class StepFace:
                     solver=solver,
                     substeps=substeps,
                     discount_rate=rho,
-                    t_start=problem.t_start,
+                    t0=problem.t0,
                 )
 
     @property
     def params(self) -> dict:
-        """The numbers every call reads: ``plant`` (a random plant at its mean), ``cost``, ``x_start``, ``t_start``, and the discount."""
+        """The numbers every call reads: ``plant`` (a random plant at its mean), ``cost``, ``x0``, ``t0``, and the discount."""
         problem = self.problem
         continuous = is_continuous(problem)
         plant = nominal_plant_params(problem) if continuous else None
         tree = {
             "plant": problem.sys.params if plant is None else plant,
             "cost": None if problem.cost is None else problem.cost.params,
-            "x_start": np.asarray(problem.x_start, dtype=float),
-            "t_start": problem.t_start,
+            "x0": np.asarray(problem.x0, dtype=float),
+            "t0": problem.t0,
         }
         if continuous:
             tree["discount_rate"] = problem.discount_rate
@@ -110,20 +110,20 @@ class StepFace:
         return self.problem.Xf
 
     @property
-    def t_start(self):
-        return self.problem.t_start
+    def t0(self):
+        return self.problem.t0
 
     def time_of(self, k, params=None):
-        """The time of tick ``k``: ``t_start + k dt`` (seconds), or ``t_start + k`` (a native problem's ticks)."""
-        t_start = self.t_start if params is None else params["t_start"]
+        """The time of tick ``k``: ``t0 + k dt`` (seconds), or ``t0 + k`` (a native problem's ticks)."""
+        t0 = self.t0 if params is None else params["t0"]
         dt = self.dt
 
         # A native problem counts ticks
         if dt is None:
-            t_k = t_start + k
+            t_k = t0 + k
             return t_k
 
-        t_k = t_start + k * dt
+        t_k = t0 + k * dt
 
         return t_k
 
@@ -176,13 +176,13 @@ class StepFace:
         return step_body(dynamics, x, u, u, t, dt, solver, substeps)
 
     def horizon_end(self):
-        """The time of the horizon's end, ``t_start + horizon`` (ticks: ``t_start + N``); ``None`` for an infinite one."""
+        """The time of the horizon's end, ``t0 + horizon`` (ticks: ``t0 + N``); ``None`` for an infinite one."""
         if self.n_steps is None:
             return None
-        t_start = self.t_start
+        t0 = self.t0
 
         if is_continuous(self.problem):
-            t_end = t_start + self.problem.horizon
+            t_end = t0 + self.problem.horizon
             return t_end
 
         t_end = self.time_of(self.n_steps)
@@ -296,7 +296,7 @@ class StepFace:
 
         return failure_cost
 
-    def run(self, policy, x_start=None, params=None, n_steps=None):
+    def run(self, policy, x0=None, params=None, n_steps=None):
         """
         The face's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
 
@@ -305,7 +305,7 @@ class StepFace:
         start: the one sum every tool's score is.
         """
         params = self.params if params is None else params
-        x = np.asarray(params["x_start"] if x_start is None else x_start, dtype=float)
+        x = np.asarray(params["x0"] if x0 is None else x0, dtype=float)
         N = self.n_steps if n_steps is None else int(n_steps)
         require_horizon(N)
         gamma = float(self.gamma_at(params))

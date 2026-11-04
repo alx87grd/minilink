@@ -53,7 +53,7 @@ class RolloutEnvironment:
         The task: plant, cost, constraint set ``X`` and the cost of a failure,
         horizon, start (a point, a set or a law), the plant's parameter laws and
         the disturbance sources. A point start restarts every episode at
-        ``x_start``.
+        ``x0``.
     dt : float
         Control period (one integration step, input held).
     episode_length : float, optional
@@ -104,7 +104,7 @@ class RolloutEnvironment:
         self.n_steps_per_episode = int(round(self.tf / self.dt))
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
         self.discount_rate = problem.discount_rate
-        self.t_start = float(problem.t_start)
+        self.t0 = float(problem.t0)
 
         # Plant and stage cost: the problem's step face at dt, one transition per
         # control period, on nominal or drawn parameters
@@ -194,14 +194,14 @@ class RolloutEnvironment:
         reached, or the state left ``X`` (a failure, charged). ``truncated``
         ends it with the value of ``x_next`` still to come: the episode length
         is reached, or the state left the training zone. ``t_origin`` is the
-        episode's start when it is not the problem's ``t_start`` (a receding
+        episode's start when it is not the problem's ``t0`` (a receding
         horizon solved from a later tick): the horizon is ``tf`` after it.
         """
         xp = array_module(x)
 
         dt = self.dt
         tf = self.tf
-        t_start = self.t_start if t_origin is None else t_origin
+        t0 = self.t0 if t_origin is None else t_origin
         finite_horizon = self.finite_horizon
         face = self.face
         X = self.X
@@ -240,7 +240,7 @@ class RolloutEnvironment:
         out_of_X = ~xp.all(X.margin(x_next, t_next, X_params) >= 0.0)
         failed = out_of_X | out_of_U | ~finite
         left_zone = ~xp.all(zone.margin(x_next, t_next) >= 0.0)
-        horizon_reached = xp.asarray(t_next >= t_start + tf - 0.5 * dt)
+        horizon_reached = xp.asarray(t_next >= t0 + tf - 0.5 * dt)
 
         # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),

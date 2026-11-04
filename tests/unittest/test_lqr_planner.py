@@ -25,7 +25,7 @@ def pendulum_problem(tf=np.inf, S=None):
     cost = QuadraticCost.from_system(plant, Q=Q, R=R, S=S, x_bar=UPRIGHT)
     return PlanningProblem(
         plant,
-        x_start=UPRIGHT + [0.3, 0.0],
+        x0=UPRIGHT + [0.3, 0.0],
         cost=cost,
         horizon=tf,
         U=plant.input_box,
@@ -125,14 +125,14 @@ def test_evaluate_rolls_out_and_scores_and_the_loop_balances_the_pendulum():
     problem = pendulum_problem()
     solution = LQRPlanner(problem, dt=0.02).solve(evaluate=True)
     assert solution.trajectory is not None and solution.evaluation.n_trials == 1
-    np.testing.assert_allclose(solution.trajectory.x[:, 0], problem.x_start)
+    np.testing.assert_allclose(solution.trajectory.x[:, 0], problem.x0)
     assert solution.evaluation.mean == pytest.approx(
-        solution.cost_to_go(problem.x_start), rel=0.5
+        solution.cost_to_go(problem.x0), rel=0.5
     )
 
     # the loop is closed in the script: the policy is a controller block
     plant = problem.sys
-    plant.x0 = problem.x_start
+    plant.x0 = problem.x0
     loop = solution.policy @ plant
     traj = loop.compute_trajectory(tf=6.0, verbose=False)
     np.testing.assert_allclose(traj.x[:, -1], UPRIGHT, atol=1e-3)

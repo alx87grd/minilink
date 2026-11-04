@@ -17,7 +17,7 @@ ATOL = 1e-12
 
 
 def run_on_the_clock(
-    system, u_steps, *, x0, t_start=0.0, params=None, points=1, rtol=RTOL, atol=ATOL
+    system, u_steps, *, x0, t0=0.0, params=None, points=1, rtol=RTOL, atol=ATOL
 ):
     """
     The run of a system on a clock with an adaptive plant: ``(N·points + 1, n)``.
@@ -38,7 +38,7 @@ def run_on_the_clock(
 
     for k, u_k in enumerate(np.asarray(u_steps, dtype=float)):
         x, inside = tick_on_the_host(
-            ev, system, x, u_k, k, t_start, params, points, rtol, atol
+            ev, system, x, u_k, k, t0, params, points, rtol, atol
         )
         rows.append(inside)
 
@@ -52,7 +52,7 @@ def run_on_the_clock(
 ###############################################################################
 
 
-def tick_on_the_host(ev, system, x, u, k, t_start, params, points, rtol, atol):
+def tick_on_the_host(ev, system, x, u, k, t0, params, points, rtol, atol):
     """One tick: the next state and the state at ``points`` instants of the period."""
     h = system.sample_period
     paths = []
@@ -77,19 +77,17 @@ def tick_on_the_host(ev, system, x, u, k, t_start, params, points, rtol, atol):
 
     if isinstance(system, SampledDiagramSystem):
         params = ev.params if params is None else params
-        signals = ev.port_signals(x, u, k, params, t_start=t_start)
-        x_next = ev.next_from_signals(
-            x, u, k, params, signals, t_start=t_start, advance=advance
-        )
+        signals = ev.port_signals(x, u, k, params, t0=t0)
+        x_next = ev.next_from_signals(x, u, k, params, signals, t0=t0, advance=advance)
         inside = inside_points(ev, x, x_next, paths, points)
     else:
         params = system.params if params is None else params
         if system.resolves:
-            x_next = advance(system, x, u, t_start + k * h, params)
+            x_next = advance(system, x, u, t0 + k * h, params)
             inside = paths[0]
         else:
             # A block with nothing to integrate inside its period: its own update
-            x_next = ev.step(x, u, k, params, t_start=t_start)
+            x_next = ev.step(x, u, k, params, t0=t0)
             inside = x_next[None, :]
 
     return x_next, inside

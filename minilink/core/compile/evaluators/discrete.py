@@ -40,16 +40,16 @@ from minilink.core.params import lookup
 class DiscreteEvaluator(Evaluator):
     """A compiled discrete-time system: its own ``step``, its ``outputs`` and the ``rollout`` of the steps."""
 
-    def step(self, x, u, k=0, params=None, *, t_start=0.0):
+    def step(self, x, u, k=0, params=None, *, t0=0.0):
         """``x_{k+1} = step(x, u, k; p)``; ``params=None`` reads the compiled parameters.
 
-        ``t_start`` is the clock's origin of a system on a clock (its tick ``k``
-        at ``t_start + k·Δ``); a tick law has no clock and ignores it.
+        ``t0`` is the clock's origin of a system on a clock (its tick ``k``
+        at ``t0 + k·Δ``); a tick law has no clock and ignores it.
         """
         raise NotImplementedError
 
     @compiled(static=("n_steps",))
-    def rollout(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
+    def rollout(self, x0, u_seq=None, params=None, *, n_steps=None, t0=0.0):
         """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the steps run over the rows of ``u_seq``.
 
         ``u_seq`` is ``(N, m)``, one input per step; ``None`` holds the nominal
@@ -66,7 +66,7 @@ class DiscreteEvaluator(Evaluator):
 
         # x_{k+1} = step(x_k, u_k, k), a bare number for n = 1 read as its one entry
         def transition(x, k, u_k):
-            x_next = xp.reshape(step(x, u_k, k, params, t_start=t_start), (n,))
+            x_next = xp.reshape(step(x, u_k, k, params, t0=t0), (n,))
             return x_next
 
         x_samples = iterate(self, transition, x0, (ks, u_seq))
@@ -74,7 +74,7 @@ class DiscreteEvaluator(Evaluator):
         return x_samples
 
     def rollout_batch(
-        self, x0s, u_sequences=None, *, n_steps=None, params=None, t_start=0.0
+        self, x0s, u_sequences=None, *, n_steps=None, params=None, t0=0.0
     ):
         """Roll out a family of step runs in one ``jax.vmap`` call (JAX).
 
@@ -83,15 +83,15 @@ class DiscreteEvaluator(Evaluator):
         more dimension than the compiled value is a family. Returns
         ``(B, N + 1, n)``.
         """
-        t_start = self.jnp.asarray(t_start, dtype=float)
+        t0 = self.jnp.asarray(t0, dtype=float)
 
         return self.batched_rollout(
-            lambda x0, u, p, t_start: self.rollout(x0, u, p, t_start=t_start),
+            lambda x0, u, p, t0: self.rollout(x0, u, p, t0=t0),
             x0s,
             u_sequences,
             n_steps,
             params,
-            t_start,
+            t0,
         )
 
     ###########################################################################
@@ -164,7 +164,7 @@ class StepEvaluator(DiscreteEvaluator):
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params
 
-        # A system on a clock steps its seconds face at t_start + k Δ
+        # A system on a clock steps its seconds face at t0 + k Δ
         self.seconds = isinstance(system, SampledSystem) and not system.counts
 
         if backend == BACKEND_JAX:
@@ -178,28 +178,28 @@ class StepEvaluator(DiscreteEvaluator):
         )
 
     @compiled
-    def step(self, x, u, k=0, params=None, *, t_start=0.0):
+    def step(self, x, u, k=0, params=None, *, t0=0.0):
         xp = self.xp
         params = self._frozen_params if params is None else params
         x, u = xp.asarray(x), xp.asarray(u)
         system = self._system
         if self.seconds:
-            return system.update(x, u, t_start + k * system.sample_period, params)
+            return system.update(x, u, t0 + k * system.sample_period, params)
         return system.step(x, u, k, params)
 
     @compiled
-    def outputs(self, x, u, k=0, params=None, *, t_start=0.0):
+    def outputs(self, x, u, k=0, params=None, *, t0=0.0):
         xp = self.xp
         params = self._frozen_params if params is None else params
         system = self._system
 
-        # The ports of a system on a clock read seconds, t_k = t_start + k Δ
-        t = t_start + k * system.sample_period if self.seconds else k
+        # The ports of a system on a clock read seconds, t_k = t0 + k Δ
+        t = t0 + k * system.sample_period if self.seconds else k
 
         return outputs_from_ports(system, xp.asarray(x), xp.asarray(u), t, params)
 
     @compiled(static=("n_steps",))
-    def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0):
+    def rollout_dense(self, x0, u_seq=None, params=None, *, n_steps=None, t0=0.0):
         """The run of a system on a clock with its substeps kept: ``(N·s + 1, n)``, the ticks bit for bit."""
         xp = self.xp
         n = self.n
@@ -212,10 +212,10 @@ class StepEvaluator(DiscreteEvaluator):
 
         def period(x, k, u_k):
             if not system.resolves:
-                x_next = xp.reshape(self.step(x, u_k, k, params, t_start=t_start), (n,))
+                x_next = xp.reshape(self.step(x, u_k, k, params, t0=t0), (n,))
                 return x_next, x_next[None, :]
             # The plant integrated once over the period: the path's last row is the tick
-            t_k = t_start + k * system.sample_period
+            t_k = t0 + k * system.sample_period
             path = system.update_path(x, u_k, t_k, params)
             x_next = xp.reshape(path[-1], (n,))
             return x_next, path
@@ -254,7 +254,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         self._jac_setup(diagram, "step", state_fn=None, outputs_fn=None, plan=plan)
 
     @compiled
-    def step(self, x, u, k=0, params=None, *, t_start=0.0):
+    def step(self, x, u, k=0, params=None, *, t0=0.0):
         """``x_{k+1}`` of every block, stacked; ``params=None`` reads each block's compiled parameters."""
         self.require_params(params)
         x, u = self.float_arrays(x, u)
@@ -262,7 +262,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         return self.next_from_signals(x, u, k, params, signals)
 
     @compiled
-    def tick(self, x, u, k=0, params=None, *, t_start=0.0):
+    def tick(self, x, u, k=0, params=None, *, t0=0.0):
         """``(x_{k+1}, outputs_k)``: the next state and the boundary outputs from one signal pass."""
         self.require_params(params)
         x, u = self.float_arrays(x, u)
@@ -410,7 +410,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
     """
     A compiled sampled diagram on NumPy or JAX: its plan swept once per base tick, on its clock.
 
-    At tick ``k`` the plan forms ``t_k = t_start + k·Δ`` once and hands each block
+    At tick ``k`` the plan forms ``t_k = t0 + k·Δ`` once and hands each block
     its time (seconds, its own count ``k // d``, or the base count); a block of
     divisor ``d > 1`` fires on ``k mod d = 0`` (a ``lax.cond`` on JAX, its
     predicate on the tick alone) and its held outputs are read from the state in
@@ -440,35 +440,35 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         self._jac_setup(diagram, "step", state_fn=None, outputs_fn=None, plan=plan)
 
     @compiled
-    def step(self, x, u, k=0, params=None, *, t_start=0.0):
-        """``X_{k+1}`` of the loop at tick ``k``, its clock's origin at ``t_start``."""
+    def step(self, x, u, k=0, params=None, *, t0=0.0):
+        """``X_{k+1}`` of the loop at tick ``k``, its clock's origin at ``t0``."""
         self.require_params(params)
         x, u = self.float_arrays(x, u)
-        signals = self.port_signals(x, u, k, params, t_start=t_start)
-        return self.next_from_signals(x, u, k, params, signals, t_start=t_start)
+        signals = self.port_signals(x, u, k, params, t0=t0)
+        return self.next_from_signals(x, u, k, params, signals, t0=t0)
 
     @compiled
-    def tick(self, x, u, k=0, params=None, *, t_start=0.0):
+    def tick(self, x, u, k=0, params=None, *, t0=0.0):
         """``(X_{k+1}, outputs_k)``: the next state and the boundary outputs from one signal pass."""
         self.require_params(params)
         x, u = self.float_arrays(x, u)
-        signals = self.port_signals(x, u, k, params, t_start=t_start)
-        x_next = self.next_from_signals(x, u, k, params, signals, t_start=t_start)
+        signals = self.port_signals(x, u, k, params, t0=t0)
+        x_next = self.next_from_signals(x, u, k, params, signals, t0=t0)
         return x_next, self.boundary_outputs(signals)
 
     @compiled
-    def outputs(self, x, u, k=0, params=None, *, t_start=0.0):
+    def outputs(self, x, u, k=0, params=None, *, t0=0.0):
         self.require_params(params)
         x, u = self.float_arrays(x, u)
-        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        signals = self.port_signals(x, u, k, params, t0=t0)
         return self.boundary_outputs(signals)
 
     @compiled(static=("n_steps", "record"))
     def rollout_dense(
-        self, x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0, record=()
+        self, x0, u_seq=None, params=None, *, n_steps=None, t0=0.0, record=()
     ):
         """
-        The run with the plant's substeps kept: ``(N·S + 1, n)`` at ``t_start + (k + j/S)·Δ``.
+        The run with the plant's substeps kept: ``(N·S + 1, n)`` at ``t0 + (k + j/S)·Δ``.
 
         ``S`` is :attr:`~minilink.core.compile.plan.SampledExecutionPlan.dense_points`.
         Each period is the tick of :meth:`rollout`, its state at the period's end
@@ -497,7 +497,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         # it; the plant is integrated once, its substep path giving the tick's state
         def period(x, k, u_k):
             x_f, u_f = self.float_arrays(x, u_k)
-            signals = self.port_signals(x_f, u_f, k, params, t_start=t_start)
+            signals = self.port_signals(x_f, u_f, k, params, t0=t0)
             paths = []
 
             def advance(system, local_x, local_u, time, p_op):
@@ -511,7 +511,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 k,
                 params,
                 signals,
-                t_start=t_start,
+                t0=t0,
                 advance=advance if S > 1 else None,
             )
             x_next = xp.reshape(x_next, (n,))
@@ -547,7 +547,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         return xp.concatenate([xp.reshape(piece, (-1,)) for piece in pieces])
 
     def rollout_with_cost(
-        self, x0, u_seq, params, rate, *, n_steps=None, t_start=0.0, signals=False
+        self, x0, u_seq, params, rate, *, n_steps=None, t0=0.0, signals=False
     ):
         """
         ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the loop's plant carrying its stage cost.
@@ -571,7 +571,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         # z_{k+1} = [x_{k+1}; C_k + c_k]: the loop's tick, its plant advanced with its cost
         def transition(z, k, u_k):
             x, u_f = self.float_arrays(z[:n], u_k)
-            buffer = self.port_signals(x, u_f, k, params, t_start=t_start)
+            buffer = self.port_signals(x, u_f, k, params, t0=t0)
             costs = []
 
             def advance(system, local_x, local_u, time, p_op):
@@ -580,7 +580,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 return x_i
 
             x_next = self.next_from_signals(
-                x, u_f, k, params, buffer, t_start=t_start, advance=advance
+                x, u_f, k, params, buffer, t0=t0, advance=advance
             )
             require_one_plant_period(costs, plant)
             z_next = xp.concatenate(
@@ -599,14 +599,14 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return z_samples[:, :n], z_samples[:, n], buffers
 
-    def signals(self, x, u, k=0, params=None, *, t_start=0.0):
+    def signals(self, x, u, k=0, params=None, *, t0=0.0):
         """The signal buffer at tick ``k``: every block output, flat (``plan.output_slices``)."""
         x, u = self.float_arrays(x, u)
-        return self.port_signals(x, u, k, params, t_start=t_start)
+        return self.port_signals(x, u, k, params, t0=t0)
 
-    def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t_start=0.0):
+    def compute_internal_signals_dict(self, x, u, k=0, params=None, *, t0=0.0):
         """Every block output at ``(x, u, k)``, keyed ``"path/block:port"`` by its nested path."""
-        signals = self.signals(x, u, k, params, t_start=t_start)
+        signals = self.signals(x, u, k, params, t0=t0)
         paths = self.plan.paths
         return {
             f"{'/'.join(paths[sys_id])}:{port_id}": signals[sl]
@@ -617,14 +617,14 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
     # Internal machinery
     ###########################################################################
 
-    def port_signals(self, x, u, k, params, inject=None, *, t_start=0.0, ops=None):
+    def port_signals(self, x, u, k, params, inject=None, *, t0=0.0, ops=None):
         """Fill the signal buffer at tick ``k``; ``inject=(wire_slice, delta)`` adds ``delta`` to one wire; ``ops`` the port operations to run (default all)."""
         xp = self.xp
         dtype = self.dtype
         signals = xp.zeros(self.plan.signal_dim, dtype=dtype)
         x_arr = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
         params = self._frozen_params if params is None else params
-        t_k = t_start + k * self.sample_period
+        t_k = t0 + k * self.sample_period
         for op in self.plan.port_ops if ops is None else ops:
             local_x = x_arr[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
@@ -646,7 +646,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 signals = added(xp, signals, op.out_slice, inject[1])
         return signals
 
-    def next_from_signals(self, x, u, k, params, signals, *, t_start=0.0, advance=None):
+    def next_from_signals(self, x, u, k, params, signals, *, t0=0.0, advance=None):
         """Every block's ``x_{k+1}`` and every held output from the filled signal buffer.
 
         ``advance(system, x, u, t, params)``, when given, takes the loop's plant
@@ -658,7 +658,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         x_old = xp.asarray(x, dtype=dtype).reshape(self.plan.state_dim)
         x_new = xp.array(x_old, dtype=dtype)
         params = self._frozen_params if params is None else params
-        t_k = t_start + k * self.sample_period
+        t_k = t0 + k * self.sample_period
         for op in self.plan.step_ops:
             local_x = x_old[op.local_x_slice]
             local_u = gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
@@ -684,7 +684,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
                 x_new = assigned(xp, x_new, op.hold_slice, signals[op.out_slice])
         return x_new
 
-    def block_input(self, path, x, u, k=0, params=None, *, t_start=0.0):
+    def block_input(self, path, x, u, k=0, params=None, *, t0=0.0):
         """
         The input the loop feeds the block at ``path`` at tick ``k``: its gathered ``u``.
 
@@ -695,9 +695,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
         x, u = self.float_arrays(x, u)
         op = self.operation_of(path)
 
-        signals = self.port_signals(
-            x, u, k, params, t_start=t_start, ops=self.ancestors_of(op)
-        )
+        signals = self.port_signals(x, u, k, params, t0=t0, ops=self.ancestors_of(op))
 
         return gather_u(op.gather_sources, op.u_dim, signals, u, self.xp, self.dtype)
 
@@ -729,10 +727,10 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
 
         return tuple(port for port in self.plan.port_ops if id(port) in needed)
 
-    def plant_input(self, x, u, k=0, params=None, *, t_start=0.0):
+    def plant_input(self, x, u, k=0, params=None, *, t0=0.0):
         """The input the loop feeds its plant at tick ``k``: the plant's gathered ``u``, held over the period."""
         x, u = self.float_arrays(x, u)
-        signals = self.port_signals(x, u, k, params, t_start=t_start)
+        signals = self.port_signals(x, u, k, params, t0=t0)
 
         return self.plant_input_from(signals, u)
 
@@ -828,7 +826,7 @@ def require_one_period(ks):
     """Refuse a recorded dense run of no period: a record needs one tick to hold at the end sample."""
     if len(ks) < 1:
         raise ValueError(
-            "a run that records signals needs at least one period: give tf > t_start"
+            "a run that records signals needs at least one period: give tf > t0"
         )
 
 

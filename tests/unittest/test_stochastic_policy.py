@@ -103,7 +103,7 @@ def test_an_evaluation_draws_the_policys_seed_per_trial():
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        x_start=Uniform([0.1, -0.1], [0.3, 0.1]),
+        x0=Uniform([0.1, -0.1], [0.3, 0.1]),
         horizon=1.0,
     )
     feedback = StateFeedback(np.array([[2.0, 1.0]]))

@@ -134,13 +134,13 @@ def _obs_build_holonomic():
     sys = Holonomic()
     sys.inputs["u"].lower_bound = np.array([0.0, -OBS_V_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_V_MAX, OBS_V_MAX])
-    x_start = np.array([0.0, OBS_Y_START])
+    x0 = np.array([0.0, OBS_Y_START])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL])
     u_bar = np.array([OBS_U_TARGET, 0.0])
     Q = np.diag([0.0, 10.0])
     R = np.diag([0.5, 0.5])
     S = np.diag([1.0, 10.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_holonomic_dyn():
@@ -151,26 +151,26 @@ def _obs_build_holonomic_dyn():
     sys.state.upper_bound[3] = OBS_V_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_SPEED_DOT_MAX, -OBS_SPEED_DOT_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_SPEED_DOT_MAX, OBS_SPEED_DOT_MAX])
-    x_start = np.array([0.0, OBS_Y_START, OBS_U_0, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, OBS_U_0, 0.0])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL, OBS_U_TARGET, 0.0])
     u_bar = np.array([0.0, 0.0])
     Q = np.diag([0.0, 10.0, 0.1, 0.1])
     R = np.diag([1.0, 1.0])
     S = np.diag([1.0, 10.0, 10.0, 1.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_kinematic():
     sys = BicycleKin()
     sys.inputs["u"].lower_bound = np.array([0.0, -OBS_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_V_MAX, OBS_DELTA_MAX])
-    x_start = np.array([0.0, OBS_Y_START, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, 0.0])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL, OBS_HEADING_TARGET])
     u_bar = np.array([OBS_U_TARGET, 0.0])
     Q = np.diag([0.0, 10.0, 1.0])
     R = np.diag([0.5, 10.0])
     S = np.diag([1.0, 10.0, 100.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_bicycle_acc():
@@ -181,7 +181,7 @@ def _obs_build_bicycle_acc():
     sys.state.upper_bound[4] = OBS_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_SPEED_DOT_MAX, -OBS_STEERING_DOT_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_SPEED_DOT_MAX, OBS_STEERING_DOT_MAX])
-    x_start = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0])
     x_ref = np.array(
         [_obs_terminal_x(), OBS_Y_GOAL, OBS_HEADING_TARGET, OBS_U_TARGET, 0.0]
     )
@@ -189,7 +189,7 @@ def _obs_build_bicycle_acc():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 100.0])
     R = np.diag([1.0, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 100.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_dynamic():
@@ -198,7 +198,7 @@ def _obs_build_dynamic():
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
     sys.inputs["u"].lower_bound = np.array([0.0, -OBS_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([w_rear_max, OBS_DELTA_MAX])
-    x_start = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0])
     x_ref = np.array(
         [
             _obs_terminal_x(),
@@ -213,7 +213,7 @@ def _obs_build_dynamic():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1])
     R = np.diag([0.5, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_dynamic_rate():
@@ -226,7 +226,7 @@ def _obs_build_dynamic_rate():
     sys.state.upper_bound[7] = OBS_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_W_REAR_DOT_MAX, -OBS_DELTA_DOT_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_W_REAR_DOT_MAX, OBS_DELTA_DOT_MAX])
-    x_start = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
     x_ref = np.array(
         [
             _obs_terminal_x(),
@@ -243,7 +243,7 @@ def _obs_build_dynamic_rate():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
     R = np.diag([1.0, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_dynamic_taurate():
@@ -256,7 +256,7 @@ def _obs_build_dynamic_taurate():
     sys.state.upper_bound[7] = OBS_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_DOT_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_DOT_MAX])
-    x_start = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
     x_ref = np.array(
         [
             _obs_terminal_x(),
@@ -273,7 +273,7 @@ def _obs_build_dynamic_taurate():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0])
     R = np.diag([1e-4, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_dynamic_servo():
@@ -286,9 +286,7 @@ def _obs_build_dynamic_servo():
     sys.state.upper_bound[7] = OBS_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_MAX])
-    x_start = np.array(
-        [0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0]
-    )
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0])
     x_ref = np.array(
         [
             _obs_terminal_x(),
@@ -306,7 +304,7 @@ def _obs_build_dynamic_servo():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0, 0.0])
     R = np.diag([1e-4, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0, 0.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 def _obs_build_dynamic_engine():
@@ -321,9 +319,7 @@ def _obs_build_dynamic_engine():
     sys.state.upper_bound[8] = OBS_P_CMD_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -OBS_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, OBS_DELTA_MAX])
-    x_start = np.array(
-        [0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0]
-    )
+    x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0])
     x_ref = np.array(
         [
             _obs_terminal_x(),
@@ -341,7 +337,7 @@ def _obs_build_dynamic_engine():
     Q = np.diag([0.0, 10.0, 1.0, 0.1, 0.1, 0.1, 0.1, 100.0, 0.0])
     R = np.diag([1e-10, 10.0])
     S = np.diag([1.0, 10.0, 100.0, 10.0, 0.0, 0.1, 0.1, 100.0, 0.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S
+    return sys, x0, x_ref, u_bar, Q, R, S
 
 
 OBS_BUILDERS = {
@@ -421,13 +417,13 @@ def _corner_build_holonomic(track: ReferenceTrack):
     sys = Holonomic()
     sys.inputs["u"].lower_bound = np.array([-CORNER_V_MAX, -CORNER_V_MAX])
     sys.inputs["u"].upper_bound = np.array([CORNER_V_MAX, CORNER_V_MAX])
-    x_start = np.array([xy0[0], xy0[1]])
+    x0 = np.array([xy0[0], xy0[1]])
     x_ref = np.array([xyf[0], xyf[1]])
     u_bar = np.array([CORNER_U_TARGET, 0.0])
     Q = np.diag([0.0, 0.0])
     R = np.diag([0.5, 0.5])
     S = np.diag([30.0, 30.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S, "numpy", disc(CORNER_DISC_RADIUS)
+    return sys, x0, x_ref, u_bar, Q, R, S, "numpy", disc(CORNER_DISC_RADIUS)
 
 
 def _corner_build_holonomic_dyn(track: ReferenceTrack):
@@ -440,9 +436,7 @@ def _corner_build_holonomic_dyn(track: ReferenceTrack):
     sys.state.upper_bound[3] = CORNER_V_MAX
     sys.inputs["u"].lower_bound = np.array([-3.0, -3.0])
     sys.inputs["u"].upper_bound = np.array([3.0, 3.0])
-    x_start = np.array(
-        [xy0[0], xy0[1], CORNER_U_0 * np.cos(th0), CORNER_U_0 * np.sin(th0)]
-    )
+    x0 = np.array([xy0[0], xy0[1], CORNER_U_0 * np.cos(th0), CORNER_U_0 * np.sin(th0)])
     x_ref = np.array(
         [
             xyf[0],
@@ -455,7 +449,7 @@ def _corner_build_holonomic_dyn(track: ReferenceTrack):
     Q = np.diag([0.0, 0.0, 0.15, 0.15])
     R = np.diag([1.0, 1.0])
     S = np.diag([30.0, 30.0, 1.0, 1.0])
-    return sys, x_start, x_ref, u_bar, Q, R, S, "numpy", disc(CORNER_DISC_RADIUS)
+    return sys, x0, x_ref, u_bar, Q, R, S, "numpy", disc(CORNER_DISC_RADIUS)
 
 
 def _corner_build_kinematic(track: ReferenceTrack):
@@ -463,14 +457,14 @@ def _corner_build_kinematic(track: ReferenceTrack):
     sys = BicycleKin()
     sys.inputs["u"].lower_bound = np.array([0.0, -CORNER_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([CORNER_V_MAX, CORNER_DELTA_MAX])
-    x_start = np.array([xy0[0], xy0[1], th0])
+    x0 = np.array([xy0[0], xy0[1], th0])
     x_ref = np.zeros(3)
     u_bar = np.array([CORNER_U_TARGET, 0.0])
     Q = np.diag([0.0, 0.0, 0.0])
     R = np.diag([0.5, 10.0])
     S = np.diag([0.0, 0.0, 0.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_bicycle_acc(track: ReferenceTrack):
@@ -482,14 +476,14 @@ def _corner_build_bicycle_acc(track: ReferenceTrack):
     sys.state.upper_bound[4] = CORNER_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-3.0, -2.5])
     sys.inputs["u"].upper_bound = np.array([3.0, 2.5])
-    x_start = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0])
+    x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0])
     x_ref = np.array([0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0])
     u_bar = np.zeros(2)
     Q = np.diag([0.0, 0.0, 0.0, 0.15, 40.0])
     R = np.diag([1.0, 10.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 40.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_dynamic(track: ReferenceTrack):
@@ -498,14 +492,14 @@ def _corner_build_dynamic(track: ReferenceTrack):
     r_r = sys.params["r_r"]
     sys.inputs["u"].lower_bound = np.array([0.0, -CORNER_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([90.0, CORNER_DELTA_MAX])
-    x_start = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0])
+    x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0])
     x_ref = np.array([0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0])
     u_bar = np.array([CORNER_U_TARGET / r_r, 0.0])
     Q = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0])
     R = np.diag([0.5, 22.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_dynamic_rate(track: ReferenceTrack):
@@ -518,9 +512,7 @@ def _corner_build_dynamic_rate(track: ReferenceTrack):
     sys.state.upper_bound[7] = CORNER_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-80.0, -2.0])
     sys.inputs["u"].upper_bound = np.array([80.0, 2.0])
-    x_start = np.array(
-        [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0]
-    )
+    x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0])
     x_ref = np.array(
         [0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0, CORNER_U_TARGET / r_r, 0.0]
     )
@@ -529,7 +521,7 @@ def _corner_build_dynamic_rate(track: ReferenceTrack):
     R = np.diag([1.0, 22.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_dynamic_taurate(track: ReferenceTrack):
@@ -542,9 +534,7 @@ def _corner_build_dynamic_taurate(track: ReferenceTrack):
     sys.state.upper_bound[7] = CORNER_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-5000.0, -2.0])
     sys.inputs["u"].upper_bound = np.array([5000.0, 2.0])
-    x_start = np.array(
-        [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0]
-    )
+    x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0])
     x_ref = np.array(
         [0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0, CORNER_U_TARGET / r_r, 0.0]
     )
@@ -553,7 +543,7 @@ def _corner_build_dynamic_taurate(track: ReferenceTrack):
     R = np.diag([1e-4, 22.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_dynamic_servo(track: ReferenceTrack):
@@ -566,7 +556,7 @@ def _corner_build_dynamic_servo(track: ReferenceTrack):
     sys.state.upper_bound[7] = CORNER_DELTA_MAX
     sys.inputs["u"].lower_bound = np.array([-5000.0, -CORNER_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([5000.0, CORNER_DELTA_MAX])
-    x_start = np.array(
+    x0 = np.array(
         [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0, 0.0]
     )
     x_ref = np.array(
@@ -577,7 +567,7 @@ def _corner_build_dynamic_servo(track: ReferenceTrack):
     R = np.diag([1e-4, 22.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0, 0.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 def _corner_build_dynamic_engine(track: ReferenceTrack):
@@ -592,7 +582,7 @@ def _corner_build_dynamic_engine(track: ReferenceTrack):
     sys.state.upper_bound[8] = OBS_P_CMD_MAX
     sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -CORNER_DELTA_MAX])
     sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, CORNER_DELTA_MAX])
-    x_start = np.array(
+    x0 = np.array(
         [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0, 0.0]
     )
     x_ref = np.array(
@@ -603,7 +593,7 @@ def _corner_build_dynamic_engine(track: ReferenceTrack):
     R = np.diag([1e-10, 22.0])
     S = np.diag([0.0, 0.0, 0.0, 0.15, 4.0, 6.0, 0.1, 80.0, 0.0])
     geom = car_outline(CORNER_CAR_LENGTH, CORNER_CAR_WIDTH, margin=CORNER_CAR_MARGIN)
-    return sys, x_start, x_ref, u_bar, Q, R, S, "jax", geom
+    return sys, x0, x_ref, u_bar, Q, R, S, "jax", geom
 
 
 CORNER_BUILDERS = {
@@ -637,7 +627,7 @@ def _speed_profile(case: ModelCase, traj: Trajectory) -> np.ndarray:
 
 
 def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
-    sys, x_start, x_ref, u_bar, Q, R, S = OBS_BUILDERS[case.key]()
+    sys, x0, x_ref, u_bar, Q, R, S = OBS_BUILDERS[case.key]()
     tracking_cost = QuadraticCost.from_system(
         sys, Q=Q, R=R, S=S, x_bar=x_ref, u_bar=u_bar
     )
@@ -648,7 +638,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
     problem = PlanningProblem(
         sys=sys,
         horizon=OBS_TF,
-        x_start=x_start,
+        x0=x0,
         cost=tracking_cost + obstacle_cost,
         X=sys.state.box,
         U=sys.input_box,
@@ -677,9 +667,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
 
 
 def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
-    sys, x_start, x_ref, u_bar, Q, R, S, backend, geom = CORNER_BUILDERS[case.key](
-        track
-    )
+    sys, x0, x_ref, u_bar, Q, R, S, backend, geom = CORNER_BUILDERS[case.key](track)
     body = mount(geom, on=sys)
     tracking_cost = QuadraticCost.from_system(
         sys, Q=Q, R=R, S=S, x_bar=x_ref, u_bar=u_bar
@@ -693,7 +681,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
     problem = PlanningProblem(
         sys=sys,
         horizon=CORNER_TF,
-        x_start=x_start,
+        x0=x0,
         cost=tracking_cost + path_cost + corridor_cost,
         X=sys.state.box,
         U=sys.input_box,

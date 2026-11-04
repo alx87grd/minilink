@@ -870,10 +870,10 @@ def draw_region(
 
     # The overlaid trajectories, each simulated from its initial state; the
     # system's own x0 and traj are left as they are
-    for x_start in trajectories:
-        traj = Simulator(cert.sys, x0=x_start, tf=horizon, verbose=False).solve()
+    for x_point in trajectories:
+        traj = Simulator(cert.sys, x0=x_point, tf=horizon, verbose=False).solve()
         ax.plot(traj.x[x_axis], traj.x[y_axis], color="0.35", linewidth=1.0)
-        ax.plot(x_start[x_axis], x_start[y_axis], "o", color="0.35", markersize=4)
+        ax.plot(x_point[x_axis], x_point[y_axis], "o", color="0.35", markersize=4)
     if len(trajectories):
         keys.append(Line2D([], [], color="0.35", linewidth=1.0, label="trajectory"))
 

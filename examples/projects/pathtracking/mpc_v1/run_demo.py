@@ -91,7 +91,7 @@ cost = (
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys_mpc,
-        x_start=x_mpc0,
+        x0=x_mpc0,
         cost=cost,
         horizon=MPC_HORIZON,
         X=sys_mpc.state.box,

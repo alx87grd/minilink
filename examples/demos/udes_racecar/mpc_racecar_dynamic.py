@@ -128,7 +128,7 @@ x0 = np.array(
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=design,
-        x_start=x0,
+        x0=x0,
         cost=cost,
         horizon=MPC_HORIZON,
         X=design.state.box,

@@ -23,19 +23,19 @@ inner.plot_diagram()
 # (a fixed count, so the whole loop stays one pure function); its setpoint an input r
 cost = QuadraticCost.from_system(inner, Q=np.diag([1.0, 0.1]), R=0.01 * np.eye(1))
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(inner, cost=cost, x_start=X0, horizon=0.5, U=inner.input_box),
+    PlanningProblem(inner, cost=cost, x0=X0, horizon=0.5, U=inner.input_box),
     n_steps=5,
     transcription="single_shooting",
     backend="jax",
     method="adam",
-    iterations=5,
+    n_iterations=5,
 )
-mpc = ModelPredictiveController(planner, inputs={"x_start": "y", "cost.x_bar": "r"})
+mpc = ModelPredictiveController(planner, inputs={"x0": "y", "cost.x_bar": "r"})
 
 mpc.plot_diagram()
 
 # The double loop compiled once on JAX: J(p), the 2 s run's cost, a pure function
-problem = PlanningProblem(inner, cost=cost, x_start=X0, horizon=2.0)
+problem = PlanningProblem(inner, cost=cost, x0=X0, horizon=2.0)
 pe = problem.compile(mpc % DT, backend="jax")
 loop = pe.loop
 loop.plot_diagram()
@@ -47,7 +47,7 @@ program = pe.program(wrt, params=start)
 z0 = pe.pack(start, wrt)
 
 # 2. Co-design: the three numbers optimized together
-best = Optimizer(program, method="adam", iterations=20).solve()
+best = Optimizer(program, method="adam", n_iterations=20).solve()
 print(best)
 tuned = pe.unpack(best.z, wrt, params=start)
 

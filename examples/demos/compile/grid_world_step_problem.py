@@ -63,7 +63,7 @@ problem = StepPlanningProblem(
     n_steps=None,
     gamma=1.0,
     cost=Moves(GOAL),
-    x_start=[0.0, 8.0],
+    x0=[0.0, 8.0],
     X=walker.state.box,
     U=walker.input_box,
     penalize_failure=True,
@@ -84,7 +84,7 @@ xs, us, cs, J = face.run(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
 print(
-    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.value_at(problem.x_start):g}"
+    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.value_at(problem.x0):g}"
 )
 
 # The cost-to-go and the walk

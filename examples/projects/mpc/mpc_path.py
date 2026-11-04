@@ -107,7 +107,7 @@ x0 = np.array([waypoints[0, 0], waypoints[0, 1], 0.0, VX0, 0.0, 0.0, VX0 / r_r, 
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys_mpc,
-        x_start=x0,
+        x0=x0,
         cost=cost,
         horizon=MPC_HORIZON,
         X=sys_mpc.state.box,
@@ -121,7 +121,7 @@ planner = TrajectoryOptimizationPlanner(
     options={"maxiter": 100, "ftol": 0.1},
 )
 pv = planner.compile()  # the planner's pure face: solve, shift, command, prediction
-z = pv.initial()  # the plan, its origin t_start inside
+z = pv.initial()  # the plan, its origin t0 inside
 # =============================================================================
 # end ROS2 NODE __init__
 # =============================================================================
@@ -178,14 +178,14 @@ while t < TF_SIM - 1e-12:
         # ROS2 NODE slow timer (period = MPC_DT) — copy these 2 lines
         #   inputs: measured state ``x``, wall time ``t``; a failed solve keeps the old plan
         # =============================================================================
-        z_new, status = pv.solve({"x_start": x, "t_start": t}, z0=pv.shift(z, t))
+        z_new, status = pv.solve({"x0": x, "t0": t}, z0=pv.shift(z, t))
         z = z_new if status["success"] else z
         # =============================================================================
         # end ROS2 NODE slow timer
         # =============================================================================
 
         # offline only: stash horizon for animation overlay
-        plan = pv.solution(z, {"t_start": float(z[-1])}).trajectory
+        plan = pv.solution(z, {"t0": float(z[-1])}).trajectory
         mpc_plans.append((t, plan))
         next_replan_t += MPC_DT
 

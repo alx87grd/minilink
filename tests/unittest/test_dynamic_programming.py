@@ -816,9 +816,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertLessEqual(converged.record.delta, 1.0)
         # the solution is the pair: the greedy lookup law and the interpolated cost-to-go
         self.assertIs(converged.policy, planner.get_controller())
-        self.assertEqual(
-            converged.cost_to_go(problem.x_start), planner.value_at(problem.x_start)
-        )
+        self.assertEqual(converged.cost_to_go(problem.x0), planner.value_at(problem.x0))
         self.assertIsNone(converged.trajectory)  # not rolled out unless asked
 
         fixed = DynamicProgrammingPlanner(
@@ -829,7 +827,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertEqual(
             fixed.evaluation.n_trials, 1
         )  # a deterministic problem: one trial
-        np.testing.assert_allclose(fixed.trajectory.x[:, 0], problem.x_start)
+        np.testing.assert_allclose(fixed.trajectory.x[:, 0], problem.x0)
         self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
 
     def test_final_time_reads_the_problem_horizon(self):
@@ -1026,7 +1024,7 @@ class TestDpFlatConstructor(unittest.TestCase):
         sys = DoubleIntegrator()
         problem = PlanningProblem(
             sys=sys,
-            x_start=np.array([0.0, 0.0]),
+            x0=np.array([0.0, 0.0]),
             cost=QuadraticCost.from_system(sys),
             U=sys.input_box,
         )

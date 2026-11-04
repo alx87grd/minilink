@@ -67,7 +67,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
-    def make_problem(self, x_start=0.0):
+    def make_problem(self, x0=0.0):
         sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
@@ -75,7 +75,7 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         return PlanningProblem(
             sys=sys,
             horizon=1.0,
-            x_start=np.array([x_start]),
+            x0=np.array([x0]),
             cost=cost,
             U=sys.input_box,
         )
@@ -118,17 +118,17 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         self.assertLess(second_step_s, 0.5 * compile_s)
 
     def test_initial_boundary_satisfied(self):
-        x_start = np.array([0.35])
-        planner = self.make_planner(self.make_problem(float(x_start[0])))
-        traj = planner.step(x_start)
-        np.testing.assert_allclose(traj.x[:, 0], x_start, atol=1e-05)
+        x0 = np.array([0.35])
+        planner = self.make_planner(self.make_problem(float(x0[0])))
+        traj = planner.step(x0)
+        np.testing.assert_allclose(traj.x[:, 0], x0, atol=1e-05)
 
     def test_solve_returns_trajectory_plan(self):
         problem = self.make_problem(0.1)
         planner = self.make_planner(problem)
         plan = planner.solve()
         traj = plan.trajectory
-        np.testing.assert_allclose(traj.x[:, 0], problem.x_start, atol=1e-05)
+        np.testing.assert_allclose(traj.x[:, 0], problem.x0, atol=1e-05)
         self.assertIs(planner.last_solution, plan)
         self.assertIsInstance(plan.record, TrajectoryOptimizationRecord)
 
@@ -142,7 +142,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
     def setUp(self):
         configure_jax(enable_x64=True)
 
-    def make_problem(self, x_start=0.0):
+    def make_problem(self, x0=0.0):
         sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
@@ -150,7 +150,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         return PlanningProblem(
             sys=sys,
             horizon=1.0,
-            x_start=np.array([x_start]),
+            x0=np.array([x0]),
             cost=cost,
             U=sys.input_box,
         )
@@ -213,13 +213,11 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             planner.solve_trajectory_from(np.array([0.0]), params={"foo": 1})
 
     def test_solve_trajectory_rebuild_and_from_compiled(self):
-        """Offline rebuild and compiled from-solve both honor ``x_start``."""
+        """Offline rebuild and compiled from-solve both honor ``x0``."""
         problem = self.make_problem(0.15)
         planner_from = self.make_planner(problem)
-        plan_from = planner_from.solve_trajectory_from(problem.x_start)
-        np.testing.assert_allclose(
-            plan_from.trajectory.x[:, 0], problem.x_start, atol=1e-05
-        )
+        plan_from = planner_from.solve_trajectory_from(problem.x0)
+        np.testing.assert_allclose(plan_from.trajectory.x[:, 0], problem.x0, atol=1e-05)
         planner_off = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
@@ -230,14 +228,12 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             options={"maxiter": 50, "ftol": 0.0001},
         )
         plan_off = planner_off.solve()
-        np.testing.assert_allclose(
-            plan_off.trajectory.x[:, 0], problem.x_start, atol=1e-05
-        )
+        np.testing.assert_allclose(plan_off.trajectory.x[:, 0], problem.x0, atol=1e-05)
 
     def test_a_set_and_the_start_time_bind_like_a_rebuild(self):
         from minilink.core.sets import BallSet
 
-        def problem_of(radius, t_start=0.0):
+        def problem_of(radius, t0=0.0):
             sys = JaxSingleIntegrator()
             cost = QuadraticCost.from_system(
                 sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([2.0])
@@ -245,8 +241,8 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             return PlanningProblem(
                 sys=sys,
                 horizon=1.0,
-                t_start=t_start,
-                x_start=np.array([0.0]),
+                t0=t0,
+                x0=np.array([0.0]),
                 cost=cost,
                 X=BallSet(np.zeros(1), radius),
                 U=sys.input_box,
@@ -256,11 +252,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIn("X", planner.program.params)  # a set read as margins is a leaf
         x0 = np.array([0.0])
         plan = planner.solve_trajectory_from(
-            x0, params={"X": {"radius": 0.5}, "t_start": 3.0}
+            x0, params={"X": {"radius": 0.5}, "t0": 3.0}
         )
-        rebuilt = self.make_planner(problem_of(0.5, t_start=3.0)).solve_trajectory_from(
-            x0
-        )
+        rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve_trajectory_from(x0)
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 5))
         self.assertLessEqual(plan.trajectory.x.max(), 0.5 + 1e-6)
@@ -284,9 +278,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         sys = JaxSingleIntegrator()
         cost = QuadraticCost.from_system(sys, Q=np.eye(1), R=0.1 * np.eye(1))
         problem = PlanningProblem(
-            sys=sys, horizon=1.0, x_start=np.array([0.0]), cost=cost, U=sys.input_box
+            sys=sys, horizon=1.0, x0=np.array([0.0]), cost=cost, U=sys.input_box
         )
-        values = {"t_start": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
+        values = {"t0": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
         x0 = np.array([0.3])
         compiled = self.make_planner(problem).solve_trajectory_from(
             x0, params=values, evaluate=True
@@ -299,12 +293,12 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             backend="numpy",
             options={"maxiter": 50, "ftol": 0.0001},
         ).solve_trajectory_from(x0, params=values, evaluate=True)
-        self.assertEqual(compiled.problem.t_start, 3.0)
-        np.testing.assert_allclose(compiled.problem.x_start, x0)
+        self.assertEqual(compiled.problem.t0, 3.0)
+        np.testing.assert_allclose(compiled.problem.x0, x0)
         np.testing.assert_allclose(
             compiled.evaluation.J, rebuild.evaluation.J, rtol=1e-3
         )
-        self.assertEqual(problem.t_start, 0.0)  # the caller's problem as it was
+        self.assertEqual(problem.t0, 0.0)  # the caller's problem as it was
 
     def test_the_compiled_tick_solves_with_ipopt(self):
         pytest.importorskip("cyipopt")
@@ -353,13 +347,13 @@ class SingleIntegrator(DynamicSystem):
         return x
 
 
-def _make_numpy_planner(x_start=0.0):
+def _make_numpy_planner(x0=0.0):
     sys = SingleIntegrator()
     cost = QuadraticCost.from_system(
         sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
     )
     problem = PlanningProblem(
-        sys=sys, x_start=np.array([x_start]), cost=cost, horizon=1.0, U=sys.input_box
+        sys=sys, x0=np.array([x0]), cost=cost, horizon=1.0, U=sys.input_box
     )
     return TrajectoryOptimizationPlanner(
         problem,
@@ -370,7 +364,7 @@ def _make_numpy_planner(x_start=0.0):
     )
 
 
-def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
+def integrator_planner(x0=0.5, goal=2.0, backend="jax"):
     """The single integrator brought to ``goal`` over 1 s on 6 collocation knots (5 periods of 0.2 s)."""
     if backend == "jax":
         configure_jax(enable_x64=True)
@@ -379,7 +373,7 @@ def integrator_planner(x_start=0.5, goal=2.0, backend="jax"):
         sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([goal])
     )
     problem = PlanningProblem(
-        sys=sys, horizon=1.0, x_start=np.array([x_start]), cost=cost, U=sys.input_box
+        sys=sys, horizon=1.0, x0=np.array([x0]), cost=cost, U=sys.input_box
     )
     return TrajectoryOptimizationPlanner(
         problem,
@@ -408,7 +402,7 @@ class TestTheDelayedMPC(unittest.TestCase):
         assert mpc.sample_period is None
         clocked = mpc % DT
         assert clocked.sample_period == DT and mpc.sample_period is None
-        assert set(mpc.params["solve"]) >= {"x_start", "t_start", "plant", "cost"}
+        assert set(mpc.params["solve"]) >= {"x0", "t0", "plant", "cost"}
 
     def test_the_loop_applies_each_plan_one_period_late(self):
         mpc = self.mpc
@@ -426,9 +420,7 @@ class TestTheDelayedMPC(unittest.TestCase):
 
     def test_a_bound_leaf_reads_its_port(self):
         planner = integrator_planner()
-        mpc = ModelPredictiveController(
-            planner, inputs={"x_start": "y", "cost.x_bar": "r"}
-        )
+        mpc = ModelPredictiveController(planner, inputs={"x0": "y", "cost.x_bar": "r"})
         assert list(mpc.inputs) == ["y", "r"] and mpc.inputs["r"].dim == 1
         pv = mpc.pv
         solve = mpc.subsystems["solve"]
@@ -440,9 +432,7 @@ class TestTheDelayedMPC(unittest.TestCase):
 
         assert command_at(3.0)[0] > command_at(0.6)[0]
         with pytest.raises(ValueError, match="its own port"):
-            ModelPredictiveController(
-                planner, inputs={"x_start": "y", "cost.x_bar": "y"}
-            )
+            ModelPredictiveController(planner, inputs={"x0": "y", "cost.x_bar": "y"})
 
     def test_the_face_predicts_the_start_for_a_users_compensation(self):
         pv = self.pv
@@ -466,9 +456,9 @@ class TestTheDelayedMPC(unittest.TestCase):
             mpc_plans_from_rollout(run, mpc)
 
 
-def tree_at(pv, x_start, t_start):
+def tree_at(pv, x0, t0):
     """The planner's tree with the measured start and the plan's origin, as a tick binds them."""
-    return {**pv.params, "x_start": x_start, "t_start": t_start}
+    return {**pv.params, "x0": x0, "t0": t0}
 
 
 @pytest.mark.jax
@@ -496,13 +486,13 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         self,
     ):
         pv = self.pv
-        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
+        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.0})
         y = np.array([0.9])
         guess = warm_guess(pv, z, y, tree_at(pv, y, DT), pv.initial())
         shifted = pv.shift(z, DT)
         assert guess[0] == 0.9 and guess[-1] == DT
         np.testing.assert_array_equal(guess[1:], shifted[1:])
-        np.testing.assert_array_equal(guess, pv.shift(z, DT, x_start=y))
+        np.testing.assert_array_equal(guess, pv.shift(z, DT, x0=y))
 
     def test_the_first_guess_is_the_default_guess_from_the_measured_start(self):
         pv = self.pv
@@ -515,11 +505,11 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_the_solve_block_solves_from_the_measurement_warm_started(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]
-        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.2})
+        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.2})
         y = np.array([0.8])
         z_star = solve.compute_z(np.zeros(0), np.concatenate([y, z]), 0.4)
         expected, _ = pv.solve(
-            {"x_start": y, "t_start": 0.4},
+            {"x0": y, "t0": 0.4},
             z0=warm_guess(pv, z, y, tree_at(pv, y, 0.4), pv.initial()),
         )
         np.testing.assert_allclose(z_star, expected, atol=1e-12)
@@ -549,7 +539,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         for k in range(5):
             t_k = k * DT
             z, _ = pv.solve(
-                {"x_start": x, "t_start": t_k},
+                {"x0": x, "t0": t_k},
                 z0=warm_guess(pv, z, x, tree_at(pv, x, t_k), pv.initial()),
             )
             u_k = pv.command(z, x, t_k)
@@ -594,7 +584,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
             sys=problem.sys,
             cost=problem.cost,
             horizon=problem.horizon,
-            x_start=np.array([0.5]),
+            x0=np.array([0.5]),
             X0=BoxSet(np.array([0.4]), np.array([0.6])),
             U=problem.U,
         )
@@ -607,7 +597,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_a_failed_solve_keeps_the_last_plan(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]
-        z, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.0})
+        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.0})
 
         def failing(params=None, z0=None):
             return z0 + 1.0, {"success": False, "iterations": 0, "cost": np.nan}
@@ -641,14 +631,14 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
         sys, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=np.array([2.0])
     )
     problem = PlanningProblem(
-        sys=sys, horizon=1.0, x_start=np.array([0.5]), cost=cost, U=sys.input_box
+        sys=sys, horizon=1.0, x0=np.array([0.5]), cost=cost, U=sys.input_box
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
         transcription=ShootingTranscription(ShootingOptions(n_steps=6)),
         backend="jax",
         method="adam",
-        iterations=20,
+        n_iterations=20,
         options={"learning_rate": 0.05},
     )
     mpc = ModelPredictiveController(planner, delay=False)
@@ -656,11 +646,11 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
     params = pe.params
 
     # The closed loop is one traced scan: its J and its gradient in the start
-    def J_of(x_start):
-        return pe.evaluate({**params, "x_start": x_start}).objective
+    def J_of(x0):
+        return pe.evaluate({**params, "x0": x0}).objective
 
-    J = J_of(params["x_start"])
-    g = jax.grad(J_of)(params["x_start"])
+    J = J_of(params["x0"])
+    g = jax.grad(J_of)(params["x0"])
     assert np.isfinite(J) and np.all(np.isfinite(g))
 
     # A verbose block prints on the host only: the traced run stays silent and traceable
@@ -680,7 +670,7 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
         pv = mpc.pv
         solve = mpc.subsystems["solve"]
         y = np.array([0.8])
-        z_prev, _ = pv.solve({"x_start": np.array([0.5]), "t_start": 0.2})
+        z_prev, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.2})
         P, z0 = solve.solve_inputs(np.zeros(0), np.concatenate([y, z_prev]), 0.4)
         np.testing.assert_array_equal(z0, pv.initial(tree_at(pv, y, 0.4)))
         with pytest.raises(TypeError, match="clock"):
@@ -712,7 +702,7 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
         from minilink import Uniform
 
         planner = integrator_planner()
-        problem = planner.problem.replace(x_start=Uniform([0.0], [1.0]))
+        problem = planner.problem.replace(x0=Uniform([0.0], [1.0]))
         planner = TrajectoryOptimizationPlanner(
             problem, n_steps=5, transcription="direct_collocation", backend="jax"
         )
@@ -736,13 +726,13 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         # planner.compile() is a build: a later edit of the problem is not the face's
         planner = integrator_planner(backend="numpy")
         pv = planner.compile()
-        planner.problem.params = {**planner.problem.params, "t_start": 5.0}
-        assert pv.params["t_start"] == 0.0 and pv.initial()[-1] == 0.0
+        planner.problem.params = {**planner.problem.params, "t0": 5.0}
+        assert pv.params["t0"] == 0.0 and pv.initial()[-1] == 0.0
         z, _ = pv.solve()
         assert z[-1] == 0.0
 
         # A partial tree merges onto the compiled one, not onto the edited problem
-        partial = {"x_start": np.array([0.3])}
+        partial = {"x0": np.array([0.3])}
         z_partial, _ = pv.solve(partial)
         assert z_partial[-1] == 0.0 and pv.initial(partial)[-1] == 0.0
         assert pv.solution(z_partial, partial).trajectory.t[0] == 0.0
@@ -806,12 +796,10 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
 
     def test_an_unwired_bound_port_reads_the_trees_value(self):
         planner = integrator_planner()
-        mpc = ModelPredictiveController(
-            planner, inputs={"x_start": "y", "cost.x_bar": "r"}
-        )
+        mpc = ModelPredictiveController(planner, inputs={"x0": "y", "cost.x_bar": "r"})
         np.testing.assert_array_equal(mpc.inputs["r"].nominal_value, [2.0])
         with pytest.raises(ValueError, match="subtree"):
-            ModelPredictiveController(planner, inputs={"x_start": "y", "cost": "c"})
+            ModelPredictiveController(planner, inputs={"x0": "y", "cost": "c"})
 
     def test_the_controllers_tree_is_its_own(self):
         planner = integrator_planner()
@@ -884,9 +872,7 @@ def test_plant_run_reads_open_ports_boxes_and_a_late_clock():
 
     # A clock started late: the tick of a sample is its index
     late = (P(2.0) % 1e-3) @ Integrator()
-    run = late.compute_trajectory(
-        tf=1e5 + 0.01, u=np.array([1.0]), t_start=1e5, dt=1e-3
-    )
+    run = late.compute_trajectory(tf=1e5 + 0.01, u=np.array([1.0]), t0=1e5, dt=1e-3)
     plant = plant_run(run, late)
     np.testing.assert_allclose(
         plant.u[0, :-1], 2.0 * (1.0 - plant.x[0, :-1]), atol=1e-12
@@ -903,8 +889,8 @@ def test_the_traced_default_guess_follows_the_traced_start():
     pv = integrator_planner().compile()
     P = tree_at(pv, np.array([1.3]), 0.4)
     host = pv.initial(P)
-    traced = jax.jit(
-        lambda x, t: pv.initial({**pv.params, "x_start": x, "t_start": t})
-    )(np.array([1.3]), 0.4)
+    traced = jax.jit(lambda x, t: pv.initial({**pv.params, "x0": x, "t0": t}))(
+        np.array([1.3]), 0.4
+    )
     np.testing.assert_allclose(np.asarray(traced), host, rtol=0, atol=1e-12)
     assert host[0] == 1.3 and host[-1] == 0.4

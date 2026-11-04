@@ -93,13 +93,11 @@ class CostFunction(ABC):
 
         return h_max
 
-    def integrate(
-        self, traj: Trajectory, *, discount_rate=0.0, params=None, t_start=0.0
-    ):
+    def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None, t0=0.0):
         """
         The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
 
-        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t_start)} g(x_k, u_k, t_k)``
+        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``
         at each sample, the discount counted from the horizon's start,
         and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
         ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
@@ -116,8 +114,8 @@ class CostFunction(ABC):
         # g_k = g(x_k, u_k, t_k), every sample (a vmap on JAX, a loop on NumPy)
         g_k = per_sample(g, x.T, u.T, t, params)
 
-        # dJ_k = e^{−ρ (t_k − t_start)} g_k
-        cost_rate = xp.exp(-rho * (t - t_start)) * g_k
+        # dJ_k = e^{−ρ (t_k − t0)} g_k
+        cost_rate = xp.exp(-rho * (t - t0)) * g_k
 
         # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
         increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])
@@ -534,7 +532,7 @@ class SampledCost(StepCost):
     The stage cost of a continuous cost on a plant sampled at ``dt``: ``c_k = ∫₀^dt e^{−ρτ} g dτ``.
 
     ``c(x, u, k)`` integrates ``e^{−ρ(τ − t_k)} g(x(τ), u, τ)`` over one period
-    from ``x`` at ``t_k = t_start + k dt``, the input held, with the plant's
+    from ``x`` at ``t_k = t0 + k dt``, the input held, with the plant's
     solver and substeps (the plant evaluated beside the cost: a direct call is
     the second plant evaluation a compiled face fuses away); ``h(x, k)`` is
     the terminal cost at ``t_k``. The stationary form: ``c_k`` does not
@@ -552,7 +550,7 @@ class SampledCost(StepCost):
         solver="rk4",
         substeps=1,
         discount_rate=0.0,
-        t_start=0.0,
+        t0=0.0,
     ):
         self.cost = cost
         self.plant = plant
@@ -560,7 +558,7 @@ class SampledCost(StepCost):
         self.solver = solver
         self.substeps = int(substeps)
         self.discount_rate = float(discount_rate)
-        self.t_start = float(t_start)
+        self.t0 = float(t0)
         self.id = cost.id
 
     @property
@@ -573,23 +571,23 @@ class SampledCost(StepCost):
         self.cost.params = value
 
     def c(self, x, u, k=0, params=None):
-        t_start = self.t_start
+        t0 = self.t0
         dt = self.dt
 
-        # t_k = t_start + k dt, the period's start
-        t_k = t_start + k * dt
+        # t_k = t0 + k dt, the period's start
+        t_k = t0 + k * dt
         c = self.stage_cost_at(x, u, t_k, params)
 
         return c
 
     def h(self, x, k=0, params=None):
         params = self.params if params is None else params
-        t_start = self.t_start
+        t0 = self.t0
         dt = self.dt
         h = self.cost.h
 
-        # h(x_k, t_k), t_k = t_start + k dt
-        t_k = t_start + k * dt
+        # h(x_k, t_k), t_k = t0 + k dt
+        t_k = t0 + k * dt
         h_k = h(x, t_k, params)
 
         return h_k

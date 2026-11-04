@@ -50,7 +50,7 @@ configure_jax(enable_x64=True)
 sys = BicycleDynRate(named_ports=True)
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 
-x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
+x0 = np.array([0.0, Y_START, 0.0, U_0, 0.0, 0.0, U_0 / sys.params["r_r"], 0.0])
 x_ref = np.array(
     [
         0.0,
@@ -84,7 +84,7 @@ obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
 )
 cost = tracking_cost + obstacle_cost
 
-problem = PlanningProblem(sys=sys, x_start=x_start, cost=cost, horizon=TF)
+problem = PlanningProblem(sys=sys, x0=x0, cost=cost, horizon=TF)
 planner = TrajectoryOptimizationPlanner(
     problem,
     n_steps=N_STEPS,

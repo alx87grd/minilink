@@ -107,10 +107,10 @@ class DirectCollocationTranscription(Transcription):
         *,
         backend: str = BACKEND_JAX,
     ) -> MathematicalProgram:
-        """The JAX program an MPC compiles once: :meth:`transcribe`'s, its start pinned from ``params["x_start"]``.
+        """The JAX program an MPC compiles once: :meth:`transcribe`'s, its start pinned from ``params["x0"]``.
 
         Requires a singleton ``X0``, so the measured start binds the initial
-        residual ``x[:, 0] − params["x_start"]``.
+        residual ``x[:, 0] − params["x0"]``.
         """
         require_jax_compile_backend(backend)
         require_singleton_x0(problem)
@@ -160,7 +160,7 @@ class DirectCollocationTranscription(Transcription):
                 problem.cost,
                 discount_rate=rho,
                 params=cost_params,
-                t_start=problem.t_start,
+                t0=problem.t0,
             )
 
         return traj
@@ -301,7 +301,7 @@ class DirectCollocationTranscription(Transcription):
         """
         The JAX program's tree: the problem's leaves it reads.
 
-        ``x_start``, ``t_start``, the plant's (a random plant's at its mean),
+        ``x0``, ``t0``, the plant's (a random plant's at its mean),
         the cost's and the discount rate; each set it reads as a constraint by
         role (``X`` and ``U`` when not lowered to the decision bounds, ``X0``
         when not the start's singleton, ``Xf``), with its numbers. A box lowered
@@ -309,8 +309,8 @@ class DirectCollocationTranscription(Transcription):
         """
         plant = nominal_plant_params(problem)
         tree = {
-            "x_start": np.asarray(problem.x_start, dtype=float),
-            "t_start": float(problem.t_start),
+            "x0": np.asarray(problem.x0, dtype=float),
+            "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
             "cost": problem.require_cost().params,
             "discount_rate": float(problem.discount_rate),
@@ -339,10 +339,10 @@ class DirectCollocationTranscription(Transcription):
         def f(x_k, u_k, t_k, plant):
             return problem.sys.f(x_k, u_k, t_k, plant)
 
-        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t_start + k dt
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t0 + k dt
         def J(z, params):
             x, u = unpack_jax(z)
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             return trajectory_cost(
                 cost,
                 x,
@@ -351,13 +351,13 @@ class DirectCollocationTranscription(Transcription):
                 dt,
                 params["cost"],
                 discount_rate=params["discount_rate"],
-                t_start=params["t_start"],
+                t0=params["t0"],
             )
 
         # d_k = x_{k+1} − x_k − dt/2 (f_k + f_{k+1}), every interval at once
         def dynamics_residual(z, params):
             x, u = unpack_jax(z)
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             dx = jax.vmap(f, in_axes=(1, 1, 0, None), out_axes=1)(
                 x, u, t, params["plant"]
             )
@@ -370,8 +370,8 @@ class DirectCollocationTranscription(Transcription):
         """
         The boundary and path constraints as functions of ``(z, params)``: ``(equalities, inequalities)``.
 
-        The start: ``x_0 − x_start = 0`` for the start's singleton ``X0`` (the
-        start pinned from ``x_start``), else its margins; the terminal
+        The start: ``x_0 − x0 = 0`` for the start's singleton ``X0`` (the
+        start pinned from ``x0``), else its margins; the terminal
         set: ``x_N − point = 0`` for a singleton, else its margins; then the
         margins of ``X`` and ``U`` at every knot when they are not lowered to the
         decision bounds. Each set reads its numbers from ``params`` by role.
@@ -381,12 +381,12 @@ class DirectCollocationTranscription(Transcription):
         equalities = []
         inequalities = []
 
-        # x_0 − x_start = 0: the start is the program's parameter
+        # x_0 − x0 = 0: the start is the program's parameter
         if isinstance(problem.X0, SingletonSet):
 
             def initial_residual(z, params):
                 x, _ = unpack_jax(z)
-                residual = x[:, 0] - params["x_start"]
+                residual = x[:, 0] - params["x0"]
                 return residual.reshape(-1)
 
             equalities.append(initial_residual)
@@ -415,7 +415,7 @@ class DirectCollocationTranscription(Transcription):
         return equalities, inequalities
 
     def knot_offsets(self, problem: PlanningProblem, xp):
-        """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t_start + offset_k``."""
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t0 + offset_k``."""
         return xp.asarray(self.options.offsets(problem))
 
     def jax_unpacker(self, problem: PlanningProblem):
@@ -568,7 +568,7 @@ class DirectCollocationTranscription(Transcription):
         dt = self.options.dt(problem)
         cost_params = problem.cost.params
 
-        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t_start)}
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t0)}
         J = trajectory_cost(
             cost,
             x,
@@ -577,7 +577,7 @@ class DirectCollocationTranscription(Transcription):
             dt,
             cost_params,
             discount_rate=problem.discount_rate,
-            t_start=problem.t_start,
+            t0=problem.t0,
         )
 
         return J
@@ -616,7 +616,7 @@ def knot_margin(set_, role, index, unpack_jax, grid):
 
     def margin(z, params):
         x, _ = unpack_jax(z)
-        t_i = params["t_start"] + grid[index]
+        t_i = params["t0"] + grid[index]
         return set_.margin(x[:, index], t=t_i, params=params[role])
 
     return margin
@@ -627,7 +627,7 @@ def state_margins(X, unpack_jax, grid):
 
     def margins(z, params):
         x, _ = unpack_jax(z)
-        t = params["t_start"] + grid
+        t = params["t0"] + grid
         values = [
             X.margin(x[:, k], t=t[k], params=params["X"]) for k in range(x.shape[1])
         ]
@@ -641,7 +641,7 @@ def input_margins(U, unpack_jax, grid):
 
     def margins(z, params):
         x, u = unpack_jax(z)
-        t = params["t_start"] + grid
+        t = params["t0"] + grid
         values = [
             U.margin(u[:, k], x=x[:, k], t=t[k], params=params["U"])
             for k in range(x.shape[1])

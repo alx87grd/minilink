@@ -730,7 +730,7 @@ def options_of(problem, grid, options, **flat) -> DynamicProgrammingOptions:
     if opt.out_of_bound_cost is None:
         opt = replace(opt, out_of_bound_cost=grid_failure_cost(grid, opt.gamma))
 
-    # The horizon's end (t_start + tf, or a step problem's last tick) is the
+    # The horizon's end (t0 + tf, or a step problem's last tick) is the
     # terminal time unless final_time is set
     if "final_time" not in given and opt.final_time == 0.0:
         end = face.horizon_end()

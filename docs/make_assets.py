@@ -121,7 +121,7 @@ def tool_montage() -> None:
     x_up = np.array([np.pi, 0.0])
     problem = PlanningProblem(
         sys=plant,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=BallSet(x_up, 0.2),
         horizon=4.0,
         cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up),
@@ -192,7 +192,7 @@ def gif_cartpole() -> None:
     problem = PlanningProblem(
         sys=plant,
         horizon=4.0,
-        x_start=np.array([-2.0, 1.0, 0.0, 0.0]),
+        x0=np.array([-2.0, 1.0, 0.0, 0.0]),
         Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             plant, Q=np.diag([1.0, 1.0, 0.0, 0.0]), R=np.diag([0.01]), x_bar=x_goal
@@ -367,7 +367,7 @@ def racecar_mpc() -> None:
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
             sys=design,
-            x_start=x0,
+            x0=x0,
             cost=cost,
             horizon=MPC_HORIZON,
             X=design.state.box,
@@ -447,9 +447,7 @@ def gif_rocket() -> None:
         plant,
         cost=LandingCost(),
         horizon=TF,
-        x_start=Gaussian(
-            [0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]
-        ),
+        x0=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
         penalize_failure=True,
         failure_cost=100.0,
         X=plant.state.box,

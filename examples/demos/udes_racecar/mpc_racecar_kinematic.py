@@ -61,9 +61,7 @@ cost = quad + corridor + obstacle
 
 # --- MPC: receding-horizon collocation on that cost ---
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(
-        sys=car, x_start=x0, cost=cost, horizon=MPC_HORIZON, U=car.input_box
-    ),
+    PlanningProblem(sys=car, x0=x0, cost=cost, horizon=MPC_HORIZON, U=car.input_box),
     n_steps=8,
     transcription="direct_collocation",
     backend="jax",

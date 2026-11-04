@@ -185,7 +185,7 @@ def restart_finished_episodes(env, carry, done, k_reset, k_params, k_seed):
     """
     The carry of the next control period, per plant.
 
-    A plant whose episode ended restarts from a fresh start, at ``t_start``, with
+    A plant whose episode ended restarts from a fresh start, at ``t0``, with
     a zero return, a fresh policy seed and, when the problem randomizes them,
     fresh parameters; the others continue.
     """
@@ -193,9 +193,9 @@ def restart_finished_episodes(env, carry, done, k_reset, k_params, k_seed):
 
     x_next, t_next, ep_return, params, seed = carry
 
-    # A finished episode restarts from a fresh start, at t_start, with a zero return
+    # A finished episode restarts from a fresh start, at t0, with a zero return
     x_next = jnp.where(done, env.reset(k_reset), x_next)
-    t_next = jnp.where(done, env.t_start, t_next)
+    t_next = jnp.where(done, env.t0, t_next)
     ep_return = jnp.where(done, 0.0, ep_return)
     seed = jnp.where(done, episode_policy_seed(k_seed), seed)
 
@@ -234,12 +234,12 @@ def reset_carry(env, key, n_envs):
     k_x, k_params = jax.random.split(key)
     k_seed = jax.random.fold_in(key, 1)
 
-    # A fresh start, fresh parameters and a fresh policy seed per plant, at t_start
+    # A fresh start, fresh parameters and a fresh policy seed per plant, at t0
     # with a zero return
     x = jax.vmap(env.reset)(jax.random.split(k_x, n_envs))
     params = jax.vmap(env.sample_params)(jax.random.split(k_params, n_envs))
     seed = jax.vmap(episode_policy_seed)(jax.random.split(k_seed, n_envs))
-    t = jnp.full(n_envs, env.t_start)
+    t = jnp.full(n_envs, env.t0)
     ep_return = jnp.zeros(n_envs)
 
     return x, t, ep_return, params, seed

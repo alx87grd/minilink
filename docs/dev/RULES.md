@@ -97,17 +97,16 @@ concrete formatting, ordered by the cost of being wrong:
   | Idea | The word | Not |
   | --- | --- | --- |
   | Final time, absolute (a run's end, `Trajectory.tf`) | `tf` | `tf` as a length |
-  | Start time | `t_start` | `t0` |
-  | A problem's length, from `t_start` (`[t_start, t_start + horizon]`) | `horizon` | `tf` on a problem |
+  | Start time (a run's, a problem's) | `t0` | `t_start` |
+  | A problem's length, from `t0` (`[t0, t0 + horizon]`) | `horizon` | `tf` on a problem |
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
   | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
-  | Iterations, an exact count (a fixed scan) | `iterations` | `n_iterations` |
+  | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
   | Operating point, target | `x_bar`, `u_bar`, `y_bar` (keyword, `params` key, attribute) | `xbar`, `ubar`, `ybar` |
-  | A system's or a run's initial state | `x0` | |
-  | A problem's start (a point or a law) | `x_start` | |
+  | Initial state, `x(t0) = x0 ∈ X0`: a system's, a run's, a problem's (a point or a law) | `x0` | `x_start` |
   | Discount rate ρ (1/s) | `discount_rate` | |
   | Discount factor γ per tick | `gamma` | `alpha` (the CVaR level `alpha` stays) |
   | A per-call draw | `key` | |

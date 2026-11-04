@@ -62,7 +62,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         return PlanningProblem(
             sys=sys,
             horizon=1.0,
-            x_start=np.array([0.0]),
+            x0=np.array([0.0]),
             Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
@@ -160,7 +160,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = PlanningProblem(
             sys=base.sys,
             horizon=1.0,
-            x_start=np.array([0.0]),
+            x0=np.array([0.0]),
             Xf=BallSet(center=np.array([1.0]), radius=0.1),
             cost=base.cost,
             U=base.sys.input_box,

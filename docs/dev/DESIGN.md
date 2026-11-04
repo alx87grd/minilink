@@ -195,7 +195,7 @@ third argument is, never the operator:
 
 | Block | `block % Δ` | Its third argument |
 | --- | --- | --- |
-| a continuous law (`System` with states) | its Euler difference equation, `z_{k+1} = z_k + Δ·f(z_k, e_k, t_k)` | seconds, `t_k = t_start + kΔ` |
+| a continuous law (`System` with states) | its Euler difference equation, `z_{k+1} = z_k + Δ·f(z_k, e_k, t_k)` | seconds, `t_k = t0 + kΔ` |
 | a static block (`n = 0`) | sampled and held | seconds |
 | a tick law (`StepSystem`) | its clock | `k`, its own count of firings, never seconds or `Δ` |
 | a sampled-data law (`NativeSampledSystem`) | refused: its period is set at construction | seconds |
@@ -240,7 +240,7 @@ the memory of the last firing, one period behind the signal a run records at the
 their start `hold_x0` a leaf of the evaluator's tree (`pe.params["hold_x0"]`, differentiable
 like every `x0`; a layout change under a start that is not zero is refused); its compiled plan
 (`build_sampled_execution_plan`, nested boxes inlined into one flat schedule) forms
-`t_k = t_start + k·Δ` once per tick and hands it to every block whose equations are in seconds
+`t_k = t0 + k·Δ` once per tick and hands it to every block whose equations are in seconds
 (a static block, a `SampledSystem`'s seconds face), `k // d` to a tick law on a clock, `k` to a
 bare tick law; the firing is a `lax.cond` on the tick on JAX, a branch on NumPy, never a
 `where`. A bare tick law reads the base count of the loop it runs in, so a tick law designed
@@ -315,7 +315,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   3-D `camera_axes` orbit) to the input ports' bounds or slews a setpoint, staying
   windowless when a controller is connected.
 - **Path integral control:** `MPPIPlanner(problem, *, dt, n_rollouts, temperature, noise,
-  control_cost, iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
+  control_cost, n_iterations, solver, seed)` (`planning/trajectory_optimization/path_integral.py`,
   JAX) plans a held input sequence `U` on a grid of `dt`: each pass samples `V^k = U + ε^k`,
   rolls each out on `RolloutEnvironment(reward="stage")`'s `step(x, t, u, key, params=None, *, t_origin=None)` (the one owner of the stage cost, the exit cost
   and the terminal cost), weighs the samples by `exp(−(S^k − S_min) / λ)` and moves `U` by the
@@ -341,7 +341,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   carries states) and `PlanMemory` under `memory` (a `UnitDelay` holding the last plan, from
   the default guess); the loop computes each signal once per tick, so a tick solves once. The
   two switches are independent: `warm_start=True` starts each solve from the last plan shifted
-  to the tick, its first state knot at the measurement (`pv.shift(z_prev, t_k, x_start=x̂_k)`,
+  to the tick, its first state knot at the measurement (`pv.shift(z_prev, t_k, x0=x̂_k)`,
   the default guess at `P_k` while there is no plan yet), `False` from the default guess at
   every tick; `delay=True` adds a visible `UnitDelay` under `delay` between the solve and the
   command, so tick `k` applies the plan solved at `k − 1` (one period of computation delay, as
@@ -349,18 +349,18 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   non-finite cost or plan) keeps the last plan. `P_k` is the planner's tree (the solve block's
   `params`: the one tuning path is `controller.solve.cost.R`,
   `pe.params["controller"]["solve"]["cost"]["R"]`) with each leaf named in `inputs` read from
-  its port (default `{"x_start": "y"}`) and `t_start` the tick's time. Delay compensation is
-  the user's predictor block on the port that binds `x_start`, on the face verb
+  its port (default `{"x0": "y"}`) and `t0` the tick's time. Delay compensation is
+  the user's predictor block on the port that binds `x0`, on the face verb
   `pv.predict_start(x, u, t, Δ, params)` (the planner's model, the command held). The face's
-  default guess `pv.initial(params)` traces: under a trace it follows the traced `x_start`
-  and `t_start` (the guess is affine in its start), so a traced loop's first plan equals the
+  default guess `pv.initial(params)` traces: under a trace it follows the traced `x0`
+  and `t0` (the guess is affine in its start), so a traced loop's first plan equals the
   host's. `verbose=True` prints one line per solve on a host run (the tick's time, success,
   iterations, cost, wall time). Ports out: `u`, `z` (the plan solved at this tick) and
   `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
   plan, `u = pv.command(z, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
   fast)`, the plan read at the slow tick itself; the one-period-late plan is the user's
   `UnitDelay(dim=n_z)` between them. A native fixed-iteration planner (single shooting,
-  `method="adam"`, `iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is
+  `method="adam"`, `n_iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is
   one scan on JAX, `vmap`s over starts and differentiates in the plan's weights. Post-run
   horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`
   (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
@@ -461,7 +461,7 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
   optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
   optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
-- **One word for a run's origin:** `t_start`, on every runner (`compute_trajectory`,
+- **One word for a run's origin:** `t0`, on every runner (`compute_trajectory`,
   `compute_forced`, `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
 - **Two words for two times.** `dt` is the step of a computation and names it at every
@@ -493,11 +493,11 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   way through, and diagrams address internal wires as `"block:port"`, as
   output or as an additive perturbation.
 - **A problem's parameters are a view of its parts** (as a diagram's are of its
-  blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x_start",
+  blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x0",
   "discount_rate"}`, assembled on each access from the parts, which stay the one home of
-  each number (the start's singleton `X0` is not an entry: its point is `x_start`, one home);
+  each number (the start's singleton `X0` is not an entry: its point is `x0`, one home);
   assigning a dictionary routes each entry to its part (a singleton `X0` moves with
-  `x_start`, and so does assigning `problem.x_start`; a library set, a frozen value, is replaced by its `with_params` copy;
+  `x0`, and so does assigning `problem.x0`; a library set, a frozen value, is replaced by its `with_params` copy;
   a set that holds no parameters refuses a write). Library costs
   hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
   `x_bar`, `u_bar`, its attributes views); a `SumCost` keys its terms by id like a diagram
@@ -871,7 +871,7 @@ backend (`backend` picked at construction; JAX imported only by a JAX evaluator)
 - :class:`StepSystem` → `StepEvaluator`, a step diagram → `StepDiagramEvaluator`
   (`evaluators/discrete.py`): `step`, `outputs`, state-only `rollout`; no `f`
 
-On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t_start,
+On JAX a continuous evaluator also offers `rollout_batch(x0s, u_sequences=None, *, t0,
 dt, n_steps, params=None)` — one `vmap` of the RK4 / ZOH rollout over a family of
 initial states, input sequences, and params (a params leaf with one more
 dimension than the compiled value is swept); the research facade for
@@ -911,12 +911,12 @@ block):
     ev.f(x, u, t=0.0, params=None)                                            # dx; a continuous evaluator
     ev.outputs(x, u, t=0.0, params=None)                                      # the boundary ports
     ev.step(x, u, t, params=None, *, dt, solver="rk4", substeps=1)            # x_{k+1}, u held
-    ev.rollout(x0, u_seq, t_start, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
-    ev.rollout_batch(x0s, u_sequences=None, *, t_start=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
+    ev.rollout(x0, u_seq, t0, dt, params=None, *, solver="rk4", substeps=1, hold="zoh", n_steps=None)
+    ev.rollout_batch(x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None)   # JAX: a family, one vmap
 
-A step evaluator has `step(x, u, k=0, params=None, *, t_start=0.0)` (the system's own map on
+A step evaluator has `step(x, u, k=0, params=None, *, t0=0.0)` (the system's own map on
 the integer tick, no knobs), `outputs` and
-`rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)`;
+`rollout(x0, u_seq=None, params=None, *, n_steps=None, t0=0.0)`;
 a static evaluator has `outputs` only.   On NumPy each method is its plain body. On JAX each
 is marked `@compiled` (a step evaluator's `rollout` through its scan, returning native
 `(N + 1, n)` arrays) (`core/compile/evaluators/compiled.py`): `jax.jit` of the body, built
@@ -991,15 +991,15 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t_start=0.0)`, a
+- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t0=0.0)`, a
   :class:`~minilink.core.trajectory.Trajectory` of the ticks (`t = k` on a tick law,
-  `t = t_start + k·Δ` on a system on a clock); its compiled evaluator's
-  `rollout(x0, u_seq=None, params=None, *, n_steps=None, t_start=0.0)` returns the states
+  `t = t0 + k·Δ` on a system on a clock); its compiled evaluator's
+  `rollout(x0, u_seq=None, params=None, *, n_steps=None, t0=0.0)` returns the states
   `(N + 1, n)` as native arrays (one `lax.scan` on JAX, traced and differentiable end to end),
   `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
   diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass;
   on a clock with a continuous plant underneath, `compute_trajectory(tf, u=None, *, x0=None,
-  t_start=0.0, dt=None, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
+  t0=0.0, dt=None, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
   `rollout_dense`, `(N·S + 1, n)`, `S` the plant's substeps, `⌈Δ / dt⌉` when `dt` is given), equal to the ticks bit for
   bit at the ticks, and `solver="scipy"` the host clock runner
   (`simulation/discrete/clock_runner.py`: the same blocks ticked on the host, the plant integrated
@@ -1050,7 +1050,7 @@ a block that computes its own (change its `params`, or pass `dt=`).
 stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
 through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
 `SampledSystem`'s `x0` is its source's. `refresh()` only rebuilds the stacked layout after a
-structural change inside a block. The problem owns the plant's start (`x_start`), and the
+structural change inside a block. The problem owns the plant's start (`x0`), and the
 evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
 `observer.x0`), read from the block at compile.
 
@@ -1098,10 +1098,10 @@ from `key`, so `J` is deterministic and any method solves it; how a solver uses 
 methods** `gd` and `adam` are pure laws on the array module of their input
 (`optimizers/first_order.py`: `law.init(z0) -> state`, `law.update(grad, state) -> state`, the
 gradient oracle beside it, the box projection in the step). `Optimizer(program, method=,
-iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
+n_iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
 `solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
 `success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
-`iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
+`n_iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
 jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
 the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
 iterates. The failure cost of
@@ -1114,20 +1114,20 @@ among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous `horizon` and its start `t_start` (the
-horizon is `[t_start, t_start + tf]`, `0` by default; a run starts there, costs, sets and
+`U=plant.input_box`), cost, the continuous `horizon` and its start `t0` (the
+horizon is `[t0, t0 + tf]`, `0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
-transcriptions are `t_start + linspace(0, tf, N)`; a leaf of `problem.params` and of the
+transcriptions are `t0 + linspace(0, tf, N)`; a leaf of `problem.params` and of the
 evaluator's tree, so `jax.grad` differentiates it), the discount rate and the failure cost
 switch (below). **The boundary dials**: `X0=` is the start constraint `x(0) ∈ X0` (a
 vector is its singleton; by default the start's singleton, a law's support, else the
 singleton at `sys.x0`); `Xf=` the terminal constraint (a vector its singleton, a hard terminal
-equality for collocation and shooting; `None` a free end); `x_start=` the evaluation start, a
+equality for collocation and shooting; `None` a free end); `x0=` the evaluation start, a
 point or a law (by default `X0`'s point: a singleton's, a region's bounding-box centre when
 finite and inside, else `sys.x0` when inside), which must belong to `X0`; the cost's `x_bar` the
 objective's target. There is no goal shortcut: `problem.goal_point()` (`Xf`'s point, else the
 cost's `x_bar`, else the start) is what a heuristic aims at (an initial guess's end, RRT's goal
-bias, a plot's anchor); it never constrains a plan. The planners pin the start from `x_start`.
+bias, a plot's anchor); it never constrains a plan. The planners pin the start from `x0`.
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner: the
@@ -1170,7 +1170,7 @@ the finite-horizon schedule. `control.design` stays the array-in / block-out
 factory the planner calls.
 
 **Horizon and the constraint set:** the horizon has one owner, `problem.horizon` — a
-finite length is a finite horizon and `h` is charged at `t_start + horizon`; `+inf` or unset is an
+finite length is a finite horizon and `h` is charged at `t0 + horizon`; `+inf` or unset is an
 infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long to run
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
@@ -1200,20 +1200,20 @@ terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
 **One scoring formula** (`planning.evaluation.score_run`, every evaluation's): a run is
-integrated from `t_start` to `t_end = t_start + tf` (no event, no cut), then
+integrated from `t0` to `t_end = t0 + tf` (no event, no cut), then
 
 ```
 finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
-cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t_start)} g dt  (+inf when not finite; no h on an infinite horizon)
+cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t0)} g dt  (+inf when not finite; no h on an infinite horizon)
 J                   = cost, or with penalize_failure on cost + failure_cost · (failed or not reached),
                       and cost_bound + failure_cost for a run not finite
 ```
 
 **The stage cost is integrated with the state**: the evaluator's run carries the running
-cost `C(t) = ∫ e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
+cost `C(t) = ∫ e^{−ρ(τ − t0)} g(x_plant, u_plant, τ) dτ` beside the loop's state, by the same
 scheme and substeps, read at the plant block's own state and input in the pass that computes
 `dx` (a sampled loop: inside the plant's period, `SampledSystem.update_with_cost`), recorded as
 the signal `"plant:running_cost"`; its last value is the run's running cost, the stage costs
@@ -1241,16 +1241,16 @@ stage integral and the step both, names it in its record, and its policy is scor
 problem's `ρ`.
 
 **A problem stochastic by its parts:** there is no stochastic class; where a number
-goes, a law may go. `x_start=` takes a point, a `Set` (the uniform law on it, the set its
-`X0`) or a `Distribution` (its mean the representative `x_start`, its support the default
+goes, a law may go. `x0=` takes a point, a `Set` (the uniform law on it, the set its
+`X0`) or a `Distribution` (its mean the representative `x0`, its support the default
 `X0`); `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
 a block inside a diagram plant by its id); `disturbances=` takes source blocks on the plant's
 ports (`{"d": WhiteNoise(...)}`; a bare law is refused, naming the fix); `criterion`
 (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the mean of the worst `alpha`
 fraction; an evaluation's `objective` is this reduction of the runs' `J`, and the RL planner,
 which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
-parts; `problem.params` shows each law at its leaf and the start's law under `"x_start"`;
-`problem.realize(key, n)` is one tree: the problem's numbers with `"x_start"` of shape
+parts; `problem.params` shows each law at its leaf and the start's law under `"x0"`;
+`problem.realize(key, n)` is one tree: the problem's numbers with `"x0"` of shape
 `(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
 path (`child_seed(key, "plant.m")`, a source's seed by its block and the trial), so adding a
@@ -1263,7 +1263,7 @@ under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation 
 trial for every random block of the loop, the problem's sources or the loop's own, even on a
 deterministic problem: a block's own seed is only its default realization, never the trials' seed. The stepped
 environment reads each source at `t_k` with the episode's seed. A deterministic planner given a stochastic problem plans
-from the mean start and warns; `Sys2Gym(sys, cost, x_start=law)` draws each episode's start
+from the mean start and warns; `Sys2Gym(sys, cost, x0=law)` draws each episode's start
 from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
 (draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
@@ -1280,7 +1280,7 @@ automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an 
 them) with no clock is refused, naming the clock.
 `pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
 plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
-the sets' parameters, `"x_start"`, `"discount_rate"`) and each free input at its nominal
+the sets' parameters, `"x0"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
 output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
 `pe.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
@@ -1306,7 +1306,7 @@ key (trial `i` is `loop.realize(child_seed(key, "trial i"))`), the same noise on
 backends for an integer key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the failure charged, its cost is a step
 with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
 reported `trajectory` is their own held-input rollout on their
-grid (`nominal_trajectory`, the problem's step face from `t_start`), the planner's evidence;
+grid (`nominal_trajectory`, the problem's step face from `t0`), the planner's evidence;
 a planner's evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
 `planning/planner.py`, an internal helper the seven planners' `solve()` call) runs on
 the real plant: a feedback law with no clock of its own held over each period, `policy % dt`, the plant integrated at the automatic step (§5), the planner's own `J` in its
@@ -1336,7 +1336,7 @@ substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k
 beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
 `N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
 (`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
-cost, `x_start`, `t_start`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
+cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
 (`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
 face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit step problem
@@ -1437,26 +1437,26 @@ demos pass `transcription=` explicitly. Tier-2 still accepts a `Transcription`
 instance; the resolved workflow settings are `planner.settings`. Offline
 `solve` always rebuilds a fresh
 `MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
-(PP-2, PP-3): `x_start` (the start's residual when `X0` is the start's singleton),
-`t_start`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
+(PP-2, PP-3): `x0` (the start's residual when `X0` is the start's singleton),
+`t0`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
 bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
 once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
-only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"x_bar": …}, "t_start": t}`)
-merged once onto the defaults with `x0` as `x_start`, an unknown path raising and naming the
+only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"x_bar": …}, "t0": t}`)
+merged once onto the defaults with `x0` as `x0`, an unknown path raising and naming the
 known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
 of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
 one-time speed warning is emitted only when a JAX planner omits parametric compile. The
 reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
 tree stays under 2× the compile, the solve and an evaluator call of the same program with it
 frozen (the bicycle MPC is the check). Every transcription's objective is the
-problem's, discounted from `t_start`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
-`w_k = e^{−ρ(t_k − t_start)}`. Knot count
+problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
+`w_k = e^{−ρ(t_k − t0)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t_start + linspace(0, problem.horizon, n_steps)` for a finite `horizon`. **The compiled face**:
+`t0 + linspace(0, problem.horizon, n_steps)` for a finite `horizon`. **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
-`z` is the transcription's decision vector with the origin `t_start` appended (`pv.n_z`);
+`z` is the transcription's decision vector with the origin `t0` appended (`pv.n_z`);
 `pv.params` the tree (`planner.params`: **one shape for every planner**, the problem's
 leaves the plan reads, `"method"` the method's numbers (a native law's `learning_rate`, `b1`,
 `b2`, `eps`; MPPI's `temperature`, `noise`, `control_cost`; the RL planner's `gamma` and its
@@ -1466,7 +1466,7 @@ constructor option); `pv.initial(params)` the default guess packed;
 `pv.solve(params=None, z0=None) -> (z, status)`; `pv.shift(z, t)` the knot rows re-read at
 `t + offset`, the tail held; `pv.command(z, x, t)` the input at `t`; `pv.prediction(z, t)` the
 planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
-`PlanningSolution`; `pv.pack(guess)`; `pv.program`. A native method with `iterations=K` (a
+`PlanningSolution`; `pv.pack(guess)`; `pv.program`. A native method with `n_iterations=K` (a
 planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
 with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
 last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the

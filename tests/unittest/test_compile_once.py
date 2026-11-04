@@ -59,7 +59,7 @@ def pendulum_problem(tf=2.0):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
     return PlanningProblem(
-        plant, cost=cost, x_start=np.array([0.5, 0.0]), horizon=tf, U=plant.input_box
+        plant, cost=cost, x0=np.array([0.5, 0.0]), horizon=tf, U=plant.input_box
     )
 
 
@@ -112,7 +112,7 @@ def test_a_repeated_solve_compiles_nothing():
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        x_start=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
+        x0=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
         horizon=2.0,
     )
     planner = TrajectoryOptimizationPlanner(
@@ -129,11 +129,11 @@ def test_a_repeated_solve_compiles_nothing():
         transcription="single_shooting",
         backend="jax",
         method="adam",
-        iterations=20,
+        n_iterations=20,
         options={"learning_rate": 0.05},
     )
     pv = native.compile()
-    start = {"x_start": np.array([0.5, 0.0]), "t_start": 0.0}
+    start = {"x0": np.array([0.5, 0.0]), "t0": 0.0}
     for run in (
         lambda: planner.solve(evaluate=False).trajectory.x,
         lambda: native.solve(evaluate=False).trajectory.x,
@@ -174,10 +174,10 @@ def test_a_leaf_given_as_any_number_type_shares_one_trace():
 def test_an_evaluation_override_of_any_number_type_shares_one_trace():
     law = StateFeedback(np.array([[2.0, 0.5]]))
     pe = pendulum_problem().compile(law, dt=0.01, backend="jax")
-    pe.evaluate({"x_start": np.array([0.4, 0.0])}).objective
+    pe.evaluate({"x0": np.array([0.4, 0.0])}).objective
     for value in (0.3, np.float64(0.3), 0, [0.3, 0.0]):
         start = value if isinstance(value, list) else np.array([value, 0.0])
-        assert compiles(lambda: pe.evaluate({"x_start": start}).objective)[0] == 0
+        assert compiles(lambda: pe.evaluate({"x0": start}).objective)[0] == 0
 
 
 def test_a_parameter_sweep_through_a_held_evaluator_compiles_once_and_reads_each_value():

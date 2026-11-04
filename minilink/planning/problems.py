@@ -47,7 +47,7 @@ class PlanningProblem:
     as a diagram's are by block.
 
     A problem is stochastic by its parts: where a number goes, a law may
-    go (``x_start=`` a law or a set; ``params=`` laws in the tree's own shape),
+    go (``x0=`` a law or a set; ``params=`` laws in the tree's own shape),
     and a disturbance is a source block on a plant port. :meth:`realize`
     draws them into one tree, :meth:`nominal` is the problem without its
     laws (the start at its law's mean, the parts at their own numbers), and
@@ -58,9 +58,9 @@ class PlanningProblem:
     =========== =========================================== =====================================
     dial        meaning                                     default
     =========== =========================================== =====================================
-    ``X0``      the start constraint ``x(0) ∈ X0``          from ``x_start``, else ``sys.x0``
+    ``X0``      the start constraint ``x(0) ∈ X0``          from ``x0``, else ``sys.x0``
     ``Xf``      the terminal constraint ``x(tf) ∈ Xf``      ``None``, a free end
-    ``x_start`` the evaluation start (a point or a law)     from ``X0``
+    ``x0`` the evaluation start (a point or a law)     from ``X0``
     ``x_bar``    the objective's target, the cost's number   the cost's
     =========== =========================================== =====================================
 
@@ -72,13 +72,13 @@ class PlanningProblem:
     ----------
     sys : System
         Minilink system or diagram to plan for.
-    x_start : array_like, Distribution or Set, optional
+    x0 : array_like, Distribution or Set, optional
         The evaluation start, where runs begin and what :meth:`realize` draws: a
         point, or a law over ``x(0)`` (a set given here is the uniform law on
         it; no randomness unless a law is given). It must belong to ``X0``. By
         default: the point of a singleton ``X0``; for a region, the centre of its
         bounding box when finite and inside, else ``sys.x0`` when inside (a
-        region holding neither is refused: give ``x_start``).
+        region holding neither is refused: give ``x0``).
     cost : CostFunction, optional
         Planning cost. Required by solvers that optimize an objective.
     X : Set, optional
@@ -94,7 +94,7 @@ class PlanningProblem:
         an unbounded one.
     X0 : Set or array_like, optional
         The start constraint ``x(0) ∈ X0``, what planners enforce; a vector is
-        the singleton at it. By default from ``x_start``: a point's singleton, a
+        the singleton at it. By default from ``x0``: a point's singleton, a
         law's support; with neither, the singleton at ``sys.x0``.
     Xf : Set or array_like, optional
         The terminal constraint ``x(tf) ∈ Xf``; a vector is the singleton at it
@@ -103,19 +103,19 @@ class PlanningProblem:
 
     horizon : float, optional
         Continuous planning horizon length in seconds, measured from
-        ``t_start``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
+        ``t0``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
         infinite-horizon. Finite trajopt / MPC grids require a finite
         ``horizon`` — demos should always set it explicitly. Knot count ``N``
         lives on transcription options.
-    t_start : float, optional
-        The start time of the horizon, ``[t_start, t_start + horizon]``: a run
-        starts at ``t_start``, its costs, sets and references read absolute
+    t0 : float, optional
+        The start time of the horizon, ``[t0, t0 + horizon]``: a run
+        starts at ``t0``, its costs, sets and references read absolute
         time, and the discount counts from it. ``0`` (default) is today's
         horizon; it is a leaf of :attr:`params`, so an MPC binds the time of its
         tick and ``jax.grad`` differentiates it.
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
-        ``∫ e^{−ρ(t − t_start)} g dt + e^{−ρ T} h`` (``T`` the horizon), applied by every consumer (value
+        ``∫ e^{−ρ(t − t0)} g dt + e^{−ρ T} h`` (``T`` the horizon), applied by every consumer (value
         iteration's ``α`` and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     penalize_failure : bool, optional
@@ -148,14 +148,14 @@ class PlanningProblem:
 
     FIELDS = (
         "sys",
-        "x_start",
+        "x0",
         "cost",
         "X",
         "U",
         "X0",
         "Xf",
         "horizon",
-        "t_start",
+        "t0",
         "penalize_failure",
         "failure_cost",
         "discount_rate",
@@ -170,8 +170,8 @@ class PlanningProblem:
         "U",
         "X0",
         "Xf",
-        "x_start",
-        "t_start",
+        "x0",
+        "t0",
         "discount_rate",
     )
     CRITERIA = ("expectation", "worst_case", "cvar")
@@ -179,14 +179,14 @@ class PlanningProblem:
     def __init__(
         self,
         sys: System,
-        x_start=None,
+        x0=None,
         cost: CostFunction | None = None,
         X: Set | None = None,
         U: InputSet | None = None,
         X0: Set | None = None,
         Xf: Set | None = None,
         horizon: float | None = None,
-        t_start: float = 0.0,
+        t0: float = 0.0,
         penalize_failure: bool = False,
         failure_cost: float | None = None,
         discount_rate: float = 0.0,
@@ -195,22 +195,22 @@ class PlanningProblem:
         criterion="expectation",
     ):
         # The start: a point, or a law over x(0) (a set is the uniform law on it)
-        self.start_law = start_law_of(x_start)
+        self.start_law = start_law_of(x0)
         if self.start_law is not None:
-            x_start = None
+            x0 = None
             if X0 is None:
                 X0 = self.start_law.support
 
         # The fields as given, coerced below; a vector boundary is its singleton
         self.sys = sys
-        self.start_point = x_start
+        self.start_point = x0
         self.cost = cost
         self.X = X
         self.U = U
         self.X0 = boundary_set_of(X0)
         self.Xf = boundary_set_of(Xf)
         self.horizon = horizon
-        self.t_start = coerce_start_time(t_start)
+        self.t0 = coerce_start_time(t0)
         self.penalize_failure = penalize_failure
         self.failure_cost = failure_cost
         self.discount_rate = discount_rate
@@ -223,9 +223,9 @@ class PlanningProblem:
         self.failure_cost = coerce_failure_cost(self.failure_cost)
 
         # The evaluation start: the point given, else the law's mean, else X0's
-        x_start = self.coerce_state(
-            self.default_x_start(),
-            label="x_start",
+        x0 = self.coerce_state(
+            self.default_x0(),
+            label="x0",
             required=True,
         )
 
@@ -233,7 +233,7 @@ class PlanningProblem:
         # Xf as given (none by default)
         X = unconstrained(n) if self.X is None else self.X
         U = BoxInputSet(unconstrained(int(self.sys.m))) if self.U is None else self.U
-        X0 = SingletonSet(x_start) if self.X0 is None else self.X0
+        X0 = SingletonSet(x0) if self.X0 is None else self.X0
         Xf = self.Xf
 
         # The sets' types
@@ -244,17 +244,17 @@ class PlanningProblem:
             self.require_type("Xf", Xf, Set)
 
         # The start: a state of size n inside X0
-        self.check_state_shape("x_start", x_start, n)
+        self.check_state_shape("x0", x0, n)
         self.require_member(
             X0,
-            x_start,
+            x0,
             set_label="X0",
-            point_label="x_start",
+            point_label="x0",
         )
 
         # The coerced fields
         self.horizon = horizon
-        self.start_point = x_start
+        self.start_point = x0
         self.X = X
         self.U = U
         self.X0 = X0
@@ -273,17 +273,17 @@ class PlanningProblem:
         The live view of the problem's parameters, by role, as a diagram's are by block.
 
         ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
-        "Xf": …, "x_start": x_start, "t_start": t₀, "discount_rate": ρ}``, assembled on each
+        "Xf": …, "x0": x0, "t0": t₀, "discount_rate": ρ}``, assembled on each
         access from the parts, which stay the one home of each number (a set's
         entry is its own ``params``, ``{}`` for a set without parameters); each
         disturbance source's ``params`` under its port; a law in place of each
-        number the problem draws (the start's law under ``"x_start"``).
+        number the problem draws (the start's law under ``"x0"``).
         Assigning a dictionary routes each entry to its part, so
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
         view = self.parts_view()
         if self.start_law is not None:
-            view["x_start"] = self.start_law
+            view["x0"] = self.start_law
         if self.laws:
             view = merge_tree(view, self.laws)
 
@@ -295,9 +295,9 @@ class PlanningProblem:
 
         # A law in the tree moves the problem's laws; the numbers move the parts
         value, laws = split_laws(value, self.parts_view())
-        if "x_start" in laws:
-            self.start_law = laws.pop("x_start")
-            value.pop("x_start", None)
+        if "x0" in laws:
+            self.start_law = laws.pop("x0")
+            value.pop("x0", None)
         self.laws = merge_tree(self.laws, laws) if laws else self.laws
 
         for role, entry in value.items():
@@ -305,10 +305,10 @@ class PlanningProblem:
                 self.sys.params = entry
             elif role == "cost":
                 self.cost.params = entry
-            elif role == "x_start":
+            elif role == "x0":
                 self.move_start(entry)
-            elif role == "t_start":
-                self.t_start = coerce_start_time(entry)
+            elif role == "t0":
+                self.t0 = coerce_start_time(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
             elif role in self.sources_by_id():
@@ -317,21 +317,21 @@ class PlanningProblem:
                 setattr(self, role, getattr(self, role).with_params(entry))
 
     @property
-    def x_start(self) -> np.ndarray:
-        """The evaluation start's point (a law's mean): the one leaf ``params["x_start"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
+    def x0(self) -> np.ndarray:
+        """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
         return self.start_point
 
-    @x_start.setter
-    def x_start(self, value):
+    @x0.setter
+    def x0(self, value):
         self.move_start(value)
 
-    def move_start(self, x_start):
-        """Set ``x_start``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
-        start = self.coerce_state(x_start, label="x_start", required=True)
-        self.check_state_shape("x_start", start, int(self.sys.n))
+    def move_start(self, x0):
+        """Set ``x0``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
+        start = self.coerce_state(x0, label="x0", required=True)
+        self.check_state_shape("x0", start, int(self.sys.n))
         if isinstance(self.X0, SingletonSet):
             self.X0 = SingletonSet(start)
-        self.require_member(self.X0, start, set_label="X0", point_label="x_start")
+        self.require_member(self.X0, start, set_label="X0", point_label="x0")
 
         self.start_point = start
 
@@ -352,21 +352,21 @@ class PlanningProblem:
         x_bar = None if self.cost is None else self.cost.params.get("x_bar")
         if x_bar is not None:
             x_bar = np.asarray(x_bar, dtype=float).reshape(-1).copy()
-            if self.X is None or bool(self.X.contains(x_bar, self.t_start)):
+            if self.X is None or bool(self.X.contains(x_bar, self.t0)):
                 return x_bar
 
-        return self.x_start.copy()
+        return self.x0.copy()
 
     def realize(self, key=None, n=1):
         """
         ``n`` realizations of the problem's draws from one key: one tree.
 
-        The problem's numbers (:meth:`parts_view`), with ``"x_start"`` of shape
+        The problem's numbers (:meth:`parts_view`), with ``"x0"`` of shape
         ``(n, nx)``, each law's leaf drawn ``n`` times in its number's shape
         (``(n, *shape)``), and each random disturbance source's ``seed`` an
         integer leaf of shape ``(n,)``; the other leaves are shared. Each
         consumer draws from its own stream, named by its path
-        (``child_seed(key, "x_start")``, ``child_seed(key, "plant.m")``; a
+        (``child_seed(key, "x0")``, ``child_seed(key, "plant.m")``; a
         source's seed by its port and the trial): adding a law or a source
         leaves every other draw unchanged. An integer key draws on the host,
         the same values for a NumPy and a JAX run; a JAX key draws
@@ -385,11 +385,11 @@ class PlanningProblem:
         # A deterministic problem: its one start, the shared numbers
         if not self.is_stochastic:
             require_one_run(n)
-            tree["x_start"] = self.sample_x0(None, n)
+            tree["x0"] = self.sample_x0(None, n)
             return tree
 
-        # x(0) ~ the start's law, n times, from the stream named "x_start"
-        tree["x_start"] = self.sample_x0(stream_of(key, "x_start"), n)
+        # x(0) ~ the start's law, n times, from the stream named "x0"
+        tree["x0"] = self.sample_x0(stream_of(key, "x0"), n)
 
         # Each law's leaf n times, in its number's shape, from the stream named by
         # its path (the tree copied along the path: the parts' dicts stay untouched)
@@ -412,7 +412,7 @@ class PlanningProblem:
 
     def drawn_paths(self):
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
-        paths = [("x_start",)]
+        paths = [("x0",)]
         paths.extend(path for path, _ in flatten(self.laws))
         for sys_id, block in self.sources_by_id().items():
             if block.is_random:
@@ -424,8 +424,8 @@ class PlanningProblem:
     def sample_x0(self, key, n=None):
         """Draw starts from the start's law: ``(nx,)`` for one, ``(n, nx)`` with ``n``."""
         if self.start_law is None:
-            x_start = self.x_start
-            return x_start.copy() if n is None else np.tile(x_start, (int(n), 1))
+            x0 = self.x0
+            return x0.copy() if n is None else np.tile(x0, (int(n), 1))
 
         return self.start_law.sample(key, n)
 
@@ -455,7 +455,7 @@ class PlanningProblem:
         tree = self.realize(None)
 
         # The copy without its laws, the start at its mean
-        nominal = deepcopy(self).replace(x_start=self.x_start, X0=None, params=None)
+        nominal = deepcopy(self).replace(x0=self.x0, X0=None, params=None)
 
         # Each law's mean in the copied part
         means = {}
@@ -476,19 +476,19 @@ class PlanningProblem:
         fields = {name: getattr(self, name) for name in self.FIELDS}
         fields["params"] = self.laws or None
         if self.start_law is not None:
-            fields["x_start"] = self.start_law
+            fields["x0"] = self.start_law
         unknown = sorted(set(changes) - set(fields))
         if unknown:
             raise TypeError(f"{type(self).__name__} has no field(s) {unknown}")
         fields.update(changes)
 
         # A new start takes its own singleton X0, unless one is given
-        if "x_start" in changes and "X0" not in changes:
+        if "x0" in changes and "X0" not in changes:
             if isinstance(self.X0, SingletonSet):
                 fields["X0"] = None
 
         # A new start law takes its own support, unless one is given
-        if isinstance(changes.get("x_start"), (Distribution, Set)):
+        if isinstance(changes.get("x0"), (Distribution, Set)):
             if "X0" not in changes:
                 fields["X0"] = None
 
@@ -523,12 +523,12 @@ class PlanningProblem:
         for role in ("X", "U", "X0", "Xf"):
             set_ = getattr(self, role)
             if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
-                continue  # The start's singleton: its point is x_start, one home
+                continue  # The start's singleton: its point is x0, one home
             view[role] = getattr(set_, "params", None)
         for port, block in getattr(self, "disturbances", {}).items():
             view[source_id(port)] = block.params
-        view["x_start"] = self.x_start
-        view["t_start"] = self.t_start
+        view["x0"] = self.x0
+        view["t0"] = self.t0
         view["discount_rate"] = self.discount_rate
 
         return view
@@ -736,7 +736,7 @@ class PlanningProblem:
 
         return value
 
-    def default_x_start(self):
+    def default_x0(self):
         """
         The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
 
@@ -763,7 +763,7 @@ class PlanningProblem:
 
         raise ValueError(
             f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
-            "sys.x0: give x_start, a point of X0 or a law over it"
+            "sys.x0: give x0, a point of X0 or a law over it"
         )
 
     @staticmethod
@@ -812,7 +812,7 @@ class PlanningProblem:
 
 
 class SetStart(Distribution):
-    """The uniform law on a start set: a :class:`~minilink.core.sets.Set` given as ``x_start``."""
+    """The uniform law on a start set: a :class:`~minilink.core.sets.Set` given as ``x0``."""
 
     def __init__(self, set_):
         box = set_.bounding_box()
@@ -830,12 +830,12 @@ class SetStart(Distribution):
         return self.support.sample(key, n, params)
 
 
-def start_law_of(x_start):
+def start_law_of(x0):
     """The law of a start given as a law or a set, ``None`` for a point."""
-    if isinstance(x_start, Distribution):
-        return x_start
-    if isinstance(x_start, Set):
-        return SetStart(x_start)
+    if isinstance(x0, Distribution):
+        return x0
+    if isinstance(x0, Set):
+        return SetStart(x0)
 
     return None
 
@@ -844,12 +844,12 @@ def require_samplable_start(set_, box):
     """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
     if type(set_).sample is Set.sample:
         raise ValueError(
-            f"x_start {type(set_).__name__} cannot draw a start (only a box samples): "
+            f"x0 {type(set_).__name__} cannot draw a start (only a box samples): "
             "give a law (a Distribution), or a box"
         )
     if not is_finite_box(box):
         raise ValueError(
-            f"x_start {type(set_).__name__} has no finite bounding box: give a law "
+            f"x0 {type(set_).__name__} has no finite bounding box: give a law "
             "(a Distribution) or a bounded set"
         )
 
@@ -908,8 +908,8 @@ def coerce_laws(laws, view) -> dict:
         name = ".".join(path)
         if not isinstance(law, Distribution):
             raise TypeError(f"params[{name!r}] must be a Distribution, got {law!r}")
-        if path[0] == "x_start":
-            raise ValueError("a law over the start is x_start=law, not params=")
+        if path[0] == "x0":
+            raise ValueError("a law over the start is x0=law, not params=")
         try:
             leaf = lookup(view, path)
         except KeyError:
@@ -967,7 +967,7 @@ def split_laws(value, view):
     for path, leaf in flatten(value):
         if isinstance(leaf, Distribution):
             set_leaf(laws, path, leaf)
-            if path != ("x_start",):
+            if path != ("x0",):
                 numbers = with_leaf(numbers, path, lookup(view, path))
 
     return numbers, laws
@@ -1007,7 +1007,7 @@ def require_one_run(n):
     if int(n) != 1:
         raise ValueError(
             f"a deterministic problem has one realization, got n={n!r}: give the "
-            "problem laws (a law on x_start, laws in params, a random source) to "
+            "problem laws (a law on x0, laws in params, a random source) to "
             "draw several"
         )
 
@@ -1121,13 +1121,13 @@ def fallback_bound(reason):
     return 1.0e6
 
 
-def coerce_start_time(t_start) -> float:
+def coerce_start_time(t0) -> float:
     """The start time as a float; refuse one that is not finite."""
-    t_start = float(t_start)
-    if not np.isfinite(t_start):
-        raise ValueError(f"t_start must be finite, got {t_start!r}")
+    t0 = float(t0)
+    if not np.isfinite(t0):
+        raise ValueError(f"t0 must be finite, got {t0!r}")
 
-    return t_start
+    return t0
 
 
 def coerce_rate(rate) -> float:

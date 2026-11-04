@@ -27,9 +27,9 @@ class StepPlanningProblem:
     ticks. ``n_steps=None`` is the infinite
     horizon (no ``h``). The start, the sets and the laws are a
     :class:`~minilink.planning.problems.PlanningProblem`'s, shared by
-    composition (:attr:`parts`). ``t_start`` is the tick offset, an integer,
+    composition (:attr:`parts`). ``t0`` is the tick offset, an integer,
     for a native step problem; a discretized problem
-    (:meth:`PlanningProblem.discretize`) keeps ``(dt, t_start)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
+    (:meth:`PlanningProblem.discretize`) keeps ``(dt, t0)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
     and its cost a :class:`~minilink.core.costs.SampledCost`. ``compile()``
     gives the step face (:class:`~minilink.planning.step_face.StepFace`), the
     one face value iteration, the RL environment and the judge read.
@@ -42,12 +42,12 @@ class StepPlanningProblem:
         n_steps=None,
         cost: StepCost | None = None,
         gamma: float = 1.0,
-        x_start=None,
+        x0=None,
         X=None,
         U=None,
         X0=None,
         Xf=None,
-        t_start=0,
+        t0=0,
         dt=None,
         penalize_failure=False,
         failure_cost=None,
@@ -62,7 +62,7 @@ class StepPlanningProblem:
         self.cost = cost
         self.gamma = coerce_gamma(gamma)
         self.dt = None if dt is None else float(dt)
-        self.t_start = coerce_tick_offset(t_start, self.dt)
+        self.t0 = coerce_tick_offset(t0, self.dt)
 
         # The continuous problem it samples, for a discretized one (problem.discretize)
         self.origin = None
@@ -70,7 +70,7 @@ class StepPlanningProblem:
         # The start, the sets and the laws, shared with the continuous problem
         self.parts = PlanningProblem(
             sys,
-            x_start=x_start,
+            x0=x0,
             X=X,
             U=U,
             X0=X0,
@@ -84,8 +84,8 @@ class StepPlanningProblem:
     # The shared parts
 
     @property
-    def x_start(self):
-        return self.parts.x_start
+    def x0(self):
+        return self.parts.x0
 
     @property
     def start_law(self):
@@ -134,14 +134,14 @@ class StepPlanningProblem:
     @property
     def params(self) -> dict:
         """
-        The live view of the problem's numbers, by role: ``plant``, ``cost``, the sets', ``x_start``, ``t_start``, ``gamma``.
+        The live view of the problem's numbers, by role: ``plant``, ``cost``, the sets', ``x0``, ``t0``, ``gamma``.
 
         A law stands in place of each number the problem draws, as on
         :class:`~minilink.planning.problems.PlanningProblem`.
         """
         view = self.parts_view()
         if self.start_law is not None:
-            view["x_start"] = self.start_law
+            view["x0"] = self.start_law
         if self.laws:
             view = merge_tree(view, self.laws)
 
@@ -156,8 +156,8 @@ class StepPlanningProblem:
         for role in ("X", "U", "X0", "Xf"):
             if role in parts:
                 view[role] = parts[role]
-        view["x_start"] = self.x_start
-        view["t_start"] = self.t_start
+        view["x0"] = self.x0
+        view["t0"] = self.t0
         view["gamma"] = self.gamma
 
         return view
@@ -253,7 +253,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     The plant becomes its :class:`~minilink.core.discrete.sampled_system.SampledSystem`,
     the cost a :class:`~minilink.core.costs.SampledCost` (the one-period
     integral of ``e^{−ρτ} g``), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
-    ``(dt, t_start)`` in seconds; the start, the sets and the laws as
+    ``(dt, t0)`` in seconds; the start, the sets and the laws as
     they are. Its face equals ``problem.compile(dt=dt, solver=, substeps=)``'s
     to the bit, its cost bound the continuous problem's on the same sum. A problem
     with disturbance sources is refused: the step problem feeds no source.
@@ -282,15 +282,15 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
             solver=solver,
             substeps=substeps,
             discount_rate=rho,
-            t_start=problem.t_start,
+            t0=problem.t0,
         ),
         gamma=gamma,
-        x_start=problem.start_law if problem.start_law is not None else problem.x_start,
+        x0=problem.start_law if problem.start_law is not None else problem.x0,
         X=problem.X,
         U=problem.U,
         X0=None if problem.start_law is not None else problem.X0,
         Xf=problem.Xf,
-        t_start=problem.t_start,
+        t0=problem.t0,
         dt=dt,
         penalize_failure=problem.penalize_failure,
         failure_cost=problem.failure_cost,
@@ -351,16 +351,16 @@ def coerce_gamma(gamma) -> float:
     return gamma
 
 
-def coerce_tick_offset(t_start, dt):
+def coerce_tick_offset(t0, dt):
     """The start: a whole tick offset for a native problem, seconds for a discretized one."""
     if dt is not None:
-        return float(t_start)
-    if int(t_start) != t_start:
+        return float(t0)
+    if int(t0) != t0:
         raise ValueError(
-            f"a native step problem's t_start is a tick offset, a whole number; got {t_start!r}"
+            f"a native step problem's t0 is a tick offset, a whole number; got {t0!r}"
         )
 
-    return int(t_start)
+    return int(t0)
 
 
 def require_step_cost(cost):
@@ -378,7 +378,7 @@ def require_no_controller(controller):
     if controller is not None:
         raise NotImplementedError(
             "StepPlanningProblem.compile() takes no controller: it gives the step face; "
-            "score a policy with face.run(policy, x_start)"
+            "score a policy with face.run(policy, x0)"
         )
 
 

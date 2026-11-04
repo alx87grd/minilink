@@ -14,7 +14,7 @@ from minilink.core.params import lookup, with_leaf
 from minilink.core.system import System
 
 # The default binding: the measured state on the input port y is the plan's start
-DEFAULT_INPUTS = {"x_start": "y"}
+DEFAULT_INPUTS = {"x0": "y"}
 
 # The status keys every face's solve reports; a planner's own account comes after them
 STANDARD_STATUS = ("success", "iterations", "cost")
@@ -49,7 +49,7 @@ def ModelPredictiveController(
 
     - ``warm_start=True`` (the default): each solve starts from the last plan
       shifted to the tick's time, its first state knot at the measurement
-      (``pv.shift(z_prev, t_k, x_start=x̂_k)``; the default guess at ``P_k``
+      (``pv.shift(z_prev, t_k, x0=x̂_k)``; the default guess at ``P_k``
       while no plan exists yet); ``False`` solves from the default guess at
       every tick.
     - ``delay=True``: one period of computation delay, a visible unit delay
@@ -60,17 +60,17 @@ def ModelPredictiveController(
     A solve that returns no usable plan (a non-finite cost or plan) keeps the
     last one. ``P_k`` is the planner's tree (the solve block's ``params``, so
     the loop's ``controller.solve.cost.R`` tunes the plan) with each leaf
-    named in ``inputs`` read from its input port (default ``{"x_start": "y"}``:
-    the measured state is the plan's start) and ``t_start`` the tick's time.
+    named in ``inputs`` read from its input port (default ``{"x0": "y"}``:
+    the measured state is the plan's start) and ``t0`` the tick's time.
     Delay compensation is the user's: a predictor block (``pv.predict_start``)
-    on the port that binds ``x_start``.
+    on the port that binds ``x0``.
 
     Parameters
     ----------
     planner : TrajectoryOptimizationPlanner or MPPIPlanner
         The planner solved at each tick; its problem's start is a point.
     inputs : dict, optional
-        Leaf path → input port: ``{"x_start": "x_hat", "plant.m": "m_hat"}``.
+        Leaf path → input port: ``{"x0": "x_hat", "plant.m": "m_hat"}``.
         A bound leaf stays in the tree as the value used when its port is not
         wired.
     delay : bool
@@ -224,14 +224,14 @@ class PlanSolver(System):
         x_hat = measured_start(self, u)
 
         # P_k: the planner's tree with the bound leaves read from their ports, the
-        # plan's origin t_start = t_k
+        # plan's origin t0 = t_k
         P = bound_tree(self, params, u, t)
         if not self.warm_start:
             return P, pv.initial(P)
 
         # z0 = shift(z_prev, t_k) with x_0 = x̂, the default guess at P_k while
         # z_prev is no plan yet
-        x_plan = P["x_start"] if x_hat is not None else None
+        x_plan = P["x0"] if x_hat is not None else None
         z_guess = warm_guess(pv, z_prev, x_plan, P, z_default)
 
         return P, z_guess
@@ -301,7 +301,7 @@ class PlanCommand(PlanFollower):
 
 
 def bindings_of(inputs):
-    """The leaf path → port bindings, ``{"x_start": "y"}`` by default."""
+    """The leaf path → port bindings, ``{"x0": "y"}`` by default."""
     bindings = dict(DEFAULT_INPUTS if inputs is None else inputs)
     require_unique_ports(bindings)
 
@@ -318,8 +318,8 @@ def declare_bound_inputs(block, pv, bindings):
         block.add_input_port(port, dim=int(value.size), nominal_value=value)
 
 
-def bound_tree(block, params, u, t_start):
-    """``P``: ``params`` with each bound leaf read from its port and ``t_start`` set."""
+def bound_tree(block, params, u, t0):
+    """``P``: ``params`` with each bound leaf read from its port and ``t0`` set."""
     xp = array_module(u)
 
     P = params
@@ -327,7 +327,7 @@ def bound_tree(block, params, u, t_start):
         value = u[block.get_input_port_slice(port)]
         shape = xp.shape(lookup(block.params, path))
         P = with_leaf(P, path, xp.reshape(value, shape))
-    P = with_leaf(P, "t_start", t_start)
+    P = with_leaf(P, "t0", t0)
 
     return P
 
@@ -339,7 +339,7 @@ def warm_guess(pv, z, x, params, z_default):
     While ``z`` is still ``z_default`` (the block's start, no plan yet) the
     guess is the default guess at ``params``, from the measured start.
     """
-    t = params["t_start"]
+    t = params["t0"]
     xp = array_module(z, t)
 
     # No plan yet: the default guess from the measured start
@@ -347,9 +347,9 @@ def warm_guess(pv, z, x, params, z_default):
     if is_concrete(fresh):
         if bool(fresh):
             return pv.initial(params)
-        return pv.shift(z, t, x_start=x)
+        return pv.shift(z, t, x0=x)
 
-    return xp.where(fresh, pv.initial(params), pv.shift(z, t, x_start=x))
+    return xp.where(fresh, pv.initial(params), pv.shift(z, t, x0=x))
 
 
 def report_solve(block, t, status, started):
@@ -402,7 +402,7 @@ def declare_follower(block, pv):
 
 def measured_start(block, u):
     """The plan's start read from its port (the measured state), ``None`` when unbound."""
-    port = block.bindings.get("x_start")
+    port = block.bindings.get("x0")
     if port is None:
         return None
 
@@ -422,7 +422,7 @@ def require_point_start(problem):
     if problem.start_law is not None or not isinstance(problem.X0, SingletonSet):
         raise ValueError(
             "the MPC binds the measured state to the plan's start: give the planner's "
-            "problem a point start (x_start), not a set or a law (its X0 is "
+            "problem a point start (x0), not a set or a law (its X0 is "
             f"{type(problem.X0).__name__}; a plan would start anywhere in it)"
         )
 

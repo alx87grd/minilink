@@ -467,7 +467,7 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         A continuous law becomes its Euler difference equation,
         ``z_{k+1} = z_k + dt·f(z_k, e_k, t_k)``, receiving seconds
-        ``t_k = t_start + k·dt``; a static block is sampled and held, receiving
+        ``t_k = t0 + k·dt``; a static block is sampled and held, receiving
         seconds; a tick law (a :class:`~minilink.core.discrete.step_system.StepSystem`)
         gets its clock and receives ``k``, its own count of firings. It is never
         integrated inside the period: the continuous plant a loop closes on is

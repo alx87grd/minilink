@@ -109,7 +109,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
     sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
 
-    x_start = np.array([0.0, 0.0])
+    x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])
     cost = QuadraticCost.from_system(
         sys,
@@ -121,7 +121,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     problem = PlanningProblem(
         sys=sys,
         horizon=PENDULUM_TF,
-        x_start=x_start,
+        x0=x0,
         Xf=SingletonSet(x_goal),
         cost=cost,
         X=sys.state.box,

@@ -66,7 +66,7 @@ plant = Pendulum()
 x_down, x_up = np.array([0.0, 0.0]), np.array([np.pi, 0.0])
 problem = PlanningProblem(
     sys=plant,
-    x_start=x_down,
+    x0=x_down,
     Xf=BallSet(x_up, 0.2),
     horizon=4.0,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=x_up),
@@ -115,7 +115,7 @@ else:
     )  # a family of rod lengths, one call
 
     tuning = PlanningProblem(
-        plant, x_start=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0
+        plant, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant), horizon=4.0
     )
     pe = tuning.compile(PID(2.0, 0.5, 1.0), dt=0.02)
     dJ = jax.grad(lambda p: pe.evaluate(p).objective)(

@@ -690,7 +690,7 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
     sys.inputs["u"].lower_bound[0] = -10.0
     sys.inputs["u"].upper_bound[0] = 10.0
 
-    x_start = np.array([-2.0, 1.0, 0.0, 0.0])
+    x0 = np.array([-2.0, 1.0, 0.0, 0.0])
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
     cost = QuadraticCost.from_system(
         sys,
@@ -702,7 +702,7 @@ def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
     )
     return PlanningProblem(
         sys=sys,
-        x_start=x_start,
+        x0=x0,
         Xf=SingletonSet(x_goal),
         cost=cost,
         horizon=float(tf),

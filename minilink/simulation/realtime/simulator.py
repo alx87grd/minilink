@@ -207,7 +207,7 @@ class RealtimeSimulator:
 
     # Public API
 
-    def run(self, x0=None, t_start=0.0):
+    def run(self, x0=None, t0=0.0):
         """
         Run the live loop until stop; return the recorded :class:`Trajectory`.
 
@@ -218,7 +218,7 @@ class RealtimeSimulator:
         ----------
         x0 : np.ndarray, optional
             Initial state (defaults to ``sys.x0``).
-        t_start : float
+        t0 : float
             Initial simulation time.
         """
         sys = self.sys
@@ -226,7 +226,7 @@ class RealtimeSimulator:
         frame_dt = self.frame_dt
 
         x = np.asarray(sys.x0 if x0 is None else x0, dtype=float).reshape(evaluator.n)
-        t = float(t_start)
+        t = float(t0)
         u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
 
         t_warm = time.perf_counter()
@@ -240,7 +240,7 @@ class RealtimeSimulator:
                 n=evaluator.n,
                 m=evaluator.m,
                 x0=x,
-                t_start=t,
+                t0=t,
                 frame_dt=frame_dt,
                 sim_dt=self.sim_dt,
                 sim_dt_auto=self._auto_sim_dt,

@@ -33,7 +33,7 @@ problem = PlanningProblem(
     boat,
     cost=parking_cost(boat, terminal=TERMINAL, well=DOCK_WELL),
     horizon=TF,
-    x_start=Uniform(
+    x0=Uniform(
         [-START_RADIUS, -START_RADIUS, -np.pi, -0.5, -0.5, -0.2],
         [START_RADIUS, START_RADIUS, np.pi, 0.5, 0.5, 0.2],
     ),

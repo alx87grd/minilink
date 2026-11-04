@@ -165,13 +165,13 @@ class TestSys2Gym(unittest.TestCase):
             Uniform([-0.5, -1.0], [0.5, 1.0]),
             Gaussian([0.0, 0.0], [0.1, 0.1]),
         ):
-            env = self.make_env(x_start=law)
+            env = self.make_env(x0=law)
             y, info = env.reset(seed=1)
             self.assertEqual(y.shape, (2,))
             self.assertIn("state", info)
             again, _ = env.reset(seed=1)
             np.testing.assert_array_equal(y, again)  # one seed, one start
-        y, _ = self.make_env(x_start=Uniform([-0.5, -1.0], [0.5, 1.0])).reset(seed=0)
+        y, _ = self.make_env(x0=Uniform([-0.5, -1.0], [0.5, 1.0])).reset(seed=0)
         self.assertTrue(np.all(np.abs(y) <= [0.5, 1.0]))
 
     def test_no_law_starts_every_episode_at_x0(self):
@@ -192,12 +192,12 @@ class TestSys2Gym(unittest.TestCase):
             PlanningProblem,
         )
 
-        # A deterministic problem on a plant without state bounds starts at x_start
+        # A deterministic problem on a plant without state bounds starts at x0
         plant = make_unbounded_pendulum()
         cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
         problem = PlanningProblem(
             plant,
-            x_start=np.array([0.2, 0.0]),
+            x0=np.array([0.2, 0.0]),
             cost=cost,
             horizon=1.0,
             U=plant.input_box,
@@ -209,7 +209,7 @@ class TestSys2Gym(unittest.TestCase):
         # The start is the problem's first draw on the seeded generator
         start = Uniform([-1.0, -0.5], [1.0, 0.5])
         problem = PlanningProblem(
-            make_bounded_pendulum(), cost=cost, horizon=1.0, x_start=start
+            make_bounded_pendulum(), cost=cost, horizon=1.0, x0=start
         )
         env = Sys2Gym.from_problem(problem, backend="numpy")
         for seed in (0, 7):
@@ -241,7 +241,7 @@ class TestSys2Gym(unittest.TestCase):
         for r, x, leaves in ((0.5, 0.7, True), (3.0, 1.5, False)):
             problem = PlanningProblem(
                 plant,
-                x_start=[0.0, 0.0],
+                x0=[0.0, 0.0],
                 cost=cost,
                 horizon=np.inf,
                 X=Band(r),

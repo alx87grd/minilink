@@ -48,8 +48,8 @@ lands. Last checked against the code: 2026-10-31.
 - **Fix:** none planned yet (clip the interpolated command to the grid's input box).
 
 ### A Gaussian start leaves `X0` at the system's `x0`
-- **Symptom:** `PlanningProblem(sys, x_start=Gaussian(...))` keeps `X0` as the singleton at
-  `sys.x0` (a Gaussian has no support to take it from); `replace(x_start=law)` also keeps
+- **Symptom:** `PlanningProblem(sys, x0=Gaussian(...))` keeps `X0` as the singleton at
+  `sys.x0` (a Gaussian has no support to take it from); `replace(x0=law)` also keeps
   the old `X0`.
 - **Workaround:** give `X0` explicitly, or use a `Uniform` start.
 - **Fix:** none planned yet.

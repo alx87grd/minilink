@@ -123,7 +123,7 @@ class ShootingTranscription(Transcription):
                 problem.cost,
                 discount_rate=problem.discount_rate,
                 params=problem.cost.params,
-                t_start=problem.t_start,
+                t0=problem.t0,
             )
 
         return traj
@@ -192,7 +192,7 @@ class ShootingTranscription(Transcription):
         Build the JAX scan-based single-shooting program on the problem's tree, ``J(z, params)``.
 
         The tree is :meth:`program_params`: the rollout starts at
-        ``params["x_start"]`` at ``params["t_start"]`` on the plant's numbers,
+        ``params["x0"]`` at ``params["t0"]`` on the plant's numbers,
         the cost reads the cost's and the discount, the sets their own.
         With no terminal set and no state or input set beyond the input box, the
         program is box-bounded: the native methods solve it.
@@ -210,11 +210,11 @@ class ShootingTranscription(Transcription):
         def unpack_jax(z):
             return z.reshape(m, n_steps)
 
-        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0 = x_start, scanned over the intervals
+        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0 = x0, scanned over the intervals
         def rollout(u, params):
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             plant = params["plant"]
-            x0 = params["x_start"]
+            x0 = params["x0"]
 
             def f(x, u_k, t_k):
                 return problem.sys.f(x, u_k, t_k, plant)
@@ -230,11 +230,11 @@ class ShootingTranscription(Transcription):
             return x
 
         # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), on the rolled-out
-        # states, w_k = e^{−ρ(t_k − t_start)}
+        # states, w_k = e^{−ρ(t_k − t0)}
         def J(z, params):
             u = unpack_jax(z)
             x = rollout(u, params)
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             return trajectory_cost(
                 cost,
                 x,
@@ -243,7 +243,7 @@ class ShootingTranscription(Transcription):
                 dt,
                 params["cost"],
                 discount_rate=params["discount_rate"],
-                t_start=params["t_start"],
+                t0=params["t0"],
             )
 
         # The terminal and path constraints on the rolled-out states, the input box
@@ -269,11 +269,11 @@ class ShootingTranscription(Transcription):
         )
 
     def program_params(self, problem: PlanningProblem) -> dict:
-        """The JAX program's tree: ``x_start``, ``t_start``, the plant's, the cost's, the discount, and each set it reads by role."""
+        """The JAX program's tree: ``x0``, ``t0``, the plant's, the cost's, the discount, and each set it reads by role."""
         plant = nominal_plant_params(problem)
         tree = {
-            "x_start": np.asarray(problem.x_start, dtype=float),
-            "t_start": float(problem.t_start),
+            "x0": np.asarray(problem.x0, dtype=float),
+            "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
             "cost": problem.require_cost().params,
             "discount_rate": float(problem.discount_rate),
@@ -302,7 +302,7 @@ class ShootingTranscription(Transcription):
 
             def terminal_margin(z, params):
                 x = rollout(unpack_jax(z), params)
-                t_N = params["t_start"] + grid[-1]
+                t_N = params["t0"] + grid[-1]
                 return Xf.margin(x[:, -1], t=t_N, params=params["Xf"])
 
             inequalities.append(terminal_margin)
@@ -314,7 +314,7 @@ class ShootingTranscription(Transcription):
 
             def state_margins(z, params):
                 x = rollout(unpack_jax(z), params)
-                t = params["t_start"] + grid
+                t = params["t0"] + grid
                 values = [
                     X.margin(x[:, k], t=t[k], params=params["X"])
                     for k in range(x.shape[1])
@@ -330,7 +330,7 @@ class ShootingTranscription(Transcription):
             def input_margins(z, params):
                 u = unpack_jax(z)
                 x = rollout(u, params)
-                t = params["t_start"] + grid
+                t = params["t0"] + grid
                 values = [
                     U.margin(u[:, k], x=x[:, k], t=t[k], params=params["U"])
                     for k in range(x.shape[1])
@@ -372,8 +372,8 @@ class ShootingTranscription(Transcription):
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:
-        """The rollout's start: the problem's ``x_start``, which a singleton ``X0`` is derived from."""
-        return problem.x_start
+        """The rollout's start: the problem's ``x0``, which a singleton ``X0`` is derived from."""
+        return problem.x0
 
     def rollout_loop(self, f, u, x0, problem: PlanningProblem) -> np.ndarray:
         """The state knots of the input knots ``u`` from ``x0``, one RK4 step per interval."""
@@ -490,7 +490,7 @@ class ShootingTranscription(Transcription):
         dt = self.options.dt(problem)
         cost_params = problem.cost.params
 
-        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t_start)}
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), w_k = e^{−ρ(t_k − t0)}
         J = trajectory_cost(
             cost,
             x,
@@ -499,7 +499,7 @@ class ShootingTranscription(Transcription):
             dt,
             cost_params,
             discount_rate=problem.discount_rate,
-            t_start=problem.t_start,
+            t0=problem.t0,
         )
 
         return J

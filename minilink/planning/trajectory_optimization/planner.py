@@ -55,7 +55,7 @@ _TRAJOPT_OPTION_KEYS = (
     "verbose",
     "feasibility_tol",
     "live_plot",
-    "iterations",
+    "n_iterations",
 )
 
 _TRANSCRIPTION_PRESETS = frozenset(
@@ -100,7 +100,7 @@ class TrajectoryOptimizationPlanner(Planner):
         verbose=_UNSET,
         feasibility_tol=_UNSET,
         live_plot=_UNSET,
-        iterations=_UNSET,
+        n_iterations=_UNSET,
     ) -> None:
         """
         Parameters
@@ -119,7 +119,7 @@ class TrajectoryOptimizationPlanner(Planner):
             The optimizer's own settings (``maxiter``, ``learning_rate``, ...),
             passed to its method.
         backend, guess, method, use_hessian, record_history, callback,
-        record_solve_time, verbose, feasibility_tol, live_plot, iterations
+        record_solve_time, verbose, feasibility_tol, live_plot, n_iterations
             The workflow settings, as keywords; the resolved set is
             :attr:`settings`.
         """
@@ -143,7 +143,7 @@ class TrajectoryOptimizationPlanner(Planner):
             verbose=verbose,
             feasibility_tol=feasibility_tol,
             live_plot=live_plot,
-            iterations=iterations,
+            n_iterations=n_iterations,
         )
 
         # Memory of the latest solve
@@ -175,7 +175,7 @@ class TrajectoryOptimizationPlanner(Planner):
         """
         The planner's tree: the problem's leaves the program reads, ``"method"`` and ``"seed"``.
 
-        ``x_start``, ``t_start``, the plant's, the cost's, the discount and the
+        ``x0``, ``t0``, the plant's, the cost's, the discount and the
         sets the program reads; ``"method"`` the method's numbers (a native
         law's learning rate and moments, ``{}`` for a host method, whose name
         and tolerances are structure); ``"seed"`` ``None`` (a gradient method
@@ -223,7 +223,7 @@ class TrajectoryOptimizationPlanner(Planner):
         Offline trajopt entry.
 
         ``params`` is a partial tree of the problem's leaves (``planner.params``:
-        ``x_start``, ``t_start``, the plant's, the cost's, ...), solved on a copy
+        ``x0``, ``t0``, the plant's, the cost's, ...), solved on a copy
         of the problem holding them; ``None`` solves the problem as it is.
         ``guess`` seeds the solve: a :class:`~minilink.core.trajectory.Trajectory`,
         a packed ``z`` (a compiled face's, its origin dropped), or a
@@ -366,7 +366,7 @@ class TrajectoryOptimizationPlanner(Planner):
         require_jax_compile_backend(self.settings.backend)
         require_parametric_transcription(self.transcription)
 
-        # The program with the start x_start as its parameter
+        # The program with the start x0 as its parameter
         t0 = time.perf_counter()
         self.program = self.transcription.transcribe_parametric(
             self.problem,
@@ -382,7 +382,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.program_evaluator = compile_program_evaluator(
             self.program, BACKEND_JAX, sample_z=z0
         )
-        self.program_evaluator.bind({"x_start": self.problem.x_start})
+        self.program_evaluator.bind({"x0": self.problem.x0})
         self.program_evaluator.warm_parametric()
 
         # The compiled plant that reads each tick's plan back, on the tick's numbers
@@ -410,9 +410,9 @@ class TrajectoryOptimizationPlanner(Planner):
             Measured initial state.
         params : mapping, optional
             The values of this tick, a partial tree of the problem's leaves
-            (``{"plant": {"mu": 0.6}, "cost": {"x_bar": …}, "t_start": t}``),
+            (``{"plant": {"mu": 0.6}, "cost": {"x_bar": …}, "t0": t}``),
             merged once onto the program's defaults with ``x0`` as its
-            ``x_start``: an unknown path raises naming the known ones.
+            ``x0``: an unknown path raises naming the known ones.
             ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
             scene bind (A3) and raises.
         guess : ndarray, Trajectory or PlanningSolution, optional
@@ -503,7 +503,7 @@ class TrajectoryOptimizationPlanner(Planner):
             method=self.settings.method,
             use_hessian=self.settings.use_hessian,
             options=dict(self.settings.optimizer_options),
-            iterations=self.settings.iterations,
+            n_iterations=self.settings.n_iterations,
         )
 
     def print_solve_preamble(
@@ -524,7 +524,7 @@ class TrajectoryOptimizationPlanner(Planner):
         print(DISP_RULE_MAIN)
         print("system:", sys.name)
         print(f"dimensions: n={int(sys.n)}, m={int(sys.m)}, p={int(sys.p)}")
-        print("x_start:", preview_vector(problem.x_start))
+        print("x0:", preview_vector(problem.x0))
         print("goal point:", preview_vector(problem.goal_point()))
         print("X:", type_name(problem.X))
         print("U:", type_name(problem.U))
@@ -727,18 +727,18 @@ class TrajectoryOptimizationPlanner(Planner):
         """One online tick on the compiled program: bind ``x0`` and the tick's values, seed, solve, read the plan back."""
         require_compiled_program(self.program_evaluator, self.optimizer_backend)
 
-        # The tick's tree: the given values, the measured state as x_start, bound once
+        # The tick's tree: the given values, the measured state as x0, bound once
         step_t0 = time.perf_counter()
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
-        self.program_evaluator.bind({**(params or {}), "x_start": x_arr})
+        self.program_evaluator.bind({**(params or {}), "x0": x_arr})
         bound = self.program_evaluator.params
 
         # The problem restarted at the measured state and the tick's start time, a
         # copy holding the tick's other values when there are any
-        t_start = float(bound["t_start"])
+        t0 = float(bound["t0"])
         problem_k = problem_with(self.problem, host_tree(params)).replace(
-            x_start=x_arr, X0=SingletonSet(x_arr), t_start=t_start
+            x0=x_arr, X0=SingletonSet(x_arr), t0=t0
         )
 
         # The seed: the given guess, else the default schedule from the measured state
@@ -841,7 +841,7 @@ class TrajectoryOptimizationPlanner(Planner):
         x_arr = np.asarray(x0, dtype=float).reshape(-1)
         require_x0_shape(x_arr, self.problem.sys)
         problem_k = problem_with(self.problem, params).replace(
-            x_start=x_arr, X0=SingletonSet(x_arr)
+            x0=x_arr, X0=SingletonSet(x_arr)
         )
 
         return self.solve_on(problem_k, guess, evaluate, n_trials)
@@ -882,7 +882,7 @@ class TrajectoryOptimizationOptions:
     live_plot: bool = False
     #: A native method's fixed step count, forwarded to its ``Optimizer``
     #:: exactly this many steps; ``None`` runs to the method's tolerance.
-    iterations: int | None = None
+    n_iterations: int | None = None
 
 
 @dataclass(frozen=True)
@@ -971,7 +971,7 @@ def require_no_scene(params) -> None:
     if "scene" in params:
         raise NotImplementedError(
             "the online params key 'scene' waits for the scene bind (A3); "
-            "bind the problem's own leaves (plant, cost, t_start, …)"
+            "bind the problem's own leaves (plant, cost, t0, …)"
         )
 
 

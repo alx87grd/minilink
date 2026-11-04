@@ -183,7 +183,7 @@ class DynamicAnimation:
         max_steps=None,
         tf=None,
         x0=None,
-        t_start=0.0,
+        t0=0.0,
         verbose=False,
     ):
         """
@@ -238,7 +238,7 @@ class DynamicAnimation:
             tf=tf,
             verbose=verbose,
         )
-        traj = rt_sim.run(x0=x0, t_start=t_start)
+        traj = rt_sim.run(x0=x0, t0=t0)
 
         self.traj = traj
 

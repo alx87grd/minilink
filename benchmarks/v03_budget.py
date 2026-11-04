@@ -61,14 +61,14 @@ def best_time(call):
     return min(times)
 
 
-def pendulum_task(tf, x_start, params=None):
+def pendulum_task(tf, x0, params=None):
     """The pendulum regulated to the bottom over ``tf``, within its torque box."""
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
     problem = PlanningProblem(
         plant,
         cost=cost,
-        x_start=x_start,
+        x0=x0,
         horizon=tf,
         U=plant.input_box,
         params=params or {},
@@ -117,7 +117,7 @@ def mpc_planner(problem, n_steps, iterations):
         transcription="single_shooting",
         backend="jax",
         method="adam",
-        iterations=iterations,
+        n_iterations=iterations,
         options={"learning_rate": 0.05},
     )
     return planner
@@ -142,7 +142,7 @@ def program_entry():
 
     _, problem = pendulum_task(2.0, np.array([0.5, 0.0]))
     pv = mpc_planner(problem, 20, 15).compile()
-    P = {"x_start": problem.x_start, "t_start": 0.0}
+    P = {"x0": problem.x0, "t0": 0.0}
     z0 = pv.initial()
 
     # The parameters a traced argument (one trace for every value), or constants of the trace

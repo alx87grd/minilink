@@ -35,7 +35,7 @@ class SystemSimulation:
         self,
         tf=10,
         *,
-        t_start=0,
+        t0=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -73,7 +73,7 @@ class SystemSimulation:
         sim = StaticSimulator(
             self,
             x0=x0,
-            t_start=t_start,
+            t0=t0,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -99,7 +99,7 @@ class SystemSimulation:
         tf=10,
         *,
         input_port_id=None,
-        t_start=0,
+        t0=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -143,7 +143,7 @@ class SystemSimulation:
         sim = StaticSimulator(
             self,
             x0=x0,
-            t_start=t_start,
+            t0=t0,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -205,7 +205,7 @@ class DynamicSimulation:
         self,
         tf=10,
         *,
-        t_start=0,
+        t0=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -252,7 +252,7 @@ class DynamicSimulation:
         sim = Simulator(
             self,
             x0=x0,
-            t_start=t_start,
+            t0=t0,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -282,7 +282,7 @@ class DynamicSimulation:
         tf=10,
         *,
         input_port_id=None,
-        t_start=0,
+        t0=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -330,7 +330,7 @@ class DynamicSimulation:
         sim = Simulator(
             self,
             x0=x0,
-            t_start=t_start,
+            t0=t0,
             tf=tf,
             n_steps=n_steps,
             dt=dt,
@@ -369,7 +369,7 @@ class StepSimulation:
         u=None,
         *,
         x0=None,
-        t_start=0.0,
+        t0=0.0,
         dt=None,
         solver=None,
         backend="numpy",
@@ -378,7 +378,7 @@ class StepSimulation:
         verbose=False,
     ):
         """
-        The run with the continuous plant's substeps kept: a :class:`~minilink.core.trajectory.Trajectory` on ``[t_start, tf]``.
+        The run with the continuous plant's substeps kept: a :class:`~minilink.core.trajectory.Trajectory` on ``[t0, tf]``.
 
         The same scan as :meth:`compute_rollout`, its value at each tick the tick
         value bit for bit; inside each period the plant shows its substep ends
@@ -391,12 +391,12 @@ class StepSimulation:
         Parameters
         ----------
         tf : float
-            End of the run in seconds; the run takes ``round((tf - t_start) / Δ)`` ticks.
+            End of the run in seconds; the run takes ``round((tf - t0) / Δ)`` ticks.
         u : array, sequence, callable, or None, optional
             The input of each tick, as for :meth:`compute_rollout`.
         x0 : array, optional
             Initial state; defaults to :attr:`x0`.
-        t_start : float
+        t0 : float
             The clock's origin.
         dt : float, optional
             The plant's integration step, ``⌈Δ / dt⌉`` steps per period (a loop
@@ -420,7 +420,7 @@ class StepSimulation:
         require_continuous_underneath(self)
         require_run_solver(solver)
         h = self.sample_period
-        n_steps = int(round((float(tf) - float(t_start)) / h))
+        n_steps = int(round((float(tf) - float(t0)) / h))
         host = solver == "scipy"
         run = stepped_view(self, dt, None if host else solver)
         ev = run.compile(backend="numpy" if host else backend, verbose=verbose)
@@ -442,24 +442,22 @@ class StepSimulation:
                 u_steps,
                 ev.call_params(),
                 n_steps=n_steps,
-                t_start=t_start,
+                t0=t0,
                 record=record,
             )
             signals = {
                 name: np.asarray(v, dtype=float).T for name, v in signals.items()
             }
         elif not host:
-            xs = ev.rollout_dense(
-                x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
-            )
+            xs = ev.rollout_dense(x0, u_steps, ev.call_params(), n_steps=n_steps, t0=t0)
         else:
             # Tools import core (DESIGN §3): the host runner loads on first use
             from minilink.simulation.discrete.clock_runner import run_on_the_clock
 
-            xs = run_on_the_clock(run, u_steps, x0=x0, t_start=t_start, points=S)
+            xs = run_on_the_clock(run, u_steps, x0=x0, t0=t0, points=S)
 
-        # t = t_start + (k + j/S) Δ, the input held over each period
-        t = t_start + h * np.arange(n_steps * S + 1) / S
+        # t = t0 + (k + j/S) Δ, the input held over each period
+        t = t0 + h * np.arange(n_steps * S + 1) / S
         u_dense = np.repeat(u_samples[:, :n_steps], S, axis=1)
         u_dense = np.concatenate([u_dense, u_samples[:, -1:]], axis=1)
 
@@ -500,7 +498,7 @@ class StepSimulation:
         u=None,
         *,
         x0=None,
-        t_start=0.0,
+        t0=0.0,
         dt=None,
         record=None,
         backend="numpy",
@@ -510,7 +508,7 @@ class StepSimulation:
         """
         Convenience shortcut to roll out a discrete-time step system: its ticks, a :class:`~minilink.core.trajectory.Trajectory`.
 
-        The samples sit at ``t = k`` on a tick law, at ``t = t_start + k·Δ``
+        The samples sit at ``t = k`` on a tick law, at ``t = t0 + k·Δ``
         seconds on a system on a clock of period ``Δ``.
 
         Parameters
@@ -522,7 +520,7 @@ class StepSimulation:
             vector, an ``(n_steps, m)`` sequence, or ``u(k)``.
         x0 : array, optional
             Initial state; defaults to :attr:`x0`.
-        t_start : float
+        t0 : float
             The clock's origin, the time of the first tick (a system on a clock).
         dt : float, optional
             The continuous plant's integration step, as for :meth:`compute_trajectory`.
@@ -567,7 +565,7 @@ class StepSimulation:
                 u_steps,
                 ev.call_params(),
                 n_steps=n_steps,
-                t_start=t_start,
+                t0=t0,
                 record=record,
             )
             xs = np.asarray(xs)[::S]
@@ -575,11 +573,9 @@ class StepSimulation:
                 name: np.asarray(v, dtype=float)[::S].T for name, v in dense.items()
             }
         else:
-            xs = ev.rollout(
-                x0, u_steps, ev.call_params(), n_steps=n_steps, t_start=t_start
-            )
+            xs = ev.rollout(x0, u_steps, ev.call_params(), n_steps=n_steps, t0=t0)
         k = np.arange(n_steps + 1, dtype=float)
-        t = k if self.sample_period is None else t_start + k * self.sample_period
+        t = k if self.sample_period is None else t0 + k * self.sample_period
 
         # The plant role: its state slice and its recorded input
         if PLANT_INPUT in signals:

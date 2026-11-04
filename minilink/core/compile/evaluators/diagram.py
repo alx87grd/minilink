@@ -112,7 +112,7 @@ class DiagramEvaluator(ContinuousEvaluator):
         self,
         x0,
         u_seq,
-        t_start,
+        t0,
         dt,
         params,
         rate,
@@ -125,7 +125,7 @@ class DiagramEvaluator(ContinuousEvaluator):
         """
         ``([x_0 … x_N], [C_0 … C_N])``: :meth:`rollout` with the running stage cost of one block integrated beside the state.
 
-        ``C(t) = ∫_{t_start}^t rate(x_b, u_b, τ) dτ``, ``x_b`` and ``u_b`` the
+        ``C(t) = ∫_{t0}^t rate(x_b, u_b, τ) dτ``, ``x_b`` and ``u_b`` the
         block's own state and input at every stage of the same scheme and
         substeps (one signal pass per stage), the input held; the states are
         :meth:`rollout`'s.
@@ -139,9 +139,9 @@ class DiagramEvaluator(ContinuousEvaluator):
         u_start, u_end = held_inputs(u_seq, "zoh")
         ks = self.indices(u_start.shape[0])
 
-        # z_{k+1} = Φ(z_k, u_k, t_k) for z = [x; C], t_k = t_start + k dt
+        # z_{k+1} = Φ(z_k, u_k, t_k) for z = [x; C], t_k = t0 + k dt
         def period(z, k, ua, ub):
-            return step_body(f_aug, z, ua, ub, t_start + k * dt, dt, solver, substeps)
+            return step_body(f_aug, z, ua, ub, t0 + k * dt, dt, solver, substeps)
 
         z0 = xp.concatenate([x0, xp.zeros(1)])
         z_samples = iterate(self, period, z0, (ks, u_start, u_end))

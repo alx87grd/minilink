@@ -108,12 +108,10 @@ class Trajectory(SampledSignals):
         object.__setattr__(self, "signals", MappingProxyType(signals))
         object.__setattr__(self, "roles", MappingProxyType(dict(self.roles)))
 
-    def with_cost(
-        self, cost, *, discount_rate=0.0, params=None, t_start=0.0
-    ) -> Trajectory:
-        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t_start``."""
+    def with_cost(self, cost, *, discount_rate=0.0, params=None, t0=0.0) -> Trajectory:
+        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``."""
         cost_rate, running = cost.integrate(
-            self, discount_rate=discount_rate, params=params, t_start=t_start
+            self, discount_rate=discount_rate, params=params, t0=t0
         )
 
         return self.with_signals(
@@ -142,7 +140,7 @@ class Trajectory(SampledSignals):
         return int(self.t.size)
 
     @property
-    def t_start(self) -> float:
+    def t0(self) -> float:
         """Initial time."""
         return float(self.t[0])
 
@@ -153,8 +151,8 @@ class Trajectory(SampledSignals):
 
     @property
     def time_duration(self) -> float:
-        """Total covered time span ``tf - t_start``."""
-        return float(self.tf - self.t_start)
+        """Total covered time span ``tf - t0``."""
+        return float(self.tf - self.t0)
 
     # Signals
 
@@ -264,7 +262,7 @@ class Trajectory(SampledSignals):
         t_new : np.ndarray, optional
             New 1-D time vector.
         n_samples : int, optional
-            Number of uniformly spaced samples between ``t_start`` and ``tf``.
+            Number of uniformly spaced samples between ``t0`` and ``tf``.
         """
         t_new = time_grid_of(self, t_new, n_samples)
         t = self.t
@@ -389,14 +387,14 @@ def require_extra_channel(name):
 
 
 def time_grid_of(traj, t_new, n_samples):
-    """The resampling grid: ``t_new``, or ``n_samples`` uniform times over ``[t_start, tf]``."""
+    """The resampling grid: ``t_new``, or ``n_samples`` uniform times over ``[t0, tf]``."""
     if (t_new is None) == (n_samples is None):
         raise ValueError("Provide exactly one of t_new or n_samples")
 
     if n_samples is not None:
         if n_samples < 1:
             raise ValueError("n_samples must be >= 1")
-        t_new = np.linspace(traj.t_start, traj.tf, int(n_samples))
+        t_new = np.linspace(traj.t0, traj.tf, int(n_samples))
     else:
         t_new = np.asarray(t_new, dtype=float).reshape(-1)
         if t_new.size == 0:

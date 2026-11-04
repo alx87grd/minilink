@@ -220,14 +220,14 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         plant,
         cost=quadratic(plant),
         horizon=np.inf,
-        x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+        x0=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         params={"plant": {"m": Uniform([0.8], [1.2])}},
         penalize_failure=True,
         failure_cost=100.0,
         U=plant.input_box,
     )
     assert isinstance(problem, PlanningProblem)
-    np.testing.assert_allclose(problem.x_start, [0.0, 0.0])
+    np.testing.assert_allclose(problem.x0, [0.0, 0.0])
     assert problem.X0.contains(np.array([1.0, 0.5]))  # the support of the draw
     assert problem.sample_x0(0, n=4).shape == (4, 2)
     assert set(problem.sample_params(0)["plant"]) == {"m"}
@@ -238,15 +238,15 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
 
     nominal = problem.nominal()
     assert type(nominal) is PlanningProblem and not nominal.is_stochastic
-    np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])
+    np.testing.assert_allclose(nominal.x0, [0.0, 0.0])
     assert nominal.failure_cost == 100.0 and nominal.penalize_failure
 
     with pytest.raises(ValueError):
-        PlanningProblem(plant, x_start=Gaussian([0.0], 1.0), U=plant.input_box)
+        PlanningProblem(plant, x0=Gaussian([0.0], 1.0), U=plant.input_box)
     with pytest.raises(ValueError):
         PlanningProblem(
             plant,
-            x_start=Gaussian([0.0, 0.0], 1.0),
+            x0=Gaussian([0.0, 0.0], 1.0),
             params={"plant": {"nope": Uniform([0.0], [1.0])}},
             U=plant.input_box,
         )
@@ -258,7 +258,7 @@ def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
     plant = pendulum()
     deterministic = PlanningProblem(
         plant,
-        x_start=[0.3, -0.1],
+        x0=[0.3, -0.1],
         cost=quadratic(plant),
         horizon=5.0,
         penalize_failure=True,
@@ -268,15 +268,15 @@ def test_a_point_start_is_one_start_and_a_set_start_draws_from_the_set():
     assert not deterministic.is_stochastic and deterministic.criterion == "expectation"
     np.testing.assert_allclose(deterministic.sample_x0(0, n=3), [[0.3, -0.1]] * 3)
     assert deterministic.sample_params(0) == {}
-    assert deterministic.nominal().x_start.tolist() == [0.3, -0.1]
+    assert deterministic.nominal().x0.tolist() == [0.3, -0.1]
 
     # A set as the start is the uniform law on it, the set its X0
     box = BoxSet([0.0, -1.0], [1.0, 1.0])
-    from_a_set = deterministic.replace(x_start=box)
+    from_a_set = deterministic.replace(x0=box)
     assert from_a_set.is_stochastic and from_a_set.X0 is box
     starts = from_a_set.sample_x0(1, n=50)
     assert np.all([box.contains(x) for x in starts])
-    np.testing.assert_allclose(from_a_set.x_start, [0.5, 0.0])
+    np.testing.assert_allclose(from_a_set.x0, [0.5, 0.0])
 
 
 # --- the shared scoring contract ---
@@ -371,7 +371,7 @@ def test_every_backend_scores_the_constraint_set_on_its_parameters_and_time():
     for r, leaves in ((0.5, True), (3.0, False)):
         problem = PlanningProblem(
             plant,
-            x_start=[0.1, 0.0],
+            x0=[0.1, 0.0],
             cost=quadratic(plant),
             horizon=1.0,
             X=Band(r),
@@ -418,7 +418,7 @@ def test_the_backends_share_the_score_on_identical_starts():
         problem = PlanningProblem(
             plant,
             cost=Discounted(),
-            x_start=one_start,
+            x0=one_start,
             discount_rate=0.2,
             **kwargs,
         )
@@ -456,7 +456,7 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
         plant,
         cost=Effort(),
         horizon=np.inf,
-        x_start=Particles([[0.5, 0.0]]),
+        x0=Particles([[0.5, 0.0]]),
         U=plant.input_box,
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0)
@@ -477,7 +477,7 @@ def test_an_exiting_run_scores_alike_on_the_step_and_the_adaptive_solver():
         cost=quadratic(plant),
         horizon=np.inf,
         X=plant.state.box,
-        x_start=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
+        x0=Particles([[6.0, 5.0]]),  # leaves θ ≤ 2π within 0.1 s
     )
     ctl = StateFeedback(K=[[0.0, 0.0]])
     settings = dict(dt=0.01, n_trials=1, episode_length=1.0, backend="numpy")
@@ -500,7 +500,7 @@ def test_a_controller_with_internal_state_scores_like_its_static_twin():
         mass,
         cost=quadratic(mass),
         horizon=np.inf,
-        x_start=Particles([[0.5, 0.0]]),
+        x0=Particles([[0.5, 0.0]]),
     )
     settings = dict(dt=0.01, n_trials=1, episode_length=2.0, backend="numpy")
     J_pid = evaluate(problem, PID(Kp=4.0), **settings).J  # with filter states
@@ -521,7 +521,7 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     plant.inputs["u"].upper_bound = np.array([4.0])
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
-    task = dict(cost=quadratic(plant), horizon=np.inf, x_start=start)
+    task = dict(cost=quadratic(plant), horizon=np.inf, x0=start)
     heavy = PlanningProblem(plant, params={"plant": {"m": Particles([[3.0]])}}, **task)
     nominal = PlanningProblem(plant, **task)
     settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
@@ -544,7 +544,7 @@ def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
     plant.inputs["u"].upper_bound = np.array([5.0])
     problem = PlanningProblem(
         plant,
-        x_start=[0.5, 0.0],
+        x0=[0.5, 0.0],
         cost=quadratic(plant),
         horizon=1.0,
         X=plant.state.box,
@@ -614,7 +614,7 @@ def test_the_default_backend_falls_back_on_a_numpy_only_set_or_cost():
     law = StateFeedback(K=[[5.0, 1.0]])
     task = dict(
         horizon=1.0,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         penalize_failure=True,
         failure_cost=5.0,
     )
@@ -642,7 +642,7 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         plant,
         cost=quadratic(plant),
         horizon=2.0,
-        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x0=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
     with pytest.warns(
@@ -653,7 +653,7 @@ def test_deterministic_planner_warns_on_a_stochastic_problem():
         )
 
 
-def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
+def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x0():
     from minilink.core.sets import SingletonSet
 
     plant = pendulum()
@@ -661,12 +661,12 @@ def test_nominal_keeps_the_mean_start_and_drops_the_support_and_x_start():
         plant,
         cost=quadratic(plant),
         horizon=2.0,
-        x_start=Uniform([-0.1, -0.1], [0.1, 0.1]),
+        x0=Uniform([-0.1, -0.1], [0.1, 0.1]),
         U=plant.input_box,
     )
     assert problem.X0.contains(np.array([0.08, -0.08]))  # the support
     nominal = problem.nominal()
-    np.testing.assert_allclose(nominal.x_start, [0.0, 0.0])  # the mean
+    np.testing.assert_allclose(nominal.x0, [0.0, 0.0])  # the mean
     assert isinstance(nominal.X0, SingletonSet)
     np.testing.assert_allclose(nominal.X0.point, [0.0, 0.0])
 
@@ -684,7 +684,7 @@ def test_gymnasium_view_of_a_stochastic_problem():
         cost=quadratic(plant),
         horizon=1.0,
         X=plant.state.box,
-        x_start=Particles([[0.3, 0.0], [-0.3, 0.0]]),
+        x0=Particles([[0.3, 0.0], [-0.3, 0.0]]),
         penalize_failure=True,
         failure_cost=50.0,
         U=plant.input_box,
@@ -724,7 +724,7 @@ def test_the_evaluation_of_one_trajectory_prints_a_single_cost():
     # a deterministic problem is one run for the evaluation as well
     law = StateFeedback(K=[[1.0, 0.5]], x_bar=[0.0, 0.0])
     report = evaluate(problem, law, dt=0.1, backend="numpy")
-    assert report.n_trials == 1 and np.all(report.x0[0] == problem.x_start)
+    assert report.n_trials == 1 and np.all(report.x0[0] == problem.x0)
 
 
 def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
@@ -732,9 +732,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     from minilink.planning import evaluate, evaluate_trajectory
 
     plant = pendulum()
-    problem = PlanningProblem(
-        plant, x_start=[0.3, 0.0], cost=quadratic(plant), horizon=1.0
-    )
+    problem = PlanningProblem(plant, x0=[0.3, 0.0], cost=quadratic(plant), horizon=1.0)
     dt, n_steps = 0.1, 10
     t = dt * np.arange(n_steps + 1)
     u = 2.0 * np.sin(3.0 * t)[None, :]
@@ -752,12 +750,12 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
         dx = plant.f(z[:2], u, tau)
         return np.concatenate([dx, [cost.g(z[:2], u, tau)]])
 
-    z = np.concatenate([problem.x_start, [0.0]])
+    z = np.concatenate([problem.x0, [0.0]])
     for k in range(n_steps):
         z = step_body(f_aug, z, u[:, k], u[:, k + 1], t[k], dt, "rk4", 1)
     J_hand = z[2] + cost.h(z[:2], t[-1])
     evaluator = plant.compile(backend="numpy", verbose=False)
-    xs = evaluator.rollout(problem.x_start, u.T, 0.0, dt, hold="foh")
+    xs = evaluator.rollout(problem.x0, u.T, 0.0, dt, hold="foh")
     np.testing.assert_allclose(xs[-1], z[:2], rtol=1e-12)
     trapezoid = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
     np.testing.assert_allclose(trapezoid, J_hand, rtol=2e-2)
@@ -799,7 +797,7 @@ def test_a_time_varying_law_scores_alike_on_every_backend():
     problem = PlanningProblem(
         pendulum(),
         cost=QuadraticCost.from_system(pendulum()),
-        x_start=Particles([[0.5, 0.0]]),
+        x0=Particles([[0.5, 0.0]]),
         horizon=1.0,
     )
     settings = dict(dt=0.01, n_trials=1)
@@ -815,7 +813,7 @@ def test_a_disturbance_on_the_command_port_is_refused():
         PlanningProblem(
             pendulum(),
             cost=QuadraticCost.from_system(pendulum()),
-            x_start=Particles([[0.5, 0.0]]),
+            x0=Particles([[0.5, 0.0]]),
             disturbances={"u": WhiteNoise(1, psd=0.1)},
         )
 
@@ -830,7 +828,7 @@ def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
         plant,
         cost=QuadraticCost.from_system(plant),
         horizon=1.0,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         X=IntersectionSet([box, ball]),
     )
     problem.params = {"X": {"1": {"radius": 2.0}}}
@@ -868,11 +866,11 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
     problem = PlanningProblem(
         plant,
-        x_start=[0.3, 0.0],
+        x0=[0.3, 0.0],
         cost=cost,
         U=plant.input_box,
         horizon=2.0,
-        t_start=1.5,
+        t0=1.5,
     )
     t_grid = 1.5 + 0.1 * np.arange(21)
     source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")

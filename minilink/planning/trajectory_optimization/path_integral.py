@@ -37,9 +37,9 @@ class MPPIPlanner(Planner):
     ``w^k ∝ exp(−(S^k − S_min) / λ)`` and moves ``U`` by ``Σ_k w^k ε^k``.
     ``ModelPredictiveController(MPPIPlanner(...)) % dt`` is MPPI in the loop.
 
-    ``dt``, ``n_rollouts``, ``iterations`` and ``solver`` are structure, fixed
+    ``dt``, ``n_rollouts``, ``n_iterations`` and ``solver`` are structure, fixed
     at build, and so is the input box the samples are clipped to; the tree is
-    the problem's leaves (``x_start``, ``t_start``, the plant's, the cost's,
+    the problem's leaves (``x0``, ``t0``, the plant's, the cost's,
     the discount, ``X``'s numbers), ``temperature`` (``λ``), ``noise`` (``Σ``)
     and ``control_cost`` (``α``) under ``params["method"]`` and ``seed`` under
     ``params["seed"]``, so a solve can rebind any of them. JAX only: the solve is one
@@ -61,7 +61,7 @@ class MPPIPlanner(Planner):
         covariance; default ``(u_half / 2)²`` from the input box.
     control_cost : float
         ``α``: 0 charges the information term, 1 turns it off.
-    iterations : int
+    n_iterations : int
         Passes of sample, roll out, weigh, update per solve.
     solver : {"rk4", "euler"}
         The plant's integration over each period.
@@ -78,7 +78,7 @@ class MPPIPlanner(Planner):
         temperature=1.0,
         noise=None,
         control_cost=0.0,
-        iterations=1,
+        n_iterations=1,
         solver="rk4",
         seed=0,
     ):
@@ -90,7 +90,7 @@ class MPPIPlanner(Planner):
         self.dt = float(dt)
         self.n_steps = steps_of(tf, self.dt)
         self.n_rollouts = int(n_rollouts)
-        self.iterations = int(iterations)
+        self.n_iterations = int(n_iterations)
         self.solver = solver
 
         # The input box of the action port, and the noise's default from it
@@ -113,8 +113,8 @@ class MPPIPlanner(Planner):
         problem = self.problem
         plant = nominal_plant_params(problem)
         tree = {
-            "x_start": np.asarray(problem.x_start, dtype=float),
-            "t_start": float(problem.t_start),
+            "x0": np.asarray(problem.x0, dtype=float),
+            "t0": float(problem.t0),
             "plant": copy.deepcopy(
                 (problem.sys.params if plant is None else plant) or {}
             ),
@@ -193,7 +193,7 @@ class CompiledMPPIPlanner:
     The pure face of an :class:`MPPIPlanner`: its solve as a function of ``(params, z)``.
 
     ``z`` is the held sequence ``U`` row by row (``N m`` numbers) with the origin
-    ``t_start`` it was solved from appended. :meth:`solve`, :meth:`shift` and
+    ``t0`` it was solved from appended. :meth:`solve`, :meth:`shift` and
     :meth:`command` are pure and trace; :meth:`solution` rebuilds the rich
     :class:`~minilink.planning.results.PlanningSolution` on the host. The plan
     carries no states (``predicts`` is false): the MPC's ``x_ref`` comes from
@@ -216,7 +216,7 @@ class CompiledMPPIPlanner:
         self.N = planner.n_steps
         self.n = int(problem.sys.n)
         self.K = planner.n_rollouts
-        self.iterations = planner.iterations
+        self.n_iterations = planner.n_iterations
         self.offsets = planner.dt * np.arange(self.N)
         self.u_lower = planner.u_lower
         self.u_upper = planner.u_upper
@@ -244,15 +244,15 @@ class CompiledMPPIPlanner:
         return self.defaults
 
     def initial(self, params=None):
-        """The default plan in ``z`` form: the action port's nominal input held over the horizon, at ``params["t_start"]``."""
+        """The default plan in ``z`` form: the action port's nominal input held over the horizon, at ``params["t0"]``."""
         P = self.merged(params)
         u_nominal = nominal_action(self.problem, self.u_lower, self.u_upper)
-        xp = array_module(P["t_start"])
+        xp = array_module(P["t0"])
 
-        # U: the nominal action held over the horizon, the origin t_start appended
+        # U: the nominal action held over the horizon, the origin t0 appended
         U = xp.tile(xp.asarray(u_nominal), (self.N, 1))
-        t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
-        z0 = xp.concatenate([xp.reshape(U, (-1,)), t_start])
+        t0 = xp.reshape(xp.asarray(P["t0"], dtype=float), (1,))
+        z0 = xp.concatenate([xp.reshape(U, (-1,)), t0])
 
         return z0
 
@@ -269,14 +269,14 @@ class CompiledMPPIPlanner:
         return self.solve_fn(P, self.jnp.asarray(z0, dtype=float))
 
     def solve_body(self, P, z0):
-        """One path-integral solve from ``P["x_start"]``: :meth:`passes`, then the plan's own rollout and the status."""
+        """One path-integral solve from ``P["x0"]``: :meth:`passes`, then the plan's own rollout and the status."""
         jnp = self.jnp
         path_cost = self.path_cost
 
-        x0 = P["x_start"]
-        t0 = P["t_start"]
+        x0 = P["x0"]
+        t0 = P["t0"]
 
-        # U after iterations passes of sample, roll out, weigh, update
+        # U after n_iterations passes of sample, roll out, weigh, update
         U, last = self.passes(P, z0)
 
         # The plan's own rollout: its cost and whether it stays in X
@@ -285,7 +285,7 @@ class CompiledMPPIPlanner:
         w = last["w"]
         status = {
             "success": ~left,
-            "iterations": self.iterations,
+            "iterations": self.n_iterations,
             "cost": cost,
             "S_min": jnp.min(S),
             "S_weighted": w @ S,
@@ -297,21 +297,21 @@ class CompiledMPPIPlanner:
         return z, status
 
     def passes(self, P, z0):
-        """``(U, last)``: ``U`` after ``iterations`` passes from the plan ``z0``, and the last pass's samples (``S``, ``w``, ``X``, ``left_X``)."""
+        """``(U, last)``: ``U`` after ``n_iterations`` passes from the plan ``z0``, and the last pass's samples (``S``, ``w``, ``X``, ``left_X``)."""
         jax = self.jax
         jnp = self.jnp
         N = self.N
         m = self.m
         K = self.K
         dt = self.dt
-        t_origin = self.problem.t_start
+        t_origin = self.problem.t0
         u_lower = self.u_lower
         u_upper = self.u_upper
         path_cost = self.path_cost
 
         # The start, the method's numbers, the plan
-        x0 = P["x_start"]
-        t0 = P["t_start"]
+        x0 = P["x0"]
+        t0 = P["t0"]
         lam = P["method"]["temperature"]
         alpha = P["method"]["control_cost"]
         Sigma = P["method"]["noise"]
@@ -320,7 +320,7 @@ class CompiledMPPIPlanner:
         U = jnp.reshape(z0[:-1], (N, m))
         key = tick_key(jax, P["seed"], t0, t_origin, dt)
 
-        for i in range(self.iterations):
+        for i in range(self.n_iterations):
             # Sample: V^k = U + ε^k, ε^k_t ~ N(0, Σ), clipped to the input box
             eps = jax.random.normal(jax.random.fold_in(key, i), (K, N, m)) @ L.T
             V = jnp.clip(U + eps, u_lower, u_upper)
@@ -378,15 +378,15 @@ class CompiledMPPIPlanner:
         plan = self.nominal_rollout(P, U)
 
         return {
-            "t": P["t_start"],
+            "t": P["t0"],
             "futures": futures,
             "weights": weights,
             "plan": plan,
             "inputs": U,
         }
 
-    def shift(self, z, t, x_start=None):
-        """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated (it carries no state to pin at ``x_start``)."""
+    def shift(self, z, t, x0=None):
+        """The plan moved to the origin ``t``: each held input read at ``t + j dt``, the last one repeated (it carries no state to pin at ``x0``)."""
         xp = array_module(z, t)
 
         dt = self.dt
@@ -444,7 +444,7 @@ class CompiledMPPIPlanner:
             S_weighted=float(status.get("S_weighted", np.nan)),
             effective_samples=float(status.get("effective_samples", np.nan)),
             exit_rate=float(status.get("exit_rate", np.nan)),
-            iterations=int(status.get("iterations", self.iterations)),
+            iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
         policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
@@ -452,7 +452,7 @@ class CompiledMPPIPlanner:
         return PlanningSolution(self.problem, policy, record, trajectory, None)
 
     def planned_trajectory(self, z, params=None) -> Trajectory:
-        """The plan as a trajectory: ``U`` held from its origin, its states rolled out on the nominal plant from ``params["x_start"]``."""
+        """The plan as a trajectory: ``U`` held from its origin, its states rolled out on the nominal plant from ``params["x0"]``."""
         P = self.merged(params)
         dt = self.dt
         N = self.N
@@ -471,7 +471,7 @@ class CompiledMPPIPlanner:
         offsets = self.offsets
         m = self.m
         trajectory = getattr(guess, "trajectory", guess)
-        t0 = float(P["t_start"])
+        t0 = float(P["t0"])
         knots = t0 + offsets
 
         u = np.asarray(trajectory.u, dtype=float)[:m]
@@ -519,10 +519,10 @@ class CompiledMPPIPlanner:
                 x_next,
             )
 
-        x_start = jnp.asarray(x0, dtype=float)
-        start = (x_start, t0, 0.0, True, 1.0)
+        x_init = jnp.asarray(x0, dtype=float)
+        start = (x_init, t0, 0.0, True, 1.0)
         (x_N, t_N, S, _, _), (ended, xs) = jax.lax.scan(period, start, V)
-        x_path = jnp.concatenate([x_start[None, :], xs], axis=0)
+        x_path = jnp.concatenate([x_init[None, :], xs], axis=0)
 
         # Left X: an end before the horizon's, or a last state outside X
         inside = jnp.all(env.X.margin(x_N, t_N, episode.get("X")) >= 0.0)
@@ -531,7 +531,7 @@ class CompiledMPPIPlanner:
         return S, left_X, x_path
 
     def nominal_rollout(self, P, U):
-        """The states ``(N + 1, n)`` of the plan held from ``P["x_start"]``: the plan's evidence."""
+        """The states ``(N + 1, n)`` of the plan held from ``P["x0"]``: the plan's evidence."""
         jax = self.jax
         jnp = self.jnp
         env = self.env
@@ -539,13 +539,11 @@ class CompiledMPPIPlanner:
 
         def period(carry, u):
             x, t = carry
-            x_next, t_next, _, _, _ = env.step(
-                x, t, u, None, episode, t_origin=P["t_start"]
-            )
+            x_next, t_next, _, _, _ = env.step(x, t, u, None, episode, t_origin=P["t0"])
             return (x_next, t_next), x_next
 
-        x0 = jnp.asarray(P["x_start"], dtype=float)
-        _, xs = jax.lax.scan(period, (x0, P["t_start"]), U)
+        x0 = jnp.asarray(P["x0"], dtype=float)
+        _, xs = jax.lax.scan(period, (x0, P["t0"]), U)
         x_path = jnp.concatenate([x0[None, :], xs], axis=0)
 
         return x_path

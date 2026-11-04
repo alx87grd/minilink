@@ -145,8 +145,8 @@ def score_run(
         feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
         failed              = not finite, or feasibility_margin < 0
         reachability_margin = Xf.margin(x(t_end), t_end)   reached = margin ≥ 0  (no Xf: reached)
-        cost                = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end)
-                              (+inf when not finite), t_end = t_start + tf
+        cost                = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ tf} h(x(t_end), t_end)
+                              (+inf when not finite), t_end = t0 + tf
         J                   = cost, or with penalize_failure on
                               cost + failure_cost · (failed or not reached)   finite
                               cost_bound + failure_cost                       not finite
@@ -156,11 +156,11 @@ def score_run(
     run can reach: its ``J`` stays finite and above that of any finite run. Its
     gradient is not defined, since the rollout itself overflowed before the
     ``where``. ``running_cost`` is the run's integral of
-    ``e^{−ρ(t − t_start)} g`` carried with the state by the step model (the
+    ``e^{−ρ(t − t0)} g`` carried with the state by the step model (the
     evaluator's), ``(N + 1,)``; without it, a logged run, the integral is
     the trapezoid on the samples. ``tf`` is the horizon's length (by default the run's,
-    ``t[-1] − t_start``) and ``t_start`` its start. ``params`` overrides
-    the problem's own leaves (``"cost"``, the sets' by role, ``"t_start"``,
+    ``t[-1] − t0``) and ``t0`` its start. ``params`` overrides
+    the problem's own leaves (``"cost"``, the sets' by role, ``"t0"``,
     ``"discount_rate"``); ``None`` reads the problem's. ``failure_cost``
     is the cost of a failure as :func:`failure_cost_of` resolves it (``None``:
     ``penalize_failure`` off); by default the problem's. ``cost_bound`` is the cost bound as
@@ -172,7 +172,7 @@ def score_run(
 
     cost_fn = problem.require_cost()
     rho = params.get("discount_rate", problem.discount_rate)
-    t_start = params.get("t_start", problem.t_start)
+    t0 = params.get("t0", problem.t0)
     finite_horizon = problem.horizon_kind() == "finite"
     X = problem.X
     U = problem.U
@@ -184,8 +184,8 @@ def score_run(
     t = traj.t
     x = traj.x.T
     u = traj.u.T
-    tf = t[-1] - t_start if tf is None else tf
-    t_end = t_start + tf
+    tf = t[-1] - t0 if tf is None else tf
+    t_end = t0 + tf
     if failure_cost is PROBLEM_FAILURE_COST:
         failure_cost = failure_cost_of(problem, tf)
     if cost_bound is None:
@@ -208,12 +208,12 @@ def score_run(
         reachability_margin = xp.min(problem.Xf.margin(x[-1], t_end, Xf_params))
     reached = reachability_margin >= 0.0
 
-    # cost = ∫ e^{−ρ(t − t_start)} g dt + e^{−ρ tf} h(x(t_end), t_end): the
+    # cost = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ tf} h(x(t_end), t_end): the
     # integral the run carried, or the trapezoid on a logged run's samples
     if running_cost is None:
         safe_run = Trajectory(t=t, x=x.T, u=u.T)
         _, running = cost_fn.integrate(
-            safe_run, discount_rate=rho, params=cost_params, t_start=t_start
+            safe_run, discount_rate=rho, params=cost_params, t0=t0
         )
     else:
         running = xp.where(finite, running_cost, 0.0)
@@ -315,14 +315,14 @@ def least_margin(margin, x, u, t):
 
 
 def problem_leaves(problem) -> dict:
-    """The problem's own leaves of a run's tree: ``"cost"``, the sets' parameters by role, ``"x_start"``, ``"t_start"``, ``"discount_rate"``."""
+    """The problem's own leaves of a run's tree: ``"cost"``, the sets' parameters by role, ``"x0"``, ``"t0"``, ``"discount_rate"``."""
     leaves = {"cost": problem.cost.params if problem.cost is not None else None}
     for role in ("X", "U", "Xf"):
         set_params = getattr(getattr(problem, role), "params", None)
         if set_params:
             leaves[role] = set_params
-    leaves["x_start"] = problem.x_start
-    leaves["t_start"] = problem.t_start
+    leaves["x0"] = problem.x0
+    leaves["t0"] = problem.t0
     leaves["discount_rate"] = problem.discount_rate
 
     return leaves

@@ -37,7 +37,7 @@ for water, current in WATERS.items():
     boat = ParkingBoat(current)
     problem = PlanningProblem(
         sys=boat,
-        x_start=X_START,
+        x0=X_START,
         cost=parking_cost(boat),
         horizon=TF,
         X=boat.state.box,
@@ -57,7 +57,7 @@ for water, current in WATERS.items():
     planner = TrajectoryOptimizationPlanner(
         PlanningProblem(
             sys=boat,
-            x_start=X_START,
+            x0=X_START,
             cost=parking_cost(boat, terminal=MPC_TERMINAL),
             horizon=MPC_HORIZON,
             X=boat.state.box,

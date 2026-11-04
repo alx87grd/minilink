@@ -111,7 +111,7 @@ def discretize_entries(out):
 def problem_of(plant, x0):
     cost = QuadraticCost.from_system(plant)
     return PlanningProblem(
-        plant, cost=cost, x_start=x0, horizon=2.0, X=plant.state.box, U=plant.input_box
+        plant, cost=cost, x0=x0, horizon=2.0, X=plant.state.box, U=plant.input_box
     )
 
 
@@ -185,7 +185,7 @@ def trajopt_entries(out):
         plant.inputs["u"].upper_bound = np.array([5.0])
         cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
         problem = PlanningProblem(
-            plant, cost=cost, x_start=np.zeros(2), horizon=1.0, U=plant.input_box
+            plant, cost=cost, x0=np.zeros(2), horizon=1.0, U=plant.input_box
         )
         if transcription == "shooting":
             from minilink.planning.trajectory_optimization.shooting import (
@@ -233,7 +233,7 @@ def rrt_entries(out):
     x_goal = np.array([np.pi, 0.0])
     problem = PlanningProblem(
         plant,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=BallSet(x_goal, 0.5),
         X=plant.state.box,
         U=plant.input_box,

@@ -151,7 +151,7 @@ def system_text(sys):
 def trajectory_text(traj):
     extra = [name for name in traj.signal_names if name not in {"x", "u"}]
     headline = (
-        f"Trajectory, N={traj.n_samples}, t={traj.t_start:g}–{traj.tf:g}, "
+        f"Trajectory, N={traj.n_samples}, t={traj.t0:g}–{traj.tf:g}, "
         f"x {tuple(traj.x.shape)}, u {tuple(traj.u.shape)}"
     )
     if not extra:

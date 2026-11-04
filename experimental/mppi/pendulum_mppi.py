@@ -39,7 +39,7 @@ class SwingUpCost(CostFunction):
 
 
 problem = PlanningProblem(
-    plant, cost=SwingUpCost(), horizon=N * DT, x_start=[0.0, 0.0], U=plant.input_box
+    plant, cost=SwingUpCost(), horizon=N * DT, x0=[0.0, 0.0], U=plant.input_box
 )
 
 # The pieces the planner reads: the plant's held-input RK4 step, the cost, the input box
@@ -89,7 +89,7 @@ def mppi_tick(U, x0, key):
 # Receding horizon by hand: solve, apply u_0, step the plant, shift the sequence
 key = jax.random.PRNGKey(SEED)
 U = jnp.zeros((N, m))
-x = jnp.array(problem.x_start)
+x = jnp.array(problem.x0)
 n_ticks = int(round(TF_SIM / DT))
 ts, xs, us, fans = [], [], [], {}
 for k in range(n_ticks):

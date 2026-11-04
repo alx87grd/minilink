@@ -107,15 +107,13 @@ class FixedGridOptions:
         self.n_steps = int(self.n_steps)
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
-        """The time grid on the horizon ``[t_start, t_start + tf]``: ``t_start`` plus ``linspace(0, tf, n_steps)``."""
-        t = problem.t_start + fixed_grid_t(
-            problem.require_finite_horizon(), self.n_steps
-        )
+        """The time grid on the horizon ``[t0, t0 + tf]``: ``t0`` plus ``linspace(0, tf, n_steps)``."""
+        t = problem.t0 + fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
 
         return t
 
     def offsets(self, problem: PlanningProblem) -> np.ndarray:
-        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t_start + offset_k``."""
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t0 + offset_k``."""
         return fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
@@ -128,18 +126,18 @@ class FixedGridOptions:
 # collocation defect, one RK4 step between input knots)
 
 
-def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t_start=0.0):
+def trajectory_cost(cost, x, u, t, dt, params, *, discount_rate=0.0, t0=0.0):
     """Sampled Bolza objective on a uniform grid, discounted from the horizon's start.
 
     ``x`` and ``u`` are knot matrices with shape ``(dim, N)``; the running
     cost is integrated with the trapezoid rule. The discount is the
-    problem's, ``e^{−ρ(t − t_start)}``; ``ρ = 0`` is the plain sum.
+    problem's, ``e^{−ρ(t − t0)}``; ``ρ = 0`` is the plain sum.
     """
     xp = array_module(x, t)
     rho = discount_rate
 
-    # w_k = e^{−ρ(t_k − t_start)}, the discount at each knot
-    w = xp.exp(-rho * (t - t_start))
+    # w_k = e^{−ρ(t_k − t0)}, the discount at each knot
+    w = xp.exp(-rho * (t - t0))
 
     # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N)
     g = w * running_cost_samples(cost, x, u, t, params)

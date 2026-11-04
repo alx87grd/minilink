@@ -60,7 +60,7 @@ cone = scene.clearance_field(probe).as_cost(
 )
 problem = PlanningProblem(
     sys=car,
-    x_start=car.x0,
+    x0=car.x0,
     cost=quad + corridor + cone,
     horizon=HORIZON,
     U=car.input_box,

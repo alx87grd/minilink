@@ -330,15 +330,15 @@ def tick_solves_of(rollout, mpc, loop):
     x_slice, _ = nested_layout(loop)[path]
     base = loop.sample_period
     S = samples_per_period(rollout, base)
-    t_start = float(rollout.t[0])
+    t0 = float(rollout.t[0])
     n_ticks = (rollout.t.size - 1) // S
 
     solves = []
     for k in range(0, n_ticks, divisor):
         x = rollout.x[:, k * S]
         u = rollout.u[:, k * S]
-        u_block = ev.block_input(path, x, u, k, t_start=t_start)
-        t_k = t_start + k * base
+        u_block = ev.block_input(path, x, u, k, t0=t0)
+        t_k = t0 + k * base
         P, z0 = block.solve_inputs(x[x_slice], u_block, t_k)
         solves.append((t_k, P, z0))
 

@@ -28,13 +28,13 @@ class CompiledTrajectoryPlanner:
 
     ``z`` is the planner's solution vector: the transcription's decision vector
     (the knots, ``(rows, N)`` row after row: collocation's states then inputs,
-    shooting's inputs) with the origin ``t_start`` it was solved from appended,
+    shooting's inputs) with the origin ``t0`` it was solved from appended,
     ``n_z`` entries. ``params`` is the planner's tree: the program's leaves
-    (``x_start``, ``t_start``, the plant's, the cost's, the discount and the
+    (``x0``, ``t0``, the plant's, the cost's, the discount and the
     sets read as constraints), the method's numbers under ``"method"`` and
     ``"seed"``. :meth:`solve`, :meth:`shift`, :meth:`command` and
     :meth:`prediction` are pure wherever the method is (a native method with
-    ``iterations=K`` on JAX traces under ``jit``, ``vmap`` and ``grad``); SLSQP
+    ``n_iterations=K`` on JAX traces under ``jit``, ``vmap`` and ``grad``); SLSQP
     and Ipopt run on the host. :meth:`solution` rebuilds the rich
     :class:`~minilink.planning.results.PlanningSolution` on the host. The face
     keeps no last solution: every answer is a function of its arguments.
@@ -91,8 +91,8 @@ class CompiledTrajectoryPlanner:
         The default guess in ``z`` form (``default_initial_trajectory``, packed), at ``params``.
 
         On the host the guess is built at ``params`` (the defaults when none).
-        Under a trace it is a function of the traced ``x_start`` and
-        ``t_start``: the guess is affine in its start (a straight line or a
+        Under a trace it is a function of the traced ``x0`` and
+        ``t0``: the guess is affine in its start (a straight line or a
         cubic from it), ``z(x̂) = z(x̄) + M (x̂ − x̄)``, ``M`` read once on the
         host, so a traced loop's first plan starts from the same guess as the
         host's; the tree's other numbers are taken at the compiled defaults.
@@ -102,13 +102,13 @@ class CompiledTrajectoryPlanner:
 
         P = self.merged(params)
         z_default, sensitivity, x_default = self.start_sensitivity
-        xp = array_module(P["x_start"], P["t_start"])
+        xp = array_module(P["x0"], P["t0"])
 
-        # z(x̂) = z(x̄) + M (x̂ − x̄), the origin t_start appended
-        x_hat = xp.reshape(xp.asarray(P["x_start"], dtype=float), (-1,))
+        # z(x̂) = z(x̄) + M (x̂ − x̄), the origin t0 appended
+        x_hat = xp.reshape(xp.asarray(P["x0"], dtype=float), (-1,))
         z_dec = z_default[:-1] + sensitivity @ (x_hat - x_default)
-        t_start = xp.reshape(xp.asarray(P["t_start"], dtype=float), (1,))
-        z = xp.concatenate([z_dec, t_start])
+        t0 = xp.reshape(xp.asarray(P["t0"], dtype=float), (1,))
+        z = xp.concatenate([z_dec, t0])
 
         return z
 
@@ -121,12 +121,12 @@ class CompiledTrajectoryPlanner:
         )
         z_dec = self.transcription.pack_initial_guess(problem, guess)
 
-        return np.concatenate([z_dec, [problem.t_start]])
+        return np.concatenate([z_dec, [problem.t0]])
 
     @cached_property
     def start_sensitivity(self):
         """``(z(x̄), M, x̄)``: the default guess at the compiled start and its derivative in the start, one column per state (the guess is affine in it)."""
-        x_default = np.asarray(self.defaults["x_start"], dtype=float).reshape(-1)
+        x_default = np.asarray(self.defaults["x0"], dtype=float).reshape(-1)
         z_default = self.host_initial(self.defaults)
 
         # M e_i = z(x̄ + e_i) − z(x̄): exact for a guess affine in its start
@@ -134,7 +134,7 @@ class CompiledTrajectoryPlanner:
         for i in range(x_default.size):
             x_i = x_default.copy()
             x_i[i] += 1.0
-            z_i = self.host_initial({**self.defaults, "x_start": x_i})
+            z_i = self.host_initial({**self.defaults, "x0": x_i})
             columns.append(z_i[:-1] - z_default[:-1])
         sensitivity = np.stack(columns, axis=1) if columns else np.zeros((0, 0))
 
@@ -145,7 +145,7 @@ class CompiledTrajectoryPlanner:
         The solve as a function: ``(z, status)`` from the guess ``z0`` (``None``: :meth:`initial`) on ``params``.
 
         ``params`` is a partial tree merged once onto the defaults; the
-        solution records its origin ``params["t_start"]``. ``status`` is
+        solution records its origin ``params["t0"]``. ``status`` is
         ``{"success", "iterations", "cost"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.
         """
@@ -164,10 +164,10 @@ class CompiledTrajectoryPlanner:
                 params={**(problem_params or {}), **numbers}, z0=z_dec0
             )
 
-        # z = [z*, t_start]: the decision vector and the origin it was solved from
-        xp = array_module(result.z, tree["t_start"])
-        t_start = xp.reshape(xp.asarray(tree["t_start"], dtype=float), (1,))
-        z = xp.concatenate([result.z, t_start])
+        # z = [z*, t0]: the decision vector and the origin it was solved from
+        xp = array_module(result.z, tree["t0"])
+        t0 = xp.reshape(xp.asarray(tree["t0"], dtype=float), (1,))
+        z = xp.concatenate([result.z, t0])
         status = {
             "success": result.success,
             "iterations": result.stats.get("nit"),
@@ -176,11 +176,11 @@ class CompiledTrajectoryPlanner:
 
         return z, status
 
-    def shift(self, z, t, x_start=None):
+    def shift(self, z, t, x0=None):
         """
         The plan rebased to the absolute time ``t``: each knot row re-read at ``t + offset``, the tail held.
 
-        With ``x_start`` (a plan that carries its states), the first state knot
+        With ``x0`` (a plan that carries its states), the first state knot
         is pinned at it: the warm start of a solve from that measured start.
         """
         xp = array_module(z, t)
@@ -197,12 +197,12 @@ class CompiledTrajectoryPlanner:
         z_shifted = xp.concatenate(
             [xp.reshape(shifted, (-1,)), xp.reshape(xp.asarray(t, dtype=float), (1,))]
         )
-        if x_start is None or not self.predicts:
+        if x0 is None or not self.predicts:
             return z_shifted
 
         # x_i(t) = x̂_i: the state rows come first in z, N knots each, x_i's first at i·N
         first_knots = xp.arange(self.n) * offsets.size
-        x_hat = xp.reshape(xp.asarray(x_start, dtype=float), (self.n,))
+        x_hat = xp.reshape(xp.asarray(x0, dtype=float), (self.n,))
         z_pinned = assigned(xp, z_shifted, first_knots, x_hat)
 
         return z_pinned
@@ -327,7 +327,7 @@ class CompiledTrajectoryPlanner:
 
         z_dec = self.transcription.pack_initial_guess(problem, trajectory)
 
-        return np.concatenate([z_dec, [problem.t_start]])
+        return np.concatenate([z_dec, [problem.t0]])
 
     ###########################################################################
     # Internal machinery

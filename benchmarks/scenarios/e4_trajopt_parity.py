@@ -100,7 +100,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
     sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
     sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
 
-    x_start = np.array([0.0, 0.0])
+    x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])
     cost = QuadraticCost.from_system(
         sys,
@@ -112,7 +112,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
     problem = PlanningProblem(
         sys=sys,
         horizon=PENDULUM_TF,
-        x_start=x_start,
+        x0=x0,
         Xf=SingletonSet(x_goal),
         cost=cost,
         X=sys.state.box,
@@ -208,7 +208,7 @@ def run_bicycle_parametric(
         x_bar=x_ref,
         u_bar=np.zeros(2),
     )
-    x_start = np.array(
+    x0 = np.array(
         [
             0.0,
             1.0,
@@ -222,7 +222,7 @@ def run_bicycle_parametric(
     )
     problem = PlanningProblem(
         sys=sys,
-        x_start=x_start,
+        x0=x0,
         cost=cost,
         horizon=BICYCLE_TF,
         X=sys.state.box,
@@ -252,7 +252,7 @@ def run_bicycle_parametric(
 
     for _ in range(n_runs):
         t0 = time.perf_counter()
-        plan = planner.solve_trajectory_from(x_start)
+        plan = planner.solve_trajectory_from(x0)
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
         cost_val = float(plan.record.cost)

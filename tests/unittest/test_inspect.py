@@ -88,7 +88,7 @@ class TestInspectPrint(unittest.TestCase):
         problem = PlanningProblem(
             plant,
             horizon=1.0,
-            x_start=law,
+            x0=law,
             cost=QuadraticCost.from_system(plant),
         )
         text = str(problem)

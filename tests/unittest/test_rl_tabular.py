@@ -39,12 +39,12 @@ def double_integrator_problem(stochastic=False):
             horizon=np.inf,
             X=plant.state.box,
             U=plant.input_box,
-            x_start=Uniform([-1, -1], [1, 1]),
+            x0=Uniform([-1, -1], [1, 1]),
             **exit_rule,
         )
     return PlanningProblem(
         plant,
-        x_start=[1.0, 0.0],
+        x0=[1.0, 0.0],
         cost=cost,
         horizon=np.inf,
         X=plant.state.box,

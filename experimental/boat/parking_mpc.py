@@ -24,7 +24,7 @@ boat = ParkingBoat(CURRENT)
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=boat,
-        x_start=X_START,
+        x0=X_START,
         cost=parking_cost(boat, terminal=MPC_TERMINAL),
         horizon=MPC_HORIZON,
         X=boat.state.box,

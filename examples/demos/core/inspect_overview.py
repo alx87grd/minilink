@@ -50,7 +50,7 @@ print(
     PlanningProblem(
         plant,
         horizon=1.0,
-        x_start=Gaussian([0.0], [0.1]),
+        x0=Gaussian([0.0], [0.1]),
         cost=cost,
         criterion="expectation",
     )

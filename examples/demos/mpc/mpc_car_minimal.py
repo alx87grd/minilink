@@ -30,7 +30,7 @@ planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
         horizon=2.0,
-        x_start=x0,
+        x0=x0,
         cost=QuadraticCost.from_system(
             sys,
             Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),

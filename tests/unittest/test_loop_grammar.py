@@ -157,7 +157,7 @@ def test_a_cascade_is_one_flat_plan_on_one_base_clock():
 def test_a_sampled_problem_takes_the_plants_substeps():
     plant = pendulum()
     problem = PlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x_start=plant.x0, horizon=0.2
+        plant, cost=QuadraticCost.from_system(plant), x0=plant.x0, horizon=0.2
     )
     pe = problem.compile(pid() % 0.01, substeps=5)
     run = pe.trajectory()

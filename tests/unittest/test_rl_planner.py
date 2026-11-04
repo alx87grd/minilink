@@ -52,7 +52,7 @@ def problem(**kwargs):
         plant,
         cost=HangCost(),
         X=plant.state.box,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         **kwargs,
     )
 
@@ -66,7 +66,7 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
         bounded_pendulum(),
         cost=HangCost(),
         horizon=np.inf,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
     )
     env = RolloutEnvironment(free, dt=0.1, episode_length=0.3)
     assert not env.finite_horizon and np.isfinite(
@@ -204,7 +204,7 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     prob = PlanningProblem(
         plant,
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
         U=plant.input_box,
     )
@@ -230,7 +230,7 @@ def test_the_discount_has_one_owner_and_an_announced_default():
     discounted = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
@@ -269,7 +269,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     key = np.asarray(planner.key)
     nominal = planner.nominal_trajectory(tf=0.5)
     np.testing.assert_array_equal(np.asarray(planner.key), key)  # no draw consumed
-    solved = planner.solve_trajectory_from(prob.x_start, tf=0.5).trajectory
+    solved = planner.solve_trajectory_from(prob.x0, tf=0.5).trajectory
     np.testing.assert_array_equal(nominal.x, solved.x)
     np.testing.assert_array_equal(nominal.u, solved.u)
 
@@ -277,7 +277,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     noisy = PlanningProblem(
         bounded_pendulum(NoisyPendulum()),
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.1)},
     )
     planner = ReinforcementLearningPlanner(noisy, **small)
@@ -286,7 +286,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
         planner.nominal_trajectory(tf=0.5),
     )
     np.testing.assert_array_equal(first.x, second.x)
-    disturbed = planner.solve_trajectory_from(noisy.x_start, tf=0.5).trajectory
+    disturbed = planner.solve_trajectory_from(noisy.x0, tf=0.5).trajectory
     assert not np.array_equal(first.x, disturbed.x)
 
 
@@ -315,7 +315,7 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
 def test_plain_planning_problem_trains_from_its_single_start():
     plant = bounded_pendulum()
     prob = PlanningProblem(
-        plant, x_start=[0.2, 0.0], cost=HangCost(), horizon=np.inf, U=plant.input_box
+        plant, x0=[0.2, 0.0], cost=HangCost(), horizon=np.inf, U=plant.input_box
     )
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32, verbose=0
@@ -418,7 +418,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
         point,
         cost=QuadraticCost.from_system(point),
         X=point.state.box,
-        x_start=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
+        x0=Uniform(-0.5 * np.ones(3), 0.5 * np.ones(3)),
         U=point.input_box,
     )
 
@@ -503,7 +503,7 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     worst = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         criterion="worst_case",
     )
     with pytest.raises(NotImplementedError):
@@ -517,7 +517,7 @@ def test_planner_trains_with_randomized_parameters():
     prob = PlanningProblem(
         plant,
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         params={"plant": {"m": Particles([[0.5], [2.0]])}},
         U=plant.input_box,
     )
@@ -553,7 +553,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     prob = PlanningProblem(
         inner,
         cost=HangCost(),
-        x_start=Uniform([-0.3, -0.3], [0.3, 0.3]),
+        x0=Uniform([-0.3, -0.3], [0.3, 0.3]),
         params={
             "plant": {"plant": {"m": Particles([[0.5], [2.0]])}}
         },  # the plant inside
@@ -605,7 +605,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
             return 0.0
 
     prob = PlanningProblem(
-        Explosive(), cost=Zero(), horizon=np.inf, x_start=Uniform([1.0], [2.0])
+        Explosive(), cost=Zero(), horizon=np.inf, x0=Uniform([1.0], [2.0])
     )
     env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
     x_next, t, r, terminated, truncated = env.step(
@@ -729,7 +729,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     prob = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
     planner = ReinforcementLearningPlanner(

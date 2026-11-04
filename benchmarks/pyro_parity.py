@@ -305,12 +305,12 @@ def run_minilink_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
     sys.inputs["u"].lower_bound = np.array([-5.0])
     sys.inputs["u"].upper_bound = np.array([5.0])
 
-    x_start = np.array([0.1, 0.0])
+    x0 = np.array([0.1, 0.0])
     x_goal = UPRIGHT_PYRO.copy()
     torques = [np.array([tau]) for tau in (-5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0)]
     problem = PlanningProblem(
         sys=sys,
-        x_start=x_start,
+        x0=x0,
         Xf=BallSet(x_goal, 0.2),
         X=sys.state.box,
         U=sys.input_box,
@@ -506,10 +506,10 @@ def run_pyro_pendulum_rrt(*, seed=0, max_nodes=20000) -> ParityRow:
 
     np.random.seed(seed)
     sys_p = pendulum.SinglePendulum()
-    x_start = np.array([0.1, 0.0])
+    x0 = np.array([0.1, 0.0])
     x_goal = UPRIGHT_PYRO.copy()
 
-    planner = randomtree.RRT(sys_p, x_start)
+    planner = randomtree.RRT(sys_p, x0)
     planner.u_options = [
         np.array([tau]) for tau in (-5.0, -3.0, -1.0, 0.0, 1.0, 3.0, 5.0)
     ]

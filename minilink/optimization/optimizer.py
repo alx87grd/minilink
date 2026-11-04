@@ -115,7 +115,7 @@ class Optimizer:
         when no ``hess_J`` is supplied.
     options : dict, optional
         Solver options merged into the preset's ``options`` dict (user keys win).
-    iterations : int, optional
+    n_iterations : int, optional
         For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
         no tolerance. On a JAX program the solve is one ``lax.scan``,
         pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
@@ -135,12 +135,12 @@ class Optimizer:
         backend: str | None = None,
         use_hessian: bool = False,
         options: dict | None = None,
-        iterations: int | None = None,
+        n_iterations: int | None = None,
         **method_kwargs,
     ):
         # The method: the class default for "auto", refused when the class does not admit it
         method = method_for(program, method)
-        self.iterations = count_of(method, iterations)
+        self.n_iterations = count_of(method, n_iterations)
 
         # The program, compiled once at the default start
         self.program = program
@@ -215,7 +215,7 @@ class Optimizer:
         params, method = split_method(params)
 
         # A fixed count of native steps: the pure solve
-        if self.iterations is not None:
+        if self.n_iterations is not None:
             require_no_hook(callback)
             return self.solve_count(params, z0, method)
 
@@ -277,9 +277,9 @@ class Optimizer:
         return IterationSystem(self, tree, method)
 
     def solve_count(self, params, z0, method=None):
-        """Exactly :attr:`iterations` native steps from ``z0`` on the merged tree and the method's numbers: a pure solve, its result traced or on the host."""
+        """Exactly :attr:`n_iterations` native steps from ``z0`` on the merged tree and the method's numbers: a pure solve, its result traced or on the host."""
         evaluator = self.program_evaluator
-        K = self.iterations
+        K = self.n_iterations
 
         # The start and the tree, merged once, bound to nothing
         tree = evaluator.merged(params)
@@ -484,24 +484,28 @@ def host_or_traced(value, cast=None):
     return concrete if cast is None else cast(concrete)
 
 
-def count_of(method, iterations):
+def count_of(method, n_iterations):
     """The fixed step count: ``None``, or a positive whole number for a native method."""
-    if iterations is None:
+    if n_iterations is None:
         return None
     require_native(method)
-    if isinstance(iterations, bool) or int(iterations) != iterations or iterations < 1:
+    if (
+        isinstance(n_iterations, bool)
+        or int(n_iterations) != n_iterations
+        or n_iterations < 1
+    ):
         raise ValueError(
-            f"iterations must be a positive whole number, got {iterations!r}"
+            f"n_iterations must be a positive whole number, got {n_iterations!r}"
         )
 
-    return int(iterations)
+    return int(n_iterations)
 
 
 def require_native(method):
     """Refuse a fixed count, or the step-system view, for a method that is not native."""
     if method not in NATIVE_METHODS:
         raise ValueError(
-            f"iterations= and as_step_system take the native methods {NATIVE_METHODS}; "
+            f"n_iterations= and as_step_system take the native methods {NATIVE_METHODS}; "
             f"{method!r} runs to its own tolerance"
         )
 
@@ -516,7 +520,7 @@ def require_no_hook(callback):
     """Refuse a progress hook on a fixed-count solve: the steps are one pure scan."""
     if callback is not None:
         raise ValueError(
-            "a fixed-count solve (iterations=) is one pure scan: no callback; "
+            "a fixed-count solve (n_iterations=) is one pure scan: no callback; "
             "use as_step_system().compute_rollout(K) for the iterates"
         )
 

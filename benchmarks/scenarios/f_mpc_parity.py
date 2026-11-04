@@ -70,7 +70,7 @@ def _bicycle_planner():
         PlanningProblem(
             sys=sys,
             horizon=HORIZON,
-            x_start=x0,
+            x0=x0,
             cost=QuadraticCost.from_system(
                 sys,
                 Q=np.diag([0.0, 12.0, 18.0, 0.5, 4.0, 6.0, 0.1, 100.0]),
@@ -159,7 +159,7 @@ def run_hand_loop() -> list[MetricRecord]:
     t0 = time.perf_counter()
     while t < TF_HAND - 1e-12:
         if t >= next_mpc_t - 1e-12:
-            z, _ = pv.solve({"x_start": x, "t_start": t}, z0=pv.shift(z, t))
+            z, _ = pv.solve({"x0": x, "t0": t}, z0=pv.shift(z, t))
             u_hold = np.asarray(pv.command(z, x, t), dtype=float)
             next_mpc_t += MPC_DT
         x = plant_eval.step(x, u_hold, t, dt=SIM_DT)

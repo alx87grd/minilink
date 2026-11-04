@@ -125,10 +125,10 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
 
             return step_body(f, x_k, u0, u1, t_k, dt, "rk4", 1)
 
-        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t_start + k dt
+        # J = Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h(x_N, t_N), t_k = t0 + k dt
         def J(z, params):
             x, u = unpack_jax(z)
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             return trajectory_cost(
                 cost,
                 x,
@@ -137,13 +137,13 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
                 dt,
                 params["cost"],
                 discount_rate=params["discount_rate"],
-                t_start=params["t_start"],
+                t0=params["t0"],
             )
 
         # d_k = x_{k+1} − RK4(x_k, u_k, u_{k+1}), every interval at once
         def dynamics_residual(z, params):
             x, u = unpack_jax(z)
-            t = params["t_start"] + grid
+            t = params["t0"] + grid
             x_next = jax.vmap(rk4_step, in_axes=(1, 1, 1, 0, None), out_axes=1)(
                 x[:, :-1],
                 u[:, :-1],

@@ -319,13 +319,13 @@ if __name__ == "__main__":
         plant, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.array([[0.1]]), x_bar=x_bar
     )
     problem = PlanningProblem(
-        plant, x_start=x0, cost=cost, horizon=np.inf, U=plant.input_box
+        plant, x0=x0, cost=cost, horizon=np.inf, U=plant.input_box
     )
 
     solution = LQRPlanner(problem).solve(evaluate=True)
     print(solution)
 
     loop = solution.policy @ plant
-    plant.x0 = problem.x_start
+    plant.x0 = problem.x0
     loop.compute_trajectory(tf=8.0)
     loop.plot_trajectory()

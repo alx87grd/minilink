@@ -79,7 +79,7 @@ def holonomic_problem():
     x_goal = np.array([4.0, 4.0])
     problem = PlanningProblem(
         sys=sys,
-        x_start=np.array([-4.0, -4.0]),
+        x0=np.array([-4.0, -4.0]),
         Xf=BallSet(x_goal, GOAL_TOLERANCE),
         X=X,
         U=sys.input_box,

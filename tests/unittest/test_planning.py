@@ -82,7 +82,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         return PlanningProblem(
             sys=sys,
             horizon=1.0,
-            x_start=np.array([0.0]),
+            x0=np.array([0.0]),
             Xf=SingletonSet(np.array([1.0])),
             cost=cost,
             X=sys.state.box,
@@ -110,7 +110,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = PlanningProblem(
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
         )
-        np.testing.assert_allclose(problem.x_start, sys.x0)
+        np.testing.assert_allclose(problem.x0, sys.x0)
         self.assertIsNone(problem.horizon)
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
         self.assertTrue(problem.U.contains(np.array([0.0])))
@@ -157,27 +157,25 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         X0 = BallSet(center=np.zeros(2), radius=0.5)
         Xf = BallSet(center=np.array([0.5, 0.0]), radius=0.25)
-        x_start = np.array([0.1, -0.1])
-        problem = PlanningProblem(
-            sys=sys, x_start=x_start, X0=X0, Xf=Xf, U=sys.input_box
-        )
+        x0 = np.array([0.1, -0.1])
+        problem = PlanningProblem(sys=sys, x0=x0, X0=X0, Xf=Xf, U=sys.input_box)
         self.assertIs(problem.X0, X0)
         self.assertIs(problem.Xf, Xf)
-        np.testing.assert_allclose(problem.x_start, x_start)
+        np.testing.assert_allclose(problem.x0, x0)
         np.testing.assert_allclose(problem.goal_point(), [0.5, 0.0])
 
     def test_planning_problem_derives_the_start_and_the_goal_from_singleton_sets(self):
         sys = self.make_system()
-        x_start = np.array([0.25, -0.5])
+        x0 = np.array([0.25, -0.5])
         x_goal = np.array([0.75, 0.5])
         problem = PlanningProblem(
-            sys=sys, X0=SingletonSet(x_start), Xf=SingletonSet(x_goal), U=sys.input_box
+            sys=sys, X0=SingletonSet(x0), Xf=SingletonSet(x_goal), U=sys.input_box
         )
-        np.testing.assert_allclose(problem.x_start, x_start)
+        np.testing.assert_allclose(problem.x0, x0)
         np.testing.assert_allclose(problem.goal_point(), x_goal)
 
         # A vector is the singleton at it
-        vectors = PlanningProblem(sys=sys, X0=x_start, Xf=x_goal, U=sys.input_box)
+        vectors = PlanningProblem(sys=sys, X0=x0, Xf=x_goal, U=sys.input_box)
         self.assertIsInstance(vectors.X0, SingletonSet)
         self.assertIsInstance(vectors.Xf, SingletonSet)
         np.testing.assert_allclose(vectors.Xf.point, x_goal)
@@ -186,40 +184,38 @@ class TestPlanningArchitecture(unittest.TestCase):
         sys = self.make_system()
         x_bar = np.array([0.3, 0.0])
         cost = QuadraticCost.from_system(sys, x_bar=x_bar)
-        x_start = np.array([0.1, 0.1])
-        with_cost = PlanningProblem(sys=sys, x_start=x_start, cost=cost)
+        x0 = np.array([0.1, 0.1])
+        with_cost = PlanningProblem(sys=sys, x0=x0, cost=cost)
         np.testing.assert_allclose(with_cost.goal_point(), x_bar)
-        bare = PlanningProblem(sys=sys, x_start=x_start)
-        np.testing.assert_allclose(bare.goal_point(), x_start)
+        bare = PlanningProblem(sys=sys, x0=x0)
+        np.testing.assert_allclose(bare.goal_point(), x0)
 
     def test_a_region_start_defaults_to_its_centre_else_the_plants_start(self):
         sys = self.make_system()
         box = BoxSet([0.0, 0.0], [1.0, 2.0])
         problem = PlanningProblem(sys=sys, X0=box)
-        np.testing.assert_allclose(problem.x_start, [0.5, 1.0])
+        np.testing.assert_allclose(problem.x0, [0.5, 1.0])
         ball = BallSet(center=np.array([2.0, 0.0]), radius=0.1)
-        np.testing.assert_allclose(
-            PlanningProblem(sys=sys, X0=ball).x_start, [2.0, 0.0]
-        )
-        with self.assertRaisesRegex(ValueError, "give x_start"):
+        np.testing.assert_allclose(PlanningProblem(sys=sys, X0=ball).x0, [2.0, 0.0])
+        with self.assertRaisesRegex(ValueError, "give x0"):
             # An annulus with no bounding box: neither a centre nor sys.x0 = 0 in it
             annulus = CallableSet(lambda z, t, p: np.array([1.0 - z @ z, z @ z - 0.25]))
             PlanningProblem(sys=sys, X0=annulus)
 
     def test_assigning_the_start_moves_its_singleton_one_home_in_the_tree(self):
         sys = self.make_system()
-        problem = PlanningProblem(sys=sys, x_start=np.array([0.1, 0.0]))
-        problem.x_start = np.array([0.2, 0.3])
+        problem = PlanningProblem(sys=sys, x0=np.array([0.1, 0.0]))
+        problem.x0 = np.array([0.2, 0.3])
         np.testing.assert_allclose(problem.X0.point, [0.2, 0.3])
         self.assertNotIn("X0", problem.params)
-        np.testing.assert_allclose(problem.params["x_start"], [0.2, 0.3])
+        np.testing.assert_allclose(problem.params["x0"], [0.2, 0.3])
 
     def test_planning_problem_rejects_a_start_outside_x0(self):
         sys = self.make_system()
-        with self.assertRaisesRegex(ValueError, "x_start must belong to X0"):
+        with self.assertRaisesRegex(ValueError, "x0 must belong to X0"):
             PlanningProblem(
                 sys=sys,
-                x_start=np.array([1.0, 0.0]),
+                x0=np.array([1.0, 0.0]),
                 X0=BallSet(center=np.zeros(2), radius=0.25),
                 U=sys.input_box,
             )
@@ -268,13 +264,13 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_mechanical_initial_guess_respects_boundary_state(self):
         sys = MechanicalSystem(dof=1)
-        x_start = np.array([0.0, 0.5])
+        x0 = np.array([0.0, 0.5])
         x_goal = np.array([1.0, -0.25])
         problem = PlanningProblem(
-            sys=sys, x_start=x_start, Xf=SingletonSet(x_goal), U=sys.input_box
+            sys=sys, x0=x0, Xf=SingletonSet(x_goal), U=sys.input_box
         )
         guess = mechanical_cubic_initial_trajectory(problem, np.linspace(0.0, 2.0, 5))
-        np.testing.assert_allclose(guess.x[:, 0], x_start)
+        np.testing.assert_allclose(guess.x[:, 0], x0)
         np.testing.assert_allclose(guess.x[:, -1], x_goal)
 
     def test_planner_require_solution_before_solve(self):
@@ -565,9 +561,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription="direct_collocation",
             options={"maxiter": 100, "ftol": 1e-09},
         )
-        moved = planner.solve({"x_start": np.array([0.4])})
+        moved = planner.solve({"x0": np.array([0.4])})
         np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
-        np.testing.assert_allclose(planner.problem.x_start, problem.x_start)
+        np.testing.assert_allclose(planner.problem.x0, problem.x0)
 
 
 import pytest
@@ -617,7 +613,7 @@ def _trajopt_problem():
     return PlanningProblem(
         sys=sys,
         horizon=1.0,
-        x_start=np.array([0.0]),
+        x0=np.array([0.0]),
         cost=QuadraticCost.from_system(
             sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
         ),
@@ -704,7 +700,7 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
         problem = PlanningProblem(
             sys=sys,
             horizon=1.0,
-            x_start=np.array([0.0]),
+            x0=np.array([0.0]),
             cost=QuadraticCost.from_system(sys),
             X=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
             U=MarginInputSet(margin_fn),
@@ -829,7 +825,7 @@ def test_kdtree_requires_euclidean_metric():
     sys = make_dubins_problem()
     problem = PlanningProblem(
         sys=sys,
-        x_start=np.array([-3.0, -3.0, 0.0]),
+        x0=np.array([-3.0, -3.0, 0.0]),
         Xf=SingletonSet(np.array([3.0, 3.0, np.pi / 2])),
         X=BoxSet.from_system_state(sys),
         U=sys.input_box,
@@ -982,12 +978,12 @@ def test_dubins_edge_is_dynamically_feasible():
 
 def test_dubins_rrt_reaches_goal_pose():
     sys = make_dubins_problem()
-    x_start = np.array([-3.0, -3.0, 0.0])
+    x0 = np.array([-3.0, -3.0, 0.0])
     x_goal = np.array([3.0, 3.0, np.pi / 2])
     X = BoxSet.from_system_state(sys)
     problem = PlanningProblem(
         sys=sys,
-        x_start=x_start,
+        x0=x0,
         X=X,
         Xf=BallSet(x_goal, 0.6),
         U=sys.input_box,
@@ -1113,7 +1109,7 @@ def edge_inputs_problem(params=None):
     sys.state.upper_bound = np.array([6.0, 6.0])
     return PlanningProblem(
         sys=sys,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
         U=ShrinkingInputs(params),
     )
@@ -2062,7 +2058,7 @@ class TestParametricCapabilityFlag(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         problem = PlanningProblem(
             plant,
-            x_start=np.zeros(2),
+            x0=np.zeros(2),
             Xf=SingletonSet(goal),
             horizon=2.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
@@ -2090,7 +2086,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         return PlanningProblem(
             plant,
-            x_start=np.zeros(2),
+            x0=np.zeros(2),
             Xf=SingletonSet(goal),
             horizon=tf,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
@@ -2161,7 +2157,7 @@ class TestTextbookOptions(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         problem = PlanningProblem(
             plant,
-            x_start=np.zeros(2),
+            x0=np.zeros(2),
             Xf=SingletonSet(goal),
             horizon=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
@@ -2185,7 +2181,7 @@ class TestTextbookOptions(unittest.TestCase):
         goal = np.array([np.pi, 0.0])
         problem = PlanningProblem(
             plant,
-            x_start=np.zeros(2),
+            x0=np.zeros(2),
             Xf=SingletonSet(goal),
             horizon=1.0,
             cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
@@ -2267,7 +2263,7 @@ def test_collocation_bounds_survive_an_intersection():
     free = CallableSet(lambda z, t, params: np.reshape(1.0 - abs(z[0]), (1,)))
     boxed = PlanningProblem(
         sys,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
         cost=cost,
         horizon=1.0,
@@ -2276,7 +2272,7 @@ def test_collocation_bounds_survive_an_intersection():
     )
     mixed = PlanningProblem(
         sys,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=SingletonSet(np.ones(2)),
         cost=cost,
         horizon=1.0,
@@ -2408,7 +2404,7 @@ def face_swing_up():
     return PlanningProblem(
         plant,
         horizon=2.0,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         Xf=SingletonSet(goal),
         cost=QuadraticCost.from_system(plant, x_bar=goal, R=0.1 * np.eye(1)),
         U=plant.input_box,
@@ -2436,7 +2432,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
     assert face.record.cost == solved.record.cost
     assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
-    assert set(pv.params) >= {"x_start", "t_start", "plant", "cost"}
+    assert set(pv.params) >= {"x0", "t0", "plant", "cost"}
 
     # The plan's command is its input at t; shifted, it is the same plan read later
     np.testing.assert_allclose(pv.command(z, None, 0.0), solved.trajectory.u[:, 0])
@@ -2450,11 +2446,11 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
 
     # A solve at other values is checked on the program it was solved on: the
     # record of a planner built at that start, on the same z
-    start = {"x_start": np.array([0.05, 0.0])}
+    start = {"x0": np.array([0.05, 0.0])}
     moved, moved_status = pv.solve(start)
     record = pv.solution(moved, start, moved_status).record
     at_start = TrajectoryOptimizationPlanner(
-        face_swing_up().replace(x_start=start["x_start"]),
+        face_swing_up().replace(x0=start["x0"]),
         n_steps=11,
         transcription="direct_collocation",
         backend=backend,
@@ -2482,7 +2478,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     problem = PlanningProblem(
         plant,
         horizon=2.0,
-        x_start=np.array([0.5, 0.0]),
+        x0=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
     )
@@ -2491,20 +2487,20 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
         transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
         backend="jax",
         method="adam",
-        iterations=200,
+        n_iterations=200,
         options={"learning_rate": 0.05},
     )
     pv = planner.compile()
 
     starts = jnp.asarray([[0.5, 0.0], [0.2, 0.1], [-0.4, 0.0]])
-    zs, status = jax.vmap(lambda x: pv.solve({"x_start": x}))(starts)
+    zs, status = jax.vmap(lambda x: pv.solve({"x0": x}))(starts)
     assert zs.shape == (3, pv.n_z)
     for x, z in zip(starts, zs):
-        alone, _ = pv.solve({"x_start": np.asarray(x)})
+        alone, _ = pv.solve({"x0": np.asarray(x)})
         np.testing.assert_allclose(z, alone, rtol=1e-12)
 
     # One jitted solve, and the cost lower than at the initial guess
-    solve = jax.jit(lambda x: pv.solve({"x_start": x})[0])
+    solve = jax.jit(lambda x: pv.solve({"x0": x})[0])
     np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
     J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
     assert float(status["cost"][0]) < J0
@@ -2523,7 +2519,7 @@ def test_every_planner_has_one_tree_shape():
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, R=0.1 * np.eye(1))
     problem = PlanningProblem(
-        plant, cost=cost, horizon=1.0, x_start=np.array([0.5, 0.0]), U=plant.input_box
+        plant, cost=cost, horizon=1.0, x0=np.array([0.5, 0.0]), U=plant.input_box
     )
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),

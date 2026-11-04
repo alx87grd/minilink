@@ -255,7 +255,7 @@ class ContinuousEvaluator(Evaluator):
         self,
         x0,
         u_seq,
-        t_start,
+        t0,
         dt,
         params=None,
         *,
@@ -279,16 +279,16 @@ class ContinuousEvaluator(Evaluator):
         u_start, u_end = held_inputs(u_seq, hold)
         ks = self.indices(u_start.shape[0])
 
-        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t_start + k dt
+        # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t0 + k dt
         def period(x, k, ua, ub):
-            return step_body(f, x, ua, ub, t_start + k * dt, dt, solver, substeps)
+            return step_body(f, x, ua, ub, t0 + k * dt, dt, solver, substeps)
 
         x_samples = iterate(self, period, x0, (ks, u_start, u_end))
 
         return x_samples
 
     def rollout_batch(
-        self, x0s, u_sequences=None, *, t_start=0.0, dt, n_steps=None, params=None
+        self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None
     ):
         """Roll out a family of RK4 / ZOH trajectories in one ``jax.vmap`` call (JAX).
 
@@ -299,7 +299,7 @@ class ContinuousEvaluator(Evaluator):
         u_sequences : None, ``(N, m)``, or ``(B, N, m)``
             Held inputs per step: the compiled nominal input (``n_steps``
             required), one sequence shared by the batch, or one per member.
-        t_start, dt : float
+        t0, dt : float
             Start time and step, shared by the batch.
         params : None or pytree
             ``None`` uses the compiled values. Otherwise a params pytree whose
@@ -312,16 +312,16 @@ class ContinuousEvaluator(Evaluator):
         jax.Array, shape ``(B, N + 1, n)``
             Sampled states, ``x0`` first, for every member of the family.
         """
-        t_start = self.jnp.asarray(t_start, dtype=float)
+        t0 = self.jnp.asarray(t0, dtype=float)
         dt = self.jnp.asarray(dt, dtype=float)
 
         return self.batched_rollout(
-            lambda x0, u, p, t_start, dt: self.rollout(x0, u, t_start, dt, p),
+            lambda x0, u, p, t0, dt: self.rollout(x0, u, t0, dt, p),
             x0s,
             u_sequences,
             n_steps,
             params,
-            t_start,
+            t0,
             dt,
         )
 

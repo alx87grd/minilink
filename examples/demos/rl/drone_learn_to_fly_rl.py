@@ -62,7 +62,7 @@ problem = PlanningProblem(
     plant,
     cost=HoverCost(),
     horizon=np.inf,
-    x_start=Gaussian(np.zeros(6), [5.0, 5.0, 1.0, 1.0, 1.0, 0.2]),
+    x0=Gaussian(np.zeros(6), [5.0, 5.0, 1.0, 1.0, 1.0, 0.2]),
     U=plant.input_box,
 )
 

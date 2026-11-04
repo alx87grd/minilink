@@ -245,12 +245,12 @@ def test_a_problem_on_a_random_system_plans_against_the_mean():
     from minilink.planning.problems import PlanningProblem, nominal_plant_params
 
     noisy = noisy_loop()
-    problem = PlanningProblem(noisy, x_start=noisy.x0, U=noisy.input_box)
+    problem = PlanningProblem(noisy, x0=noisy.x0, U=noisy.input_box)
     nominal = nominal_plant_params(problem)
     assert nominal["process_noise"]["seed"] is None
     assert nominal["plant"] is noisy.subsystems["plant"].params
 
-    quiet = PlanningProblem(Pendulum(), x_start=np.zeros(2))
+    quiet = PlanningProblem(Pendulum(), x0=np.zeros(2))
     assert nominal_plant_params(quiet) is None
 
 
@@ -286,7 +286,7 @@ def test_the_rollout_environment_warns_about_noise_it_never_sees():
             sys,
             cost=QuadraticCost.from_system(sys),
             horizon=1.0,
-            x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+            x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
             disturbances=disturbances or None,
             U=sys.input_box,
         )
@@ -342,9 +342,9 @@ def test_a_distribution_is_dim_mean_and_sample_and_a_user_law_drives_a_problem()
 
     plant = DoubleIntegrator()
     problem = PlanningProblem(
-        plant, cost=QuadraticCost.from_system(plant), x_start=Corners()
+        plant, cost=QuadraticCost.from_system(plant), x0=Corners()
     )
-    x0s = problem.realize(0, 4)["x_start"]
+    x0s = problem.realize(0, 4)["x0"]
     assert x0s.shape == (4, 2) and set(np.abs(x0s).ravel()) == {1.0}
     assert isinstance(problem.nominal(), PlanningProblem)
 
@@ -558,7 +558,7 @@ def test_the_nominal_problem_is_the_problem_at_its_means():
         plant,
         horizon=1.0,
         cost=QuadraticCost.from_system(plant),
-        x_start=Gaussian([0.5, 0.0], [0.1, 0.1]),
+        x0=Gaussian([0.5, 0.0], [0.1, 0.1]),
         params={"plant": {"m": Uniform([1.2], [1.6])}},
         disturbances={
             "d": NoiseSource(Gaussian([0.3], [1.0]), sample_period=0.1, seed=4)
@@ -567,14 +567,14 @@ def test_the_nominal_problem_is_the_problem_at_its_means():
 
     # realize(None): every law at its mean, every seed None
     tree = problem.realize(None, 2)
-    np.testing.assert_allclose(tree["x_start"], [[0.5, 0.0], [0.5, 0.0]])
+    np.testing.assert_allclose(tree["x0"], [[0.5, 0.0], [0.5, 0.0]])
     np.testing.assert_allclose(tree["plant"]["m"], [1.4, 1.4])
     assert tree["disturbance"]["seed"] is None
 
     # nominal(): that tree in a copy, the caller's plant untouched
     nominal = problem.nominal()
     assert not nominal.is_stochastic
-    np.testing.assert_allclose(nominal.x_start, [0.5, 0.0])
+    np.testing.assert_allclose(nominal.x0, [0.5, 0.0])
     assert float(np.squeeze(nominal.sys.params["m"])) == pytest.approx(1.4)
     assert plant.params["m"] == m_own and nominal.sys is not plant
     source = nominal.disturbances["d"]

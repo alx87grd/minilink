@@ -139,11 +139,11 @@ class RRTPlanner(Planner):
 
         rng = np.random.default_rng(options.seed)
         goal_region = self.goal_region()
-        x_start = np.asarray(self.problem.x_start, dtype=float)
+        x0 = np.asarray(self.problem.x0, dtype=float)
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x_start, parent=None, edge=None, cost=0.0),
+            Node(x=x0, parent=None, edge=None, cost=0.0),
             nearest_backend=options.nearest_backend,
         )
         self.reached_goal = False

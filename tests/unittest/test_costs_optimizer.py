@@ -799,7 +799,7 @@ def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
     program = parametric_quadratic("jax")
     options = {"learning_rate": 0.05}
     opt = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, iterations=40
+        program, z0=[0.0, 0.0], method=method, options=options, n_iterations=40
     )
 
     # Exactly K steps: the iterates of the step-system view end where the solve does
@@ -840,16 +840,16 @@ def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
     program = type(program)(**{**program.__dict__, "grad_J": grad})
     options = {"learning_rate": 0.05, "maxiter": 25}
     fixed = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, iterations=25
+        program, z0=[0.0, 0.0], method=method, options=options, n_iterations=25
     )
     loop = Optimizer(program, z0=[0.0, 0.0], method=method, options=options)
     np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
 
     # A count is for the native methods, and a whole number
     with pytest.raises(ValueError, match="native methods"):
-        Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", iterations=10)
+        Optimizer(program, z0=[0.0, 0.0], method="l-bfgs", n_iterations=10)
     with pytest.raises(ValueError, match="positive whole number"):
-        Optimizer(program, z0=[0.0, 0.0], method=method, iterations=0)
+        Optimizer(program, z0=[0.0, 0.0], method=method, n_iterations=0)
 
 
 @pytest.mark.jax
@@ -872,7 +872,7 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
             program,
             z0=[0.0, 0.0],  # a list: the start is checked as on the host path
             method="adam",
-            iterations=20,
+            n_iterations=20,
             options={"max_grad_norm": max_grad_norm},
         )
         jacobian = jax.jacobian(lambda c: opt.solve(params={"c": c}).z)(

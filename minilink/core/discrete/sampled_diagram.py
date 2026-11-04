@@ -38,7 +38,7 @@ class SampledDiagramSystem(StepDiagramSystem):
     ``k mod d = 0`` and holds its outputs in between, each held output a state
     slot after the blocks' states (a zero-order hold is a memory). One pure map
     on the base tick, ``X_{k+1} = F(X_k, U_k, k)``, whose plan hands every
-    block the time of the loop: ``t_k = t_start + k·Δ`` in seconds to a block
+    block the time of the loop: ``t_k = t0 + k·Δ`` in seconds to a block
     whose equations are in seconds (a static block, a system on a clock), its
     own count ``k // d`` to a tick law on a clock, the base count ``k`` to a bare
     tick law. Signals propagate within the tick. A sampled box nested inside is
@@ -334,7 +334,7 @@ def plant_run_of(loop, rollout, params=None):
     plant = getattr(op.system, "source", op.system)
     if "plant" in rollout.roles:
         return plant, rollout.of("plant")
-    t_start = float(rollout.t[0])
+    t0 = float(rollout.t[0])
     n_samples = rollout.t.size
 
     # S = the samples per period of this run: the dense run's substeps, a ticks run's one
@@ -348,7 +348,7 @@ def plant_run_of(loop, rollout, params=None):
         samples = np.flatnonzero(ticks == k)
         first = samples[0]
         u_k = ev.plant_input(
-            rollout.x[:, first], rollout.u[:, first], int(k), params, t_start=t_start
+            rollout.x[:, first], rollout.u[:, first], int(k), params, t0=t0
         )
         u[:, samples] = np.asarray(u_k).reshape(-1, 1)
 

@@ -43,12 +43,12 @@ def pendulum_problem(stochastic=False):
             plant,
             cost=cost,
             horizon=2.0,
-            x_start=Uniform([-0.2, -0.2], [0.2, 0.2]),
+            x0=Uniform([-0.2, -0.2], [0.2, 0.2]),
             U=plant.input_box,
         )
     return PlanningProblem(
         plant,
-        x_start=[0.0, 0.0],
+        x0=[0.0, 0.0],
         Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
         horizon=2.0,
@@ -68,12 +68,12 @@ def move_problem(stochastic=False):
             cost=cost,
             horizon=2.0,
             Xf=SingletonSet([0.0, 0.0]),
-            x_start=Uniform([0.8, -0.2], [1.2, 0.2]),
+            x0=Uniform([0.8, -0.2], [1.2, 0.2]),
             U=plant.input_box,
         )
     return PlanningProblem(
         plant,
-        x_start=[1.0, 0.0],
+        x0=[1.0, 0.0],
         Xf=SingletonSet([0.0, 0.0]),
         cost=cost,
         horizon=2.0,
@@ -205,7 +205,7 @@ def double_integrator_problem():
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     return PlanningProblem(
         plant,
-        x_start=[1.0, 0.0],
+        x0=[1.0, 0.0],
         cost=cost,
         horizon=np.inf,
         penalize_failure=True,
@@ -232,13 +232,13 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
     def law(x, t):
         return solution.policy.action(x)
 
-    x_hand = held_input_rollout(problem.sys, law, planned.t, problem.x_start)
+    x_hand = held_input_rollout(problem.sys, law, planned.t, problem.x0)
     np.testing.assert_allclose(planned.x, x_hand, atol=1e-10)
     # the same rollout is what plot_solution draws, and the cost-to-go is the planner's table
     np.testing.assert_array_equal(
         planner.solution_trajectory().x, solution.trajectory.x
     )
-    assert solution.cost_to_go(problem.x_start) == planner.value_at(problem.x_start)
+    assert solution.cost_to_go(problem.x0) == planner.value_at(problem.x0)
     assert str(solution.evaluation).startswith("J = ")
 
 
@@ -271,7 +271,7 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
         plant,
         cost=cost,
         horizon=np.inf,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -308,7 +308,7 @@ def solved_pendulum():
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=[np.pi, 0])
     problem = PlanningProblem(
         plant,
-        x_start=[0.0, 0.0],
+        x0=[0.0, 0.0],
         Xf=SingletonSet([np.pi, 0.0]),
         cost=cost,
         horizon=np.inf,
@@ -453,7 +453,7 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
         X=problem.X,
         penalize_failure=True,
         failure_cost=500.0,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=problem.sys.input_box,
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
@@ -494,9 +494,7 @@ def test_compare_scores_a_sampled_loop_as_evaluate_does():
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    problem = PlanningProblem(
-        plant, x_start=np.array([0.3, 0.0]), cost=cost, horizon=5.0
-    )
+    problem = PlanningProblem(plant, x0=np.array([0.3, 0.0]), cost=cost, horizon=5.0)
     law = lqr_design(plant, np.eye(2), np.eye(1)) % 0.2
 
     alone = evaluate(problem, law, dt=0.2)

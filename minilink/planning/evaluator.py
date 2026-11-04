@@ -161,9 +161,9 @@ class ProblemEvaluator:
 
         ``{block_id: block params}`` for every block of the loop, a stateful block
         other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
-        ``observer.x0``; the plant's start is the problem's ``x_start``); the
+        ``observer.x0``; the plant's start is the problem's ``x0``); the
         problem's own leaves (``"cost"``, the parameters of the sets that hold any by
-        role, ``"x_start"``, ``"discount_rate"``); a sampled loop's held outputs'
+        role, ``"x0"``, ``"discount_rate"``); a sampled loop's held outputs'
         start ``"hold_x0"`` when a block fires slower than the base tick; and each
         free input of the loop at its nominal value. Every leaf a float array, so ``jax.grad`` differentiates
         the whole tree.
@@ -195,17 +195,17 @@ class ProblemEvaluator:
 
         # The nominal run, or the draw of one trial
         if key is None:
-            x_start, params = params["x_start"], params
+            x0, params = params["x0"], params
         else:
-            x_start, params = self.realize(params, key, 1)
-            x_start = x_start[0]
+            x0, params = self.realize(params, key, 1)
+            x0 = x0[0]
             params = take_trial(params, 0)
 
         # One jitted run on JAX (its scan and its recorded signals one dispatch)
         if self.backend == BACKEND_JAX and self.adaptive is None:
-            return self.run_compiled(params, x_start)
+            return self.run_compiled(params, x0)
 
-        return self.run(params, x_start)
+        return self.run(params, x0)
 
     def evaluate(self, params=None, key=0, n_trials=None, *, record=False):
         """
@@ -222,15 +222,15 @@ class ProblemEvaluator:
 
         # The draws, the cost of a failure and the cost bound of a run not finite,
         # then the runs and their scores, batched on JAX
-        x_starts, trial_params = self.realize(params, key, n_trials)
+        x0s, trial_params = self.realize(params, key, n_trials)
         failure_cost, bound = self.failure_cost_and_bound(params)
         rows, trajectories = self.run_trials(
-            trial_params, x_starts, record, failure_cost, bound
+            trial_params, x0s, record, failure_cost, bound
         )
 
         return Evaluation(
             **rows,
-            x0=x_starts,
+            x0=x0s,
             trajectories=trajectories,
             criterion=criterion_of(self.problem),
         )
@@ -261,9 +261,9 @@ class ProblemEvaluator:
 
         wrt = paths_of(wrt)
         require_no_seed(wrt)
-        if tunes(wrt, "x_start") and self.problem.is_stochastic:
+        if tunes(wrt, "x0") and self.problem.is_stochastic:
             raise ValueError(
-                "cannot put 'x_start' in wrt on a stochastic problem: the starts are drawn"
+                "cannot put 'x0' in wrt on a stochastic problem: the starts are drawn"
             )
 
         base = self.merged(params)
@@ -273,9 +273,9 @@ class ProblemEvaluator:
 
         # The draws, the failure cost and the cost bound stay fixed when the start and
         # the cost are not among the tuned leaves
-        freeze = not tunes(wrt, "x_start") and not tunes(wrt, "cost")
+        freeze = not tunes(wrt, "x0") and not tunes(wrt, "cost")
         if freeze:
-            x_starts, trial_params = self.realize(base, key, n_trials)
+            x0s, trial_params = self.realize(base, key, n_trials)
             failure_cost, bound = self.failure_cost_and_bound(base)
             batched = isinstance(trial_params, Batched)
             frozen_tree = trial_params.tree if batched else trial_params
@@ -287,11 +287,11 @@ class ProblemEvaluator:
 
             def report_of(z):
                 trial_rows, _ = self.run_trials(
-                    overlay(z), x_starts, False, failure_cost, bound
+                    overlay(z), x0s, False, failure_cost, bound
                 )
                 return Evaluation(
                     **trial_rows,
-                    x0=x_starts,
+                    x0=x0s,
                     trajectories=None,
                     criterion=criterion_of(self.problem),
                 )
@@ -371,7 +371,7 @@ class ProblemEvaluator:
 
         return self.on_device.get(tree, lambda same: same, jax.device_put)
 
-    def run_compiled(self, params, x_start):
+    def run_compiled(self, params, x0):
         """:meth:`run` jitted once per problem parts: the recorded run in one dispatch."""
         jax = ensure_jax_x64()
 
@@ -380,7 +380,7 @@ class ProblemEvaluator:
             self.run_fn = (jax.jit(self.run), parts)
         run, _ = self.run_fn
 
-        return run(self.device_tree(params), np.asarray(x_start, dtype=float))
+        return run(self.device_tree(params), np.asarray(x0, dtype=float))
 
     def failure_cost_and_bound(self, params):
         """
@@ -428,21 +428,21 @@ class ProblemEvaluator:
         """
         problem = self.problem
         loop = self.loop
-        xp = array_module(params["x_start"])
+        xp = array_module(params["x0"])
 
         # Nothing random: the one start, the parameters as they are
         if not self.draws:
-            return xp.reshape(params["x_start"], (1, -1)), params
+            return xp.reshape(params["x0"], (1, -1)), params
 
         # x0 ~ p(x0), each law and each source's seed, n_trials times: one tree,
         # drawn on the host from an integer key whatever the backend; a point
         # start, the same for every trial
         overrides = {}
-        x_starts = xp.tile(xp.asarray(params["x_start"], dtype=float), (n_trials, 1))
+        x0s = xp.tile(xp.asarray(params["x0"], dtype=float), (n_trials, 1))
         if problem.is_stochastic:
             tree = problem.realize(key, n_trials)
             if problem.start_law is not None:
-                x_starts = tree["x_start"]
+                x0s = tree["x0"]
             for path in problem.drawn_paths()[1:]:
                 set_leaf(overrides, path, lookup(tree, path))
 
@@ -452,57 +452,57 @@ class ProblemEvaluator:
 
         axes = merge_tree(axes_like(params, None), axes_like(overrides, 0))
 
-        return x_starts, Batched(merge_tree(params, overrides), axes)
+        return x0s, Batched(merge_tree(params, overrides), axes)
 
-    def loop_start(self, params, x_start, xp):
-        """The loop's start ``x(0)``: the plant at ``x_start``, every other stateful block at its ``x0`` leaf, the held outputs at the ``hold_x0`` leaf."""
+    def loop_start(self, params, x0, xp):
+        """The loop's start ``x(0)``: the plant at ``x0``, every other stateful block at its ``x0`` leaf, the held outputs at the ``hold_x0`` leaf."""
         pieces = []
         for sys_id in self.block_ids:
             if sys_id == "plant":
-                pieces.append(xp.reshape(xp.asarray(x_start, dtype=float), (-1,)))
+                pieces.append(xp.reshape(xp.asarray(x0, dtype=float), (-1,)))
             elif sys_id in self.start_ids:
                 pieces.append(xp.reshape(params[sys_id]["x0"], (-1,)))
         if "hold_x0" in params:
             pieces.append(xp.reshape(params["hold_x0"], (-1,)))
 
-        x0 = xp.concatenate(pieces)
+        x0_loop = xp.concatenate(pieces)
 
-        return x0
+        return x0_loop
 
-    def run(self, params, x_start) -> Trajectory:
-        """One run of the loop from the plant state ``x_start``: the loop's trajectory, signals recorded."""
+    def run(self, params, x0) -> Trajectory:
+        """One run of the loop from the plant state ``x0``: the loop's trajectory, signals recorded."""
         ev = self.evaluator
         loop = self.loop
-        xp = array_module(x_start, *flat_leaves(params))
+        xp = array_module(x0, *flat_leaves(params))
         dt = self.dt
         N = self.n_steps
 
-        # The loop's start: each block's x0 leaf, the plant's slice at x_start
-        x0 = self.loop_start(params, x_start, xp)
+        # The loop's start: each block's x0 leaf, the plant's slice at x0
+        x0_loop = self.loop_start(params, x0, xp)
 
         # The free inputs held at their parameters over every period
         u = self.held_inputs(params, xp)
         u_seq = xp.broadcast_to(u, (N, u.size))
 
-        # x_{k+1} = Φ(x_k, u, t_k), t_k = t_start + k dt, k = 0 … N − 1, with the
+        # x_{k+1} = Φ(x_k, u, t_k), t_k = t0 + k dt, k = 0 … N − 1, with the
         # plant's stage cost integrated beside the state; or the adaptive
         # integral reported on that grid
         loop_params = {
             sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
         }
         loop_params = integer_seeds(loop, loop_params)
-        t_start = params["t_start"]
-        ts = t_start + xp.arange(N + 1) * dt
+        t0 = params["t0"]
+        ts = t0 + xp.arange(N + 1) * dt
         rate = self.cost_rate(params)
         if self.sampled:
             xs, running, signals = ev.rollout_with_cost(
-                x0, u_seq, loop_params, rate, n_steps=N, t_start=t_start, signals=True
+                x0_loop, u_seq, loop_params, rate, n_steps=N, t0=t0, signals=True
             )
         elif self.adaptive is None:
             xs, running = ev.rollout_with_cost(
-                x0,
+                x0_loop,
                 u_seq,
-                t_start,
+                t0,
                 dt,
                 loop_params,
                 rate,
@@ -512,7 +512,7 @@ class ProblemEvaluator:
             )
         else:
             f_aug = ev.rhs_with_cost(loop_params, "plant", rate)
-            z0 = xp.concatenate([xp.asarray(x0, dtype=float), xp.zeros(1)])
+            z0 = xp.concatenate([xp.asarray(x0_loop, dtype=float), xp.zeros(1)])
             zs = integrate_adaptive(f_aug, z0, u, ts, self.adaptive)
             xs, running = zs[:, :-1], zs[:, -1]
         us = xp.broadcast_to(u, (N + 1, u.size))
@@ -539,16 +539,16 @@ class ProblemEvaluator:
         )
 
     def cost_rate(self, params):
-        """The plant's discounted cost rate ``e^{−ρ(τ − t_start)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
+        """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
         g = self.problem.require_cost().g
         cost_params = params["cost"]
         rho = params["discount_rate"]
-        t_start = params["t_start"]
+        t0 = params["t0"]
 
-        # ċ = e^{−ρ(τ − t_start)} g(x_plant, u_plant, τ)
+        # ċ = e^{−ρ(τ − t0)} g(x_plant, u_plant, τ)
         def rate(x, u, tau):
             xp = array_module(x, u, tau)
-            c_dot = xp.exp(-rho * (tau - t_start)) * g(x, u, tau, cost_params)
+            c_dot = xp.exp(-rho * (tau - t0)) * g(x, u, tau, cost_params)
             return c_dot
 
         return rate
@@ -557,7 +557,7 @@ class ProblemEvaluator:
         """Whether one trial's score traces on JAX (the loop does; the cost, ``X``, ``U`` and ``Xf`` may not)."""
         jax = ensure_jax_x64()
         params = self.params
-        x_start = np.asarray(self.problem.x_start, dtype=float)
+        x0 = np.asarray(self.problem.x0, dtype=float)
 
         # An abstract trace of the run and its score: no compile, no numbers
         try:
@@ -566,7 +566,7 @@ class ProblemEvaluator:
             jax.eval_shape(
                 lambda p, x0: self.score(p, x0, False, failure_cost, bound)[0],
                 params,
-                x_start,
+                x0,
             )
         except (TypeError, jax.errors.JAXTypeError, jax.errors.ConcretizationTypeError):
             return False
@@ -582,9 +582,9 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x_start, record, failure_cost, bound):
+    def score(self, params, x0, record, failure_cost, bound):
         """One trial's row of the record (and its trajectory when ``record``)."""
-        traj = self.run(params, x_start)
+        traj = self.run(params, x0)
         plant_run = traj.of("plant")
 
         row = score_run(
@@ -599,14 +599,14 @@ class ProblemEvaluator:
 
         return row, (traj if record else None)
 
-    def run_trials(self, params, x_starts, record, failure_cost, bound):
+    def run_trials(self, params, x0s, record, failure_cost, bound):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x_starts, record, failure_cost, bound)
+            return self.run_trials_jax(params, x0s, record, failure_cost, bound)
 
-        return self.run_trials_numpy(params, x_starts, record, failure_cost, bound)
+        return self.run_trials_numpy(params, x0s, record, failure_cost, bound)
 
-    def run_trials_jax(self, params, x_starts, record, failure_cost, bound):
+    def run_trials_jax(self, params, x0s, record, failure_cost, bound):
         """The trials as one ``vmap`` of the run, jitted once per batch layout and problem parts."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
@@ -627,16 +627,16 @@ class ProblemEvaluator:
             self.trials_fn[layout] = (jax.jit(batched), parts)
 
         trials_fn, _ = self.trials_fn[layout]
-        rows, trajs = trials_fn(tree, x_starts, failure_cost, bound)
+        rows, trajs = trials_fn(tree, x0s, failure_cost, bound)
 
-        return rows, unbatch(trajs, x_starts.shape[0]) if record else None
+        return rows, unbatch(trajs, x0s.shape[0]) if record else None
 
-    def run_trials_numpy(self, params, x_starts, record, failure_cost, bound):
+    def run_trials_numpy(self, params, x0s, record, failure_cost, bound):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
-        for i, x_start in enumerate(x_starts):
+        for i, x0 in enumerate(x0s):
             row, traj = self.score(
-                take_trial(params, i), x_start, record, failure_cost, bound
+                take_trial(params, i), x0, record, failure_cost, bound
             )
             rows.append(row)
             trajs.append(traj)
@@ -684,7 +684,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
 
     ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
     takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
-    parameters, on NumPy, from ``t_start``: the sampled loop a feedback planner
+    parameters, on NumPy, from ``t0``: the sampled loop a feedback planner
     designs for (its grid, its model), reported beside its policy; the
     planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
     length for an infinite horizon. ``u`` is the plant's command port. The run
@@ -702,7 +702,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
 
     # The face's step, the law on the grid, the command's slice of the plant input
     face = nominal.compile(dt=float(dt))
-    t = nominal.t_start + float(dt) * np.arange(n_steps + 1)
+    t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
     law = held_law(policy, t)
     command = plant.get_input_port_slice(command_port(plant))
     u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
@@ -715,7 +715,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     xs = np.zeros((plant.n, n_steps + 1))
     us = np.zeros((command.stop - command.start, n_steps + 1))
     running = np.zeros(n_steps + 1)
-    xs[:, 0] = nominal.x_start
+    xs[:, 0] = nominal.x0
     for k in range(n_steps + 1):
         us[:, k] = law(xs[:, k], t[k])
         if k == n_steps:
@@ -1237,8 +1237,8 @@ def require_free_names(free_inputs, block_ids):
         "X",
         "U",
         "Xf",
-        "x_start",
-        "t_start",
+        "x0",
+        "t0",
         "discount_rate",
         "hold_x0",
     }
@@ -1249,7 +1249,7 @@ def require_free_names(free_inputs, block_ids):
     if clash:
         raise ValueError(
             f"the loop's name(s) {clash} clash in the run's parameter tree (a block, a "
-            "free input, or the problem's cost, sets, x_start, discount_rate): rename "
+            "free input, or the problem's cost, sets, x0, discount_rate): rename "
             "the port or the block"
         )
 

@@ -129,11 +129,11 @@ class RRTStarPlanner(RRTPlanner):
         patience = star_options.convergence_patience if star_options else 500
         record_history = star_options.record_history if star_options else False
         history_stride = max(1, star_options.history_stride if star_options else 1)
-        x_start = np.asarray(self.problem.x_start, dtype=float)
+        x0 = np.asarray(self.problem.x0, dtype=float)
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x_start, parent=None, edge=None, cost=0.0),
+            Node(x=x0, parent=None, edge=None, cost=0.0),
             nearest_backend=options.nearest_backend,
         )
         self.reached_goal = False

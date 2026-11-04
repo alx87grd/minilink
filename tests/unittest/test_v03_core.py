@@ -56,7 +56,7 @@ def digital_pid_problem():
     """A digital PID on the pendulum, its setpoint 1 rad, scored over 2 s."""
     plant = FastPendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([1.0, 0.0]))
-    problem = PlanningProblem(plant, cost=cost, x_start=np.zeros(2), horizon=2.0)
+    problem = PlanningProblem(plant, cost=cost, x0=np.zeros(2), horizon=2.0)
     pid = PID(Kp=8.0, Ki=1.0, Kd=2.0)
     pid.inputs["e"].nominal_value = np.zeros(1)
     return problem, pid
@@ -89,7 +89,7 @@ def lqg_problem():
     problem = PlanningProblem(
         plant,
         cost=cost,
-        x_start=np.zeros(2),
+        x0=np.zeros(2),
         horizon=LQG_TF,
         disturbances={
             "d": WhiteNoise(1, psd=PROCESS_PSD, sample_period=LQG_DT, seed=1),
@@ -326,14 +326,14 @@ class SineTracking(CostFunction):
         return e**2
 
 
-def tracking_problem(t_start, phase):
+def tracking_problem(t0, phase):
     plant = Pendulum()
     return PlanningProblem(
         plant,
-        x_start=[0.2, 0.0],
+        x0=[0.2, 0.0],
         cost=SineTracking(phase),
         horizon=2.0,
-        t_start=t_start,
+        t0=t0,
         discount_rate=0.3,
     )
 
@@ -356,7 +356,7 @@ def test_script_12_program_a_loop_started_at_100_scores_as_from_0_shifted(
     J_early = float(early.evaluate().J[0])
     assert J_late == pytest.approx(J_early, rel=1e-9)
 
-    # The run is stamped in absolute time, and the discount counts from t_start
+    # The run is stamped in absolute time, and the discount counts from t0
     traj = late.trajectory()
     assert traj.t[0] == 100.0 and traj.t[-1] == pytest.approx(102.0)
     undiscounted = tracking_problem(100.0, 0.0).replace(discount_rate=0.0)
@@ -367,7 +367,7 @@ def test_script_12_program_a_loop_started_at_100_scores_as_from_0_shifted(
 
 
 @pytest.mark.jax
-def test_script_12_program_the_gradient_in_t_start_matches_a_central_difference():
+def test_script_12_program_the_gradient_in_t0_matches_a_central_difference():
     import jax
 
     pe = tracking_problem(100.0, 0.0).compile(
@@ -377,10 +377,10 @@ def test_script_12_program_the_gradient_in_t_start_matches_a_central_difference(
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
 
     h = 1e-5
-    J_plus = float(pe.evaluate(pe.merged({"t_start": 100.0 + h})).objective)
-    J_minus = float(pe.evaluate(pe.merged({"t_start": 100.0 - h})).objective)
+    J_plus = float(pe.evaluate(pe.merged({"t0": 100.0 + h})).objective)
+    J_minus = float(pe.evaluate(pe.merged({"t0": 100.0 - h})).objective)
     central = (J_plus - J_minus) / (2 * h)
-    assert float(grad["t_start"]) == pytest.approx(central, rel=1e-5)
+    assert float(grad["t0"]) == pytest.approx(central, rel=1e-5)
     assert abs(central) > 1e-3  # the reference moves under the run
 
 
@@ -391,8 +391,8 @@ def test_script_12_program_the_gradient_in_t_start_matches_a_central_difference(
 def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcription):
     from minilink.planning import TrajectoryOptimizationPlanner
 
-    def plan(t_start, phase):
-        problem = tracking_problem(t_start, phase).replace(discount_rate=0.0)
+    def plan(t0, phase):
+        problem = tracking_problem(t0, phase).replace(discount_rate=0.0)
         planner = TrajectoryOptimizationPlanner(
             problem,
             n_steps=11,
@@ -432,9 +432,9 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
         x_bar=target,
         u_bar=np.zeros(2),
     )
-    x_start = np.array([0.0, 1.0, 0.0, 0.9 * speed, 0.0, 0.0, 0.9 * speed / r_r, 0.0])
+    x0 = np.array([0.0, 1.0, 0.0, 0.9 * speed, 0.0, 0.0, 0.9 * speed / r_r, 0.0])
     problem = PlanningProblem(
-        sys, x_start=x_start, cost=cost, horizon=1.0, X=sys.state.box, U=sys.input_box
+        sys, x0=x0, cost=cost, horizon=1.0, X=sys.state.box, U=sys.input_box
     )
     options = (
         {"max_iter": 300, "tol": 1e-10}
@@ -455,7 +455,7 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
 def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
     compiled = bicycle_planner()
     compiled.compile_parametric_program()
-    x_start = compiled.problem.x_start
+    x0 = compiled.problem.x0
 
     plans = {}
     for mu, target_y in ((1.0, 0.0), (0.4, 0.0), (0.4, 0.6)):
@@ -463,7 +463,7 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
             "plant": {"mu": np.asarray(mu)},
             "cost": {"x_bar": bicycle_planner(target_y=target_y).problem.cost.x_bar},
         }
-        plan = compiled.solve_trajectory_from(x_start, params=values)
+        plan = compiled.solve_trajectory_from(x0, params=values)
         rebuilt = bicycle_planner(mu, target_y).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.u, rebuilt.trajectory.u, atol=1e-5)
@@ -471,7 +471,7 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
 
         # The NumPy rebuild path answers the same values on the same API
         numpy_plan = bicycle_planner(backend="numpy").solve_trajectory_from(
-            x_start, params=values
+            x0, params=values
         )
         # (SLSQP on finite differences: the same optimum on a flat valley)
         assert numpy_plan.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
@@ -486,7 +486,7 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
 
     # An unknown path raises, naming the known ones
     with pytest.raises(ValueError, match="known entries"):
-        compiled.solve_trajectory_from(x_start, params={"plant": {"nu": 1.0}})
+        compiled.solve_trajectory_from(x0, params={"plant": {"nu": 1.0}})
 
 
 def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
@@ -498,7 +498,7 @@ def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
     problem = PlanningProblem(
         plant,
         horizon=2.0,
-        x_start=np.array([0.5, 0.0]),
+        x0=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
     )
@@ -526,7 +526,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     compiled = pendulum_planner(method="ipopt")
     compiled.compile_parametric_program()
     plan = compiled.solve_trajectory_from(
-        compiled.problem.x_start, params={"plant": {"m": np.asarray(1.3)}}
+        compiled.problem.x0, params={"plant": {"m": np.asarray(1.3)}}
     )
     reference = pendulum_planner(1.3).solve()
     assert plan.success
@@ -555,7 +555,7 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
         J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     )
 
-    # The greedy walk from the start, rolled out on the face, pays J(x_start)
+    # The greedy walk from the start, rolled out on the face, pays J(x0)
     law = vi.get_controller()
     walk = face.run(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
@@ -573,7 +573,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
-        x_start=np.array([0.5, 0.0]),
+        x0=np.array([0.5, 0.0]),
         horizon=3.0,
         U=plant.input_box,
         discount_rate=0.5,
@@ -598,7 +598,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     # The RL environment's discounted return of the same law, on the stage reward
     # (the score's; its training default −g dt is a modified copy)
     env = RolloutEnvironment(problem, dt=dt, backend="numpy", reward="stage")
-    x, t, J_env = problem.x_start, 0.0, 0.0
+    x, t, J_env = problem.x0, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
         x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
         J_env += face.gamma**k * -float(reward)
@@ -634,7 +634,7 @@ def native_mpc_problem():
     problem = PlanningProblem(
         plant,
         horizon=2.0,
-        x_start=np.array([0.5, 0.0]),
+        x0=np.array([0.5, 0.0]),
         cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
         U=plant.input_box,
     )
@@ -643,7 +643,7 @@ def native_mpc_problem():
         transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
         backend="jax",
         method="adam",
-        iterations=30,
+        n_iterations=30,
         options={"learning_rate": 0.05},
     )
     return problem, planner
@@ -670,10 +670,10 @@ def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradien
 
     # vmap over starts: one closed loop per start, the same J as one by one
     starts = jnp.asarray([[0.5, 0.0], [0.3, 0.2]])
-    batch = jax.vmap(lambda x: objective({**params, "x_start": x}))(starts)
+    batch = jax.vmap(lambda x: objective({**params, "x0": x}))(starts)
     np.testing.assert_allclose(batch[0], J, rtol=1e-10)
     np.testing.assert_allclose(
-        batch[1], objective({**params, "x_start": np.asarray(starts[1])}), rtol=1e-10
+        batch[1], objective({**params, "x0": np.asarray(starts[1])}), rtol=1e-10
     )
 
     # The gradient in the controller's effort weight R, against a central difference
@@ -714,7 +714,7 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
     # x(0) arrives at t = 0.05 and is read at the fast ticks
     np.testing.assert_array_equal(u[:5], 0.0)
     pv = mpc.pv
-    z0, _ = pv.solve({"x_start": problem.x_start, "t_start": 0.0}, z0=pv.initial())
+    z0, _ = pv.solve({"x0": problem.x0, "t0": 0.0}, z0=pv.initial())
     expected = [float(pv.command(z0, None, 0.01 * k)[0]) for k in range(5, 10)]
     np.testing.assert_allclose(u[5:10], expected, rtol=1e-10)
 
@@ -759,24 +759,20 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     plant = InvertedPendulum()
     Q = np.diag([10.0, 1.0])
     R = 0.1 * np.eye(1)
-    x_start = np.array([0.4, 0.0])
+    x0 = np.array([0.4, 0.0])
     score = QuadraticCost.from_system(plant, Q=Q, R=R)
-    problem = PlanningProblem(
-        plant, cost=score, x_start=x_start, horizon=4.0, U=plant.input_box
-    )
+    problem = PlanningProblem(plant, cost=score, x0=x0, horizon=4.0, U=plant.input_box)
     model = linearize(plant)
     V = QuadraticField(model.x_bar, solve_continuous_are(model.A(), model.B(), Q, R))
 
     def J_of(cost):
         planner = TrajectoryOptimizationPlanner(
-            PlanningProblem(
-                plant, cost=cost, x_start=x_start, horizon=0.3, U=plant.input_box
-            ),
+            PlanningProblem(plant, cost=cost, x0=x0, horizon=0.3, U=plant.input_box),
             n_steps=3,
             transcription="single_shooting",
             backend="jax",
             method="adam",
-            iterations=40,
+            n_iterations=40,
             options={"learning_rate": 0.2},
         )
         mpc = ModelPredictiveController(planner, delay=True)
@@ -797,7 +793,7 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant, S=10.0 * np.eye(2)),
-        x_start=np.array([0.5, 0.0]),
+        x0=np.array([0.5, 0.0]),
         horizon=3.0,
         U=plant.input_box,
         discount_rate=0.5,

@@ -35,7 +35,7 @@ class SwingUpCost(CostFunction):
 
 
 problem = PlanningProblem(
-    plant, cost=SwingUpCost(), horizon=HORIZON, x_start=[0.0, 0.0], U=plant.input_box
+    plant, cost=SwingUpCost(), horizon=HORIZON, x0=[0.0, 0.0], U=plant.input_box
 )
 planner = MPPIPlanner(problem, dt=DT, n_rollouts=K, temperature=LAMBDA, noise=SIGMA**2)
 print(planner.solve().record)

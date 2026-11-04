@@ -79,7 +79,7 @@ cost = QuadraticCost.from_system(
 planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys_mpc,
-        x_start=x0,
+        x0=x0,
         cost=cost,
         horizon=MPC_HORIZON,
         X=sys_mpc.state.box,

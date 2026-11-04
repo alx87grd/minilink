@@ -76,10 +76,10 @@ class Accumulator(StepSystem):
         return x
 
 
-def pendulum_problem(horizon=2.0, x_start=X0, **kwargs):
+def pendulum_problem(horizon=2.0, x0=X0, **kwargs):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant)
-    return PlanningProblem(plant, cost=cost, x_start=x_start, horizon=horizon, **kwargs)
+    return PlanningProblem(plant, cost=cost, x0=x0, horizon=horizon, **kwargs)
 
 
 def pd_controller():
@@ -179,7 +179,7 @@ def mpc_entries(out):
         PlanningProblem(
             sys=plant,
             horizon=1.0,
-            x_start=x0,
+            x0=x0,
             Xf=SingletonSet(x_goal),
             cost=QuadraticCost.from_system(
                 plant, Q=np.eye(1), R=0.1 * np.eye(1), x_bar=x_goal
@@ -224,7 +224,7 @@ def evaluator_entries(out):
 
             grad = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)
             out[f"{key}.grad_K"] = grad["controller"]["K"]
-            out[f"{key}.grad_x_start"] = grad["x_start"]
+            out[f"{key}.grad_x0"] = grad["x0"]
 
 
 def optimizer_entries(out):
@@ -284,12 +284,12 @@ def draw_entries(out):
         plant,
         cost=QuadraticCost.from_system(plant),
         horizon=1.0,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         params={"plant": {"m": Uniform([0.8], [1.2])}},
         U=plant.input_box,
     )
     tree = problem.realize(0, 3)
-    out["draws.realize.x0s"] = tree["x_start"]
+    out["draws.realize.x0s"] = tree["x0"]
     out["draws.realize.m"] = tree["plant"]["m"]
     for backend in ("numpy", "jax"):
         pe = problem.compile(pd_controller(), dt=DT, backend=backend)
@@ -344,7 +344,7 @@ def rl_entries(out):
         plant,
         cost=SwingUpCost(),
         horizon=np.inf,
-        x_start=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
+        x0=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -378,7 +378,7 @@ def gym_problem_entries(out):
         plant,
         cost=QuadraticCost.from_system(plant),
         horizon=1.0,
-        x_start=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         U=plant.input_box,
     )
     env = Sys2Gym.from_problem(problem, dt=DT)

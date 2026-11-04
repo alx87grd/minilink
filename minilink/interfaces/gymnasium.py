@@ -56,9 +56,9 @@ class Sys2Gym(gym.Env):
         Time step of one env step (zero-order hold on the action).
     tf : float
         Maximum duration of an episode (truncation).
-    t_start : float
+    t0 : float
         Initial time (only relevant if the system is time dependent).
-    x_start : Distribution, optional
+    x0 : Distribution, optional
         The law of the initial state on :meth:`reset`, drawn with the
         environment's ``np_random`` (``Uniform(lower, upper)``,
         ``Gaussian(mean, std)``, any :class:`~minilink.core.distributions.Distribution`);
@@ -86,7 +86,7 @@ class Sys2Gym(gym.Env):
         Clip the states to the state bounds after integration (default
         ``False``; some classic gym envs do this, but it is a very artificial
         behaviour — use with caution).
-    x_start : Distribution or None
+    x0 : Distribution or None
         The start's law, as given (it may be replaced between episodes).
     """
 
@@ -98,9 +98,9 @@ class Sys2Gym(gym.Env):
         cost,
         dt=0.05,
         tf=10.0,
-        t_start=0.0,
+        t0=0.0,
         render_mode=None,
-        x_start=None,
+        x0=None,
         solver="rk4",
         substeps=1,
         backend=None,
@@ -108,7 +108,7 @@ class Sys2Gym(gym.Env):
         self.sys = sys
         self.cost = cost
         self.dt = dt
-        self.t_start = t_start
+        self.t0 = t0
         self.tf = tf  # for truncation of episodes
 
         # The step model of one env step, compiled once for the whole run
@@ -133,12 +133,12 @@ class Sys2Gym(gym.Env):
         self._render_backend = None
 
         # The start's law (None: sys.x0 every episode)
-        self.x_start = x_start
+        self.x0 = x0
 
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
         self.u = sys.get_u_from_input_ports()
-        self.t = t_start
+        self.t = t0
 
         if self.render_mode == "human":
             self._init_render()
@@ -155,12 +155,12 @@ class Sys2Gym(gym.Env):
         cost of a failure) and leaving the plant's state box, the training
         zone, is a *truncation*.
         Parameter laws and disturbance sources are not applied by this view.
-        A problem with a point start starts every episode at its ``x_start``.
+        A problem with a point start starts every episode at its ``x0``.
         """
         finite = problem.horizon_kind() == "finite"
         tf = float(problem.horizon) if finite else float(episode_length or 10.0)
 
-        kwargs.setdefault("t_start", float(problem.t_start))
+        kwargs.setdefault("t0", float(problem.t0))
         env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
@@ -171,13 +171,13 @@ class Sys2Gym(gym.Env):
         super().reset(seed=seed)
 
         # x(0) ~ the start's law, drawn with the environment's generator, else sys.x0
-        if self.x_start is None:
+        if self.x0 is None:
             self.x = np.asarray(self.sys.x0, dtype=float).copy()
         else:
-            self.x = np.asarray(self.x_start.sample(self.np_random), dtype=float)
+            self.x = np.asarray(self.x0.sample(self.np_random), dtype=float)
 
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t_start
+        self.t = self.t0
 
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
@@ -217,7 +217,7 @@ class Sys2Gym(gym.Env):
         # Truncation of episodes at the horizon tf (within half a step) or out of
         # the state bounds
         truncated = bool(
-            (t_new >= self.t_start + self.tf - 0.5 * dt)
+            (t_new >= self.t0 + self.tf - 0.5 * dt)
             or np.any(x_new < self.x_lb)
             or np.any(x_new > self.x_ub)
         )
@@ -349,7 +349,7 @@ class ProblemEnv(Sys2Gym):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
         self.u = self.sys.get_u_from_input_ports()
-        self.t = self.t_start
+        self.t = self.t0
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
         )
@@ -363,7 +363,7 @@ class ProblemEnv(Sys2Gym):
         # A failure is charged its cost; the end of a finite horizon its h, a
         # failure on the last step both, as the evaluation scores the run
         failed = not problem.X.contains(x, t, None)
-        ended = self.finite_horizon and t >= self.t_start + self.tf - 0.5 * self.dt
+        ended = self.finite_horizon and t >= self.t0 + self.tf - 0.5 * self.dt
         if failed:
             r -= float(self.failure_cost)
         if ended:

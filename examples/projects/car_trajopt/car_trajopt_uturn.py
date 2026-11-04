@@ -24,7 +24,7 @@ sys.inputs["w_rear"].upper_bound[0] = W_REAR_MAX
 sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
 sys.inputs["delta"].upper_bound[0] = DELTA_MAX
 
-x_start = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
+x0 = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
 x_ref = np.array([-0.0, Y_GOAL, np.pi, U_TARGET, 0.0, 0.0])
 
 
@@ -46,7 +46,7 @@ cost = QuadraticCost.from_system(
 problem = PlanningProblem(
     sys=sys,
     horizon=TF,
-    x_start=x_start,
+    x0=x0,
     cost=cost,
     U=sys.input_box,
 )

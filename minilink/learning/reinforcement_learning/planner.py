@@ -387,7 +387,7 @@ class ReinforcementLearningPlanner(Planner):
 
     def nominal_trajectory(self, tf=None) -> Trajectory:
         """The learned law from the problem's start, with nominal parameters and disturbances."""
-        return self.rollout_law(self.problem.x_start, tf)
+        return self.rollout_law(self.problem.x0, tf)
 
     # Plots
 
@@ -697,9 +697,9 @@ class ReinforcementLearningPlanner(Planner):
         # The episode's sources: their seeds drawn only with a key, the plant nominal
         sources = None if key is None else env.source_seeds(key)
 
-        # The N periods from x0 at t_start, one jitted scan per (N, sources drawn)
+        # The N periods from x0 at t0, one jitted scan per (N, sources drawn)
         x0 = jnp.asarray(x0, dtype=float)
-        t_start = env.t_start
+        t0 = env.t0
         form = (n_steps, sources is None)
         if form not in self.rollout_forms:
 
@@ -711,7 +711,7 @@ class ReinforcementLearningPlanner(Planner):
                     x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
                     return (x_next, t_next), (x, u)
 
-                return jax.lax.scan(body, (x0, t_start), None, length=n_steps)
+                return jax.lax.scan(body, (x0, t0), None, length=n_steps)
 
             self.rollout_forms[form] = jax.jit(rollout)
         (x_end, _), (xs, us) = self.rollout_forms[form](theta, x0, sources)
@@ -719,7 +719,7 @@ class ReinforcementLearningPlanner(Planner):
         # N + 1 samples: the final state appended, the last input held at it
         xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
         us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
-        t = t_start + env.dt * np.arange(n_steps + 1)
+        t = t0 + env.dt * np.arange(n_steps + 1)
 
         return Trajectory(t=t, x=xs.T, u=us.T)
 

@@ -226,7 +226,7 @@ class TabularLearningPlanner(Planner):
             progress = episode / max(episodes - 1, 1)
             params = env.sample_params(rng)
             s = self.node(self.start())
-            t = env.t_start
+            t = env.t0
             x = grid.states[s]
             a = explore.choose(Q[s], N[s], rng, progress)
             visited = []

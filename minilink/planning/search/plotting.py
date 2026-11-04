@@ -353,7 +353,7 @@ def mark_endpoints(ax, planner, x_axis, y_axis):
     problem = planner.problem
 
     # The start
-    x0 = np.asarray(problem.x_start, dtype=float)
+    x0 = np.asarray(problem.x0, dtype=float)
     ax.plot([x0[x_axis]], [x0[y_axis]], "ks", zorder=4, label="start")
 
     # The goal, and the circle of the goal region around it

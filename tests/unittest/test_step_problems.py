@@ -14,16 +14,14 @@ def swing_problem(**fields):
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
     fields.setdefault("horizon", 2.0)
-    return PlanningProblem(
-        plant, x_start=[0.3, 0.0], cost=cost, U=plant.input_box, **fields
-    )
+    return PlanningProblem(plant, x0=[0.3, 0.0], cost=cost, U=plant.input_box, **fields)
 
 
 @pytest.mark.parametrize(("solver", "substeps"), [("euler", 1), ("rk4", 1), ("rk4", 3)])
 def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
     solver, substeps
 ):
-    problem = swing_problem(discount_rate=0.4, t_start=1.5)
+    problem = swing_problem(discount_rate=0.4, t0=1.5)
     face = problem.compile(dt=0.05, solver=solver, substeps=substeps)
     plant = problem.sys
     rng = np.random.default_rng(3)
@@ -114,25 +112,25 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
             return np.clip(x + u, 0.0, 5.0)
 
     problem = StepPlanningProblem(
-        Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x_start=[1.0], t_start=2
+        Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x0=[1.0], t0=2
     )
     face = problem.compile()
     xs, us, cs, J = face.run(lambda x, t: np.ones(1))
     np.testing.assert_array_equal(xs[:, 0], [1, 2, 3, 4, 5, 5, 5])
     assert J == pytest.approx(1 + 0.9 + 0.81 + 0.0 + 0.9**4 + 0.9**5)
     assert face.time_of(3) == 5  # the tick offset, an integer
-    assert set(problem.params) >= {"plant", "cost", "x_start", "t_start", "gamma"}
+    assert set(problem.params) >= {"plant", "cost", "x0", "t0", "gamma"}
 
     with pytest.raises(TypeError, match="SampledCost"):
         StepPlanningProblem(
             Walk(), n_steps=3, cost=QuadraticCost.from_system(Pendulum())
         )
     with pytest.raises(ValueError, match="tick offset"):
-        StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]), t_start=0.5)
+        StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]), t0=0.5)
 
 
 def test_the_state_only_step_is_the_transitions_state_on_both_faces():
-    problem = swing_problem(t_start=2.0)
+    problem = swing_problem(t0=2.0)
     face = problem.compile(dt=0.05, solver="rk4")
     sampled = problem.discretize(0.05, solver="rk4").compile()
     x, u = np.array([0.4, -0.3]), np.array([1.0])
@@ -143,7 +141,7 @@ def test_the_state_only_step_is_the_transitions_state_on_both_faces():
         np.testing.assert_array_equal(sampled.step_at(x, u, t), face.step_at(x, u, t))
 
     # A problem without a cost still steps: a grid needs only its successors
-    free = PlanningProblem(problem.sys, x_start=[0.0, 0.0])
+    free = PlanningProblem(problem.sys, x0=[0.0, 0.0])
     assert free.compile(dt=0.1).step_at(x, u, 0.0).shape == (2,)
 
 
@@ -166,7 +164,7 @@ def grid_world():
     return StepPlanningProblem(
         walker,
         cost=Moves([5.0, 3.0]),
-        x_start=[0.0, 0.0],
+        x0=[0.0, 0.0],
         X=walker.state.box,
         U=walker.input_box,
         penalize_failure=True,
@@ -202,9 +200,9 @@ def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
     problem = PlanningProblem(
         plant,
         cost=TimedTerminal.from_system(plant),
-        x_start=[0.3, 0.0],
+        x0=[0.3, 0.0],
         horizon=2.0,
-        t_start=0.5,
+        t0=0.5,
     )
     face = problem.compile(dt=0.05)
     sampled = problem.discretize(0.05).compile()
@@ -241,7 +239,7 @@ def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize()
     noisy = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        x_start=[0.3, 0.0],
+        x0=[0.3, 0.0],
         horizon=1.0,
         disturbances={"d": WhiteNoise(1, psd=0.5, sample_period=0.01, seed=1)},
     )
@@ -277,7 +275,7 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant),
-        x_start=[0.3, 0.0],
+        x0=[0.3, 0.0],
         horizon=1.0,
         params={"plant": {"m": Uniform(1.5, 2.5)}},
     )

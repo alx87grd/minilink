@@ -41,7 +41,7 @@ planner = TrajectoryOptimizationPlanner(
     PlanningProblem(
         sys=sys,
         horizon=1.0,
-        x_start=x0,
+        x0=x0,
         Xf=SingletonSet(x_goal),
         cost=QuadraticCost.from_system(
             sys,

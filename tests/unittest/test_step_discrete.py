@@ -612,10 +612,10 @@ def test_a_system_on_a_clock_rolls_out_from_its_origin():
         for k in range(10):
             x = sampled.step(x, us[k], k)
         np.testing.assert_allclose(xs[-1], x, rtol=1e-13)
-        shifted = np.asarray(ev.rollout(x0, us, t_start=1.0))
+        shifted = np.asarray(ev.rollout(x0, us, t0=1.0))
         x = x0
         for k in range(10):
             x = sampled.update(x, us[k], 1.0 + k * 0.05)
         np.testing.assert_allclose(shifted[-1], x, rtol=1e-13)
-    traj = sampled.compute_rollout(4, t_start=2.0)
+    traj = sampled.compute_rollout(4, t0=2.0)
     np.testing.assert_allclose(traj.t, 2.0 + 0.05 * np.arange(5))

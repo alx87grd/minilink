@@ -44,7 +44,7 @@ class Planner(ABC):
     """
 
     #: Planners that read the uncertainty of a stochastic problem set this;
-    #: the others read its start set ``X0`` and its ``x_start``, and warn.
+    #: the others read its start set ``X0`` and its ``x0``, and warn.
     accepts_stochastic = False
 
     #: Planners whose feedback law runs on the grid of its ``dt`` (value
@@ -64,7 +64,7 @@ class Planner(ABC):
             warnings.warn(
                 f"{type(self).__name__} is a deterministic planner: it reads the "
                 "start set X0 of this stochastic problem (the support of its start "
-                "law) and its x_start, and plans on its parameters' means with its "
+                "law) and its x0, and plans on its parameters' means with its "
                 "random sources at their mean. Pass problem.nominal() to plan from "
                 "the mean start alone.",
                 stacklevel=2,

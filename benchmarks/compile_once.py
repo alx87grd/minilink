@@ -89,14 +89,14 @@ def pipelines():
     sampled_ev = sampled.compile(backend="jax")
 
     problem = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
+        pend, cost=cost, x0=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
     )
     pe = problem.compile(StateFeedback(np.array([[2.0, 0.5]])), dt=0.01, backend="jax")
 
     swing = PlanningProblem(
         cart,
         cost=QuadraticCost.from_system(cart),
-        x_start=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
+        x0=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
         horizon=2.0,
     )
     collocation = TrajectoryOptimizationPlanner(
@@ -108,7 +108,7 @@ def pipelines():
         options={"maxiter": 50},
     )
     horizon = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
+        pend, cost=cost, x0=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
     )
     native = TrajectoryOptimizationPlanner(
         horizon,
@@ -116,15 +116,13 @@ def pipelines():
         transcription="single_shooting",
         backend="jax",
         method="adam",
-        iterations=15,
+        n_iterations=15,
         options={"learning_rate": 0.05},
     )
     mpc_loop = (ModelPredictiveController(native, delay=True) % 0.05) @ pend
     mpc_ev = mpc_loop.compile(backend="jax", substeps=1)
     dp = DynamicProgrammingPlanner(
-        PlanningProblem(
-            pend, cost=cost, x_start=np.array([0.5, 0.0]), U=pend.input_box
-        ),
+        PlanningProblem(pend, cost=cost, x0=np.array([0.5, 0.0]), U=pend.input_box),
         x_grid=(41, 41),
         u_grid=(5,),
         dt=0.05,
@@ -162,14 +160,14 @@ def forms():
     pend = Pendulum()
     cost = QuadraticCost.from_system(pend, R=0.1 * np.eye(1))
     problem = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
+        pend, cost=cost, x0=np.array([0.5, 0.0]), horizon=5.0, U=pend.input_box
     )
     law = StateFeedback(np.array([[2.0, 0.5]]))
     pe = problem.compile(law, dt=0.01, backend="jax")
     tree = pe.params
 
     horizon = PlanningProblem(
-        pend, cost=cost, x_start=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
+        pend, cost=cost, x0=np.array([0.5, 0.0]), horizon=1.0, U=pend.input_box
     )
     pv = TrajectoryOptimizationPlanner(
         horizon,
@@ -177,10 +175,10 @@ def forms():
         transcription="single_shooting",
         backend="jax",
         method="adam",
-        iterations=200,
+        n_iterations=200,
         options={"learning_rate": 0.05},
     ).compile()
-    start = {"x_start": horizon.x_start, "t_start": 0.0}
+    start = {"x0": horizon.x0, "t0": 0.0}
     z0 = pv.initial()
     parametric = jax.jit(lambda P, z: pv.solve(P, z0=z)[0])
     frozen = jax.jit(lambda z: pv.solve(start, z0=z)[0])

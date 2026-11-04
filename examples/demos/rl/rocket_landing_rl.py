@@ -51,7 +51,7 @@ problem = PlanningProblem(
     plant,
     cost=LandingCost(),
     horizon=TF,
-    x_start=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
+    x0=Gaussian([0.0, 20.0, 0.0, 0.0, 0.0, 0.0], [10.0, 8.0, 0.3, 2.0, 2.0, 0.3]),
     penalize_failure=True,
     failure_cost=100.0,
     X=plant.state.box,

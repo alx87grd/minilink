@@ -40,7 +40,7 @@ class SampledSystem(StepSystem):
     on any system. The tick face serves the step algebra:
     ``step(x, u, k) = update(x, u, k h)`` and ``h(x, u, k)`` likewise, the clock's
     origin at zero. A sampled diagram hands the seconds face its own time
-    ``t_k = t_start + k Δ``.
+    ``t_k = t0 + k Δ``.
 
     A view of ``source``, never a container: its ``params``, ports and labels
     are the source's own, and ``sample_period`` is structural. A continuous

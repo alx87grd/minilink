@@ -190,7 +190,7 @@ X = (
     & track.corridor_field(body).as_set(lower=0.0)
 )
 problem = PlanningProblem(
-    sys=sys_mpc, x_start=x0, X=X, cost=cost, horizon=MPC_HORIZON, U=sys_mpc.input_box
+    sys=sys_mpc, x0=x0, X=X, cost=cost, horizon=MPC_HORIZON, U=sys_mpc.input_box
 )
 planner = TrajectoryOptimizationPlanner(
     problem,

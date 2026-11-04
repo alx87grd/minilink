@@ -129,14 +129,14 @@ def _simulate_once(
 ):
     sim = Simulator(
         system,
-        t_start=t0,
+        t0=t0,
         tf=tf,
         dt=dt,
         solver=solver,
         backend=backend,
         verbose=False,
     )
-    t_start = time.perf_counter()
+    wall_start = time.perf_counter()
     traj = sim.solve()
-    _ = time.perf_counter() - t_start
+    _ = time.perf_counter() - wall_start
     return traj

@@ -57,7 +57,7 @@ sys.state.upper_bound[4] = DELTA_MAX
 sys.inputs["u"].lower_bound = np.array([-SPEED_DOT_MAX, -STEERING_DOT_MAX])
 sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
 
-x_start = np.array([0.0, Y_START, 0.0, U_0, 0.0])
+x0 = np.array([0.0, Y_START, 0.0, U_0, 0.0])
 x_ref = np.array([U_TARGET * TF, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])
 u_bar = np.array([0.0, 0.0])
 
@@ -81,7 +81,7 @@ obstacle_cost = scene.clearance_field(mount(point_probe(), on=sys)).as_cost(
 cost = tracking_cost + obstacle_cost
 
 problem = PlanningProblem(
-    sys=sys, x_start=x_start, cost=cost, horizon=TF, X=sys.state.box, U=sys.input_box
+    sys=sys, x0=x0, cost=cost, horizon=TF, X=sys.state.box, U=sys.input_box
 )
 planner = TrajectoryOptimizationPlanner(
     problem,
