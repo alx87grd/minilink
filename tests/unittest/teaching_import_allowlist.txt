@@ -23,10 +23,8 @@ examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.spatial.collisio
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.spatial.scene
 examples/demos/rrt/rrt_holonomic_obstacles.py minilink.planning.spatial.workspace_fields
 examples/demos/rrt/rrt_pendulum_swingup.py minilink.planning.search.extenders
-examples/demos/rrt/rrt_pendulum_swingup.py minilink.planning.search.rrt
 examples/demos/rrt/rrt_star_live.py minilink.core.geometry
 examples/demos/rrt/rrt_star_live.py minilink.planning.search.extenders
-examples/demos/rrt/rrt_star_live.py minilink.planning.search.rrt_star
 examples/demos/rrt/rrt_star_live.py minilink.planning.search.steering
 examples/demos/rrt/rrt_star_live.py minilink.planning.spatial.collision
 examples/demos/rrt/rrt_star_live.py minilink.planning.spatial.scene

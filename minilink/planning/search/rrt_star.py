@@ -102,7 +102,8 @@ class RRTStarPlanner(RRTPlanner):
             record_history=record_history,
             history_stride=history_stride,
         )
-        super().__init__(problem, extender, metric=metric, options=star_options)
+        super().__init__(problem, extender, metric=metric)
+        self.settings = star_options
 
         # The search's convergence, refreshed by every solve
         self.converged: bool = False

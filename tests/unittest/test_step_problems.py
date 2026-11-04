@@ -221,7 +221,7 @@ def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
     kwargs = dict(x_grid=(21, 21), u_grid=(5,), solver="rk4")
     vi = DynamicProgrammingPlanner(problem, dt=0.1, **kwargs)
     vd = DynamicProgrammingPlanner(problem.discretize(0.1, solver="rk4"), **kwargs)
-    assert vi.settings.out_of_bound_cost == vd.options.out_of_bound_cost
+    assert vi.settings.out_of_bound_cost == vd.settings.out_of_bound_cost
     vi.solve()
     vd.solve()
     np.testing.assert_array_equal(vi.result.J, vd.result.J)

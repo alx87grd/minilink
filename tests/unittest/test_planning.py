@@ -339,11 +339,11 @@ class TestPlanningArchitecture(unittest.TestCase):
             backend="numpy",
         )
         self.assertEqual(to.transcription.options.n_steps, 5)
-        self.assertEqual(to.options.backend, "numpy")
+        self.assertEqual(to.settings.backend, "numpy")
         guess = default_initial_trajectory(
             problem, to.transcription.initial_guess_time_grid(problem)
         )
-        program = to.transcription.transcribe(problem, backend=to.options.backend)
+        program = to.transcription.transcribe(problem, backend=to.settings.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
         self.assertEqual(program.n_z, 15)

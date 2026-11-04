@@ -393,10 +393,10 @@ class TestBackends(unittest.TestCase):
             with self.subTest(backend=backend):
                 reused = planner_of(backend)
                 reused.solve_steps(5)
-                setattr(reused.options, name, value)
+                setattr(reused.settings, name, value)
                 reused.solve_steps(5)
                 fresh = planner_of(backend)
-                setattr(fresh.options, name, value)
+                setattr(fresh.settings, name, value)
                 fresh.solve_steps(5)
                 np.testing.assert_allclose(
                     reused.result.J, fresh.result.J, rtol=0, atol=1e-12
@@ -847,7 +847,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         untimed = DynamicProgrammingPlanner(
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
-        self.assertEqual(untimed.options.final_time, 0.0)
+        self.assertEqual(untimed.settings.final_time, 0.0)
 
     def test_grid_and_shapes_are_exclusive(self):
         from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
@@ -937,7 +937,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
 
         # A scalar failure_cost (an int like a float) keeps the scalar table
         scalar = self.planner(500)
-        self.assertEqual(scalar.options.out_of_bound_cost, 500.0)
+        self.assertEqual(scalar.settings.out_of_bound_cost, 500.0)
         G_scalar = scalar.running_cost_table(0.0)
         np.testing.assert_array_equal(G_scalar[~inadmissible], G[~inadmissible])
         self.assertTrue(np.all(G_scalar[inadmissible] == 500.0))
