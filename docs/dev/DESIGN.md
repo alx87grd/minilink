@@ -1365,14 +1365,14 @@ the cost-to-go table `Q(x, u)` on a `StateSpaceGrid` from transitions alone,
 NumPy only: the state is rounded to its nearest node, the action taken among
 the grid's input levels, and every algorithm is a moving average toward its
 own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
-`c + alpha min Q(x', .)`, off-policy), `SARSA` (the action taken next,
+`c + gamma min Q(x', .)`, off-policy), `SARSA` (the action taken next,
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
-`J = min Q` as `cost_to_go`); `planner.result` is the table as a
-`DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), so
-`plot_cost_to_go`, `plot_control_law` and `get_controller` (a `LookupPolicy`)
-are those of value iteration, and the same grid solved by
+`J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.result` is the
+table as it stands, a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), and
+`plot_cost_to_go`, `plot_control_law`, `value_at` and `get_controller` (a `LookupPolicy`)
+are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
@@ -1524,8 +1524,8 @@ the discount the face's `γ` and the failure cost its rule; a `StepPlanningProbl
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
-interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, stays on
-`planner.result`); out-of-domain
+interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
+`solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable
