@@ -85,6 +85,8 @@ class DynamicProgrammingPlanner(Planner):
         sweep progress (the grid's own progress follows
         :attr:`StateSpaceGrid.verbose`).
 
+    Notes
+    -----
     The sweeps' terminal time, :attr:`final_time`, is the problem's horizon
     end (``t0 + horizon``, or a step problem's last tick); ``0`` without one.
     """
