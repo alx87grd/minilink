@@ -1,6 +1,6 @@
 # One parameters model for every object
 
-**Status:** proposal for the maintainer's ruling, with an independent review to come.
+**Status:** proposal for the maintainer's ruling; the independent review (2026-11-04, §8) amended it: option B stands, with the PM-0 step and the decisions of §8 first.
 **Release:** v0.4, the clean surface (ROADMAP §5.4). **Owner of the ruling:** the maintainer
 (core architecture, AGENTS "Ask first"). Its steps are prefixed `PM-`.
 
@@ -60,7 +60,7 @@ set or a law, fails on a diagram with a partial tree, and fails on a Gaussian wi
 The frozen values predate the per-call `params=` contract; `with_params` exists because their
 fields cannot be assigned.
 
-## 3. The fast frozen path under `jit`: unaffected
+## 3. The fast frozen path under `jit` (as first written; §8 corrects it)
 
 The fast path is the compiled evaluator's **frozen form**: a compiled method called with
 `params=None` uses the values taken at compile as constants of the trace, the fastest run of one
@@ -167,3 +167,81 @@ twenty classes lose `@dataclass(frozen=True)`.
   per call (`Optimizer(program).solve(params=)`), and its callables are compiled once.
 - **Pickling and `deepcopy`**: the live tree is a plain `dict`, never a `MappingProxyType` (the
   known deepcopy defect, KNOWN_ISSUES).
+
+## 8. The independent review (2026-11-04) and the amended plan
+
+An independent reviewer checked §2 and §3 against the code; the two findings marked
+(reproduced) were run again by the author.
+
+**What §2 got wrong: the values are not consistently frozen today.**
+- The distributions are plain mutable classes (`g.mean = ...` works); `Particles.mean` is stored
+  at construction and goes stale when `points` changes.
+- 17 classes (the fields, `FieldSet`, `EllipsoidSet`, the shapes, `Scene`, the spatial fields)
+  cache `params` with a `cached_property`, so an edit has two homes: after
+  `q.params["center"] = [1, 0]`, `q.value` reads the new centre and `q.center` still says
+  `[0, 0]` (reproduced).
+- A "frozen" `BoxSet`'s arrays can be edited in place: `X.params["upper"][0] = 5` changes
+  `X.upper`. `CallableSet.params` is a mutable dict.
+- Value equality works for one-element arrays and raises otherwise; nothing compares or hashes
+  sets (confirmed).
+
+**What §3 got wrong: three caches are keyed on identity, not values.**
+- **The offline trajectory-optimization program** (`trajectory_optimization/planner.py:475`)
+  keys on the parts' identity plus the program's parameter tree, and a box lowered to the decision
+  bounds is left out of that tree (`direct_collocation.py:300-319`). After an in-place box edit the
+  old program is reused with the old bounds (reproduced: the program object is reused). Today
+  `problem.params = {"X": ...}` replaces the set, so its identity changes and the program is rebuilt.
+- **The problem evaluator's failure-bound cache** (`planning/evaluator.py:416`) is keyed on the
+  parts' identity and the cost's numbers; the bound samples `g` over the boxes.
+- **RRT** stores `X.bounding_box()`, which is the box itself (`rrt.py:121`): an edit is
+  half-seen. MPPI keeps array views (`path_integral.py:579`).
+- Confirmed: the jitted problem run takes the sets through the tree; the system snapshots are
+  deep copies; no slowdown found. A user closure `jax.jit(lambda z: X.margin(z))` freezes `X`'s
+  numbers, as a closure over a plant does today.
+
+**Other points.**
+- `PlanningProblem.replace` shares the parts it does not change (`problems.py:474`), so under B
+  an edit of a set on the copy reaches the original, as plant and cost edits already do;
+  tutorial 05 says the copy does not mutate the original.
+- `NoiseSource` keeps a copy of its law's params (`blocks/sources.py:241`): one home only if a
+  setter merges into the existing dict, never rebinds it.
+- In-place item assignment skips the class's checks and conversions (lower ≤ upper, a symmetric
+  `P`, float arrays): `X.params["upper"] = [3, 3]` then fails on JAX (a list leaf).
+- A deep-copy `with_params` would detach a `ClearanceField`'s collision body from the planner's
+  plant; today `replace` shares it.
+- Three partial-tree semantics must be written down: the setter takes a partial tree; a call's
+  `params=` is a complete tree (`BoxSet.margin(params={"upper": ...})` raises a KeyError); a
+  planner's `solve(params=)` merges a partial tree.
+- Derived quantities (`Particles.mean`, `Uniform.mean`, `cov`, `dim`) must be computed, never
+  stored; `EllipsoidSet`'s tree a view of its field's; a Gaussian switching `std` → `cov` changes
+  its keys; `FieldSet`'s `lower=None` is structure.
+- User `@dataclass(frozen=True)` subclasses of `Field` exist in the tests: the base stays a
+  plain class.
+- Counts: 24 frozen dataclasses, 17 cached `params`, 25 `with_params` definitions; 10 example
+  and doc lines mention `with_params`.
+
+**The amended plan.**
+- **PM-0 (first, needed under any option; it fixes defects that exist today):** key the offline
+  program, the failure-bound cache and the evaluator's run on a digest of every part's numbers,
+  the lowered boxes included, never on identity alone; remove the 17 cached `params`; RRT and
+  MPPI copy the box they keep. A test per cache: edit after the build, solve again, the edit is
+  seen.
+- **The live tree is checked on write:** a dict subclass whose `__setitem__` coerces to float
+  arrays, keeps the shapes, and re-runs the class's own checks; setters merge into the existing
+  dict, never rebind it.
+- **`with_params` copies the tree, not the structure:** a shallow copy of the object with a
+  deep copy of its numbers, so held bodies and plants stay shared.
+- **PM-6 (the diagram's partial setter) moves before PM-2**, so the composites agree throughout.
+- **The baseline records more than numbers:** rebuild and trace counts, each tree's key order
+  and the packing of `z` and `wrt`, the leaf dtypes; the intended stale-to-fresh changes get their
+  own tests.
+- `test_contract.py` gains, for every object: edit, call with `params=None`, a held tool sees the
+  edit.
+
+**Decisions for the maintainer.**
+1. **`problem.params = {"X": ...}`**: edit the set in place (needs PM-0), or keep replacing it.
+2. **`PlanningProblem.replace`**: copy its sets (a derived problem never touches the original),
+   or keep sharing and fix tutorial 05's wording.
+3. **The three partial-tree semantics** above, written into DESIGN §4 and RULES 2.3, the diagram
+   bullet ("names every block") amended.
+
