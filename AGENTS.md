@@ -183,6 +183,21 @@ Optional extras (not required every push): "Headless pygame"; the graphics visua
 checklist and "Demo-check change" when graphical or user-facing demos changed; "Docs
 build" only when editing `docs/` or docstrings (separate Docs workflow; warnings fail it).
 
+**Long runs at the right step.** The full `pytest`, the notebook sweep and the regression
+gates each take tens of minutes on a cloud machine; spend them once per handoff, not once
+per commit:
+
+- **A series of commits on one branch** (a sweep, a multi-step refactor): after each commit,
+  the narrow rows only (the touched modules' test files, `test_vocabulary.py`, the touched
+  notebooks and demos); the long rows once, on the finished branch, before the push that
+  hands it off or the merge.
+- **Run the suite in parallel:** `pip install pytest-xdist` in the session (not a project
+  dependency), then `pytest -n auto`.
+- **A demo no CI job runs** runs only when the change touches it, under a `timeout`; a
+  timeout counts as a failure only after the same demo, on the base branch, finishes in time.
+- **Never start a long run on a half-edited tree**, and never edit modules while one imports
+  them: finish the edit, then run.
+
 **After push:** only check GitHub CI when the user asked to push, open a PR, or debug a reported failure — not as a routine step on every edit.
 
 **Handoff:** re-read the diff for scope creep; user manual edits intact (see Workflow); clean `git status`; short summary of changes and verification.
