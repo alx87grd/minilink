@@ -124,9 +124,9 @@ class PolicyEvaluator:
 
         return float(J[0])
 
-    def plot_cost2go(self, **kwargs):
+    def plot_cost_to_go(self, **kwargs):
         """Draw the policy's cost-to-go field; options as in :meth:`StateSpaceGrid.plot_value`."""
-        require_solved(self.last_J, "plot_cost2go")
+        require_solved(self.last_J, "plot_cost_to_go")
 
         kwargs.setdefault("vmax", cost_scale_limit(self.options.out_of_bound_cost))
 

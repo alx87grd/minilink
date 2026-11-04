@@ -131,16 +131,12 @@ class RRTPlanner(Planner):
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
         """
-        Offline traj-family entry.
+        Grow the tree until the goal region is reached or the budget is spent.
 
         The solution's policy is the path's input held by a source block,
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
         """
-        return self.solve_trajectory(evaluate=evaluate, n_trials=n_trials)
-
-    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Grow the tree until the goal region is reached or the budget is spent."""
         options = self.options
         metric = self.metric
         self.require_nearest_backend()

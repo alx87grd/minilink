@@ -38,8 +38,8 @@ class TabularLearningPlanner(Planner):
     Q-learning with the Bellman target ``q = c + gamma min_u' Q(x', u')``,
     SARSA with the action actually taken next, Monte Carlo control with the
     cost observed to the end of the episode. The result is the cost-to-go
-    field and greedy policy that value iteration returns, so ``plot_cost2go``,
-    ``plot_policy`` and ``get_controller`` (a lookup-table block) read the
+    field and greedy policy that value iteration returns, so ``plot_cost_to_go``,
+    ``plot_control_law`` and ``get_controller`` (a lookup-table block) read the
     same way, and the same grid solved by
     :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
     is the exact answer the learner approaches.
@@ -206,12 +206,6 @@ class TabularLearningPlanner(Planner):
 
         return self.store_solution(solution)
 
-    def solve_policy(
-        self, episodes=1000, *, evaluate=False, n_trials=50
-    ) -> PlanningSolution:
-        """The planner-family name of :meth:`solve`, answered by every policy planner."""
-        return self.solve(episodes, evaluate=evaluate, n_trials=n_trials)
-
     # Learning
 
     def learn(self, episodes):
@@ -323,12 +317,14 @@ class TabularLearningPlanner(Planner):
             tf=self.env.tf if tf is None else tf,
         )
 
-    def plot_cost2go(self, **kwargs):
+    def plot_cost_to_go(self, **kwargs):
+        """The learned cost-to-go table on the grid itself, as value iteration draws it."""
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
-        return plotting.plot_cost2go(self.result, **kwargs)
+        return plotting.plot_cost_to_go(self.result, **kwargs)
 
-    def plot_policy(self, **kwargs):
-        return plotting.plot_policy(self.result, **kwargs)
+    def plot_control_law(self, **kwargs):
+        """The greedy policy table on the grid itself, as value iteration draws it."""
+        return plotting.plot_control_law(self.result, **kwargs)
 
     def plot_learning_curve(self, ax=None, window=20):
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""

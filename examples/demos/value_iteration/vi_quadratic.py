@@ -34,7 +34,7 @@ planner = DynamicProgrammingPlanner(
     verbose=True,
 )
 planner.solve()
-planner.plot_cost2go(jmax=INF, show_3d=True)
+planner.plot_cost_to_go(jmax=INF, show_3d=True)
 
 controller = planner.get_controller()
 controller.plot_control_law()  # interpolated law the closed loop actually feels
@@ -45,4 +45,4 @@ diagram.plot_diagram()
 trajectory = diagram.compute_trajectory(tf=20.0)
 diagram.plot_trajectory(trajectory)
 
-planner.plot_policy(trajectory=trajectory)
+planner.plot_control_law(trajectory=trajectory)

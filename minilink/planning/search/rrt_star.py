@@ -112,11 +112,7 @@ class RRTStarPlanner(RRTPlanner):
         self.history: list[RRTStarSnapshot] = []
 
     def solve(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Offline traj-family entry (see :meth:`RRTPlanner.solve`)."""
-        return self.solve_trajectory(evaluate=evaluate, n_trials=n_trials)
-
-    def solve_trajectory(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Grow an RRT* until goal convergence, patience, or ``max_nodes``."""
+        """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s)."""
         options = self.options
         metric = self.metric
         self.require_nearest_backend()

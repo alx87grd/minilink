@@ -111,7 +111,7 @@ class ReinforcementLearningPlanner(Planner):
         Seed of the weights, exploration and starts.
     verbose : bool
         Print the environment's semantics and one line per learning iteration
-        (default ``True``). Pass ``False`` to silence training.
+        (default ``False``: training is silent unless asked).
 
     Attributes
     ----------
@@ -150,7 +150,7 @@ class ReinforcementLearningPlanner(Planner):
         training_zone=None,
         reward="running",
         seed=0,
-        verbose=True,
+        verbose=False,
         **algorithm_kwargs,
     ):
         super().__init__(problem)
@@ -282,14 +282,6 @@ class ReinforcementLearningPlanner(Planner):
         solution = self.solution(evaluate, n_trials)
 
         return self.store_solution(solution)
-
-    def solve_policy(
-        self, timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
-    ) -> PlanningSolution:
-        """The planner-family name of :meth:`solve`, answered by every policy planner."""
-        return self.solve(
-            timesteps, evaluate=evaluate, n_trials=n_trials, verbose=verbose
-        )
 
     # Training
 

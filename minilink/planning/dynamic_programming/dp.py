@@ -149,10 +149,6 @@ class DynamicProgrammingPlanner(Planner):
             result, fixed_horizon=True, evaluate=evaluate, n_trials=n_trials
         )
 
-    def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """The planner-family name of :meth:`solve`, answered by every policy planner."""
-        return self.solve(evaluate=evaluate, n_trials=n_trials)
-
     # Value iteration
 
     def value_iteration(
@@ -460,23 +456,25 @@ class DynamicProgrammingPlanner(Planner):
 
         return result
 
-    def plot_cost2go(self, **kwargs):
+    def plot_cost_to_go(self, **kwargs):
+        """The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...)."""
         self.require_solution()
         kwargs.setdefault(
             "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
         )
-        return plotting.plot_cost2go(self.result, **kwargs)
+        return plotting.plot_cost_to_go(self.result, **kwargs)
 
-    def plot_policy(self, **kwargs):
+    def plot_control_law(self, **kwargs):
+        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``axes``, ...)."""
         self.require_solution()
-        return plotting.plot_policy(self.result, **kwargs)
+        return plotting.plot_control_law(self.result, **kwargs)
 
-    def animate_cost2go(self, **kwargs):
+    def animate_cost_to_go(self, **kwargs):
         self.require_solution()
         kwargs.setdefault(
             "jmax", plotting.cost_scale_limit(self.options.out_of_bound_cost)
         )
-        return plotting.animate_cost2go(self.result, **kwargs)
+        return plotting.animate_cost_to_go(self.result, **kwargs)
 
     def animate_policy(self, **kwargs):
         self.require_solution()

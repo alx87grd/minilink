@@ -68,8 +68,8 @@ planner = DynamicProgrammingPlanner(
 solution = planner.solve_steps(N_STEPS)
 print(solution.record)
 
-# planner.plot_cost2go(jmax=INF, axes=(1, 3), anchor=UPRIGHT)
-# planner.plot_policy(axis=0, axes=(1, 3), anchor=UPRIGHT)
+# planner.plot_cost_to_go(jmax=INF, axes=(1, 3), anchor=UPRIGHT)
+# planner.plot_control_law(axis=0, axes=(1, 3), anchor=UPRIGHT)
 
 vi_ctl = planner.get_controller()
 vi_ctl.plot_control_law(x_axis=1, y_axis=3, u_axis=0)  # force vs (theta, dtheta)

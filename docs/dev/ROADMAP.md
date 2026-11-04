@@ -142,7 +142,7 @@ GRO501 (§4.2, v0.2) and GMC714 (§4.3, v0.3). A course is
 
 | Topic | Surface | Material | Gate |
 | --- | --- | --- | --- |
-| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost2go` / `plot_policy` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
+| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost_to_go` / `plot_control_law` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos/value_iteration/` | `final_time` reads `problem.tf`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr` (on arrays, a linear model or the plant), `plot_control_law` | `basics/02_analyze_and_control`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `shooting`), `QuadraticCost` | `basics/03_plan_and_sample`, `advanced/02_optimal_control`, `demos/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
 | Reinforcement Learning (tabular on the grid, neural in native JAX) | `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control; `EpsilonGreedy`, `UCB`), `PlanningProblem` with laws, `ReinforcementLearningPlanner` (REINFORCE / actor-critic / PPO / SAC), `NeuralPolicy`, `evaluate` | `advanced/04_reinforcement_learning.ipynb`, `pendulum_value_iteration_vs_lqr_vs_rl.ipynb`, `drone_ppo.ipynb`, `gymnasium_interface.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` (pendulum, cart-pole, drone, rocket) | pure-JAX training on compiled plant (pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode; those names (plus `Evaluation`, `Gaussian` / `Uniform`) are on the root prelude. Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |
@@ -432,8 +432,8 @@ public name; v1.0 (§5.6) freezes.
 **The trust contract:**
 - **V4** The policy for changing a public name after v1.0: open (QUESTIONS; a one-release
   `DeprecationWarning` shim was declined), no alias meanwhile; a snapshot test pins the
-  teaching-surface export list. The renames held back to v1.0
-  (`xbar` / `ubar`, `plot_cost2go`; `JaxMechanicalSystem` is deleted instead) are on its list. **[ask]**
+  teaching-surface export list. The pending renames land before the freeze (ruled
+  2026-11-03, the vocabulary of RULES 2.7); `JaxMechanicalSystem` is deleted instead. **[ask]**
 - **V5** `CHANGELOG.md` for users; every release from v0.9 carries its entry.
 - **V6** The Colab cell installs a pinned release (the install story itself landed:
   conda recommended, `pip install minilink` plus one `full` extra, no

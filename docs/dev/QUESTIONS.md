@@ -40,7 +40,7 @@ for one sitting in the merge-review triage. Nothing else is open here.
 - **Today:** `Planner.solve()` stores `self.last_solution` (`planning/planner.py`).
   `get_controller()` returns `last_solution.policy`, `plot_solution()` plots it, and RRT's
   `plot_tree()` draws its path. The planner's own internals are a separate state the plots
-  need: the RRT tree, the value-iteration tables (`plot_cost2go`, `plot_policy`), the RL
+  need: the RRT tree, the value-iteration tables (`plot_cost_to_go`, `plot_control_law`), the RL
   learning curve.
 - **Evidence (counted on `dev`):** `planner.get_controller()` in 22 example and 22 test lines,
   `solution.policy` in 18 and 33; planner-side plots (`planner.plot_*`) in 55 example lines,
@@ -50,7 +50,7 @@ for one sitting in the merge-review triage. Nothing else is open here.
   every solution one live law (fixed 2026-11-03 by copying the law into each solution). The
   compiled face (`planner.compile()`) and the MPC keep no last solution.
 - **What it buys:** the one-object student flow, `planner.solve()` then
-  `planner.plot_cost2go()` and `planner.get_controller()`, which the course notebooks use.
+  `planner.plot_cost_to_go()` and `planner.get_controller()`, which the course notebooks use.
 - **Options:**
   1. Keep it as it is.
   2. Keep it as a read-only convenience: every plot and the policy live on the solution, and

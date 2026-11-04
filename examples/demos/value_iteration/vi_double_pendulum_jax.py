@@ -95,12 +95,12 @@ print(f"  x_next table:     {t_xnext - t_mesh:5.2f} s  (planner init)")
 print(f"  G, J0, Bellman:   {t_done - t_xnext:5.2f} s  (each step timed above)")
 print(f"  total pipeline:   {t_done - t_plan:5.2f} s")
 
-planner.plot_cost2go(
+planner.plot_cost_to_go(
     jmax=INF,
     axes=[(0, 1), (0, 2), (1, 3)],
     anchor=GOAL,
 )
-planner.plot_policy(axis=[0, 1], axes=[(0, 1), (0, 1)], anchor=GOAL)
+planner.plot_control_law(axis=[0, 1], axes=[(0, 1), (0, 1)], anchor=GOAL)
 
 controller = planner.get_controller()
 diagram = DiagramSystem()

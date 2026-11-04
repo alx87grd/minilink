@@ -76,7 +76,7 @@ class TrajectoryOptimizationPlanner(Planner):
     constraints. This planner owns the domain workflow:
     ``problem -> transcription -> mathematical program -> optimizer -> trajectory``.
 
-    Offline :meth:`solve_trajectory` always rebuilds a fresh
+    Offline :meth:`solve` always rebuilds a fresh
     :class:`~minilink.optimization.mathematical_program.MathematicalProgram`.
     Online :meth:`solve_trajectory_from` rebuilds with the measured ``x0``
     unless :meth:`compile_parametric_program` has been called, in which case
@@ -220,7 +220,7 @@ class TrajectoryOptimizationPlanner(Planner):
         n_trials: int = 50,
     ) -> PlanningSolution:
         """
-        Offline trajopt entry (``solve_trajectory``).
+        Offline trajopt entry.
 
         ``params`` is a partial tree of the problem's leaves (``planner.params``:
         ``x_start``, ``t_start``, the plant's, the cost's, ...), solved on a copy
@@ -233,19 +233,6 @@ class TrajectoryOptimizationPlanner(Planner):
         input as a source block, ``policy >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
         """
-        return self.solve_trajectory(
-            params, guess=guess, evaluate=evaluate, n_trials=n_trials
-        )
-
-    def solve_trajectory(
-        self,
-        params=None,
-        *,
-        guess=None,
-        evaluate: bool = False,
-        n_trials: int = 50,
-    ) -> PlanningSolution:
-        """Compute and store a trajectory-optimization solution on the problem holding ``params`` (always rebuild)."""
         problem_params, method = planner_parts(params)
         problem = problem_with(self.problem, host_tree(problem_params))
 

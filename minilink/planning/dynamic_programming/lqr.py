@@ -185,10 +185,6 @@ class LQRPlanner(Planner):
 
         return self.store_solution(solution)
 
-    def solve_policy(self, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """The planner-family name of :meth:`solve`, answered by every policy planner."""
-        return self.solve(evaluate=evaluate, n_trials=n_trials)
-
     def nominal_trajectory(self, tf=None):
         """The law from the problem's start on the nonlinear plant, sampled every ``dt``."""
         return nominal_trajectory(

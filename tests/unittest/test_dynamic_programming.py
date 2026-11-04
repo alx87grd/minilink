@@ -221,9 +221,9 @@ class TestControllerAndEvaluation(unittest.TestCase):
         verbs = {
             "value_at": lambda: planner.value_at([0.0, 0.0]),
             "get_controller": lambda: planner.get_controller(interpolation="nearest"),
-            "plot_cost2go": planner.plot_cost2go,
-            "plot_policy": planner.plot_policy,
-            "animate_cost2go": planner.animate_cost2go,
+            "plot_cost_to_go": planner.plot_cost_to_go,
+            "plot_control_law": planner.plot_control_law,
+            "animate_cost_to_go": planner.animate_cost_to_go,
             "animate_policy": planner.animate_policy,
             "clean_infeasible_set": planner.clean_infeasible_set,
         }
@@ -542,7 +542,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         _, result = solve(make_problem())
-        fig, ax = plotting.plot_cost2go(result, show=False)
+        fig, ax = plotting.plot_cost_to_go(result, show=False)
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -551,7 +551,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         _, result = solve(make_problem())
-        fig, ax = plotting.plot_policy(result, show=False)
+        fig, ax = plotting.plot_control_law(result, show=False)
         self.assertIsNotNone(fig)
         self.assertIsNotNone(ax)
 
@@ -561,7 +561,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         matplotlib.use("Agg")
         problem = make_problem()
         planner, _ = solve(problem)
-        fig, ax = planner.plot_cost2go(show=False)
+        fig, ax = planner.plot_cost_to_go(show=False)
         self.assertIsNotNone(fig)
         controller = planner.get_controller()
         self.assertTrue(hasattr(controller, "action"))
@@ -571,13 +571,13 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, _ = solve(make_problem(), out_of_bound_cost=50.0)
-        _, ax = planner.plot_cost2go(show=False)
+        _, ax = planner.plot_cost_to_go(show=False)
         self.assertEqual(ax.collections[0].get_clim()[1], 50.0)
 
         # An explicit jmax wins, and jmax=None hands the scale back to Matplotlib
-        _, ax = planner.plot_cost2go(jmax=10.0, show=False)
+        _, ax = planner.plot_cost_to_go(jmax=10.0, show=False)
         self.assertEqual(ax.collections[0].get_clim()[1], 10.0)
-        _, ax = planner.plot_cost2go(jmax=None, show=False)
+        _, ax = planner.plot_cost_to_go(jmax=None, show=False)
         self.assertEqual(
             ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
         )
@@ -592,7 +592,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         for jmax, top in ((7.0, 7.0), (None, float(np.max(result.history[-1][1])))):
             with self.subTest(jmax=jmax):
                 plt.close("all")
-                animation = plotting.animate_cost2go(result, jmax=jmax, show=False)
+                animation = plotting.animate_cost_to_go(result, jmax=jmax, show=False)
                 fig = plt.gcf()
                 self.assertEqual(fig.axes[0].collections[0].get_clim(), (0.0, top))
                 fig.canvas.draw()  # the first frame: the animation has rendered
@@ -607,7 +607,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         _, result = solve(make_problem())
         plt.close("all")
-        plotting.plot_cost2go(result, axes=[(0, 1), (1, 0)], show_3d=True, show=False)
+        plotting.plot_cost_to_go(
+            result, axes=[(0, 1), (1, 0)], show_3d=True, show=False
+        )
         surfaces = [
             ax
             for num in plt.get_fignums()
@@ -639,7 +641,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         plant.x0 = np.array([2.0, 0.0])
         diagram = plotting.get_controller(result) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
-        _, ax = plotting.plot_policy(result, trajectory=trajectory, show=False)
+        _, ax = plotting.plot_control_law(result, trajectory=trajectory, show=False)
         self.assertGreaterEqual(len(ax.lines), 1)
 
     def test_lookup_controller_matmul_wires_state_feedback(self):
@@ -746,7 +748,7 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
             evaluator.value_at(np.zeros(2)),
             float(result.grid.interpolate(evaluator.last_J, np.zeros((1, 2)))[0]),
         )
-        fig, _ = evaluator.plot_cost2go(vmax=10.0, show=False)
+        fig, _ = evaluator.plot_cost_to_go(vmax=10.0, show=False)
         self.assertIsNotNone(fig)
         fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
         self.assertIsNotNone(fig)

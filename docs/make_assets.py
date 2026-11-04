@@ -162,8 +162,8 @@ def tool_montage() -> None:
             lambda: loop.plot_step_response(x_up, show=False),
         ),
         panel(
-            "DynamicProgrammingPlanner: plot_cost2go",
-            lambda: vi.plot_cost2go(jmax=60.0, show=False),
+            "DynamicProgrammingPlanner: plot_cost_to_go",
+            lambda: vi.plot_cost_to_go(jmax=60.0, show=False),
         ),
         panel("RRTPlanner: plot_tree", lambda: rrt.plot_tree(show=False)),
         panel(

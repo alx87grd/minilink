@@ -41,7 +41,7 @@ class SystemSimulation:
         show=False,
         x0=None,
         backend="numpy",
-        verbose=True,
+        verbose=False,
     ):
         """
         Convenience shortcut to sample boundary IO on a time grid.
@@ -59,8 +59,7 @@ class SystemSimulation:
             to try JAX then fall back to NumPy.
         verbose : bool
             Print simulator setup (solver, ``dt``, compile backend). Default
-            ``True`` for interactive ``compute_trajectory`` calls; library
-            helpers pass ``verbose=False``.
+            ``False``: the run is silent unless asked.
 
         Returns
         -------
@@ -105,7 +104,7 @@ class SystemSimulation:
         show=False,
         x0=None,
         backend="numpy",
-        verbose=True,
+        verbose=False,
     ):
         """
         Convenience shortcut to sample boundary IO under a prescribed input.
@@ -129,8 +128,7 @@ class SystemSimulation:
             Named input port to force while keeping the others at default
             values.
         verbose : bool
-            Print simulator setup. Default ``True``; pass ``False`` from library
-            helpers.
+            Print simulator setup. Default ``False``.
 
         Returns
         -------
@@ -211,7 +209,7 @@ class DynamicSimulation:
         show=False,
         x0=None,
         backend="numpy",
-        verbose=True,
+        verbose=False,
         solver_warnings="warn",
         record=None,
     ):
@@ -230,7 +228,7 @@ class DynamicSimulation:
             to try JAX then fall back to NumPy.
         verbose : bool
             Print solver selection, time grid, and compile backend (default
-            ``True`` for interactive use).
+            ``False``).
         solver_warnings : str
             ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).
@@ -287,7 +285,7 @@ class DynamicSimulation:
         show=False,
         x0=None,
         backend="numpy",
-        verbose=True,
+        verbose=False,
         solver_warnings="warn",
     ):
         """
@@ -312,7 +310,7 @@ class DynamicSimulation:
             Named input port to force while keeping the others at default
             values.
         verbose : bool
-            Print solver selection and time grid (default ``True``).
+            Print solver selection and time grid (default ``False``).
         solver_warnings : str
             ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).

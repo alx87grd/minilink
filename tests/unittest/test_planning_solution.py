@@ -370,6 +370,20 @@ def test_solution_verbs_draw_what_the_planner_produced():
 
 
 def test_planner_shortcuts_draw_the_latest_solution():
+    """A planner's plots draw its latest solution; refused before any solve."""
+    from minilink import LQRPlanner
+
+    problem, vi, lqr = solved_pendulum()
+    planner = LQRPlanner(problem)
+    with pytest.raises(ValueError):
+        planner.plot_control_law()
+    planner.solve()
+    assert planner.plot_control_law(show=False).figure is not None
+    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9))[0] is not None
+
+
+def test_value_iteration_plots_its_own_tables_under_the_solution_names():
+    """On the grid planner, plot_cost_to_go and plot_control_law draw the J and π tables."""
     problem, vi, lqr = solved_pendulum()
     planner = DynamicProgrammingPlanner(
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, gamma=0.9, tol=1.0
@@ -377,8 +391,8 @@ def test_planner_shortcuts_draw_the_latest_solution():
     with pytest.raises(ValueError):
         planner.plot_control_law()
     planner.solve()
-    assert planner.plot_control_law(show=False).figure is not None
-    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9))[0] is not None
+    assert planner.plot_cost_to_go(show=False)[0] is not None
+    assert planner.plot_control_law(show=False)[0] is not None
 
 
 def test_compare_reads_the_solutions_side_by_side():

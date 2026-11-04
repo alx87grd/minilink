@@ -228,7 +228,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
                 optimizer_options={"maxiter": 50, "ftol": 0.0001},
             ),
         )
-        plan_off = planner_off.solve_trajectory()
+        plan_off = planner_off.solve()
         np.testing.assert_allclose(
             plan_off.trajectory.x[:, 0], problem.x_start, atol=1e-05
         )

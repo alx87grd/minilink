@@ -1371,7 +1371,7 @@ Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
 `J = min Q` as `cost_to_go`); `planner.result` is the table as a
 `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), so
-`plot_cost2go`, `plot_policy` and `get_controller` (a `LookupPolicy`)
+`plot_cost_to_go`, `plot_control_law` and `get_controller` (a `LookupPolicy`)
 are those of value iteration, and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
@@ -1435,7 +1435,7 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 `optimizer_options={…}`) like `Simulator` / `Optimizer`; teach demos pass
 `transcription=` explicitly. Tier-2 still accepts a `Transcription` instance
 and/or `options=TrajectoryOptimizationOptions(...)`. Offline
-`solve_trajectory` always rebuilds a fresh
+`solve` always rebuilds a fresh
 `MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
 (PP-2, PP-3): `x_start` (the start's residual when `X0` is the start's singleton),
 `t_start`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role

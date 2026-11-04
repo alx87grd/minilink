@@ -76,23 +76,13 @@ class Planner(ABC):
         """
         Offline solve entry: the planner's verb, each planner's own solve.
 
-        A trajectory planner's ``solve`` runs :meth:`solve_trajectory`. A policy
-        planner's ``solve`` is the solve itself, and :meth:`solve_policy`, the
-        family name every policy planner answers, calls it.
+        Every planner answers ``solve``, the one offline entry of the family.
         """
         raise NotImplementedError(f"{type(self).__name__}.solve is not implemented")
-
-    def solve_trajectory(self, **kwargs) -> PlanningSolution:
-        """Fixed (offline) traj-family solve."""
-        raise NotImplementedError(f"{type(self).__name__} has no trajectory solve")
 
     def solve_trajectory_from(self, x0, **kwargs) -> PlanningSolution:
         """Online traj-family solve from measured ``x0``."""
         raise NotImplementedError(f"{type(self).__name__} has no solve_trajectory_from")
-
-    def solve_policy(self, **kwargs) -> PlanningSolution:
-        """Fixed (offline) policy-family solve."""
-        raise NotImplementedError(f"{type(self).__name__} has no policy solve")
 
     # The latest solution, and the parts of the problem a solver needs
 

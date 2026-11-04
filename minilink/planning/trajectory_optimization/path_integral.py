@@ -160,10 +160,6 @@ class MPPIPlanner(Planner):
 
         return self.store_solution(solution)
 
-    def solve_trajectory(self, **kwargs) -> PlanningSolution:
-        """The trajectory family's offline solve: :meth:`solve`."""
-        return self.solve(**kwargs)
-
 
 @dataclass(frozen=True)
 class MPPIRecord:

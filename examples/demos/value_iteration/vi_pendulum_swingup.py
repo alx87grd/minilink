@@ -36,8 +36,8 @@ planner = DynamicProgrammingPlanner(
 )
 planner.solve()
 
-planner.plot_cost2go(jmax=INF, show_3d=True)
-planner.plot_policy()
+planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.plot_control_law()
 
 controller = planner.get_controller()
 diagram = controller @ plant
@@ -47,5 +47,5 @@ diagram.plot_diagram()
 trajectory = diagram.compute_trajectory(tf=10.0)
 diagram.plot_trajectory(trajectory)
 
-planner.plot_policy(trajectory=trajectory)
+planner.plot_control_law(trajectory=trajectory)
 diagram.animate()

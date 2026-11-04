@@ -15,7 +15,7 @@ from minilink.planning.plotting import maybe_show
 ###############################################################################
 
 
-def plot_cost2go(
+def plot_cost_to_go(
     result,
     *,
     jmax=None,
@@ -40,7 +40,7 @@ def plot_cost2go(
     # Several slices: one heatmap per pair, without the overlay
     if is_batch_axes(axes):
         return [
-            plot_cost2go(
+            plot_cost_to_go(
                 result,
                 jmax=jmax,
                 axes=pair,
@@ -99,7 +99,7 @@ def plot_cost2go(
     return fig, ax
 
 
-def plot_policy(
+def plot_control_law(
     grid_or_result,
     pi=None,
     *,
@@ -115,8 +115,8 @@ def plot_policy(
     """
     Draw a policy heatmap on the state grid.
 
-    Grid form: ``plot_policy(grid, pi, ...)`` for a raw policy table.
-    Result form: ``plot_policy(result, ...)`` from value iteration.
+    Grid form: ``plot_control_law(grid, pi, ...)`` for a raw policy table.
+    Result form: ``plot_control_law(result, ...)`` from value iteration.
 
     ``axes`` may be ``(i, j)`` or a list of pairs; ``axis`` may be an int or a
     list aligned with batch ``axes``.
@@ -142,7 +142,7 @@ def plot_policy(
     if is_batch_axes(axes):
         axis_list = axis_list_of(axis, axes)
         return [
-            plot_policy(
+            plot_control_law(
                 result,
                 axis=axis_k,
                 axes=axes_k,
@@ -177,7 +177,7 @@ def plot_policy(
     return fig, ax
 
 
-def animate_cost2go(
+def animate_cost_to_go(
     result,
     *,
     axes=(0, 1),
