@@ -139,9 +139,10 @@ class Simulator:
     def __init__(
         self,
         sys,
+        tf=10,
+        *,
         x0=None,  # Initial state; sys.x0 when None
         t_start=0,
-        tf=10,
         n_steps=None,
         dt=None,
         solver=None,

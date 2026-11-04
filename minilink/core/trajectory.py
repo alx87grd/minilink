@@ -142,7 +142,7 @@ class Trajectory(SampledSignals):
         return int(self.t.size)
 
     @property
-    def t0(self) -> float:
+    def t_start(self) -> float:
         """Initial time."""
         return float(self.t[0])
 
@@ -153,8 +153,8 @@ class Trajectory(SampledSignals):
 
     @property
     def time_duration(self) -> float:
-        """Total covered time span ``tf - t0``."""
-        return float(self.tf - self.t0)
+        """Total covered time span ``tf - t_start``."""
+        return float(self.tf - self.t_start)
 
     # Signals
 
@@ -264,7 +264,7 @@ class Trajectory(SampledSignals):
         t_new : np.ndarray, optional
             New 1-D time vector.
         n_samples : int, optional
-            Number of uniformly spaced samples between ``t0`` and ``tf``.
+            Number of uniformly spaced samples between ``t_start`` and ``tf``.
         """
         t_new = time_grid_of(self, t_new, n_samples)
         t = self.t
@@ -389,14 +389,14 @@ def require_extra_channel(name):
 
 
 def time_grid_of(traj, t_new, n_samples):
-    """The resampling grid: ``t_new``, or ``n_samples`` uniform times over ``[t0, tf]``."""
+    """The resampling grid: ``t_new``, or ``n_samples`` uniform times over ``[t_start, tf]``."""
     if (t_new is None) == (n_samples is None):
         raise ValueError("Provide exactly one of t_new or n_samples")
 
     if n_samples is not None:
         if n_samples < 1:
             raise ValueError("n_samples must be >= 1")
-        t_new = np.linspace(traj.t0, traj.tf, int(n_samples))
+        t_new = np.linspace(traj.t_start, traj.tf, int(n_samples))
     else:
         t_new = np.asarray(t_new, dtype=float).reshape(-1)
         if t_new.size == 0:

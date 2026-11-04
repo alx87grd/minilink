@@ -33,8 +33,9 @@ class SystemSimulation:
 
     def compute_trajectory(
         self,
-        t_start=0,
         tf=10,
+        *,
+        t_start=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -95,9 +96,10 @@ class SystemSimulation:
     def compute_forced(
         self,
         u,
+        tf=10,
+        *,
         input_port_id=None,
         t_start=0,
-        tf=10,
         n_steps=None,
         dt=None,
         solver=None,
@@ -201,8 +203,9 @@ class DynamicSimulation:
 
     def compute_trajectory(
         self,
-        t_start=0,
         tf=10,
+        *,
+        t_start=0,
         n_steps=None,
         dt=None,
         solver=None,
@@ -276,9 +279,10 @@ class DynamicSimulation:
     def compute_forced(
         self,
         u,
+        tf=10,
+        *,
         input_port_id=None,
         t_start=0,
-        tf=10,
         n_steps=None,
         dt=None,
         solver=None,
