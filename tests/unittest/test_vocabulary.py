@@ -35,7 +35,6 @@ RETIRED = {
     "optimizer_options": ("options", None),
     "tf": ("horizon", ("PlanningProblem",)),
     "require_finite_tf": ("require_finite_horizon", None),
-    "t0": ("t0", ("Trajectory",)),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
     "ybar": ("y_bar", None),
@@ -47,7 +46,6 @@ RETIRED = {
     "solve_policy": ("solve", None),
     "N": ("n_steps", ("StepPlanningProblem",)),
     "n_samples": ("n_rollouts", ("MPPIPlanner",)),
-    "n_iterations": ("iterations", ("MPPIPlanner",)),
     "solver": ("record", ("PlanningSolution",)),
     "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
     "alpha": (
