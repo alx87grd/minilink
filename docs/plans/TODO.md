@@ -357,6 +357,13 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
   documented): one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
+- [ ] **The planner's four kinds of argument** (RN-P) (ruled 2026-11-04; agent; DESIGN §6):
+  the native numbers as flat keywords and `options=` the external solver's knobs only; the
+  settings records become attributes set in `__init__` (`planner.settings` retired,
+  `PolicyEvaluator` takes the numbers flat, value iteration's `final_time` read from the
+  problem, RRT*'s radius constant renamed off `gamma`); then `planner.params` and
+  `solve(params=)` on value iteration, RRT, RRT*, LQR and tabular learning, on the host.
+  Done when every planner answers `params` and no planner holds a settings record.
 - [ ] **The vocabulary sweeps** (RN-V) (ruled 2026-11-03; agent, one commit per group, every
   call site and the course notebooks in the same commit, no alias): RULES 2.7's table, in the
   order seeds, choice keywords (`algorithm=` → `method=`, `solution.solver` → `.record`, the

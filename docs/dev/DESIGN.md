@@ -1431,10 +1431,9 @@ and the solver's own flag stays in `message` / `stats`. The worst equality
 residual / inequality margin / bound violation are recorded on the record.
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
-(`n_steps=…`, `transcription="direct_collocation"`, `backend=…`, and
-`options={…}`, the optimizer's own settings) like `Simulator` / `Optimizer`; teach
-demos pass `transcription=` explicitly. Tier-2 still accepts a `Transcription`
-instance; the resolved workflow settings are `planner.settings`. Offline
+(`n_steps=…`, `transcription="direct_collocation"`, `backend=…`) like `Simulator` /
+`Optimizer`; teach demos pass `transcription=` explicitly. Tier-2 still accepts a
+`Transcription` instance. Offline
 `solve` always rebuilds a fresh
 `MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
 (PP-2, PP-3): `x0` (the start's residual when `X0` is the start's singleton),
@@ -1454,7 +1453,21 @@ problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
 `w_k = e^{−ρ(t_k − t0)}`. Knot count
 `n_steps` is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t0 + linspace(0, problem.horizon, n_steps)` for a finite `horizon`. **The compiled face**:
+`t0 + linspace(0, problem.horizon, n_steps)` for a finite `horizon`.
+
+**A planner's four kinds of argument** (ruled 2026-11-04, every planner alike):
+**structure**, what a change of rebuilds (the grid, the transcription, `n_steps`, `dt`,
+`method`, `backend`, the stopping rules `n_iterations`, `max_iterations` and the
+tolerances), a constructor keyword read back as an attribute; **numbers**, what a sweep, a
+tuning loop or `jax.grad` varies without a rebuild (the problem's leaves, the method's numbers:
+a native law's `learning_rate`, a discount `gamma`, MPPI's `temperature`, RRT's `goal_bias`;
+the `seed`), given as flat keywords and held in `planner.params` (`params["method"]`),
+overridden per call by `solve(params=…)`; **an external solver's knobs** (SciPy `maxiter`,
+`ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
+**workflow** (`verbose`, `callback`, `live_plot`, `record_history`), keywords that change what
+is shown, never what is computed. There is no settings record on a planner.
+
+**The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:
 `z` is the transcription's decision vector with the origin `t0` appended (`pv.n_z`);
 `pv.params` the tree (`planner.params`: **one shape for every planner**, the problem's

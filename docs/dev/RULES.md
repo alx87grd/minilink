@@ -113,7 +113,8 @@ concrete formatting, ordered by the cost of being wrong:
   | A seed stored at construction (`0` by default where a run draws; `None` is a random block's mean, never fresh entropy) | `seed` | `rng` (internal only) |
   | The verb's algorithm | `method` | `algorithm` |
   | A planner's record | `solution.record` | `solution.solver` |
-  | A solver's own settings | `options=` (a dict) | `optimizer_options`, an options dataclass |
+  | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native law's numbers |
+  | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
   | Print text / draw a figure | `verbose` (default `False`) / `show` | |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots | `plot_cost_to_go`, `plot_control_law` | `plot_cost2go`, `plot_policy` |
