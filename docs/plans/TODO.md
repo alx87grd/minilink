@@ -157,14 +157,9 @@ maintainer would and logged in the run's record.
 
 ### 1.3 The draws
 
-- [ ] **The draws' contract in DESIGN** (RN-6; the per-block seeds, the disturbance sources and
-  the problem stochastic by its parts landed in the v0.3 run): DESIGN §4's distributions entry
-  (the convention, the three periods, the bridge table, the solver hint) and §6 (the problem's
-  laws and sources, `realize`, `evaluate` on the draws); DESIGN §4's "Randomness" entry and
-  §6's problem evaluator already hold most of it. Then: `kalman()` reads intensities (the
-  discrete filter later `Q_d`, `R_d`); the release notes of the draws' changes; CONSTITUTION
-  §2's disturbance sentence amended with it (the maintainer's). Done when DESIGN states
-  each.
+No open row: the contract is DESIGN §4 ("Randomness": the convention, the three periods,
+the Kalman bridge, the solver hint) and §6 (the problem's laws and sources, `realize`,
+`evaluate` on the draws); the discrete Kalman filter is an estimation follow-up (v0.9).
 
 ### 1.4 The seeded stochastic policy
 
