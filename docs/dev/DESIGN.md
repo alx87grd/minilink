@@ -811,7 +811,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `dt` tightens it). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
-  continuous filter, `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` for the discrete one.
+  continuous filter (`kalman(sys, Q_n, R_n)`, the intensities); the discrete filter, an
+  estimation follow-up (ROADMAP §5.6), will read `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ`.
   `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise: `w_k` the law drawn
   at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
   draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample

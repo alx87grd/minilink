@@ -379,7 +379,7 @@ the one shortcut, enforced by `test_last_answer.py`).
 | --- | --- | --- |
 | 1 | Every object pure, every number a parameter (invariant) | A5's later nouns, the sets-as-costs demos (was V1 step 8), T2 |
 | 2 | The step algebra first-class (invariant) | S53 (a parameter family's batch price), S65 (one owner per rule) |
-| 3 | The draws | RN-6, the contract in DESIGN |
+| 3 | The draws | nothing (the contract is DESIGN §4 and §6) |
 | 4 | The seeded stochastic policy | nothing |
 | 5 | The sampled loop: a step diagram, two runners | nothing (the realtime runner on the pure blocks is v0.5) |
 | 6 | One score | a step problem's own tree: `realize` and the tick offset |

@@ -157,14 +157,9 @@ maintainer would and logged in the run's record.
 
 ### 1.3 The draws
 
-- [ ] **The draws' contract in DESIGN** (RN-6; the per-block seeds, the disturbance sources and
-  the problem stochastic by its parts landed in the v0.3 run): DESIGN §4's distributions entry
-  (the convention, the three periods, the bridge table, the solver hint) and §6 (the problem's
-  laws and sources, `realize`, `evaluate` on the draws); DESIGN §4's "Randomness" entry and
-  §6's problem evaluator already hold most of it. Then: `kalman()` reads intensities (the
-  discrete filter later `Q_d`, `R_d`); the release notes of the draws' changes; CONSTITUTION
-  §2's disturbance sentence amended with it (the maintainer's). Done when DESIGN states
-  each.
+No open row: the contract is DESIGN §4 ("Randomness": the convention, the three periods,
+the Kalman bridge, the solver hint) and §6 (the problem's laws and sources, `realize`,
+`evaluate` on the draws); the discrete Kalman filter is an estimation follow-up (v0.9).
 
 ### 1.4 The seeded stochastic policy
 
@@ -271,6 +266,7 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
+- [ ] **One parameters model for every object** **[ask — core]** ([one-params-model.md](one-params-model.md), its option B): sets, fields, distributions and shapes hold a live `params` tree as systems do; `with_params` the copy on every object; composites take a partial tree. It replaces CA-4 below. Done when the plan's PM steps land byte-identical on the seeded baseline.
 - [ ] **Partial parameter updates** (CA-4): `Distribution.with_params` merges a partial
   dictionary (CA-4a, today it rebuilds from the given keys only, `core/distributions.py`),
   `CostFunction.with_params` (CA-4b; sets, fields and distributions have it), and a partial
@@ -287,9 +283,6 @@ Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, C
 benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
 **[ask]**; the order is the plan's §4.
 
-- [ ] **CI shape** (MS-D3, ruled 2026-11-04: option B, the critical path first): done when a
-  `workflow_dispatch` run of the new `test.yml` shows the same test counts per job as before
-  and its wall time is reported.
 - [ ] **The test layers** (MS-D1, MS-D2): the layers, then the moves and deletions, file by file.
 - [ ] **The demo set** (MS-D4), with the maintainer's pass (K4, §2).
 - [ ] **The notebooks** (MS-D5) and **the benchmarks** (MS-D6).
