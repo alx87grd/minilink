@@ -25,6 +25,7 @@ from minilink import (  # noqa: E402
     lqr,
 )
 from minilink.core.backends import configure_jax  # noqa: E402
+from tests.unittest.planning_helpers import edited  # noqa: E402
 
 configure_jax(enable_x64=True)
 
@@ -133,7 +134,7 @@ def test_a_repeated_solve_compiles_nothing():
         learning_rate=0.05,
     )
     pv = native.compile()
-    start = {"x0": np.array([0.5, 0.0]), "t0": 0.0}
+    start = edited(pv.params, {"x0": np.array([0.5, 0.0]), "t0": 0.0})
     for run in (
         lambda: planner.solve(evaluate=False).trajectory.x,
         lambda: native.solve(evaluate=False).trajectory.x,
@@ -174,10 +175,11 @@ def test_a_leaf_given_as_any_number_type_shares_one_trace():
 def test_an_evaluation_override_of_any_number_type_shares_one_trace():
     law = StateFeedback(np.array([[2.0, 0.5]]))
     pe = pendulum_problem().compile(law, dt=0.01, backend="jax")
-    pe.evaluate({"x0": np.array([0.4, 0.0])}).objective
+    pe.evaluate(edited(pe.params, {"x0": np.array([0.4, 0.0])})).objective
     for value in (0.3, np.float64(0.3), 0, [0.3, 0.0]):
         start = value if isinstance(value, list) else np.array([value, 0.0])
-        assert compiles(lambda: pe.evaluate({"x0": start}).objective)[0] == 0
+        tree = edited(pe.params, {"x0": start})
+        assert compiles(lambda: pe.evaluate(tree).objective)[0] == 0
 
 
 def test_a_parameter_sweep_through_a_held_evaluator_compiles_once_and_reads_each_value():
@@ -206,16 +208,14 @@ def test_a_repeated_gradient_through_a_compiled_method_never_reuses_a_tracer():
         return ev.rollout(np.zeros(1), u, 0.0, 0.1, p)[-1, 0]
 
     grad = jax.grad(last)
-    for _ in range(50):
-        grad(dict(ev.params))
+    grads = [grad(dict(ev.params)) for _ in range(50)]
     jax.vmap(lambda k: last({**ev.params, "k": k}))(np.ones(3))
-    assert ev.on_device.entry is None
+    assert all(np.isfinite(np.asarray(g["k"])) for g in grads)
 
-    # A host tree put on the device inside an outer jit is traced too: never kept
+    # A host tree read inside an outer jit is traced too; a later host call reads it
     host = {"k": np.array(2.0)}
     batch = jax.jit(jax.vmap(lambda x0: ev.rollout(x0, u, 0.0, 0.1, host)[-1]))
     batch(np.zeros((3, 1)))
-    assert ev.on_device.entry is None
     np.testing.assert_allclose(ev.rollout(np.zeros(1), u, 0.0, 0.1, host)[-1], [1.0])
 
 

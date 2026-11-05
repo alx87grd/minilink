@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.geometry import Union
+from minilink.core.params import held_params
 from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 ###############################################################################
 
 
-@dataclass(frozen=True)
 class Scene:
     """
     Hard ``Shape`` obstacles and soft ``WorkspaceField`` sources on the workspace.
@@ -30,22 +28,18 @@ class Scene:
         X = bounds & scene.clearance_field(body).as_set()
         cost = base + w * scene.cost_field(body).as_cost()
 
-    ``params`` is ``{"obstacles": the union's numbers, "workspace_fields": each
-    field's by position}``: ``params=None`` reads them.
+    ``params`` holds ``{"obstacles": each obstacle's own numbers by position,
+    "workspace_fields": each field's}``: ``params=None`` reads them.
     """
 
-    obstacles: tuple = ()
-    workspace_fields: tuple = ()
+    params = held_params(
+        '``{"obstacles", "workspace_fields"}``: each obstacle\'s and each field\'s numbers by position.'
+    )
 
-    def __post_init__(self) -> None:
-        # The sources, stored as tuples on the frozen dataclass
-        object.__setattr__(self, "obstacles", tuple(self.obstacles))
-        object.__setattr__(self, "workspace_fields", tuple(self.workspace_fields))
-
-    @cached_property
-    def params(self) -> dict:
-        """``{"obstacles", "workspace_fields"}``: the obstacles' numbers by position, each field's."""
-        return {
+    def __init__(self, obstacles=(), workspace_fields=()):
+        self.obstacles = tuple(obstacles)
+        self.workspace_fields = tuple(workspace_fields)
+        self.params = {
             "obstacles": {
                 str(i): shape.params for i, shape in enumerate(self.obstacles)
             },
@@ -54,18 +48,14 @@ class Scene:
             },
         }
 
-    def with_params(self, params):
-        """The scene with each obstacle and field moved by its entry of ``params``."""
-        obstacles = tuple(
-            shape.with_params(params["obstacles"][str(i)])
-            for i, shape in enumerate(self.obstacles)
-        )
-        fields = tuple(
-            field.with_params(params["workspace_fields"][str(i)])
-            for i, field in enumerate(self.workspace_fields)
-        )
-
-        return replace(self, obstacles=obstacles, workspace_fields=fields)
+    def param_parts(self) -> dict:
+        """The obstacles and the fields by position: the parts an assignment routes to."""
+        return {
+            "obstacles": {str(i): shape for i, shape in enumerate(self.obstacles)},
+            "workspace_fields": {
+                str(i): field for i, field in enumerate(self.workspace_fields)
+            },
+        }
 
     def clearance(self, p, t=0.0, params=None):
         """Signed distance from ``p`` to the nearest obstacle."""

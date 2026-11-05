@@ -170,22 +170,26 @@ u_nom = np.zeros(sys_sim.m)
 next_replan_t = 0.0
 next_broadcast_t = 0.0
 t_hist, x_hist, u_hist, mpc_plans = [t], [x.copy()], [u_nom.copy()], []
+tick = pv.params  # the face's tree, a copy: each tick sets its start and its time
 
 while t < TF_SIM - 1e-12:
     # Demo clock stands in for ROS2 timers (``create_timer`` at MPC_DT / DT_BROADCAST).
     if t >= next_replan_t - 1e-12:
         # =============================================================================
-        # ROS2 NODE slow timer (period = MPC_DT) — copy these 2 lines
+        # ROS2 NODE slow timer (period = MPC_DT) — copy these 3 lines
         #   inputs: measured state ``x``, wall time ``t``; a failed solve keeps the old plan
         # =============================================================================
-        z_new, status = pv.solve({"x0": x, "t0": t}, z0=pv.shift(z, t))
+        tick["x0"], tick["t0"] = x, t
+        z_new, status = pv.solve(tick, z0=pv.shift(z, t))
         z = z_new if status["success"] else z
         # =============================================================================
         # end ROS2 NODE slow timer
         # =============================================================================
 
         # offline only: stash horizon for animation overlay
-        plan = pv.solution(z, {"t0": float(z[-1])}).trajectory
+        origin = pv.params  # the face's tree, a copy, at the plan's origin time
+        origin["t0"] = float(z[-1])
+        plan = pv.solution(z, origin).trajectory
         mpc_plans.append((t, plan))
         next_replan_t += MPC_DT
 

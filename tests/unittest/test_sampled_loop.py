@@ -9,6 +9,7 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_diagram import StepDiagramSystem
+from tests.unittest.planning_helpers import edited
 
 
 class LowPass(StepSystem):
@@ -566,7 +567,7 @@ def test_the_held_outputs_start_is_a_leaf_of_the_run():
     built = closed_loop_with_holds()
     pe = problem.compile(built)
     np.testing.assert_array_equal(pe.params["hold_x0"], [0.0])
-    moved = pe.trajectory({"hold_x0": np.array([3.0])})
+    moved = pe.trajectory(edited(pe.params, {"hold_x0": np.array([3.0])}))
 
     # The run's held slot (the last state row) starts at the leaf
     assert moved.x[-1, 0] == 3.0

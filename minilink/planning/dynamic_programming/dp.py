@@ -13,7 +13,12 @@ from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, given_numbers, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    given_numbers,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_problems import StepPlanningProblem
@@ -155,12 +160,15 @@ class DynamicProgrammingPlanner(Planner):
         ``max_iterations`` sweeps. The solution's policy is the greedy lookup
         table and its ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
-        problem's draws. ``params`` (a partial tree of :attr:`params`) solves the
-        planner :meth:`at` it instead, this one unchanged.
+        problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
+        edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
+        this one unchanged.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         # Backward sweeps until the cost-to-go stops changing

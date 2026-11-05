@@ -1,9 +1,7 @@
 """Allowable sets: ``x(t) in X(t)``, ``u(t) in U(x, t)`` and boundary sets ``x(tf) in Xf``."""
 
-import copy
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -14,7 +12,7 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import own_params
+from minilink.core.params import delegated_params, held_params, own_params, param_view
 
 ###############################################################################
 # Public API
@@ -34,9 +32,10 @@ class Set(ABC):
     :class:`~minilink.core.distributions.Distribution`.
 
     ``params`` is the set's own numbers (``{}`` for a set without any), by
-    name: ``params=None`` in :meth:`margin` and :meth:`sample` reads them, and
-    a tree passed instead moves the set (``{"lower": ..., "upper": ...}`` on a
-    box), so a set's numbers are parameters like a plant's.
+    name, held as a plant holds its own: ``X.params["upper"] = ...`` moves the
+    set, ``params=None`` in :meth:`margin` and :meth:`sample` reads them, and a
+    tree passed instead is read in their place. A set's named attributes
+    (``X.lower``) are views of its tree.
     """
 
     params = own_params()
@@ -77,16 +76,6 @@ class Set(ABC):
     def bounding_box(self):
         """The tightest :class:`BoxSet` containing the set, or ``None`` when it has none."""
         return None
-
-    def with_params(self, params):
-        """The set with its numbers replaced by ``params``: a copy holding them (a set without numbers refuses any)."""
-        if not params and not self.params:
-            return self
-        if not self.params:
-            raise TypeError(f"{type(self).__name__} holds no parameters")
-        moved = copy.copy(self)
-        moved.params = params
-        return moved
 
     def as_cost(self, *, weight: float = 1.0, shaping: Callable | None = None):
         """
@@ -163,16 +152,6 @@ class InputSet(ABC):
         """The tightest :class:`BoxSet` of inputs containing the set, or ``None`` when it has none."""
         return None
 
-    def with_params(self, params):
-        """The input set with its numbers replaced by ``params`` (as :meth:`Set.with_params`)."""
-        if not params and not self.params:
-            return self
-        if not self.params:
-            raise TypeError(f"{type(self).__name__} holds no parameters")
-        moved = copy.copy(self)
-        moved.params = params
-        return moved
-
     # Display
 
     def __str__(self):
@@ -182,10 +161,9 @@ class InputSet(ABC):
         repr_pretty(self, p, cycle)
 
 
-@dataclass(frozen=True)
 class BoxSet(Set):
     """
-    Axis-aligned box ``lower <= z <= upper``.
+    Axis-aligned box ``lower <= z <= upper``; ``params`` is ``{"lower", "upper"}``.
 
     Parameters
     ----------
@@ -193,27 +171,21 @@ class BoxSet(Set):
         Lower and upper bounds with shape ``(n,)``.
     """
 
-    lower: np.ndarray
-    upper: np.ndarray
-
-    def __post_init__(self) -> None:
+    def __init__(self, lower, upper):
         # The bounds as flat float copies, checked before they are stored
-        lower = np.asarray(self.lower, dtype=float).reshape(-1).copy()
-        upper = np.asarray(self.upper, dtype=float).reshape(-1).copy()
+        lower = np.asarray(lower, dtype=float).reshape(-1).copy()
+        upper = np.asarray(upper, dtype=float).reshape(-1).copy()
         require_box_bounds(lower, upper)
 
-        object.__setattr__(self, "lower", lower)
-        object.__setattr__(self, "upper", upper)
+        self.params = {"lower": lower, "upper": upper}
+
+    lower = param_view("lower")
+    upper = param_view("upper")
 
     @property
     def dim(self) -> int:
         """Dimension of the boxed vector."""
-        return int(self.lower.size)
-
-    @property
-    def params(self) -> dict:
-        """``{"lower", "upper"}``, the box's bounds."""
-        return {"lower": self.lower, "upper": self.upper}
+        return int(np.size(self.lower))
 
     @classmethod
     def from_system_state(cls, sys) -> "BoxSet":
@@ -265,22 +237,16 @@ class BoxSet(Set):
         """A box is its own bounding box."""
         return self
 
-    def with_params(self, params):
-        return replace(self, **params)
 
-
-@dataclass(frozen=True)
 class BoxInputSet(InputSet):
     """
-    State-independent input box ``lower <= u <= upper``.
+    State-independent input box ``lower <= u <= upper``; ``params`` is its box's ``{"lower", "upper"}``.
     """
 
-    box: BoxSet
+    params = delegated_params("box", "The input box's bounds: its box's numbers.")
 
-    @property
-    def params(self) -> dict:
-        """``{"lower", "upper"}``, the input box's bounds."""
-        return self.box.params
+    def __init__(self, box: BoxSet):
+        self.box = box
 
     @classmethod
     def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> "BoxInputSet":
@@ -308,11 +274,7 @@ class BoxInputSet(InputSet):
         """The input box itself."""
         return self.box
 
-    def with_params(self, params):
-        return replace(self, box=self.box.with_params(params))
 
-
-@dataclass(frozen=True)
 class SingletonSet(Set):
     """
     Singleton boundary set ``z == point``.
@@ -322,21 +284,17 @@ class SingletonSet(Set):
     constraints should use :meth:`residual` directly.
     """
 
-    point: np.ndarray
+    def __init__(self, point):
+        point = np.asarray(point, dtype=float).reshape(-1).copy()
 
-    def __post_init__(self) -> None:
-        point = np.asarray(self.point, dtype=float).reshape(-1).copy()
-        object.__setattr__(self, "point", point)
+        self.params = {"point": point}
 
-    @property
-    def params(self) -> dict:
-        """``{"point"}``."""
-        return {"point": self.point}
+    point = param_view("point")
 
     @property
     def dim(self) -> int:
         """Dimension of the singleton point."""
-        return int(self.point.size)
+        return int(np.size(self.point))
 
     def margin(self, z, t=0.0, params=None):
         """Return zero only when ``z`` equals the singleton point."""
@@ -363,37 +321,27 @@ class SingletonSet(Set):
         """The degenerate box ``point <= z <= point``."""
         return BoxSet(self.point, self.point)
 
-    def with_params(self, params):
-        return replace(self, **params)
 
-
-@dataclass(frozen=True)
 class BallSet(Set):
     """
-    Euclidean ball ``||z - center|| <= radius``.
+    Euclidean ball ``||z - center|| <= radius``; ``params`` is ``{"center", "radius"}``.
     """
 
-    center: np.ndarray
-    radius: float
-
-    def __post_init__(self) -> None:
+    def __init__(self, center, radius):
         # The center and the radius as floats, checked before they are stored
-        center = np.asarray(self.center, dtype=float).reshape(-1).copy()
-        radius = float(self.radius)
+        center = np.asarray(center, dtype=float).reshape(-1).copy()
+        radius = float(radius)
         require_nonnegative_radius(radius)
 
-        object.__setattr__(self, "center", center)
-        object.__setattr__(self, "radius", radius)
+        self.params = {"center": center, "radius": radius}
 
-    @property
-    def params(self) -> dict:
-        """``{"center", "radius"}``."""
-        return {"center": self.center, "radius": self.radius}
+    center = param_view("center")
+    radius = param_view("radius")
 
     @property
     def dim(self) -> int:
         """Dimension of the ball center."""
-        return int(self.center.size)
+        return int(np.size(self.center))
 
     def margin(self, z, t=0.0, params=None):
         """Return the signed distance to the ball boundary, shape ``(1,)``."""
@@ -420,11 +368,7 @@ class BallSet(Set):
 
         return BoxSet(lower, upper)
 
-    def with_params(self, params):
-        return replace(self, **params)
 
-
-@dataclass(frozen=True)
 class CallableSet(Set):
     """
     Set backed by user callables.
@@ -439,12 +383,17 @@ class CallableSet(Set):
         The numbers the functions read, handed to them when a call passes none.
     """
 
-    margin_fn: Callable | None = None
-    contains_fn: Callable | None = None
-    params: dict = field(default_factory=dict)
+    def __init__(
+        self,
+        margin_fn: Callable | None = None,
+        contains_fn: Callable | None = None,
+        params: dict | None = None,
+    ):
+        require_margin_or_contains(margin_fn, contains_fn)
 
-    def __post_init__(self) -> None:
-        require_margin_or_contains(self.margin_fn, self.contains_fn)
+        self.margin_fn = margin_fn
+        self.contains_fn = contains_fn
+        self.params = {} if params is None else params
 
     def margin(self, z, t=0.0, params=None):
         """Evaluate the user-supplied margin function."""
@@ -470,26 +419,29 @@ class CallableSet(Set):
 
         return super().contains(z, t=t, params=params)
 
-    def with_params(self, params):
-        return replace(self, params=params)
 
-
-@dataclass(frozen=True)
 class IntersectionSet(Set):
     """
     Intersection of several sets, ``z in Z_1 and z in Z_2 and ...``.
 
     Built by the ``&`` operator on :class:`Set`; ``a & b & c`` is one flat
-    intersection of three members.
+    intersection of three members. ``params`` holds the members' own trees by
+    position, ``{"0": ..., "1": ...}``: an edit of a member's numbers is the
+    intersection's, and an assignment routes each entry to its member.
     """
 
-    sets: tuple
+    params = held_params('The members\' numbers by position: ``{"0": ..., "1": ...}``.')
 
-    def __post_init__(self) -> None:
-        sets = tuple(self.sets)
+    def __init__(self, sets):
+        sets = tuple(sets)
         require_members(sets)
 
-        object.__setattr__(self, "sets", sets)
+        self.sets = sets
+        self.params = {str(i): set_.params for i, set_ in enumerate(sets)}
+
+    def param_parts(self) -> dict:
+        """The members by position: the parts an assignment routes to."""
+        return {str(i): set_ for i, set_ in enumerate(self.sets)}
 
     @classmethod
     def of(cls, *sets: Set) -> "IntersectionSet":
@@ -502,11 +454,6 @@ class IntersectionSet(Set):
                 members.append(set_)
 
         return cls(tuple(members))
-
-    @property
-    def params(self) -> dict:
-        """The members' ``params`` by position: ``{"0": ..., "1": ...}``."""
-        return {str(i): set_.params for i, set_ in enumerate(self.sets)}
 
     def margin(self, z, t=0.0, params=None):
         """Concatenate the margins of all member sets (a scalar margin counts as one)."""
@@ -525,18 +472,6 @@ class IntersectionSet(Set):
         margin = xp.concatenate(margins)
 
         return margin
-
-    def with_params(self, params):
-        """The intersection with its members moved by ``params``: a member left out keeps its numbers."""
-        ids = [str(i) for i in range(len(self.sets))]
-        unknown = sorted(set(params) - set(ids))
-        if unknown:
-            raise ValueError(f"unknown member(s) {unknown}; the members are {ids}")
-        members = tuple(
-            set_.with_params(params[str(i)]) if str(i) in params else set_
-            for i, set_ in enumerate(self.sets)
-        )
-        return replace(self, sets=members)
 
     def bounding_box(self):
         """The intersection of the members' boxes; ``None`` when no member has one.

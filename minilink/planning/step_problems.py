@@ -6,7 +6,6 @@ import numpy as np
 
 from minilink.core.costs import SampledCost, StepCost, box_samples
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import merge_tree
 from minilink.planning.problems import (
     PlanningProblem,
     fallback_bound,
@@ -51,7 +50,7 @@ class StepPlanningProblem:
         dt=None,
         penalize_failure=False,
         failure_cost=None,
-        params=None,
+        distributions=None,
         criterion="expectation",
     ):
         require_step_cost(cost)
@@ -77,7 +76,7 @@ class StepPlanningProblem:
             Xf=Xf,
             penalize_failure=penalize_failure,
             failure_cost=failure_cost,
-            params=params,
+            distributions=distributions,
             criterion=criterion,
         )
 
@@ -108,8 +107,8 @@ class StepPlanningProblem:
         return self.parts.Xf
 
     @property
-    def laws(self):
-        return self.parts.laws
+    def distributions(self):
+        return self.parts.distributions
 
     @property
     def penalize_failure(self):
@@ -136,16 +135,10 @@ class StepPlanningProblem:
         """
         The live view of the problem's numbers, by role: ``plant``, ``cost``, the sets', ``x0``, ``t0``, ``gamma``.
 
-        A law stands in place of each number the problem draws, as on
-        :class:`~minilink.planning.problems.PlanningProblem`.
+        Numbers only, as on :class:`~minilink.planning.problems.PlanningProblem`:
+        the laws over them are :attr:`distributions`.
         """
-        view = self.parts_view()
-        if self.start_law is not None:
-            view["x0"] = self.start_law
-        if self.laws:
-            view = merge_tree(view, self.laws)
-
-        return view
+        return self.parts_view()
 
     def parts_view(self) -> dict:
         """The parts' numbers by role: :attr:`params` without the laws."""
@@ -294,7 +287,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
         dt=dt,
         penalize_failure=problem.penalize_failure,
         failure_cost=problem.failure_cost,
-        params=problem.laws or None,
+        distributions=problem.distributions or None,
         criterion=problem.criterion,
     )
 

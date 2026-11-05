@@ -13,8 +13,14 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
 from minilink.planning.evaluator import closed_loop_of, evaluate
 from minilink.planning.problems import PlanningProblem
+from tests.unittest.planning_helpers import edited
 
 UPRIGHT = {"r": np.array([np.pi])}
+
+
+def upright(pe):
+    """The evaluator's tree with the reference upright: the complete tree a verb takes."""
+    return edited(pe.params, UPRIGHT)
 
 
 def plant():
@@ -43,7 +49,7 @@ def pid():
 )
 def test_the_run_records_every_block_output_and_the_plant_role(backend):
     pe = upright_problem().compile(pid(), dt=0.01, backend=backend)
-    traj = pe.trajectory(UPRIGHT)
+    traj = pe.trajectory(upright(pe))
 
     # The loop's state on the grid, every block output recorded, the plant's input among them
     assert traj.x.shape == (4, 201)
@@ -60,10 +66,10 @@ def test_the_run_records_every_block_output_and_the_plant_role(backend):
 @pytest.mark.jax
 def test_numpy_and_jax_runs_agree():
     problem = upright_problem()
-    reports = [
-        problem.compile(pid(), dt=0.01, backend=backend).evaluate(UPRIGHT)
-        for backend in ("numpy", "jax")
+    evaluators = [
+        problem.compile(pid(), dt=0.01, backend=backend) for backend in ("numpy", "jax")
     ]
+    reports = [pe.evaluate(upright(pe)) for pe in evaluators]
     assert np.allclose(reports[0].J, reports[1].J, rtol=1e-9)
 
 
@@ -71,7 +77,7 @@ def test_numpy_and_jax_runs_agree():
 def test_the_fixed_step_run_matches_the_adaptive_simulator():
     problem = upright_problem()
     pe = problem.compile(pid(), dt=0.001, backend="jax")
-    traj = pe.trajectory(UPRIGHT)
+    traj = pe.trajectory(upright(pe))
 
     loop = pe.loop
     loop.inputs["r"].nominal_value = np.array([np.pi])
@@ -204,14 +210,14 @@ def stochastic_problem(**fields):
         horizon=1.0,
         U=BoxInputSet.from_bounds([-50.0], [50.0]),
         x0=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
-        params={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
+        distributions={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,
     )
 
 
 def test_a_deterministic_problem_is_one_run():
     pe = upright_problem().compile(pid(), dt=0.01, backend="numpy")
-    assert pe.evaluate(UPRIGHT).n_trials == 1
+    assert pe.evaluate(upright(pe)).n_trials == 1
     with pytest.raises(ValueError, match="one run"):
         pe.evaluate(n_trials=5)
 
@@ -248,7 +254,7 @@ def test_the_gradient_matches_a_central_difference():
     import jax
 
     pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
-    params = pe.merged(UPRIGHT)
+    params = pe.merged(upright(pe))
     wrt = ["controller.Kp", "controller.Kd"]
 
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
@@ -285,13 +291,15 @@ def test_the_program_reads_the_same_objective_and_the_declared_rows():
     pe = problem.compile(pid(), dt=0.01, backend="jax")
     wrt = ["controller.Kp", "controller.Kd"]
 
-    program = pe.program(wrt, bounds={"controller.Kp": (0.0, None)}, params=UPRIGHT)
+    program = pe.program(wrt, bounds={"controller.Kp": (0.0, None)}, params=upright(pe))
     z0 = program.metadata["z0"]
 
     assert program.n_z == 2 and program.backend == "jax"
     assert program.lower.tolist() == [0.0, -np.inf]
     assert program.metadata["rows"] == ["feasibility_margin", "reachability_margin"]
-    assert float(program.J(z0)) == pytest.approx(float(pe.evaluate(UPRIGHT).objective))
+    assert float(program.J(z0)) == pytest.approx(
+        float(pe.evaluate(upright(pe)).objective)
+    )
     assert np.asarray(program.g(z0)).shape == (2,)
     assert np.asarray(program.grad_J(z0)).shape == (2,)
 
@@ -329,8 +337,8 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
 
     problem = upright_problem()
     pe = problem.compile(pid(), dt=0.01, backend="numpy")
-    traj = pe.trajectory(UPRIGHT)
-    report = pe.evaluate(UPRIGHT)
+    traj = pe.trajectory(upright(pe))
+    report = pe.evaluate(upright(pe))
 
     # The loop's run carries its running cost: the evaluator's score, to the bit
     np.testing.assert_array_equal(evaluate_trajectory(problem, traj).J, report.J)
@@ -403,9 +411,9 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
     # In place, and by assignment: the parts change
     problem.params["cost"]["R"][0, 0] = 2.0
     assert cost.R[0, 0] == 2.0
-    problem.params = {"plant": {**sys.params, "m": 3.0}, "discount_rate": 0.5}
+    problem.params = edited(problem.params, {"plant": {"m": 3.0}, "discount_rate": 0.5})
     assert sys.params["m"] == 3.0 and problem.discount_rate == 0.5
-    problem.params = {"x0": [0.2, 0.0]}
+    problem.params = edited(problem.params, {"x0": [0.2, 0.0]})
     assert problem.x0.tolist() == [0.2, 0.0] and problem.X0.point.tolist() == [
         0.2,
         0.0,
@@ -414,7 +422,9 @@ def test_the_problems_params_are_a_live_view_whose_writes_reach_the_parts():
     with pytest.raises(ValueError, match="unknown problem role"):
         problem.params = {"gains": {}}
     # A set is a value: its numbers move it, a new set in the role
-    problem.params = {"U": {"lower": np.array([-2.0]), "upper": np.array([2.0])}}
+    problem.params = edited(
+        problem.params, {"U": {"lower": np.array([-2.0]), "upper": np.array([2.0])}}
+    )
     assert problem.U.box.upper.tolist() == [2.0]
 
 
@@ -423,7 +433,7 @@ def test_the_gradient_reaches_the_cost_weights_and_the_discount():
     import jax
 
     pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
-    params = pe.merged(UPRIGHT)
+    params = pe.merged(upright(pe))
     assert set(params["cost"]) == {"Q", "R", "S", "x_bar", "u_bar"}
 
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
@@ -445,7 +455,7 @@ def test_the_gradient_reaches_the_plants_mass_and_the_start(path):
     import jax
 
     pe = upright_problem().compile(pid(), dt=0.01, backend="jax")
-    params = pe.merged({**UPRIGHT, "x0": np.array([0.3, 0.0])})
+    params = pe.merged(edited(upright(pe), {"x0": np.array([0.3, 0.0])}))
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
 
     # The derivative along the first entry of the leaf, by a central difference
@@ -461,7 +471,7 @@ def test_the_gradient_reaches_the_plants_mass_and_the_start(path):
 
 def test_the_recorded_plant_command_is_the_reconstructed_signal():
     pe = upright_problem().compile(pid(), dt=0.01, backend="numpy")
-    traj = pe.trajectory(UPRIGHT)
+    traj = pe.trajectory(upright(pe))
 
     loop = pe.loop
     loop.inputs["r"].nominal_value = np.array([np.pi])
@@ -483,15 +493,15 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
     X = BoxSet([-1.0, -20.0], [np.pi + 0.05, 20.0])  # no overshoot past upright
     problem = PlanningProblem(sys, cost=cost, horizon=3.0, X=X)
     pe = problem.compile(PID(Kp=60.0, Ki=0.0, Kd=2.0), dt=0.01, backend="jax")
-    assert pe.evaluate(UPRIGHT).failed[0]  # the start overshoots
+    assert pe.evaluate(upright(pe)).failed[0]  # the start overshoots
 
     wrt = ["controller.Kp", "controller.Kd"]
     bounds = {"controller.Kp": (1.0, 200.0), "controller.Kd": (0.0, 50.0)}
-    program = pe.program(wrt, bounds=bounds, params=UPRIGHT)
+    program = pe.program(wrt, bounds=bounds, params=upright(pe))
     assert program.metadata["rows"] == ["feasibility_margin"]
     result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 100}).solve()
 
-    tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(UPRIGHT)))
+    tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(upright(pe))))
     assert not tuned.failed[0] and float(tuned.feasibility_margin[0]) >= 0.0
 
 
@@ -627,21 +637,25 @@ def test_a_plant_input_left_unwired_reads_its_nominal_value():
 @pytest.mark.parametrize(
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
-def test_an_evaluator_reads_the_failure_cost_and_the_sets_the_problem_holds_now(
+def test_an_evaluator_reads_the_failure_switch_now_and_a_new_compile_the_new_goal(
     backend,
 ):
     problem = upright_problem(x0=[0.0, 0.0], Xf=BallSet([np.pi, 0.0], 0.01))
     pe = problem.compile(PID(Kp=1.0, Kd=0.1), dt=0.05, backend=backend)
-    before = pe.evaluate(UPRIGHT)
+    before = pe.evaluate(upright(pe))
     assert not bool(before.reached[0])
 
-    # The failure charged, then the goal widened to hold the run's end
+    # The failure charged: the switch and its cost are read at each evaluation
     problem.penalize_failure = True
     problem.failure_cost = 1000.0
-    charged = pe.evaluate(UPRIGHT)
+    charged = pe.evaluate(upright(pe))
     np.testing.assert_allclose(charged.J, before.J + 1000.0)
+
+    # A goal widened after the compile is a new compile's: the held one keeps its numbers
     problem.Xf = BallSet([np.pi, 0.0], 10.0)
-    widened = pe.evaluate(UPRIGHT)
+    assert not bool(pe.evaluate(upright(pe)).reached[0])
+    fresh = problem.compile(PID(Kp=1.0, Kd=0.1), dt=0.05, backend=backend)
+    widened = fresh.evaluate(upright(fresh))
     assert bool(widened.reached[0])
     np.testing.assert_allclose(widened.J, before.J)
 
@@ -719,8 +733,8 @@ def test_each_law_draws_from_its_own_stream():
     assert len({tuple(x) for x in first["x0"]}) == 4  # distinct trials
 
     # Adding a law leaves the other draws unchanged
-    laws = {"plant": {**problem.laws["plant"], "l": Uniform([0.9], [1.1])}}
-    more = problem.replace(params=laws).realize(0, 4)
+    laws = {"plant": {**problem.distributions["plant"], "l": Uniform([0.9], [1.1])}}
+    more = problem.replace(distributions=laws).realize(0, 4)
     np.testing.assert_array_equal(more["x0"], first["x0"])
     np.testing.assert_array_equal(more["plant"]["m"], first["plant"]["m"])
 
@@ -745,7 +759,9 @@ def test_each_stateful_block_has_its_start_as_a_leaf():
     moved = {"controller": {"x0": np.full(controller.n, 0.2)}}
     controller.x0 = np.full(controller.n, 0.2)
     rebuilt = problem.compile(controller, dt=0.01, backend="numpy")
-    np.testing.assert_allclose(pe.evaluate(moved).J, rebuilt.evaluate().J, rtol=1e-12)
+    np.testing.assert_allclose(
+        pe.evaluate(edited(pe.params, moved)).J, rebuilt.evaluate().J, rtol=1e-12
+    )
 
 
 @pytest.mark.jax
@@ -817,19 +833,20 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
 # --- the problem's laws, sources and starts: the seam review's cases ---
 
 
-def test_a_law_written_into_the_params_moves_the_laws_and_leaves_the_parts():
+def test_a_law_goes_in_the_distributions_never_in_the_params():
     problem = stochastic_problem()
     m_before = problem.sys.params["m"]
     law = Uniform(np.array([1.5]), np.array([1.6]))
     start = Gaussian(mean=np.array([0.2, 0.0]), std=np.array([0.01, 0.01]))
 
-    params = problem.params
-    params["plant"]["m"] = law
-    params["x0"] = start
-    problem.params = params
+    # The tree holds numbers: a law written into it is refused, the plant untouched
+    with pytest.raises(TypeError, match="distributions"):
+        problem.params = {"plant": {**problem.sys.params, "m": law}}
+    assert problem.sys.params["m"] is m_before
 
-    # The laws hold the new law, the plant keeps its own number
-    assert problem.laws["plant"]["m"] is law
+    # The laws are the problem's distributions, the start's law its x0
+    problem = problem.replace(x0=start, distributions={"plant": {"m": law}})
+    assert problem.distributions["plant"]["m"] is law
     assert problem.start_law is start
     assert problem.sys.params["m"] is m_before
     tree = problem.realize(0, 4)
@@ -878,7 +895,7 @@ def test_a_diagram_source_draws_a_seed_per_noise_block_per_trial():
 def test_a_point_start_reads_the_start_the_params_give():
     problem = stochastic_problem().replace(x0=np.array([0.5, 0.0]))
     pe = problem.compile(pid(), dt=0.01, backend="numpy")
-    moved = pe.merged({"x0": np.array([0.3, 0.0])})
+    moved = pe.merged(edited(pe.params, {"x0": np.array([0.3, 0.0])}))
     report = pe.evaluate(moved, n_trials=2, key=0)
     np.testing.assert_array_equal(report.x0, np.tile([0.3, 0.0], (2, 1)))
 
@@ -912,15 +929,15 @@ def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
     cost.g_max = counted
     own_cost, _ = pe.failure_cost_and_bound(pe.params)
     doubled = {"cost": {"Q": 2.0 * cost.params["Q"], "R": 2.0 * cost.params["R"]}}
-    doubled_cost, _ = pe.failure_cost_and_bound(pe.merged(doubled))
+    doubled_cost, _ = pe.failure_cost_and_bound(pe.merged(edited(pe.params, doubled)))
     assert doubled_cost == pytest.approx(
         2.0 * own_cost, rel=1e-12
     )  # the bound scales with g
 
     # Cached by the value: the same weights again sample g no more
     n_calls = len(calls)
-    pe.evaluate(doubled)
-    pe.evaluate(doubled)
+    pe.evaluate(edited(pe.params, doubled))
+    pe.evaluate(edited(pe.params, doubled))
     assert len(calls) == n_calls
 
 

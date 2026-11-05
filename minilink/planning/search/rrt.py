@@ -9,7 +9,7 @@ import numpy as np
 
 from minilink.core.sets import SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, planner_at, planner_evidence
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender
@@ -128,13 +128,15 @@ class RRTPlanner(Planner):
         The solution's policy is the path's input held by a source block,
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         metric = self.metric

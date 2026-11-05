@@ -1,5 +1,7 @@
 """Cost horizon/discount, the problem exit rule, distributions, and the stochastic problem."""
 
+import copy
+
 import numpy as np
 import pytest
 
@@ -9,6 +11,7 @@ from minilink.core.distributions import Gaussian, Particles, Uniform
 from minilink.core.trajectory import Trajectory
 from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 from minilink.planning.problems import PlanningProblem
+from tests.unittest.planning_helpers import edited
 
 
 def pendulum():
@@ -221,7 +224,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         cost=quadratic(plant),
         horizon=np.inf,
         x0=Uniform([-np.pi, -1.0], [np.pi, 1.0]),
-        params={"plant": {"m": Uniform([0.8], [1.2])}},
+        distributions={"plant": {"m": Uniform([0.8], [1.2])}},
         penalize_failure=True,
         failure_cost=100.0,
         U=plant.input_box,
@@ -231,10 +234,9 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
     assert problem.X0.contains(np.array([1.0, 0.5]))  # the support of the draw
     assert problem.sample_x0(0, n=4).shape == (4, 2)
     assert set(problem.sample_params(0)["plant"]) == {"m"}
-    assert (
-        problem.is_stochastic
-        and problem.params["plant"]["m"] is problem.laws["plant"]["m"]
-    )
+    assert problem.is_stochastic
+    assert isinstance(problem.distributions["plant"]["m"], Uniform)
+    assert problem.params["plant"]["m"] == plant.params["m"]  # numbers only
 
     nominal = problem.nominal()
     assert type(nominal) is PlanningProblem and not nominal.is_stochastic
@@ -247,7 +249,7 @@ def test_stochastic_problem_is_a_planning_problem_with_a_nominal_bridge():
         PlanningProblem(
             plant,
             x0=Gaussian([0.0, 0.0], 1.0),
-            params={"plant": {"nope": Uniform([0.0], [1.0])}},
+            distributions={"plant": {"nope": Uniform([0.0], [1.0])}},
             U=plant.input_box,
         )
 
@@ -522,7 +524,9 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
     task = dict(cost=quadratic(plant), horizon=np.inf, x0=start)
-    heavy = PlanningProblem(plant, params={"plant": {"m": Particles([[3.0]])}}, **task)
+    heavy = PlanningProblem(
+        plant, distributions={"plant": {"m": Particles([[3.0]])}}, **task
+    )
     nominal = PlanningProblem(plant, **task)
     settings = dict(dt=0.05, n_trials=1, episode_length=1.0)
     J_heavy = {}
@@ -818,7 +822,7 @@ def test_a_disturbance_on_the_command_port_is_refused():
         )
 
 
-def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
+def test_a_write_to_an_intersection_role_keeps_the_other_members():
     from minilink.core.sets import BallSet, IntersectionSet
 
     plant = Pendulum()
@@ -831,13 +835,14 @@ def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
         x0=np.zeros(2),
         X=IntersectionSet([box, ball]),
     )
-    problem.params = {"X": {"1": {"radius": 2.0}}}
+    problem.params = edited(problem.params, {"X": {"1": {"radius": 2.0}}})
     assert problem.X.sets[1].radius == 2.0 and problem.X.sets[0] is box
-    with pytest.raises(ValueError, match="unknown member"):
-        IntersectionSet([box, ball]).with_params({"2": {"radius": 1.0}})
+    both = IntersectionSet([box, ball])
+    with pytest.raises(ValueError, match="unknown \\['2'\\]"):
+        both.params = edited(both.params, {"2": {"radius": 1.0}})
 
 
-def test_a_user_set_with_numbers_is_moved_on_a_copy():
+def test_a_user_set_with_numbers_is_moved_on_a_deep_copy():
     from minilink.core.sets import Set
 
     class Disk(Set):
@@ -854,8 +859,10 @@ def test_a_user_set_with_numbers_is_moved_on_a_copy():
             return r**2 - z @ z
 
     disk = Disk()
-    moved = disk.with_params({"r": 2.0})
+    moved = copy.deepcopy(disk)
+    moved.params["r"] = 2.0
     assert moved is not disk and disk.params["r"] == 1.0 and moved.params["r"] == 2.0
+    assert moved.margin(np.zeros(2)) == 4.0
 
 
 def test_a_source_policy_is_held_from_the_problems_start_time():

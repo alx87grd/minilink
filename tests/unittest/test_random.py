@@ -1,5 +1,7 @@
 """The counter-based draws: published cipher vectors, the JAX primitive, the normal law, the index traps."""
 
+import copy
+
 import numpy as np
 import pytest
 
@@ -404,15 +406,17 @@ def test_a_set_reads_its_numbers_from_params_and_moves_by_them():
     box = BoxSet([0.0, 0.0], [1.0, 2.0])
     z = np.array([0.5, 0.5])
     assert set(box.params) == {"lower", "upper"}
+    moved_box = copy.deepcopy(box)
+    moved_box.params["upper"] = np.ones(2)
     np.testing.assert_array_equal(
         box.margin(z, params={"lower": np.zeros(2), "upper": np.ones(2)}),
-        box.with_params({"lower": np.zeros(2), "upper": np.ones(2)}).margin(z),
+        moved_box.margin(z),
     )
     both = box & BallSet([0.0, 0.0], 1.0)
     assert set(both.params) == {"0", "1"}
-    moved = both.with_params(
-        {**both.params, "1": {"center": np.ones(2), "radius": 0.1}}
-    )
+    moved = copy.deepcopy(both)
+    moved.params["1"]["center"] = np.ones(2)
+    moved.params["1"]["radius"] = 0.1
     assert moved.margin(z)[-1] < 0.0 <= both.margin(z)[-1]
     assert SingletonSet([1.0]).params["point"].tolist() == [1.0]
 
@@ -559,7 +563,7 @@ def test_the_nominal_problem_is_the_problem_at_its_means():
         horizon=1.0,
         cost=QuadraticCost.from_system(plant),
         x0=Gaussian([0.5, 0.0], [0.1, 0.1]),
-        params={"plant": {"m": Uniform([1.2], [1.6])}},
+        distributions={"plant": {"m": Uniform([1.2], [1.6])}},
         disturbances={
             "d": NoiseSource(Gaussian([0.3], [1.0]), sample_period=0.1, seed=4)
         },

@@ -2,13 +2,11 @@
 
 import functools
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
-from functools import cached_property
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.params import own_params
+from minilink.core.params import held_params, own_params, param_view
 from minilink.core.sets import require_box_bounds, require_nonnegative_radius
 
 ###############################################################################
@@ -28,10 +26,6 @@ class Shape(ABC):
     """
 
     params = own_params()
-
-    def with_params(self, params):
-        """The shape moved to ``params``: a copy holding them."""
-        return replace(self, **params)
 
     @property
     @abstractmethod
@@ -61,7 +55,6 @@ class Shape(ABC):
         return Inflated(self, float(radius))
 
 
-@dataclass(frozen=True)
 class Sphere(Shape):
     """
     Ball ``||p - center|| <= radius`` (a disc in 2-D, a sphere in 3-D).
@@ -74,25 +67,19 @@ class Sphere(Shape):
         Nonnegative radius.
     """
 
-    center: np.ndarray
-    radius: float
-
-    def __post_init__(self) -> None:
-        center = np.asarray(self.center, dtype=float).reshape(-1).copy()
-        radius = float(self.radius)
+    def __init__(self, center, radius):
+        center = np.asarray(center, dtype=float).reshape(-1).copy()
+        radius = float(radius)
         require_nonnegative_radius(radius)
 
-        object.__setattr__(self, "center", center)
-        object.__setattr__(self, "radius", radius)
+        self.params = {"center": center, "radius": radius}
+
+    center = param_view("center")
+    radius = param_view("radius")
 
     @property
     def dim(self) -> int:
-        return int(self.center.size)
-
-    @cached_property
-    def params(self) -> dict:
-        """``{"center", "radius"}``, the ball's numbers."""
-        return {"center": self.center, "radius": self.radius}
+        return int(np.size(self.center))
 
     def sdf(self, p, t=0.0, params=None):
         params = self.params if params is None else params
@@ -106,7 +93,6 @@ class Sphere(Shape):
         return sdf
 
 
-@dataclass(frozen=True)
 class Box(Shape):
     """
     Axis-aligned box ``lower <= p <= upper``.
@@ -117,25 +103,19 @@ class Box(Shape):
         Opposite corners with shape ``(dim,)``.
     """
 
-    lower: np.ndarray
-    upper: np.ndarray
-
-    def __post_init__(self) -> None:
-        lower = np.asarray(self.lower, dtype=float).reshape(-1).copy()
-        upper = np.asarray(self.upper, dtype=float).reshape(-1).copy()
+    def __init__(self, lower, upper):
+        lower = np.asarray(lower, dtype=float).reshape(-1).copy()
+        upper = np.asarray(upper, dtype=float).reshape(-1).copy()
         require_box_bounds(lower, upper)
 
-        object.__setattr__(self, "lower", lower)
-        object.__setattr__(self, "upper", upper)
+        self.params = {"lower": lower, "upper": upper}
+
+    lower = param_view("lower")
+    upper = param_view("upper")
 
     @property
     def dim(self) -> int:
-        return int(self.lower.size)
-
-    @cached_property
-    def params(self) -> dict:
-        """``{"lower", "upper"}``, the box's corners."""
-        return {"lower": self.lower, "upper": self.upper}
+        return int(np.size(self.lower))
 
     def sdf(self, p, t=0.0, params=None):
         params = self.params if params is None else params
@@ -155,40 +135,31 @@ class Box(Shape):
         return sdf
 
 
-@dataclass(frozen=True)
 class Union(Shape):
     """
     Union of several shapes, with ``sdf = min`` over the members.
 
     This is the obstacle-field primitive: a point is occupied when it lies
-    inside any member shape.
+    inside any member shape. ``params`` holds the members' own trees by
+    position, ``{"0": ..., "1": ...}``.
     """
 
-    shapes: tuple
+    params = held_params('The members\' numbers by position: ``{"0": ..., "1": ...}``.')
 
-    def __post_init__(self) -> None:
-        shapes = tuple(self.shapes)
+    def __init__(self, shapes):
+        shapes = tuple(shapes)
         require_members(shapes)
 
-        object.__setattr__(self, "shapes", shapes)
+        self.shapes = shapes
+        self.params = {str(i): shape.params for i, shape in enumerate(shapes)}
+
+    def param_parts(self) -> dict:
+        """The members by position: the parts an assignment routes to."""
+        return {str(i): shape for i, shape in enumerate(self.shapes)}
 
     @property
     def dim(self) -> int:
         return self.shapes[0].dim
-
-    @cached_property
-    def params(self) -> dict:
-        """The members' ``params`` by position: ``{"0": ..., "1": ...}``."""
-        return {str(i): shape.params for i, shape in enumerate(self.shapes)}
-
-    def with_params(self, params):
-        """The union with each member moved by its entry of ``params``."""
-        shapes = self.shapes
-        moved = tuple(
-            shape.with_params(params[str(i)]) for i, shape in enumerate(shapes)
-        )
-
-        return replace(self, shapes=moved)
 
     def sdf(self, p, t=0.0, params=None):
         params = self.params if params is None else params
@@ -206,32 +177,30 @@ class Union(Shape):
         return sdf
 
 
-@dataclass(frozen=True)
 class Inflated(Shape):
     """
     Shape grown outward by ``radius`` (Minkowski sum with a ball).
 
     Subtracting the radius from a base signed distance gives the clearance for
-    a disc-shaped robot, or a safety margin around a hard obstacle.
+    a disc-shaped robot, or a safety margin around a hard obstacle. ``params``
+    holds ``{"base": the base shape's own numbers, "radius"}``.
     """
 
-    base: Shape
-    radius: float
+    params = held_params('``{"base": the base shape\'s numbers, "radius"}``.')
+
+    def __init__(self, base: Shape, radius: float):
+        self.base = base
+        self.params = {"base": base.params, "radius": radius}
+
+    radius = param_view("radius")
+
+    def param_parts(self) -> dict:
+        """The base shape: the part an assignment routes to."""
+        return {"base": self.base}
 
     @property
     def dim(self) -> int:
         return self.base.dim
-
-    @cached_property
-    def params(self) -> dict:
-        """``{"base": the base shape's numbers, "radius"}``."""
-        return {"base": self.base.params, "radius": self.radius}
-
-    def with_params(self, params):
-        """The inflated shape with its base and radius moved to ``params``."""
-        return replace(
-            self, base=self.base.with_params(params["base"]), radius=params["radius"]
-        )
 
     def sdf(self, p, t=0.0, params=None):
         params = self.params if params is None else params

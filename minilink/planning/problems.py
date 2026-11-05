@@ -13,7 +13,14 @@ from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import flatten, lookup, merge_tree, set_leaf, with_leaf
+from minilink.core.params import (
+    flatten,
+    lookup,
+    merge_tree,
+    require_complete,
+    set_leaf,
+    with_leaf,
+)
 from minilink.core.sets import (
     BallSet,
     BoxInputSet,
@@ -25,6 +32,9 @@ from minilink.core.sets import (
 )
 from minilink.core.system import System
 from minilink.core.wiring import WiredDiagramMixin
+
+# The problem's own numbers, held in its tree beside the parts' trees
+OWN_LEAVES = ("x0", "t0", "discount_rate")
 
 ###############################################################################
 # Public API
@@ -43,11 +53,13 @@ class PlanningProblem:
     The problem is the continuous task: the system, the admissible and boundary
     sets, the continuous ``horizon``, the optional cost. The knot count and
     the other discretization choices belong to the solvers, not to the problem.
-    The parameters live on the parts; :attr:`params` is their live view by role,
-    as a diagram's are by block.
+    The parameters live on the parts; :attr:`params` holds their trees by role,
+    as a diagram's are by block, and the problem's own numbers (``x0``, ``t0``,
+    ``discount_rate``) beside them. It holds numbers only: the laws over them
+    are :attr:`distributions`.
 
     A problem is stochastic by its parts: where a number goes, a law may
-    go (``x0=`` a law or a set; ``params=`` laws in the tree's own shape),
+    go (``x0=`` a law or a set; ``distributions=`` laws in the tree's own shape),
     and a disturbance is a source block on a plant port. :meth:`realize`
     draws them into one tree, :meth:`nominal` is the problem without its
     laws (the start at its law's mean, the parts at their own numbers), and
@@ -127,7 +139,7 @@ class PlanningProblem:
         (default) is :meth:`cost_bound`. Value iteration and the learners always
         charge a failure this cost. A declared cost should exceed the cost-to-go
         of finishing the task from a typical start.
-    params : mapping, optional
+    distributions : mapping, optional
         Laws over the problem's parameters, in the tree's own shape
         (``{"plant": {"m": Uniform([0.9], [1.1])}}``; a block inside a diagram
         plant by its id, ``{"plant": {"plant": {"m": ...}}}``): each leaf a
@@ -159,7 +171,7 @@ class PlanningProblem:
         "penalize_failure",
         "failure_cost",
         "discount_rate",
-        "params",
+        "distributions",
         "disturbances",
         "criterion",
     )
@@ -190,7 +202,7 @@ class PlanningProblem:
         penalize_failure: bool = False,
         failure_cost: float | None = None,
         discount_rate: float = 0.0,
-        params: Mapping | None = None,
+        distributions: Mapping | None = None,
         disturbances: Mapping[str, System] | None = None,
         criterion="expectation",
     ):
@@ -263,42 +275,46 @@ class PlanningProblem:
         # The laws over the parameters, the source blocks on the plant's ports, and
         # the criterion over the draws
         self.disturbances = coerce_disturbances(disturbances, self.sys)
-        self.laws = coerce_laws(params, self.parts_view())
+        self.distributions = coerce_laws(distributions, self.parts_view())
         require_criterion(criterion, self.CRITERIA)
         self.criterion = criterion
 
     @property
     def params(self) -> dict:
         """
-        The live view of the problem's parameters, by role, as a diagram's are by block.
+        The problem's numbers, by role, as a diagram's are by block: one tree of numbers.
 
         ``{"plant": sys.params, "cost": cost.params, "X": …, "U": …, "X0": …,
-        "Xf": …, "x0": x0, "t0": t₀, "discount_rate": ρ}``, assembled on each
-        access from the parts, which stay the one home of each number (a set's
-        entry is its own ``params``, ``{}`` for a set without parameters); each
-        disturbance source's ``params`` under its port; a law in place of each
-        number the problem draws (the start's law under ``"x0"``).
+        "Xf": …, "x0": x0, "t0": t₀, "discount_rate": ρ}``. Each part's entry is
+        the part's own tree, its one home (a set's entry is its own ``params``,
+        ``{}`` for a set without parameters; each disturbance source's under its
+        port), read again from the parts at each access; ``x0``, ``t0`` and
+        ``discount_rate`` live here, so ``problem.params["discount_rate"] = 0.5``
+        sets the rate. The laws over the numbers are :attr:`distributions`.
         Assigning a dictionary routes each entry to its part, so
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
-        view = self.parts_view()
-        if self.start_law is not None:
-            view["x0"] = self.start_law
-        if self.laws:
-            view = merge_tree(view, self.laws)
+        tree = self.__dict__.setdefault("held_params", {})
+        parts = self.part_trees()
+        own = {key: tree.get(key) for key in OWN_LEAVES}
 
-        return view
+        # The parts' trees, refreshed when a part was replaced, in the roles' order
+        stale = list(tree) != [*parts, *OWN_LEAVES] or any(
+            tree[role] is not entry for role, entry in parts.items()
+        )
+        if stale:
+            tree.clear()
+            tree.update(parts)
+            tree.update(own)
+
+        return tree
 
     @params.setter
     def params(self, value):
-        require_roles(value, self.params)
-
-        # A law in the tree moves the problem's laws; the numbers move the parts
-        value, laws = split_laws(value, self.parts_view())
-        if "x0" in laws:
-            self.start_law = laws.pop("x0")
-            value.pop("x0", None)
-        self.laws = merge_tree(self.laws, laws) if laws else self.laws
+        view = self.params
+        require_roles(value, view)
+        require_numbers(value or {})
+        require_complete(value, view)
 
         for role, entry in value.items():
             if role == "plant":
@@ -314,7 +330,37 @@ class PlanningProblem:
             elif role in self.sources_by_id():
                 self.sources_by_id()[role].params = entry
             else:
-                setattr(self, role, getattr(self, role).with_params(entry))
+                # A set's numbers in place, its one home
+                getattr(self, role).params = entry
+
+    @property
+    def start_point(self):
+        """The evaluation start's point, the leaf ``params["x0"]`` (``None`` while the constructor resolves it)."""
+        return self.__dict__.setdefault("held_params", {}).get("x0")
+
+    @start_point.setter
+    def start_point(self, value):
+        self.__dict__.setdefault("held_params", {})["x0"] = value
+
+    @property
+    def t0(self) -> float:
+        """The start time of the horizon, the leaf ``params["t0"]``."""
+        return self.__dict__["held_params"]["t0"]
+
+    @t0.setter
+    def t0(self, value):
+        self.__dict__.setdefault("held_params", {})["t0"] = coerce_start_time(value)
+
+    @property
+    def discount_rate(self) -> float:
+        """The continuous discount rate ``ρ``, the leaf ``params["discount_rate"]``."""
+        return self.__dict__["held_params"]["discount_rate"]
+
+    @discount_rate.setter
+    def discount_rate(self, value):
+        self.__dict__.setdefault("held_params", {})["discount_rate"] = coerce_rate(
+            value
+        )
 
     @property
     def x0(self) -> np.ndarray:
@@ -393,7 +439,7 @@ class PlanningProblem:
 
         # Each law's leaf n times, in its number's shape, from the stream named by
         # its path (the tree copied along the path: the parts' dicts stay untouched)
-        for path, law in flatten(self.laws):
+        for path, law in flatten(self.distributions):
             nominal = np.shape(lookup(tree, path))
             values = law.sample(stream_of(key, ".".join(path)), n)
             tree = with_leaf(tree, path, values.reshape((n, *nominal)))
@@ -413,7 +459,7 @@ class PlanningProblem:
     def drawn_paths(self):
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
         paths = [("x0",)]
-        paths.extend(path for path, _ in flatten(self.laws))
+        paths.extend(path for path, _ in flatten(self.distributions))
         for sys_id, block in self.sources_by_id().items():
             if block.is_random:
                 seeds = seeds_of(block, block.realize(0))
@@ -431,14 +477,14 @@ class PlanningProblem:
 
     def sample_params(self, key):
         """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
-        paths = [path for path, _ in flatten(self.laws)]
+        paths = [path for path, _ in flatten(self.distributions)]
         keys = split_keys(key, len(paths))
         view = self.parts_view()
 
         draws = {}
         for path, k in zip(paths, keys):
             # One draw, in the nominal entry's shape, at its path
-            value = lookup(self.laws, path).sample(k)
+            value = lookup(self.distributions, path).sample(k)
             set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
 
         return draws
@@ -455,11 +501,11 @@ class PlanningProblem:
         tree = self.realize(None)
 
         # The copy without its laws, the start at its mean
-        nominal = deepcopy(self).replace(x0=self.x0, X0=None, params=None)
+        nominal = deepcopy(self).replace(x0=self.x0, X0=None, distributions=None)
 
         # Each law's mean in the copied part
         means = {}
-        for path, _ in flatten(self.laws):
+        for path, _ in flatten(self.distributions):
             set_leaf(means, path, lookup(tree, path)[0])
         if means:
             nominal.params = merge_tree(nominal.parts_view(), means)
@@ -474,7 +520,7 @@ class PlanningProblem:
     def replace(self, **changes):
         """A new problem of the same class with the named fields replaced (the others shared)."""
         fields = {name: getattr(self, name) for name in self.FIELDS}
-        fields["params"] = self.laws or None
+        fields["distributions"] = self.distributions or None
         if self.start_law is not None:
             fields["x0"] = self.start_law
         unknown = sorted(set(changes) - set(fields))
@@ -509,29 +555,30 @@ class PlanningProblem:
         """``True`` when a part is random: a law on the start or a parameter, a random source."""
         random_source = any(block.is_random for block in self.disturbances.values())
 
-        return self.start_law is not None or bool(self.laws) or random_source
+        return self.start_law is not None or bool(self.distributions) or random_source
 
     def sources_by_id(self) -> dict:
         """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
         return {source_id(port): block for port, block in self.disturbances.items()}
 
     def parts_view(self) -> dict:
-        """The parts' numbers by role, live: :attr:`params` without the laws (the start its point)."""
-        view = {"plant": self.sys.params}
+        """:attr:`params` copied at its top level: the parts' own trees by role and the problem's own numbers, for a caller that sets entries."""
+        return dict(self.params)
+
+    def part_trees(self) -> dict:
+        """Each part's own tree by role, in the roles' order: the start's singleton left out (its point is ``x0``, one home)."""
+        trees = {"plant": self.sys.params}
         if self.cost is not None:
-            view["cost"] = self.cost.params
+            trees["cost"] = self.cost.params
         for role in ("X", "U", "X0", "Xf"):
             set_ = getattr(self, role)
             if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
-                continue  # The start's singleton: its point is x0, one home
-            view[role] = getattr(set_, "params", None)
+                continue
+            trees[role] = getattr(set_, "params", None)
         for port, block in getattr(self, "disturbances", {}).items():
-            view[source_id(port)] = block.params
-        view["x0"] = self.x0
-        view["t0"] = self.t0
-        view["discount_rate"] = self.discount_rate
+            trees[source_id(port)] = block.params
 
-        return view
+        return trees
 
     def discount_factor(self, dt) -> float:
         """The per-step factor ``γ = e^{−ρ dt}`` of a planner stepping ``dt``."""
@@ -907,18 +954,20 @@ def coerce_laws(laws, view) -> dict:
     for path, law in flatten(laws):
         name = ".".join(path)
         if not isinstance(law, Distribution):
-            raise TypeError(f"params[{name!r}] must be a Distribution, got {law!r}")
+            raise TypeError(
+                f"distributions[{name!r}] must be a Distribution, got {law!r}"
+            )
         if path[0] == "x0":
-            raise ValueError("a law over the start is x0=law, not params=")
+            raise ValueError("a law over the start is x0=law, not distributions=")
         try:
             leaf = lookup(view, path)
         except KeyError:
             raise ValueError(
-                f"params law {name!r} names no leaf of the problem's parameters"
+                f"distributions law {name!r} names no leaf of the problem's parameters"
             ) from None
         if isinstance(leaf, dict):
             raise ValueError(
-                f"params law over {name!r}: a law applies to a number, not to a whole dict"
+                f"distributions law over {name!r}: a law applies to a number, not to a whole dict"
             )
 
     return laws
@@ -960,17 +1009,15 @@ def source_seeds(block, key, sys_id, n):
     return stack_leaves(seeds)
 
 
-def split_laws(value, view):
-    """``(numbers, laws)``: the tree with each law replaced by the part's current number, and the laws alone."""
-    numbers = dict(value)
-    laws = {}
+def require_numbers(value):
+    """Refuse a law in a tree of numbers: the laws over a problem's numbers are its distributions."""
     for path, leaf in flatten(value):
         if isinstance(leaf, Distribution):
-            set_leaf(laws, path, leaf)
-            if path != ("x0",):
-                numbers = with_leaf(numbers, path, lookup(view, path))
-
-    return numbers, laws
+            name = ".".join(path)
+            raise TypeError(
+                f"params[{name!r}] is a law: params holds numbers; a law over the start "
+                "is problem.replace(x0=law), over a number problem.distributions"
+            )
 
 
 def seeds_of(system, realized):

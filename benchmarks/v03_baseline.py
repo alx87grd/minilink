@@ -285,7 +285,7 @@ def draw_entries(out):
         cost=QuadraticCost.from_system(plant),
         horizon=1.0,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params={"plant": {"m": Uniform([0.8], [1.2])}},
+        distributions={"plant": {"m": Uniform([0.8], [1.2])}},
         U=plant.input_box,
     )
     tree = problem.realize(0, 3)

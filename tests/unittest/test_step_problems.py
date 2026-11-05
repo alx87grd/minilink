@@ -283,7 +283,7 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
         cost=QuadraticCost.from_system(plant),
         x0=[0.3, 0.0],
         horizon=1.0,
-        params={"plant": {"m": Uniform(1.5, 2.5)}},
+        distributions={"plant": {"m": Uniform(1.5, 2.5)}},
     )
     assert problem.sample_params(None)["plant"]["m"] == 2.0
     face = problem.compile(dt=0.1)

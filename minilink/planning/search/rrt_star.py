@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from minilink.planning.planner import planner_at
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import euclidean
@@ -124,13 +125,15 @@ class RRTStarPlanner(RRTPlanner):
 
     def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
         """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         metric = self.metric

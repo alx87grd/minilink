@@ -3,6 +3,8 @@
 import numpy as np
 import pytest
 
+from tests.unittest.planning_helpers import edited
+
 pytestmark = [pytest.mark.optional, pytest.mark.jax]
 
 jax = pytest.importorskip("jax")
@@ -67,7 +69,7 @@ def test_a_solve_is_a_function_of_its_seed():
     pv = swing_up_planner().compile()
     z_a, _ = pv.solve()
     z_b, _ = pv.solve()
-    z_c, _ = pv.solve({"seed": 1})
+    z_c, _ = pv.solve(edited(pv.params, {"seed": 1}))
     np.testing.assert_array_equal(z_a, z_b)
     assert not np.array_equal(z_a, z_c)
 
@@ -77,7 +79,7 @@ def test_the_plan_lowers_the_cost_of_the_default_one():
     pv = planner.compile()
     z0 = pv.initial()
     _, status_0 = pv.solve(
-        {"method": {"temperature": 1e9}}, z0
+        edited(pv.params, {"method": {"temperature": 1e9}}), z0
     )  # an unweighted average
     z, status = pv.solve(None, z0)
     assert float(status["cost"]) < float(status_0["cost"])
@@ -250,7 +252,7 @@ def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
     } <= set(pv.params)
     z0 = pv.initial()
     z, _ = pv.solve(None, z0)
-    heavy = {"cost": {**pv.params["cost"], "R": 100.0 * np.eye(1)}}
+    heavy = edited(pv.params, {"cost": {"R": 100.0 * np.eye(1)}})
     z_heavy, _ = pv.solve(heavy, z0)
     assert np.max(np.abs(z_heavy[:-1])) < np.max(np.abs(z[:-1]))
 
@@ -317,7 +319,7 @@ def test_the_plan_is_made_at_the_plant_design_point():
         horizon=0.5,
         x0=[0.0, 0.0],
         U=plant.input_box,
-        params={"plant": {"m": Uniform([2.5], [3.5])}},
+        distributions={"plant": {"m": Uniform([2.5], [3.5])}},
     )
     planner = MPPIPlanner(problem, dt=DT, n_rollouts=8)
     np.testing.assert_allclose(planner.params["plant"]["m"], 3.0)

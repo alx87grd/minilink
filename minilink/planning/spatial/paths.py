@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
-from functools import cached_property
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.params import own_params
+from minilink.core.params import own_params, param_view
 
 ###############################################################################
 # Public API
@@ -28,10 +26,6 @@ class ReferencePath(ABC):
     """
 
     params = own_params()
-
-    def with_params(self, params):
-        """The path moved to ``params``: a copy holding them."""
-        return replace(self, **params)
 
     @property
     @abstractmethod
@@ -64,7 +58,6 @@ class ReferencePath(ABC):
         ...
 
 
-@dataclass(frozen=True)
 class PolylinePath(ReferencePath):
     """
     Piecewise-linear path through waypoints (C⁰).
@@ -75,13 +68,14 @@ class PolylinePath(ReferencePath):
         Vertices with ``N >= 2``; ``params`` is ``{"waypoints"}``.
     """
 
-    waypoints: np.ndarray
-
-    def __post_init__(self) -> None:
+    def __init__(self, waypoints):
         # The vertices, as an (N, d) float array of at least two points
-        wp = np.asarray(self.waypoints, dtype=float)
+        wp = np.asarray(waypoints, dtype=float)
         require_polyline(wp)
-        object.__setattr__(self, "waypoints", wp)
+
+        self.params = {"waypoints": wp}
+
+    waypoints = param_view("waypoints")
 
     @property
     def workspace_dim(self) -> int:
@@ -91,11 +85,6 @@ class PolylinePath(ReferencePath):
     def total_length(self) -> float:
         _, s_knots = arc_lengths(self.waypoints, np)
         return float(s_knots[-1])
-
-    @cached_property
-    def params(self) -> dict:
-        """``{"waypoints"}``, the path's vertices."""
-        return {"waypoints": self.waypoints}
 
     def distance(self, p, t=0.0, params=None):
         params = self.params if params is None else params

@@ -19,18 +19,13 @@ lands. Last checked against the code: 2026-11-04.
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
-  keys, so the change has no effect and nothing says so. Diagram-level params check their
-  block ids; a block's own keys are not checked.
-- **Workaround:** read the key back (`plant.params["m"]`) after a change.
-- **Fix:** a Later idea in TODO §6 (a `validate_params` hook on `System`).
-
-### `copy.deepcopy` of a plant fails after a JAX simulation
-- **Symptom:** `plant.compute_trajectory(backend="jax")` then `copy.deepcopy(plant)` raises
-  "cannot pickle 'mappingproxy' object": the run's trajectory kept on the plant (`plant.traj`)
-  does not deep-copy. The same on `main`.
-- **Workaround:** deep-copy before the run, set `plant.traj = None` first, or copy
-  `plant.params` into a new plant.
-- **Fix:** none planned yet; it touches the `sys.traj` shortcut (RULES 2.4).
+  keys, so the change has no effect and nothing says so.
+- **Workaround:** a checked spelling: every tree a tool or a composite takes is checked
+  against the structure it enters, so `problem.params = p`, `planner.solve(params=p)` or
+  `sim.solve(params=p)`, with `p` a copy of the tool's own tree edited, raises on a misspelled
+  key and names the known ones. Or read the key back (`plant.params["m"]`) after a change.
+- **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
+  ruling of 2026-11-05 ([one-params-model.md](../plans/one-params-model.md), ruling 4).
 
 ## Planning and learning
 

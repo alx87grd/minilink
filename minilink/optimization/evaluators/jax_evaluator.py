@@ -237,9 +237,14 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
             if parametric is not None:
                 self.jax.block_until_ready(parametric(z_sample, self.params))
 
+    def bind(self, params=None) -> None:
+        """Bind the next calls' values, and decide their form once: frozen while the bound tree is the compiled defaults."""
+        super().bind(params)
+        self.frozen = self.frozen and tree_digest(self.params) == self.default_digest
+
     def form(self, name):
-        """The compiled ``name`` for the bound tree, a function of ``z``: frozen while the compiled defaults are bound (a later edit of the program's numbers goes parametric), else parametric."""
-        if not self.frozen or tree_digest(self.params) != self.default_digest:
+        """The compiled ``name`` for the bound tree, a function of ``z``: frozen while :meth:`bind` found the compiled defaults, else parametric."""
+        if not self.frozen:
             parametric = getattr(self, f"_jit_{name}")
             return lambda z: parametric(z, self.params)
 

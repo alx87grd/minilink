@@ -518,7 +518,7 @@ def test_planner_trains_with_randomized_parameters():
         plant,
         cost=HangCost(),
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
-        params={"plant": {"m": Particles([[0.5], [2.0]])}},
+        distributions={"plant": {"m": Particles([[0.5], [2.0]])}},
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
@@ -554,7 +554,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         inner,
         cost=HangCost(),
         x0=Uniform([-0.3, -0.3], [0.3, 0.3]),
-        params={
+        distributions={
             "plant": {"plant": {"m": Particles([[0.5], [2.0]])}}
         },  # the plant inside
         U=inner.input_box,

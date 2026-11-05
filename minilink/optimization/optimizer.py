@@ -1,5 +1,6 @@
 """The optimizer: one mathematical program, compiled once, solved by a method preset."""
 
+import copy
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -9,7 +10,9 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.params import require_complete
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
+from minilink.optimization.evaluators.program_evaluator import require_declared_params
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -169,10 +172,10 @@ class Optimizer:
 
     @property
     def params(self) -> dict:
-        """The solve's tree: the program's parameters (``{}`` without), and the method's numbers under ``"method"`` (``{}`` for a host method)."""
+        """The solve's tree, a copy: the program's parameters (``{}`` without), and the method's numbers under ``"method"`` (``{}`` for a host method); the tree a solve at other numbers edits."""
         program = self.program_evaluator.merged(None) or {}
 
-        return {**program, "method": self.adapter.method_params}
+        return copy.deepcopy({**program, "method": self.adapter.method_params})
 
     def solve(
         self,
@@ -213,7 +216,9 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
-        # The program's values and the method's numbers of this solve
+        # The program's values and the method's numbers of this solve, one complete tree
+        if params is not None:
+            require_tree_of(self, params)
         params, method = split_method(params)
 
         # A fixed count of native steps: the pure solve
@@ -273,6 +278,8 @@ class Optimizer:
         so ``compute_rollout(K)`` gives the iterates of a ``K``-step solve.
         """
         require_native(self.method)
+        if params is not None:
+            require_tree_of(self, params)
         params, method = split_method(params)
         tree = self.program_evaluator.merged(params)
 
@@ -465,6 +472,13 @@ def method_params_of(method: str, options: dict | None = None) -> dict:
         return {}
 
     return make_optimizer_backend(method, options=options).method_params
+
+
+def require_tree_of(optimizer, params):
+    """Refuse values for a program that declares none, then a tree that is not the solve's complete tree."""
+    if set(params) - {"method"}:
+        require_declared_params(optimizer.program.params)
+    require_complete(params, optimizer.params)
 
 
 def split_method(params):

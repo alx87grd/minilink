@@ -1,6 +1,8 @@
 import copy
 
 import numpy as np
+
+from tests.unittest.planning_helpers import edited
 import pytest
 from minilink.core.costs import (
     CostFunction,
@@ -174,9 +176,13 @@ def test_params_reach_each_term_by_its_id():
     u = np.array([3.0])
     base = make_quadratic().g(x, u)
     assert list(s.terms) == ["QuadraticCost", "_ParamCost"]
-    assert s.g(x, u, params={"_ParamCost": {"w": 5.0}}) == pytest.approx(base + 5.0)
+    assert s.g(
+        x, u, params=edited(s.params, {"_ParamCost": {"w": 5.0}})
+    ) == pytest.approx(base + 5.0)
     scaled = 3.0 * _ParamCost()
-    assert scaled.g(x, u, params={"cost": {"w": 2.0}}) == pytest.approx(6.0)
+    assert scaled.g(x, u, params={"weight": 3.0, "cost": {"w": 2.0}}) == pytest.approx(
+        6.0
+    )
     with pytest.raises(ValueError, match="unknown cost term"):
         s.g(x, u, params={"w": 5.0})  # a flat dictionary names no term
 
@@ -195,13 +201,14 @@ def test_a_composite_cost_nests_its_terms_params_like_a_diagram():
         "cost": {"x_bar": obstacle.cost.x_bar, "radius": obstacle.cost.radius},
     }
 
-    # A partial override changes its term only; the attributes are views
-    assert cost.g(x, u, params={"TimeCost": {"weight": 0.0}}) == pytest.approx(
+    # A tree with one term moved changes that term only; the attributes are views
+    zero_obstacle = edited(cost.params, {"TimeCost": {"weight": 0.0}})
+    assert cost.g(x, u, params=zero_obstacle) == pytest.approx(
         q.g(x, u) + other.g(x, u)
     )
     q.R[0, 0] = 3.0
     assert cost.g(x, u) == pytest.approx(q.g(x, u) + 5.0 + other.g(x, u))
-    cost.params = {"TimeCost": {"weight": 2.0}}
+    cost.params = edited(cost.params, {"TimeCost": {"weight": 2.0}})
     assert obstacle.weight == 2.0
 
     # Named terms keep their names; sum() flattens like +
@@ -740,10 +747,14 @@ def test_one_program_with_parameters_solves_for_each_value(backend):
     opt = Optimizer(program, z0=[0.0, 0.0], method="l-bfgs")
 
     np.testing.assert_allclose(opt.solve().z, [1.0, 2.0], atol=1e-6)
-    moved = opt.solve(params={"target": {"c": np.array([-3.0, 0.5])}})
+    moved = opt.solve(
+        params=edited(opt.params, {"target": {"c": np.array([-3.0, 0.5])}})
+    )
     np.testing.assert_allclose(moved.z, [-3.0, 0.5], atol=1e-6)
     n_traces = len(traces)  # the frozen form and the parametric one, each traced once
-    again = opt.solve(params={"target": {"c": np.array([0.5, -1.0])}})
+    again = opt.solve(
+        params=edited(opt.params, {"target": {"c": np.array([0.5, -1.0])}})
+    )
     np.testing.assert_allclose(again.z, [0.5, -1.0], atol=1e-6)
     np.testing.assert_allclose(
         opt.solve().z, [1.0, 2.0], atol=1e-6
@@ -751,11 +762,11 @@ def test_one_program_with_parameters_solves_for_each_value(backend):
     if backend == "jax":
         assert len(traces) == n_traces  # a new value never retraces
 
-    # The one merge at the boundary: an unknown path, a new shape
+    # The one check at the boundary: an unknown path, a new shape
     with pytest.raises(ValueError, match="known entries are"):
-        opt.solve(params={"target": {"d": 1.0}})
+        opt.solve(params=edited(opt.params, {"target": {"d": 1.0}}))
     with pytest.raises(ValueError, match="shape"):
-        opt.solve(params={"target": {"c": np.zeros(3)}})
+        opt.solve(params=edited(opt.params, {"target": {"c": np.zeros(3)}}))
 
 
 def test_a_program_without_parameters_refuses_values():
@@ -763,7 +774,7 @@ def test_a_program_without_parameters_refuses_values():
 
     program = MathematicalProgram(n_z=1, J=lambda z: z @ z)
     opt = Optimizer(program, z0=[1.0], method="l-bfgs")
-    assert abs(opt.solve(params={}).z[0]) < 1e-6
+    assert abs(opt.solve(params=opt.params).z[0]) < 1e-6
     with pytest.raises(ValueError, match="declares no parameters"):
         opt.solve(params={"c": 1.0})
     with pytest.raises(TypeError, match="must be a dict"):
@@ -812,7 +823,7 @@ def test_a_fixed_count_solve_is_one_pure_scan_with_a_gradient(method):
 
     # d z_K / d c through the K steps, against a central difference
     def z_of(c):
-        return opt.solve(params={"c": c}).z
+        return opt.solve(params=edited(opt.params, {"c": c})).z
 
     c = jnp.asarray([1.0, -0.5])
     jacobian = np.asarray(jax.jacobian(z_of)(c))
@@ -882,9 +893,9 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
             n_iterations=20,
             options={"max_grad_norm": max_grad_norm},
         )
-        jacobian = jax.jacobian(lambda c: opt.solve(params={"c": c}).z)(
-            jnp.asarray([0.0, 2.0])
-        )
+        jacobian = jax.jacobian(
+            lambda c: opt.solve(params=edited(opt.params, {"c": c})).z
+        )(jnp.asarray([0.0, 2.0]))
         assert np.all(np.isfinite(np.asarray(jacobian)))
     with pytest.raises(ValueError, match="shape"):
         opt.solve(z0=[0.0, 0.0, 0.0])

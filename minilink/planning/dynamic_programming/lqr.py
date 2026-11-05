@@ -18,7 +18,12 @@ from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
 from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, given_numbers, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    given_numbers,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.problems import PlanningProblem, nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
@@ -111,13 +116,15 @@ class LQRPlanner(Planner):
         the quadratic form of the linear model. ``evaluate=True`` also rolls
         the law out from the problem's start on the nonlinear plant and scores
         it over the problem's draws.
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         problem = self.problem

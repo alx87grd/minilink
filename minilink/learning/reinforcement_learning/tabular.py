@@ -14,7 +14,12 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, given_numbers, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    given_numbers,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -195,13 +200,13 @@ class TabularLearningPlanner(Planner):
 
         ``evaluate=True`` also rolls the law out from the problem's start and
         scores it over the problem's draws.
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(
+            solution = planner_at(self, params).solve(
                 episodes, evaluate=evaluate, n_trials=n_trials
             )
             return self.store_solution(solution)

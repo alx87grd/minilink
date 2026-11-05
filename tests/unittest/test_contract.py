@@ -281,15 +281,26 @@ def test_jax_agrees_and_a_float_leaf_has_a_gradient(name, obj, call):
     assert np.all(np.isfinite(np.asarray(grad))), f"{name}: d/d{'.'.join(keys)}"
 
 
-def test_a_law_at_other_numbers_is_built_from_them():
+def test_a_law_moves_with_its_numbers_and_its_mean_follows():
     from minilink.core.distributions import Gaussian, Particles, Uniform
 
-    for law, moved in (
-        (Gaussian(np.zeros(2), np.ones(2)), {"mean": np.ones(2), "std": np.ones(2)}),
-        (Uniform([0.0], [1.0]), {"lower": np.array([2.0]), "upper": np.array([3.0])}),
-        (Particles(np.zeros((3, 1))), {"points": np.ones((3, 1))}),
+    for law, moved, mean in (
+        (
+            Gaussian(np.zeros(2), np.ones(2)),
+            {"mean": np.ones(2)},
+            np.ones(2),
+        ),
+        (
+            Uniform([0.0], [1.0]),
+            {"lower": np.array([2.0]), "upper": np.array([3.0])},
+            np.array([2.5]),
+        ),
+        (Particles(np.zeros((3, 1))), {"points": np.ones((3, 1))}, np.ones(1)),
     ):
-        other = law.with_params(moved)
-        assert type(other) is type(law) and other is not law
+        spread = {key: value for key, value in law.params.items() if key not in moved}
         for key, value in moved.items():
-            np.testing.assert_array_equal(other.params[key], value)
+            law.params[key] = value
+
+        np.testing.assert_array_equal(law.mean, mean)
+        for key, value in spread.items():
+            np.testing.assert_array_equal(law.params[key], value)

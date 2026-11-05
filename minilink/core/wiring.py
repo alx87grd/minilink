@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
+from minilink.core.params import require_complete
 from minilink.core.roles import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
@@ -124,6 +125,8 @@ class WiredDiagramMixin:
         if value is None:
             return
 
+        # The whole tree checked before the first write: a refused tree changes nothing
+        require_complete(value, self.params)
         for sys_id, subsystem_params in value.items():
             self.subsystems[sys_id].params = subsystem_params
 
@@ -142,6 +145,7 @@ class WiredDiagramMixin:
         """
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
+        require_new_block(sys, sys_id, self.subsystems)
 
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
@@ -870,6 +874,17 @@ def require_plain_id(sys_id):
             f"block id {sys_id!r} holds {''.join(separators)!r}: '.' and '/' join "
             "parameter paths ('controller.Kp') and ':' names a port ('plant:y'); "
             "use letters, digits and '_' (motor_v2)"
+        )
+
+
+def require_new_block(sys, sys_id, subsystems):
+    """Refuse a block the diagram already holds: its numbers would have two paths in the diagram's tree."""
+    held = [existing_id for existing_id, block in subsystems.items() if block is sys]
+    if held:
+        raise ValueError(
+            f"this block is already in the diagram as {held[0]!r}; a block is added "
+            f"once (its params have one home): add a copy under {sys_id!r}, "
+            "copy.deepcopy(block)"
         )
 
 

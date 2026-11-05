@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -61,6 +62,11 @@ class PlanningSolution:
         the critic of a learned law when it estimates the problem's own
         discount. On a stochastic problem it is the expected cost-to-go
         when the method takes the distributions.
+    params : dict, optional
+        The numbers the solve ran on: the problem's tree as it was when the
+        solution was made, a copy. ``None`` (the default) takes it from
+        ``problem`` at construction; the live problem may move afterwards, the
+        evidence keeps its numbers.
     """
 
     problem: PlanningProblem
@@ -69,6 +75,12 @@ class PlanningSolution:
     trajectory: Trajectory | None
     evaluation: Evaluation | None
     cost_to_go: Callable | None = None
+    params: dict | None = None
+
+    def __post_init__(self) -> None:
+        # The numbers solved on, a copy: the evidence keeps them when the problem moves
+        if self.params is None:
+            object.__setattr__(self, "params", copy.deepcopy(self.problem.params))
 
     @property
     def success(self) -> bool:

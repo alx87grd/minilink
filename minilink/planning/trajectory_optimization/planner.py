@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
-from minilink.core.params import tree_digest
+from minilink.core.params import checked, tree_digest
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -216,9 +216,9 @@ class TrajectoryOptimizationPlanner(Planner):
         """
         Offline trajopt entry.
 
-        ``params`` is a partial tree of the problem's leaves (``planner.params``:
-        ``x0``, ``t0``, the plant's, the cost's, ...), solved on a copy
-        of the problem holding them; ``None`` solves the problem as it is.
+        ``params`` is the complete tree of :attr:`params` (``x0``, ``t0``, the
+        plant's, the cost's, ..., ``method``, ``seed``), a copy edited, solved on
+        a copy of the problem holding it; ``None`` solves the problem as it is.
         ``guess`` seeds the solve: a :class:`~minilink.core.trajectory.Trajectory`,
         a packed ``z`` (a compiled face's, its origin dropped), or a
         :class:`~minilink.planning.results.PlanningSolution`
@@ -227,7 +227,9 @@ class TrajectoryOptimizationPlanner(Planner):
         input as a source block, ``policy >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
         """
-        problem_params, method = planner_parts(params)
+        problem_params, method = planner_parts(
+            None if params is None else checked(params, self.params)
+        )
         problem = problem_with(self.problem, host_tree(problem_params))
 
         return self.solve_on(problem, guess, evaluate, n_trials, method)
@@ -277,7 +279,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # back from z*
         history = []
         optimization_result = optimizer.solve(
-            params=None if method is None else {"method": method},
+            params=None if method is None else {**optimizer.params, "method": method},
             z0=z0,
             callback=self.build_callback(optimizer, backend, history),
             record_solve_time=self.record_solve_time or self.verbose,
@@ -403,11 +405,11 @@ class TrajectoryOptimizationPlanner(Planner):
         x0 : array_like
             Measured initial state.
         params : mapping, optional
-            The values of this tick, a partial tree of the problem's leaves
-            (``{"plant": {"mu": 0.6}, "cost": {"x_bar": …}, "t0": t}``),
-            merged once onto the program's defaults with ``x0`` as its
-            ``x0``: an unknown path raises naming the known ones.
-            ``None`` or ``{}`` binds ``x0`` only; ``scene`` is reserved for the
+            The values of this tick: ``None``, or the planner's complete tree
+            (:attr:`params`, a copy edited: ``p["plant"]["mu"] = 0.6``,
+            ``p["t0"] = t``), checked against it, with ``x0`` as its ``x0``:
+            an unknown or a missing path raises naming the known ones.
+            ``None`` binds ``x0`` only; ``scene`` is reserved for the
             scene bind (A3) and raises.
         guess : ndarray, Trajectory or PlanningSolution, optional
             NLP seed (a schedule, a packed ``z``, or a solution's trajectory);
@@ -420,6 +422,8 @@ class TrajectoryOptimizationPlanner(Planner):
         suggesting :meth:`compile_parametric_program`): one API at two speeds.
         """
         require_no_scene(params)
+        if params is not None:
+            params, _ = planner_parts(checked(params, self.params))
 
         # The fast bind path on a compiled program, else a rebuild from x0
         if self.has_parametric_program:
@@ -483,6 +487,7 @@ class TrajectoryOptimizationPlanner(Planner):
             tuple(id(part) for part in parts),
             problem.horizon,
             tree_digest(params_of(problem)),
+            tree_digest(sets_params(problem)),
         )
 
         return key, parts
@@ -912,6 +917,15 @@ class TrajectoryOptimizationIteration:
     cost: float
     max_eq: float
     min_ineq: float | None
+
+
+def sets_params(problem) -> dict:
+    """Every set's numbers by role: a box lowered to the decision bounds is no leaf of the program, yet its numbers build it."""
+    return {
+        role: getattr(set_, "params", None)
+        for role in ("X", "U", "X0", "Xf")
+        if (set_ := getattr(problem, role)) is not None
+    }
 
 
 def require_no_scene(params) -> None:

@@ -6,21 +6,13 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
-from minilink.core.params import own_params
+from minilink.core.params import (
+    held_params,
+    own_params,
+    param_view,
+    require_complete,
+)
 from minilink.core.trajectory import Trajectory
-
-
-def param_view(key):
-    """An attribute that reads and writes ``self.params[key]``: a view, so in-place writes reach the cost."""
-
-    def read(self):
-        return self.params[key]
-
-    def write(self, value):
-        self.params[key] = value
-
-    return property(read, write, doc=f"View of ``params[{key!r}]``.")
-
 
 ###############################################################################
 # Public API
@@ -376,17 +368,20 @@ class SumCost(CostFunction):
     @params.setter
     def params(self, value):
         validate_cost_params(value, self.terms)
-        for term_id, term_params in (value or {}).items():
+        if value is None:
+            return
+        require_complete(value, self.params)
+        for term_id, term_params in value.items():
             self.terms[term_id].params = term_params
 
     def g(self, x, u, t=0.0, params=None):
         """Return the summed running cost, each term on its own entry of ``params``."""
         validate_cost_params(params, self.terms)
-        params = params or {}
+        params = self.params if params is None else params
 
         # g = Σᵢ gᵢ(x, u, t)
         g = sum(
-            cost.g(x, u, t, params.get(term_id)) for term_id, cost in self.terms.items()
+            cost.g(x, u, t, params[term_id]) for term_id, cost in self.terms.items()
         )
 
         return g
@@ -394,18 +389,16 @@ class SumCost(CostFunction):
     def h(self, x, t=0.0, params=None):
         """Return the summed terminal cost, each term on its own entry of ``params``."""
         validate_cost_params(params, self.terms)
-        params = params or {}
+        params = self.params if params is None else params
 
         # h = Σᵢ hᵢ(x, t)
-        h = sum(
-            cost.h(x, t, params.get(term_id)) for term_id, cost in self.terms.items()
-        )
+        h = sum(cost.h(x, t, params[term_id]) for term_id, cost in self.terms.items())
 
         return h
 
     def g_max(self, X, U, params=None):
         """The sum of the terms' bounds: ``max Σ gᵢ ≤ Σ max gᵢ``."""
-        params = params or {}
+        params = self.params if params is None else params
 
         return sum(
             cost.g_max(X, U, params.get(term_id))
@@ -414,7 +407,7 @@ class SumCost(CostFunction):
 
     def h_max(self, X, params=None):
         """The sum of the terms' bounds."""
-        params = params or {}
+        params = self.params if params is None else params
 
         return sum(
             cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
@@ -426,29 +419,23 @@ class ScaledCost(CostFunction):
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``. Its :attr:`params` nest the
-    scaled cost's, ``{"weight": w, "cost": cost.params}``; in a sum it takes
-    the id of the cost it scales.
+    reads as ``base + weight * obstacle_cost``. Its :attr:`params` hold the
+    weight, its one home, beside the scaled cost's own tree,
+    ``{"weight": w, "cost": cost.params}``; in a sum it takes the id of the cost
+    it scales.
     """
+
+    params = held_params('``{"weight": w, "cost": the scaled cost\'s numbers}``.')
 
     def __init__(self, cost, weight):
         self.cost = cost
-        self.weight = float(weight)
+        self.params = {"weight": float(weight), "cost": cost.params}
 
-    @property
-    def params(self):
-        """Live view ``{"weight": w, "cost": cost.params}``."""
-        return {"weight": self.weight, "cost": self.cost.params}
+    weight = param_view("weight")
 
-    @params.setter
-    def params(self, value):
-        require_known_keys(value, ("weight", "cost"), "ScaledCost")
-        if value is None:
-            return
-        if "weight" in value:
-            self.weight = value["weight"]
-        if "cost" in value:
-            self.cost.params = value["cost"]
+    def param_parts(self) -> dict:
+        """The scaled cost: the part an assignment routes to."""
+        return {"cost": self.cost}
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""
@@ -487,11 +474,10 @@ class ScaledCost(CostFunction):
         return weight * self.cost.h_max(X, inner)
 
     def split(self, params):
-        """``(weight, the scaled cost's params)``: the entries given, else the cost's own."""
-        require_known_keys(params, ("weight", "cost"), "ScaledCost")
-        params = params or {}
+        """``(weight, the scaled cost's params)``: the tree given, else the cost's own."""
+        params = self.params if params is None else params
 
-        return params.get("weight", self.weight), params.get("cost")
+        return params["weight"], params["cost"]
 
 
 class StepCost(ABC):
@@ -568,6 +554,7 @@ class SampledCost(StepCost):
 
     @params.setter
     def params(self, value):
+        require_complete(value, self.cost.params)
         self.cost.params = value
 
     def c(self, x, u, k=0, params=None):
@@ -757,15 +744,6 @@ def validate_cost_params(params, terms):
         raise ValueError(
             f"unknown cost term id(s) {unknown}; the sum's terms are {list(terms)}"
         )
-
-
-def require_known_keys(params, keys, owner):
-    """Refuse a params dictionary with a key the owner does not have."""
-    if params is None:
-        return
-    unknown = sorted(set(params) - set(keys))
-    if unknown:
-        raise ValueError(f"{owner} params take {list(keys)}, got {unknown}")
 
 
 def check_weights(Q, R, S, n, m):

@@ -266,11 +266,18 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
-- [ ] **One parameters model for every object** **[ask — core]** ([one-params-model.md](one-params-model.md), its option B): sets, fields, distributions and shapes hold a live `params` tree as systems do; `with_params` the copy on every object; composites take a partial tree. It replaces CA-4 below. Done when the plan's PM steps land byte-identical on the seeded baseline.
-- [ ] **Partial parameter updates** (CA-4): `Distribution.with_params` merges a partial
-  dictionary (CA-4a, today it rebuilds from the given keys only, `core/distributions.py`),
-  `CostFunction.with_params` (CA-4b; sets, fields and distributions have it), and a partial
-  dictionary on `diagram.params` (CA-4c). Done when each reproducer passes.
+- [ ] **One parameters model for every object** ([one-params-model.md](one-params-model.md),
+  ruled 2026-11-05; built on the branch `params-one-tree` by the overnight run,
+  [one-params-run.md](one-params-run.md), its log the handoff): its steps PM-0 to PM-6
+  landed there, each byte-identical on the seeded baseline, DESIGN §4 holding the contract.
+  **[ask]** the maintainer's review before the merge into `dev`: the flagged student-facing
+  edits and the planner-rebuild choice, both listed in the run log. Its follow-ups, each
+  small: the problem evaluator's frozen form (it snapshots, and always runs its tree as an
+  argument); the planner's method numbers as views of its tree (they are attributes, and
+  `solve(params=)` their route); the problem's internal helpers (`parts_view`,
+  `sample_params`, `nominal_plant_params`, `drawn_paths`) folded into its held tree; a
+  union's members and a scene's obstacles keyed by id rather than position. Done when the
+  branch is merged and the follow-ups are rows of their own or landed.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
 - [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,
@@ -473,10 +480,7 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   machinery, apart from `METHODS` at the top.
 - [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
   `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
-  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies;
-  `search/extenders.py` asks `getattr(U, "box", None)` instead of `U.bounding_box()` (also a
-  D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
-  `_total_length` through `object.__setattr__` without declaring them as fields.
+  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies.
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
   method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by the compiled face (DESIGN §6);
@@ -541,8 +545,6 @@ pick):
 **D3 — hardening rows** (research lane, small; S53 and the `HybridSimulator` drift row moved to
 §1):
 
-- [ ] RRT `KinodynamicExtender` ignores `problem.params.system`; `extenders.py` probes
-  `getattr(U, "box", None)` instead of `U.bounding_box()`.
 - [ ] RRT checks `X.contains(sample)` and the goal region without the time: a time-varying `X` or
   `Xf` is read at `t = 0` (`rrt.py`, `rrt_star.py`); the tree nodes need a time (the sum of the
   edge durations) and the checks pass it.
@@ -986,9 +988,6 @@ One line each; open a plan doc only when a design needs a writeup.
 - A training run that rebinds its numbers: the RL planner's `params` is a report
   today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.
-- A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
-  where diagram params are validated): today a typo or a retired key in any block's params is
-  ignored silently; a question for the whole library.
 - A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static
   HTML of one frame. The headless screenshot side exists: `docs/asset_export.py::html_to_gif`
   seeks an exported page frame by frame, so a still is one `seek` and one screenshot. With it,

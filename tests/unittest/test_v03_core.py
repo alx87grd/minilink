@@ -21,6 +21,7 @@ from minilink import (
 from minilink.analysis import discretize
 from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
+from tests.unittest.planning_helpers import edited
 
 
 class LowPass(StepSystem):
@@ -373,12 +374,16 @@ def test_script_12_program_the_gradient_in_t0_matches_a_central_difference():
     pe = tracking_problem(100.0, 0.0).compile(
         PID(Kp=8.0, Kd=2.0), dt=0.01, backend="jax"
     )
-    params = pe.merged({})
+    params = pe.merged(None)
     grad = jax.grad(lambda p: pe.evaluate(p).objective)(params)
 
     h = 1e-5
-    J_plus = float(pe.evaluate(pe.merged({"t0": 100.0 + h})).objective)
-    J_minus = float(pe.evaluate(pe.merged({"t0": 100.0 - h})).objective)
+    J_plus = float(
+        pe.evaluate(pe.merged(edited(pe.params, {"t0": 100.0 + h}))).objective
+    )
+    J_minus = float(
+        pe.evaluate(pe.merged(edited(pe.params, {"t0": 100.0 - h}))).objective
+    )
     central = (J_plus - J_minus) / (2 * h)
     assert float(grad["t0"]) == pytest.approx(central, rel=1e-5)
     assert abs(central) > 1e-3  # the reference moves under the run
@@ -463,15 +468,18 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
             "plant": {"mu": np.asarray(mu)},
             "cost": {"x_bar": bicycle_planner(target_y=target_y).problem.cost.x_bar},
         }
-        plan = compiled.solve_trajectory_from(x0, params=values)
+        plan = compiled.solve_trajectory_from(
+            x0, params=edited(compiled.params, values)
+        )
         rebuilt = bicycle_planner(mu, target_y).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.u, rebuilt.trajectory.u, atol=1e-5)
         plans[mu, target_y] = plan.trajectory
 
         # The NumPy rebuild path answers the same values on the same API
-        numpy_plan = bicycle_planner(backend="numpy").solve_trajectory_from(
-            x0, params=values
+        numpy_planner = bicycle_planner(backend="numpy")
+        numpy_plan = numpy_planner.solve_trajectory_from(
+            x0, params=edited(numpy_planner.params, values)
         )
         # (SLSQP on finite differences: the same optimum on a flat valley)
         assert numpy_plan.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
@@ -486,7 +494,9 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
 
     # An unknown path raises, naming the known ones
     with pytest.raises(ValueError, match="known entries"):
-        compiled.solve_trajectory_from(x0, params={"plant": {"nu": 1.0}})
+        compiled.solve_trajectory_from(
+            x0, params=edited(compiled.params, {"plant": {"nu": 1.0}})
+        )
 
 
 def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
@@ -526,7 +536,8 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     compiled = pendulum_planner(method="ipopt")
     compiled.compile_parametric_program()
     plan = compiled.solve_trajectory_from(
-        compiled.problem.x0, params={"plant": {"m": np.asarray(1.3)}}
+        compiled.problem.x0,
+        params=edited(compiled.params, {"plant": {"m": np.asarray(1.3)}}),
     )
     reference = pendulum_planner(1.3).solve()
     assert plan.success
@@ -714,7 +725,7 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
     # x(0) arrives at t = 0.05 and is read at the fast ticks
     np.testing.assert_array_equal(u[:5], 0.0)
     pv = mpc.pv
-    z0, _ = pv.solve({"x0": problem.x0, "t0": 0.0}, z0=pv.initial())
+    z0, _ = pv.solve(edited(pv.params, {"x0": problem.x0, "t0": 0.0}), z0=pv.initial())
     expected = [float(pv.command(z0, None, 0.01 * k)[0]) for k in range(5, 10)]
     np.testing.assert_allclose(u[5:10], expected, rtol=1e-10)
 
