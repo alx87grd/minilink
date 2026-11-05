@@ -313,3 +313,43 @@ the run log and a clean tree.
   Executed: both tutorials and the MPC example. Full pytest 2192 passed, regression gates
   and the demo bridge pass, baseline byte-identical. The full notebook smoke check runs from
   a snapshot worktree of this commit; its result is logged with step 5.
+- **Step 5 (40e6fdc).** The device cache and its per-call digest removed; a JAX leaf already
+  in its compiled dtype and shape passes untouched. Measured against the base commit, same
+  script, per `ev.f` call: the frozen form unchanged (11.5 against 12.7 µs pendulum, 13.5
+  both racecar), a device tree 1.8 to 2.4 times faster, two trees alternating (the MPC
+  pattern) 5 to 6 times faster. The problem evaluator snapshots at its compile; one test that
+  pinned its live read of a goal set replaced after the compile reads it through a new
+  compile. `Simulator.solve(params=)` (ruling 7); every `PlanningSolution` records `params`
+  (ruling 5). Deferred: the problem evaluator's frozen form (it snapshots but runs its tree as
+  an argument, so the baseline stays byte-identical). The notebook smoke check of step 4
+  caught the planners tutorial's partial tree; fixed here (**flagged, student-facing**).
+- **Step 6 (23cbd58).** DESIGN §4 holds the seven rules; §5 "Compile once" without the cache;
+  RULES 2.3, 4.4, 5.21; KNOWN_ISSUES and TODO follow. Two deviations, deliberate: the plan
+  and this runbook stay on the branch until the review (this log is the handoff), and the
+  parameters tutorial's `refresh()` cell, listed for removal, is kept (it runs; removing
+  teaching content is the maintainer's call). **Flagged:** that tutorial's diagram row.
+- **Step 7 (6b0c7f2).** The RRT extender reads the plant's numbers at each solve and asks
+  `U` for its bounding box; its TODO rows leave.
+
+### Handoff, 2026-11-05 morning
+
+- **Landed on `params-one-tree`** (`git log --oneline origin/dev..origin/params-one-tree`):
+  the baseline script, steps 0 to 7, three run-log commits, one format fix. Not merged into
+  `dev`; no pull request opened.
+- **Verified on the final commit:** full pytest 2197 passed locally; the seeded baseline
+  byte-identical after every step; regression gates (CI flags) and the demo bridge pass;
+  docs build passes; the full notebook smoke check 38 of 38 pass; **CI on the branch**
+  (workflow dispatch, run 41974576046): all ten jobs green, the regression job's JAX tests,
+  flagships and gates included.
+- **Waiting for the maintainer:**
+  1. The planner-rebuild choice (step 4): a method number a complete tree leaves at the
+     planner's value is derived again on the new problem, one it changes is given.
+  2. The student-facing edits, all executed: the parameters, sets, problem, compile,
+     program and planners tutorials, the RL-to-Bode showcase, the MPC path example (its
+     ROS snippet is three lines now: one tick tree, its start and time set).
+  3. Whether to delete the parameters tutorial's `refresh()` cell, as the plan lists.
+  4. The merge into `dev`, and then deleting the plan and this runbook, the contract being
+     in DESIGN.
+- **Follow-ups, each small** (the TODO row lists them): the problem evaluator's frozen form;
+  the planner's method numbers as views of its tree; the problem's internal helpers folded
+  into its held tree; a union's members and a scene's obstacles keyed by id.
