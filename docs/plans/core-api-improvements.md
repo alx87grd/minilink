@@ -1,6 +1,6 @@
 # Core API improvements from the core tutorial audit
 
-**Status:** the `examples/tutorial/core/` (`01`–`08`) API review's proposals; CA-1 to CA-6 open, scheduled in v0.4 (TODO §1.11, each **[ask — core]**); CA-7 landed. The diffs' line numbers are from the review and drift.
+**Status:** the `examples/tutorial/core/` (`01`–`08`) API review's proposals; CA-1, CA-2 and CA-5 open, scheduled in v0.4 (TODO §1.11, each **[ask — core]**); CA-3, CA-6 and CA-7 landed. The diffs' line numbers are from the review and drift.
 
 Each item below records:
 1. **The problem and concrete reproducer**

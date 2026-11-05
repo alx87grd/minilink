@@ -27,8 +27,8 @@ Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or rev
 agent starts. They are details, versions and demos, not design questions (those are
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
-**The API surface rulings have the go** (§1.11, ruled 2026-11-05: each ruling is taken, build it as
-written).
+**The nine API surface rulings of 2026-11-05 landed** (the branch `api-surface-rulings-review`; their
+contracts are DESIGN's).
 
 **The core's leftover rows have the go**: every row of §1.1 to §1.10 is cleared to start under its
 "done when"; the internal choices an agent meets (the default output stub's type under JAX, the
@@ -37,8 +37,8 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| The core API proposals | CA-1–CA-6 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
-| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions ([api-surface-rulings.md](api-surface-rulings.md), "Not ruled yet") |
+| The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
+| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
@@ -78,15 +78,12 @@ maintainer would and logged in the run's record.
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-05, `dev` at the API surface plan; every branch before it merged):
-1. **The API surface rulings** (§1.11, [api-surface-rulings.md](api-surface-rulings.md)):
-   reviewed one by one 2026-11-05 (AR-4 to AR-9 amended in place), one branch
-   (`api-surface-rulings-review`), one commit per ruling, with the small rows the plan doc's
-   "What the branch also carries" lists. Cleared to start; the signal-recording companion is its
-   own row after it.
+**Next, in order** (as of 2026-11-05, the nine API surface rulings built on `api-surface-rulings-review`):
+1. **A continuous run records its signals from its own pass** (§1.11): the companion split off
+   the block-selector ruling, benchmarked first. Cleared to start.
 2. **The decisions waiting for the maintainer** before their rows can start: the core API
-   proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
-   §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
+   proposals CA-1, CA-2 and CA-5, the minimal surface's MS-D1 to MS-D6, `refresh()` retired and
+   a later round of API proposals (all §1.11 and §1.12).
 3. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
    merge to `main`, `0.4.0`.
 
@@ -278,16 +275,16 @@ commit per proposal, its callers and DESIGN in the same change.
   y_dependencies=)` as `DynamicSystem` and `StepSystem` do. Done when the reproducer builds.
 - [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
-- [ ] **The API surface rulings** (AR-1 to AR-9 in
-  [api-surface-rulings.md](api-surface-rulings.md), ruled 2026-11-05, none built): a
-  distribution's mean one spelling; `evaluate` without `dt` for a sampled controller; two box
-  spellings, `U=` a box; `traj.at(t, name)`; `jacobian` an array everywhere, one name; a default start on the
-  constructor and this solve's on `solve`, the solve time recorded at the user's verb, never in
-  a traced solve; `traj.of("plant")` on both loop kinds, with a
-  continuous run recording its signals from its own pass (benchmarked first); the forced run folded into
-  `compute_trajectory(u=)`, the rollout and its plot kept beside it, inputs `(m, N)` at the facade; two replanning routes, the start-only route and the RL planner's rollout verb removed. One branch, one commit per
-  ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
-  deleted.
+- [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
+  public-surface scan, after its nine rulings landed; each needs its own context and options
+  before a ruling): the planner's shortcuts taking the solution's names (`plot_solution` →
+  `plot_trajectory`; `get_controller` and `value_at`; student-facing); training budgets
+  `n_episodes` and `n_timesteps` (RULES 2.7); workflow keywords on constructors;
+  `problem.compile()` always returning the evaluator, the step face from
+  `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the
+  evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
+  `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
+  a result object for `pv.solve`. Done when the maintainer rules on each.
 - [ ] **A continuous run records its signals from its own pass** (was the companion of the
   block-selector ruling AR-7; split off 2026-11-05, its own branch after the rulings). Today an
   adaptive run computes every internal signal at its own stage points and throws them away, then

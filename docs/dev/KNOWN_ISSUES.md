@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-11-04.
+lands. Last checked against the code: 2026-11-05.
 
 ## Composition and control
 
