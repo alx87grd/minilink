@@ -12,7 +12,13 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import delegated_params, held_params, own_params, param_view
+from minilink.core.params import (
+    delegated_params,
+    held_params,
+    member_keys,
+    own_params,
+    param_view,
+)
 
 ###############################################################################
 # Public API
@@ -407,22 +413,24 @@ class IntersectionSet(Set):
 
     Built by the ``&`` operator on :class:`Set`; ``a & b & c`` is one flat
     intersection of three members. ``params`` holds the members' own trees by
-    position, ``{"0": ..., "1": ...}``: an edit of a member's numbers is the
+    class name (a repeat numbered, ``{"BoxSet": ..., "BallSet": ...}``): an edit of a member's numbers is the
     intersection's, and an assignment routes each entry to its member.
     """
 
-    params = held_params('The members\' numbers by position: ``{"0": ..., "1": ...}``.')
+    params = held_params(
+        'The members\' numbers by class name: ``{"BoxSet": ..., "BallSet": ...}``, a repeat numbered.'
+    )
 
     def __init__(self, sets):
         sets = tuple(sets)
         require_members(sets)
 
         self.sets = sets
-        self.params = {str(i): set_.params for i, set_ in enumerate(sets)}
+        self.params = {key: set_.params for key, set_ in zip(member_keys(sets), sets)}
 
     def param_parts(self) -> dict:
-        """The members by position: the parts an assignment routes to."""
-        return {str(i): set_ for i, set_ in enumerate(self.sets)}
+        """The members by key: the parts an assignment routes to."""
+        return dict(zip(member_keys(self.sets), self.sets))
 
     @classmethod
     def of(cls, *sets: Set) -> "IntersectionSet":
@@ -445,8 +453,8 @@ class IntersectionSet(Set):
 
         # Each member's margins as a vector, a scalar margin as one entry
         margins = [
-            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params[str(i)])), (-1,))
-            for i, set_ in enumerate(sets)
+            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params[key])), (-1,))
+            for key, set_ in zip(member_keys(sets), sets)
         ]
 
         # z ∈ Z₁ ∩ Z₂ ∩ … ⇔ every member's margins ≥ 0

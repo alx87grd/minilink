@@ -128,7 +128,7 @@ class MPPIPlanner(Planner):
         }
         if problem.X.params:
             tree["X"] = copy.deepcopy(problem.X.params)
-        tree["method"] = copy.deepcopy(self.method)
+        tree["method"] = self.method
         tree["seed"] = self.seed
 
         return tree

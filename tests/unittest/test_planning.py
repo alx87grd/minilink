@@ -2124,9 +2124,13 @@ class TestTextbookOptions(unittest.TestCase):
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
         self.assertTrue(planner.live_plot)
-        self.assertIsNotNone(planner.build_callback(None, planner.problem, "numpy", [], None))
+        self.assertIsNotNone(
+            planner.build_callback(None, planner.problem, "numpy", [], None)
+        )
         planner.live_plot = False
-        self.assertIsNone(planner.build_callback(None, planner.problem, "numpy", [], None))
+        self.assertIsNone(
+            planner.build_callback(None, planner.problem, "numpy", [], None)
+        )
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
     def test_trajopt_live_plot_composes_with_a_user_callback(self):

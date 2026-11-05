@@ -835,11 +835,11 @@ def test_a_write_to_an_intersection_role_keeps_the_other_members():
         x0=np.zeros(2),
         X=IntersectionSet([box, ball]),
     )
-    problem.params = edited(problem.params, {"X": {"1": {"radius": 2.0}}})
+    problem.params = edited(problem.params, {"X": {"BallSet": {"radius": 2.0}}})
     assert problem.X.sets[1].radius == 2.0 and problem.X.sets[0] is box
     both = IntersectionSet([box, ball])
-    with pytest.raises(ValueError, match="unknown \\['2'\\]"):
-        both.params = edited(both.params, {"2": {"radius": 1.0}})
+    with pytest.raises(ValueError, match="unknown \\['BallSet_2'\\]"):
+        both.params = edited(both.params, {"BallSet_2": {"radius": 1.0}})
 
 
 def test_a_user_set_with_numbers_is_moved_on_a_deep_copy():

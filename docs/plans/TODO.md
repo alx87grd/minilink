@@ -84,12 +84,10 @@ maintainer would and logged in the run's record.
    (`api-surface-rulings-review`), one commit per ruling, with the small rows the plan doc's
    "What the branch also carries" lists. Cleared to start; the signal-recording companion is its
    own row after it.
-2. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical. On the
-   same branch, after the rulings.
-3. **The decisions waiting for the maintainer** before their rows can start: the core API
+2. **The decisions waiting for the maintainer** before their rows can start: the core API
    proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
    §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
-4. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
+3. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
    merge to `main`, `0.4.0`.
 
 **How the work flows.**
@@ -305,17 +303,13 @@ commit per proposal, its callers and DESIGN in the same change.
   math read next to `dp.py`. Done when the signals come from the run's own pass on both
   backends, the benchmark is in `benchmarks/`, and the default is set by its numbers.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
-  contract DESIGN §4 "Parameters"; each small, each byte-identical on
-  `benchmarks/params_baseline.py`):
-  - the problem evaluator's frozen form: it snapshots at its compile but always runs its tree
-    as an argument;
-  - a planner's method numbers and seed as views of its tree (they are attributes today, so
-    `planner.params["method"]` is a fresh view, `solve(params=)` their route);
-  - the problem's internal helpers (`parts_view`, `sample_params`, `nominal_plant_params`,
-    `drawn_paths`) folded into its held tree;
-  - a union's members and a scene's obstacles keyed by id, else class name numbered, rather
-    than by position (it changes a recorded tree's keys).
-  Done when each has landed or been dropped.
+  contract DESIGN §4 "Parameters"). Three of its four landed (the problem evaluator was found to
+  run its tree as an argument already, its run jitted on the tree; a planner's method numbers and
+  seed are views of its tree; an intersection's, a union's and a scene's members are keyed by
+  class name, a repeat numbered). Left, deferred in the rulings run (it spans twelve modules and
+  moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
+  `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
+  been dropped.
 - [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
   diagram's re-stacks the state layout after a block's state size changes, the sampled view and
   the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)

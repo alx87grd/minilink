@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.geometry import Union
-from minilink.core.params import held_params
+from minilink.core.params import held_params, member_keys
 from minilink.planning.spatial.collision import CollisionBody
 
 if TYPE_CHECKING:
@@ -28,32 +28,39 @@ class Scene:
         X = bounds & scene.clearance_field(body).as_set()
         cost = base + w * scene.cost_field(body).as_cost()
 
-    ``params`` holds ``{"obstacles": each obstacle's own numbers by position,
-    "workspace_fields": each field's}``: ``params=None`` reads them.
+    ``params`` holds ``{"obstacles": each obstacle's own numbers by class name
+    (a repeat numbered, ``Sphere``, ``Sphere_2``), "workspace_fields": each field's}``:
+    ``params=None`` reads them.
     """
 
     params = held_params(
-        '``{"obstacles", "workspace_fields"}``: each obstacle\'s and each field\'s numbers by position.'
+        '``{"obstacles", "workspace_fields"}``: each obstacle\'s and each field\'s numbers by class name, a repeat numbered.'
     )
 
     def __init__(self, obstacles=(), workspace_fields=()):
         self.obstacles = tuple(obstacles)
         self.workspace_fields = tuple(workspace_fields)
         self.params = {
-            "obstacles": {
-                str(i): shape.params for i, shape in enumerate(self.obstacles)
-            },
+            "obstacles": dict(
+                zip(member_keys(self.obstacles), (s.params for s in self.obstacles))
+            ),
             "workspace_fields": {
-                str(i): field.params for i, field in enumerate(self.workspace_fields)
+                key: field.params
+                for key, field in zip(
+                    member_keys(self.workspace_fields), self.workspace_fields
+                )
             },
         }
 
     def param_parts(self) -> dict:
-        """The obstacles and the fields by position: the parts an assignment routes to."""
+        """The obstacles and the fields by key: the parts an assignment routes to."""
         return {
-            "obstacles": {str(i): shape for i, shape in enumerate(self.obstacles)},
+            "obstacles": dict(zip(member_keys(self.obstacles), self.obstacles)),
             "workspace_fields": {
-                str(i): field for i, field in enumerate(self.workspace_fields)
+                key: field
+                for key, field in zip(
+                    member_keys(self.workspace_fields), self.workspace_fields
+                )
             },
         }
 
@@ -82,9 +89,10 @@ class Scene:
         if not fields:
             density = xp.asarray(0.0)
         else:
-            density = fields[0].density(p, t=t, params=field_params["0"])
-            for i, field in enumerate(fields[1:], start=1):
-                density = density + field.density(p, t=t, params=field_params[str(i)])
+            keys = member_keys(fields)
+            density = fields[0].density(p, t=t, params=field_params[keys[0]])
+            for key, field in zip(keys[1:], fields[1:]):
+                density = density + field.density(p, t=t, params=field_params[key])
 
         return density
 

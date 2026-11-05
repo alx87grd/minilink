@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.params import held_params, own_params, param_view
+from minilink.core.params import held_params, member_keys, own_params, param_view
 from minilink.core.sets import require_box_bounds, require_nonnegative_radius
 
 ###############################################################################
@@ -140,22 +140,26 @@ class Union(Shape):
     Union of several shapes, with ``sdf = min`` over the members.
 
     This is the obstacle-field primitive: a point is occupied when it lies
-    inside any member shape. ``params`` holds the members' own trees by
-    position, ``{"0": ..., "1": ...}``.
+    inside any member shape. ``params`` holds the members' own trees by class
+    name, a repeat numbered, ``{"Sphere": ..., "Sphere_2": ...}``.
     """
 
-    params = held_params('The members\' numbers by position: ``{"0": ..., "1": ...}``.')
+    params = held_params(
+        "The members' numbers by class name, a repeat numbered (``Sphere``, ``Sphere_2``)."
+    )
 
     def __init__(self, shapes):
         shapes = tuple(shapes)
         require_members(shapes)
 
         self.shapes = shapes
-        self.params = {str(i): shape.params for i, shape in enumerate(shapes)}
+        self.params = {
+            key: shape.params for key, shape in zip(member_keys(shapes), shapes)
+        }
 
     def param_parts(self) -> dict:
-        """The members by position: the parts an assignment routes to."""
-        return {str(i): shape for i, shape in enumerate(self.shapes)}
+        """The members by key: the parts an assignment routes to."""
+        return dict(zip(member_keys(self.shapes), self.shapes))
 
     @property
     def dim(self) -> int:
@@ -171,7 +175,10 @@ class Union(Shape):
         # traces under JAX (Python min() would compare traced values and break jit)
         sdf = functools.reduce(
             xp.minimum,
-            (shape.sdf(p, t, params[str(i)]) for i, shape in enumerate(shapes)),
+            (
+                shape.sdf(p, t, params[key])
+                for key, shape in zip(member_keys(shapes), shapes)
+            ),
         )
 
         return sdf

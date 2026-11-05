@@ -443,8 +443,9 @@ One model for every object, in seven rules:
 2. **A composite holds its parts' own dicts at the parts' keys**, beside its own numbers, so
    every number has one home and a write anywhere lands in it: `loop.params["plant"] is
    plant.params`, `problem.params["X"] is problem.X.params`. Keys are diagram ids, cost term
-   ids, problem roles, a scaled cost's `"cost"`, an intersection's or a union's members by
-   position. A composite value (an intersection, a field set, a field cost, a union, an
+   ids, problem roles, a scaled cost's `"cost"`, an intersection's, a union's or a scene's
+   members by class name, a repeat numbered (`"BallSet"`, `"BallSet_2"`), so a recorded tree still
+   names a member after a reorder. A composite value (an intersection, a field set, a field cost, a union, an
    inflated shape, a track, a scene, a state field, a scaled cost) holds its parts' trees by
    reference (`held_params`); a wrapper is what it wraps (`delegated_params`: an input box its
    box, a uniform law its box, a margin field its set, a sampled view its source); a diagram
@@ -794,7 +795,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   set's type. Compose with
   `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set's numbers are its `params`
   (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
-  singleton, the members' by position `{"0", "1", …}` on an intersection, `{}` for a set with
+  singleton, the members' by class name `{"BoxSet", "BallSet", …}` on an intersection, `{}` for a set with
   none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
   a set holds its numbers as a plant does (rule 3): `X.params["upper"] = ...` moves it, and
   a problem's entry for the role is the set's own tree.

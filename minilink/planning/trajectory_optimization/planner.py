@@ -127,9 +127,12 @@ class TrajectoryOptimizationPlanner(Planner):
         self.feasibility_tol = float(feasibility_tol)
         self.guess = guess
 
-        # The numbers: a native law's, as keywords; options= the external solver's knobs
+        # The numbers: a native law's, complete over its preset, the one home of
+        # params["method"]; options= the external solver's knobs
         self.options = dict(options or {})
-        self.method_numbers = method_numbers_of(method, self.options, method_numbers)
+        self.method_numbers = method_params_of(
+            method, method_numbers_of(method, self.options, method_numbers)
+        )
 
         # Workflow
         self.verbose = bool(verbose)
@@ -155,7 +158,7 @@ class TrajectoryOptimizationPlanner(Planner):
         and tolerances are structure); ``"seed"`` ``None`` (a gradient method
         draws nothing).
         """
-        method = method_params_of(self.method, self.method_numbers)
+        method = self.method_numbers
 
         return {
             **self.transcription.program_params(self.problem),
