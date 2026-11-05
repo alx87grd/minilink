@@ -247,3 +247,27 @@ params-one-tree, pushing the branch after every step. Build autonomously; do not
 anything tonight. Stop where the runbook says to stop. Do not open a pull request. Leave
 the run log and a clean tree.
 ```
+
+## Run log
+
+### 2026-11-05, session 1
+
+- **Environment.** No conda environment in the cloud container: `pip install -e ".[dev,full]"`
+  on Python 3.13, JAX 0.12 on CPU; graphviz and cyipopt absent (their tests skip). A worktree
+  of the base commit sits in the scratchpad for comparisons.
+- **Baseline.** `benchmarks/params_baseline.py` committed (4ff4e72); two captures at the base
+  byte-identical.
+- **Step 0 (9254457).** The trajectory record's copy and pickle, the composite setters'
+  check, the program evaluator's form decided at bind, the sets' numbers in the build keys,
+  the sum's `None`. Two deviations from the runbook's wording, both deliberate: the record
+  keeps its read-only proxies and gains `__reduce__` (a frozen record should stay
+  read-only); the composite check applies only to a part whose assignment replaces its
+  tree whole (a leaf system or a leaf cost), because two existing tests pin partial writes
+  to parts that route or merge themselves (a scaled cost's weight, an intersection member),
+  which never wiped anything. Those partial writes go in step 4 (complete trees), with their
+  tests. Gates: full pytest 2180 passed, regression gates (CI flags) and the demo-check
+  bridge pass, baseline byte-identical. KNOWN_ISSUES: the deep-copy row left, the
+  misspelled-key row narrowed.
+- **Step 1 (cfe5fb1).** The identity-keeping property on `System` and the five bases. The
+  suite caught the shallow-copy hazard in the sets' copy; fixed. Full pytest 2182 passed,
+  baseline byte-identical.
