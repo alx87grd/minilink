@@ -108,7 +108,8 @@ def test_a_repeated_evaluation_and_its_trajectory_compile_nothing():
         assert compiles(run)[0] == 0
 
 
-def test_a_repeated_solve_compiles_nothing():
+def test_a_repeated_compiled_solve_compiles_nothing():
+    # planner.solve builds each call (DESIGN §4 rule 6): the held compiled planner repeats
     plant = cartpole()
     problem = PlanningProblem(
         plant,
@@ -116,14 +117,14 @@ def test_a_repeated_solve_compiles_nothing():
         x0=np.array([0.0, np.pi - 0.5, 0.0, 0.0]),
         horizon=2.0,
     )
-    planner = TrajectoryOptimizationPlanner(
+    collocation = TrajectoryOptimizationPlanner(
         problem,
         n_steps=20,
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
         options={"maxiter": 20},
-    )
+    ).compile()
     native = TrajectoryOptimizationPlanner(
         pendulum_problem(tf=1.0),
         n_steps=10,
@@ -132,13 +133,11 @@ def test_a_repeated_solve_compiles_nothing():
         method="adam",
         n_iterations=20,
         learning_rate=0.05,
-    )
-    pv = native.compile()
-    start = edited(pv.params, {"x0": np.array([0.5, 0.0]), "t0": 0.0})
+    ).compile()
+    start = edited(native.params, {"x0": np.array([0.5, 0.0]), "t0": 0.0})
     for run in (
-        lambda: planner.solve(evaluate=False).trajectory.x,
-        lambda: native.solve(evaluate=False).trajectory.x,
-        lambda: pv.solve(start, z0=pv.initial())[0],
+        lambda: collocation.solve()[0],
+        lambda: native.solve(start, z0=native.initial())[0],
     ):
         first = run()
         n, again = compiles(run)

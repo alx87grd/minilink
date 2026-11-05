@@ -278,6 +278,21 @@ commit per proposal, its callers and DESIGN in the same change.
   - a union's members and a scene's obstacles keyed by id, else class name numbered, rather
     than by position (it changes a recorded tree's keys).
   Done when each has landed or been dropped.
+- [ ] **No cache left** (DESIGN §4 rule 6, "Minilink keeps no cache"; the trajectory planner's
+  saved program and its transcription's held plant went 2026-11-05). Hidden state that decides
+  by itself when to rebuild, keyed on an identity or a digest, still lives in:
+  - the problem evaluator: its run and trial functions jitted again when a problem part is
+    replaced (`planning/evaluator.py`, `problem_parts`/`replaced`), and the failure cost kept
+    under a numbers key and a digest of the live boxes (DESIGN "once per value (cached)");
+  - value iteration: `_G`, `_jax_cache`, `_cached_numbers` and `forget_stale_caches`
+    (`dp.py`, `dp_jax.py`), keyed on option numbers, so a cost edit inside the problem is not
+    seen; its transition tables are built at construction (a held tool, to say so);
+  - `analysis/lyapunov.py`: jitted forms keyed on a digest of the point;
+  - `TrajectoryOptimizationPlanner.compile_parametric_program`, a second held program on the
+    planner, goes with the start-only route (the core API proposals' replanning ruling).
+  Each: rebuilt in the convenience verb, or snapshotted at the held tool's build. Also: one
+  planner solve compiles its plant up to three times (transcribe, read-back, iterate history),
+  once would do. Done when no identity or digest key decides a rebuild.
 - [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
   diagram's re-stacks the state layout after a block's state size changes, the sampled view and
   the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)

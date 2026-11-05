@@ -43,23 +43,6 @@ class Transcription(ABC):
     #: instead of ``hasattr`` so a subclass cannot inherit a wrong one.
     supports_parametric = False
 
-    #: The plant compiled for this transcription, ``(sys, backend, evaluator)``:
-    #: a transcription is built once per planner and compiles its plant once
-    held_plant = None
-
-    def plant_evaluator(self, problem: PlanningProblem, backend: str):
-        """The plant of ``problem`` compiled on ``backend``, held while the plant is the same object (``None`` in direct mode)."""
-        key = normalize_backend(backend, allow_direct=True)
-        if key == BACKEND_DIRECT:
-            return None
-
-        held = self.held_plant
-        if held is None or held[0] is not problem.sys or held[1] != key:
-            held = (problem.sys, key, problem.sys.compile(backend=key))
-            self.held_plant = held
-
-        return held[2]
-
     @abstractmethod
     def transcribe(
         self,
@@ -206,12 +189,12 @@ def program_backend_for_compile(backend: str) -> str:
     return BACKEND_JAX if key == BACKEND_JAX else BACKEND_NUMPY
 
 
-def dynamics_function(problem: PlanningProblem, backend: str, evaluator=None):
+def dynamics_function(problem: PlanningProblem, backend: str):
     """Return ``(x, u, t) -> f(x, u, t)`` for a transcription.
 
-    ``"numpy"`` and ``"jax"`` use a compiled evaluator (``evaluator`` when
-    given, the transcription's held one, else a new compile); system params from
-    ``nominal_plant_params(problem)`` flow through the evaluator's ``params`` argument.
+    ``"numpy"`` and ``"jax"`` compile the plant (its frozen form on its own
+    numbers); system params from ``nominal_plant_params(problem)`` flow through
+    the evaluator's ``params`` argument.
     ``"direct"`` calls ``system.f`` without compiling (escape hatch for
     systems that cannot be compiled).
     """
@@ -222,11 +205,8 @@ def dynamics_function(problem: PlanningProblem, backend: str, evaluator=None):
     if key == BACKEND_DIRECT:
         return lambda x, u, t: problem.sys.f(x, u, t, params)
 
-    # A compiled evaluator, on the params when given, else on the plant's numbers now
-    if evaluator is None:
-        evaluator = problem.sys.compile(backend=key)
-    f = evaluator.f
-    params = evaluator.call_params() if params is None else params
+    # The plant compiled now: on the params when given, else its frozen form
+    f = problem.sys.compile(backend=key).f
 
     return lambda x, u, t: f(x, u, t, params)
 

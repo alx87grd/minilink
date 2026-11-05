@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
-from minilink.core.params import checked, tree_digest
+from minilink.core.params import checked
 from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -149,10 +149,6 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
 
-        # The offline program and its optimizer, kept with the key they were built on and
-        # the problem's parts the key names (held, so no identity in it is reused)
-        self.offline = None
-
         # The compiled parametric program, its optimizer and its dynamics
         self.program = None
         self.program_evaluator = None
@@ -242,29 +238,18 @@ class TrajectoryOptimizationPlanner(Planner):
         backend = self.backend
         seed = self.resolve_guess(problem, guess)
 
-        # The problem transcribed into a program and compiled into an optimizer, or
-        # the ones of the last solve while the problem is unchanged; the seed packed
-        # into its z0
-        key = self.offline_key(problem)
+        # The problem transcribed into a program and compiled into an optimizer, every
+        # solve (a convenience verb builds; a held compiled planner is planner.compile());
+        # the seed packed into its z0
         transcribe_t0 = time.perf_counter()
-        if key is None or self.offline is None or self.offline[0][0] != key[0]:
-            program = self.transcription.transcribe(
-                problem,
-                backend=backend,
-            )
-            transcribe_s = time.perf_counter() - transcribe_t0
-            seed = decision_vector_of(seed, program)
-            z0 = self.transcription.pack_initial_guess(problem, seed)
-            compile_t0 = time.perf_counter()
-            optimizer = self.build_optimizer(program, z0)
-            warm_bound_form(optimizer)
-            compile_s = time.perf_counter() - compile_t0
-            self.offline = (key, program, optimizer)
-        else:
-            _, program, optimizer = self.offline
-            seed = decision_vector_of(seed, program)
-            z0 = self.transcription.pack_initial_guess(problem, seed)
-            transcribe_s = compile_s = 0.0
+        program = self.transcription.transcribe(problem, backend=backend)
+        transcribe_s = time.perf_counter() - transcribe_t0
+        seed = decision_vector_of(seed, program)
+        z0 = self.transcription.pack_initial_guess(problem, seed)
+        compile_t0 = time.perf_counter()
+        optimizer = self.build_optimizer(program, z0)
+        warm_bound_form(optimizer)
+        compile_s = time.perf_counter() - compile_t0
 
         if self.verbose:
             self.print_solve_preamble(
@@ -281,7 +266,7 @@ class TrajectoryOptimizationPlanner(Planner):
         optimization_result = optimizer.solve(
             params=None if method is None else {**optimizer.params, "method": method},
             z0=z0,
-            callback=self.build_callback(optimizer, backend, history),
+            callback=self.build_callback(optimizer, problem, backend, history),
             record_solve_time=self.record_solve_time or self.verbose,
             verbose=False,
         )
@@ -461,37 +446,6 @@ class TrajectoryOptimizationPlanner(Planner):
         t = self.transcription.initial_guess_time_grid(problem)
         return default_initial_trajectory(problem, t)
 
-    def offline_key(self, problem):
-        """
-        What an offline program is built from, ``(key, parts)``: the problem's parts by identity, its horizon and its numbers (``None``: build every time).
-
-        The planner is built once and run many times: a part replaced on the
-        problem (its plant, cost or a set), a new horizon or new numbers build a
-        new program; an edit inside a part (a plant's method, a transcription's
-        options) needs a new planner. ``parts`` are held with the program, so no
-        identity in the key is reused while it is kept.
-        """
-        params_of = getattr(self.transcription, "program_params", None)
-        if params_of is None:
-            return None
-
-        parts = (
-            problem.sys,
-            problem.cost,
-            problem.X,
-            problem.U,
-            problem.X0,
-            problem.Xf,
-        )
-        key = (
-            tuple(id(part) for part in parts),
-            problem.horizon,
-            tree_digest(params_of(problem)),
-            tree_digest(sets_params(problem)),
-        )
-
-        return key, parts
-
     def build_optimizer(
         self, program: MathematicalProgram, z0: np.ndarray
     ) -> Optimizer:
@@ -560,6 +514,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def build_callback(
         self,
         optimizer: Optimizer,
+        problem: PlanningProblem,
         backend: str,
         history: list,
     ) -> OptimizationProgressCallback | None:
@@ -573,7 +528,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 LiveTrajectoryPlotCallback,
             )
 
-            live_callback = LiveTrajectoryPlotCallback(self.problem.sys)
+            live_callback = LiveTrajectoryPlotCallback(problem.sys)
             if callback is None:
                 callback = live_callback
             else:
@@ -588,11 +543,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # One dynamics callable for every iterate (reconstruct_result would
         # otherwise compile the plant again on each optimizer step).
-        dynamics = dynamics_function(
-            self.problem,
-            backend,
-            self.transcription.plant_evaluator(self.problem, backend),
-        )
+        dynamics = dynamics_function(problem, backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:
@@ -600,6 +551,7 @@ class TrajectoryOptimizationPlanner(Planner):
             z_arr = np.asarray(z, dtype=float).reshape(-1)
             iteration = self.iteration_from_z(
                 optimizer,
+                problem,
                 z_arr,
                 backend,
                 iteration_index,
@@ -617,6 +569,7 @@ class TrajectoryOptimizationPlanner(Planner):
     def iteration_from_z(
         self,
         optimizer: Optimizer,
+        problem: PlanningProblem,
         z: np.ndarray,
         backend: str,
         iteration_index: int,
@@ -630,7 +583,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         trajectory = self.transcription.reconstruct_result(
             OptimizationResult(z=z, success=False, cost=cost),
-            problem=self.problem,
+            problem=problem,
             backend=backend,
             dynamics=dynamics,
         )
@@ -917,15 +870,6 @@ class TrajectoryOptimizationIteration:
     cost: float
     max_eq: float
     min_ineq: float | None
-
-
-def sets_params(problem) -> dict:
-    """Every set's numbers by role: a box lowered to the decision bounds is no leaf of the program, yet its numbers build it."""
-    return {
-        role: getattr(set_, "params", None)
-        for role in ("X", "U", "X0", "Xf")
-        if (set_ := getattr(problem, role)) is not None
-    }
 
 
 def require_no_scene(params) -> None:

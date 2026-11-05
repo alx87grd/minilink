@@ -12,7 +12,12 @@ from minilink.core.params import checked
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    host_tree,
+    planner_evidence,
+    problem_with,
+)
 from minilink.planning.problems import nominal_plant_params
 from minilink.planning.results import PlanningSolution
 
@@ -129,14 +134,18 @@ class MPPIPlanner(Planner):
         return tree
 
     def compile(self, backend=None):
-        """The planner's pure face, ``pv``: its solve as one jitted function of ``(params, z)``."""
+        """The planner's pure face, ``pv``: its solve as one jitted function of ``(params, z)`` (JAX only: ``None`` or ``"jax"``)."""
+        if backend not in (None, "jax"):
+            raise ValueError(f"MPPIPlanner compiles on JAX only, not {backend!r}")
+
         return CompiledMPPIPlanner(self)
 
     def solve(self, *, params=None, guess=None, evaluate=False, n_trials=50):
         """
         One path-integral solve from the problem's start: a :class:`~minilink.planning.results.PlanningSolution`.
 
-        ``params`` overrides leaves of :attr:`params`; ``guess`` (a trajectory or
+        ``params`` is ``None`` (the problem as it is) or the complete tree of
+        :attr:`params`, edited; ``guess`` (a trajectory or
         a solution) seeds ``U``, else the ports' nominal input. The policy is the
         held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
         """
@@ -240,8 +249,8 @@ class CompiledMPPIPlanner:
 
     @property
     def params(self) -> dict:
-        """The compiled defaults: the planner's tree at compile."""
-        return self.defaults
+        """The compiled defaults, a copy: the planner's tree at compile."""
+        return copy.deepcopy(self.defaults)
 
     def initial(self, params=None):
         """The default plan in ``z`` form: the action port's nominal input held over the horizon, at ``params["t0"]``."""
@@ -431,6 +440,13 @@ class CompiledMPPIPlanner:
 
         return u
 
+    def prediction(self, z, t, params=None):
+        """Refuse: the plan carries no state knots (read ``pv.solution(z).trajectory`` for its rolled-out states)."""
+        raise NotImplementedError(
+            "the plan carries no state knots (MPPI): read "
+            "pv.solution(z).trajectory for its planned states"
+        )
+
     def solution(self, z, params=None, status=None) -> PlanningSolution:
         """The host-side :class:`~minilink.planning.results.PlanningSolution` of ``z``: the held schedule, its nominal rollout, the record."""
         status = {} if status is None else status
@@ -449,7 +465,13 @@ class CompiledMPPIPlanner:
         )
         policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
 
-        return PlanningSolution(self.problem, policy, record, trajectory, None)
+        return PlanningSolution(
+            problem_with(self.problem, host_tree(problem_part(self.merged(params)))),
+            policy,
+            record,
+            trajectory,
+            None,
+        )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:
         """The plan as a trajectory: ``U`` held from its origin, its states rolled out on the nominal plant from ``params["x0"]``."""
@@ -486,7 +508,7 @@ class CompiledMPPIPlanner:
 
     def merged(self, params):
         """The tree the face runs on: its defaults for ``None``, else ``params``, checked complete against them."""
-        return checked(params, self.params)
+        return checked(params, self.defaults)
 
     def sequence(self, z):
         """``U``, the plan's ``(N, m)`` held inputs."""
@@ -632,3 +654,8 @@ def tick_key(jax, seed, t0, t_origin, dt):
     between = jax.random.fold_in(on_knot, offset)
 
     return jnp.where(offset == 0, on_knot, between)
+
+
+def problem_part(tree) -> dict:
+    """The problem's leaves of a face's tree: the method's numbers and the seed dropped."""
+    return {key: value for key, value in tree.items() if key not in ("method", "seed")}

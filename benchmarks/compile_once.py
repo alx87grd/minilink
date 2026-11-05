@@ -5,7 +5,8 @@
 A report, not a gate (CPU, float64). Part 1, for each pipeline's held tool (a simulator, a
 compiled loop, an evaluation, a trajectory optimization, a native MPC, value iteration): the
 first call's seconds, a repeat's and the XLA compilations the repeat costs (0 is the
-contract; a convenience call compiles each time). Part 2, at the problem and the program layers: the parametric form (the
+contract; a convenience call such as ``planner.solve`` builds each time, so a planner is
+measured by its held compiled planner ``pv = planner.compile()``). Part 2, at the problem and the program layers: the parametric form (the
 tree an argument, held on the device) against a frozen one (the tree closed over, constants
 of the trace); a frozen form is worth building at a layer only if it is steadily more than
 15 % faster.
@@ -119,6 +120,8 @@ def pipelines():
         n_iterations=15,
         learning_rate=0.05,
     )
+    collocation_pv = collocation.compile()
+    native_pv = native.compile()
     mpc_loop = (ModelPredictiveController(native, delay=True) % 0.05) @ pend
     mpc_ev = mpc_loop.compile(backend="jax", substeps=1)
     dp = DynamicProgrammingPlanner(
@@ -142,12 +145,8 @@ def pipelines():
         "eval pe.evaluate()": lambda: pe.evaluate().objective,
         "eval pe.evaluate(params)": lambda: pe.evaluate(pe.params).objective,
         "eval pe.trajectory()": lambda: pe.trajectory().x,
-        "opt  collocation planner.solve()": lambda: (
-            collocation.solve(evaluate=False).trajectory.x
-        ),
-        "opt  native planner.solve()": lambda: (
-            native.solve(evaluate=False).trajectory.x
-        ),
+        "opt  collocation pv.solve()": lambda: collocation_pv.solve()[0],
+        "opt  native pv.solve()": lambda: native_pv.solve()[0],
         "mpc  (mpc % dt) @ plant, compiled": lambda: mpc_ev.rollout_dense(
             mpc_loop.x0, None, None, n_steps=20
         ),
@@ -178,7 +177,7 @@ def forms():
         n_iterations=200,
         learning_rate=0.05,
     ).compile()
-    start = {"x0": horizon.x0, "t0": 0.0}
+    start = pv.params
     z0 = pv.initial()
     parametric = jax.jit(lambda P, z: pv.solve(P, z0=z)[0])
     frozen = jax.jit(lambda z: pv.solve(start, z0=z)[0])

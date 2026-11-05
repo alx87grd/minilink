@@ -337,7 +337,7 @@ class CompiledTrajectoryPlanner:
 
     def merged(self, params):
         """The tree the face runs on: its defaults for ``None``, else ``params``, checked complete against them."""
-        return checked(params, self.params)
+        return checked(params, self.defaults)
 
     def optimizer_at(self, params, z_dec):
         """The optimizer of a NumPy program at the tree ``params``: the compiled one for none, else one rebuilt on a copy of the problem holding them."""
