@@ -193,6 +193,8 @@ To get the primary output array `y`, the caller must write `ev.outputs(x, u)["y"
 
 ## CA-3. Add `diagram.of(...)` and accept string subsystem IDs in `WiredDiagramMixin.subsystem_id` / `trajectory_of`
 
+`trajectory_of` itself goes by AR-7 of [api-surface-rulings.md](api-surface-rulings.md) (`traj.of("plant")` on both loop kinds); the string ids in `subsystem_id` and `diagram.of` stay this proposal's.
+
 ### Problem and reproducer
 1. `SumCost`'s docstring (`minilink/core/costs.py:337`) states:
    > *"``SumCost.of(track=..., effort=...)`` builds a sum with the given ids (like :meth:`of` on a diagram or a trajectory)."*

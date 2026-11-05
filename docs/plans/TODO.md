@@ -266,6 +266,15 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
+- [ ] **The API surface rulings** (AR-1 to AR-9 in
+  [api-surface-rulings.md](api-surface-rulings.md), ruled 2026-11-05, none built): a
+  distribution's mean one spelling; `evaluate` without `dt` for a sampled controller; two box
+  spellings, `U=` a box; `traj.at(t, name)`; `jacobian` an array everywhere; the start point on
+  `solve` only, the solve time always recorded; `traj.of("plant")` on both loop kinds, with a
+  continuous run recording its signals from its own pass (benchmarked first); one simulate verb,
+  inputs `(m, N)`; two replanning routes, the start-only route removed. One branch, one commit per
+  ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
+  deleted.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
   contract DESIGN §4 "Parameters"; each small, each byte-identical on
   `benchmarks/params_baseline.py`):
