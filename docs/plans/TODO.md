@@ -480,10 +480,7 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   machinery, apart from `METHODS` at the top.
 - [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
   `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
-  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies;
-  `search/extenders.py` asks `getattr(U, "box", None)` instead of `U.bounding_box()` (also a
-  D3 row); `spatial/paths.py`'s `PolylinePath` sets `_seg_lengths`, `_s_knots` and
-  `_total_length` through `object.__setattr__` without declaring them as fields.
+  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies.
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
   method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by the compiled face (DESIGN §6);
@@ -548,8 +545,6 @@ pick):
 **D3 — hardening rows** (research lane, small; S53 and the `HybridSimulator` drift row moved to
 §1):
 
-- [ ] RRT `KinodynamicExtender` ignores `problem.params.system`; `extenders.py` probes
-  `getattr(U, "box", None)` instead of `U.bounding_box()`.
 - [ ] RRT checks `X.contains(sample)` and the goal region without the time: a time-varying `X` or
   `Xf` is read at `t = 0` (`rrt.py`, `rrt_star.py`); the tree nodes need a time (the sum of the
   edge durations) and the checks pass it.

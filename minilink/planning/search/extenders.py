@@ -6,6 +6,7 @@ from collections.abc import Iterable
 
 import numpy as np
 
+from minilink.planning.problems import nominal_plant_params
 from minilink.planning.search.edge import Edge
 
 ###############################################################################
@@ -69,15 +70,20 @@ class KinodynamicExtender(TrajectoryExtender):
         evaluator = self.compiled(problem.sys)
         controls = self.candidate_controls(problem, rng)
 
+        # The plant's numbers now (a random plant's design point): an edit of the
+        # plant between solves reaches the edges
+        plant = nominal_plant_params(problem)
+        params = problem.sys.params if plant is None else plant
+
         # One fixed-time rollout per control
         edges = [
-            self.rollout(evaluator, from_state, np.asarray(u, dtype=float))
+            self.rollout(evaluator, from_state, np.asarray(u, dtype=float), params)
             for u in controls
         ]
 
         return edges
 
-    def rollout(self, evaluator, from_state, u) -> Edge:
+    def rollout(self, evaluator, from_state, u, params=None) -> Edge:
         """Hold ``u`` over the horizon: ``n_substeps`` RK4 steps of ``dt``."""
         N = self.n_substeps
         dt = self.dt
@@ -85,7 +91,9 @@ class KinodynamicExtender(TrajectoryExtender):
 
         # x_{k+1} = RK4(x_k, u, t_k), the control held over every step
         inputs = np.tile(u, (N, 1))
-        states = np.asarray(evaluator.rollout(from_state, inputs, 0.0, dt), dtype=float)
+        states = np.asarray(
+            evaluator.rollout(from_state, inputs, 0.0, dt, params), dtype=float
+        )
 
         # The knots, the held input on each step, the knot times, and the
         # minimum-time cost: the duration T
@@ -205,8 +213,8 @@ def require_known_preset(controls):
 
 
 def require_box_input_set(U):
-    """Refuse an input set without a box (input port bounds); return its box."""
-    box = getattr(U, "box", None)
+    """Refuse an input set without a bounding box (input port bounds); return the box."""
+    box = U.bounding_box()
     if box is None:
         raise ValueError(
             "the 'bang-bang' preset needs a box input set (input port bounds); "

@@ -444,3 +444,21 @@ def test_a_held_problem_evaluator_snapshots_and_a_new_compile_reads_the_edit():
     assert problem.compile(law, dt=0.02, backend="numpy").evaluate().objective != before
     heavy = edited(pe.params, {"plant": {"m": 3.0}})
     assert pe.evaluate(heavy).objective != before
+
+
+# The RRT extender reads the plant's numbers at each solve
+
+
+def test_the_kinodynamic_extender_reads_an_edit_of_the_plant():
+    from minilink.planning.search.extenders import KinodynamicExtender
+
+    plant = Pendulum()
+    problem = PlanningProblem(plant, x0=np.zeros(2), U=plant.input_box)
+    extender = KinodynamicExtender(horizon=0.2, n_substeps=4)
+    start = np.array([0.3, 0.0])
+
+    light = extender.propose(start, start, problem, np.random.default_rng(0))
+    plant.params["m"] = 3.0
+    heavy = extender.propose(start, start, problem, np.random.default_rng(0))
+
+    assert not np.allclose(light[1].states, heavy[1].states)
