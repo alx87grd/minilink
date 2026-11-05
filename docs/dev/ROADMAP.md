@@ -360,9 +360,14 @@ vocabulary of RULES 2.7 (`x0`, `t0`, `horizon`, `n_steps`, `n_iterations`, `gamm
 `options=` the external solver's knobs, `solution.record`, enforced by `test_vocabulary.py`);
 every planner's `params` tree and `solve(params=)` (the four kinds of argument, DESIGN §6); one
 last answer per object (RULES 2.4: a run's result carries its whole account, `last_solution`
-the one shortcut, enforced by `test_last_answer.py`).
+the one shortcut, enforced by `test_last_answer.py`); the one parameters model (DESIGN §4
+"Parameters": one `params` tree per object, complete trees at every boundary, a tool's `params`
+a copy); no cache (DESIGN §4 rule 6: `planner.solve` builds every call, the held compiled
+planner never compiles for new numbers, enforced by `test_no_recompile.py`).
 
 **Left:**
+- **The API surface rulings** ([api-surface-rulings.md](../plans/api-surface-rulings.md), AR-1
+  to AR-9, ruled 2026-11-05, to build; TODO §1.11): 22 fewer names to learn.
 - **The core API proposals** ([core-api-improvements.md](../plans/core-api-improvements.md),
   CA-1 to CA-6; TODO §1.11) **[ask — core]**.
 - **The minimal surface** ([minimal-surface.md](../plans/minimal-surface.md), its decisions
