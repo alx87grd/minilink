@@ -11,7 +11,7 @@ import numpy as np
 
 from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
-from minilink.core.distributions import Distribution, child_seed, split_keys
+from minilink.core.distributions import Distribution, child_seed, split_keys, tiled_mean
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import (
     flatten,
@@ -875,7 +875,7 @@ class SetStart(Distribution):
 
     def sample(self, key, n=None, params=None):
         if key is None:
-            return self.mean_draw(n)
+            return tiled_mean(self.mean, n)
         return self.support.sample(key, n, params)
 
 

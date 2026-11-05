@@ -819,7 +819,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
   an optional `Set`. **No key, no draw:** `sample(None)` is the mean at the law's numbers
-  (`mean_at(params)`; `(n, dim)` tiled with `n`), as a noise block's `seed=None` is its mean
+  (`sample(None, params=p)` the mean at other numbers; `(n, dim)` tiled with `n`), as a noise block's `seed=None` is its mean
   signal: the design point. A library law's numbers are its `params`, and `cov` is the covariance of
   one draw: `Gaussian(mean, std=None, cov=None)` (one spread, `{"mean", "std"}` or
   `{"mean", "cov"}`, a full `cov` drawn through its Cholesky factor), `Uniform(lower, upper)`

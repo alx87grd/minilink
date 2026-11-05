@@ -39,24 +39,6 @@ compiles for new numbers.
 Call-site counts below are files per tree at 2026-11-05 (`grep`), a guide for the size of each
 commit.
 
-## AR-1 A distribution's mean has one spelling
-
-`Distribution.mean` (a property, at the law's own numbers) and `sample(None, ...)` stay;
-`mean_at(params)`, `mean_draw(n, params)` and `Gaussian.full_cov` go (`core/distributions.py`;
-callers in 8 library files, 2 examples, 1 test). A mean at other numbers is the law built at
-those numbers, or `sample` with its key `None`. `full_cov` is read as `cov` (a Gaussian holds
-`{mean, std}` or `{mean, cov}`; `cov` is the view that always answers).
-
-```python
-# before                         # after
-law.mean_at(p)                   law.sample(None, params=p)   # or law.mean at its own numbers
-law.mean_draw(n, p)              law.sample(None, n, params=p)
-g.full_cov                       g.cov
-```
-
-`sample(key, n=None, params=None)` exists on every law today; `key=None` returns the mean, so no
-signature changes.
-
 ## AR-4 `Trajectory` reads a value at a time with `traj.at(t, name="x")`
 
 One reader, **linearly interpolated** between samples (today's readers return the nearest
