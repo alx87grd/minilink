@@ -136,12 +136,12 @@ def test_the_program_form_is_decided_at_bind():
     assert evaluator.frozen
 
 
-# A set's numbers key the offline program, a lowered box included
+# planner.solve builds every call: it sees an in-place edit, a lowered box included
 
 
 @pytest.mark.optional
 @pytest.mark.jax
-def test_an_in_place_edit_of_a_lowered_box_builds_a_new_program():
+def test_a_planner_solve_builds_every_call_and_sees_an_edit_of_a_lowered_box():
     pytest.importorskip("jax")
     from minilink import TrajectoryOptimizationPlanner
 
@@ -161,12 +161,13 @@ def test_an_in_place_edit_of_a_lowered_box_builds_a_new_program():
         options={"maxiter": 10},
     )
     planner.solve(evaluate=False)
-    first = planner.last_program
 
-    problem.U.box.params["upper"][:] = 0.5 * problem.U.box.params["upper"]
-    planner.solve(evaluate=False)
+    upper = 0.5 * problem.U.box.params["upper"]
+    problem.U.box.params["upper"][:] = upper
+    solution = planner.solve(evaluate=False)
 
-    assert planner.last_program is not first
+    np.testing.assert_array_equal(planner.last_program.upper[-8:], np.repeat(upper, 8))
+    assert np.all(solution.trajectory.u <= upper + 1e-8)
 
 
 # A sum reads its own numbers when given none

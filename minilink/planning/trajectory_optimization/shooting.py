@@ -103,9 +103,7 @@ class ShootingTranscription(Transcription):
         """Roll out the optimized input sequence."""
         # The program's rollout, and the dynamics for the state rates
         rollout = self.make_rollout(problem, backend)
-        dynamics = dynamics_function(
-            problem, backend, self.plant_evaluator(problem, backend)
-        )
+        dynamics = dynamics_function(problem, backend)
 
         # The optimized input knots, and the states they roll out
         u = self.unpack(result.z, problem)
@@ -352,8 +350,8 @@ class ShootingTranscription(Transcription):
 
         # A compiled system without explicit params: its own integrator over the grid
         if key != BACKEND_DIRECT and nominal_plant_params(problem) is None:
-            evaluator = self.plant_evaluator(problem, key)
-            params = evaluator.call_params()
+            evaluator = problem.sys.compile(backend=key)
+            params = None  # the plant's frozen form, on its own numbers
 
             def rollout(u):
                 t0 = float(self.options.t(problem)[0])
@@ -368,7 +366,7 @@ class ShootingTranscription(Transcription):
             return rollout
 
         # Direct mode or explicit system params: step the dynamics per knot
-        f = dynamics_function(problem, backend, self.plant_evaluator(problem, backend))
+        f = dynamics_function(problem, backend)
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:

@@ -476,11 +476,18 @@ One model for every object, in seven rules:
 6. **A tool snapshots at build**: `tool.params` is what `params=None` runs on (the compiled
    evaluators, the `Simulator`, the problem evaluator, the planner's compiled face, the
    `Optimizer`), and reading it gives a copy, so an edit of it never changes the tool (whose
-   frozen form compiled the snapshot as constants); nothing reads the objects or compares trees per call. A
-   convenience call (`compute_trajectory`, `problem.compile`, `planner.solve`) builds each
-   time, so it sees every edit. A planner's `solve(params=)` rebuilds at the tree
-   (`planner_at`): a method number the tree changes is given, one it leaves at the planner's
-   value is derived again on the new problem (a new discount rate re-derives the factor).
+   frozen form compiled the snapshot as constants); nothing reads the objects or compares
+   trees per call. A convenience call (`compute_trajectory`, `problem.compile`,
+   `planner.solve`) builds each time, so it sees every edit, and keeps nothing but its last
+   answer: Minilink keeps no cache (the ones left are TODO's "No cache left" row). A held
+   tool is the fast route for repeated calls: its pure functions (`pv.solve`, `shift`,
+   `command`, `prediction`) compile once, at the build or the first call, and never for new
+   numbers, which are their arguments (`tests/unittest/test_no_recompile.py`); a NumPy program
+   has no compile, and a face on it rebuilds the program at new numbers. `pv.solution` is the
+   face's host-side read-back, on the face's numbers: it builds what it reads back (the plant's
+   rates) each call. A planner's `solve(params=)` rebuilds at the tree (`planner_at`): a
+   method number the tree changes is given, one it leaves at the planner's value is derived
+   again on the new problem (a new discount rate re-derives the factor).
 7. **A problem's uncertain numbers are `Distribution`s in `problem.distributions`**, a sparse
    tree of the same shape (`distributions={"plant": {"m": Uniform([0.9], [1.1])}}`, the
    start's law `x0=law`); `problem.params` holds numbers only, and a law written into it is
