@@ -27,6 +27,9 @@ Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or rev
 agent starts. They are details, versions and demos, not design questions (those are
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
+**The API surface rulings have the go** (§1.11, ruled 2026-11-05: each ruling is taken, build it as
+written), and so does **No cache left** (§1.11, internal structure under DESIGN §4 rule 6).
+
 **The core's leftover rows have the go**: every row of §1.1 to §1.10 is cleared to start under its
 "done when"; the internal choices an agent meets (the default output stub's type under JAX, the
 open-loop face as the evaluator or a sibling, the hold slots' labels) are decided as the
@@ -35,6 +38,8 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | The core API proposals | CA-1–CA-6 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
+| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions ([api-surface-rulings.md](api-surface-rulings.md), "Not ruled yet") |
+| `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
@@ -72,6 +77,19 @@ maintainer would and logged in the run's record.
 ---
 
 ## 1. v0.4 — the clean surface
+
+**Next, in order** (as of 2026-11-05, `dev` at the API surface plan; every branch before it merged):
+1. **The API surface rulings** (§1.11, [api-surface-rulings.md](api-surface-rulings.md)): one
+   branch, nine commits, AR-9 (the start-only route removed) and AR-7 (with its signal-recording
+   benchmark) the largest. Cleared to start.
+2. **No cache left** (§1.11): the problem evaluator, value iteration and the Lyapunov analysis
+   rebuilt in their verbs or snapshotted at build. Cleared to start; AR-9 clears its last item.
+3. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical.
+4. **The decisions waiting for the maintainer** before their rows can start: the core API
+   proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
+   §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
+5. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
+   merge to `main`, `0.4.0`.
 
 **How the work flows.**
 - **Status:** [ROADMAP §5.4](../dev/ROADMAP.md#54-v04--the-clean-surface). v0.3 shipped as
