@@ -155,11 +155,13 @@ def run_hand_loop() -> list[MetricRecord]:
     z = pv.initial()
     u_hold = np.zeros(plant.m)
     next_mpc_t = 0.0
+    tick = pv.params  # the face's tree, a copy: each tick sets its start and time
 
     t0 = time.perf_counter()
     while t < TF_HAND - 1e-12:
         if t >= next_mpc_t - 1e-12:
-            z, _ = pv.solve({"x0": x, "t0": t}, z0=pv.shift(z, t))
+            tick["x0"], tick["t0"] = x, t
+            z, _ = pv.solve(tick, z0=pv.shift(z, t))
             u_hold = np.asarray(pv.command(z, x, t), dtype=float)
             next_mpc_t += MPC_DT
         x = plant_eval.step(x, u_hold, t, dt=SIM_DT)

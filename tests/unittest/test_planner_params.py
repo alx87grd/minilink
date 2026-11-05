@@ -14,6 +14,8 @@ from minilink import (
 )
 from minilink.core.sets import BallSet
 from minilink.learning import TabularLearningPlanner
+from minilink.planning.planner import planner_at
+from tests.unittest.planning_helpers import edited
 
 X_UP = np.array([np.pi, 0.0])
 
@@ -112,7 +114,7 @@ def test_a_solve_at_a_tree_is_the_planner_built_there(name):
         if value is not None
     }
 
-    at_tree = solve_of(planner, params={"method": numbers})
+    at_tree = solve_of(planner, params=edited(planner.params, {"method": numbers}))
     built_there = solve_of(build(**numbers))
 
     np.testing.assert_allclose(fingerprint(at_tree), fingerprint(built_there))
@@ -123,7 +125,7 @@ def test_a_solve_at_a_tree_is_the_planner_built_there(name):
 def test_a_changed_problem_derives_its_own_numbers():
     """The rebuild keeps the numbers given, never the defaults derived: the discount follows the rate."""
     vi = DynamicProgrammingPlanner(regulation(), max_iterations=30, **GRID)
-    at_faster_rate = vi.at({"discount_rate": 1.0})
+    at_faster_rate = planner_at(vi, edited(vi.params, {"discount_rate": 1.0}))
 
     np.testing.assert_allclose(at_faster_rate.gamma, np.exp(-1.0 * GRID["dt"]))
     np.testing.assert_allclose(vi.gamma, np.exp(-0.5 * GRID["dt"]))
@@ -141,7 +143,7 @@ def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
     build, numbers = PLANNERS[name]
     planner = build()
     solve_of(planner)
-    solution = solve_of(planner, params={"method": numbers})
+    solution = solve_of(planner, params=edited(planner.params, {"method": numbers}))
     x = np.array([0.5, 0.0])
 
     assert solution is planner.last_solution

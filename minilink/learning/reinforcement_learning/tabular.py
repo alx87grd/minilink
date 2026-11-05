@@ -14,7 +14,12 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, given_numbers, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    given_numbers,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -201,7 +206,7 @@ class TabularLearningPlanner(Planner):
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(
+            solution = planner_at(self, params).solve(
                 episodes, evaluate=evaluate, n_trials=n_trials
             )
             return self.store_solution(solution)

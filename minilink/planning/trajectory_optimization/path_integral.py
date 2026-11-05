@@ -8,7 +8,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.backends import array_module, require_jax, require_jax_numpy
-from minilink.core.params import merge_known
+from minilink.core.params import checked
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
@@ -485,11 +485,8 @@ class CompiledMPPIPlanner:
     ###########################################################################
 
     def merged(self, params):
-        """The defaults with ``params`` merged over them, checked against the tree."""
-        if not params:
-            return self.params
-
-        return merge_known(self.params, params)
+        """The tree the face runs on: its defaults for ``None``, else ``params``, checked complete against them."""
+        return checked(params, self.params)
 
     def sequence(self, z):
         """``U``, the plan's ``(N, m)`` held inputs."""

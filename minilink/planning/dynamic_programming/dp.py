@@ -13,7 +13,12 @@ from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
 from minilink.planning.evaluator import nominal_trajectory
-from minilink.planning.planner import Planner, given_numbers, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    given_numbers,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_problems import StepPlanningProblem
@@ -160,7 +165,9 @@ class DynamicProgrammingPlanner(Planner):
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         # Backward sweeps until the cost-to-go stops changing

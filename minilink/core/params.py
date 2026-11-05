@@ -149,12 +149,11 @@ def route_tree(tree, value, parts, path=()):
     """
     Route ``value`` into the held ``tree``: each part's entry to the part, each own number in place.
 
-    A part that holds its own tree takes its entry merged onto its numbers
-    (:func:`merge_known`: an unknown key, a subtree for a leaf, a new shape
-    raise); a composite part routes its entry itself. Every key is checked
-    before the first write.
+    The tree given is complete (:func:`require_complete`, checked before the
+    first write): a part that holds its own tree takes its entry whole, a
+    composite part routes its entry itself, an own number is written in place.
     """
-    require_routed_keys(tree, value, parts, path)
+    require_complete(value, tree, path)
     for key, entry in value.items():
         part = parts.get(key)
         if isinstance(part, dict):
@@ -163,31 +162,11 @@ def route_tree(tree, value, parts, path=()):
             # An empty entry moves nothing: a part with no numbers (a user's frozen
             # field) is never written
             if entry:
-                part.params = merge_known(part.params, entry)
+                part.params = entry
         elif part is not None:
             part.params = entry
         else:
             tree[key] = entry
-
-
-def require_routed_keys(tree, value, parts, path):
-    """Refuse a routed tree with a key the held tree lacks, or a subtree where an own number is, before any write."""
-    where = "params" + "".join(f"[{key!r}]" for key in path)
-    if not isinstance(value, dict):
-        raise ValueError(f"{where} is a subtree: give a dict of its entries")
-    unknown = [key for key in value if key not in tree]
-    if unknown:
-        raise ValueError(
-            f"{where} has no entry {unknown}; the known entries are {list(tree)}"
-        )
-    for key, entry in value.items():
-        part = parts.get(key)
-        if isinstance(part, dict):
-            require_routed_keys(tree[key], entry, part, (*path, key))
-        elif part is not None and holds_own_tree(part):
-            merge_known(part.params, entry)
-        elif part is None and isinstance(entry, dict):
-            raise ValueError(f"{where}[{key!r}] is a number, got a dict")
 
 
 def split_path(path):
@@ -266,6 +245,22 @@ def merge_known(tree, override):
     return merged
 
 
+def checked(tree, reference):
+    """
+    The tree a verb runs on: ``reference`` for ``None``, else ``tree`` checked complete against it.
+
+    Complete trees everywhere (DESIGN §4, "Parameters"): a tree given to a verb
+    names every entry of the tool's own tree, in the same shapes
+    (:func:`require_complete`), so nothing is merged and nothing is left to a
+    default. A list or tuple leaf becomes an array: a tree's containers are dicts.
+    """
+    if tree is None:
+        return reference
+    require_complete(tree, reference)
+
+    return merge_known(reference, tree)
+
+
 def require_complete(tree, reference, path=()):
     """
     Refuse a tree that does not name every entry of ``reference``, or names one it lacks.
@@ -287,9 +282,9 @@ def require_complete(tree, reference, path=()):
         missing = [key for key in reference if key not in tree]
         if unknown or missing:
             raise ValueError(
-                f"{where} must name every entry of the part it sets: "
-                f"unknown {unknown}, missing {missing}; the known entries are "
-                f"{list(reference)}"
+                f"{where} is a complete tree: unknown {unknown}, missing {missing}; "
+                f"the known entries are {list(reference)} (a tree at other numbers is "
+                "a copy of the tool's own, edited: p = copy.deepcopy(tool.params))"
             )
         for key, value in tree.items():
             require_complete(value, reference[key], (*path, key))

@@ -10,7 +10,7 @@ from minilink.core.params import (
     held_params,
     own_params,
     param_view,
-    require_complete_part,
+    require_complete,
 )
 from minilink.core.trajectory import Trajectory
 
@@ -368,9 +368,10 @@ class SumCost(CostFunction):
     @params.setter
     def params(self, value):
         validate_cost_params(value, self.terms)
-        for term_id, term_params in (value or {}).items():
-            require_complete_part(term_params, self.terms[term_id], (term_id,))
-        for term_id, term_params in (value or {}).items():
+        if value is None:
+            return
+        require_complete(value, self.params)
+        for term_id, term_params in value.items():
             self.terms[term_id].params = term_params
 
     def g(self, x, u, t=0.0, params=None):
@@ -380,7 +381,7 @@ class SumCost(CostFunction):
 
         # g = Σᵢ gᵢ(x, u, t)
         g = sum(
-            cost.g(x, u, t, params.get(term_id)) for term_id, cost in self.terms.items()
+            cost.g(x, u, t, params[term_id]) for term_id, cost in self.terms.items()
         )
 
         return g
@@ -391,9 +392,7 @@ class SumCost(CostFunction):
         params = self.params if params is None else params
 
         # h = Σᵢ hᵢ(x, t)
-        h = sum(
-            cost.h(x, t, params.get(term_id)) for term_id, cost in self.terms.items()
-        )
+        h = sum(cost.h(x, t, params[term_id]) for term_id, cost in self.terms.items())
 
         return h
 
@@ -475,11 +474,10 @@ class ScaledCost(CostFunction):
         return weight * self.cost.h_max(X, inner)
 
     def split(self, params):
-        """``(weight, the scaled cost's params)``: the entries given, else the cost's own."""
-        require_known_keys(params, ("weight", "cost"), "ScaledCost")
-        params = params or {}
+        """``(weight, the scaled cost's params)``: the tree given, else the cost's own."""
+        params = self.params if params is None else params
 
-        return params.get("weight", self.weight), params.get("cost")
+        return params["weight"], params["cost"]
 
 
 class StepCost(ABC):
@@ -556,7 +554,7 @@ class SampledCost(StepCost):
 
     @params.setter
     def params(self, value):
-        require_complete_part(value, self.cost)
+        require_complete(value, self.cost.params)
         self.cost.params = value
 
     def c(self, x, u, k=0, params=None):
@@ -746,15 +744,6 @@ def validate_cost_params(params, terms):
         raise ValueError(
             f"unknown cost term id(s) {unknown}; the sum's terms are {list(terms)}"
         )
-
-
-def require_known_keys(params, keys, owner):
-    """Refuse a params dictionary with a key the owner does not have."""
-    if params is None:
-        return
-    unknown = sorted(set(params) - set(keys))
-    if unknown:
-        raise ValueError(f"{owner} params take {list(keys)}, got {unknown}")
 
 
 def check_weights(Q, R, S, n, m):

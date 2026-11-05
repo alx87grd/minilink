@@ -8,7 +8,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.compile.evaluators.base import assigned
 from minilink.core.compile.evaluators.stepping import step_body
-from minilink.core.params import merge_known
+from minilink.core.params import checked
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
@@ -151,18 +151,18 @@ class CompiledTrajectoryPlanner:
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
-        problem_params, _ = planner_parts(params)
+        problem_params, _ = planner_parts(tree)
         numbers = {"method": tree["method"]}
         z_start = self.initial(params) if z0 is None else z0
         z_dec0 = z_start[:-1]
 
         # z* = argmin J(z; p) from the guess, by the planner's method on its numbers
         if self.program.params is None:
-            optimizer = self.optimizer_at(problem_params, z_dec0)
+            optimizer = self.optimizer_at(params, z_dec0)
             result = optimizer.solve(params=numbers, z0=z_dec0)
         else:
             result = self.optimizer.solve(
-                params={**(problem_params or {}), **numbers}, z0=z_dec0
+                params={**problem_params, **numbers}, z0=z_dec0
             )
 
         # z = [z*, t0]: the decision vector and the origin it was solved from
@@ -336,16 +336,12 @@ class CompiledTrajectoryPlanner:
     ###########################################################################
 
     def merged(self, params):
-        """The defaults with ``params`` merged over them, checked against the tree."""
-        if not params:
-            return self.params
-
-        return merge_known(self.params, params)
+        """The tree the face runs on: its defaults for ``None``, else ``params``, checked complete against them."""
+        return checked(params, self.params)
 
     def optimizer_at(self, params, z_dec):
-        """The optimizer of a NumPy program at ``params``: the compiled one for none, else one rebuilt on a copy of the problem holding them."""
-        params, _ = planner_parts(params)
-        if not params:
+        """The optimizer of a NumPy program at the tree ``params``: the compiled one for none, else one rebuilt on a copy of the problem holding them."""
+        if params is None:
             return self.optimizer
 
         program = self.transcription.transcribe(

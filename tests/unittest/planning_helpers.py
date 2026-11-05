@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import copy
+
 import numpy as np
 
 from minilink.core.geometry import Sphere
+from minilink.core.params import flatten, set_leaf
 from minilink.core.sets import BallSet, BoxSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
@@ -29,3 +32,12 @@ def make_holonomic_obstacle_problem():
     X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
     Xf = BallSet(X_GOAL, GOAL_TOLERANCE)
     return PlanningProblem(sys=sys, x0=X_START, Xf=Xf, X=X, U=sys.input_box), X
+
+
+def edited(tree, changes):
+    """A deep copy of a tool's complete ``tree`` with the leaves of ``changes`` (a nested dict) set: the tree a verb takes."""
+    tree = copy.deepcopy(tree)
+    for path, value in flatten(changes):
+        set_leaf(tree, path, value)
+
+    return tree

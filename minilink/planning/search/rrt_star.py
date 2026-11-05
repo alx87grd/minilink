@@ -7,6 +7,7 @@ from dataclasses import dataclass, replace
 
 import numpy as np
 
+from minilink.planning.planner import planner_at
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender, SteeringExtender
 from minilink.planning.search.metric import euclidean
@@ -130,7 +131,9 @@ class RRTStarPlanner(RRTPlanner):
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
-            solution = self.at(params).solve(evaluate=evaluate, n_trials=n_trials)
+            solution = planner_at(self, params).solve(
+                evaluate=evaluate, n_trials=n_trials
+            )
             return self.store_solution(solution)
 
         metric = self.metric

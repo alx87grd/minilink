@@ -8,7 +8,7 @@ import numpy as np
 
 from minilink.blocks.sources import TrajectorySource
 from minilink.core.costs import CostFunction
-from minilink.core.params import merge_known
+from minilink.core.params import checked, merge_known
 from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
@@ -90,27 +90,6 @@ class Planner(ABC):
         method = {name: getattr(self, name) for name in self.number_names}
 
         return {**self.problem.parts_view(), "method": method, "seed": self.seed}
-
-    def at(self, params) -> "Planner":
-        """
-        A planner of the same kind at a partial tree of :attr:`params`: on the problem holding its leaves, with its numbers and seed.
-
-        A new planner, built from this one's keywords (the numbers it was
-        given, never the defaults it derived, so a changed problem derives its
-        own); this one is unchanged. The host planners build it (value
-        iteration, tabular learning, LQR, RRT, RRT*); a planner with a compiled
-        face (trajectory optimization, MPPI) solves at a tree through the face,
-        ``solve(params=...)``.
-        """
-        problem_leaves, method, seed = planner_tree_parts(params)
-        require_known_numbers(self, method)
-        problem = problem_with(self.problem, host_tree(problem_leaves))
-
-        kwargs = {**self.build_kwargs(), **(method or {})}
-        if seed is not None:
-            kwargs["seed"] = seed
-
-        return type(self)(problem, **kwargs)
 
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem: its structure, its workflow, the numbers it was given."""
@@ -275,6 +254,39 @@ def held_feedback(policy, dt):
         return policy % float(dt)
 
     return policy
+
+
+def planner_at(planner, params) -> "Planner":
+    """
+    A planner of the same kind at the complete tree ``params`` of ``planner.params``: what ``solve(params=)`` solves with.
+
+    A new planner, built from the planner's keywords (the numbers it was
+    given, never the defaults it derived, so a changed problem derives its
+    own) on a copy of its problem holding the tree; the planner is unchanged.
+    A method number the tree leaves at the planner's value is not given: it
+    is derived again on the new problem (the discount factor follows a new
+    rate); a number the tree changes is given. The host planners solve
+    through it (value iteration, tabular learning, LQR, RRT, RRT*); a planner
+    with a compiled face (trajectory optimization, MPPI) solves at a tree
+    through the face.
+    """
+    require_known_numbers(planner, (params or {}).get("method"))
+    params = checked(params, planner.params)
+    problem_leaves, method, seed = planner_tree_parts(params)
+    problem = problem_with(planner.problem, host_tree(problem_leaves))
+
+    # The numbers the tree changes: the others stay derived (or given) as they were
+    own = planner.params["method"]
+    changed = {
+        name: value
+        for name, value in (method or {}).items()
+        if not np.array_equal(np.asarray(value), np.asarray(own[name]))
+    }
+    kwargs = {**planner.build_kwargs(), **changed}
+    if seed is not None:
+        kwargs["seed"] = seed
+
+    return type(planner)(problem, **kwargs)
 
 
 def given_numbers(**numbers) -> dict:

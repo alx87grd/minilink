@@ -25,6 +25,7 @@ from minilink import (  # noqa: E402
     lqr,
 )
 from minilink.core.backends import configure_jax  # noqa: E402
+from tests.unittest.planning_helpers import edited  # noqa: E402
 
 configure_jax(enable_x64=True)
 
@@ -133,7 +134,7 @@ def test_a_repeated_solve_compiles_nothing():
         learning_rate=0.05,
     )
     pv = native.compile()
-    start = {"x0": np.array([0.5, 0.0]), "t0": 0.0}
+    start = edited(pv.params, {"x0": np.array([0.5, 0.0]), "t0": 0.0})
     for run in (
         lambda: planner.solve(evaluate=False).trajectory.x,
         lambda: native.solve(evaluate=False).trajectory.x,
@@ -174,10 +175,11 @@ def test_a_leaf_given_as_any_number_type_shares_one_trace():
 def test_an_evaluation_override_of_any_number_type_shares_one_trace():
     law = StateFeedback(np.array([[2.0, 0.5]]))
     pe = pendulum_problem().compile(law, dt=0.01, backend="jax")
-    pe.evaluate({"x0": np.array([0.4, 0.0])}).objective
+    pe.evaluate(edited(pe.params, {"x0": np.array([0.4, 0.0])})).objective
     for value in (0.3, np.float64(0.3), 0, [0.3, 0.0]):
         start = value if isinstance(value, list) else np.array([value, 0.0])
-        assert compiles(lambda: pe.evaluate({"x0": start}).objective)[0] == 0
+        tree = edited(pe.params, {"x0": start})
+        assert compiles(lambda: pe.evaluate(tree).objective)[0] == 0
 
 
 def test_a_parameter_sweep_through_a_held_evaluator_compiles_once_and_reads_each_value():

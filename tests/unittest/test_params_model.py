@@ -13,6 +13,7 @@ from minilink import (
     QuadraticCost,
     TimeCost,
 )
+from tests.unittest.planning_helpers import edited
 
 
 def regulation_problem(plant):
@@ -48,10 +49,10 @@ def test_a_plant_simulated_on_jax_deep_copies():
     np.testing.assert_array_equal(np.asarray(twin.traj.x), np.asarray(plant.traj.x))
 
 
-# A composite refuses a part's tree that would wipe its other numbers
+# A composite takes its whole tree: a partial one is refused and changes nothing
 
 
-def test_a_problem_refuses_a_part_tree_missing_entries_and_keeps_them():
+def test_a_problem_refuses_a_partial_tree_and_keeps_its_numbers():
     plant = Pendulum()
     problem = regulation_problem(plant)
     keys = sorted(problem.cost.params)
@@ -59,17 +60,17 @@ def test_a_problem_refuses_a_part_tree_missing_entries_and_keeps_them():
     with pytest.raises(ValueError, match="missing"):
         problem.params = {"cost": {"R": np.array([[10.0]])}}
     with pytest.raises(ValueError, match="unknown \\['mass'\\]"):
-        problem.params = {"plant": {**plant.params, "mass": 2.0}}
+        problem.params = edited(problem.params, {"plant": {"mass": 2.0}})
 
     assert sorted(problem.cost.params) == keys
     assert "mass" not in plant.params
 
 
-def test_a_problem_takes_a_complete_part_tree():
+def test_a_problem_takes_its_complete_tree_edited():
     plant = Pendulum()
     problem = regulation_problem(plant)
 
-    problem.params = {"plant": {**plant.params, "m": 2.0}}
+    problem.params = edited(problem.params, {"plant": {"m": 2.0}})
 
     assert plant.params["m"] == 2.0
 
@@ -108,7 +109,7 @@ def test_a_new_shape_through_a_composite_is_refused():
     problem = regulation_problem(plant)
 
     with pytest.raises(ValueError, match="shape"):
-        problem.params = {"cost": {**problem.cost.params, "R": np.eye(2)}}
+        problem.params = edited(problem.params, {"cost": {"R": np.eye(2)}})
 
 
 # The program's form is decided once per bind, never per call
@@ -224,7 +225,7 @@ def test_a_problem_write_lands_in_the_users_set():
     problem = PlanningProblem(plant, x0=np.zeros(2), X=X, horizon=1.0)
 
     problem.params["X"]["upper"] = np.array([2.0, 2.0])
-    problem.params = {"X": {"lower": np.array([-2.0, -2.0])}}
+    problem.params = edited(problem.params, {"X": {"lower": np.array([-2.0, -2.0])}})
 
     assert problem.X is X
     np.testing.assert_array_equal(X.lower, [-2.0, -2.0])
@@ -240,7 +241,7 @@ def test_a_field_set_and_a_field_cost_hold_their_fields_numbers():
     x = np.array([1.0, 0.0])
 
     band.params["field"]["center"] = np.array([1.0, 0.0])
-    cost.params = {"weight": 2.0}
+    cost.params = edited(cost.params, {"weight": 2.0})
 
     np.testing.assert_array_equal(V.center, [1.0, 0.0])
     assert float(cost.g(x, np.zeros(1))) == 0.0 and cost.weight == 2.0
@@ -264,8 +265,8 @@ def test_a_composite_values_unknown_entry_is_refused_before_any_write():
 
     both = BoxSet([-1.0], [1.0]) & BallSet([0.0], 1.0)
 
-    with pytest.raises(ValueError, match="no entry"):
-        both.params = {"0": {"upper": np.array([2.0])}, "2": {"radius": 1.0}}
+    with pytest.raises(ValueError, match="unknown \\['2'\\]"):
+        both.params = edited(both.params, {"2": {"radius": 1.0}})
     np.testing.assert_array_equal(both.sets[0].upper, [1.0])
 
 
@@ -330,3 +331,42 @@ def test_a_diagram_refuses_a_block_added_twice():
 
     with pytest.raises(ValueError, match="already in the diagram as 'plant'"):
         diagram.add_subsystem(plant, "plant2")
+
+
+# Complete trees everywhere: a verb takes None or its tool's whole tree
+
+
+def test_a_verb_refuses_a_partial_tree_and_takes_its_tools_tree_edited():
+    from minilink import DynamicProgrammingPlanner
+
+    plant = Pendulum()
+    plant.state.lower_bound = np.array([-np.pi, -6.0])
+    plant.state.upper_bound = np.array([np.pi, 6.0])
+    problem = regulation_problem(plant).replace(X=plant.state.box, U=plant.input_box)
+    planner = DynamicProgrammingPlanner(
+        problem, max_iterations=5, x_grid=(5, 5), u_grid=(3,), dt=0.1
+    )
+
+    with pytest.raises(ValueError, match="missing"):
+        planner.solve(params={"plant": {"m": 2.0}})
+    solution = planner.solve(params=edited(planner.params, {"plant": {"m": 2.0}}))
+
+    assert solution is planner.last_solution
+    assert plant.params["m"] == 1.0  # the user's problem untouched
+
+
+def test_an_optimizer_refuses_a_partial_tree():
+    from minilink.optimization import MathematicalProgram, Optimizer
+
+    program = MathematicalProgram(
+        n_z=1,
+        J=lambda z, p: (z[0] - p["c"]) ** 2,
+        params={"c": np.array(1.0)},
+    )
+    optimizer = Optimizer(program, z0=[0.0], method="l-bfgs")
+
+    with pytest.raises(ValueError, match="missing \\['method'\\]"):
+        optimizer.solve(params={"c": np.array(3.0)})
+    result = optimizer.solve(params=edited(optimizer.params, {"c": np.array(3.0)}))
+
+    assert result.z[0] == pytest.approx(3.0, abs=1e-6)

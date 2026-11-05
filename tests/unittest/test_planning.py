@@ -3,6 +3,8 @@ import io
 import tempfile
 import unittest
 import numpy as np
+
+from tests.unittest.planning_helpers import edited
 from minilink.core.costs import QuadraticCost
 from minilink.core.sets import BallSet, BoxSet, CallableSet, SingletonSet
 from minilink.core.system import DynamicSystem
@@ -469,7 +471,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(f(x, u, 0.0), [2.0], atol=1e-12)
 
         # The plant's parameters, written through the problem's view, reach f
-        problem.params = {"plant": {**sys.params, "k": 3.0}}
+        problem.params = edited(problem.params, {"plant": {"k": 3.0}})
         for backend in ("numpy", "direct"):
             f = dynamics_function(problem, backend)
             np.testing.assert_allclose(f(x, u, 0.0), [6.0], atol=1e-12)
@@ -563,7 +565,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription="direct_collocation",
             options={"maxiter": 100, "ftol": 1e-09},
         )
-        moved = planner.solve(params={"x0": np.array([0.4])})
+        moved = planner.solve(params=edited(planner.params, {"x0": np.array([0.4])}))
         np.testing.assert_allclose(moved.trajectory.x[:, 0], [0.4], atol=1e-9)
         np.testing.assert_allclose(planner.problem.x0, problem.x0)
 
@@ -2444,7 +2446,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
 
     # A solve at other values is checked on the program it was solved on: the
     # record of a planner built at that start, on the same z
-    start = {"x0": np.array([0.05, 0.0])}
+    start = edited(pv.params, {"x0": np.array([0.05, 0.0])})
     moved, moved_status = pv.solve(start)
     record = pv.solution(moved, start, moved_status).record
     at_start = TrajectoryOptimizationPlanner(
@@ -2462,7 +2464,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     # A guess packs back to z, and an unknown path is refused
     np.testing.assert_allclose(pv.pack(face)[:-1], z[:-1], atol=1e-12)
     with pytest.raises(ValueError, match="known entries"):
-        pv.solve({"plant": {"nu": 1.0}})
+        pv.solve(edited(pv.params, {"plant": {"nu": 1.0}}))
 
 
 @pytest.mark.jax
@@ -2491,14 +2493,14 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     pv = planner.compile()
 
     starts = jnp.asarray([[0.5, 0.0], [0.2, 0.1], [-0.4, 0.0]])
-    zs, status = jax.vmap(lambda x: pv.solve({"x0": x}))(starts)
+    zs, status = jax.vmap(lambda x: pv.solve(edited(pv.params, {"x0": x})))(starts)
     assert zs.shape == (3, pv.n_z)
     for x, z in zip(starts, zs):
-        alone, _ = pv.solve({"x0": np.asarray(x)})
+        alone, _ = pv.solve(edited(pv.params, {"x0": np.asarray(x)}))
         np.testing.assert_allclose(z, alone, rtol=1e-12)
 
     # One jitted solve, and the cost lower than at the initial guess
-    solve = jax.jit(lambda x: pv.solve({"x0": x})[0])
+    solve = jax.jit(lambda x: pv.solve(edited(pv.params, {"x0": x}))[0])
     np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
     J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
     assert float(status["cost"][0]) < J0

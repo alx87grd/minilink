@@ -7,6 +7,8 @@ from unittest import mock
 
 import matplotlib
 import numpy as np
+
+from tests.unittest.planning_helpers import edited
 import pytest
 
 matplotlib.use("Agg")
@@ -194,13 +196,15 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIsNone(plan.evaluation)  # not asked
         self.assertIsNotNone(planner.last_solution.record.optimization_result.z)
 
-    def test_params_none_and_empty_ok(self):
+    def test_params_none_or_the_planners_tree(self):
         planner = self.make_planner(self.make_problem(0.0))
         x0 = np.array([0.0])
         plan_none = planner.solve_trajectory_from(x0, params=None)
-        plan_empty = planner.solve_trajectory_from(x0, params={})
+        plan_tree = planner.solve_trajectory_from(x0, params=planner.params)
         np.testing.assert_allclose(plan_none.trajectory.x[:, 0], x0, atol=1e-05)
-        np.testing.assert_allclose(plan_empty.trajectory.x[:, 0], x0, atol=1e-05)
+        np.testing.assert_allclose(plan_tree.trajectory.x[:, 0], x0, atol=1e-05)
+        with self.assertRaises(ValueError):  # an empty tree is no tree: None
+            planner.solve_trajectory_from(x0, params={})
 
     def test_params_scene_not_implemented(self):
         planner = self.make_planner(self.make_problem(0.0))
@@ -252,7 +256,7 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         self.assertIn("X", planner.program.params)  # a set read as margins is a leaf
         x0 = np.array([0.0])
         plan = planner.solve_trajectory_from(
-            x0, params={"X": {"radius": 0.5}, "t0": 3.0}
+            x0, params=edited(planner.params, {"X": {"radius": 0.5}, "t0": 3.0})
         )
         rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve_trajectory_from(x0)
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
@@ -269,7 +273,9 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             return problem
 
         start = np.array([1.5])
-        plan = planner.solve_trajectory_from(start, params={"X": {"center": [1.0]}})
+        plan = planner.solve_trajectory_from(
+            start, params=edited(planner.params, {"X": {"center": [1.0]}})
+        )
         rebuilt = self.make_planner(moved(1.0)).solve_trajectory_from(start)
         self.assertTrue(plan.success)
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
@@ -282,17 +288,21 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         )
         values = {"t0": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
         x0 = np.array([0.3])
-        compiled = self.make_planner(problem).solve_trajectory_from(
-            x0, params=values, evaluate=True
+        planner = self.make_planner(problem)
+        compiled = planner.solve_trajectory_from(
+            x0, params=edited(planner.params, values), evaluate=True
         )
-        rebuild = TrajectoryOptimizationPlanner(
+        numpy_planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="numpy",
             options={"maxiter": 50, "ftol": 0.0001},
-        ).solve_trajectory_from(x0, params=values, evaluate=True)
+        )
+        rebuild = numpy_planner.solve_trajectory_from(
+            x0, params=edited(numpy_planner.params, values), evaluate=True
+        )
         self.assertEqual(compiled.problem.t0, 3.0)
         np.testing.assert_allclose(compiled.problem.x0, x0)
         np.testing.assert_allclose(
@@ -486,7 +496,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         self,
     ):
         pv = self.pv
-        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.0})
+        z, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.0}))
         y = np.array([0.9])
         guess = warm_guess(pv, z, y, tree_at(pv, y, DT), pv.initial())
         shifted = pv.shift(z, DT)
@@ -505,11 +515,11 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_the_solve_block_solves_from_the_measurement_warm_started(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]
-        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.2})
+        z, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.2}))
         y = np.array([0.8])
         z_star = solve.compute_z(np.zeros(0), np.concatenate([y, z]), 0.4)
         expected, _ = pv.solve(
-            {"x0": y, "t0": 0.4},
+            edited(pv.params, {"x0": y, "t0": 0.4}),
             z0=warm_guess(pv, z, y, tree_at(pv, y, 0.4), pv.initial()),
         )
         np.testing.assert_allclose(z_star, expected, atol=1e-12)
@@ -539,7 +549,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         for k in range(5):
             t_k = k * DT
             z, _ = pv.solve(
-                {"x0": x, "t0": t_k},
+                edited(pv.params, {"x0": x, "t0": t_k}),
                 z0=warm_guess(pv, z, x, tree_at(pv, x, t_k), pv.initial()),
             )
             u_k = pv.command(z, x, t_k)
@@ -597,7 +607,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
     def test_a_failed_solve_keeps_the_last_plan(self):
         pv = self.pv
         solve = self.mpc.subsystems["solve"]
-        z, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.0})
+        z, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.0}))
 
         def failing(params=None, z0=None):
             return z0 + 1.0, {"success": False, "iterations": 0, "cost": np.nan}
@@ -670,7 +680,7 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
         pv = mpc.pv
         solve = mpc.subsystems["solve"]
         y = np.array([0.8])
-        z_prev, _ = pv.solve({"x0": np.array([0.5]), "t0": 0.2})
+        z_prev, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.2}))
         P, z0 = solve.solve_inputs(np.zeros(0), np.concatenate([y, z_prev]), 0.4)
         np.testing.assert_array_equal(z0, pv.initial(tree_at(pv, y, 0.4)))
         with pytest.raises(TypeError, match="clock"):
@@ -731,8 +741,8 @@ class TestTheMPCOnANumPyPlanner(unittest.TestCase):
         z, _ = pv.solve()
         assert z[-1] == 0.0
 
-        # A partial tree merges onto the compiled one, not onto the edited problem
-        partial = {"x0": np.array([0.3])}
+        # A tree at other numbers is the compiled one edited, not the edited problem's
+        partial = edited(pv.params, {"x0": np.array([0.3])})
         z_partial, _ = pv.solve(partial)
         assert z_partial[-1] == 0.0 and pv.initial(partial)[-1] == 0.0
         assert pv.solution(z_partial, partial).trajectory.t[0] == 0.0
@@ -889,7 +899,7 @@ def test_the_traced_default_guess_follows_the_traced_start():
     pv = integrator_planner().compile()
     P = tree_at(pv, np.array([1.3]), 0.4)
     host = pv.initial(P)
-    traced = jax.jit(lambda x, t: pv.initial({**pv.params, "x0": x, "t0": t}))(
+    traced = jax.jit(lambda x, t: pv.initial(edited(pv.params, {"x0": x, "t0": t})))(
         np.array([1.3]), 0.4
     )
     np.testing.assert_allclose(np.asarray(traced), host, rtol=0, atol=1e-12)

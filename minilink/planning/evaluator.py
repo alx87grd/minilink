@@ -26,6 +26,7 @@ from minilink.core.params import (
     float_leaves,
     lookup,
     merge_tree,
+    require_complete,
     set_leaf,
     split_path,
     tree_digest,
@@ -363,8 +364,9 @@ class ProblemEvaluator:
         defaults = self.params
         if params is None:
             return defaults
+        require_complete(params, defaults)
 
-        return canonical_tree(merge_tree(defaults, params), defaults)
+        return canonical_tree(params, defaults)
 
     def device_tree(self, tree):
         """``tree`` on the device: put there once and kept while its values repeat, so a repeat transfers nothing."""

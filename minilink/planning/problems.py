@@ -15,11 +15,9 @@ from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import (
     flatten,
-    holds_own_tree,
     lookup,
-    merge_known,
     merge_tree,
-    require_complete_part,
+    require_complete,
     set_leaf,
     with_leaf,
 )
@@ -316,10 +314,7 @@ class PlanningProblem:
         view = self.params
         require_roles(value, view)
         require_numbers(value or {})
-        parts = {"plant": self.sys, "cost": self.cost, **self.sources_by_id()}
-        for role, entry in (value or {}).items():
-            if role in parts and parts[role] is not None:
-                require_complete_part(entry, parts[role], (role,))
+        require_complete(value, view)
 
         for role, entry in value.items():
             if role == "plant":
@@ -335,12 +330,8 @@ class PlanningProblem:
             elif role in self.sources_by_id():
                 self.sources_by_id()[role].params = entry
             else:
-                # A set's numbers in place, its one home: merged and checked on a set
-                # that holds them, routed by a set that composes others
-                set_ = getattr(self, role)
-                set_.params = (
-                    merge_known(set_.params, entry) if holds_own_tree(set_) else entry
-                )
+                # A set's numbers in place, its one home
+                getattr(self, role).params = entry
 
     @property
     def start_point(self):
