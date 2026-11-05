@@ -648,7 +648,6 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         n_steps=OBS_N_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        record_solve_time=True,
         options={"maxiter": 500, "ftol": 1e-1},
     )
     t0 = time.perf_counter()
@@ -692,7 +691,6 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         n_steps=CORNER_N_STEPS,
         transcription="direct_collocation",
         backend=backend,
-        record_solve_time=True,
         method="scipy_slsqp",
         options={"maxiter": 150, "ftol": 0.1},
     )

@@ -634,7 +634,6 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="numpy",
-            record_solve_time=True,
             options={"maxiter": 20, "ftol": 0.001},
         )
         flat = TrajectoryOptimizationPlanner(
@@ -642,13 +641,11 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             n_steps=5,
             transcription="direct_collocation",
             backend="numpy",
-            record_solve_time=True,
             options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
         self.assertEqual(flat.backend, nested.backend)
-        self.assertEqual(flat.record_solve_time, nested.record_solve_time)
         self.assertEqual(flat.options, nested.options)
 
     def test_string_presets(self):

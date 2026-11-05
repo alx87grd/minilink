@@ -46,6 +46,7 @@ RETIRED = {
     "plot_policy": ("plot_control_law", None),
     "animate_cost2go": ("animate_cost_to_go", None),
     "solve_trajectory": ("solve", None),
+    "record_solve_time": ("solve_time_s, always recorded", None),
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
     "sample": ("at", ("Trajectory",)),

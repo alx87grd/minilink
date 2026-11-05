@@ -1483,7 +1483,10 @@ and the solver's own flag stays in `message` / `stats`. The worst equality
 residual / inequality margin / bound violation are recorded on the record, with the
 solve's whole account (`optimization_result`, the per-iteration `history` when
 `record_history=True`, `solve_time_s`, `step_time_s`); the planner keeps only the
-diagnostics `last_program` and `last_optimizer` (RULES 2.4).
+diagnostics `last_program` and `last_optimizer` (RULES 2.4). A user's verb (`Optimizer.solve`,
+`planner.solve`) always times the backend solve it wraps and fills `solve_time_s`; the
+machine-side solves (the compiled face's `pv.solve`, the fixed-iteration pure solve) are traced,
+have no wall clock, and leave it `None`.
 Online ticks (`solve_trajectory_from`, the MPC path) report
 the solver flag without a residual check. **I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `backend=…`) like `Simulator` /

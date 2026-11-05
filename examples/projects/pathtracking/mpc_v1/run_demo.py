@@ -100,7 +100,6 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    record_solve_time=True,
     method="scipy_slsqp",
     options={"maxiter": 100, "ftol": 0.1},
 )

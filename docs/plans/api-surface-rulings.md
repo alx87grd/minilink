@@ -39,27 +39,6 @@ compiles for new numbers.
 Call-site counts below are files per tree at 2026-11-05 (`grep`), a guide for the size of each
 commit.
 
-## AR-6 A default start on the constructor, this solve's on `solve`; the solve time at the user's verb
-
-Amended 2026-11-05 (the maintainer's review): the constructors keep their default start, and the
-timing flag goes.
-
-**The start.** `Optimizer(program, z0=)` and `TrajectoryOptimizationPlanner(..., guess=)` set the
-default start, as `method=` sets the default method; `solve(z0=)` and `solve(guess=)` are this
-solve's, overriding it once. The same word on both, as `method=` already is; no `default_` prefix.
-The optimizer's default is the constructor's `z0`, else the program's own (`metadata["z0"]`, set by
-an exported program), else a refusal, as today; it is also the sample the build traces the program
-at. In a loop, the natural route is the compiled face, `pv = planner.compile()` then
-`pv.solve(P, z0)`, which takes its start explicitly every call (the MPC's memory holds the last
-plan, `pv.initial()` the default guess while there is none).
-
-**The solve time.** `record_solve_time` goes. A user's verb (`Optimizer.solve`, `planner.solve`)
-always times the backend solve it wraps and fills `solve_time_s`; the timer costs nothing. The
-machine-side solves never time: the compiled face's `pv.solve(P, z0)` and the fixed-iteration pure
-solve (`n_iterations=K`, `solve_count`) are traced under `jit`, with no wall clock inside; their
-results leave `solve_time_s` empty, and the verb that calls them on the host times around them.
-Callers of the flag: 11 library files, 16 examples, 12 tests, 5 benchmarks.
-
 ## AR-7 One block selector: `traj.of("plant")` on both loop kinds
 
 `traj.of("plant")` and `compute_cost(cost, of="plant")` work on a continuous loop as on a

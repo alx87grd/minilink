@@ -143,10 +143,10 @@ class OptimizationResult:
     Parameters
     ----------
     solve_time_s : float, optional
-        Wall-clock time in seconds for the backend solver only, when the caller
-        requested timing on :meth:`~minilink.optimization.optimizer.Optimizer.solve`
-        (``record_solve_time=True``) or a summary report (``verbose=True``).
-        ``None`` means not measured.
+        Wall-clock time in seconds of the backend solve alone, measured by
+        :meth:`~minilink.optimization.optimizer.Optimizer.solve`; ``None`` on a
+        traced solve (a compiled face, a fixed count of native steps), which
+        has no wall clock.
     """
 
     z: np.ndarray

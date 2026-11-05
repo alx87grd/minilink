@@ -647,7 +647,6 @@ class TestTheClockOperator(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="jax",
-            record_solve_time=True,
             method="scipy_slsqp",
             options={"maxiter": 5, "ftol": 0.1},
         )

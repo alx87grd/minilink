@@ -90,7 +90,6 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
             problem,
             transcription=transcription,
             backend="jax",
-            record_solve_time=True,
             options={"maxiter": 50, "ftol": 0.0001},
         )
         planner.compile_parametric_program()
@@ -165,7 +164,6 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             problem,
             transcription=transcription,
             backend="jax",
-            record_solve_time=True,
             options={"maxiter": 50, "ftol": 0.0001},
         )
         planner.compile_parametric_program()
@@ -228,7 +226,6 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="jax",
-            record_solve_time=True,
             options={"maxiter": 50, "ftol": 0.0001},
         )
         plan_off = planner_off.solve()

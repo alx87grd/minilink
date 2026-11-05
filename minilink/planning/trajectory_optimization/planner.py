@@ -85,7 +85,6 @@ class TrajectoryOptimizationPlanner(Planner):
         callback: Callable | None = None,
         live_plot: bool = False,
         record_history: bool = False,
-        record_solve_time: bool = False,
         **method_numbers,
     ) -> None:
         """
@@ -110,11 +109,11 @@ class TrajectoryOptimizationPlanner(Planner):
         options : dict, optional
             An external solver's own knobs (SciPy's ``maxiter``, ``ftol``;
             Ipopt's), passed through untouched.
-        verbose, callback, live_plot, record_history, record_solve_time
+        verbose, callback, live_plot, record_history
             Workflow: the preamble and report, a per-iterate callback (it takes
-            precedence over ``live_plot``), the live redraw, a full
+            precedence over ``live_plot``), the live redraw, and a full
             :class:`Trajectory` per iterate (one rollout each: leave it off for
-            production solves), and the solve's wall time.
+            production solves).
         **method_numbers
             A native method's own numbers (``learning_rate``, ``b1``, ``b2``,
             ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``.
@@ -142,7 +141,6 @@ class TrajectoryOptimizationPlanner(Planner):
         self.callback = callback
         self.live_plot = bool(live_plot)
         self.record_history = bool(record_history)
-        self.record_solve_time = bool(record_solve_time)
 
         # Diagnostics: the machinery of the latest offline solve, never read by a tool
         # (its answer, timings and history are in solution.record)
@@ -267,7 +265,6 @@ class TrajectoryOptimizationPlanner(Planner):
             params=None if method is None else {**optimizer.params, "method": method},
             z0=z0,
             callback=self.build_callback(optimizer, problem, backend, history),
-            record_solve_time=self.record_solve_time or self.verbose,
             verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
@@ -699,25 +696,20 @@ class TrajectoryOptimizationPlanner(Planner):
         seed = self.resolve_guess(problem_k, guess)
         z0 = self.transcription.pack_initial_guess(problem_k, seed)
 
-        # z* = argmin J(z; x0), timed when asked
-        record_solve_time = self.record_solve_time or self.verbose
-        if record_solve_time:
-            solve_t0 = time.perf_counter()
-
+        # z* = argmin J(z; x0), timed
+        solve_t0 = time.perf_counter()
         result = self.optimizer_backend.solve(
             self.program_evaluator,
             z0,
         )
-
-        if record_solve_time:
-            result = OptimizationResult(
-                z=result.z,
-                success=result.success,
-                cost=result.cost,
-                message=result.message,
-                stats=result.stats,
-                solve_time_s=time.perf_counter() - solve_t0,
-            )
+        result = OptimizationResult(
+            z=result.z,
+            success=result.success,
+            cost=result.cost,
+            message=result.message,
+            stats=result.stats,
+            solve_time_s=time.perf_counter() - solve_t0,
+        )
 
         # The plan read back from z* with the compiled dynamics on the tick's plant
         plant = bound["plant"]
