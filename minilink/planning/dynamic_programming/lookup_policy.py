@@ -22,7 +22,9 @@ class LookupPolicy(System):
     composes with a plant through ``controller @ plant`` and simulates like any
     other block. Each input axis is interpolated on the grid (multilinear, the
     edge cells extended past the grid, or the nearest node), so the discrete
-    table yields a smooth command; the law traces under JAX. ``params`` is
+    table yields a smooth command, clipped to the grid's input box (the corners
+    of a cell at the bound interpolate to the bound, not past it by rounding);
+    the law traces under JAX. ``params`` is
     ``{"u_table", "levels"}``: the input at every node, ``(*grid_shape, m)``, and
     each axis's levels by position.
 
@@ -43,10 +45,13 @@ class LookupPolicy(System):
 
         super().__init__()
 
-        # The grid and the policy's action ids; the rule is structure
+        # The grid and the policy's action ids; the rule and the grid's input box
+        # are structure
         self.grid = grid
         self.pi = np.asarray(pi, dtype=int)
         self.interpolation = interpolation
+        self.u_lb = np.asarray(grid.u_lb, dtype=float)
+        self.u_ub = np.asarray(grid.u_ub, dtype=float)
 
         # Parameters: the input at every node and the grid's levels
         n = grid.n
@@ -79,6 +84,8 @@ class LookupPolicy(System):
         u_table = params["u_table"]
         n = self.grid.n
         nearest = self.interpolation == "nearest"
+        u_lb = self.u_lb
+        u_ub = self.u_ub
 
         x = xp.reshape(xp.asarray(x, dtype=float), (-1,))
 
@@ -105,6 +112,9 @@ class LookupPolicy(System):
                 for (_, y), upper in zip(cells, corner):
                     term = term * (y if upper else 1.0 - y)
                 u = u + term
+
+        # The command inside the grid's input box: the corners at a bound sum to it
+        u = xp.clip(u, u_lb, u_ub)
 
         return u
 

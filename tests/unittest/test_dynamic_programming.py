@@ -1119,3 +1119,35 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
         problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1, precompute=False
     )
     np.testing.assert_allclose(euler.successor(x, u, 0.0), x + 0.1 * plant.f(x, u))
+
+
+def test_the_lookup_policys_command_never_leaves_the_grids_input_box():
+    """Corners that all sit at the torque limit interpolate to the limit, never past it by rounding."""
+    from minilink import (
+        DynamicProgrammingPlanner,
+        Pendulum,
+        PlanningProblem,
+        QuadraticCost,
+    )
+    from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
+
+    plant = Pendulum()
+    plant.inputs["u"].lower_bound = np.array([-2.0])
+    plant.inputs["u"].upper_bound = np.array([2.0])
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant, R=0.01 * np.eye(1)),
+        X=plant.state.box,
+        U=plant.input_box,
+        horizon=np.inf,
+    )
+    planner = DynamicProgrammingPlanner(
+        problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, max_iterations=20
+    )
+    planner.solve()
+    policy = LookupPolicy(planner.result.grid, planner.result.pi)
+
+    rng = np.random.default_rng(0)
+    for x in rng.uniform(plant.state.box.lower, plant.state.box.upper, size=(200, 2)):
+        u = policy.action(x)
+        assert np.all(u <= 2.0) and np.all(u >= -2.0)

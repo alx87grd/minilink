@@ -29,16 +29,6 @@ lands. Last checked against the code: 2026-11-04.
 
 ## Planning and learning
 
-### A value-iteration policy overshoots the input bound by rounding
-- **Symptom:** a `DynamicProgrammingPlanner` policy (`LookupPolicy`) interpolates grid
-  corners that all sit at the torque limit and returns `u = u_max + 1e-15`; scored on a
-  problem with `U`, the run reports "failed" with a feasibility margin of about -9e-16.
-- **Workaround:** read the margin, not the flag, or score the policy on the problem without
-  `U`.
-- **Fix:** the interpolated command clipped to the grid's input box, on the API surface rulings
-  branch ([api-surface-rulings.md](../plans/api-surface-rulings.md), "What the branch also
-  carries"; the go given 2026-11-05).
-
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
   problem whose `Xf` is a `BallSet` stops with SLSQP's "Inequality constraints
