@@ -193,7 +193,7 @@ To get the primary output array `y`, the caller must write `ev.outputs(x, u)["y"
 
 ## CA-3. Add `diagram.of(...)` and accept string subsystem IDs in `WiredDiagramMixin.subsystem_id` / `trajectory_of`
 
-`trajectory_of` itself goes by AR-7 of [api-surface-rulings.md](api-surface-rulings.md) (`traj.of("plant")` on both loop kinds); the string ids in `subsystem_id` and `diagram.of` stay this proposal's.
+`trajectory_of` itself goes by AR-7 of [api-surface-rulings.md](api-surface-rulings.md) (`traj.of("plant")` on both loop kinds); the string ids in `subsystem_id` and `diagram.of` stay this proposal's. **The go given 2026-11-05:** built with the rulings branch (api-surface-rulings.md, "What the branch also carries").
 
 ### Problem and reproducer
 1. `SumCost`'s docstring (`minilink/core/costs.py:337`) states:
@@ -308,6 +308,11 @@ Furthermore, `Field` and `QuadraticField` are exported from `minilink.core` but 
 ---
 
 ## CA-6. Derivative method aliases (`grad_J`, `hess_J`, `jac_h`, `jac_g`) on `MathematicalProgramEvaluator`
+
+**Ruled 2026-11-05, bundled with the API surface rulings
+([api-surface-rulings.md](api-surface-rulings.md), "What the branch also carries"):** one name per
+derivative, the record's textbook spelling (`grad_J`, `hess_J`, `jac_h`, `jac_g`) on the evaluator
+too; the long names go, no alias. The section below is the proposal as reviewed.
 
 ### Problem and reproducer
 On `MathematicalProgram` (`minilink/optimization/mathematical_program.py`), the 7 mathematical callables are named:

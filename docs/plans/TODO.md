@@ -79,12 +79,15 @@ maintainer would and logged in the run's record.
 ## 1. v0.4 — the clean surface
 
 **Next, in order** (as of 2026-11-05, `dev` at the API surface plan; every branch before it merged):
-1. **The API surface rulings** (§1.11, [api-surface-rulings.md](api-surface-rulings.md)): one
-   branch, nine commits, AR-9 (the start-only route removed) and AR-7 (with its signal-recording
-   benchmark) the largest. Cleared to start.
+1. **The API surface rulings** (§1.11, [api-surface-rulings.md](api-surface-rulings.md)):
+   reviewed one by one 2026-11-05 (AR-4 to AR-9 amended in place), one branch
+   (`api-surface-rulings-review`), one commit per ruling, with the small rows the plan doc's
+   "What the branch also carries" lists. Cleared to start; the signal-recording companion is its
+   own row after it.
 2. **No cache left** (§1.11): the problem evaluator, value iteration and the Lyapunov analysis
-   rebuilt in their verbs or snapshotted at build. Cleared to start; AR-9 clears its last item.
-3. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical.
+   rebuilt in their verbs or snapshotted at build. On the same branch, after the rulings.
+3. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical. On the
+   same branch, after the rulings.
 4. **The decisions waiting for the maintainer** before their rows can start: the core API
    proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
    §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
@@ -153,8 +156,9 @@ maintainer would and logged in the run's record.
   - **Read by the loop lane:**
     - the automatic `dt` as `auto_dt(sys)` in `time_grid.py`, with the discontinuous scale made
       finer or DESIGN's promise dropped (the duplicated constant goes with it);
-    - the forced-input hold as one `input_interp` option every solver obeys (its sampled side
-      is S75; today the automatic solver choice changes the hold model);
+    - the forced-input hold as one rule every solver obeys (its sampled side is S75; today
+      the automatic solver choice changes the hold model): bundled with the simulate-verb
+      ruling AR-8, which rewrites the forced-input path (the go given 2026-11-05);
     - what `n_steps` counts on each verb.
   - **The rest, which no pillar reads and which reviewer C §3.2 would return to standing
     work:**
@@ -282,8 +286,9 @@ commit per proposal, its callers and DESIGN in the same change.
   y_dependencies=)` as `DynamicSystem` and `StepSystem` do. Done when the reproducer builds.
 - [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
-- [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
-  `trajectory_of`. Done when both forms return the same block.
+- [ ] **Subsystems by name** (CA-3; bundled with the API surface rulings, the go given
+  2026-11-05): `diagram.of("plant")` and string ids in `subsystem_id`; `trajectory_of` goes
+  with the block-selector ruling. Done when both forms return the same block.
 - [ ] **The API surface rulings** (AR-1 to AR-9 in
   [api-surface-rulings.md](api-surface-rulings.md), ruled 2026-11-05, none built): a
   distribution's mean one spelling; `evaluate` without `dt` for a sampled controller; two box
@@ -343,8 +348,9 @@ commit per proposal, its callers and DESIGN in the same change.
   now). Done when the maintainer picks and the sites follow.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
-- [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,
-  `jac_h`, `jac_g` beside today's names, or instead of them (a choice, RULES 2.7). Done when
+- [ ] **The textbook derivative names on the program evaluator** (CA-6; ruled 2026-11-05,
+  bundled with the API surface rulings): `grad_J`, `hess_J`, `jac_h`, `jac_g`, the record's own
+  spelling, instead of `gradient`, `hessian`, `jacobian_h`, `jacobian_g`, which go. Done when
   one name per derivative is on the surface.
 
 ### 1.12 The minimal surface

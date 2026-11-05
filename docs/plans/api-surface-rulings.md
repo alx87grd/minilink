@@ -199,6 +199,35 @@ within noise per tick (SLSQP's own loop dominates), so no partial freezing is bu
 a GPU or Ipopt case shows program evaluation dominating (API then: `planner.compile(free=("x0",))`).
 Removing the route also clears the last item of TODO's "No cache left" row that it names.
 
+## What the branch also carries (the maintainer's picks, 2026-11-05)
+
+Small rows on the same lines as the rulings, bundled so one run lands them; each keeps its own
+commit and its own "done when":
+
+- **Agent lane, no ask:** the planner's `supports_parametric` probe (the textbook pass's planning
+  row, T5) goes with AR-9's plumbing; `analysis/derivatives.py`'s bare `from jax.errors` becomes
+  `require_jax()` (a D3 row) in AR-5's commit; the RL planner sizes its default `NeuralPolicy` from
+  `problem.U.bounding_box()` and refuses an unbounded `problem.U` (KNOWN_ISSUES; the V1.2 rest row
+  of TODO §2) beside AR-3.
+- **Ruled to bundle:** `PlanningProblem.start_point`, a second name for the `x0` leaf, goes (9
+  call sites; the start is a number of the tree, AR-9's spirit); `diagram.of("plant")` and string
+  ids in `subsystem_id` (CA-3's remainder once `trajectory_of` goes with AR-7); the program
+  evaluator's derivatives take the record's own textbook names, `grad_J`, `hess_J`, `jac_h`,
+  `jac_g`, and the long names `gradient`, `hessian`, `jacobian_h`, `jacobian_g` go (CA-6, ruled:
+  one name per derivative, matching `J`, `h`, `g`). `evaluator.h` (CA-2) waits for the core-API
+  round.
+- **Two defects, each re-pinning what it moves with its closeness report:** a value-iteration
+  policy's interpolated command is clipped to the grid's input box (KNOWN_ISSUES, the `u_max +
+  1e-15` overshoot); the forced-input hold is one rule every solver obeys (the one-owner row S65's
+  item), built with AR-8 since it rewrites the forced-input path.
+- **After the nine, on the same branch:** TODO §1.11's "No cache left" (the problem evaluator's
+  re-jit on a replaced part and its digest-keyed failure cost, value iteration's option-keyed
+  tables, the Lyapunov digest: each rebuilt in its verb or snapshotted at build) and the
+  parameters model's four follow-ups (each byte-identical on `benchmarks/params_baseline.py`).
+
+The branch is `api-surface-rulings-review`, off `dev` at 8029a36; nothing merges to `dev`
+before the maintainer's review.
+
 ## Not ruled yet (a later round)
 
 From the same scan, each needs its own context and options before a ruling: the planner's
@@ -206,6 +235,6 @@ shortcuts taking the solution's names (`plot_solution` → `plot_trajectory`; `g
 `value_at`; student-facing); training budgets `n_episodes` and `n_timesteps` (RULES 2.7);
 workflow keywords on constructors; `problem.compile()` always returning the evaluator, the step
 face from `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem,
-the evaluator and the planners moved to module functions (`PlanningProblem.start_point`, a second
-name for `x0`, goes). Not recommended by the scan: `%` against `discretize`, dropping the analysis
+the evaluator and the planners moved to module functions (`PlanningProblem.start_point` is ruled,
+above). Not recommended by the scan: `%` against `discretize`, dropping the analysis
 method facades, one array layout for every plot and scan, a result object for `pv.solve`.

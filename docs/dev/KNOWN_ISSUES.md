@@ -32,7 +32,7 @@ lands. Last checked against the code: 2026-11-04.
 ### `ReinforcementLearningPlanner` sizes its default `NeuralPolicy` from the plant's port bounds instead of `problem.U`
 - **Symptom:** a user subclass of `MechanicalSystem` has unbounded port bounds (`[-inf, inf]`); declaring finite bounds on the problem (`U=BoxInputSet.from_bounds(...)`) and calling `ReinforcementLearningPlanner(problem)` raises `ValueError: NeuralPolicy needs finite bounds on the plant's action port` because `NeuralPolicy` in `control/neural.py` reads `sys.inputs[command_port(sys)].box` instead of `problem.U`. Conversely, omitting `U` on a catalog plant lets `ReinforcementLearningPlanner` scale actions to the plant's port bounds while `problem.U` is unconstrained, and omitting `X` lets `StateSpaceGrid.state_bounds` in `planning/dynamic_programming/discretizer.py` silently fall back to `sys.state.box` (against the rule that `X` and `U` are unconstrained unless declared).
 - **Workaround:** set `plant.inputs["u"].lower_bound` and `upper_bound` on custom plants before calling `ReinforcementLearningPlanner`, and pass `X=plant.state.box, U=plant.input_box` explicitly on `PlanningProblem`.
-- **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) §2 (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`).
+- **Fix:** V1.2's rest in [TODO.md](../plans/TODO.md) §2 (`ReinforcementLearningPlanner` reads `problem.U.bounding_box()` and refuses an unbounded `problem.U`; `StateSpaceGrid.state_bounds` aligns with `input_bounds`); built on the API surface rulings branch beside the box ruling AR-3).
 
 ### A value-iteration policy overshoots the input bound by rounding
 - **Symptom:** a `DynamicProgrammingPlanner` policy (`LookupPolicy`) interpolates grid
@@ -40,7 +40,9 @@ lands. Last checked against the code: 2026-11-04.
   problem with `U`, the run reports "failed" with a feasibility margin of about -9e-16.
 - **Workaround:** read the margin, not the flag, or score the policy on the problem without
   `U`.
-- **Fix:** none planned yet (clip the interpolated command to the grid's input box).
+- **Fix:** the interpolated command clipped to the grid's input box, on the API surface rulings
+  branch ([api-surface-rulings.md](../plans/api-surface-rulings.md), "What the branch also
+  carries"; the go given 2026-11-05).
 
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
