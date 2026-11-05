@@ -355,22 +355,28 @@ class TestMethod(unittest.TestCase):
             plant.jacobian("f", "params", method="jax")
 
 
-class TestEvaluatorFunctionForm(unittest.TestCase):
-    def test_numpy_evaluator_returns_a_callable(self):
+class TestEvaluatorArrayForm(unittest.TestCase):
+    """``ev.jacobian`` is the array at a point; the method unevaluated is the function."""
+
+    def test_numpy_evaluator_returns_the_array_and_keeps_the_built_derivative(self):
         plant = _Affine()
         ev = plant.compile("numpy")
-        dfdx = ev.jacobian("f", "x")
-        np.testing.assert_allclose(
-            dfdx(np.zeros(2), np.zeros(2), 0.0, plant.params), _Affine.A, atol=1e-6
-        )
+        A = ev.jacobian("f", "x", np.zeros(2), np.zeros(2), 0.0, plant.params)
+        np.testing.assert_allclose(A, _Affine.A, atol=1e-6)
+
+        # The compiled parameters when none are given; one build per (of, wrt)
+        np.testing.assert_allclose(ev.jacobian("f", "x", np.zeros(2), np.zeros(2)), A)
+        self.assertEqual(len(ev.jacobians), 1)
 
     @jax_only
-    def test_jax_callable_composes_with_jit(self):
+    def test_the_method_as_a_function_composes_with_jit(self):
+        from functools import partial
+
         import jax
         import jax.numpy as jnp
 
         plant = _Affine()
-        dfdx = jax.jit(plant.compile("jax").jacobian("f", "x"))
+        dfdx = jax.jit(partial(plant.compile("jax").jacobian, "f", "x"))
         J = dfdx(jnp.zeros(2), jnp.zeros(2), 0.0, plant.params)
         np.testing.assert_allclose(np.asarray(J), _Affine.A, atol=1e-6)
 

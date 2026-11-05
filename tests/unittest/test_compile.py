@@ -676,7 +676,7 @@ class TestDiagramEvaluatorParamsJax(unittest.TestCase):
 
     def test_jacobian_wrt_params_analytic(self):
         params = {"controller": {"Kp": 2.5}, "plant": {"k": 1.0}}
-        jac = self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, params)
+        jac = self.ev.jacobian("f", "params", self.x_j, self.u_j, 0.0, params)
         np.testing.assert_allclose(
             np.asarray(jac["plant"]["k"]), [2.5 * 1.5], atol=1e-05
         )
@@ -695,7 +695,7 @@ class TestDiagramEvaluatorParamsJax(unittest.TestCase):
 
     def test_jacobian_wrt_params_requires_params(self):
         with self.assertRaises(ValueError):
-            self.ev.jacobian("f", "params")(self.x_j, self.u_j, 0.0, None)
+            self.ev.jacobian("f", "params", self.x_j, self.u_j, 0.0, None)
 
 
 from minilink.blocks.routing import Gain
@@ -1002,10 +1002,10 @@ def test_numpy_evaluator_objective_constraints_and_derivatives():
     np.testing.assert_allclose(
         program_evaluator.inequality_margin([0.25, 0.75]), [0.25, 0.75]
     )
-    np.testing.assert_allclose(program_evaluator.gradient([1.0, 2.0]), [2.0, 4.0])
-    np.testing.assert_allclose(program_evaluator.hessian([1.0, 2.0]), 2.0 * np.eye(2))
-    np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
-    np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
+    np.testing.assert_allclose(program_evaluator.grad_J([1.0, 2.0]), [2.0, 4.0])
+    np.testing.assert_allclose(program_evaluator.hess_J([1.0, 2.0]), 2.0 * np.eye(2))
+    np.testing.assert_allclose(program_evaluator.jac_h([1.0, 2.0]), [[1.0, 1.0]])
+    np.testing.assert_allclose(program_evaluator.jac_g([1.0, 2.0]), np.eye(2))
 
 
 def test_numpy_evaluator_empty_constraints():
@@ -1015,8 +1015,8 @@ def test_numpy_evaluator_empty_constraints():
     assert program_evaluator.n_g == 0
     np.testing.assert_allclose(program_evaluator.equality_residual([1.0]), [])
     np.testing.assert_allclose(program_evaluator.inequality_margin([1.0]), [])
-    np.testing.assert_allclose(program_evaluator.jacobian_h([1.0]), np.zeros((0, 1)))
-    np.testing.assert_allclose(program_evaluator.jacobian_g([1.0]), np.zeros((0, 1)))
+    np.testing.assert_allclose(program_evaluator.jac_h([1.0]), np.zeros((0, 1)))
+    np.testing.assert_allclose(program_evaluator.jac_g([1.0]), np.zeros((0, 1)))
 
 
 def test_numpy_evaluator_reports_bad_constraint_shape():
@@ -1049,10 +1049,10 @@ def test_jax_evaluator_autodiff_when_available():
     )
     assert program_evaluator.backend == "jax"
     assert program_evaluator.objective([1.0, 2.0]) == pytest.approx(5.0)
-    np.testing.assert_allclose(program_evaluator.gradient([1.0, 2.0]), [2.0, 4.0])
-    np.testing.assert_allclose(program_evaluator.hessian([1.0, 2.0]), 2.0 * np.eye(2))
-    np.testing.assert_allclose(program_evaluator.jacobian_h([1.0, 2.0]), [[1.0, 1.0]])
-    np.testing.assert_allclose(program_evaluator.jacobian_g([1.0, 2.0]), np.eye(2))
+    np.testing.assert_allclose(program_evaluator.grad_J([1.0, 2.0]), [2.0, 4.0])
+    np.testing.assert_allclose(program_evaluator.hess_J([1.0, 2.0]), 2.0 * np.eye(2))
+    np.testing.assert_allclose(program_evaluator.jac_h([1.0, 2.0]), [[1.0, 1.0]])
+    np.testing.assert_allclose(program_evaluator.jac_g([1.0, 2.0]), np.eye(2))
     assert jax is not None
 
 
@@ -1488,7 +1488,7 @@ class TestCompileFlatten(unittest.TestCase):
         ev = compile_diagram(nested, flatten=True)
         x = np.array([0.3, -0.2, 0.5, 0.1])
         u = np.zeros(0)
-        jac = ev.jacobian("f", "inner__controller:u")(x, u, 0.0, None)
+        jac = ev.jacobian("f", "inner__controller:u", x, u, 0.0, None)
         self.assertEqual(jac.shape[0], nested.n)
 
 

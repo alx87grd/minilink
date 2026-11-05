@@ -418,8 +418,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   editor shows their parameters, and `tests/unittest/test_system_shortcuts.py` pins each
   to its band function (parameters, defaults, forwarding, docstring target). Every facade is a two-line delegation to the tool's module and
   stores no run state on the system (RULES 2.4): `jacobian` compiles its
-  evaluator per call, about a millisecond on the eager JAX path, and loops
-  keep the callable from `evaluator.jacobian(of, wrt)` instead. The exception
+  evaluator per call, about a millisecond on the eager JAX path, and a loop
+  holds a compiled evaluator and takes its `jacobian` as the function instead. The exception
   is `self.traj`, a convenience cache of the latest facade rollout; library
   code never reads it as an input. **MRO**
   picks `compute_trajectory` implementation; no
@@ -528,9 +528,11 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
-  `evaluator.jacobian(of, wrt)` returns a callable `(x, u, t, params)` on every
-  evaluator (`(x, u, k, params)` on a step evaluator; `jax.jacfwd` eagerly on JAX,
-  central differences on NumPy); the
+  `evaluator.jacobian(of, wrt, x, u, t, params)` returns the array at the point on every
+  evaluator (`t` the tick `k` on a step evaluator; `jax.jacfwd` eagerly on JAX, central
+  differences on NumPy), as `sys.jacobian` does: a derivative is a matrix at a point, and its
+  function form is the method itself, `partial(ev.jacobian, "f", "x")`; the evaluator keeps
+  each built derivative by `(of, wrt)`, machinery keyed on structure (rule 6); the
   callable is jit-compatible for blocks written with `array_module` all the
   way through, and diagrams address internal wires as `"block:port"`, as
   output or as an additive perturbation.

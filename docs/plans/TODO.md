@@ -348,11 +348,6 @@ commit per proposal, its callers and DESIGN in the same change.
   now). Done when the maintainer picks and the sites follow.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
-- [ ] **The textbook derivative names on the program evaluator** (CA-6; ruled 2026-11-05,
-  bundled with the API surface rulings): `grad_J`, `hess_J`, `jac_h`, `jac_g`, the record's own
-  spelling, instead of `gradient`, `hessian`, `jacobian_h`, `jacobian_g`, which go. Done when
-  one name per derivative is on the surface.
-
 ### 1.12 The minimal surface
 
 Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, CI and

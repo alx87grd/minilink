@@ -1,5 +1,5 @@
 """
-Jacobians of compiled evaluators — ``evaluator.jacobian(of, wrt)``.
+Jacobians of compiled evaluators — ``evaluator.jacobian(of, wrt, x, u, t, params)``.
 
 ``of`` names what is differentiated: ``"f"`` (continuous evolution),
 ``"step"`` (discrete evolution), a boundary output port id, or on a diagram
@@ -9,11 +9,13 @@ variable: ``"x"`` (state), ``"u"`` (every input stacked), an input port id,
 means an additive perturbation of that signal.
 
 The mixin resolves the two names once and hands a *probe*
-``(x, u, t, params, delta) -> vector`` to the backend, which returns the
-Jacobian as a callable with the signature of the evaluator's methods:
+``(x, u, t, params, delta) -> vector`` to the backend, which builds the
+Jacobian as a function with the signature of the evaluator's methods:
 ``(x, u, t, params)`` on continuous and static evaluators, ``(x, u, k, params)``
-on step evaluators. JAX evaluators run ``jax.jacfwd`` eagerly on the uncompiled
-body; NumPy evaluators use central finite differences.
+on step evaluators. The evaluator keeps each built derivative by ``(of, wrt)``
+and evaluates it at the point given, so the public method returns the array,
+as ``sys.jacobian`` does. JAX evaluators run ``jax.jacfwd`` eagerly on the
+uncompiled body; NumPy evaluators use central finite differences.
 """
 
 from __future__ import annotations
@@ -30,17 +32,30 @@ from minilink.core.params import flatten, set_leaf, with_leaf
 class JacobianMixin:
     """Name resolution shared by every evaluator, and the Jacobian on its backend."""
 
-    def jacobian(self, of, wrt, *, eps=1e-6):
-        """Return ``d(of)/d(wrt)`` as a callable ``(x, u, t, params) -> J``.
+    def jacobian(self, of, wrt, x, u, t=0.0, params=None, *, eps=1e-6):
+        """Return ``d(of)/d(wrt)`` at ``(x, u, t, params)``, an array.
 
         ``J`` has shape ``(dim(of), dim(wrt))``; ``wrt="t"`` gives ``(dim(of),)``
         and ``wrt="params"`` a dict shaped like ``params`` whose leaves are
         ``(dim(of), *leaf.shape)`` (integer and boolean leaves are skipped).
-        ``eps`` is the central-difference step on NumPy evaluators.
+        ``t`` is the tick ``k`` on a step evaluator; ``params=None`` reads the
+        compiled parameters; ``eps`` is the central-difference step on NumPy
+        evaluators. The derivative is built once per ``(of, wrt)`` and kept, so
+        a loop takes the method as its function, ``partial(ev.jacobian, "f", "x")``.
         """
-        target = self._jac_resolve_of(of)
-        variable = self._jac_resolve_wrt(wrt)
-        return self._jac_build(target, variable, float(eps))
+        params = self.call_params() if params is None else params
+
+        key = (of, wrt, float(eps))
+        jac = self.jacobians.get(key)
+        if jac is None:
+            target = self._jac_resolve_of(of)
+            variable = self._jac_resolve_wrt(wrt)
+            jac = self._jac_build(target, variable, float(eps))
+            self.jacobians[key] = jac
+
+        J = jac(x, u, t, params)
+
+        return J
 
     def _jac_build(self, target, variable, eps):
         """The Jacobian callable: ``jax.jacfwd`` on JAX, central differences on NumPy."""
@@ -59,6 +74,7 @@ class JacobianMixin:
         ``outputs_fn`` the parametric output map returning a dict by port id.
         Diagrams pass their execution ``plan`` so wires become addressable.
         """
+        self.jacobians = {}  # The built derivatives, by (of, wrt, eps)
         self._jac_kind = kind
         self._jac_state_fn = state_fn
         self._jac_outputs_fn = outputs_fn

@@ -57,35 +57,6 @@ systems tutorial (01), `get_signal` stays.
 `at` here reads a value at a time on a record; it is unrelated to the planner copy verb `at` the
 parameters model removed.
 
-## AR-5 `jacobian` returns an array everywhere, and there is no function form
-
-`ev.jacobian(of, wrt, x, u, t, params)` returns the array, as `sys.jacobian` does (today
-`ev.jacobian(of, wrt)` returns a function: `core/compile/evaluators/jacobian.py`). There is no
-second name: the textbook's derivative is a matrix at a point, `A = ∂f/∂x |₍x̄, ū₎`, and the
-function form is the method itself, unevaluated, as `f` is the function form of a rate (ruled
-2026-11-05, option A of three; a `jacobian_fn` sibling and "no point means the function" were
-declined: nothing else in the core returns a function, and `plant.jacobian("f", "x")` already
-means the matrix at the nominal point).
-
-```python
-A = plant.jacobian("f", "x", x_bar, u_bar)       # NumPy array; the nominal point if omitted
-A = ev.jacobian("f", "x", x, u, t, params)       # the array on the evaluator's backend
-
-# A loop or a filter that wants the function takes the method, unevaluated
-A_of = partial(ev.jacobian, "f", "x")            # A_of(x, u, t, params) -> matrix
-A_jit = jax.jit(partial(ev.jacobian, "f", "x"))  # a hot loop on JAX
-```
-
-The evaluator's point arguments are `x, u, t, params`, the slots of `ev.f` (an EKF evaluates at a
-running estimate); the system's shortcut keeps `x_bar, u_bar`, the operating-point words of
-RULES 2.7. The evaluator builds each `(of, wrt)` derivative once, at its first call, and keeps
-it: compiled machinery of a held tool keyed on structure, not a cache (DESIGN §4 rule 6), so the
-partial costs a lookup per call; the built derivative stays unjitted, as today, so it traces under
-the caller's `jit` with concrete `params`. A specialized tool (the EKF of
-[estimation-and-state-feedback.md](estimation-and-state-feedback.md)) takes its derivatives on
-`model.f` directly, as that plan already says. The two library callers (`analysis/derivatives.py`)
-evaluate at a point; about 17 lines change.
-
 ## AR-6 A default start on the constructor, this solve's on `solve`; the solve time at the user's verb
 
 Amended 2026-11-05 (the maintainer's review): the constructors keep their default start, and the

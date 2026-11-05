@@ -60,9 +60,9 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
             program_evaluator.objective,
             np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
             method=self.scipy_method,
-            jac=program_evaluator.gradient if program_evaluator.has_gradient else None,
+            jac=program_evaluator.grad_J if program_evaluator.has_gradient else None,
             hess=(
-                program_evaluator.hessian
+                program_evaluator.hess_J
                 if self.uses_hessian() and program_evaluator.has_hessian
                 else None
             ),
