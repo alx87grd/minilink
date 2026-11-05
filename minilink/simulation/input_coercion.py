@@ -10,7 +10,7 @@ import numpy as np
 def coerce_forced_input(sys, times, u, input_port_id=None):
     """Return the sampled ``(m, n_pts)`` input matrix for a forced simulation.
 
-    ``solve_forced``-style APIs accept a callable ``u(t)``, a constant scalar or
+    A run's ``u=`` accepts a callable ``u(t)``, a constant scalar or
     vector, or a full sampled matrix, optionally for a single named input port
     (the other ports hold their nominal values); each becomes the solver's
     sampled ``(m, n_pts)`` input matrix.

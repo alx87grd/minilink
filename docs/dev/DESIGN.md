@@ -403,8 +403,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   standalone HTML page of that native animation.
 - **Facades:** user shortcuts only (lazy simulation/graphics); split across
   `core/facades/` by what they do, one mixin per category and system kind:
-  `simulation.py` (`SystemSimulation`: `compile`, static `compute_trajectory`,
-  `compute_forced`, `compute_cost`; `DynamicSimulation`: the continuous ones;
+  `simulation.py` (`SystemSimulation`: `compile`, static `compute_trajectory` (the nominal
+  input, or `u=`), `compute_cost`; `DynamicSimulation`: the continuous one;
   `StepSimulation`: `compute_rollout`), `analysis.py` (`SystemAnalysis`:
   `jacobian`; `DynamicAnalysis`: `linearize`, `transfer_function`,
   `find_equilibrium`; `StepAnalysis`: `jacobian` with `k`), `plotting.py`
@@ -512,7 +512,7 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
   optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
 - **One word for a run's origin:** `t0`, on every runner (`compute_trajectory`,
-  `compute_forced`, `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
+  `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
 - **Two words for two times.** `dt` is the step of a computation and names it at every
   call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
@@ -1031,7 +1031,7 @@ differences on NumPy, `jax.jacfwd` on the uncompiled body on JAX).
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 
-**Default sim API:** `compute_trajectory` / `compute_forced` dispatch by **class MRO**
+**Default sim API:** `compute_trajectory(tf, u=None)` dispatches by **class MRO**
 (façade mixins), enforced at simulator constructors:
 
 - :class:`DynamicSystem` (including :class:`DiagramSystem`) →
@@ -1067,7 +1067,7 @@ Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous di
 An input left unwired is a constant at its declared `nominal_value` (the
 Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
-via `compute_forced`. Facades default `backend="numpy"`.
+via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
 
 **Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `rk4_fixedsteps` when a block
@@ -1105,8 +1105,12 @@ evaluator's tree gives every other stateful block its start as a leaf (`controll
 
 Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
-model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout: a sampled input held over
-each period, a function of time read at the stage times; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
+model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
+**One input rule on every solver** (`Simulator.solve(u=)`, `compute_trajectory(u=)`): a sampled
+input `(m, N)` is held over each sample period (`u(t) = u_k` on `[t_k, t_{k+1})`), and a function
+of time is read where the method evaluates `f`: the stage times of RK4, the adaptive solver's own
+points, the grid times of Euler (where the held sample is the same read). The automatic solver
+choice never changes the input model.
 
 ### Discontinuous closed loops
 

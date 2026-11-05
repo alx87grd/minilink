@@ -7,7 +7,7 @@ from minilink import Pendulum
 sys = Pendulum()
 sys.x0[0] = 2.0
 
-sys.compute_forced(u=lambda t: 3.0 * np.sin(10.0 * t), tf=5.0)
+sys.compute_trajectory(u=lambda t: 3.0 * np.sin(10.0 * t), tf=5.0)
 sys.plot_trajectory(backend="plotly")
 
 sys.animate(renderer="matplotlib")

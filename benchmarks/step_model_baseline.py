@@ -204,23 +204,23 @@ def trajopt_entries(out):
         out[f"trajopt.{transcription}.u"] = traj.u
 
 
-def compute_forced_entries(out):
-    """``compute_forced`` on each fixed-step solver, a callable and a sampled input."""
+def forced_entries(out):
+    """``compute_trajectory(u=)`` on each fixed-step solver, a callable and a sampled input."""
     plant = Pendulum()
     plant.x0 = X0.copy()
     t = np.linspace(0.0, 1.0, 20)
     u_matrix = 0.5 * np.sin(2.0 * t)[None, :]
     for solver in ("rk4_fixedsteps", "euler_fixedsteps", "euler"):
-        traj = plant.compute_forced(
-            lambda tt: np.array([0.5 * np.sin(2.0 * tt)]),
+        traj = plant.compute_trajectory(
+            u=lambda tt: np.array([0.5 * np.sin(2.0 * tt)]),
             tf=1.0,
             n_steps=20,
             solver=solver,
             verbose=False,
         )
         out[f"forced.{solver}.callable"] = traj.x
-        traj = plant.compute_forced(
-            u_matrix, tf=1.0, n_steps=20, solver=solver, verbose=False
+        traj = plant.compute_trajectory(
+            u=u_matrix, tf=1.0, n_steps=20, solver=solver, verbose=False
         )
         out[f"forced.{solver}.sampled"] = traj.x
 
@@ -268,7 +268,7 @@ ENTRIES = (
     gym_entries,
     dp_entries,
     trajopt_entries,
-    compute_forced_entries,
+    forced_entries,
     rrt_entries,
     lyapunov_entries,
 )

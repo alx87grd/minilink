@@ -1040,8 +1040,8 @@ def planar_velocity_geometry(velocity):
 if __name__ == "__main__":
     sys = TwoLinkManipulator()
     sys.x0 = np.array([0.2, -0.3, 0.0, 0.0])
-    sys.compute_forced(
-        lambda t: np.array([0.1 * np.sin(t), 0.1 * np.cos(t)]),
+    sys.compute_trajectory(
+        u=lambda t: np.array([0.1 * np.sin(t), 0.1 * np.cos(t)]),
         tf=4.0,
         n_steps=160,
     )

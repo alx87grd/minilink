@@ -1403,7 +1403,7 @@ class TestDiscretize(unittest.TestCase):
         self.assertEqual(u_port.units, plant_u.units)
         np.testing.assert_array_equal(u_port.lower_bound, plant_u.lower_bound)
         np.testing.assert_array_equal(u_port.nominal_value, [0.3])
-        rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((3, 1)))
+        rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((1, 3)))
         self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
 
     def test_discretize_keeps_each_input_port_of_its_source(self):

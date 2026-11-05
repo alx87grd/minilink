@@ -54,29 +54,6 @@ simulator's pass with its own baseline and a measurement-gated default, not an A
 not hold this branch. Its design and benchmark plan are in TODO §1.11 ("A continuous run records
 its signals from its own pass"); this ruling lands without it, on today's recording path.
 
-## AR-8 One simulate verb for the ODE run; the rollout stays beside it
-
-Amended 2026-11-05 (the maintainer's review). Two run verbs, each with its plot, because they mean
-two things on a hybrid system: `compute_trajectory` integrates the ODE (the continuous side, dense
-between the ticks) and `compute_rollout` steps the sampled loop as a pure stepping system, tick
-by tick. `plot_trajectory` and `plot_rollout` mirror them; the fold of `plot_rollout` into
-`plot_trajectory` is declined.
-
-**The forced run is the same verb.** `compute_trajectory(tf, u=None, ...)` on every system kind
-and `Simulator.solve(u=)`: `u` decides, `None` the nominal inputs, else the prescribed input as
-today's `compute_forced` took it (a full array, a function `u(t)`, a constant vector, a scalar on a
-one-input system; `input_port_id=` forces one port and keeps the others nominal). `compute_forced`
-and `solve_forced` go. On a rollout, `u` stays the tick's: a constant, a sequence, or `u(k)`.
-
-**An input array is `(m, N)` everywhere**, the textbook layout (`U = [u_0 … u_N]`, a column per
-sample, RULES §5), the layout of `traj.u`, so `compute_trajectory(tf, u=old.u)` replays a run.
-`compute_rollout(n_steps, u)` switches from `(n_steps, m)` to `(m, n_steps)` (the systems
-tutorial cell, two demos, one test), at the facade: the compiled evaluators keep their
-time-leading `(N, m)` scan layout, and the facade transposes once, as it already does (the RL
-and MPC rollouts are untouched). A vector of length `m` stays a constant input.
-Callers of the removed names: 12 examples, 14 tests, 5 benchmarks, plus one call in the GRO860
-drone PPO notebook.
-
 ## What the branch also carries (the maintainer's picks, 2026-11-05)
 
 Small rows on the same lines as the rulings, bundled so one run lands them; each keeps its own

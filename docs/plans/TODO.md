@@ -155,9 +155,6 @@ maintainer would and logged in the run's record.
   - **Read by the loop lane:**
     - the automatic `dt` as `auto_dt(sys)` in `time_grid.py`, with the discontinuous scale made
       finer or DESIGN's promise dropped (the duplicated constant goes with it);
-    - the forced-input hold as one rule every solver obeys (its sampled side is S75; today
-      the automatic solver choice changes the hold model): bundled with the simulate-verb
-      ruling AR-8, which rewrites the forced-input path (the go given 2026-11-05);
     - what `n_steps` counts on each verb.
   - **The rest, which no pillar reads and which reviewer C §3.2 would return to standing
     work:**

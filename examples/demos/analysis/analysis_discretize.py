@@ -13,6 +13,6 @@ print(
 )
 print("discrete A = d(step)/dx =\n", np.round(disc.jacobian("step", "x"), 4))
 
-u_seq = np.zeros((40, plant.m))
+u_seq = np.zeros((plant.m, 40))
 disc.compute_rollout(n_steps=40, u=u_seq)
 disc.plot_rollout()

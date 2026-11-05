@@ -353,8 +353,8 @@ if __name__ == "__main__":
     sys.show_hydrodynamic_forces = True
 
     sys.x0 = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
-    sys.compute_forced(
-        lambda t: np.array([10000.0, 5000.0 * np.sin(0.5 * t)]),
+    sys.compute_trajectory(
+        u=lambda t: np.array([10000.0, 5000.0 * np.sin(0.5 * t)]),
         tf=10.0,
     )
     sys.animate()

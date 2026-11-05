@@ -16,10 +16,6 @@ class SolverBackend(ABC):
     The evaluator provides ``f(x, u, t)`` and its ``nominal_input``.
     """
 
-    #: Whether a forced input given as a function of time is read at the solver's
-    #: stage times (:meth:`integrate_input`) rather than sampled on the grid.
-    reads_input_at_stages = False
-
     @abstractmethod
     def integrate(
         self,
@@ -82,6 +78,22 @@ class SolverBackend(ABC):
             The states ``x``, shape ``(n, n_pts)``.
         """
         ...
+
+    def integrate_input(self, evaluator, times, u_of_t, x0, args=None, params=None):
+        """
+        A function of time: ``x(t) = x₀ + ∫ f(x(s), u(s), s) ds``, ``u`` read where the method evaluates ``f``.
+
+        A one-stage method evaluates ``f`` at the grid times only, so the input
+        sampled there and held gives the same run: the default; a method with
+        stages (RK4) or its own points (an adaptive solver) reads ``u(t)`` at
+        each of them.
+        """
+        u = np.stack(
+            [np.asarray(u_of_t(float(t)), dtype=float).reshape(-1) for t in times],
+            axis=1,
+        )
+
+        return self.integrate_forced(evaluator, times, u, x0, args=args, params=params)
 
 
 ###############################################################################

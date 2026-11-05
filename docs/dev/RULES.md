@@ -105,7 +105,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **2.7 One keyword per kind of choice.** `method=` is the verb's own numerical method (the
   derivative, the optimizer's algorithm, the interpolation, the certificate family); `solver=`
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
-  `compute_forced`, `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
+  `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
   The whole vocabulary, one word per idea and one idea per word
   (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):

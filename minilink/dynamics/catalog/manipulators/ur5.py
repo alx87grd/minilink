@@ -596,8 +596,8 @@ if __name__ == "__main__":
     sys = UR5Manipulator()
     q0 = np.array([0.0, -np.pi / 2 + 0.2, 0.0, -np.pi / 2, 0.0, 0.0])
     sys.x0 = sys.q2x(q0, np.zeros(6))
-    sys.compute_forced(
-        lambda t: np.zeros(6),
+    sys.compute_trajectory(
+        u=lambda t: np.zeros(6),
         tf=3.0,
         n_steps=120,
         backend="jax",

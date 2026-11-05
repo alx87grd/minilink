@@ -101,7 +101,7 @@ class Simulator:
     Integrate a compiled system along a discrete time grid.
 
     The dynamics follow ``dx/dt = f(x, u, t)``. Inputs are nominal for
-    :meth:`solve`; :meth:`solve_forced` accepts callables, constants, or sampled
+    :meth:`solve`, whose ``u=`` accepts callables, constants, or sampled
     input trajectories and converts them to the solver's sampled input matrix.
     The system has state dimension ``n`` and input dimension ``m`` (from
     ``sys.n`` and ``sys.m``). ``compute_trajectory`` is the facade; use the class
@@ -163,7 +163,7 @@ class Simulator:
         self.t0 = float(t0)
         self.tf = float(tf)
 
-        # The latest run, filled by solve and solve_forced
+        # The latest run, filled by solve
         self.last_solve_time_s = None
         self.last_traj = None
         self.last_debug = None
@@ -217,73 +217,26 @@ class Simulator:
     def __str__(self):
         return inspect_text(self)
 
-    def solve(self, *, params=None):
+    def solve(self, *, u=None, input_port_id=None, params=None):
         """
-        Run the simulation over ``self.t`` with the **nominal** input.
+        Run the simulation over ``self.t``: the nominal input, or ``u`` prescribed.
 
-        The input is the constant :math:`\\bar{u}` of the compiled evaluator.
-        ``params=None`` runs on the numbers taken when the simulator was built
-        (the compiled form); a tree, the system's complete tree at other
-        numbers (``p = sim.params``, a copy, edited), runs
-        on those without a recompile: a sweep on one simulator compiles once.
+        ``u`` is ``None`` for the constant :math:`\\bar{u}` of the compiled
+        evaluator; else a sampled matrix ``(m, n_pts)``, a function ``u(t)``, a
+        constant vector, or a scalar for a one-input system. A sampled input is
+        held over each sample period and a function of time is read where the
+        solver evaluates ``f``, on every solver; ``input_port_id`` prescribes one
+        port and keeps the others at their nominal values. ``params=None`` runs
+        on the numbers taken when the simulator was built (the compiled form); a
+        tree, the system's complete tree at other numbers (``p = sim.params``, a
+        copy, edited), runs on those without a recompile: a sweep on one
+        simulator compiles once.
 
         Returns
         -------
         Trajectory
             State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
         """
-        # Integrate with the selected solver backend, timed when verbose
-        time_solve = self.verbose
-        if time_solve:
-            t0 = time.perf_counter()
-
-        x_traj = self.solver_backend.integrate(
-            self.evaluator,
-            self.t,
-            self.x0,
-            args=self.solver_backend_options,
-            params=self.tree_of(params),
-        )
-
-        if time_solve:
-            self.last_solve_time_s = time.perf_counter() - t0
-
-        # The nominal input ū, held over the whole grid
-        m = self.sys.m
-        u_traj = np.zeros((m, self.n_pts))
-        if m > 0:
-            u_bar = self.evaluator._u_nominal
-            u_traj[:, :] = u_bar.reshape(m, 1)
-
-        # The trajectory, kept with the solver's debug record
-        return self.store_trajectory(x_traj, u_traj)
-
-    @property
-    def params(self) -> dict:
-        """The numbers the simulator runs on, taken at its build: a copy, the tree ``solve(params=)`` takes edited."""
-        return self.evaluator.params
-
-    def tree_of(self, params):
-        """The tree a run takes: ``None`` (the compiled numbers), or ``params`` checked complete against them."""
-        return None if params is None else checked(params, self.evaluator.params)
-
-    def solve_forced(self, u, input_port_id=None, *, params=None):
-        """
-        Run simulation with a prescribed input, at ``params`` as :meth:`solve`.
-
-        ``u`` may be a full sampled input matrix, a callable ``u(t)``, a constant
-        vector, or a scalar for one-dimensional inputs. If ``input_port_id`` is
-        given, ``u`` describes only that port and the other ports use nominal
-        values.
-
-        Returns
-        -------
-        Trajectory
-            State and input time series.
-        """
-        # The input sampled on the grid, and the numbers of this run
-        u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
-        self.require_forced_mode()
         params = self.tree_of(params)
 
         # Integrate with the selected solver backend, timed when verbose
@@ -291,18 +244,43 @@ class Simulator:
         if time_solve:
             t0 = time.perf_counter()
 
-        # A function of time read where the solver needs it (RK4: at its stage times);
-        # a sampled input held over each sample period
-        if callable(u) and self.solver_backend.reads_input_at_stages:
+        if u is None:
+            # The nominal input ū, held over the whole grid
+            x_traj = self.solver_backend.integrate(
+                self.evaluator,
+                self.t,
+                self.x0,
+                args=self.solver_backend_options,
+                params=params,
+            )
+            m = self.sys.m
+            u_traj = np.zeros((m, self.n_pts))
+            if m > 0:
+                u_bar = self.evaluator._u_nominal
+                u_traj[:, :] = u_bar.reshape(m, 1)
+        elif callable(u):
+            # A function of time, read where the solver evaluates f
             sys = self.sys
 
             def u_of_t(t):
                 return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
 
             x_traj = self.solver_backend.integrate_input(
-                self.evaluator, self.t, u_of_t, self.x0, params=params
+                self.evaluator,
+                self.t,
+                u_of_t,
+                self.x0,
+                args=self.solver_backend_options,
+                params=params,
+            )
+            u_traj = coerce_forced_input(
+                self.sys, self.t, u, input_port_id=input_port_id
             )
         else:
+            # A sampled input, each sample held over its period
+            u_traj = coerce_forced_input(
+                self.sys, self.t, u, input_port_id=input_port_id
+            )
             x_traj = self.solver_backend.integrate_forced(
                 self.evaluator,
                 self.t,
@@ -317,6 +295,15 @@ class Simulator:
 
         # The trajectory, kept with the solver's debug record
         return self.store_trajectory(x_traj, u_traj)
+
+    @property
+    def params(self) -> dict:
+        """The numbers the simulator runs on, taken at its build: a copy, the tree ``solve(params=)`` takes edited."""
+        return self.evaluator.params
+
+    def tree_of(self, params):
+        """The tree a run takes: ``None`` (the compiled numbers), or ``params`` checked complete against them."""
+        return None if params is None else checked(params, self.evaluator.params)
 
     # Solver and time-grid selection
 
@@ -420,17 +407,6 @@ class Simulator:
             )
 
         return traj
-
-    def require_forced_mode(self):
-        """Refuse a forced run on a solver that cannot take a prescribed input."""
-        if not self.supports_forced_mode():
-            raise ValueError(
-                f"Solver '{self.solver_mode}' does not support forced simulations"
-            )
-
-    def supports_forced_mode(self):
-        """Every solver backend integrates a prescribed input."""
-        return True
 
 
 ###############################################################################

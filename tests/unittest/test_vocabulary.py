@@ -47,6 +47,8 @@ RETIRED = {
     "animate_cost2go": ("animate_cost_to_go", None),
     "solve_trajectory": ("solve", None),
     "record_solve_time": ("solve_time_s, always recorded", None),
+    "compute_forced": ("compute_trajectory(u=)", None),
+    "solve_forced": ("solve(u=)", None),
     "solve_trajectory_from": ("solve(params=) or compile().solve(params, z0)", None),
     "compile_parametric_program": ("compile()", None),
     "has_parametric_program": ("compile()", None),
