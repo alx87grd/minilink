@@ -295,3 +295,21 @@ the run log and a clean tree.
   showcase still running at the time of this entry). Full pytest 2192 passed, baseline
   byte-identical. A formatting slip reached the step's commit because a pipe hid the
   format check's exit status; fixed in 7534ad1, and the gate now runs without a pipe.
+- **Step 4 (6b5c604).** Complete trees everywhere (ruling 6): one check at every verb and
+  every composite assignment; no merge at a verb; the equations read the tree as given;
+  `Planner.at` becomes the module helper `planner_at` (ruling 1). **For the maintainer's
+  review, a semantic choice:** a planner rebuilds from "the numbers it was given, never the
+  defaults it derived", so a new discount rate re-derives the discount factor. A complete
+  tree carries the derived numbers too, which would pin them. The rebuild therefore takes a
+  method number as given only when the tree changes it; a number left at the planner's value
+  is derived again on the new problem. The alternative is to pin every number the tree
+  carries, which changes what `solve(params=)` means for value iteration and the learners.
+  The baseline caught one internal partial call the tests missed (the offline trajectory
+  solve's call into the optimizer); fixed in the same step. About fifty test lines move to a
+  shared test helper, `edited(tree, changes)`, the tool's tree deep-copied with the changed
+  leaves set. **Flagged, student-facing:** the MPC example holds one tick tree (its ROS
+  snippet is three lines now) and reads its plan back on the face's tree; the compile and
+  program tutorials show the deep copy edited; the MPC parity benchmark holds its tick tree.
+  Executed: both tutorials and the MPC example. Full pytest 2192 passed, regression gates
+  and the demo bridge pass, baseline byte-identical. The full notebook smoke check runs from
+  a snapshot worktree of this commit; its result is logged with step 5.
