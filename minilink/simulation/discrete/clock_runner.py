@@ -76,7 +76,8 @@ def tick_on_the_host(ev, system, x, u, k, t0, params, points, rtol, atol):
         return solution.y[:, -1]
 
     if isinstance(system, SampledDiagramSystem):
-        params = ev.params if params is None else params
+        # The compiled snapshot itself, read each tick (ev.params would copy it)
+        params = ev._frozen_params if params is None else params
         signals = ev.port_signals(x, u, k, params, t0=t0)
         x_next = ev.next_from_signals(x, u, k, params, signals, t0=t0, advance=advance)
         inside = inside_points(ev, x, x_next, paths, points)

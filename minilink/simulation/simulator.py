@@ -224,7 +224,7 @@ class Simulator:
         The input is the constant :math:`\\bar{u}` of the compiled evaluator.
         ``params=None`` runs on the numbers taken when the simulator was built
         (the compiled form); a tree, the system's complete tree at other
-        numbers (``p = copy.deepcopy(sim.evaluator.params)``, edited), runs
+        numbers (``p = sim.evaluator.params``, a copy, edited), runs
         on those without a recompile: a sweep on one simulator compiles once.
 
         Returns

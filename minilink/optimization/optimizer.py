@@ -1,5 +1,6 @@
 """The optimizer: one mathematical program, compiled once, solved by a method preset."""
 
+import copy
 import time
 from collections.abc import Callable
 from dataclasses import replace
@@ -171,10 +172,10 @@ class Optimizer:
 
     @property
     def params(self) -> dict:
-        """The solve's tree: the program's parameters (``{}`` without), and the method's numbers under ``"method"`` (``{}`` for a host method)."""
+        """The solve's tree, a copy: the program's parameters (``{}`` without), and the method's numbers under ``"method"`` (``{}`` for a host method); the tree a solve at other numbers edits."""
         program = self.program_evaluator.merged(None) or {}
 
-        return {**program, "method": self.adapter.method_params}
+        return copy.deepcopy({**program, "method": self.adapter.method_params})
 
     def solve(
         self,

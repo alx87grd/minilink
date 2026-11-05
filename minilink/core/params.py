@@ -284,7 +284,7 @@ def require_complete(tree, reference, path=()):
             raise ValueError(
                 f"{where} is a complete tree: unknown {unknown}, missing {missing}; "
                 f"the known entries are {list(reference)} (a tree at other numbers is "
-                "a copy of the tool's own, edited: p = copy.deepcopy(tool.params))"
+                "the tool's own, edited: p = tool.params, a copy on a tool)"
             )
         for key, value in tree.items():
             require_complete(value, reference[key], (*path, key))

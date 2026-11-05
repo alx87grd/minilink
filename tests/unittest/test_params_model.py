@@ -462,3 +462,42 @@ def test_the_kinodynamic_extender_reads_an_edit_of_the_plant():
     heavy = extender.propose(start, start, problem, np.random.default_rng(0))
 
     assert not np.allclose(light[1].states, heavy[1].states)
+
+
+# A tool's params is a copy of its snapshot: editing it never changes the tool
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
+)
+def test_a_tools_params_is_a_copy_and_passed_back_runs_there(backend):
+    from minilink import Simulator
+    from minilink.optimization import MathematicalProgram, Optimizer
+
+    plant = Pendulum()
+    x, u = np.array([0.5, 0.0]), np.zeros(1)
+    ev = plant.compile(backend=backend)
+    before = np.asarray(ev.f(x, u))
+
+    p = ev.params
+    p["m"] = 3.0
+
+    np.testing.assert_array_equal(np.asarray(ev.f(x, u)), before)
+    assert ev.params["m"] == 1.0
+    assert not np.allclose(np.asarray(ev.f(x, u, 0.0, p)), before)
+
+    plant.x0 = np.array([0.5, 0.0])  # tilted: the mass shows in the swing
+    sim = Simulator(plant, tf=0.5, n_steps=51, solver="rk4_fixedsteps", backend=backend)
+    q = sim.evaluator.params
+    q["m"] = 3.0
+    assert sim.evaluator.params["m"] == 1.0
+    assert not np.allclose(sim.solve(params=q).x, sim.solve().x)
+
+    program = MathematicalProgram(
+        n_z=1, J=lambda z, prm: (z[0] - prm["c"]) ** 2, params={"c": np.array(1.0)}
+    )
+    optimizer = Optimizer(program, z0=[0.0], method="l-bfgs")
+    r = optimizer.params
+    r["c"][...] = 5.0  # even an in-place edit of a leaf stays in the copy
+    assert float(optimizer.params["c"]) == 1.0
+    assert optimizer.solve(params=r).z[0] == pytest.approx(5.0, abs=1e-6)

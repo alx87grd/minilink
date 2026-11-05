@@ -83,8 +83,14 @@ class Evaluator(JacobianMixin):
 
     @property
     def params(self):
-        """The parameters taken at compile: ``params=None`` reads these."""
-        return self._frozen_params
+        """
+        The parameters taken at compile, a copy: ``params=None`` runs on them.
+
+        A tool's snapshot never changes after its build (its frozen form compiled
+        them as constants), so reading it gives a fresh copy, the tree a call at
+        other numbers edits: ``p = ev.params; p["m"] = 2.0; ev.f(x, u, 0.0, p)``.
+        """
+        return copy.deepcopy(self._frozen_params)
 
     def call_params(self):
         """``None`` when the system's parameters still equal the compiled ones (the frozen form), else the live tree."""

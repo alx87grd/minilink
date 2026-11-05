@@ -462,9 +462,12 @@ One model for every object, in seven rules:
    merge, no check) and on every tool verb (`Simulator.solve`, `ev.f/step/rollout/
    rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
    initial`, `solve_trajectory_from`, `Optimizer.solve`). Nothing merges anywhere. A one-off
-   tree is a copy of the tool's own, edited: `p = copy.deepcopy(planner.params);
-   p["plant"]["m"] = 1.3; planner.solve(params=p)`. A copy of an object at other numbers is
-   Python's own, `copy.deepcopy(plant)` then the edit; there is no copying verb.
+   tree is the tool's own, edited: a held tool's `params` is a copy (`p = sim.evaluator.params;
+   p["m"] = 2.0; sim.solve(params=p)`); a planner's is live on its problem's parts, so a solve
+   that leaves the problem as it is copies it (`p = copy.deepcopy(planner.params)`), and one
+   that does not care edits the problem and calls `planner.solve()`. A copy of an object at
+   other numbers is Python's own, `copy.deepcopy(plant)` then the edit; there is no copying
+   verb.
 5. **A tree that crosses a boundary is checked** against the structure it enters (`checked`,
    `require_complete` in `core/params.py`): a tool's `params=`, a composite's assignment. An
    unknown key, a missing one, a subtree for a leaf or a leaf of another shape raises, naming
@@ -472,7 +475,8 @@ One model for every object, in seven rules:
    bare item write on a leaf (`plant.params["mass"] = 2.0`) is a dict write, unchecked.
 6. **A tool snapshots at build**: `tool.params` is what `params=None` runs on (the compiled
    evaluators, the `Simulator`, the problem evaluator, the planner's compiled face, the
-   program evaluator's bound tree); nothing reads the objects or compares trees per call. A
+   `Optimizer`), and reading it gives a copy, so an edit of it never changes the tool (whose
+   frozen form compiled the snapshot as constants); nothing reads the objects or compares trees per call. A
    convenience call (`compute_trajectory`, `problem.compile`, `planner.solve`) builds each
    time, so it sees every edit. A planner's `solve(params=)` rebuilds at the tree
    (`planner_at`): a method number the tree changes is given, one it leaves at the planner's
