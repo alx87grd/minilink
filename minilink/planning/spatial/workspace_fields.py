@@ -1,13 +1,11 @@
 """Workspace fields: smooth penalty densities over a workspace point ``p`` in ℝ² or ℝ³."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, replace
-from functools import cached_property
 
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.params import own_params
+from minilink.core.params import own_params, param_view
 
 ###############################################################################
 # Public API
@@ -32,17 +30,12 @@ class WorkspaceField(ABC):
 
     params = own_params()
 
-    def with_params(self, params):
-        """The field moved to ``params``: a copy holding them."""
-        return replace(self, **params)
-
     @abstractmethod
     def density(self, p, t=0.0, params=None):
         """Return the nonnegative penalty density at workspace point ``p``."""
         ...
 
 
-@dataclass(frozen=True)
 class GaussianField(WorkspaceField):
     """
     Smooth Gaussian penalty peak centered at ``center``.
@@ -57,27 +50,19 @@ class GaussianField(WorkspaceField):
         Standard deviation of the Gaussian envelope.
     """
 
-    center: np.ndarray
-    amplitude: float
-    sigma: float
-
-    def __post_init__(self) -> None:
+    def __init__(self, center, amplitude, sigma):
         # Parameters: a flat float center, a nonnegative peak, a positive width
-        center = np.asarray(self.center, dtype=float).reshape(-1).copy()
-        amplitude = float(self.amplitude)
-        sigma = float(self.sigma)
+        center = np.asarray(center, dtype=float).reshape(-1).copy()
+        amplitude = float(amplitude)
+        sigma = float(sigma)
         require_nonnegative_amplitude(amplitude)
         require_positive_sigma(sigma)
 
-        # Stored on the frozen dataclass
-        object.__setattr__(self, "center", center)
-        object.__setattr__(self, "amplitude", amplitude)
-        object.__setattr__(self, "sigma", sigma)
+        self.params = {"center": center, "amplitude": amplitude, "sigma": sigma}
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"center", "amplitude", "sigma"}``, the peak's numbers."""
-        return {"center": self.center, "amplitude": self.amplitude, "sigma": self.sigma}
+    center = param_view("center")
+    amplitude = param_view("amplitude")
+    sigma = param_view("sigma")
 
     def density(self, p, t=0.0, params=None):
         params = self.params if params is None else params

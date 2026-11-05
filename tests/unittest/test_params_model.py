@@ -199,3 +199,71 @@ def test_assigning_an_object_its_own_tree_keeps_it():
     plant.params = plant.params
 
     assert plant.params == numbers
+
+
+# Values hold their numbers: one home, edited in place
+
+
+def test_a_set_moves_with_an_in_place_edit_and_its_attributes_are_views():
+    from minilink import BoxSet
+
+    X = BoxSet([-1.0, -1.0], [1.0, 1.0])
+    X.params["upper"] = np.array([3.0, 3.0])
+
+    np.testing.assert_array_equal(X.upper, [3.0, 3.0])
+    assert X.contains(np.array([2.0, 0.0]))
+    X.upper = np.array([1.0, 1.0])
+    assert not X.contains(np.array([2.0, 0.0]))
+
+
+def test_a_problem_write_lands_in_the_users_set():
+    from minilink import BoxSet
+
+    plant = Pendulum()
+    X = BoxSet([-1.0, -1.0], [1.0, 1.0])
+    problem = PlanningProblem(plant, x0=np.zeros(2), X=X, horizon=1.0)
+
+    problem.params["X"]["upper"] = np.array([2.0, 2.0])
+    problem.params = {"X": {"lower": np.array([-2.0, -2.0])}}
+
+    assert problem.X is X
+    np.testing.assert_array_equal(X.lower, [-2.0, -2.0])
+    np.testing.assert_array_equal(X.upper, [2.0, 2.0])
+
+
+def test_a_field_set_and_a_field_cost_hold_their_fields_numbers():
+    from minilink.core.fields import QuadraticField
+
+    V = QuadraticField(np.zeros(2), np.eye(2))
+    band = V.as_set(lower=0.1, upper=2.0)
+    cost = V.as_cost(weight=3.0)
+    x = np.array([1.0, 0.0])
+
+    band.params["field"]["center"] = np.array([1.0, 0.0])
+    cost.params = {"weight": 2.0}
+
+    np.testing.assert_array_equal(V.center, [1.0, 0.0])
+    assert float(cost.g(x, np.zeros(1))) == 0.0 and cost.weight == 2.0
+    np.testing.assert_allclose(band.margin(x), [-0.1, 2.0])
+
+
+def test_a_gaussian_keeps_its_spread_when_its_mean_moves():
+    from minilink import Gaussian
+
+    law = Gaussian([0.0, 0.0], std=[0.1, 0.2])
+    law.params["mean"] = np.array([1.0, 0.0])
+
+    np.testing.assert_array_equal(law.mean, [1.0, 0.0])
+    np.testing.assert_array_equal(law.std, [0.1, 0.2])
+    assert law.sample(0).shape == (2,)
+
+
+def test_a_composite_values_unknown_entry_is_refused_before_any_write():
+    from minilink import BoxSet
+    from minilink.core.sets import BallSet
+
+    both = BoxSet([-1.0], [1.0]) & BallSet([0.0], 1.0)
+
+    with pytest.raises(ValueError, match="no entry"):
+        both.params = {"0": {"upper": np.array([2.0])}, "2": {"radius": 1.0}}
+    np.testing.assert_array_equal(both.sets[0].upper, [1.0])

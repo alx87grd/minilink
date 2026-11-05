@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
 from minilink.core.fields import Field
+from minilink.core.params import held_params
 from minilink.planning.spatial.collision import CollisionBody, iter_probes
 from minilink.planning.spatial.scene import Scene
 
@@ -20,7 +19,6 @@ if TYPE_CHECKING:
 ###############################################################################
 
 
-@dataclass(frozen=True)
 class ClearanceField(Field):
     """
     ``value(x) = minᵢ (clearance(pᵢ) − rᵢ)`` over the body's probes; nonnegative when free.
@@ -30,17 +28,16 @@ class ClearanceField(Field):
     the plant's own kinematics, on the plant's numbers.
     """
 
-    scene: Scene
-    body: CollisionBody
+    params = held_params('``{"scene"}``: the scene\'s numbers.')
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"scene"}``: the scene's numbers."""
-        return {"scene": self.scene.params}
+    def __init__(self, scene: Scene, body: CollisionBody):
+        self.scene = scene
+        self.body = body
+        self.params = {"scene": scene.params}
 
-    def with_params(self, params):
-        """The field on its scene moved to ``params``."""
-        return replace(self, scene=self.scene.with_params(params["scene"]))
+    def param_parts(self) -> dict:
+        """The scene: the part an assignment routes to."""
+        return {"scene": self.scene}
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -61,21 +58,19 @@ class ClearanceField(Field):
         return clearance
 
 
-@dataclass(frozen=True)
 class CostDensityField(Field):
     """``value(x) = maxᵢ density(pᵢ)`` over the body's probes."""
 
-    scene: Scene
-    body: CollisionBody
+    params = held_params('``{"scene"}``: the scene\'s numbers.')
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"scene"}``: the scene's numbers."""
-        return {"scene": self.scene.params}
+    def __init__(self, scene: Scene, body: CollisionBody):
+        self.scene = scene
+        self.body = body
+        self.params = {"scene": scene.params}
 
-    def with_params(self, params):
-        """The field on its scene moved to ``params``."""
-        return replace(self, scene=self.scene.with_params(params["scene"]))
+    def param_parts(self) -> dict:
+        """The scene: the part an assignment routes to."""
+        return {"scene": self.scene}
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -96,21 +91,19 @@ class CostDensityField(Field):
         return density
 
 
-@dataclass(frozen=True)
 class PathDistanceField(Field):
     """``value(x) = minᵢ (distance(pᵢ) − rᵢ)`` to the reference centerline."""
 
-    track: ReferenceTrack
-    body: CollisionBody
+    params = held_params('``{"track"}``: the track\'s numbers.')
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"track"}``: the track's numbers."""
-        return {"track": self.track.params}
+    def __init__(self, track: ReferenceTrack, body: CollisionBody):
+        self.track = track
+        self.body = body
+        self.params = {"track": track.params}
 
-    def with_params(self, params):
-        """The field on its track moved to ``params``."""
-        return replace(self, track=self.track.with_params(params["track"]))
+    def param_parts(self) -> dict:
+        """The track: the part an assignment routes to."""
+        return {"track": self.track}
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -131,21 +124,21 @@ class PathDistanceField(Field):
         return distance
 
 
-@dataclass(frozen=True)
 class CorridorMarginField(Field):
     """``value(x) = minᵢ (w − distance(pᵢ) − rᵢ)``; nonnegative in the tube."""
 
-    track: ReferenceTrack
-    body: CollisionBody
+    params = held_params(
+        "``{\"track\"}``: the track's numbers, its corridor's half-width among them."
+    )
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"track"}``: the track's numbers, its corridor's half-width among them."""
-        return {"track": self.track.params}
+    def __init__(self, track: ReferenceTrack, body: CollisionBody):
+        self.track = track
+        self.body = body
+        self.params = {"track": track.params}
 
-    def with_params(self, params):
-        """The field on its track moved to ``params``."""
-        return replace(self, track=self.track.with_params(params["track"]))
+    def param_parts(self) -> dict:
+        """The track: the part an assignment routes to."""
+        return {"track": self.track}
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params

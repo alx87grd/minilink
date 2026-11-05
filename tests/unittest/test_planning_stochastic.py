@@ -1,5 +1,7 @@
 """Cost horizon/discount, the problem exit rule, distributions, and the stochastic problem."""
 
+import copy
+
 import numpy as np
 import pytest
 
@@ -833,11 +835,11 @@ def test_a_partial_write_to_an_intersection_role_keeps_the_other_members():
     )
     problem.params = {"X": {"1": {"radius": 2.0}}}
     assert problem.X.sets[1].radius == 2.0 and problem.X.sets[0] is box
-    with pytest.raises(ValueError, match="unknown member"):
-        IntersectionSet([box, ball]).with_params({"2": {"radius": 1.0}})
+    with pytest.raises(ValueError, match="has no entry \\['2'\\]"):
+        IntersectionSet([box, ball]).params = {"2": {"radius": 1.0}}
 
 
-def test_a_user_set_with_numbers_is_moved_on_a_copy():
+def test_a_user_set_with_numbers_is_moved_on_a_deep_copy():
     from minilink.core.sets import Set
 
     class Disk(Set):
@@ -854,8 +856,10 @@ def test_a_user_set_with_numbers_is_moved_on_a_copy():
             return r**2 - z @ z
 
     disk = Disk()
-    moved = disk.with_params({"r": 2.0})
+    moved = copy.deepcopy(disk)
+    moved.params["r"] = 2.0
     assert moved is not disk and disk.params["r"] == 1.0 and moved.params["r"] == 2.0
+    assert moved.margin(np.zeros(2)) == 4.0
 
 
 def test_a_source_policy_is_held_from_the_problems_start_time():

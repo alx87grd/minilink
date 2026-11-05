@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass, replace
-from functools import cached_property
 
 import numpy as np
 from scipy.linalg import solve_triangular
@@ -17,10 +15,15 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.compile.evaluators.jacobian import central_difference
-from minilink.core.costs import CostFunction, param_view
+from minilink.core.costs import CostFunction
 from minilink.core.distributions import is_counter_key
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import own_params
+from minilink.core.params import (
+    delegated_params,
+    held_params,
+    own_params,
+    param_view,
+)
 from minilink.core.sets import BoxSet, InputSet, Set
 from minilink.core.shaping import shaping_of
 
@@ -70,15 +73,6 @@ class Field(ABC):
 
         return dV_dx.reshape(-1)
 
-    def with_params(self, params):
-        """The field with its numbers replaced by ``params``: a copy holding them (a field without numbers refuses any)."""
-        if not params and not self.params:
-            return self
-        if not self.params:
-            raise TypeError(f"{type(self).__name__} holds no parameters")
-
-        return replace(self, **params)
-
     def as_set(self, *, lower: float | None = 0.0, upper: float | None = None) -> Set:
         """The set of states where ``lower ≤ V(x) ≤ upper``."""
         return FieldSet(self, lower, upper)
@@ -110,30 +104,40 @@ class Field(ABC):
         repr_pretty(self, p, cycle)
 
 
-@dataclass(frozen=True)
 class FieldSet(Set):
     """
     Feasible where ``lower <= V(x) <= upper``.
 
-    ``params`` is ``{"field": the field's numbers}`` and each bound that is set
-    (``"lower"``, ``"upper"``): moving the tree moves the set.
+    ``params`` holds ``{"field": the field's own numbers}`` and each bound that
+    is set (``"lower"``, ``"upper"``): an edit of the field's numbers moves the
+    set, and which bounds are set is the set's structure.
     """
 
-    field: Field
-    lower: float | None = 0.0
-    upper: float | None = None
+    params = held_params(
+        '``{"field", "lower", "upper"}``: the field\'s numbers and the bounds that are set.'
+    )
 
-    def __post_init__(self) -> None:
-        require_a_bound(self.lower, self.upper)
+    def __init__(
+        self, field: Field, lower: float | None = 0.0, upper: float | None = None
+    ):
+        require_a_bound(lower, upper)
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"field", "lower", "upper"}``: the field's numbers and the bounds that are set."""
-        return bounds_tree(self.field, self.lower, self.upper)
+        self.field = field
+        self.params = bounds_tree(field, lower, upper)
 
-    def with_params(self, params):
-        """The set moved to ``params`` (any of ``field``, ``lower``, ``upper``)."""
-        return replace(self, **moved_parts(self, params))
+    def param_parts(self) -> dict:
+        """The field: the part an assignment routes to."""
+        return {"field": self.field}
+
+    @property
+    def lower(self):
+        """The lower bound on ``V``, ``None`` when it is not set."""
+        return self.params.get("lower")
+
+    @property
+    def upper(self):
+        """The upper bound on ``V``, ``None`` when it is not set."""
+        return self.params.get("upper")
 
     def margin(self, z, t=0.0, params=None):
         params = self.params if params is None else params
@@ -157,30 +161,39 @@ class FieldSet(Set):
         return margin
 
 
-@dataclass(frozen=True)
 class FieldInputSet(InputSet):
     """
     Admissible where ``lower <= V(x, u) <= upper`` at the state ``x``.
 
-    ``params`` is ``{"field": the field's numbers}`` and each bound that is set,
-    as on :class:`FieldSet`.
+    ``params`` holds ``{"field": the field's own numbers}`` and each bound that
+    is set, as on :class:`FieldSet`.
     """
 
-    field: Field
-    lower: float | None = 0.0
-    upper: float | None = None
+    params = held_params(
+        '``{"field", "lower", "upper"}``: the field\'s numbers and the bounds that are set.'
+    )
 
-    def __post_init__(self) -> None:
-        require_a_bound(self.lower, self.upper)
+    def __init__(
+        self, field: Field, lower: float | None = 0.0, upper: float | None = None
+    ):
+        require_a_bound(lower, upper)
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"field", "lower", "upper"}``: the field's numbers and the bounds that are set."""
-        return bounds_tree(self.field, self.lower, self.upper)
+        self.field = field
+        self.params = bounds_tree(field, lower, upper)
 
-    def with_params(self, params):
-        """The input set moved to ``params`` (any of ``field``, ``lower``, ``upper``)."""
-        return replace(self, **moved_parts(self, params))
+    def param_parts(self) -> dict:
+        """The field: the part an assignment routes to."""
+        return {"field": self.field}
+
+    @property
+    def lower(self):
+        """The lower bound on ``V``, ``None`` when it is not set."""
+        return self.params.get("lower")
+
+    @property
+    def upper(self):
+        """The upper bound on ``V``, ``None`` when it is not set."""
+        return self.params.get("upper")
 
     def margin(self, u, x=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -213,12 +226,20 @@ class FieldCost(CostFunction):
     the shaping's numbers are leaves of the cost's tree.
     """
 
+    params = held_params(
+        '``{"weight", "field"}``, and ``"shaping"`` when shaped: the field\'s and the shaping\'s own numbers.'
+    )
+
     def __init__(self, field: Field, weight: float = 1.0, shaping=None):
         self.field = field
         self.shaping = shaping_of(shaping)
         self.params = cost_tree(field, weight, self.shaping)
 
     weight = param_view("weight")
+
+    def param_parts(self) -> dict:
+        """The field, and the shaping when there is one: the parts an assignment routes to."""
+        return field_cost_parts(self)
 
     def g(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -242,12 +263,20 @@ class FieldCost(CostFunction):
 class FieldTerminalCost(CostFunction):
     """``h = weight * shaping(V(x, t))``, no running cost; :attr:`params` is ``{"weight", "field", "shaping"}``, as on :class:`FieldCost`."""
 
+    params = held_params(
+        '``{"weight", "field"}``, and ``"shaping"`` when shaped: the field\'s and the shaping\'s own numbers.'
+    )
+
     def __init__(self, field: Field, weight: float = 1.0, shaping=None):
         self.field = field
         self.shaping = shaping_of(shaping)
         self.params = cost_tree(field, weight, self.shaping)
 
     weight = param_view("weight")
+
+    def param_parts(self) -> dict:
+        """The field, and the shaping when there is one: the parts an assignment routes to."""
+        return field_cost_parts(self)
 
     def g(self, x, u, t=0.0, params=None):
         return 0.0
@@ -268,20 +297,13 @@ class FieldTerminalCost(CostFunction):
         return h
 
 
-@dataclass(frozen=True)
 class MarginField(Field):
     """A set's least margin as a field: ``V(x) = minᵢ mᵢ(x)``, nonnegative inside the set; ``params`` is the set's."""
 
-    set_: Set
+    params = delegated_params("set_", "The set's numbers: the field moves with them.")
 
-    @cached_property
-    def params(self) -> dict:
-        """The set's numbers: the field moves with them."""
-        return self.set_.params
-
-    def with_params(self, params):
-        """The field of the set moved to ``params``."""
-        return MarginField(self.set_.with_params(params))
+    def __init__(self, set_: Set):
+        self.set_ = set_
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -295,7 +317,6 @@ class MarginField(Field):
         return least
 
 
-@dataclass(frozen=True)
 class QuadraticField(Field):
     """
     The quadratic field ``V(x, t) = (x − c)ᵀ P(t) (x − c)``: a Lyapunov function, an LQR value.
@@ -310,28 +331,25 @@ class QuadraticField(Field):
     bounds itself.
     """
 
-    center: np.ndarray
-    P: np.ndarray
-    t: np.ndarray | None = None
-
-    def __post_init__(self) -> None:
-        center = np.asarray(self.center, dtype=float).reshape(-1)
-        P = np.asarray(self.P, dtype=float)
-        t = None if self.t is None else np.asarray(self.t, dtype=float).reshape(-1)
+    def __init__(self, center, P, t=None):
+        center = np.asarray(center, dtype=float).reshape(-1)
+        P = np.asarray(P, dtype=float)
+        t = None if t is None else np.asarray(t, dtype=float).reshape(-1)
         require_quadratic_shapes(center, P, t)
         require_symmetric(P)
 
-        object.__setattr__(self, "center", center)
-        object.__setattr__(self, "P", P)
-        object.__setattr__(self, "t", t)
+        # The numbers: a schedule's times are among them, a constant P has none
+        self.params = {"center": center, "P": P}
+        if t is not None:
+            self.params["t"] = t
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"center", "P"}``, and ``"t"`` for a schedule: the field's numbers."""
-        if self.t is None:
-            return {"center": self.center, "P": self.P}
+    center = param_view("center")
+    P = param_view("P")
 
-        return {"center": self.center, "P": self.P, "t": self.t}
+    @property
+    def t(self):
+        """The schedule's times ``(N,)``, ``None`` for a constant ``P``."""
+        return self.params.get("t")
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -391,39 +409,44 @@ class QuadraticField(Field):
         return FieldSet(self, lower, upper)
 
 
-@dataclass(frozen=True)
 class EllipsoidSet(FieldSet):
     """
     The sublevel set of a quadratic field, ``{x : (x − c)ᵀ P (x − c) ≤ level}``, which draws and bounds itself.
 
-    ``params`` is ``{"center", "P", "level"}``, and :meth:`with_params` the
-    moved copy. :meth:`sample` draws uniformly inside (a Gaussian direction, a
+    ``params`` is ``{"center", "P", "level"}``, the ellipsoid's own numbers;
+    its :attr:`field` is the quadratic field at them. :meth:`sample` draws uniformly inside (a Gaussian direction, a
     radius ``r^{1/n}``, mapped through ``P = L Lᵀ``) from a NumPy generator, an
     integer seed or a JAX key, and gives the center for ``key=None``;
     :meth:`bounding_box` is ``c ± √(level · diag(P⁻¹))``, the ellipsoid's
     shadow on each axis.
     """
 
-    def __post_init__(self) -> None:
-        require_sublevel(self.lower, self.upper)
+    params = own_params('``{"center", "P", "level"}``, the ellipsoid\'s numbers.')
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"center", "P", "level"}``, the ellipsoid's numbers."""
-        field = self.field
-        return {"center": field.center, "P": field.P, "level": self.upper}
+    def __init__(self, field: QuadraticField, lower=None, upper=None):
+        require_sublevel(lower, upper)
+
+        self.params = {"center": field.center, "P": field.P, "level": upper}
+
+    @property
+    def field(self) -> QuadraticField:
+        """The quadratic field ``V`` at the ellipsoid's numbers."""
+        return QuadraticField(self.params["center"], self.params["P"])
+
+    @property
+    def lower(self):
+        """An ellipsoid has no lower bound on ``V``."""
+        return None
+
+    @property
+    def upper(self):
+        """The sublevel ``c`` of ``V``, as given."""
+        return self.params["level"]
 
     @property
     def level(self) -> float:
         """The sublevel ``c`` of ``V``."""
         return float(self.upper)
-
-    def with_params(self, params):
-        """The ellipsoid moved to ``params`` (any of ``center``, ``P``, ``level``)."""
-        moved = {**self.params, **params}
-        field = QuadraticField(moved["center"], moved["P"])
-
-        return EllipsoidSet(field, None, moved["level"])
 
     def margin(self, z, t=0.0, params=None):
         params = self.params if params is None else params
@@ -519,16 +542,11 @@ def bounds_tree(field, lower, upper) -> dict:
     return tree
 
 
-def moved_parts(field_set, params) -> dict:
-    """The parts of a field set moved to ``params``: the field moved, each bound given replaced."""
-    unknown = sorted(set(params) - set(field_set.params))
-    if unknown:
-        raise ValueError(
-            f"unknown key(s) {unknown}; the set's are {sorted(field_set.params)}"
-        )
-    parts = {key: params[key] for key in ("lower", "upper") if key in params}
-    if "field" in params:
-        parts["field"] = field_set.field.with_params(params["field"])
+def field_cost_parts(cost) -> dict:
+    """A field cost's parts: its field, and its shaping when it has one."""
+    parts = {"field": cost.field}
+    if cost.shaping is not None:
+        parts["shaping"] = cost.shaping
 
     return parts
 

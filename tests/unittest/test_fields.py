@@ -1,5 +1,7 @@
 """The quadratic field and its ellipsoid: value, gradient, schedule, draw and box."""
 
+import copy
+
 import numpy as np
 import pytest
 
@@ -108,7 +110,9 @@ def test_a_non_symmetric_matrix_and_a_band_called_an_ellipsoid_are_refused():
 
 def test_the_ellipsoid_reads_its_params_and_moves_with_them():
     region = QuadraticField(CENTER, P).as_set(upper=2.0)
-    moved = region.with_params({"center": np.zeros(3), "level": 1.0})
+    moved = copy.deepcopy(region)
+    moved.params["center"] = np.zeros(3)
+    moved.params["level"] = 1.0
 
     assert set(region.params) == {"center", "P", "level"}
     np.testing.assert_array_equal(moved.params["center"], np.zeros(3))
@@ -177,7 +181,9 @@ def test_a_fields_numbers_move_its_set_and_its_cost():
     )
     assert float(cost.g(x, np.zeros(1))) == 3.0
     assert float(cost.g(x, np.zeros(1), params={"weight": 3.0, "field": moved})) == 0.0
-    assert sublevel.with_params({"field": moved}).field.center[0] == 1.0
+    moved_set = copy.deepcopy(sublevel)
+    moved_set.params["field"]["center"] = moved["center"]
+    assert moved_set.field.center[0] == 1.0 and V.center[0] == 0.0
 
 
 def test_a_set_seen_as_a_cost_carries_the_sets_numbers():

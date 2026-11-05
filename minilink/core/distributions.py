@@ -15,7 +15,7 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import own_params
+from minilink.core.params import delegated_params, own_params, param_view
 from minilink.core.sets import BoxSet, Set
 
 ###############################################################################
@@ -43,24 +43,8 @@ class Distribution(ABC):
     @abstractmethod
     def dim(self) -> int: ...
 
-    # The law's numbers, by name (``{}`` for a law that exposes none)
+    # The law's numbers, by name (``{}`` for a law that exposes none), held as a plant's
     params = own_params()
-
-    def with_params(self, params):
-        """
-        The law at the numbers ``params``: a new law of the same kind built from them (the set pattern).
-
-        A library law's ``params`` name its constructor's arguments
-        (``Gaussian(mean=, std=)``, ``Uniform(lower=, upper=)``,
-        ``Particles(points=)``), so the law they name is ``type(law)(**params)``;
-        a law without numbers refuses any.
-        """
-        if not params and not self.params:
-            return self
-        if not self.params:
-            raise TypeError(f"{type(self).__name__} holds no parameters")
-
-        return type(self)(**params)
 
     @property
     def cov(self) -> np.ndarray:
@@ -104,27 +88,31 @@ class Gaussian(Distribution):
 
     def __init__(self, mean, std=None, cov=None):
         require_one_spread(std, cov)
-        self.mean = np.asarray(mean, dtype=float).reshape(-1)
+        mean = np.asarray(mean, dtype=float).reshape(-1)
+
+        # The numbers: the spread given, std (diagonal) or cov (full), is the law's structure
         if cov is None:
-            self.std = np.broadcast_to(
-                np.asarray(std, dtype=float), self.mean.shape
-            ).copy()
-            self.full_cov = None
+            std = np.broadcast_to(np.asarray(std, dtype=float), mean.shape).copy()
+            self.params = {"mean": mean, "std": std}
         else:
-            self.std = None
-            self.full_cov = np.asarray(cov, dtype=float).reshape(self.dim, self.dim)
+            cov = np.asarray(cov, dtype=float).reshape(mean.size, mean.size)
+            self.params = {"mean": mean, "cov": cov}
+
+    mean = param_view("mean")
+
+    @property
+    def std(self):
+        """The standard deviations ``(dim,)`` of a diagonal law, ``None`` for a full one."""
+        return self.params.get("std")
+
+    @property
+    def full_cov(self):
+        """The covariance ``(dim, dim)`` given to a full law, ``None`` for a diagonal one."""
+        return self.params.get("cov")
 
     @property
     def dim(self) -> int:
-        return int(self.mean.size)
-
-    @property
-    def params(self) -> dict:
-        """``{"mean", "std"}`` for a diagonal law, ``{"mean", "cov"}`` for a full one."""
-        if self.full_cov is None:
-            return {"mean": self.mean, "std": self.std}
-
-        return {"mean": self.mean, "cov": self.full_cov}
+        return int(np.size(self.mean))
 
     @property
     def cov(self) -> np.ndarray:
@@ -176,19 +164,20 @@ class Gaussian(Distribution):
 class Uniform(Distribution):
     """Uniform law on the box ``lower <= x <= upper``; ``support`` is that box."""
 
+    params = delegated_params("box", '``{"lower", "upper"}``, the box\'s bounds.')
+
     def __init__(self, lower, upper):
         self.box = BoxSet(lower, upper)
         self.support = self.box
-        self.mean = 0.5 * (self.box.lower + self.box.upper)
+
+    @property
+    def mean(self) -> np.ndarray:
+        """The box's center, ``(a + b) / 2``."""
+        return self.mean_at()
 
     @property
     def dim(self) -> int:
         return self.box.dim
-
-    @property
-    def params(self) -> dict:
-        """``{"lower", "upper"}``, the box's bounds."""
-        return self.box.params
 
     @property
     def cov(self) -> np.ndarray:
@@ -218,18 +207,21 @@ class Particles(Distribution):
     """Empirical distribution: a uniform choice among fixed points ``(N, dim)``."""
 
     def __init__(self, points):
-        self.points = np.asarray(points, dtype=float)
-        check_points(self.points)
-        self.mean = self.points.mean(axis=0)
+        points = np.asarray(points, dtype=float)
+        check_points(points)
+
+        self.params = {"points": points}
+
+    points = param_view("points")
+
+    @property
+    def mean(self) -> np.ndarray:
+        """The points' mean, ``p̄ = (1/N) Σᵢ pᵢ``."""
+        return self.mean_at()
 
     @property
     def dim(self) -> int:
-        return int(self.points.shape[1])
-
-    @property
-    def params(self) -> dict:
-        """``{"points"}``, the ``(N, dim)`` support points."""
-        return {"points": self.points}
+        return int(np.shape(self.points)[1])
 
     @property
     def cov(self) -> np.ndarray:

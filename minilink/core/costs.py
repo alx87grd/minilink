@@ -6,21 +6,8 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
-from minilink.core.params import own_params, require_complete_part
+from minilink.core.params import own_params, param_view, require_complete_part
 from minilink.core.trajectory import Trajectory
-
-
-def param_view(key):
-    """An attribute that reads and writes ``self.params[key]``: a view, so in-place writes reach the cost."""
-
-    def read(self):
-        return self.params[key]
-
-    def write(self, value):
-        self.params[key] = value
-
-    return property(read, write, doc=f"View of ``params[{key!r}]``.")
-
 
 ###############################################################################
 # Public API

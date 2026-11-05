@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from functools import cached_property
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
+from minilink.core.params import held_params, param_view
 from minilink.planning.spatial.collision import CollisionBody
 from minilink.planning.spatial.paths import ReferencePath
 
@@ -19,7 +18,6 @@ if TYPE_CHECKING:
 ###############################################################################
 
 
-@dataclass(frozen=True)
 class ReferenceTrack:
     """
     Target path with a constant half-width corridor in workspace units.
@@ -43,22 +41,21 @@ class ReferenceTrack:
 
     """
 
-    path: ReferencePath
-    half_width: float = 1.0
+    params = held_params(
+        '``{"path", "half_width"}``: the centerline\'s numbers and the corridor\'s radius.'
+    )
 
-    def __post_init__(self) -> None:
-        require_positive_half_width(self.half_width)
+    def __init__(self, path: ReferencePath, half_width: float = 1.0):
+        require_positive_half_width(half_width)
 
-    @cached_property
-    def params(self) -> dict:
-        """``{"path", "half_width"}``: the centerline's numbers and the corridor's radius."""
-        return {"path": self.path.params, "half_width": self.half_width}
+        self.path = path
+        self.params = {"path": path.params, "half_width": half_width}
 
-    def with_params(self, params):
-        """The track with its centerline and half-width moved to ``params``."""
-        path = self.path.with_params(params["path"])
+    half_width = param_view("half_width")
 
-        return replace(self, path=path, half_width=params["half_width"])
+    def param_parts(self) -> dict:
+        """The centerline: the part an assignment routes to."""
+        return {"path": self.path}
 
     def distance(self, p, t=0.0, params=None):
         """Distance from ``p`` to the centerline."""

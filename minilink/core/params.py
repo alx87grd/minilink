@@ -51,8 +51,77 @@ def own_params(
     return OwnParams(get, set_, doc=doc)
 
 
+def param_view(key):
+    """An attribute that reads and writes ``self.params[key]``: a view of the one home of the number."""
+
+    def read(self):
+        return self.params[key]
+
+    def write(self, value):
+        self.params[key] = value
+
+    return property(read, write, doc=f"View of ``params[{key!r}]``.")
+
+
 class OwnParams(property):
     """The ``params`` property of a base class (:func:`own_params`): an assignment replaces the object's tree whole."""
+
+
+def held_params(
+    doc="The numbers of the parts, each at its key, and the object's own beside them.",
+):
+    """
+    The ``params`` of a composite value: the tree it holds, each part's own dict at its key.
+
+    The tree is built once, by the constructor's assignment, holding each
+    part's ``params`` by reference beside the composite's own numbers, so a
+    number has one home and an edit anywhere lands in it. Assigned again, the
+    tree is routed: a part's entry goes to that part (merged onto its numbers
+    and checked: an unknown key or a new shape raises), and an own number is
+    written in place. The class names its parts with ``param_parts()``, a
+    nested mapping of the tree's shape whose leaves are the part objects.
+    """
+
+    def get(self):
+        return self.__dict__["params"]
+
+    def set_(self, value):
+        tree = self.__dict__.get("params")
+        if tree is None:
+            self.__dict__["params"] = value
+            return
+        route_tree(tree, value, self.param_parts())
+
+    return HeldParams(get, set_, doc=doc)
+
+
+class HeldParams(property):
+    """The ``params`` property of a composite value (:func:`held_params`): an assignment routes to the parts."""
+
+
+def delegated_params(attribute, doc="The numbers of the object it wraps."):
+    """
+    The ``params`` of a wrapper: the tree of the object at ``attribute``, read and assigned through it.
+
+    An input box is its box's numbers, a uniform law its box's, a margin field
+    its set's: one home, the wrapped object's.
+    """
+
+    def get(self):
+        return getattr(self, attribute).params
+
+    def set_(self, value):
+        getattr(self, attribute).params = value
+
+    return DelegatedParams(get, set_, doc=doc, attribute=attribute)
+
+
+class DelegatedParams(property):
+    """The ``params`` property of a wrapper (:func:`delegated_params`): its wrapped object's."""
+
+    def __init__(self, fget, fset, doc, attribute):
+        super().__init__(fget, fset, doc=doc)
+        self.attribute = attribute
 
 
 def holds_own_tree(obj) -> bool:
@@ -61,9 +130,11 @@ def holds_own_tree(obj) -> bool:
 
     A system's plain attribute or the base classes' :func:`own_params` holds
     the tree; a composite's own ``params`` property routes each entry to its
-    parts, and keeps the entries it is not given.
+    parts, and keeps the entries it is not given; a wrapper is what it wraps.
     """
     descriptor = inspect.getattr_static(type(obj), "params", None)
+    if isinstance(descriptor, DelegatedParams):
+        return holds_own_tree(getattr(obj, descriptor.attribute))
 
     return descriptor is None or isinstance(descriptor, OwnParams)
 
@@ -72,6 +143,51 @@ def require_complete_part(tree, part, path=()):
     """Refuse a tree for ``part`` that would wipe its other numbers: checked when its assignment replaces its tree whole."""
     if holds_own_tree(part):
         require_complete(tree, part.params, path)
+
+
+def route_tree(tree, value, parts, path=()):
+    """
+    Route ``value`` into the held ``tree``: each part's entry to the part, each own number in place.
+
+    A part that holds its own tree takes its entry merged onto its numbers
+    (:func:`merge_known`: an unknown key, a subtree for a leaf, a new shape
+    raise); a composite part routes its entry itself. Every key is checked
+    before the first write.
+    """
+    require_routed_keys(tree, value, parts, path)
+    for key, entry in value.items():
+        part = parts.get(key)
+        if isinstance(part, dict):
+            route_tree(tree[key], entry, part, (*path, key))
+        elif part is not None and holds_own_tree(part):
+            # An empty entry moves nothing: a part with no numbers (a user's frozen
+            # field) is never written
+            if entry:
+                part.params = merge_known(part.params, entry)
+        elif part is not None:
+            part.params = entry
+        else:
+            tree[key] = entry
+
+
+def require_routed_keys(tree, value, parts, path):
+    """Refuse a routed tree with a key the held tree lacks, or a subtree where an own number is, before any write."""
+    where = "params" + "".join(f"[{key!r}]" for key in path)
+    if not isinstance(value, dict):
+        raise ValueError(f"{where} is a subtree: give a dict of its entries")
+    unknown = [key for key in value if key not in tree]
+    if unknown:
+        raise ValueError(
+            f"{where} has no entry {unknown}; the known entries are {list(tree)}"
+        )
+    for key, entry in value.items():
+        part = parts.get(key)
+        if isinstance(part, dict):
+            require_routed_keys(tree[key], entry, part, (*path, key))
+        elif part is not None and holds_own_tree(part):
+            merge_known(part.params, entry)
+        elif part is None and isinstance(entry, dict):
+            raise ValueError(f"{where}[{key!r}] is a number, got a dict")
 
 
 def split_path(path):
