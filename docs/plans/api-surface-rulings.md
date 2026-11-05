@@ -2,8 +2,9 @@
 
 The maintainer ruled on nine proposals from a scan of the public API (2026-11-05), each
 taken one by one with its context, before and after, and options. Each removes or merges
-names a user must learn: 22 fewer in all. None is built yet. This doc is the starting point
-for the branch that builds them; the order of work and "done when" sit in
+names a user must learn: about twenty fewer in all. The maintainer's review pass of 2026-11-05 went
+through the nine one by one and amended AR-4 to AR-9 in place (each says so). None is built yet.
+This doc is the starting point for the branch that builds them; the order of work and "done when" sit in
 [TODO.md](TODO.md) §1.11 ("The API surface rulings"). Once a ruling lands, its contract moves
 into [DESIGN.md](../dev/DESIGN.md) and its section here is deleted; the doc goes with the last.
 
@@ -22,6 +23,10 @@ compiles for new numbers.
 - Before each commit: `benchmarks/params_baseline.py` byte-identical against `dev` (an intended
   numeric change gets its own test instead), ruff, the touched modules' tests and
   `tests/unittest/test_vocabulary.py` (add each retired name to its list).
+- Each commit sweeps the docs for its retired names (`grep` over `docs/` and `README.md`): the
+  README is clean today, but RULES 2.7's `solver=` row names `compute_forced`, KNOWN_ISSUES's
+  reproducer `BoxInputSet.from_bounds`, TODO's CA-3 row `trajectory_of`, and DESIGN about
+  fourteen lines.
 - On the finished branch, once: the full `pytest -n auto`, the demo-check bridge on its own, the
   regression gates (CI flags), the notebook smoke check, and the docs build when docstrings moved
   (AGENTS.md, "Before push or PR").
@@ -180,8 +185,11 @@ is a number of the tree like a mass or a cost weight. `solve_trajectory_from`,
 `solve_trajectory_from_parametric`, `solve_trajectory_from_rebuild`, `step`,
 `compile_parametric_program`, `has_parametric_program`, `transcribe_parametric` and the
 parametric optimizer plumbing go (`planning/trajectory_optimization/planner.py`; 24 test lines,
-1 example, 5 benchmark lines). The RL planner's `solve_trajectory_from(x0, tf)`, which rolls out
-its learned policy, gets a name for what it does.
+1 example, 5 benchmark lines), and with them the base `Planner.solve_trajectory_from` hook. The RL
+planner's `solve_trajectory_from(x0, tf)`, which rolled its learned policy out from `x0` with
+draws, goes too (amended 2026-11-05, the maintainer's review): that rollout is
+`evaluate(problem, solution.policy, record=True)`, the one judge, with no second verb to learn
+(its callers: the planners tutorial 08, `test_rl_planner.py`).
 
 Measured before the ruling (pendulum, 20 knots, a new `x0` and mass each call): the compiled
 planner `pv.solve` 8 ms a solve after a 0.54 s build, the old start-only route 11 ms after

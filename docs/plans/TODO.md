@@ -291,7 +291,7 @@ commit per proposal, its callers and DESIGN in the same change.
   constructor and this solve's on `solve`, the solve time recorded at the user's verb, never in
   a traced solve; `traj.of("plant")` on both loop kinds, with a
   continuous run recording its signals from its own pass (benchmarked first); the forced run folded into
-  `compute_trajectory(u=)`, the rollout and its plot kept beside it, inputs `(m, N)` at the facade; two replanning routes, the start-only route removed. One branch, one commit per
+  `compute_trajectory(u=)`, the rollout and its plot kept beside it, inputs `(m, N)` at the facade; two replanning routes, the start-only route and the RL planner's rollout verb removed. One branch, one commit per
   ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
   deleted.
 - [ ] **A continuous run records its signals from its own pass** (was the companion of the
