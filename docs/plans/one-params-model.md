@@ -1,255 +1,299 @@
 # One parameters model for every object
 
-**Status:** proposal for the maintainer's ruling; the independent review (2026-11-04, §8) amended it: option B stands, with the PM-0 step and the decisions of §8 first.
-**Release:** v0.4, the clean surface (ROADMAP §5.4). **Owner of the ruling:** the maintainer
-(core architecture, AGENTS "Ask first"). Its steps are prefixed `PM-`.
+**Status:** ruled by the maintainer on 2026-11-05 (§6, seven rulings); ready to run, in the
+order of §7. **Release:** v0.4, the clean surface (ROADMAP §5.4, workstream 11). Its steps are
+prefixed `PM-`.
 
-## 1. The problem
+How it was reached: a proposal and its first review (2026-11-04), a second independent review
+with two reviews of its own, then three designs written from a blank page without reading any of
+the above (a student's-notebook lens, a compiled-path lens, a composition lens) and one
+consolidation of all seven documents, every contested fact run again on `dev` at e479784. The
+three blank-page designs converged on the model below on their own; the maintainer's rulings
+settled what they did not.
 
-Every number in minilink is a parameter (CONSTITUTION, "every number a parameter"), but two
-kinds of objects hold their parameters in two different ways today.
+## 1. The model, in seven rules
 
-**Things you build are mutable** (`System`, diagrams, costs, `PlanningProblem`): `.params` is
-the object's live tree, edited in place, and a composite nests its parts by id.
+1. Every object has `params`, one dict of its numbers, `{}` when it has none; its mathematics
+   reads that dict when a call passes `params=None`.
+2. A composite's `params` holds its parts' own dicts at the parts' keys, beside its own leaves,
+   so every number has one home and a write anywhere lands in it.
+3. Structure is the constructor's: sizes, ports, a method, a clock, a part's key, a leaf's
+   name; a value is written by item, `plant.params["m"] = 2.0`.
+4. A `params` argument is `None` or the whole tree, the same shape as `.params`; nothing merges
+   anywhere; a one-off tree is a copy edited like any dict.
+5. A tree that crosses a boundary (a tool's `params=`, a composite's assignment) is checked
+   against the structure it enters: an unknown key or a changed shape raises, naming the known.
+6. A tool snapshots at build; `tool.params` is what `params=None` runs on; nothing reads the
+   objects or compares trees per call.
+7. A problem's uncertain numbers are `Distribution`s in `problem.distributions`, a sparse tree
+   of the same shape; `realize(key, n)` turns them into numbers with a trial axis.
 
-**Values are frozen** (sets, fields, distributions, geometry shapes, the spatial scene and
-track): frozen dataclasses whose `.params` is a dictionary computed from their fields on each
-access; a change is a new object made by `with_params(tree)`.
+A copy at other numbers is Python's own: `heavy = copy.deepcopy(plant); heavy.params["m"] = 2.0`.
+There is no copying verb (ruling 1).
 
-What a user meets today, run on `dev` (2026-11-04):
+## 2. The API surface
+
+| Name | On | Takes / gives | Semantics |
+| --- | --- | --- | --- |
+| `params` (read) | every object and tool | a dict, nested by part key, `{}` for none | An object's: live. A tool's: the snapshot taken at build, read-only. |
+| `params[k] = v` | every object | one leaf, nested on a composite (`p["plant"]["m"]`) | A dict write into the dict that owns the leaf; the composites hold that very dict (rule 2). |
+| `params = tree` | leaves | the complete dict | The declaration, the constructor's gesture. The dict keeps its identity (its contents are replaced), so a composite holding it stays current. |
+| `params = tree` | composites | the complete tree, every part named | Routed part by part, each part's complete dict to that part; a missing or unknown part, key or shape raises naming the known ones (today's diagram law, `core/wiring.py:670-703`, on every composite). `loop.params = loop.realize(key)` is such a tree. |
+| `params=` | equation methods `f h tf g margin value sdf sample step`, and every tool verb (`compute_trajectory`, `Simulator.solve`, `ev.f/step/rollout/rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution`, `Optimizer.solve`) | `None` or the complete tree | An equation reads the tree as given (`params = self.params if params is None else params`, RULES 5.2). A tool: `None` is the frozen form; a tree is checked (rule 5), made canonical (each leaf the compiled dtype and shape; one extra leading axis on the batched verbs) and passed to the parametric form. |
+| `realize(key)` / `realize(key, n)` | random blocks, diagrams, problems, planners | a tree of numbers | A fresh seed per random block under its own stream (`blocks/sources.py:277-280`, `core/wiring.py:334-338`); `None`: every seed `None`, every distribution its mean; `n` stacks the drawn leaves on a leading axis. |
+| `distributions` | `PlanningProblem` | a sparse tree of `Distribution`s, `{}` for none | Given at construction as `x0=law` for the start and `distributions={"plant": {"m": Uniform(…)}}` for a number; `nominal()` is the deep copy at `realize(None)` without distributions. |
+| `solution.params` | `PlanningSolution` (new field) | the tree the solve ran on | The evidence's numbers; the live problem may move after the solve. |
+| `wrt=` | `pe.program`, `jacobian` | dotted paths (`"plant.m"`, `"inner.plant.m"`) | The leaves a verb differentiates or tunes; `lookup` and `with_leaf` in `core/params.py` spell them, internals. |
+
+**Removed.** `with_params` (41 library definitions, 11 test lines, 2 notebooks), `Planner.at`
+(5 internal callers, 1 test), `problem_with` (5 callers), `PlanningProblem.replace(params=)`,
+`parts_view`, `sample_params`, `nominal_plant_params`, `split_laws`, `coerce_laws`, `start_law`
+and `laws` (into `distributions`), `drawn_paths`, `host_tree`, `float_leaves`, `merge_tree`,
+`merge_known` (the merge; one structure check replaces it), `own_params` (into the one `params`
+property), `call_params`, `params_reader`, `_frozen_params`, `DeviceTree`, `tree_digest` in the
+call path (it stays in the offline planner's build key only), `bind`/`merged`/`form` on the
+program evaluators, `SampledSystem.params_override` and `discretize(params=)`,
+`check_diagram_params`/`validate_cost_params`/`require_known_keys` (into the one structure
+check), the `Simulator.params` attribute (into `solve(params=)`), the `/` path spelling, `None`
+as "no parameters" on costs and the sampled view (`{}` everywhere; the one `None` is
+`MathematicalProgram.params`, a `J(z)` signature on a record), `SumCost.g`'s partial per-call
+tree, and the parameters tutorial's `refresh()` cell. `refresh()` itself stays what DESIGN §5
+says: a diagram-internal relayout after a block changes size, with no role in parameters.
+Kept as internals: `param_view` (`core/costs.py:13-22`), `canonical_tree`, `flatten`, `Batched`.
+
+**What a student types, in full.**
 
 ```python
-p = Pendulum();  p.params["m"] = 2.0              # ✓ edits the plant
-loop = PID(Kp=10, Ki=1, Kd=2) @ Pendulum()
-loop.params["plant"]["m"] = 2.0                   # ✓ edits the plant inside the loop
+plant.params["m"] = 2.0                              # one number, in place
+loop.params["controller"]["Kp"] = 20.0               # nested by block id, the controller's own dict
+problem.params["X"]["upper"] = np.array([3., 3.])    # a set's number through the problem
 
-X = BoxSet([-1, -1], [1, 1])
-X.params["upper"] = [3, 3]                        # no error, and X.upper is still [1, 1]
-X.upper = [3, 3]                                  # FrozenInstanceError
-X2 = X.with_params({"upper": [3, 3]})             # ✓ a new set; X unchanged
+heavy = copy.deepcopy(plant); heavy.params["m"] = 2.0          # a copy at other numbers
 
-g = Gaussian([0, 0], std=[0.1, 0.2])
-g.params["mean"] = [1, 0]                         # no error, and g.mean is still [0, 0]
-g.params = {"mean": [1, 0]}                       # AttributeError: no setter
-g.with_params({"mean": [1, 0]})                   # ValueError: Gaussian takes one spread
-                                                  #   (a partial tree loses the std: a bug)
+p = copy.deepcopy(planner.params); p["plant"]["m"] = 1.3       # one solve at other numbers
+sol = planner.solve(params=p)                                  # the user's problem untouched
+
+sim = Simulator(plant, tf=10, backend="jax")                   # a sweep on one compiled tool
+trajs = []
+for m in masses:
+    p = copy.deepcopy(sim.params); p["m"] = m
+    trajs.append(sim.solve(params=p))
 ```
 
-The composites disagree too:
+## 3. Composition
 
-| Composite | Nested by | `obj.params = {partial tree}` | Unknown id |
-| --- | --- | --- | --- |
-| `PlanningProblem` | role | ✓ the named parts change | refused |
-| `SumCost` | term id | ✓ | refused |
-| `DiagramSystem` | block id | ✗ "must name every subsystem" | refused |
-| `IntersectionSet` (frozen; `FieldSet`, `Scene` alike by reading, not run) | index or name | through `with_params`, partial ✓ | refused |
+**Keys.** A part is keyed by what names it in the algebra: a block by its diagram id
+(`controller`, `plant`, else `block.id`, else its class name with `2`, `3`, … for a repeat); a
+cost term by `cost.id`, else the scaled cost's cost's id, else its class name numbered the same
+way (`core/costs.py:689-696`); a problem's parts by role (`plant cost X U X0 Xf`, each
+disturbance source by its port's block id), its own leaves `x0 t0 discount_rate` beside them; a
+planner is the problem's keys plus `method` (its numbers) and `seed`; a program's tree is the
+subset of the problem's leaves it reads under the same keys (`direct_collocation.py:300-321`), so
+`"plant.m"` names one number from problem to program to MPC tick. A scene's obstacles and a
+union's members take the same rule (`id`, else class name numbered) instead of today's
+positional `"0"`, `"1"` (`core/geometry.py:179-182`, `planning/spatial/scene.py:46-56`; nothing
+addresses a positional key today). A scaled term is `{"weight": w, "cost": cost.params}`; a noise
+source `{"seed", "sample_period", "law": law.params}`.
 
-So the same student gesture, "change one number", works on a plant, does nothing silently on a
-set or a law, fails on a diagram with a partial tree, and fails on a Gaussian with a partial
-`with_params`.
+**One home, held, not viewed.** A composite builds its dict when its structure is set (wiring,
+`__init__`, `replace()`): `{key: part.params}` by reference, its own leaves by value, with
+`param_view`s making `problem.x0`, `problem.t0`, `problem.discount_rate`, `ScaledCost.weight`,
+`Planner.seed` and the method's numbers attributes of that dict. Today's views, rebuilt on each
+access (`core/wiring.py:109-119`, `core/costs.py:372-374, 439-441`, `planning/problems.py:271-290`,
+`planning/planner.py:82-92`), lose every write to a composite's own leaf
+(`problem.params["discount_rate"] = 0.5` and `total.params[term]["weight"] = 20` both change
+nothing, reproduced) and every write to a top-level key. Holding the dicts closes both with no
+setter code per composite. It needs one thing: a leaf's assignment keeps its dict's identity
+(`clear`, `update`; 0.08 µs), or a composite holding the old dict goes stale (reproduced). That
+is two lines in the one `params` property on `System`, `CostFunction`, `Set`, `Field`,
+`Distribution`, `Shape`. A block added twice to a diagram, or a cost twice to a sum, would reach
+one home by two paths: the sum refuses it today (`core/costs.py:699`); `add_subsystem` will.
 
-## 2. What being frozen buys today (as first written; §8 corrects it)
+**Nested and flattened.** Nesting mirrors the object: `outer.params["inner"]["plant"]["m"]`,
+dotted `"inner.plant.m"`. Anonymous composition inlines (`ctl @ plant`, `a + b`); a named part
+nests. The flattened compile joins ids with `__` (`core/assembly.py:131-165`) but shares the
+block objects and keeps the evaluator's tree nested; `__` never reaches a user.
 
-| Claimed reason | What the code shows |
-| --- | --- |
-| Tracing (`jit`, `grad`, `vmap`) needs frozen values | Every object already takes its numbers per call: `Pendulum.f(x, u, t, params=None)`, `QuadraticCost.g(x, u, t, params=None)`, `BoxSet.contains(z, t, params=None)`, `Gaussian.sample(key, n, params=None)`, `QuadraticField.value(x, u, t, params=None)`. The mutable plant traces through that argument; a mutable set would trace the same way. The problem evaluator reads its sets through the tree it is passed (`Xf.margin(x, t, Xf_params)`, `planning/evaluation.py:208`). |
-| Tools must not write into the user's objects | They do not, and do not rely on freezing for it: a solve at another tree is `problem_with` (`planning/planner.py:329`): `deepcopy(problem)`, then assign the tree. The mutable plant goes through the same copy. |
-| A value shared by several holders must not change under them | The library hands out fresh sets: `plant.input_box` and `plant.state.box` are new objects on each access (checked). The things are shared anyway: a solution holds the live problem and its live plant (`sol.problem is prob`, `sol.problem.sys is plant`, both True). |
-| Equality and hashing by value | Neither works: `BoxSet(a, b) == BoxSet(a, b)` raises "truth value of an array is ambiguous", and `hash(BoxSet(...))` raises "unhashable type: numpy.ndarray". Nothing relies on either. |
+**Distributions and seeds.** `params` is numeric everywhere, so the whole tree traces
+(CONSTITUTION §2, "One signature") and `jax.grad(f)(obj.params)` needs no stripping. A problem
+keeps its distributions beside the tree; where one stands, the part's own number is the mean and
+the tools plan on `realize(None)`, draw on `realize(key, n)`. Today the distribution sits inside
+`problem.params` (`planning/problems.py:285-288`), which makes the view a copy whenever any
+plant leaf has one, and `problem.params["plant"]["l"] = 2.0` is then silently lost (reproduced).
+A seed is an integer leaf (`None` the mean), never in `wrt`.
 
-The frozen values predate the per-call `params=` contract; `with_params` exists because their
-fields cannot be assigned.
+**Copies and part replacement.** A copy is `copy.deepcopy`; a system's copy drops the kept
+trajectory (a copy carries no last answer, RULES 2.4). `problem.replace(cost=other)` and
+`add_subsystem` swap that entry of the held tree. A sampled view (`plant.discretize(dt)`) has no
+numbers of its own: `sampled.params is plant.params`.
 
-## 3. The fast frozen path under `jit` (as first written; §8 corrects it)
+## 4. The compiled paths
 
-The fast path is the compiled evaluator's **frozen form**: a compiled method called with
-`params=None` uses the values taken at compile as constants of the trace, the fastest run of one
-fixed model (DESIGN §5, "Compile once, in the form the call needs").
+A held tool (`Evaluator`, `Simulator`, `ProblemEvaluator`, the program evaluators under
+`Optimizer`, the compiled planner face `pv`) has one tree and two executables behind each method
+name, as DESIGN §5 says today. What changes: nothing is read from the objects after build,
+nothing is compared per call.
 
-How it decides today (`core/compile/evaluators/base.py`, `call_params`): it keeps the tree it
-compiled with, and on each call compares a digest of the live tree with it. Equal: `None`, the
-frozen form. Different: the live tree, the parametric form (traced leaves, no retrace).
+- **Build snapshots.** `tool.params` is a deep copy of the object's tree, leaves canonical. The
+  system evaluators already do this (`core/compile/evaluators/dynamic.py:32`); the `Simulator`
+  does by accident (`simulation/simulator.py:176`, verified); the problem evaluator does not
+  (`planning/evaluator.py:158-184`, rebuilt per access and always passed as an argument) and
+  becomes one.
+- **Frozen form, `params=None`.** The snapshot's leaves are constants of the trace; the only
+  per-call Python is one `is None` test. It earns its keep: when the tree is an argument instead,
+  a 1000-step rollout is 13 % slower on a PID loop (13 leaves), 23 % on a three-link arm (20), 42 %
+  on the racecar (29), because XLA folds the parameter-only algebra out of the scan body. The
+  large-leaf rule stays (`core/compile/evaluators/base.py:44`).
+- **Live form, `params=tree`.** The structure check, `canonical_tree`, then the jitted call with
+  the tree as argument: one trace per structure, new values never retrace. No device cache and no
+  digest: the digest cost more than the transfer it saved at 5 and at 29 leaves and lost badly
+  when two trees alternate (an MPC estimate, a sweep). A caller who repeats a value holds device
+  leaves (`jax.device_put(tree)` once); `canonical_leaf` passes a JAX leaf whose dtype and shape
+  already match untouched (today it converts every one, 13.6 µs per leaf).
+- **Once per solve.** `Optimizer.solve(params=)` checks the tree once and hands it to the
+  adapter: the JAX forms are `(z, tree)` functions compiled once, the host loop closes over the
+  tree for that solve; `params=None` picks the frozen form once per solve, never per `J(z)`. Today
+  `form()` digests the bound tree on every `J`, `grad`, `h` call
+  (`optimization/evaluators/jax_evaluator.py:240-244`): 23 % of a real offline collocation solve.
+- **Edit after build.** Never seen by a held tool; `tool.params` says what it runs on; the
+  convenience calls (`compute_trajectory`, `problem.compile`, `planner.solve`) build per call and
+  see every edit, as today. The one tool this changes observably is the problem evaluator (no
+  test relies on its live read); it gets its own test and gains the frozen path it lacks.
+- **Structure change.** After a part is replaced a held tool is stale; its next `params=` refuses
+  the new keys or shapes; the frozen form keeps its snapshot.
+- **Draws.** `pe.evaluate(params, key, n_trials)` builds the trial tree from
+  `problem.distributions` and the sources' seeds and `vmap`s over the drawn axis, the same two
+  forms with the drawn leaves batched.
 
-- **Systems are already mutable and use this path**: an edit is detected by the digest, so the
-  frozen form stays exact. Sets, fields and laws do not enter a system's compiled evaluator, so
-  the change does not touch it.
-- **The problem evaluator** (`problem.compile(controller, dt)`) passes the problem's tree as an
-  argument of its jitted run on every call (`run_compiled(params, x0)`), sets included: no set
-  value is baked as a constant there, so mutable sets change nothing on that path.
-- **Planners that bake a set at build** read its bounds once (`problem.X.bounding_box()`: the
-  value-iteration grid, RRT's sampling box, the transcriptions' bounds, MPPI's input clip). An
-  edit after the planner is built is not seen, **exactly as today** when `problem.params =
-  {"X": ...}` replaces the set after the build. The offline trajectory-optimization cache is keyed
-  on `tree_digest(params_of(problem))` (`trajectory_optimization/planner.py:485`), which reads the
-  sets' params, so an in-place edit invalidates it as a replacement does. `solve(params=)` goes
-  through `Planner.at` (a rebuild), unchanged.
-- **Cost of the check:** the digest per call already runs for systems; no new check is added on
-  any hot path. A set's method called with `params=None` inside an outer `jit` reads `self.params`
-  as constants, as a frozen field reads today.
+## 5. The twenty use cases, as the user types them
 
-Nothing in the change moves a number from "constant of the trace" to "argument" or back.
+| # | Use case | Code |
+| --- | --- | --- |
+| 1 | one number everywhere | `plant.params["m"] = 2.0`; `X.params["upper"] = np.array([2., 2.])`; `law.params["std"] = np.array([.5, .5])`; `cost.params["R"] = 0.1 * np.eye(1)` (or `cost.R = …`); `loop.params["controller"]["Kp"] = 20.0`; `problem.params["plant"]["m"] = 2.0` |
+| 2 | sweep on a held simulator | `sim = Simulator(plant, tf=10, backend="jax")`; per value `p = copy.deepcopy(sim.params); p["m"] = m; sim.solve(params=p)` |
+| 3 | `grad`, whole tree and one leaf | `pe = problem.compile(ctl, backend="jax")`; `dJ = jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`; `dJ["controller"]["Kp"]` |
+| 4 | `vmap` over a family | `p = copy.deepcopy(ev.params); p["plant"]["m"] = jnp.linspace(.5, 2, 10)`; `ev.rollout_batch(x0s, None, dt=0.01, n_steps=1000, params=p)` |
+| 5 | a sum of costs, retuned, same tree in the program | `J = SumCost.of(track=base, avoid=10 * obstacle)`; `J.params["avoid"]["weight"] = 20.0`; `J.params["track"]["R"] = 0.1 * np.eye(1)`; `planner.compile().params["cost"]` is that tree |
+| 6 | a problem; a solve at other numbers; an uncertain mass; trials | `problem = PlanningProblem(plant, cost=J, X=X, U=U, Xf=Xf, x0=x0, horizon=3., discount_rate=.1, distributions={"plant": {"m": Uniform(.8, 1.2)}})`; `p = copy.deepcopy(planner.params); p["plant"]["d"] = .3; planner.solve(params=p)`; `trees = problem.realize(key=0, n=100)` |
+| 7 | a planner's numbers and seed | `planner.params["method"]["step_size"] = .05`; `planner.params["seed"] = 3`; `planner.solve()` |
+| 8 | MPC, no retrace | `pv = planner.compile()`; `tick = copy.deepcopy(pv.params)`; per tick `tick["x0"], tick["t0"], tick["plant"]["d"] = x, t, d_hat`; `z, status = pv.solve(params=tick, z0=pv.shift(z, t))`; `plan = pv.solution(z, params=tick)` |
+| 9 | held frozen tool after an edit | `ev = plant.compile(backend="jax")`; `plant.params["m"] = 3.0`; `ev.f(x, u)` runs `m = 1` (`ev.params` says so); `ev.f(x, u, params=plant.params)` or `plant.compile()` reads the edit |
+| 10 | identification over two leaves | `program = pe.program(wrt=["plant.m", "plant.d"])`; `z = Optimizer(program).solve().z`; `plant.params.update(pe.unpack(z, wrt)["plant"])` |
+| 11 | random blocks | `noise.params["seed"]`; `noise.params = noise.realize(key)`; `noise.params["seed"] = None` (the mean signal) |
+| 12 | a copy at other numbers | `heavy = copy.deepcopy(plant); heavy.params["m"] = 2.0`; the same on a box, a loop, a problem; a planner is built anew on the copied problem |
+| 13 | a sampled view | `sd = plant.discretize(.01)`; `sd.params is plant.params`; other numbers: copy the plant first |
+| 14 | nested diagram, flattened compile | `outer.params["inner"]["plant"]["m"]`; `wrt=["inner.plant.m"]`; `outer.compile().params` nested the same |
+| 15 | trees given to a call | `None` or complete, everywhere; a typo or a new shape raises at the tool's `params=` and at a composite's assignment, naming the known keys |
+| 16 | structure vs value | constructor arguments; a shape is free on an object, fixed on a tool |
+| 17 | no parameters | `{}` everywhere; `MathematicalProgram.params=None` the one written exception (`J(z)` alone) |
+| 18 | records | frozen; `PlanningSolution.params` the tree solved on; `Trajectory` has none |
+| 19 | pickle and deep copy | every object, after a run too; tools are rebuilt by `compile()` |
+| 20 | a typo in a key | `sim.solve(params={…, "mass": 2})` and `problem.params = {…, "plant": {…, "mass": 2}}` raise naming `['I', 'd', 'gravity', 'l', 'm']`; the bare `plant.params["mass"] = 2` stays a dict write (ruling 4) |
 
-## 4. The options
+## 6. The rulings (2026-11-05)
 
-**A. Keep the two kinds, fix the edges.** The Gaussian merge fix; a read-only `.params` view on
-frozen values (an in-place edit raises and names `with_params`); a partial tree on the diagram.
-Small (three changes), no migration. The two models stay, and the student still meets two ways
-to change a number.
+1. **No public copying verb.** `with_params` and `Planner.at` go; a copy is a new instance, or
+   `copy.deepcopy` then the usual edit. The only internal need, a problem at other numbers for one
+   solve, is a private helper in `planning/planner.py`. No alias, ever (the 2026-10-27 policy).
+2. **`distributions=` and `problem.distributions`**, not `laws`: "law" already means four things
+   in the library (a probability law, a control law, an optimizer's update law, a rule citation)
+   and the object is a `Distribution`; the keyword sits beside `disturbances=`. `x0=law` stays the
+   start's spelling. Today's `params=` keyword, which refuses a plain number, goes.
+3. **Sets, fields, distributions and shapes are plain classes holding `params`**, attributes as
+   views (the `QuadraticCost` pattern); checks run in `__init__` and at every boundary. RULES 5.21
+   becomes: frozen dataclasses for records; plain classes with `params` for every parametric object.
+4. **A misspelled key is caught at the boundaries only.** `plant.params["mass"] = 2.0` stays a
+   dict write; every tree that enters a tool or a composite is checked. No dict subclass (verified
+   to mismatch plain-dict pytrees under JAX and to cost six times the write).
+5. **`PlanningSolution.params`** records the tree the solve ran on.
+6. **Complete trees everywhere**; no partial tree, no merge. CONSTITUTION §6's sentence ("the full
+   nested tree, or `None` for the snapshot") stands as written.
+7. **`Simulator.solve(params=)`** is the sweep gesture, the same keyword as every tool.
 
-**B. One model: every object holds a live `params` tree** (recommended). Sets, fields,
-distributions, shapes, the scene and the track hold their numbers as systems do: `.params` is
-the live tree, edited in place or assigned a partial tree; their named fields (`X.upper`,
-`g.mean`) read and write through it. `with_params(tree)` stays, on **every** object (systems
-included), as the one copying verb: `deepcopy` then assign. Every function keeps `params=` per
-call. Composites nest by id, take a partial tree, and refuse an unknown id; the diagram's setter
-joins. **Records stay frozen**: `Trajectory`, `OptimizationResult`, `PlanningSolution`,
-`MathematicalProgram` (built once, compiled; its numbers come per call) — outputs of a run or a
-build, which nobody tunes (RULES 2.4).
+## 7. The steps
 
-**C. Freeze everything.** Systems become frozen values too (a functional API: `p2 =
-p.with_params(...)` for every change). Consistent and pure, but it breaks the student syntax
-`plant.params["m"] = 2` across every course notebook; ruled out by CONSTITUTION §3 ("the student
-syntax never breaks").
+Each step is one branch, behaviour-preserving where it can be. Before it, a seeded baseline to
+JSON in the scratchpad of every path it touches (each planner family, the problem evaluator on a
+stochastic problem, a set-as-cost and a field-as-constraint program, the compiled rollouts, the
+trace counts of `test_compile_once`, each tree's key order and leaf dtypes, the packing of `z` and
+`wrt`), run twice and `cmp`-ed; after each commit, ruff, the touched tests, the baseline again,
+byte-identical (AGENTS "Behavior-preserving refactor runs"); an intended change gets its own
+test. The long gates run once, on the finished branch of each step.
 
-## 5. The rules under option B
+- **PM-0. Defects that exist today, no API change.** `Trajectory` stores plain dicts (deep copy
+  and pickle of a system after a run; its KNOWN_ISSUES row closes). Every composite setter
+  checks the tree against its view before routing (`core/wiring.py:121-128`,
+  `core/costs.py:376-380, 443-451`, `planning/problems.py:292-317`): a partial dict that would wipe
+  a leaf's other keys raises naming them, a typo through a composite raises. The program
+  evaluator's digest moves from `form()` to `bind()`. The offline planner's build key and the
+  failure-bound cache include the lowered boxes. The sum cost's `None` becomes `{}`. One test per
+  defect. Done when each reproducer raises or passes as stated and the baseline is byte-identical.
+- **PM-1. The one `params` property.** `own_params` becomes the identity-keeping property on the
+  six base classes (`System`, `CostFunction`, `Set`, `Field`, `Distribution`, `Shape`); a held
+  `{"plant": plant.params}` stays current after `plant.params = {...}` (test). Byte-identical.
+- **PM-2. Values hold their numbers (ruling 3).** Sets, fields, distributions, shapes, scene,
+  track, paths: plain classes, `self.params = {...}` in `__init__`, `param_view` attributes,
+  derived quantities (`dim`, `cov`, `Particles.mean`) computed, keys by id or class name,
+  `dataclasses.replace` sites rewritten (11), `with_params` removed (ruling 1; 11 test lines, 2
+  notebooks). Family by family, the sets' diff shown first. Byte-identical.
+- **PM-3. Composites hold their parts' dicts.** Diagram at wiring (`add_subsystem` refuses a
+  block added twice), sum and scaled cost at build, problem at `__init__` with `x0`, `t0`,
+  `discount_rate` as views, planner with `method` and `seed` views; `distributions` beside the tree
+  with `distributions=` (ruling 2; 8 test sites, 4 notebook cells); `parts_view`, `sample_params`,
+  `nominal_plant_params`, `drawn_paths`, `start_law`, `problem_with`, `Planner.at` removed, the
+  private problem copy kept; the sampled view reads its source. Tests: a write to an own leaf
+  lands; `problem.params` is numeric. The planners' numbers are unchanged: byte-identical.
+- **PM-4. Complete trees everywhere (ruling 6).** `merge_known` becomes the one structure check
+  (`core/params.py`); `solve(params=)`, `evaluate(params=)`, `Optimizer.solve(params=)`,
+  `pv.solve(params=)` take `None` or the complete tree; `SumCost.g` too (3 test lines). Tests: a
+  partial tree raises naming the missing keys. Byte-identical on complete trees.
+- **PM-5. The compiled paths.** One `snapshot` in `core/params.py`; `DeviceTree`, `call_params`,
+  `params_reader`, `_frozen_params`, `bind`/`merged`/`form` removed; `CompiledCall` checks once;
+  `canonical_leaf` passes a matching JAX leaf; the problem evaluator snapshots and gains the
+  frozen form (test: after an edit, `evaluate()` reads the build's values and
+  `evaluate(problem.params)` the live ones); `Simulator.solve(params=)` (ruling 7);
+  `PlanningSolution.params` (ruling 5). The numbers stay byte-identical; the trace counts are
+  asserted anew (two trees alternating: one trace).
+- **PM-6. The contract and the tutorial.** DESIGN §4 "Parameters" and §5 "Compile once"
+  rewritten as §1–§4 of this plan; RULES 2.3, 4.4, 5.21; the parameters tutorial's table and
+  cells (maintainer's review: student-facing); KNOWN_ISSUES (two rows close, the typo row narrows
+  to the bare item write); this plan deleted, its contract in DESIGN (one fact, one home). Gates
+  at the end: full `pytest -n auto`, the regression gates, the notebook sweep, the docs build; CI
+  on the branch.
 
-1. **`.params` is the object's live tree.** Edit it in place (`X.params["upper"] = ...`) or
-   assign a tree (`X.params = {...}`); a partial tree changes the named entries and keeps the rest;
-   an unknown key or id is refused with the known ones.
-2. **Named fields are views of the tree.** `X.upper`, `g.mean`, `field.center` read the tree; a
-   write through one goes into the tree (one home for each number).
-3. **Every function takes `params=` per call** and changes nothing. Tools and JAX use this path.
-4. **`with_params(tree)` is the copy**, on every object: a deep copy holding the tree; the
-   original is unchanged.
-5. **Composites nest their parts by id.** Assigning a partial tree routes each entry to its part.
-6. **Records are frozen.** A run's or a build's output never changes after it is returned.
+## 8. What breaks for users today
 
-## 6. The plan (PM steps)
+Counts: `examples/*.py` / notebooks / tests. `with_params` → a deep copy and an edit (0 / 2 / 11);
+`PlanningProblem(params={laws})` → `distributions=` (0 / 4 / 8); `problem.params` shows numbers
+only (`drawn_paths` 0 / 2 / 3, `sample_params` 0 / 1 / 4); sets, laws and shapes stop being
+frozen dataclasses (`dataclasses.replace` on them → a copy, value equality, which raises on
+arrays today, goes); `Planner.at` → `copy.deepcopy(planner.problem)`, edit, a new planner (0 / 0 / 1);
+`SumCost.g(x, u, t, partial)` → the complete tree (0 / 0 / 3); `solve(params=partial)` → the
+complete tree (0 / 0 / 17 to read); a held `ProblemEvaluator` snapshots (no example edits an
+object between `compile` and `evaluate()`); `discretize(sys, dt, params=)` and the sampled view's
+override go (0 / 0 / 9); `bind` → `solve(params=)` (0 / 0 / 5); imports of `tree_digest`,
+`DeviceTree`, `merge_tree`, `own_params` (0 outside the library). Unchanged: every
+`f(x, u, t, params=None)` body, the in-place `params["m"] = 2.0` (56 example and 47 notebook
+sites), `realize`, `pe.program(wrt=)`, `planner.compile()`.
 
-Behaviour-preserving run (AGENTS, "Behavior-preserving refactor runs"): a seeded baseline of
-every path the change touches (value iteration, LQR, RRT, trajectory optimization, the problem
-evaluator on a stochastic problem, a set-as-cost and a field-as-constraint program), captured
-twice and `cmp`-ed; after each step ruff, the touched tests, the baseline `cmp` byte-identical.
+## 9. Evidence and residual risks
 
-- **PM-1. The base pattern.** One mixin in `core/params.py` beside `tree_digest`: a live
-  `params` dict, a setter merging a partial tree and refusing unknown keys, `with_params` as
-  `deepcopy` + assign, named-field properties. Tests for the rules of §5 on one class (`BoxSet`).
-- **PM-2. Sets** (`core/sets.py`, 6 frozen classes, the input sets, `IntersectionSet` by index):
-  the frozen dataclass shell replaced; `dataclasses.replace(self, ...)` call sites rewritten.
-- **PM-3. Fields** (`core/fields.py`, 5 classes; `FieldSet`, `MarginField` composites).
-- **PM-4. Distributions** (`core/distributions.py`): the Gaussian's spread kept on a partial tree
-  (the bug of §1 gone by construction), `std` or `cov` replacing the spread.
-- **PM-5. Shapes and spatial** (`core/geometry.py`, 4 classes; `planning/spatial/` scene, track,
-  paths, state and workspace fields).
-- **PM-6. Systems get `with_params`** (the copy, rule 4); the diagram's setter takes a partial
-  tree (rule 5).
-- **PM-7. Docs and tutorials.** DESIGN §4 ("Parameters": the six rules replace the two kinds),
-  RULES 2.3, the tutorial `core/02_parameters` and `core/03_sets_fields_distributions` tables
-  (their `with_params` examples keep working; the in-place form is added beside them, the
-  maintainer's review: student-facing). `tests/unittest/test_contract.py` walks every core
-  object: it gains the rules of §5.
-- **Gates at the end:** full `pytest -n auto`, the regression gates, the notebook sweep, the
-  docs build; CI on the branch.
+Measured on this machine (CPU, JAX 0.12), each figure the median of alternated blocks:
 
-**Scope:** 25 `with_params` definitions collapse into the mixin; their 14 library callers, 7
-test callers and 8 example and tutorial lines keep working unchanged (the verb stays). About
-twenty classes lose `@dataclass(frozen=True)`.
+| What | Frozen | Live tree |
+| --- | --- | --- |
+| `ev.rollout`, 1000 RK4 steps, PID loop (13 leaves) | 2.45 ms | 2.78 ms |
+| the same, racecar (29 leaves) | 4.34 ms | 6.17 ms |
+| `ev.f`, pendulum (5 leaves) | 7.5 µs | 25 µs (host leaves), 8 µs (device leaves) |
+| program `J(z)`, digest per call today | 68 µs | 45 µs |
+| real collocation solve, 178 calls, digest per call | 76 ms | 58 ms without the digest |
+| `tree_digest`, 5 / 29 leaves | 14 / 77 µs | |
+| two trees alternating through today's device cache, per pair | 325 / 1426 µs | |
 
-## 7. Risks and open points
-
-- **Value equality.** Today it raises; after the change a set compares by identity unless it
-  defines `__eq__`. Nothing compares sets (checked): no `__eq__` is added.
-- **An edit after a planner's build** is not seen by a baked grid or box, as today with a
-  replacement; the planners' docstrings say so, and `solve(params=)` is the per-solve route.
-- **A solution holds the live problem** (`sol.problem is prob`). Not this change's question: a
-  separate entry for QUESTIONS (should a solution snapshot its problem at solve time, RULES 2.4).
-- **Records stay frozen**; `MathematicalProgram` is listed as a record: its numbers are passed
-  per call (`Optimizer(program).solve(params=)`), and its callables are compiled once.
-- **Pickling and `deepcopy`**: the live tree is a plain `dict`, never a `MappingProxyType` (the
-  known deepcopy defect, KNOWN_ISSUES).
-
-## 8. The independent review (2026-11-04) and the amended plan
-
-An independent reviewer checked §2 and §3 against the code; the two findings marked
-(reproduced) were run again by the author.
-
-**What §2 got wrong: the values are not consistently frozen today.**
-- The distributions are plain mutable classes (`g.mean = ...` works); `Particles.mean` is stored
-  at construction and goes stale when `points` changes.
-- 17 classes (the fields, `FieldSet`, `EllipsoidSet`, the shapes, `Scene`, the spatial fields)
-  cache `params` with a `cached_property`, so an edit has two homes: after
-  `q.params["center"] = [1, 0]`, `q.value` reads the new centre and `q.center` still says
-  `[0, 0]` (reproduced).
-- A "frozen" `BoxSet`'s arrays can be edited in place: `X.params["upper"][0] = 5` changes
-  `X.upper`. `CallableSet.params` is a mutable dict.
-- Value equality works for one-element arrays and raises otherwise; nothing compares or hashes
-  sets (confirmed).
-
-**What §3 got wrong: three caches are keyed on identity, not values.**
-- **The offline trajectory-optimization program** (`trajectory_optimization/planner.py:475`)
-  keys on the parts' identity plus the program's parameter tree, and a box lowered to the decision
-  bounds is left out of that tree (`direct_collocation.py:300-319`). After an in-place box edit the
-  old program is reused with the old bounds (reproduced: the program object is reused). Today
-  `problem.params = {"X": ...}` replaces the set, so its identity changes and the program is rebuilt.
-- **The problem evaluator's failure-bound cache** (`planning/evaluator.py:416`) is keyed on the
-  parts' identity and the cost's numbers; the bound samples `g` over the boxes.
-- **RRT** stores `X.bounding_box()`, which is the box itself (`rrt.py:121`): an edit is
-  half-seen. MPPI keeps array views (`path_integral.py:579`).
-- Confirmed: the jitted problem run takes the sets through the tree; the system snapshots are
-  deep copies; no slowdown found. A user closure `jax.jit(lambda z: X.margin(z))` freezes `X`'s
-  numbers, as a closure over a plant does today.
-
-**Other points.**
-- `PlanningProblem.replace` shares the parts it does not change (`problems.py:474`), so under B
-  an edit of a set on the copy reaches the original, as plant and cost edits already do;
-  tutorial 05 says the copy does not mutate the original.
-- `NoiseSource` keeps a copy of its law's params (`blocks/sources.py:241`): one home only if a
-  setter merges into the existing dict, never rebinds it.
-- In-place item assignment skips the class's checks and conversions (lower ≤ upper, a symmetric
-  `P`, float arrays): `X.params["upper"] = [3, 3]` then fails on JAX (a list leaf).
-- A deep-copy `with_params` would detach a `ClearanceField`'s collision body from the planner's
-  plant; today `replace` shares it.
-- Three partial-tree semantics must be written down: the setter takes a partial tree; a call's
-  `params=` is a complete tree (`BoxSet.margin(params={"upper": ...})` raises a KeyError); a
-  planner's `solve(params=)` merges a partial tree.
-- Derived quantities (`Particles.mean`, `Uniform.mean`, `cov`, `dim`) must be computed, never
-  stored; `EllipsoidSet`'s tree a view of its field's; a Gaussian switching `std` → `cov` changes
-  its keys; `FieldSet`'s `lower=None` is structure.
-- User `@dataclass(frozen=True)` subclasses of `Field` exist in the tests: the base stays a
-  plain class.
-- Counts: 24 frozen dataclasses, 17 cached `params`, 25 `with_params` definitions; 10 example
-  and doc lines mention `with_params`.
-
-**The amended plan.**
-- **PM-0 (first, needed under any option; it fixes defects that exist today):** key the offline
-  program, the failure-bound cache and the evaluator's run on a digest of every part's numbers,
-  the lowered boxes included, never on identity alone; remove the 17 cached `params`; RRT and
-  MPPI copy the box they keep. A test per cache: edit after the build, solve again, the edit is
-  seen.
-- **The live tree is checked on write:** a dict subclass whose `__setitem__` coerces to float
-  arrays, keeps the shapes, and re-runs the class's own checks; setters merge into the existing
-  dict, never rebind it.
-- **`with_params` copies the tree, not the structure:** a shallow copy of the object with a
-  deep copy of its numbers, so held bodies and plants stay shared.
-- **PM-6 (the diagram's partial setter) moves before PM-2**, so the composites agree throughout.
-- **The baseline records more than numbers:** rebuild and trace counts, each tree's key order
-  and the packing of `z` and `wrt`, the leaf dtypes; the intended stale-to-fresh changes get their
-  own tests.
-- `test_contract.py` gains, for every object: edit, call with `params=None`, a held tool sees the
-  edit.
-
-**Decisions for the maintainer.**
-1. **`problem.params = {"X": ...}`**: edit the set in place (needs PM-0), or keep replacing it.
-   *Recommendation:* in place, one model everywhere; replacing is what the frozen model forced.
-2. **`PlanningProblem.replace`**: copy its sets (a derived problem never touches the original),
-   or keep sharing and fix tutorial 05's wording.
-   *Recommendation:* keep sharing: one rule for plants, costs and sets ("`replace` changes the
-   named parts and shares the rest"); full independence is `copy.deepcopy`.
-3. **The three partial-tree semantics** above, written into DESIGN §4 and RULES 2.3, the diagram
-   bullet ("names every block") amended.
-   *Recommendation:* as listed: the setter takes a partial tree, a call's `params=` is a complete
-   tree (JAX needs the whole structure), `solve(params=)` merges.
-
-**Next, on the maintainer's go:** PM-0 first (it fixes defects that exist today and changes no
-public API), then PM-6, then PM-1 to PM-5 family by family, the sets' diff shown before the rest.
-
+Not verified: GPU; a tree large enough to bloat an executable with constants (the large-leaf
+rule covers it); the notebooks were read, not run. Risks: the identity-keeping setter means
+`a.params = b.params` copies contents rather than aliasing two objects to one dict (no library or
+test site does this); `canonical_leaf`'s pass-through must keep the weak-type rule
+(`test_a_leaf_given_as_any_number_type_shares_one_trace`); the failure-bound cache keeps one
+digest per `evaluate`, at the verb, never per call; the RL planner's `params` (a report, DESIGN
+§6's exception) is untouched.

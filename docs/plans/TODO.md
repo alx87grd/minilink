@@ -266,11 +266,13 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
-- [ ] **One parameters model for every object** **[ask — core]** ([one-params-model.md](one-params-model.md), its option B): sets, fields, distributions and shapes hold a live `params` tree as systems do; `with_params` the copy on every object; composites take a partial tree. It replaces CA-4 below. Done when the plan's PM steps land byte-identical on the seeded baseline.
-- [ ] **Partial parameter updates** (CA-4): `Distribution.with_params` merges a partial
-  dictionary (CA-4a, today it rebuilds from the given keys only, `core/distributions.py`),
-  `CostFunction.with_params` (CA-4b; sets, fields and distributions have it), and a partial
-  dictionary on `diagram.params` (CA-4c). Done when each reproducer passes.
+- [ ] **One parameters model for every object** ([one-params-model.md](one-params-model.md),
+  ruled 2026-11-05): every object holds one live `params` tree; composites hold their parts'
+  dicts; complete trees everywhere; a tool snapshots at build; `distributions` beside the
+  problem's tree; no copying verb. In the plan's order, the defects that exist today first
+  (PM-0), the contract and the tutorial last (PM-6). It absorbs the partial-parameter-updates
+  proposal (CA-4, closed). Done when each step lands byte-identical on the seeded baseline and
+  DESIGN §4 holds the contract.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
 - [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,
