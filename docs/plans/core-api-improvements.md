@@ -246,7 +246,7 @@ loop.of("plant")                  # AttributeError: 'DiagramSystem' object has n
 
 ## CA-4. Parameter ergonomics across core objects (closed)
 
-Absorbed by [one-params-model.md](one-params-model.md), ruled 2026-11-05: `with_params` goes
+Absorbed by the one parameters model (DESIGN §4, "Parameters"), ruled and merged 2026-11-05: `with_params` goes
 rather than merging a partial dictionary (its ruling 1), costs hold `params` like every object
 (ruling 3), and a composite's assignment takes the complete tree (ruling 6), so none of the
 three proposals here (`CA-4a`–`CA-4c`) is built as written. Their reproducers are in git

@@ -38,8 +38,6 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 | --- | --- | --- |
 | [core-api-improvements.md](core-api-improvements.md) | The core API proposals from the `examples/tutorial/core/` review (`CA-1`–`CA-6` open, `CA-7` landed), with reproducers and diffs | v0.4 (TODO §1.11) |
 | [minimal-surface.md](minimal-surface.md) | **Decisions open.** Demos, notebooks, tests and CI redrafted on the core: the audit, the decisions `MS-D1`–`MS-D6` with options, the order | v0.4 (TODO §1.12) |
-| [one-params-model.md](one-params-model.md) | **Ruled 2026-11-05; built on `params-one-tree`, waiting for review.** One parameters model for every object: the seven rules, the API surface, composition, the compiled paths, the twenty use cases, the rulings, the steps `PM-0`–`PM-6` | v0.4 (TODO §1.11) |
-| [one-params-run.md](one-params-run.md) | The overnight runbook for one-params-model.md: the baseline, the order of the steps, the gates by name, the stop conditions, the run log | v0.4 (TODO §1.11) |
 | [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.5 (the proof of concept landed in v0.3) |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
 | [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.5 (A3) |

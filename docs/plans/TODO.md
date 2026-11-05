@@ -266,18 +266,24 @@ commit per proposal, its callers and DESIGN in the same change.
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
-- [ ] **One parameters model for every object** ([one-params-model.md](one-params-model.md),
-  ruled 2026-11-05; built on the branch `params-one-tree` by the overnight run,
-  [one-params-run.md](one-params-run.md), its log the handoff): its steps PM-0 to PM-6
-  landed there, each byte-identical on the seeded baseline, DESIGN §4 holding the contract.
-  **[ask]** the maintainer's review before the merge into `dev`: the flagged student-facing
-  edits and the planner-rebuild choice, both listed in the run log. Its follow-ups, each
-  small: the problem evaluator's frozen form (it snapshots, and always runs its tree as an
-  argument); the planner's method numbers as views of its tree (they are attributes, and
-  `solve(params=)` their route); the problem's internal helpers (`parts_view`,
-  `sample_params`, `nominal_plant_params`, `drawn_paths`) folded into its held tree; a
-  union's members and a scene's obstacles keyed by id rather than position. Done when the
-  branch is merged and the follow-ups are rows of their own or landed.
+- [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
+  contract DESIGN §4 "Parameters"; each small, each byte-identical on
+  `benchmarks/params_baseline.py`):
+  - the problem evaluator's frozen form: it snapshots at its compile but always runs its tree
+    as an argument;
+  - a planner's method numbers and seed as views of its tree (they are attributes today, so
+    `planner.params["method"]` is a fresh view, `solve(params=)` their route);
+  - the problem's internal helpers (`parts_view`, `sample_params`, `nominal_plant_params`,
+    `drawn_paths`) folded into its held tree;
+  - a union's members and a scene's obstacles keyed by id, else class name numbered, rather
+    than by position (it changes a recorded tree's keys).
+  Done when each has landed or been dropped.
+- [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
+  diagram's re-stacks the state layout after a block's state size changes, the sampled view and
+  the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)
+  remove it, the diagram re-stacking its layout at each read of `n` and `state_index` as it
+  already reads its `x0` and solver hints; (b) keep it, internal only, out of the tutorials (as
+  now). Done when the maintainer picks and the sites follow.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
 - [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,

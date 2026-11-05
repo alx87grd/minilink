@@ -2,7 +2,7 @@
 
 Run: ``PYTHONPATH=. python benchmarks/params_baseline.py OUT.json`` (needs JAX). It records
 numbers only, never timings, so two runs on one commit are byte-identical (``cmp``); the run of
-docs/plans/one-params-run.md compares every later commit against the capture taken at its base.
+a change to the parameters model (DESIGN §4) compares every commit against the capture taken at its base.
 It uses only the surface every step keeps: ``params=None`` or a complete tree, built as a deep
 copy of an object's own ``params`` and edited like a dict.
 

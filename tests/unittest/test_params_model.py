@@ -1,4 +1,4 @@
-"""One parameters model (docs/plans/one-params-model.md): the defects its first step closes, one test each."""
+"""One parameters model (DESIGN §4, "Parameters"): its seven rules and the defects they closed, one test each."""
 
 import copy
 import pickle
