@@ -28,6 +28,7 @@ from minilink.core.params import (
     merge_tree,
     set_leaf,
     split_path,
+    tree_digest,
     with_leaf,
 )
 from minilink.core.sets import is_bounded
@@ -406,7 +407,13 @@ class ProblemEvaluator:
         # The key: the failure switch and cost, the rate and the numbers; the entry holds the
         # parts it was taken on, so a part replaced since takes a new bound
         parts = problem_parts(problem)
-        key = (problem.penalize_failure, problem.failure_cost, rate, numbers)
+        key = (
+            problem.penalize_failure,
+            problem.failure_cost,
+            rate,
+            numbers,
+            tree_digest(boxes_params(problem)),
+        )
         cached = self.failure_cost_cache.get(key)
         if cached is None or replaced(cached[0], parts):
             failure_cost = failure_cost_of(problem, self.tf, cost_params, rate)
@@ -1114,6 +1121,15 @@ def is_concrete_number(value) -> bool:
         return False
 
     return True
+
+
+def boxes_params(problem) -> dict:
+    """The numbers of the sets a failure bound samples ``g`` over, by role."""
+    return {
+        role: getattr(set_, "params", None)
+        for role in ("X", "U")
+        if (set_ := getattr(problem, role)) is not None
+    }
 
 
 def problem_parts(problem):

@@ -483,6 +483,7 @@ class TrajectoryOptimizationPlanner(Planner):
             tuple(id(part) for part in parts),
             problem.horizon,
             tree_digest(params_of(problem)),
+            tree_digest(sets_params(problem)),
         )
 
         return key, parts
@@ -912,6 +913,15 @@ class TrajectoryOptimizationIteration:
     cost: float
     max_eq: float
     min_ineq: float | None
+
+
+def sets_params(problem) -> dict:
+    """Every set's numbers by role: a box lowered to the decision bounds is no leaf of the program, yet its numbers build it."""
+    return {
+        role: getattr(set_, "params", None)
+        for role in ("X", "U", "X0", "Xf")
+        if (set_ := getattr(problem, role)) is not None
+    }
 
 
 def require_no_scene(params) -> None:

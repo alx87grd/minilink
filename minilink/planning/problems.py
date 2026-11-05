@@ -13,7 +13,14 @@ from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, child_seed, split_keys
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import flatten, lookup, merge_tree, set_leaf, with_leaf
+from minilink.core.params import (
+    flatten,
+    lookup,
+    merge_tree,
+    require_complete_part,
+    set_leaf,
+    with_leaf,
+)
 from minilink.core.sets import (
     BallSet,
     BoxInputSet,
@@ -291,7 +298,12 @@ class PlanningProblem:
 
     @params.setter
     def params(self, value):
-        require_roles(value, self.params)
+        view = self.params
+        require_roles(value, view)
+        parts = {"plant": self.sys, "cost": self.cost, **self.sources_by_id()}
+        for role, entry in (value or {}).items():
+            if role in parts and parts[role] is not None:
+                require_complete_part(entry, parts[role], (role,))
 
         # A law in the tree moves the problem's laws; the numbers move the parts
         value, laws = split_laws(value, self.parts_view())

@@ -108,6 +108,13 @@ class Trajectory(SampledSignals):
         object.__setattr__(self, "signals", MappingProxyType(signals))
         object.__setattr__(self, "roles", MappingProxyType(dict(self.roles)))
 
+    def __reduce__(self):
+        """Pickled and copied by its fields: the record rebuilt by its constructor, its signals read-only again."""
+        return (
+            type(self),
+            (self.t, self.x, self.u, dict(self.signals), dict(self.roles)),
+        )
+
     def with_cost(self, cost, *, discount_rate=0.0, params=None, t0=0.0) -> Trajectory:
         """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``."""
         cost_rate, running = cost.integrate(

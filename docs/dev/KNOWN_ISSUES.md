@@ -19,18 +19,12 @@ lands. Last checked against the code: 2026-11-04.
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
-  keys, so the change has no effect and nothing says so. Diagram-level params check their
-  block ids; a block's own keys are not checked.
+  keys, so the change has no effect and nothing says so. A tree given to a diagram, a sum, a
+  scaled cost or a problem is checked against the part it sets and refuses an unknown or
+  missing key; the bare item write on a block is not checked.
 - **Workaround:** read the key back (`plant.params["m"]`) after a change.
-- **Fix:** a Later idea in TODO §6 (a `validate_params` hook on `System`).
-
-### `copy.deepcopy` of a plant fails after a JAX simulation
-- **Symptom:** `plant.compute_trajectory(backend="jax")` then `copy.deepcopy(plant)` raises
-  "cannot pickle 'mappingproxy' object": the run's trajectory kept on the plant (`plant.traj`)
-  does not deep-copy. The same on `main`.
-- **Workaround:** deep-copy before the run, set `plant.traj = None` first, or copy
-  `plant.params` into a new plant.
-- **Fix:** none planned yet; it touches the `sys.traj` shortcut (RULES 2.4).
+- **Fix:** the one-parameters-model run ([one-params-model.md](../plans/one-params-model.md)):
+  every tree a tool takes is checked; the bare item write stays a dict write (its ruling 4).
 
 ## Planning and learning
 

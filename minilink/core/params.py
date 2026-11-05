@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import inspect
 from dataclasses import dataclass
 
 import numpy as np
@@ -37,7 +38,30 @@ def own_params(
     def set_(self, value):
         self.__dict__["params"] = value
 
-    return property(get, set_, doc=doc)
+    return OwnParams(get, set_, doc=doc)
+
+
+class OwnParams(property):
+    """The ``params`` property of a base class (:func:`own_params`): an assignment replaces the object's tree whole."""
+
+
+def holds_own_tree(obj) -> bool:
+    """
+    Whether assigning ``obj.params`` replaces its tree whole: a leaf's own dict, not a composite's routing.
+
+    A system's plain attribute or the base classes' :func:`own_params` holds
+    the tree; a composite's own ``params`` property routes each entry to its
+    parts, and keeps the entries it is not given.
+    """
+    descriptor = inspect.getattr_static(type(obj), "params", None)
+
+    return descriptor is None or isinstance(descriptor, OwnParams)
+
+
+def require_complete_part(tree, part, path=()):
+    """Refuse a tree for ``part`` that would wipe its other numbers: checked when its assignment replaces its tree whole."""
+    if holds_own_tree(part):
+        require_complete(tree, part.params, path)
 
 
 def split_path(path):
@@ -114,6 +138,44 @@ def merge_known(tree, override):
             )
 
     return merged
+
+
+def require_complete(tree, reference, path=()):
+    """
+    Refuse a tree that does not name every entry of ``reference``, or names one it lacks.
+
+    The check of a tree a composite routes to one of its parts: at every level
+    the same keys, a leaf where a leaf is, a subtree where a subtree is, and
+    each leaf in its reference's shape. A ``None`` leaf on either side (a seed
+    at its mean) and a distribution standing where a number goes are not
+    shape-checked.
+    """
+    where = "params" + "".join(f"[{key!r}]" for key in path)
+    if isinstance(reference, dict):
+        if not isinstance(tree, dict):
+            raise ValueError(
+                f"{where} is a subtree: give a dict of its entries, got "
+                f"{type(tree).__name__}"
+            )
+        unknown = [key for key in tree if key not in reference]
+        missing = [key for key in reference if key not in tree]
+        if unknown or missing:
+            raise ValueError(
+                f"{where} must name every entry of the part it sets: "
+                f"unknown {unknown}, missing {missing}; the known entries are "
+                f"{list(reference)}"
+            )
+        for key, value in tree.items():
+            require_complete(value, reference[key], (*path, key))
+        return
+    if isinstance(tree, dict):
+        raise ValueError(f"{where} is a leaf, got a dict")
+    if tree is None or reference is None or is_law(tree) or is_law(reference):
+        return
+    if np.shape(tree) != np.shape(reference):
+        raise ValueError(
+            f"{where} has shape {np.shape(reference)}, got {np.shape(tree)}"
+        )
 
 
 def flatten(tree, prefix=()):
@@ -292,6 +354,11 @@ def leaf_bytes(leaf) -> bytes:
         return f"{array.dtype}{array.shape}".encode() + array.tobytes()
 
     return b"obj" + id(leaf).to_bytes(8, "little")
+
+
+def is_law(value) -> bool:
+    """Whether ``value`` is a distribution standing where a number goes (it draws: ``sample``)."""
+    return hasattr(value, "sample") and not isinstance(value, (np.ndarray, np.generic))
 
 
 def require_known_key(key, tree):

@@ -6,7 +6,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
-from minilink.core.params import own_params
+from minilink.core.params import own_params, require_complete_part
 from minilink.core.trajectory import Trajectory
 
 
@@ -377,12 +377,14 @@ class SumCost(CostFunction):
     def params(self, value):
         validate_cost_params(value, self.terms)
         for term_id, term_params in (value or {}).items():
+            require_complete_part(term_params, self.terms[term_id], (term_id,))
+        for term_id, term_params in (value or {}).items():
             self.terms[term_id].params = term_params
 
     def g(self, x, u, t=0.0, params=None):
         """Return the summed running cost, each term on its own entry of ``params``."""
         validate_cost_params(params, self.terms)
-        params = params or {}
+        params = self.params if params is None else params
 
         # g = Σᵢ gᵢ(x, u, t)
         g = sum(
@@ -394,7 +396,7 @@ class SumCost(CostFunction):
     def h(self, x, t=0.0, params=None):
         """Return the summed terminal cost, each term on its own entry of ``params``."""
         validate_cost_params(params, self.terms)
-        params = params or {}
+        params = self.params if params is None else params
 
         # h = Σᵢ hᵢ(x, t)
         h = sum(
@@ -405,7 +407,7 @@ class SumCost(CostFunction):
 
     def g_max(self, X, U, params=None):
         """The sum of the terms' bounds: ``max Σ gᵢ ≤ Σ max gᵢ``."""
-        params = params or {}
+        params = self.params if params is None else params
 
         return sum(
             cost.g_max(X, U, params.get(term_id))
@@ -414,7 +416,7 @@ class SumCost(CostFunction):
 
     def h_max(self, X, params=None):
         """The sum of the terms' bounds."""
-        params = params or {}
+        params = self.params if params is None else params
 
         return sum(
             cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
@@ -445,6 +447,8 @@ class ScaledCost(CostFunction):
         require_known_keys(value, ("weight", "cost"), "ScaledCost")
         if value is None:
             return
+        if "cost" in value:
+            require_complete_part(value["cost"], self.cost, ("cost",))
         if "weight" in value:
             self.weight = value["weight"]
         if "cost" in value:
@@ -568,6 +572,7 @@ class SampledCost(StepCost):
 
     @params.setter
     def params(self, value):
+        require_complete_part(value, self.cost)
         self.cost.params = value
 
     def c(self, x, u, k=0, params=None):

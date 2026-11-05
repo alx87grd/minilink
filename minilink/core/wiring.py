@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.distributions import child_seed
+from minilink.core.params import require_complete_part
 from minilink.core.roles import check_reserved_id
 from minilink.core.signals import OutputPort, VectorSignal
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT
@@ -124,6 +125,9 @@ class WiredDiagramMixin:
         if value is None:
             return
 
+        # Every block's tree checked before the first write: a refused tree changes nothing
+        for sys_id, subsystem_params in value.items():
+            require_complete_part(subsystem_params, self.subsystems[sys_id], (sys_id,))
         for sys_id, subsystem_params in value.items():
             self.subsystems[sys_id].params = subsystem_params
 
