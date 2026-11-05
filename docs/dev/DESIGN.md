@@ -1345,7 +1345,8 @@ params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted
 `"controller.Kp"`): the objective `pe.evaluate(...).objective`, its reverse-mode gradient on
 JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and the
 reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
-`z`. `evaluate(problem, controller, *, dt, ...)` is the facade. No backend clips the law:
+`z`. `evaluate(problem, controller, dt=None, ...)` is the facade: a sampled controller runs on
+its clock with `dt` omitted, a continuous one needs `dt`. No backend clips the law:
 port bounds are information, and saturation lives inside the law or in a `Saturation`
 block. A stochastic problem needs `n_trials`; its draws are `problem.realize(key, n)`, one
 tree (above), one key per call, and each trial realizes the loop's random blocks under that

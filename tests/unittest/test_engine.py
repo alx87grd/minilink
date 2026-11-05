@@ -246,6 +246,19 @@ def test_the_facade_is_compile_then_evaluate():
     assert isinstance(report, Evaluation) and report.n_trials == 4
 
 
+def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_for_dt():
+    problem = upright_problem()
+
+    # A sampled controller runs on its own clock
+    on_clock = evaluate(problem, pid() % 0.01, backend="numpy")
+    assert isinstance(on_clock, Evaluation)
+    assert on_clock.trajectories is None
+
+    # A continuous controller's loop needs the period it is integrated on
+    with pytest.raises(TypeError, match="needs dt"):
+        evaluate(problem, pid(), backend="numpy")
+
+
 # --- the gradient and the program ---
 
 

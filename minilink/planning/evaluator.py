@@ -659,7 +659,7 @@ def evaluate(
     problem,
     controller,
     *,
-    dt,
+    dt=None,
     solver="rk4",
     substeps=None,
     n_trials=None,
@@ -672,7 +672,10 @@ def evaluate(
     The :class:`Evaluation` of a controller on a problem: ``problem.compile(...).evaluate(...)``.
 
     One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
-    see :class:`ProblemEvaluator` for the loop, the run and the score.
+    see :class:`ProblemEvaluator` for the loop, the run and the score. A sampled
+    controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
+    continuous controller needs ``dt``, the period its loop is integrated and
+    recorded on.
     """
     pe = ProblemEvaluator(
         problem,

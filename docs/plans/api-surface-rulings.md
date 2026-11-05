@@ -57,13 +57,6 @@ g.full_cov                       g.cov
 `sample(key, n=None, params=None)` exists on every law today; `key=None` returns the mean, so no
 signature changes.
 
-## AR-2 `evaluate(problem, ctl)` needs no `dt` for a sampled controller
-
-Today `evaluate(problem, ctl)` refuses without `dt`. A sampled controller's `dt` is its loop's
-tick and must equal its clock, so it is read from the clock, as `problem.compile` already does;
-plant accuracy is `substeps=`. A continuous controller still needs `dt` (its loop's integration
-step) and keeps the refusal, with a message that says so. Default `dt=None`. Nothing breaks.
-
 ## AR-3 Boxes: two spellings, `U=` takes a box
 
 The boxes are `sys.state.box` and `sys.input_box`; `PlanningProblem(U=...)` accepts a `BoxSet`
