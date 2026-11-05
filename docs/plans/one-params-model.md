@@ -212,6 +212,9 @@ nothing is compared per call.
 
 ## 7. The steps
 
+The procedure of the autonomous run that builds them (the baseline script, the gates by name,
+the stop conditions, the run log) is [one-params-run.md](one-params-run.md).
+
 Each step is one branch, behaviour-preserving where it can be. Before it, a seeded baseline to
 JSON in the scratchpad of every path it touches (each planner family, the problem evaluator on a
 stochastic problem, a set-as-cost and a field-as-constraint program, the compiled rollouts, the
