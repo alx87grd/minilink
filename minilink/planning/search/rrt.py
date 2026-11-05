@@ -128,8 +128,8 @@ class RRTPlanner(Planner):
         The solution's policy is the path's input held by a source block,
         ``policy >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here

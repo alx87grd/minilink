@@ -145,7 +145,7 @@ class CompiledTrajectoryPlanner:
         """
         The solve as a function: ``(z, status)`` from the guess ``z0`` (``None``: :meth:`initial`) on ``params``.
 
-        ``params`` is a partial tree merged once onto the defaults; the
+        ``params`` is ``None`` (the defaults) or :attr:`params` edited, checked once; the
         solution records its origin ``params["t0"]``. ``status`` is
         ``{"success", "iterations", "cost"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.

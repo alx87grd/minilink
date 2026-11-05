@@ -462,7 +462,7 @@ One model for every object, in seven rules:
    merge, no check) and on every tool verb (`Simulator.solve`, `ev.f/step/rollout/
    rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
    initial`, `solve_trajectory_from`, `Optimizer.solve`). Nothing merges anywhere. A one-off
-   tree is the tool's own, edited: a held tool's `params` is a copy (`p = sim.evaluator.params;
+   tree is the tool's own, edited: a held tool's `params` is a copy (`p = sim.params;
    p["m"] = 2.0; sim.solve(params=p)`); a planner's is live on its problem's parts, so a solve
    that leaves the problem as it is copies it (`p = copy.deepcopy(planner.params)`), and one
    that does not care edits the problem and calls `planner.solve()`. A copy of an object at

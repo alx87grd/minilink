@@ -224,7 +224,7 @@ class Simulator:
         The input is the constant :math:`\\bar{u}` of the compiled evaluator.
         ``params=None`` runs on the numbers taken when the simulator was built
         (the compiled form); a tree, the system's complete tree at other
-        numbers (``p = sim.evaluator.params``, a copy, edited), runs
+        numbers (``p = sim.params``, a copy, edited), runs
         on those without a recompile: a sweep on one simulator compiles once.
 
         Returns
@@ -257,6 +257,11 @@ class Simulator:
 
         # The trajectory, kept with the solver's debug record
         return self.store_trajectory(x_traj, u_traj)
+
+    @property
+    def params(self) -> dict:
+        """The numbers the simulator runs on, taken at its build: a copy, the tree ``solve(params=)`` takes edited."""
+        return self.evaluator.params
 
     def tree_of(self, params):
         """The tree a run takes: ``None`` (the compiled numbers), or ``params`` checked complete against them."""

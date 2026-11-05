@@ -216,9 +216,9 @@ class TrajectoryOptimizationPlanner(Planner):
         """
         Offline trajopt entry.
 
-        ``params`` is a partial tree of the problem's leaves (``planner.params``:
-        ``x0``, ``t0``, the plant's, the cost's, ...), solved on a copy
-        of the problem holding them; ``None`` solves the problem as it is.
+        ``params`` is the complete tree of :attr:`params` (``x0``, ``t0``, the
+        plant's, the cost's, ..., ``method``, ``seed``), a copy edited, solved on
+        a copy of the problem holding it; ``None`` solves the problem as it is.
         ``guess`` seeds the solve: a :class:`~minilink.core.trajectory.Trajectory`,
         a packed ``z`` (a compiled face's, its origin dropped), or a
         :class:`~minilink.planning.results.PlanningSolution`

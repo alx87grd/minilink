@@ -160,8 +160,9 @@ class DynamicProgrammingPlanner(Planner):
         ``max_iterations`` sweeps. The solution's policy is the greedy lookup
         table and its ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
-        problem's draws. ``params`` (a partial tree of :attr:`params`) solves the
-        planner :meth:`at` it instead, this one unchanged.
+        problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
+        edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
+        this one unchanged.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:

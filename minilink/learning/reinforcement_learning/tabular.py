@@ -200,8 +200,8 @@ class TabularLearningPlanner(Planner):
 
         ``evaluate=True`` also rolls the law out from the problem's start and
         scores it over the problem's draws.
-        ``params`` (a partial tree of :attr:`params`) solves the planner
-        :meth:`at` it instead, this one unchanged.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) solves
+        the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
 
         # At another tree: the planner there, its solution kept here

@@ -394,14 +394,10 @@ def test_a_held_simulator_sweeps_a_parameter_with_one_compile():
     sim = Simulator(plant, tf=1.0, n_steps=101, solver="rk4_fixedsteps", backend="jax")
 
     finals = [
-        sim.solve(params=edited(sim.evaluator.params, {"m": m})).x[0, -1]
-        for m in (0.5, 1.0)
+        sim.solve(params=edited(sim.params, {"m": m})).x[0, -1] for m in (0.5, 1.0)
     ]
     compiles.clear()
-    more = [
-        sim.solve(params=edited(sim.evaluator.params, {"m": m})).x[0, -1]
-        for m in (1.5, 2.0)
-    ]
+    more = [sim.solve(params=edited(sim.params, {"m": m})).x[0, -1] for m in (1.5, 2.0)]
 
     assert len(compiles) == 0
     assert len({*finals, *more}) == 4
@@ -488,9 +484,9 @@ def test_a_tools_params_is_a_copy_and_passed_back_runs_there(backend):
 
     plant.x0 = np.array([0.5, 0.0])  # tilted: the mass shows in the swing
     sim = Simulator(plant, tf=0.5, n_steps=51, solver="rk4_fixedsteps", backend=backend)
-    q = sim.evaluator.params
+    q = sim.params
     q["m"] = 3.0
-    assert sim.evaluator.params["m"] == 1.0
+    assert sim.params["m"] == 1.0
     assert not np.allclose(sim.solve(params=q).x, sim.solve().x)
 
     program = MathematicalProgram(

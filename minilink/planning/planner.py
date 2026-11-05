@@ -83,9 +83,10 @@ class Planner(ABC):
         """
         The planner's tree: the problem's leaves by role, ``"method"`` its numbers, ``"seed"`` its seed.
 
-        ``solve(params=...)`` solves at a partial tree of it, and :meth:`at`
-        builds the planner there; the seed is ``None`` for a planner that draws
-        nothing.
+        Its problem parts are the problem's own dicts (live); ``solve(params=...)``
+        takes the complete tree, a copy edited (``copy.deepcopy(planner.params)``),
+        and solves on the planner rebuilt there (:func:`planner_at`); the seed is
+        ``None`` for a planner that draws nothing.
         """
         method = {name: getattr(self, name) for name in self.number_names}
 
