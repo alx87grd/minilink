@@ -271,3 +271,27 @@ the run log and a clean tree.
 - **Step 1 (cfe5fb1).** The identity-keeping property on `System` and the five bases. The
   suite caught the shallow-copy hazard in the sets' copy; fixed. Full pytest 2182 passed,
   baseline byte-identical.
+- **Step 2 (90fff37).** Values hold their numbers: 24 frozen dataclasses become plain
+  classes; three shared helpers in `core/params.py` (`param_view` for a leaf's attributes,
+  `held_params` for a composite value that holds its parts' trees and routes an assignment,
+  `delegated_params` for a wrapper). `with_params` removed everywhere. A partial entry for a
+  set inside a problem is still merged, checked by `merge_known`, until step 4. Deferred: the
+  keying of a union's members and a scene's obstacles by id instead of position (it changes
+  a recorded tree structure; left for a reviewed commit of its own). Six tests rewritten
+  from the copy verb to a deep copy and an edit, their assertions kept. **Flagged,
+  student-facing:** the parameters and sets tutorials' three code cells and their table rows
+  (executed). Full pytest 2187 passed, regression gates and demo bridge pass, baseline
+  byte-identical.
+- **Step 3 (f8f9ea0, 7534ad1).** A problem's own numbers held (`x0`, `t0`,
+  `discount_rate` views of its tree), its laws `problem.distributions` with the keyword
+  `distributions=` (ruling 2), a law written into its tree refused; the scaled cost holds its
+  weight; the sampled view writes through to its source; a diagram refuses a block added
+  twice. Two deviations, deliberate: the diagram and the sum keep their views (no own
+  numbers; a top-level part write cannot reach the part without the dict subclass ruling 4
+  rejected), and the planner's method numbers stay attributes (`solve(params=)` their
+  route). The problem's internal helpers (`parts_view`, `sample_params`,
+  `nominal_plant_params`, `drawn_paths`) stay for now. **Flagged, student-facing:** the
+  keyword in four notebooks and their prose (three tutorials executed; the RL-to-Bode
+  showcase still running at the time of this entry). Full pytest 2192 passed, baseline
+  byte-identical. A formatting slip reached the step's commit because a pipe hid the
+  format check's exit status; fixed in 7534ad1, and the gate now runs without a pipe.
