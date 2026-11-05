@@ -243,6 +243,7 @@ def run_bicycle_parametric(
     pv = planner.compile()
     tree = pv.params
     tree["x0"] = np.asarray(x0, dtype=float)
+    pv.solve(tree)  # the face compiles at its first call, once; the ticks are timed
 
     total_times: list[float] = []
     solve_times: list[float] = []
@@ -258,7 +259,7 @@ def run_bicycle_parametric(
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
         cost_val = float(plan.record.cost)
-        success = bool(plan.success)
+        success = bool(status["success"])  # the solver's flag, as a tick reports it
 
     assert traj is not None
     assert_simulation_finite(traj)
