@@ -156,32 +156,7 @@ class Trajectory(SampledSignals):
         """Final time."""
         return float(self.t[-1])
 
-    @property
-    def time_duration(self) -> float:
-        """Total covered time span ``tf - t0``."""
-        return float(self.tf - self.t0)
-
     # Signals
-
-    def with_signal(self, name: str, values: np.ndarray) -> Trajectory:
-        """
-        Return a new trajectory with one additional sampled signal.
-
-        Parameters
-        ----------
-        name : str
-            Signal name. Cannot be ``"x"`` or ``"u"``.
-        values : np.ndarray
-            Signal samples with shape ``(dim, N)``.
-        """
-        require_extra_channel(name)
-
-        new_signals = dict(self.signals)
-        new_signals[name] = values
-
-        return Trajectory(
-            t=self.t, x=self.x, u=self.u, signals=new_signals, roles=self.roles
-        )
 
     def with_signals(self, values: dict[str, np.ndarray]) -> Trajectory:
         """Return a new trajectory with multiple additional sampled signals."""
@@ -194,32 +169,23 @@ class Trajectory(SampledSignals):
             t=self.t, x=self.x, u=self.u, signals=new_signals, roles=self.roles
         )
 
-    # Samples at a time
+    # A value at a time
 
-    def sample(self, name: str, t: float) -> np.ndarray:
-        """Sample a signal by nearest time index."""
-        i = self.nearest_index(t)
-        return self.get_signal(name)[:, i]
+    def at(self, t, name="x"):
+        """
+        The value of one channel at time ``t``: ``traj.at(2.5)``, ``traj.at(2.5, "u")``, ``traj.at(2.5, "plant:u")``.
 
-    def t2x(self, t: float) -> np.ndarray:
-        """Return the state sample nearest to time ``t``."""
-        return self.sample("x", t)
+        Linear between the samples and held outside them, shape ``(dim,)``;
+        ``name`` is ``"x"``, ``"u"`` or a recorded signal.
+        """
+        values = self.get_signal(name)
+        xp = array_module(values)
 
-    def t2u(self, t: float) -> np.ndarray:
-        """Return the input sample nearest to time ``t``."""
-        return self.sample("u", t)
+        value = interpolate_schedule(xp, self.t, values.T, t)
 
-    # Copies and files
+        return value
 
-    def copy(self) -> Trajectory:
-        """Return a deep copy of the trajectory."""
-        return Trajectory(
-            t=self.t.copy(),
-            x=self.x.copy(),
-            u=self.u.copy(),
-            signals={name: values.copy() for name, values in self.signals.items()},
-            roles=self.roles,
-        )
+    # Files
 
     def save(self, path) -> None:
         """Save the sampled trajectory to an ``.npz`` file, its role layout with it."""
@@ -300,15 +266,6 @@ class Trajectory(SampledSignals):
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def nearest_index(self, t: float) -> int:
-        """Index of the time sample nearest to ``t``."""
-        t_samples = self.t
-
-        # i = argminₖ |t_k − t|
-        i = np.abs(t_samples - t).argmin()
-
-        return int(i)
 
 
 def interpolate_schedule(xp, t_samples, values, t):

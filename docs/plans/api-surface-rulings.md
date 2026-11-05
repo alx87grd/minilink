@@ -39,24 +39,6 @@ compiles for new numbers.
 Call-site counts below are files per tree at 2026-11-05 (`grep`), a guide for the size of each
 commit.
 
-## AR-4 `Trajectory` reads a value at a time with `traj.at(t, name="x")`
-
-One reader, **linearly interpolated** between samples (today's readers return the nearest
-sample), `name` defaulting to the state: `traj.at(2.5)`, `traj.at(2.5, "u")`,
-`traj.at(2.5, "controller:u")`. The interpolation already exists: `interpolate_schedule` in
-`core/trajectory.py` (linear between samples, held outside), which the gain-scheduled controllers
-(`control/state.py`) and the finite-horizon LQR already read; `traj.at` is that function on the
-record's samples, one transpose at the boundary. Landing it closes TODO's "one time-interpolation
-for trajectories and gain schedules" row outright (amended 2026-11-05, the maintainer's go).
-
-Gone (`core/trajectory.py`): `sample(name, t)` (it clashed with `sample(key)` on sets and laws,
-which draws), `t2x`, `t2u`, `with_signal` (use `with_signals({name: value})`), `time_duration`
-(`traj.tf - traj.t0`), `copy` (the record is frozen; no caller). User calls: three lines in the
-systems tutorial (01), `get_signal` stays.
-
-`at` here reads a value at a time on a record; it is unrelated to the planner copy verb `at` the
-parameters model removed.
-
 ## AR-6 A default start on the constructor, this solve's on `solve`; the solve time at the user's verb
 
 Amended 2026-11-05 (the maintainer's review): the constructors keep their default start, and the

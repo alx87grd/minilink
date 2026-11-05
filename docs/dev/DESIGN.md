@@ -780,7 +780,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
 
 - `Trajectory`: `t (N,)`, `x (n,N)`, `u (m,N)`, optional `signals`; array-module native
   (JAX arrays kept) and a JAX pytree, its reporting verbs (`t0`, `tf`, `resample`, `save`,
-  the plots) NumPy by contract; a loop's run carries `roles`, so `traj.of("plant")` is the
+  the plots) NumPy by contract; `traj.at(t, name="x")` reads one channel at a time, linear
+  between the samples and held outside (`interpolate_schedule`, the one time-interpolation
+  the gain schedules read too); a loop's run carries `roles`, so `traj.of("plant")` is the
   plant's run by static indexing.
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable

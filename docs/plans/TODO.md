@@ -137,7 +137,6 @@ maintainer would and logged in the run's record.
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.5 row.
 - [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
-  - one time-interpolation for trajectories and gain schedules;
   - one warm-start helper on the plan `Trajectory`;
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
 

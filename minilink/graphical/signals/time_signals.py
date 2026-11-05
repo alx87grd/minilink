@@ -111,7 +111,7 @@ def build_signal_plot_spec(
     for name in requested:
         if "/" in name.split(":", 1)[0] and not traj.has_signal(name):
             values, labels, units = nested_signal(sys, traj, name)
-            traj = traj.with_signal(name, values)
+            traj = traj.with_signals({name: values})
             nested[name] = (labels, units)
 
     # A block of this diagram: the signals the run did not record, and only those
@@ -134,7 +134,7 @@ def build_signal_plot_spec(
             continue
         sampled = system_channel_samples(sys, traj, name)
         if sampled is not None:
-            traj = traj.with_signal(name, sampled)
+            traj = traj.with_signals({name: sampled})
 
     traces = []
     internal_index = 0

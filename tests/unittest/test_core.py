@@ -753,3 +753,23 @@ def test_renaming_the_ports_of_a_sampled_view_keeps_the_source_ports():
     view = plant.discretize(0.01).rename_ports(y="theta")
     assert list(view.outputs) == ["theta", "x"] and view.outputs["theta"].id == "theta"
     assert list(plant.outputs) == ["y", "x"] and plant.outputs["y"].id == "y"
+
+
+def test_a_trajectory_reads_one_channel_at_a_time_linearly_between_its_samples():
+    from minilink.core.trajectory import Trajectory
+
+    traj = Trajectory(
+        t=np.array([0.0, 1.0, 2.0]),
+        x=np.array([[0.0, 2.0, 4.0], [1.0, 1.0, 1.0]]),
+        u=np.array([[0.0, 10.0, 20.0]]),
+        signals={"plant:u": np.array([[0.0, -1.0, -2.0]])},
+    )
+
+    # Linear between the samples, the state by default, any channel by name
+    np.testing.assert_allclose(traj.at(0.5), [1.0, 1.0])
+    np.testing.assert_allclose(traj.at(1.5, "u"), [15.0])
+    np.testing.assert_allclose(traj.at(1.25, "plant:u"), [-1.25])
+
+    # Held outside the samples
+    np.testing.assert_allclose(traj.at(-1.0), [0.0, 1.0])
+    np.testing.assert_allclose(traj.at(5.0, "u"), [20.0])

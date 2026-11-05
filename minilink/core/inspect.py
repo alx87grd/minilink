@@ -274,7 +274,7 @@ def solution_text(solution):
     else:
         trajectory = (
             f"{solution.trajectory.n_samples} samples over "
-            f"{solution.trajectory.time_duration:.3g} s"
+            f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
     success = "yes" if solution.success else "no"
