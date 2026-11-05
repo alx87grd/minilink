@@ -267,9 +267,9 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
 def compiled_loop(planner, stop_on_tol, max_sweeps):
     """The jitted whole value-iteration loop, compiled once per loop shape ``(stop_on_tol, max_sweeps)``; the discount and the tolerance are its arguments."""
     key = (bool(stop_on_tol), int(max_sweeps))
-    cached = planner.compiled.get(key)
-    if cached is not None:
-        return cached
+    compiled = planner.compiled.get(key)
+    if compiled is not None:
+        return compiled
 
     jax = ensure_jax_x64()
     jnp = jax.numpy
@@ -309,9 +309,9 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
 
 def jitted_step(planner):
     """The jitted single Bellman backup, compiled once per planner; the discount is its argument."""
-    cached = planner.compiled.get("step")
-    if cached is not None:
-        return cached
+    compiled = planner.compiled.get("step")
+    if compiled is not None:
+        return compiled
 
     jax = ensure_jax_x64()
     jnp = jax.numpy
