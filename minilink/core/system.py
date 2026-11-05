@@ -11,6 +11,7 @@ from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
 from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
 from minilink.core.facades.simulation import DynamicSimulation, SystemSimulation
 from minilink.core.inspect import inspect_text
+from minilink.core.params import own_params
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
 if TYPE_CHECKING:
@@ -76,6 +77,11 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     #: touching ``f``/``tf`` (``skin`` is to ``get_kinematic_geometry`` as
     #: ``params`` is to ``f``).
     skin = None
+
+    #: The block's numbers: one dict, kept by identity when a new one is assigned
+    params = own_params(
+        "The block's numbers: a dict of floats and arrays (``{}`` for none), read when a call passes ``params=None``."
+    )
 
     #: Whether the block draws random numbers from a seed in its ``params``.
     is_random = False

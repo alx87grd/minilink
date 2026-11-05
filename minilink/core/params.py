@@ -29,13 +29,23 @@ def own_params(
 
     Read, it is the instance's own tree, or a new empty dict for an instance
     that holds none (nothing is written on read, and no dict is shared between
-    instances); assigned, it becomes the instance's own.
+    instances). Assigned a dict, it declares the instance's numbers anew in the
+    dict it already holds: that dict keeps its identity, so a composite holding
+    it (``{"plant": plant.params}``) stays current. The first assignment, or
+    anything but a dict, is stored as given.
     """
 
     def get(self):
         return self.__dict__.get("params", {})
 
     def set_(self, value):
+        own = self.__dict__.get("params")
+        if type(own) is dict and type(value) is dict and own is not value:
+            # The new numbers in the held dict: every holder sees them
+            fresh = dict(value)
+            own.clear()
+            own.update(fresh)
+            return
         self.__dict__["params"] = value
 
     return OwnParams(get, set_, doc=doc)

@@ -84,8 +84,9 @@ class Set(ABC):
             return self
         if not self.params:
             raise TypeError(f"{type(self).__name__} holds no parameters")
+        # The copy's own tree: a shallow copy shares the dict an assignment writes into
         moved = copy.copy(self)
-        moved.params = params
+        vars(moved)["params"] = params
         return moved
 
     def as_cost(self, *, weight: float = 1.0, shaping: Callable | None = None):
@@ -169,8 +170,9 @@ class InputSet(ABC):
             return self
         if not self.params:
             raise TypeError(f"{type(self).__name__} holds no parameters")
+        # The copy's own tree: a shallow copy shares the dict an assignment writes into
         moved = copy.copy(self)
-        moved.params = params
+        vars(moved)["params"] = params
         return moved
 
     # Display

@@ -176,3 +176,26 @@ def test_a_sum_given_none_reads_its_terms_own_numbers():
     x, u = np.array([0.3, -0.2]), np.array([0.4])
 
     assert total.g(x, u, 0.1) == total.g(x, u, 0.1, total.params)
+
+
+# One params property: an assignment keeps the dict a composite holds
+
+
+def test_a_held_tree_stays_current_after_an_assignment():
+    plant = Pendulum()
+    loop = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ plant
+    held = {"plant": plant.params}
+
+    plant.params = {**plant.params, "m": 7.0}
+
+    assert held["plant"]["m"] == 7.0
+    assert loop.params["plant"] is plant.params
+
+
+def test_assigning_an_object_its_own_tree_keeps_it():
+    plant = Pendulum()
+    numbers = dict(plant.params)
+
+    plant.params = plant.params
+
+    assert plant.params == numbers
