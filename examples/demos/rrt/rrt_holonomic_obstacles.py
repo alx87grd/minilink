@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink import (
     BallSet,
-    BoxSet,
     HolonomicMobileRobot,
     PlanningProblem,
     RRTPlanner,
@@ -67,7 +66,7 @@ def make_holonomic_problem(*, robot_radius=0.25):
 
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
     body = mount(disc(robot_radius), on=sys)
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
+    X = sys.state.box & scene.clearance_field(body).as_set()
     problem = PlanningProblem(sys=sys, x0=X_START, X=X, U=sys.input_box)
     return sys, scene, body, problem
 

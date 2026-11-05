@@ -51,6 +51,7 @@ def problem(**kwargs):
     return PlanningProblem(
         plant,
         cost=HangCost(),
+        U=plant.input_box,
         X=plant.state.box,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         **kwargs,
@@ -230,6 +231,7 @@ def test_the_discount_has_one_owner_and_an_announced_default():
     discounted = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
+        U=bounded_pendulum().input_box,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
@@ -277,6 +279,7 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     noisy = PlanningProblem(
         bounded_pendulum(NoisyPendulum()),
         cost=HangCost(),
+        U=bounded_pendulum(NoisyPendulum()).input_box,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.1)},
     )
@@ -503,6 +506,7 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     worst = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
+        U=bounded_pendulum().input_box,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         criterion="worst_case",
     )
@@ -729,6 +733,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     prob = PlanningProblem(
         bounded_pendulum(),
         cost=HangCost(),
+        U=bounded_pendulum().input_box,
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )

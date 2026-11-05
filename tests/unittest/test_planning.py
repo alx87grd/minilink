@@ -827,7 +827,7 @@ def test_kdtree_requires_euclidean_metric():
         sys=sys,
         x0=np.array([-3.0, -3.0, 0.0]),
         Xf=SingletonSet(np.array([3.0, 3.0, np.pi / 2])),
-        X=BoxSet.from_system_state(sys),
+        X=sys.state.box,
         U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
@@ -980,7 +980,7 @@ def test_dubins_rrt_reaches_goal_pose():
     sys = make_dubins_problem()
     x0 = np.array([-3.0, -3.0, 0.0])
     x_goal = np.array([3.0, 3.0, np.pi / 2])
-    X = BoxSet.from_system_state(sys)
+    X = sys.state.box
     problem = PlanningProblem(
         sys=sys,
         x0=x0,

@@ -57,13 +57,6 @@ g.full_cov                       g.cov
 `sample(key, n=None, params=None)` exists on every law today; `key=None` returns the mean, so no
 signature changes.
 
-## AR-3 Boxes: two spellings, `U=` takes a box
-
-The boxes are `sys.state.box` and `sys.input_box`; `PlanningProblem(U=...)` accepts a `BoxSet`
-over the inputs as well as a `BoxInputSet` (today it refuses one). `BoxSet.from_system_state`,
-`BoxInputSet.from_system_inputs` and `from_bounds` go (callers: 6 examples, 3 tests, 1 benchmark
-for the first; about 13 lines in all). A box from numbers is `BoxSet(lower, upper)`.
-
 ## AR-4 `Trajectory` reads a value at a time with `traj.at(t, name="x")`
 
 One reader, **linearly interpolated** between samples (today's readers return the nearest

@@ -6,7 +6,6 @@ import numpy as np
 
 from minilink import (
     BallSet,
-    BoxSet,
     HolonomicMobileRobot,
     PlanningProblem,
     RRTStarPlanner,
@@ -48,7 +47,7 @@ scene = Scene(
     )
 )
 body = mount(disc(0.22), on=sys)
-X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
+X = sys.state.box & scene.clearance_field(body).as_set()
 
 x0 = np.array([-4.5, -4.5])
 x_goal = np.array([4.5, 4.5])

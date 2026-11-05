@@ -1160,7 +1160,7 @@ among them, as the offline `Optimizer` does (OPW-1).
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`), cost, the continuous `horizon` and its start `t0` (the
+`U=plant.input_box`, or a `BoxSet` over the inputs, wrapped), cost, the continuous `horizon` and its start `t0` (the
 horizon is `[t0, t0 + tf]`, `0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
 transcriptions are `t0 + linspace(0, tf, N)`; a leaf of `problem.params` and of the

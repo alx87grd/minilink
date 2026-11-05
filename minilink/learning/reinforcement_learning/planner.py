@@ -11,6 +11,8 @@ import numpy as np
 
 from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
+from minilink.core.roles import command_port
+from minilink.core.sets import BoxSet
 from minilink.core.trajectory import Trajectory
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
@@ -194,6 +196,7 @@ class ReinforcementLearningPlanner(Planner):
         # bound to the algorithm with the one discount
         self.controller = policy or NeuralPolicy(
             problem.sys,
+            input_box=require_finite_input_box(problem),
             features=features,
             hidden=hidden,
             activation=activation,
@@ -782,6 +785,29 @@ class ReinforcementLearningRecord:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_finite_input_box(problem):
+    """Refuse a problem whose ``U`` has no finite box on the command port: the default policy's action spans it."""
+    plant = problem.sys
+    command = plant.get_input_port_slice(command_port(plant))
+    box = problem.U.bounding_box()
+    if box is None:
+        raise ValueError(
+            "ReinforcementLearningPlanner needs an input set with a bounding box: "
+            "U=plant.input_box"
+        )
+
+    # The command port's slice of the problem's input box
+    lower = np.asarray(box.lower, dtype=float)[command]
+    upper = np.asarray(box.upper, dtype=float)[command]
+    if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+        raise ValueError(
+            "ReinforcementLearningPlanner needs finite input bounds on the problem, "
+            "the box its default policy's action spans: U=plant.input_box"
+        )
+
+    return BoxSet(lower, upper)
 
 
 def snapshot_of(controller):

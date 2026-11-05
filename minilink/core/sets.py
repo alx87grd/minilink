@@ -187,11 +187,6 @@ class BoxSet(Set):
         """Dimension of the boxed vector."""
         return int(np.size(self.lower))
 
-    @classmethod
-    def from_system_state(cls, sys) -> "BoxSet":
-        """The state box of ``sys``: its state bounds (``sys.state.box``)."""
-        return sys.state.box
-
     def margin(self, z, t=0.0, params=None):
         """Return the margins to the lower and upper faces, shape ``(2n,)``."""
         params = self.params if params is None else params
@@ -247,20 +242,6 @@ class BoxInputSet(InputSet):
 
     def __init__(self, box: BoxSet):
         self.box = box
-
-    @classmethod
-    def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> "BoxInputSet":
-        """Create an input box from lower and upper arrays."""
-        return cls(BoxSet(lower, upper))
-
-    @classmethod
-    def from_system_inputs(cls, sys) -> "BoxInputSet":
-        """The input box of ``sys``: its input ports' bounds, stacked in port order."""
-        boxes = [port.box for port in sys.inputs.values()]
-        lower = np.concatenate([box.lower for box in boxes]) if boxes else np.zeros(0)
-        upper = np.concatenate([box.upper for box in boxes]) if boxes else np.zeros(0)
-
-        return cls(BoxSet(lower, upper))
 
     def margin(self, u, x=None, t=0.0, params=None):
         """Return the margins to the input box faces, shape ``(2m,)``."""

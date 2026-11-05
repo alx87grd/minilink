@@ -62,6 +62,9 @@ class NeuralPolicy(System):
     ``[-1, 1]`` maps onto the ``u`` port bounds, which is what makes
     exploration cover the whole input range from the first step.
 
+    ``input_box`` is the action box the normalized action spans (the plant's
+    command port's bounds by default).
+
     Optional visualization: ``show_setpoint=True`` draws a ball at the
     commanded set-point (``forward_kinematics(r)`` when the action is a
     joint reference, or the action itself when it is already a task point).
@@ -84,6 +87,7 @@ class NeuralPolicy(System):
         setpoint_radius=0.04,
         task_target=None,
         task_target_radius=0.04,
+        input_box=None,
     ):
         super().__init__()
         if name is not None:
@@ -104,11 +108,12 @@ class NeuralPolicy(System):
         self.squash = squash
 
         # The plant's state box, and the box of the input port the law drives
+        # (the given one, else the port's own bounds)
         port = sys.inputs[command_port(sys)]
         n = int(sys.n)
         m = int(port.dim)
         x_box = sys.state.box
-        u_box = port.box
+        u_box = port.box if input_box is None else input_box
         x_lb = x_box.lower
         x_ub = x_box.upper
         u_lb = u_box.lower

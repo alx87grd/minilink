@@ -98,7 +98,7 @@ class PlanningProblem:
         failure. Unconstrained by default (the whole state space); pass
         ``X=sys.state.box`` to constrain the plant to its declared state range,
         or any set (``sys.state.box & free``).
-    U : InputSet, optional
+    U : InputSet or BoxSet, optional
         Input constraint ``u(t) in U(x, t)``: a hard constraint, like ``X``.
         Unconstrained by default; pass ``U=sys.input_box`` to constrain the input
         to its ports' declared range. A planner that needs a finite box (value
@@ -245,6 +245,8 @@ class PlanningProblem:
         # Xf as given (none by default)
         X = unconstrained(n) if self.X is None else self.X
         U = BoxInputSet(unconstrained(int(self.sys.m))) if self.U is None else self.U
+        if isinstance(U, Set):
+            U = BoxInputSet(require_input_box(U))
         X0 = SingletonSet(x0) if self.X0 is None else self.X0
         Xf = self.Xf
 
@@ -1189,3 +1191,14 @@ def coerce_rate(rate) -> float:
 def unconstrained(n):
     """The whole state space as a set: no constraint on ``x``."""
     return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
+
+
+def require_input_box(U):
+    """Refuse a state set as ``U`` unless it is a box: the input box is state-independent."""
+    if U.bounding_box() is not U:
+        raise TypeError(
+            "U given as a Set must be a box over the inputs, BoxSet(lower, upper); "
+            "a state-dependent input set is an InputSet"
+        )
+
+    return U

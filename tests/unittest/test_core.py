@@ -506,7 +506,6 @@ class TestForgottenSuperInit(unittest.TestCase):
 
 
 def test_signal_box_is_derived_from_the_bounds():
-    from minilink.core.sets import BoxInputSet
 
     signal = VectorSignal("x", dim=2, lower_bound=[-1.0, -2.0], upper_bound=[1.0, 2.0])
     np.testing.assert_allclose(signal.box.lower, [-1.0, -2.0])
@@ -517,7 +516,7 @@ def test_signal_box_is_derived_from_the_bounds():
     sys.add_input_port("w", dim=2, lower_bound=[-0.5, -0.5], upper_bound=[0.5, 0.5])
     sys.inputs["u"].lower_bound = np.array([-5.0])
     sys.inputs["u"].upper_bound = np.array([5.0])
-    U = BoxInputSet.from_system_inputs(sys)
+    U = sys.input_box
     np.testing.assert_allclose(U.box.lower, [-5.0, -0.5, -0.5])
     np.testing.assert_allclose(U.box.upper, [5.0, 0.5, 0.5])
 

@@ -8,7 +8,7 @@ from minilink.blocks.sources import WhiteNoise
 from minilink.core.closed_loop import closed_loop
 from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Uniform
-from minilink.core.sets import BallSet, BoxInputSet
+from minilink.core.sets import BallSet, BoxSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
 from minilink.planning.evaluator import closed_loop_of, evaluate
@@ -33,7 +33,7 @@ def upright_problem(**fields):
         sys, x_bar=np.array([np.pi, 0.0]), R=0.01 * np.eye(1)
     )
     fields.setdefault("horizon", 2.0)
-    fields.setdefault("U", BoxInputSet.from_bounds([-50.0], [50.0]))
+    fields.setdefault("U", BoxSet([-50.0], [50.0]))
     return PlanningProblem(sys, cost=cost, **fields)
 
 
@@ -208,7 +208,7 @@ def stochastic_problem(**fields):
         sys=sys,
         cost=cost,
         horizon=1.0,
-        U=BoxInputSet.from_bounds([-50.0], [50.0]),
+        U=BoxSet([-50.0], [50.0]),
         x0=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
         distributions={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,

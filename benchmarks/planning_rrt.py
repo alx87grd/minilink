@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BallSet, BoxSet
+from minilink.core.sets import BallSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.search.extenders import SteeringExtender
@@ -75,7 +75,7 @@ def holonomic_problem():
         )
     )
     body = mount(disc(0.25), on=sys)
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
+    X = sys.state.box & scene.clearance_field(body).as_set()
     x_goal = np.array([4.0, 4.0])
     problem = PlanningProblem(
         sys=sys,

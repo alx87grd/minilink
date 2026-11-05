@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from minilink import (
-    BoxSet,
     HolonomicMobileRobot,
     PlanningProblem,
     QuadraticCost,
@@ -92,7 +91,7 @@ track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH
 body = mount(disc(ROBOT_RADIUS), on=sys)
 
 X = (
-    BoxSet.from_system_state(sys)
+    sys.state.box
     & scene.clearance_field(body).as_set()
     & track.corridor_field(body).as_set(lower=0.0)
 )

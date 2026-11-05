@@ -146,7 +146,7 @@ class StateSpaceGrid:
     @property
     def U(self) -> BoxInputSet:
         """The input box the grid's actions span, ``u_lb ≤ u ≤ u_ub``."""
-        return BoxInputSet.from_bounds(self.u_lb, self.u_ub)
+        return BoxInputSet(BoxSet(self.u_lb, self.u_ub))
 
     # Dynamics and validity
 
