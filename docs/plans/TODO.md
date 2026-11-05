@@ -290,8 +290,8 @@ commit per proposal, its callers and DESIGN in the same change.
   spellings, `U=` a box; `traj.at(t, name)`; `jacobian` an array everywhere, one name; a default start on the
   constructor and this solve's on `solve`, the solve time recorded at the user's verb, never in
   a traced solve; `traj.of("plant")` on both loop kinds, with a
-  continuous run recording its signals from its own pass (benchmarked first); one simulate verb,
-  inputs `(m, N)`; two replanning routes, the start-only route removed. One branch, one commit per
+  continuous run recording its signals from its own pass (benchmarked first); the forced run folded into
+  `compute_trajectory(u=)`, the rollout and its plot kept beside it, inputs `(m, N)` at the facade; two replanning routes, the start-only route removed. One branch, one commit per
   ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
   deleted.
 - [ ] **A continuous run records its signals from its own pass** (was the companion of the
