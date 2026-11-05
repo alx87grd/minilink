@@ -918,7 +918,7 @@ def test_a_start_set_that_cannot_draw_is_refused():
         PlanningProblem(plant(), x0=BallSet(np.zeros(2), 1.0), horizon=1.0)
 
 
-def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
+def test_the_failure_cost_follows_the_overridden_weights():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     problem = PlanningProblem(
@@ -947,10 +947,13 @@ def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
         2.0 * own_cost, rel=1e-12
     )  # the bound scales with g
 
-    # Cached by the value: the same weights again sample g no more
+    # The compile's own numbers (a call with no tree) take the bound of the build and
+    # sample g no more
     n_calls = len(calls)
-    pe.evaluate(edited(pe.params, doubled))
-    pe.evaluate(edited(pe.params, doubled))
+    assert pe.failure_cost_and_bound(pe.merged(None)) == (
+        pe.failure_cost,
+        pe.cost_bound,
+    )
     assert len(calls) == n_calls
 
 

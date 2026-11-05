@@ -44,8 +44,9 @@ class Transcription(ABC):
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> MathematicalProgram:
-        """Convert ``problem`` into a finite-dimensional mathematical program."""
+        """Convert ``problem`` into a finite-dimensional mathematical program; ``dynamics`` the compiled ``(x, u, t) -> f`` when the caller holds one."""
         ...
 
     @abstractmethod
@@ -64,8 +65,9 @@ class Transcription(ABC):
         *,
         problem: PlanningProblem,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> Trajectory:
-        """Convert an optimizer result back into a trajectory."""
+        """Convert an optimizer result back into a trajectory; ``dynamics`` the compiled ``(x, u, t) -> f`` when the caller holds one."""
         ...
 
     @abstractmethod

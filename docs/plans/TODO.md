@@ -28,7 +28,7 @@ agent starts. They are details, versions and demos, not design questions (those 
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
 **The API surface rulings have the go** (§1.11, ruled 2026-11-05: each ruling is taken, build it as
-written), and so does **No cache left** (§1.11, internal structure under DESIGN §4 rule 6).
+written).
 
 **The core's leftover rows have the go**: every row of §1.1 to §1.10 is cleared to start under its
 "done when"; the internal choices an agent meets (the default output stub's type under JAX, the
@@ -84,14 +84,12 @@ maintainer would and logged in the run's record.
    (`api-surface-rulings-review`), one commit per ruling, with the small rows the plan doc's
    "What the branch also carries" lists. Cleared to start; the signal-recording companion is its
    own row after it.
-2. **No cache left** (§1.11): the problem evaluator, value iteration and the Lyapunov analysis
-   rebuilt in their verbs or snapshotted at build. On the same branch, after the rulings.
-3. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical. On the
+2. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical. On the
    same branch, after the rulings.
-4. **The decisions waiting for the maintainer** before their rows can start: the core API
+3. **The decisions waiting for the maintainer** before their rows can start: the core API
    proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
    §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
-5. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
+4. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
    merge to `main`, `0.4.0`.
 
 **How the work flows.**
@@ -318,19 +316,6 @@ commit per proposal, its callers and DESIGN in the same change.
   - a union's members and a scene's obstacles keyed by id, else class name numbered, rather
     than by position (it changes a recorded tree's keys).
   Done when each has landed or been dropped.
-- [ ] **No cache left** (DESIGN §4 rule 6, "Minilink keeps no cache"; the trajectory planner's
-  saved program and its transcription's held plant went 2026-11-05). Hidden state that decides
-  by itself when to rebuild, keyed on an identity or a digest, still lives in:
-  - the problem evaluator: its run and trial functions jitted again when a problem part is
-    replaced (`planning/evaluator.py`, `problem_parts`/`replaced`), and the failure cost kept
-    under a numbers key and a digest of the live boxes (DESIGN "once per value (cached)");
-  - value iteration: `_G`, `_jax_cache`, `_cached_numbers` and `forget_stale_caches`
-    (`dp.py`, `dp_jax.py`), keyed on option numbers, so a cost edit inside the problem is not
-    seen; its transition tables are built at construction (a held tool, to say so);
-  - `analysis/lyapunov.py`: jitted forms keyed on a digest of the point;
-  Each: rebuilt in the convenience verb, or snapshotted at the held tool's build. Also: one
-  planner solve compiles its plant up to three times (transcribe, read-back, iterate history),
-  once would do. Done when no identity or digest key decides a rebuild.
 - [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
   diagram's re-stacks the state layout after a block's state size changes, the sampled view and
   the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)

@@ -479,7 +479,7 @@ One model for every object, in seven rules:
    frozen form compiled the snapshot as constants); nothing reads the objects or compares
    trees per call. A convenience call (`compute_trajectory`, `problem.compile`,
    `planner.solve`) builds each time, so it sees every edit, and keeps nothing but its last
-   answer: Minilink keeps no cache (the ones left are TODO's "No cache left" row). A held
+   answer: Minilink keeps no cache. A held
    tool is the fast route for repeated calls: its pure functions (`pv.solve`, `shift`,
    `command`, `prediction`) compile once, at the build or the first call, and never for new
    numbers, which are their arguments (`tests/unittest/test_no_recompile.py`); a NumPy program
@@ -1160,9 +1160,9 @@ n_iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
 jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
 the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
 iterates. The failure cost of
-an evaluation follows its cost's numbers: the bound is taken at the overridden weights,
-once per value (cached), and under a trace at the problem's own (a failure cost is a step, with no
-gradient). One method table
+an evaluation follows its cost's numbers: the bound of the build at the compile's numbers, one
+computed for the call at other weights, and under a trace the build's (a failure cost is a step,
+with no gradient). One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
 (`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
 among them, as the offline `Optimizer` does (OPW-1).

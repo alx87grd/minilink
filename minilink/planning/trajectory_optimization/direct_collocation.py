@@ -58,6 +58,7 @@ class DirectCollocationTranscription(Transcription):
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> MathematicalProgram:
         """Build the trapezoidal collocation nonlinear program."""
         # The JAX backend builds the same program, vectorized over the knots
@@ -65,7 +66,8 @@ class DirectCollocationTranscription(Transcription):
             return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        dynamics = dynamics_function(problem, backend)
+        if dynamics is None:
+            dynamics = dynamics_function(problem, backend)
 
         # Dynamics: the trapezoidal defect of every interval vanishes
         equalities: list[ConstraintFunction] = [

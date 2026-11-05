@@ -218,9 +218,13 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The problem transcribed into a program and compiled into an optimizer, every
         # solve (a convenience verb builds; a held compiled planner is planner.compile());
-        # the seed packed into its z0
+        # the plant compiled once for the transcription, the read-back and the
+        # iterates; the seed packed into its z0
         transcribe_t0 = time.perf_counter()
-        program = self.transcription.transcribe(problem, backend=backend)
+        dynamics = dynamics_function(problem, backend)
+        program = self.transcription.transcribe(
+            problem, backend=backend, dynamics=dynamics
+        )
         transcribe_s = time.perf_counter() - transcribe_t0
         seed = decision_vector_of(seed, program)
         z0 = self.transcription.pack_initial_guess(problem, seed)
@@ -244,7 +248,9 @@ class TrajectoryOptimizationPlanner(Planner):
         optimization_result = optimizer.solve(
             params=None if method is None else {**optimizer.params, "method": method},
             z0=z0,
-            callback=self.build_callback(optimizer, problem, backend, history),
+            callback=self.build_callback(
+                optimizer, problem, backend, history, dynamics
+            ),
             verbose=False,
         )
         reconstruct_t0 = time.perf_counter()
@@ -252,6 +258,7 @@ class TrajectoryOptimizationPlanner(Planner):
             optimization_result,
             problem=problem,
             backend=backend,
+            dynamics=dynamics,
         )
         reconstruct_s = time.perf_counter() - reconstruct_t0
         total_s = time.perf_counter() - workflow_t0
@@ -395,8 +402,9 @@ class TrajectoryOptimizationPlanner(Planner):
         problem: PlanningProblem,
         backend: str,
         history: list,
+        dynamics,
     ) -> OptimizationProgressCallback | None:
-        """The optimizer's progress hook (``history`` appended to, live plot, user callback), or ``None``."""
+        """The optimizer's progress hook (``history`` appended to, live plot, user callback) on the solve's compiled ``dynamics``, or ``None``."""
         callback = self.callback
 
         # The live figure, beside the user's callback when there is one
@@ -419,9 +427,6 @@ class TrajectoryOptimizationPlanner(Planner):
         if not self.record_history and callback is None:
             return None
 
-        # One dynamics callable for every iterate (reconstruct_result would
-        # otherwise compile the plant again on each optimizer step).
-        dynamics = dynamics_function(problem, backend)
         iteration_index = 0
 
         def planner_progress(z: np.ndarray, J: float, _t: float) -> None:

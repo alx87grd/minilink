@@ -29,7 +29,6 @@ from minilink.core.params import (
     require_complete,
     set_leaf,
     split_path,
-    tree_digest,
     with_leaf,
 )
 from minilink.core.sets import is_bounded
@@ -145,15 +144,23 @@ class ProblemEvaluator:
         require_free_names(self.free_inputs, self.block_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
-        # The forms generated once: the batched trial, jitted on JAX; the failure
-        # and bound of each value of the cost's numbers
+        # The forms generated once: the run and the batched trial, jitted on JAX
+        # at their first call, by batch layout
         self.trials_fn = {}
         self.run_fn = None
-        self.failure_cost_cache = {}
 
         # The run's numbers, taken now: a held evaluator runs on them unless a call
         # gives a tree (a later edit of the problem is a new compile's)
         self.defaults = self.tree_of_objects()
+
+        # The failure cost and the cost bound at the compile's numbers (a call at
+        # other numbers computes its own)
+        self.failure_cost = failure_cost_of(
+            problem, self.tf, None, problem.discount_rate
+        )
+        self.cost_bound = diverged_cost_of(
+            problem, self.tf, self.failure_cost, None, problem.discount_rate
+        )
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
         if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
@@ -376,54 +383,38 @@ class ProblemEvaluator:
         return canonical_tree(params, defaults)
 
     def run_compiled(self, params, x0):
-        """:meth:`run` jitted once per problem parts: the recorded run in one dispatch."""
+        """:meth:`run` jitted once, at its first call: the recorded run in one dispatch."""
         jax = ensure_jax_x64()
 
-        parts = problem_parts(self.problem)
-        if self.run_fn is None or replaced(self.run_fn[1], parts):
-            self.run_fn = (jax.jit(self.run), parts)
-        run, _ = self.run_fn
+        if self.run_fn is None:
+            self.run_fn = jax.jit(self.run)
 
-        return run(params, np.asarray(x0, dtype=float))
+        return self.run_fn(params, np.asarray(x0, dtype=float))
 
     def failure_cost_and_bound(self, params):
         """
         The cost of a failure and the cost bound of a run not finite, at the cost's numbers of ``params``.
 
-        The bound follows the overridden weights: it is computed once per value
-        of the cost's leaves and cached by it (and by the problem's parts and
-        failure switch, which may be replaced after the compile), since each bound
-        samples ``g`` over the boxes. Under a trace the weights have no value, and the bound
-        is the problem's own (a failure cost is a step: it carries no gradient).
+        The compile's numbers give the bound taken at the build; a tree with other
+        cost weights or another discount rate computes its own for this call
+        (each bound samples ``g`` over the boxes). Under a trace the weights have
+        no value, and the bound is the compile's (a failure cost is a step: it
+        carries no gradient).
         """
         problem = self.problem
         cost_params = params.get("cost")
-        numbers = numbers_key(cost_params)
-        if numbers is None:
-            cost_params, numbers = None, "own"
-
-        # The evaluation's discount rate, when it has a value (a traced one bounds at
-        # the problem's)
         rate = params.get("discount_rate", problem.discount_rate)
-        rate = float(rate) if is_concrete_number(rate) else problem.discount_rate
+        own_numbers = params is self.defaults
+        traced = numbers_key(cost_params) is None or not is_concrete_number(rate)
+        if own_numbers or traced:
+            return self.failure_cost, self.cost_bound
 
-        # The key: the failure switch and cost, the rate and the numbers; the entry holds the
-        # parts it was taken on, so a part replaced since takes a new bound
-        parts = problem_parts(problem)
-        key = (
-            problem.penalize_failure,
-            problem.failure_cost,
-            rate,
-            numbers,
-            tree_digest(boxes_params(problem)),
+        failure_cost = failure_cost_of(problem, self.tf, cost_params, float(rate))
+        bound = diverged_cost_of(
+            problem, self.tf, failure_cost, cost_params, float(rate)
         )
-        cached = self.failure_cost_cache.get(key)
-        if cached is None or replaced(cached[0], parts):
-            failure_cost = failure_cost_of(problem, self.tf, cost_params, rate)
-            bound = diverged_cost_of(problem, self.tf, failure_cost, cost_params, rate)
-            cached = self.failure_cost_cache[key] = (parts, failure_cost, bound)
 
-        return cached[1:]
+        return failure_cost, bound
 
     def realize(self, params, key, n_trials):
         """
@@ -617,26 +608,22 @@ class ProblemEvaluator:
         return self.run_trials_numpy(params, x0s, record, failure_cost, bound)
 
     def run_trials_jax(self, params, x0s, record, failure_cost, bound):
-        """The trials as one ``vmap`` of the run, jitted once per batch layout and problem parts."""
+        """The trials as one ``vmap`` of the run, jitted once per batch layout."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
 
-        # The batched axes: a drawn leaf carries the trial axis, the others are shared.
-        # The trace reads the problem's cost and sets, so a part replaced on the
-        # problem traces anew, in place of the entry it replaces
+        # The batched axes: a drawn leaf carries the trial axis, the others are shared;
+        # one jitted form per layout, a structure
         tree, axes = batch_axes(params)
-        parts = problem_parts(self.problem)
         layout = (record, tree_signature(axes))
-        cached = self.trials_fn.get(layout)
-        if cached is None or replaced(cached[1], parts):
+        if layout not in self.trials_fn:
             batched = jax.vmap(
                 lambda p, x0, c, b: self.score(p, x0, record, c, b),
                 in_axes=(axes, 0, None, None),
             )
-            self.trials_fn[layout] = (jax.jit(batched), parts)
+            self.trials_fn[layout] = jax.jit(batched)
 
-        trials_fn, _ = self.trials_fn[layout]
-        rows, trajs = trials_fn(tree, x0s, failure_cost, bound)
+        rows, trajs = self.trials_fn[layout](tree, x0s, failure_cost, bound)
 
         return rows, unbatch(trajs, x0s.shape[0]) if record else None
 
@@ -1126,33 +1113,6 @@ def is_concrete_number(value) -> bool:
         return False
 
     return True
-
-
-def boxes_params(problem) -> dict:
-    """The numbers of the sets a failure bound samples ``g`` over, by role."""
-    return {
-        role: getattr(set_, "params", None)
-        for role in ("X", "U")
-        if (set_ := getattr(problem, role)) is not None
-    }
-
-
-def problem_parts(problem):
-    """The objects a trial's trace reads from the problem: its cost, its sets, its start and its disturbances."""
-    return (
-        problem.cost,
-        problem.X,
-        problem.U,
-        problem.Xf,
-        problem.X0,
-        problem.start_law,
-        problem.disturbances,
-    )
-
-
-def replaced(cached_parts, parts) -> bool:
-    """Whether a part of the problem was replaced since a form was generated on ``cached_parts`` (by identity)."""
-    return any(a is not b for a, b in zip(cached_parts, parts))
 
 
 def horizon_of(problem, episode_length):
