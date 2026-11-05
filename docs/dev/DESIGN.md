@@ -435,27 +435,66 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
 
 ### Parameters
 
-- `params is None` → `self.params`; any other value overrides (never
-  `params or self.params`).
-- **One contract for every core math object.** Its mathematics is a function of its
-  arguments and `params` (`f`, `h`, `step`, `g`, `margin`, `value`, `sample`); it has a
-  `params` dict, `{}` when it has none; a composed object's `params` is its parts' dicts, by a
-  dotted path; the leaves are numbers and numeric arrays, an integer leaf (a seed) never in
-  `wrt`; every function is deterministic given its parameters, the seed among them.
-  `tests/unittest/test_contract.py` walks every public system, cost, set and law on both
-  backends (`params=None` its defaults, the same values twice, the JAX numbers the NumPy ones,
-  a finite gradient through a float leaf). Every number that is not structure is a leaf: a field's numbers are leaves of the set's and the cost's tree (`{"field": …}`, a
-  shaping's under `"shaping"`), a shape's and a path's of the scene's and the track's, an LTI
-  block's matrices of its own (`{"A", "B", "C", "D"}`), a lookup policy's table and levels, a
-  replayed signal's times and values, a model-based law's model under `"model"`. A number
-  stays out only for a written structural reason: a size, a count, a choice of method, a
-  boolean switch, a clock's period (it decides the plan), a summing junction's signs, the
-  action box of a neural policy (the plant's input bounds), the drawn geometry of a skin
-  (link lengths drawn, wheel tracks), an LTI model's operating point (it never enters `f`).
-  The other written exceptions: the abstract shells and the diagrams (their `params` are their
-  blocks', walked as blocks); `Trajectory` (a record, not a function); a hand-written
-  `MathematicalProgram` without `params` (`J(z)` alone); a student-written model (RULES 2.3). A base class's
-  `params` is each instance's own dict (`{}` until it assigns one), never one shared dict.
+One model for every object, in seven rules:
+
+1. **Every object has `params`**, one dict of its numbers, `{}` when it has none (the one
+   `None` is `MathematicalProgram.params`, a `J(z)` signature on a record); its mathematics
+   reads that dict when a call passes `params=None` (never `params or self.params`).
+2. **A composite holds its parts' own dicts at the parts' keys**, beside its own numbers, so
+   every number has one home and a write anywhere lands in it: `loop.params["plant"] is
+   plant.params`, `problem.params["X"] is problem.X.params`. Keys are diagram ids, cost term
+   ids, problem roles, a scaled cost's `"cost"`, an intersection's or a union's members by
+   position. A composite value (an intersection, a field set, a field cost, a union, an
+   inflated shape, a track, a scene, a state field, a scaled cost) holds its parts' trees by
+   reference (`held_params`); a wrapper is what it wraps (`delegated_params`: an input box its
+   box, a uniform law its box, a margin field its set, a sampled view its source); a diagram
+   and a sum, with no numbers of their own, assemble the view from their parts at each read.
+   A block is added to a diagram once, a cost to a sum once.
+3. **Structure is the constructor's**: sizes, ports, a method, a clock, a part's key, a
+   leaf's name, which spread a Gaussian takes (`std` or `cov`), which bounds a field set has.
+   A value is written by item, `plant.params["m"] = 2.0`; a named attribute is a view of its
+   leaf (`box.upper`, `law.mean`, `cost.Q`, `problem.discount_rate`), never a second home.
+   Assigning a leaf's `params` declares it anew inside the dict it already holds, so a
+   composite holding that dict stays current (`own_params`). Derived quantities (`dim`,
+   `cov`, a uniform law's and a particle law's `mean`) are computed, never stored.
+4. **A `params` argument is `None` or the whole tree**, the same shape as `.params`: on an
+   equation method (`f h tf g margin value sdf sample step`, which read it as given, no
+   merge, no check) and on every tool verb (`Simulator.solve`, `ev.f/step/rollout/
+   rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
+   initial`, `solve_trajectory_from`, `Optimizer.solve`). Nothing merges anywhere. A one-off
+   tree is a copy of the tool's own, edited: `p = copy.deepcopy(planner.params);
+   p["plant"]["m"] = 1.3; planner.solve(params=p)`. A copy of an object at other numbers is
+   Python's own, `copy.deepcopy(plant)` then the edit; there is no copying verb.
+5. **A tree that crosses a boundary is checked** against the structure it enters (`checked`,
+   `require_complete` in `core/params.py`): a tool's `params=`, a composite's assignment. An
+   unknown key, a missing one, a subtree for a leaf or a leaf of another shape raises, naming
+   the known entries; a distribution standing where a number goes is not shape-checked. The
+   bare item write on a leaf (`plant.params["mass"] = 2.0`) is a dict write, unchecked.
+6. **A tool snapshots at build**: `tool.params` is what `params=None` runs on (the compiled
+   evaluators, the `Simulator`, the problem evaluator, the planner's compiled face, the
+   program evaluator's bound tree); nothing reads the objects or compares trees per call. A
+   convenience call (`compute_trajectory`, `problem.compile`, `planner.solve`) builds each
+   time, so it sees every edit. A planner's `solve(params=)` rebuilds at the tree
+   (`planner_at`): a method number the tree changes is given, one it leaves at the planner's
+   value is derived again on the new problem (a new discount rate re-derives the factor).
+7. **A problem's uncertain numbers are `Distribution`s in `problem.distributions`**, a sparse
+   tree of the same shape (`distributions={"plant": {"m": Uniform([0.9], [1.1])}}`, the
+   start's law `x0=law`); `problem.params` holds numbers only, and a law written into it is
+   refused. `realize(key, n)` turns the laws into numbers with a trial axis.
+
+Every number that is not structure is a leaf: a field's numbers are leaves of the set's and
+the cost's tree (`{"field": …}`, a shaping's under `"shaping"`), a shape's and a path's of the
+scene's and the track's, an LTI block's matrices of its own (`{"A", "B", "C", "D"}`), a lookup
+policy's table and levels, a replayed signal's times and values, a model-based law's model
+under `"model"`. A number stays out only for a written structural reason: a size, a count, a
+choice of method, a boolean switch, a clock's period (it decides the plan), a summing
+junction's signs, the action box of a neural policy (the plant's input bounds), the drawn
+geometry of a skin (link lengths drawn, wheel tracks), an LTI model's operating point (it
+never enters `f`). `tests/unittest/test_contract.py` walks every public system, cost, set and
+law on both backends (`params=None` its defaults, the same values twice, the JAX numbers the
+NumPy ones, a finite gradient through a float leaf); `tests/unittest/test_params_model.py`
+pins the seven rules. The leaves are numbers and numeric arrays, an integer leaf (a seed)
+never in `wrt`; every function is deterministic given its parameters, the seed among them.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
@@ -470,19 +509,11 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   system, the noise sources, the seeded policy). `discretize(plant, dt, substeps=4)` shows the
   two: the period above, the integration step `dt / 4` underneath. A noise block's period is
   never a `dt`: its physics does not change with the tool's step.
-- **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`.
-  `DiagramSystem.params` is a live-view property — the getter assembles
-  `{sys_id: subsystem.params}` from live references (subsystems stay the
-  single source of truth), the setter distributes by sys_id. A tree passed to
-  `f` / `outputs` / `step`, or assigned to `diagram.params`, names every block
-  (a missing id is an error; unknown ids raise). Edit one number by mutating a
-  live key (`diagram.params["plant"]["m"] = 4`). Nested diagrams nest the dict
-  recursively.
+- **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`,
+  each the block's own dict (rule 2); nested diagrams nest recursively. A tree passed to `f`
+  / `outputs` / `step`, or assigned to `diagram.params`, names every block and every key.
 - Compile: a diagram's compile copies every block's params into the plan, as a leaf's does.
-  The evaluator's `params` is that snapshot; `params=None` reads it. A held evaluator
-  reads an edit made after compile only through an explicit complete tree (copy
-  `evaluator.params` and replace the block you change); the convenience calls
-  (`compute_trajectory`, `Simulator`, `problem.compile`) read the live values on every call. On JAX the dict is a pytree argument
+  The evaluator's `params` is that snapshot; `params=None` reads it (rule 6). On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
   w.r.t. parameters (see `examples/demos/compile/params_gradient.py`).
@@ -492,25 +523,21 @@ boundaries (evaluators, solvers, plotting, `Trajectory`, I/O). Every core object
   callable is jit-compatible for blocks written with `array_module` all the
   way through, and diagrams address internal wires as `"block:port"`, as
   output or as an additive perturbation.
-- **A problem's parameters are a view of its parts** (as a diagram's are of its
-  blocks): `problem.params` is `{"plant", "cost", "X", "U", "X0", "Xf", "x0",
-  "discount_rate"}`, assembled on each access from the parts, which stay the one home of
-  each number (the start's singleton `X0` is not an entry: its point is `x0`, one home);
-  assigning a dictionary routes each entry to its part (a singleton `X0` moves with
-  `x0`, and so does assigning `problem.x0`; a library set, a frozen value, is replaced by its `with_params` copy;
-  a set that holds no parameters refuses a write). Library costs
-  hold their parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`,
-  `x_bar`, `u_bar`, its attributes views); a `SumCost` keys its terms by id like a diagram
-  (the class name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the
-  cost it scales) and routes a nested dictionary to them. Anonymous `+` and `sum()` flatten
-  into one level of terms; `SumCost.of(**named)` and a cost with an `id` stay nested. A sum
-  holds each cost object once (`q + 10 * q` is refused; write `11 * q`, or add a copy). A
-  `ScaledCost`'s params are `{"weight": w, "cost": {...}}`. A partial dictionary fills the
-  missing entries from the composite's own, a leaf's dictionary replaces it whole, and an
-  unknown id raises. A cost without parameters has `params = None`, an empty pytree;
-  `FieldCost`'s params are its weight. Each library set owns its `params` (`{}` when it
-  has none) and `with_params` returns the moved copy. Planners read each part's own
-  parameters; a random plant's nominal draw is `nominal_plant_params(problem)`.
+- **A problem's parameters are its parts' trees by role**: `problem.params` is `{"plant",
+  "cost", "X", "U", "X0", "Xf", "x0", "t0", "discount_rate"}`, each part's entry the part's
+  own dict (the start's singleton `X0` is not an entry: its point is `x0`, one home), its own
+  numbers `x0`, `t0` and `discount_rate` held in the tree (the attributes are views of them).
+  Assigning the complete tree routes each entry to its part (a singleton `X0` moves with
+  `x0`; a set's entry is written into the set, its one home). Library costs hold their
+  parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`, `x_bar`,
+  `u_bar`, its attributes views); a `SumCost` keys its terms by id like a diagram (the class
+  name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the cost it scales).
+  Anonymous `+` and `sum()` flatten into one level of terms; `SumCost.of(**named)` and a cost
+  with an `id` stay nested. A sum holds each cost object once (`q + 10 * q` is refused;
+  write `11 * q`, or add a copy). A `ScaledCost`'s params are `{"weight": w, "cost": {...}}`,
+  the weight held there. `FieldCost`'s params are its weight and its field's tree. Planners
+  read each part's own parameters; a random plant's nominal draw is
+  `nominal_plant_params(problem)`.
   Online façade: `solve_trajectory_from(x0, params=)` binds any leaf of the program's tree
   (§6, the parametric program); `params={"scene": …}` raises `NotImplementedError` (moving
   obstacles online, A3). **Gap:** call-time `params` on the base `Shape` and the workspace
@@ -753,8 +780,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
   singleton, the members' by position `{"0", "1", …}` on an intersection, `{}` for a set with
   none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
-  a library set is a frozen value, and `with_params(params)` is the moved copy a problem
-  assignment (`problem.params = {"U": {...}}`) puts in the role.
+  a set holds its numbers as a plant does (rule 3): `X.params["upper"] = ...` moves it, and
+  a problem's entry for the role is the set's own tree.
 - Fields (`core/fields.py`): `Field`, a scalar `value(x, u=None, t=0.0, params=None)` (it reads
   the arguments it depends on), `gradient` (`jax.grad` on JAX, central differences on NumPy),
   and four conversions named by what they return: `as_set(lower=, upper=)` (a `FieldSet`;
@@ -770,7 +797,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `(N, n, n)` on `N ≥ 2` times `t` (the Riccati `S(t)` of `lqr_gain_schedule`), read linearly
   in `t` and held past its ends. The sublevel set of a constant `P`, `as_set(upper=level)`
   with `lower` 0 or `None`, is an `EllipsoidSet` (any other band, or a schedule, a plain
-  `FieldSet`): its `params` are `{"center", "P", "level"}` and `with_params` the moved copy; it
+  `FieldSet`): its `params` are `{"center", "P", "level"}`, its `field` derived from them; it
   draws uniformly inside (`sample` on a NumPy generator, an integer seed or a JAX key; like a
   distribution, the center, its design point, for `key=None`) and bounds itself
   (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
@@ -933,11 +960,17 @@ name: `params=None` is the frozen form (the compiled values are constants of the
 fastest run of one fixed model), a tree is the parametric form (its leaves traced, so new
 values never retrace). Before the jitted call, every scalar argument and every leaf of the
 tree is made the dtype and shape of the compiled default (`9`, `9.0`, `np.float64(9.0)` and a
-0-d array share one trace) and the tree is put on the device once per distinct value; a tree
-holding a leaf of more than 1000 numbers (a network's weights) always goes as an argument,
-never as constants. A tool passes `evaluator.call_params()`: `None` while the live values are
-the compiled ones (the frozen form), else the live tree (the parametric form), so a value
-sweep on one tool compiles once. A convenience call (`compute_trajectory`, `problem.compile`,
+0-d array share one trace) and passed as it is: a host leaf transferred by the call, a JAX
+leaf already in its compiled dtype and shape passed untouched, so a caller who repeats a value
+holds it on the device (`jax.device_put(tree)`) and transfers nothing. No cache and no digest
+run per call; the frozen form's only per-call work is one `is None` test. A tree holding a leaf
+of more than 1000 numbers (a network's weights) always goes as an argument, never as
+constants. The frozen form earns its keep: with the tree as an argument a 1000-step rollout is
+13 % slower on a PID loop (13 leaves), 23 % on a three-link arm (20) and 42 % on the racecar
+(29), because XLA folds the parameter-only algebra out of the scan body. A value sweep on one
+held tool compiles the parametric form once (`sim.solve(params=p)`). A tool built inside a
+planner's solve reads the problem's numbers at that solve (`evaluator.call_params()`, once per
+solve, never per call). A convenience call (`compute_trajectory`, `problem.compile`,
 `closed_loop`) compiles each time, so it sees every edit; speed is a tool held by the user
 (`Simulator(sys, backend="jax")`, `pe = problem.compile(ctl)`, `planner.compile()`), built
 once and run many times (no cache, no hidden registry). The `jit` sits at the outermost pure
@@ -1083,10 +1116,11 @@ fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
 constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
 declare parameters: `MathematicalProgram(..., params=tree)` takes callables of
-`(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` merges a partial
-tree once onto the defaults (`core.params.merge_known`: an unknown path raises naming the known
-ones, a new shape raises) and binds it, so one compiled program is solved for many values
-without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
+`(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` takes the
+solve's complete tree (`optimizer.params`: the program's numbers and the method's under
+`"method"`, a copy edited), checks it once (`core.params.checked`: an unknown or a missing
+path raises naming the known ones, a new shape raises) and binds it, so one compiled program is
+solved for many values without a recompile; a program without `params` keeps callables of `z` alone. One evaluator
 body serves both: it holds the bound tree, the JAX one passes it as a traced argument and
 differentiates in `z`. **The stochastic program is the seed case**: every program is
 deterministic given its parameters, the seed one of them, an integer leaf found by the key
@@ -1244,13 +1278,14 @@ problem's `ρ`.
 **A problem stochastic by its parts:** there is no stochastic class; where a number
 goes, a law may go. `x0=` takes a point, a `Set` (the uniform law on it, the set its
 `X0`) or a `Distribution` (its mean the representative `x0`, its support the default
-`X0`); `params=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
+`X0`); `distributions=` takes laws in the tree's own shape (`{"plant": {"m": Uniform([0.9], [1.1])}}`,
 a block inside a diagram plant by its id); `disturbances=` takes source blocks on the plant's
 ports (`{"d": WhiteNoise(...)}`; a bare law is refused, naming the fix); `criterion`
 (`"expectation"` default, `"worst_case"`, or `("cvar", alpha)`, the mean of the worst `alpha`
 fraction; an evaluation's `objective` is this reduction of the runs' `J`, and the RL planner,
 which optimizes the expectation, refuses the others). `problem.is_stochastic` is read off the
-parts; `problem.params` shows each law at its leaf and the start's law under `"x0"`;
+parts; `problem.params` holds numbers only and `problem.distributions` the laws, the
+start's law its `start_law`;
 `problem.realize(key, n)` is one tree: the problem's numbers with `"x0"` of shape
 `(n, nx)`, each law's leaf drawn `n` times and each random source's `seed` a trial axis of
 integers (`drawn_paths()` names them); every consumer draws from its own stream, named by its
@@ -1445,9 +1480,9 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
 bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
 once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
-only: `params` is a partial tree (`{"plant": {"mu": …}, "cost": {"x_bar": …}, "t0": t}`)
-merged once onto the defaults with `x0` as `x0`, an unknown path raising and naming the
-known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
+only: `params` is `None` or the planner's complete tree (`planner.params`, a copy edited:
+`p["plant"]["mu"] = 0.6`, `p["t0"] = t`), checked once, with `x0` as `x0`, an unknown or a
+missing path raising and naming the known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
 of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
 one-time speed warning is emitted only when a JAX planner omits parametric compile. The
 reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
@@ -1466,7 +1501,8 @@ tolerances), a constructor keyword read back as an attribute; **numbers**, what 
 tuning loop or `jax.grad` varies without a rebuild (the problem's leaves, the method's numbers:
 a native law's `learning_rate`, a discount `gamma`, MPPI's `temperature`, RRT's `goal_bias`;
 the `seed`), given as flat keywords and held in `planner.params` (`params["method"]`),
-overridden per call by `solve(params=…)`; **an external solver's knobs** (SciPy `maxiter`,
+taken per call by `solve(params=…)`, the complete tree edited (a method number the tree
+leaves at its value is derived again on the solve's problem, one it changes is given); **an external solver's knobs** (SciPy `maxiter`,
 `ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
 **workflow** (`verbose`, `callback`, `live_plot`, `record_history`), keywords that change what
 is shown, never what is computed. There is no settings record on a planner. One exception:
@@ -1481,7 +1517,8 @@ leaves the plan reads, `"method"` the method's numbers (a native law's `learning
 algorithm's and optimizer's numbers; `{}` for a host method, whose name and tolerances are
 structure) and `"seed"` (`None` for a method that draws nothing); the method's name is a
 constructor option); `pv.initial(params)` the default guess packed;
-`pv.solve(params=None, z0=None) -> (z, status)`; `pv.shift(z, t)` the knot rows re-read at
+`pv.solve(params=None, z0=None) -> (z, status)` (`params` `None` or `pv.params` edited:
+`pv.params` returns a copy, so an MPC holds one tree and sets its `x0` and `t0` each tick); `pv.shift(z, t)` the knot rows re-read at
 `t + offset`, the tail held; `pv.command(z, x, t)` the input at `t`; `pv.prediction(z, t)` the
 planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
 `PlanningSolution`; `pv.pack(guess)`; `pv.program`. A native method with `n_iterations=K` (a

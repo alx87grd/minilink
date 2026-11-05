@@ -55,12 +55,14 @@ concrete formatting, ordered by the cost of being wrong:
   choices that change which equation or branch runs (`gravity_comp`, `tracking_ref`, `hold`,
   `interpolation`) are fixed at `__init__` (for example by binding a port's compute function
   to `ctl` vs. `ctl_with_gravity`), never stored in `params`.
-  An explicit override on a diagram or evaluator is the complete nested tree (every
-  block id present) or `None` for the compile snapshot; a missing block is an error. Live mutation of one number stays `sys.params["m"] = 4`.
+  A `params` argument, on an equation or on a tool's verb, is `None` or the complete tree
+  (every key, every block); nothing merges, and a one-off tree is a copy of the tool's own,
+  edited. Live mutation of one number stays `sys.params["m"] = 4`.
   The same holds for every core math object: a cost, a set, a distribution, a field
-  have a `params` dict (`{}` when they have none), read when the call passes `None`; a
-  composed object's `params` is its parts' dicts, by a dotted path; every function is
-  deterministic given its parameters, the seed among them. The written exceptions are DESIGN
+  hold a `params` dict (`{}` when they have none), read when the call passes `None`, their
+  named attributes views of it; a composed object's `params` holds its parts' own dicts by
+  key, so a number has one home; every function is deterministic given its parameters, the
+  seed among them. The seven rules: DESIGN §4, 'Parameters'. The written exceptions are DESIGN
   §4's list, and `tests/unittest/test_contract.py` walks every other public core object.
   However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
@@ -195,7 +197,8 @@ concrete formatting, ordered by the cost of being wrong:
   never `sys.state.box` or an input port's `box` behind the problem's back. The one `isinstance` on a set is the
   lowering at the solver boundary: a singleton to an equality residual, a box to decision bounds.
 - **4.4 Parameter override rule.** Does `params is None` resolve to the defaults and any
-  dictionary replace them, never `params or self.params`? Contract: DESIGN §4, 'Parameters'.
+  dictionary replace them whole, never `params or self.params` and never a merge? Does a tool
+  check a tree it takes against its own (`checked`)? Contract: DESIGN §4, 'Parameters'.
 - **4.5 Unconnected input ports are silent.** Does an unwired input read its nominal value
   without a warning or an error? Contract: DESIGN §5.
 - **4.6 Libraries are silent.** Library functions and classes must never `print()`, except when
@@ -431,8 +434,8 @@ concrete formatting, ordered by the cost of being wrong:
   and NumPy docstrings except in equation paths (rule 5.1). Lazy imports follow 5.27. Prefer a low
   helper count in math tools; inline single-use helpers.
 - **5.21 Validation in proportion:** Validate at boundaries, not in every helper. Frozen dataclasses
-  for value objects — a `Trajectory`, a set, a shape, a certificate, a solver record; plain
-  classes with `params` for parametric equation objects — systems, costs. Never dataclasses as
+  for records — a `Trajectory`, a certificate, a solver record, a solution; plain classes with
+  `params` for every parametric object — systems, costs, sets, fields, laws, shapes. Never dataclasses as
   input/output wrappers around arrays (rule 2.5). Use `ABC` only when enforcement helps.
 - **5.22 Comment only when it is not a copy of the code.** Beat 2 of rule 5.3 is
   the highlighted equation: a blank line, then a named assignment. Add a short

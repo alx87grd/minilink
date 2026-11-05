@@ -1,8 +1,9 @@
 # One parameters model for every object
 
-**Status:** ruled by the maintainer on 2026-11-05 (§6, seven rulings); ready to run, in the
-order of §7. **Release:** v0.4, the clean surface (ROADMAP §5.4, workstream 11). Its steps are
-prefixed `PM-`.
+**Status:** ruled by the maintainer on 2026-11-05 (§6, seven rulings); built on the branch
+`params-one-tree` by the overnight run of 2026-11-05 ([one-params-run.md](one-params-run.md),
+its run log the handoff), waiting for the maintainer's review before the merge into `dev`.
+**Release:** v0.4, the clean surface (ROADMAP §5.4, workstream 11). Its steps are prefixed `PM-`.
 
 How it was reached: a proposal and its first review (2026-11-04), a second independent review
 with two reviews of its own, then three designs written from a blank page without reading any of

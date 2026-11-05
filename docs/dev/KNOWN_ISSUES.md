@@ -19,12 +19,13 @@ lands. Last checked against the code: 2026-11-04.
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
-  keys, so the change has no effect and nothing says so. A tree given to a diagram, a sum, a
-  scaled cost or a problem is checked against the part it sets and refuses an unknown or
-  missing key; the bare item write on a block is not checked.
-- **Workaround:** read the key back (`plant.params["m"]`) after a change.
-- **Fix:** the one-parameters-model run ([one-params-model.md](../plans/one-params-model.md)):
-  every tree a tool takes is checked; the bare item write stays a dict write (its ruling 4).
+  keys, so the change has no effect and nothing says so.
+- **Workaround:** a checked spelling: every tree a tool or a composite takes is checked
+  against the structure it enters, so `problem.params = p`, `planner.solve(params=p)` or
+  `sim.solve(params=p)`, with `p` a copy of the tool's own tree edited, raises on a misspelled
+  key and names the known ones. Or read the key back (`plant.params["m"]`) after a change.
+- **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
+  ruling of 2026-11-05 ([one-params-model.md](../plans/one-params-model.md), ruling 4).
 
 ## Planning and learning
 

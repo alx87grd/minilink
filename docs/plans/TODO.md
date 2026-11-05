@@ -267,12 +267,17 @@ commit per proposal, its callers and DESIGN in the same change.
 - [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
   `trajectory_of`. Done when both forms return the same block.
 - [ ] **One parameters model for every object** ([one-params-model.md](one-params-model.md),
-  ruled 2026-11-05): every object holds one live `params` tree; composites hold their parts'
-  dicts; complete trees everywhere; a tool snapshots at build; `distributions` beside the
-  problem's tree; no copying verb. In the plan's order, the defects that exist today first
-  (PM-0), the contract and the tutorial last (PM-6). It absorbs the partial-parameter-updates
-  proposal (CA-4, closed). Done when each step lands byte-identical on the seeded baseline and
-  DESIGN §4 holds the contract.
+  ruled 2026-11-05; built on the branch `params-one-tree` by the overnight run,
+  [one-params-run.md](one-params-run.md), its log the handoff): its steps PM-0 to PM-6
+  landed there, each byte-identical on the seeded baseline, DESIGN §4 holding the contract.
+  **[ask]** the maintainer's review before the merge into `dev`: the flagged student-facing
+  edits and the planner-rebuild choice, both listed in the run log. Its follow-ups, each
+  small: the problem evaluator's frozen form (it snapshots, and always runs its tree as an
+  argument); the planner's method numbers as views of its tree (they are attributes, and
+  `solve(params=)` their route); the problem's internal helpers (`parts_view`,
+  `sample_params`, `nominal_plant_params`, `drawn_paths`) folded into its held tree; a
+  union's members and a scene's obstacles keyed by id rather than position. Done when the
+  branch is merged and the follow-ups are rows of their own or landed.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
 - [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,
@@ -988,9 +993,6 @@ One line each; open a plan doc only when a design needs a writeup.
 - A training run that rebinds its numbers: the RL planner's `params` is a report
   today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.
-- A key check on leaf params (a `validate_params` hook on `System`, no-op by default, called
-  where diagram params are validated): today a typo or a retired key in any block's params is
-  ignored silently; a question for the whole library.
 - A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static
   HTML of one frame. The headless screenshot side exists: `docs/asset_export.py::html_to_gif`
   seeks an exported page frame by frame, so a still is one `seek` and one screenshot. With it,
