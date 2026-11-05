@@ -48,6 +48,7 @@ RETIRED = {
     "solve_trajectory": ("solve", None),
     "record_solve_time": ("solve_time_s, always recorded", None),
     "compute_forced": ("compute_trajectory(u=)", None),
+    "trajectory_of": ("traj.of(block)", None),
     "solve_forced": ("solve(u=)", None),
     "solve_trajectory_from": ("solve(params=) or compile().solve(params, z0)", None),
     "compile_parametric_program": ("compile()", None),

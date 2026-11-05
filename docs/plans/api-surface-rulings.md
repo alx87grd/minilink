@@ -39,21 +39,6 @@ compiles for new numbers.
 Call-site counts below are files per tree at 2026-11-05 (`grep`), a guide for the size of each
 commit.
 
-## AR-7 One block selector: `traj.of("plant")` on both loop kinds
-
-`traj.of("plant")` and `compute_cost(cost, of="plant")` work on a continuous loop as on a
-sampled one (today the continuous one refuses both). A continuous run always records every
-block's state slice under its role; a block's input is recorded only when asked,
-`record=("plant:u",)`. `diagram.trajectory_of` goes (it replaces part of CA-3 in
-[core-api-improvements.md](core-api-improvements.md): update that section). Callers: 8 notebook
-lines, including one call each in the GRO501 racecar and GRO860 pendulum notebooks.
-
-Its companion, **a continuous run records its signals from its own pass**, is its own row and
-branch (split 2026-11-05, the maintainer's review): a behaviour-preserving restructure of the
-simulator's pass with its own baseline and a measurement-gated default, not an API trim, so it does
-not hold this branch. Its design and benchmark plan are in TODO §1.11 ("A continuous run records
-its signals from its own pass"); this ruling lands without it, on today's recording path.
-
 ## What the branch also carries (the maintainer's picks, 2026-11-05)
 
 Small rows on the same lines as the rulings, bundled so one run lands them; each keeps its own

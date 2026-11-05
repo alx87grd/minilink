@@ -567,15 +567,16 @@ Wiring, port gather and params nesting live on `WiredDiagramMixin` in `wiring.py
 the port-dependency graph is `topology.py`: `check_algebraic_loops` (raises on a loop,
 returns nothing; also a diagram method) and `evaluation_order_of` (the port order the
 compilers read); `DiagramSystem` adds flow-only `f`,
-`compile`, `reconstruct_internal_signals`, and `trajectory_of`; the wiring
-methods reach `DiagramSystem` through the mixin.
-`loop.trajectory_of(plant, traj=None)` returns one block's trajectory as that
-block saw it — its own state and the input it received — on the diagram
-trajectory's grid (default: the last one computed). A cost written for the
-plant alone scores the plant inside any loop:
-`loop.compute_cost(cost, of=plant)`. The input is recomputed from the
-stored states with the blocks' current `params`: the ones the simulation used,
-unless they were changed after simulating.
+`compile` and `reconstruct_internal_signals`; the wiring methods reach `DiagramSystem` through
+the mixin, `diagram.of("plant")` the block by its id or role (a path, `"inner/plant"`, inside a
+nested diagram) and `subsystem_id` a block or its id. **One block selector on every run:** a
+diagram's run carries `roles`, every block's state slice by id (a nested block by its path), so
+`traj.of("plant")` is the plant's own `(t, x, u)` by static indexing on a continuous loop as on
+a sampled one; the input is the recorded signal `"plant:u"` (a sampled loop records its plant's
+always; a continuous run with `record=("plant:u",)`, an input port being a recordable signal like
+an output port), else empty. A cost written for the plant alone scores the plant inside any loop,
+`loop.compute_cost(cost, of="plant")` (the block or its id): the recorded run, else the plant's
+input rebuilt from the stored states with the blocks' current `params` (`block_run`).
 Every `System` has the two cost shortcuts over that path:
 `sys.compute_cost(cost, of=None, traj=None)` returns `J` as a number and
 `sys.plot_cost(...)` plots the running cost and `J(t)`; `of=None` scores the
@@ -782,8 +783,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (JAX arrays kept) and a JAX pytree, its reporting verbs (`t0`, `tf`, `resample`, `save`,
   the plots) NumPy by contract; `traj.at(t, name="x")` reads one channel at a time, linear
   between the samples and held outside (`interpolate_schedule`, the one time-interpolation
-  the gain schedules read too); a loop's run carries `roles`, so `traj.of("plant")` is the
-  plant's run by static indexing.
+  the gain schedules read too); a diagram's run carries `roles`, every block's state slice by
+  id, so `traj.of("plant")` is the plant's run by static indexing (its input when recorded).
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
   boolean under JAX); `sample(key, n=None, params=None)` follows the distributions' draw

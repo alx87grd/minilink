@@ -105,10 +105,15 @@ def replay(problem, solution, solver="rk4_fixedsteps"):
     plant.x0 = np.asarray(planned.x[:, 0])
     loop = solution.policy >> plant
     dt = float(planned.t[1] - planned.t[0])
+    plant_id = loop.subsystem_id(plant)
     traj = loop.compute_trajectory(
-        tf=float(planned.tf), dt=dt, solver=solver, verbose=False
+        tf=float(planned.tf),
+        dt=dt,
+        solver=solver,
+        record=(f"{plant_id}:u",),
+        verbose=False,
     )
-    driven = loop.trajectory_of(plant, traj)
+    driven = traj.of(plant_id)
     n = planned.n_samples  # the simulator may append one rounding sample past tf
     np.testing.assert_allclose(driven.t[:n], planned.t, atol=1e-9)
     return driven.x[:, :n]

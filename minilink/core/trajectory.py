@@ -127,17 +127,21 @@ class Trajectory(SampledSignals):
 
     def of(self, role: str) -> Trajectory:
         """
-        The run of one block of a loop: its state slice and its recorded input.
+        The run of one block of a diagram: its state slice and its recorded input.
 
-        ``traj.of("plant")`` indexes the loop's samples by the static layout in
-        :attr:`roles`, so it traces under JAX like any slice.
+        ``traj.of("plant")`` indexes the diagram's samples by the static layout in
+        :attr:`roles`, so it traces under JAX like any slice; a block inside a
+        nested diagram is a path, ``traj.of("inner/plant")``. A diagram's run
+        records every block's state slice; the input is the recorded signal
+        ``"plant:u"`` (a sampled loop records its plant's; a continuous run with
+        ``record=("plant:u",)``), else empty, ``(0, N)``.
         """
         require_role(self, role)
         start, stop = self.roles[role]["x"]
         u_name = self.roles[role]["u"]
 
         x = self.x[start:stop]
-        u = self.signals[u_name]
+        u = self.signals[u_name] if u_name else np.zeros((0, self.t.shape[0]))
 
         return Trajectory(t=self.t, x=x, u=u)
 
@@ -374,8 +378,8 @@ def require_role(traj, role):
     if role not in traj.roles:
         recorded = ", ".join(traj.roles) or "none"
         raise ValueError(
-            f"this trajectory records no {role!r} role (roles: {recorded}); a loop's "
-            "run from problem.compile(...).trajectory() records its plant"
+            f"this trajectory records no {role!r} role (roles: {recorded}); a "
+            "diagram's run records every block's state slice under its id"
         )
 
 

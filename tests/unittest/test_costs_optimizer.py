@@ -261,10 +261,16 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     # Closed loop: the plant as it ran inside the loop, last or given trajectory
     loop = StateFeedback(K=[[5.0, 1.0]]) @ plant
-    loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    J = total(cost, loop.trajectory_of(plant, loop_traj))
+    loop_traj = loop.compute_trajectory(
+        tf=1.0, dt=0.05, record=("plant:u",), verbose=False
+    )
+    J = total(cost, loop_traj.of("plant"))
     assert loop.compute_cost(cost, of=plant) == pytest.approx(J)
-    assert loop.compute_cost(cost, of=plant, traj=loop_traj) == pytest.approx(J)
+    assert loop.compute_cost(cost, of="plant", traj=loop_traj) == pytest.approx(J)
+
+    # A run without the plant's input recorded: the cost rebuilds it from the states
+    bare = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
+    assert loop.compute_cost(cost, of="plant", traj=bare) == pytest.approx(J)
 
     # of=None scores the loop in its own (x, u): here x = plant state, u = r
     loop_cost = QuadraticCost.from_system(loop, S=np.eye(2))

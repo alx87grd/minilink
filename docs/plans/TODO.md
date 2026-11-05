@@ -282,9 +282,6 @@ commit per proposal, its callers and DESIGN in the same change.
   y_dependencies=)` as `DynamicSystem` and `StepSystem` do. Done when the reproducer builds.
 - [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
-- [ ] **Subsystems by name** (CA-3; bundled with the API surface rulings, the go given
-  2026-11-05): `diagram.of("plant")` and string ids in `subsystem_id`; `trajectory_of` goes
-  with the block-selector ruling. Done when both forms return the same block.
 - [ ] **The API surface rulings** (AR-1 to AR-9 in
   [api-surface-rulings.md](api-surface-rulings.md), ruled 2026-11-05, none built): a
   distribution's mean one spelling; `evaluate` without `dt` for a sampled controller; two box

@@ -15,7 +15,6 @@ SHORTCUTS = {
         "planning/search/plotting.py": {"plot_tree", "animate_search.update"},
     },
     "traj": {
-        "core/diagram.py": {"DiagramSystem.trajectory_of"},
         "core/discrete/sampled_diagram.py": {"SampledDiagramSystem.animate"},
         "core/facades/animation.py": {"SystemAnimation.animate"},
         "core/facades/plotting.py": {

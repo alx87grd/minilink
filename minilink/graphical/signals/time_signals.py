@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.diagram import DiagramSystem
+from minilink.core.diagram import DiagramSystem, block_run
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
 from minilink.graphical.signals.signal_colors import (
@@ -359,7 +359,7 @@ def subsystem_path(diagram, subsystem):
 def nested_signal(sys, traj, name):
     """Sample the output ``"a/b/c:port"`` of a nested block along ``traj``: ``(values, labels, units)``.
 
-    The trajectory is narrowed one diagram level at a time (``trajectory_of``)
+    The trajectory is narrowed one diagram level at a time (``block_run``)
     to the diagram holding the block, whose internal signals give the port.
     """
     path, port_id = name.rsplit(":", 1)
@@ -370,7 +370,7 @@ def nested_signal(sys, traj, name):
     diagram_traj = traj
     for sys_id in outer:
         inner = diagram.subsystems[sys_id]
-        diagram_traj = diagram.trajectory_of(inner, diagram_traj)
+        diagram_traj = block_run(diagram, sys_id, diagram_traj)
         diagram = inner
 
     # The port among the internal signals of the diagram holding the block

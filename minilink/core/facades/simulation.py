@@ -111,10 +111,11 @@ class SystemSimulation:
         ----------
         cost : CostFunction
             Cost written for the system that is scored.
-        of : System, optional
-            On a diagram, the block to score, as it ran inside the diagram
-            (:meth:`~minilink.core.diagram.DiagramSystem.trajectory_of`).
-            ``None`` scores this whole system in its own ``(x, u)``.
+        of : System or str, optional
+            On a diagram, the block to score, as it ran inside the diagram: the
+            block or its id, ``of="plant"`` (its recorded run, ``traj.of``, else
+            its input rebuilt from the diagram's states). ``None`` scores this
+            whole system in its own ``(x, u)``.
         traj : Trajectory, optional
             Trajectory of this system; defaults to the last one computed.
 
@@ -185,9 +186,11 @@ class DynamicSimulation:
             warnings (see :mod:`minilink.simulation.solver_warnings`).
         record : sequence of str, optional
             A diagram's signals to keep in the trajectory's ``signals``,
-            ``"sys_id:port_id"``: each port and the blocks it reads, evaluated
-            once per sample after the run (the adaptive solver has no fixed
-            samples to record inside the run).
+            ``"sys_id:port_id"``, an output port or a block's input
+            (``"plant:u"``, what ``traj.of("plant")`` reads as the plant's
+            input): each evaluated once per sample after the run (the adaptive
+            solver has no fixed samples to record inside the run). A diagram's
+            run always carries every block's state slice (``traj.of("plant")``).
 
         Returns
         -------
@@ -195,6 +198,8 @@ class DynamicSimulation:
             The simulated trajectory, also stored in :attr:`traj`.
         """
         # A real cycle through minilink.core.system
+        from minilink.core.diagram import block_roles
+        from minilink.core.trajectory import Trajectory
         from minilink.simulation.simulator import Simulator
 
         sim = Simulator(
@@ -213,6 +218,15 @@ class DynamicSimulation:
         if record:
             require_signals_to_record(self)
             traj = self.reconstruct_internal_signals(traj, ports=tuple(record))
+        if hasattr(self, "state_index"):
+            # A diagram's run: every block's state slice, the inputs recorded
+            traj = Trajectory(
+                t=traj.t,
+                x=traj.x,
+                u=traj.u,
+                signals=traj.signals,
+                roles=block_roles(self, traj.signal_names),
+            )
 
         if show:
             # A real cycle through minilink.core.system
@@ -334,13 +348,15 @@ class StepSimulation:
         u_dense = np.repeat(u_samples[:, :n_steps], S, axis=1)
         u_dense = np.concatenate([u_dense, u_samples[:, -1:]], axis=1)
 
-        # The plant role: its state slice and its recorded input
+        # The plant role: its state slice and its recorded input, and the
+        # blocks inside a plant that is itself a diagram
         if PLANT_INPUT in signals:
             plant_slice = plant_op.local_x_slice
             roles["plant"] = {
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT,
             }
+            roles.update(plant_block_roles(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -442,13 +458,15 @@ class StepSimulation:
         k = np.arange(n_steps + 1, dtype=float)
         t = k if self.sample_period is None else t0 + k * self.sample_period
 
-        # The plant role: its state slice and its recorded input
+        # The plant role: its state slice and its recorded input, and the
+        # blocks inside a plant that is itself a diagram
         if PLANT_INPUT in signals:
             plant_slice = plant_op.local_x_slice
             roles["plant"] = {
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT,
             }
+            roles.update(plant_block_roles(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -584,9 +602,9 @@ def dense_points_of(system, ev):
 
 
 def scored_trajectory(system, of, traj):
-    """The trajectory a cost shortcut scores: the system's own, or one block's inside it."""
+    """The trajectory a cost shortcut scores: the system's own, or one block's inside it (its recorded run, else reconstructed)."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import DiagramSystem
+    from minilink.core.diagram import DiagramSystem, block_run
 
     traj = system.traj if traj is None else traj
     if traj is None:
@@ -595,8 +613,32 @@ def scored_trajectory(system, of, traj):
         )
     if of is None:
         return traj
-    if not isinstance(system, DiagramSystem):
+    if not hasattr(system, "subsystem_id"):
         raise ValueError(
             f"of= names a block inside a diagram; {system.name!r} is not a diagram"
         )
-    return system.trajectory_of(of, traj)
+
+    # The block's run as recorded (its input among the signals), else rebuilt
+    # from the diagram's states on a continuous diagram
+    path = of if isinstance(of, str) else system.subsystem_id(of)
+    recorded = traj.roles.get(path)
+    if recorded is not None and recorded["u"] is not None:
+        return traj.of(path)
+    if not isinstance(system, DiagramSystem):
+        raise ValueError(
+            f"this run records no input for {path!r}: record=({path + ':u'!r},)"
+        )
+
+    return block_run(system, path, traj)
+
+
+def plant_block_roles(plant_op, offset):
+    """The blocks inside a loop's plant when it is itself a diagram, by path ``"plant/<id>"``, their slices offset into the loop's state."""
+    # A real cycle through minilink.core.system
+    from minilink.core.diagram import block_roles
+
+    plant = getattr(plant_op.system, "source", plant_op.system)
+    if not hasattr(plant, "state_index"):
+        return {}
+
+    return block_roles(plant, (), offset, "plant/")
