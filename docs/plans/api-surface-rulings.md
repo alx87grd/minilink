@@ -143,17 +143,11 @@ block's state slice under its role; a block's input is recorded only when asked,
 [core-api-improvements.md](core-api-improvements.md): update that section). Callers: 8 notebook
 lines, including one call each in the GRO501 racecar and GRO860 pendulum notebooks.
 
-Its companion, built with it or right after: **a continuous run records its signals from its own
-pass**. Today an adaptive run computes every internal signal at its own stage points and throws
-them away, then `record=` and `reconstruct_internal_signals` evaluate them again at the saved
-samples, one Python call per sample. On a fixed-step or compiled run the named signals come out of
-the step loop at each step's first evaluation (as the sampled loop does); on an adaptive run one
-batched pass at the saved samples (`vmap` on JAX). Benchmark before any default changes: nothing
-recorded, the plant's input only, every port; NumPy and JAX; short and long runs and a gradient
-through a rollout; run time and peak memory. Asking a compiled run for every port forces XLA to
-compute and store what it would otherwise drop. The plant's input becomes recorded by default only
-if it costs a few percent at most; every port stays opt-in (`record="all"`) unless the
-measurements say otherwise.
+Its companion, **a continuous run records its signals from its own pass**, is its own row and
+branch (split 2026-11-05, the maintainer's review): a behaviour-preserving restructure of the
+simulator's pass with its own baseline and a measurement-gated default, not an API trim, so it does
+not hold this branch. Its design and benchmark plan are in TODO §1.11 ("A continuous run records
+its signals from its own pass"); this ruling lands without it, on today's recording path.
 
 ## AR-8 One simulate verb
 

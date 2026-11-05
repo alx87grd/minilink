@@ -294,6 +294,20 @@ commit per proposal, its callers and DESIGN in the same change.
   inputs `(m, N)`; two replanning routes, the start-only route removed. One branch, one commit per
   ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
   deleted.
+- [ ] **A continuous run records its signals from its own pass** (was the companion of the
+  block-selector ruling AR-7; split off 2026-11-05, its own branch after the rulings). Today an
+  adaptive run computes every internal signal at its own stage points and throws them away, then
+  `record=` and `reconstruct_internal_signals` evaluate them again at the saved samples, one
+  Python call per sample. On a fixed-step or compiled run the named signals come out of the step
+  loop at each step's first evaluation (as the sampled loop does); on an adaptive run one batched
+  pass at the saved samples (`vmap` on JAX). Benchmark before any default changes: nothing
+  recorded, the plant's input only, every port; NumPy and JAX; short and long runs and a gradient
+  through a rollout; run time and peak memory (asking a compiled run for every port forces XLA to
+  compute and store what it would otherwise drop). The plant's input becomes recorded by default
+  only if it costs a few percent at most; every port stays opt-in (`record="all"`) unless the
+  measurements say otherwise. A behaviour-preserving restructure: AGENTS' baseline recipe, the
+  math read next to `dp.py`. Done when the signals come from the run's own pass on both
+  backends, the benchmark is in `benchmarks/`, and the default is set by its numbers.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
   contract DESIGN §4 "Parameters"; each small, each byte-identical on
   `benchmarks/params_baseline.py`):
