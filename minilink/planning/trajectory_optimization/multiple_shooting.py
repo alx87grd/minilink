@@ -41,10 +41,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     Dynamics are enforced by RK4 shooting defects between neighboring knots.
     """
 
-    # The collocation parametric build assumes collocation defects; multiple
-    # shooting has no parametric (MPC) form.
-    supports_parametric = False
-
     # The transcription's name in a program's metadata
     name = "multiple_shooting"
 
@@ -92,13 +88,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
                 "transcription": "multiple_shooting",
                 "backend": backend,
             },
-        )
-
-    def transcribe_parametric(self, *args, **kwargs):
-        """Refuse: multiple shooting has no parametric (MPC) form."""
-        raise NotImplementedError(
-            "MultipleShootingTranscription has no parametric (MPC) form; use "
-            "transcription='direct_collocation' for compile_parametric_program"
         )
 
     ###########################################################################

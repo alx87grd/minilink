@@ -334,8 +334,6 @@ commit per proposal, its callers and DESIGN in the same change.
     (`dp.py`, `dp_jax.py`), keyed on option numbers, so a cost edit inside the problem is not
     seen; its transition tables are built at construction (a held tool, to say so);
   - `analysis/lyapunov.py`: jitted forms keyed on a digest of the point;
-  - `TrajectoryOptimizationPlanner.compile_parametric_program`, a second held program on the
-    planner, goes with the start-only route (the core API proposals' replanning ruling).
   Each: rebuilt in the convenience verb, or snapshotted at the held tool's build. Also: one
   planner solve compiles its plant up to three times (transcribe, read-back, iterate history),
   once would do. Done when no identity or digest key decides a rebuild.
@@ -541,9 +539,9 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   instead of raising, with `link_lengths` the base contract (scan: dynamics#7).
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
-- [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
-  `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
-  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies.
+- [ ] **planning** (T5): `direct_collocation.py` / `shooting.py` / `multiple_shooting.py`
+  read `self.options.*` inside their bodies (the planner's parametric probe went with the
+  start-only replanning route).
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
   method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by the compiled face (DESIGN §6);
@@ -1047,7 +1045,7 @@ One line each; open a plan doc only when a design needs a writeup.
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
 - Multiple shooting with the problem's parameters: shooting and collocation take the
-  parametric program's tree; `MultipleShootingTranscription.transcribe_parametric` refuses.
+  program's tree on the compiled face; multiple shooting does not yet.
 - A training run that rebinds its numbers: the RL planner's `params` is a report
   today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.

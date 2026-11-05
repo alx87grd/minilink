@@ -77,28 +77,6 @@ and MPC rollouts are untouched). A vector of length `m` stays a constant input.
 Callers of the removed names: 12 examples, 14 tests, 5 benchmarks, plus one call in the GRO860
 drone PPO notebook.
 
-## AR-9 Two routes to replan from a new start
-
-Offline: `planner.solve(params=p, guess=prev)` with the new `p["x0"]` (it builds each call).
-Real time: `pv = planner.compile()`, then `pv.solve(p, z)`, which MPC already uses. The start state
-is a number of the tree like a mass or a cost weight. `solve_trajectory_from`,
-`solve_trajectory_from_parametric`, `solve_trajectory_from_rebuild`, `step`,
-`compile_parametric_program`, `has_parametric_program`, `transcribe_parametric` and the
-parametric optimizer plumbing go (`planning/trajectory_optimization/planner.py`; 24 test lines,
-1 example, 5 benchmark lines), and with them the base `Planner.solve_trajectory_from` hook. The RL
-planner's `solve_trajectory_from(x0, tf)`, which rolled its learned policy out from `x0` with
-draws, goes too (amended 2026-11-05, the maintainer's review): that rollout is
-`evaluate(problem, solution.policy, record=True)`, the one judge, with no second verb to learn
-(its callers: the planners tutorial 08, `test_rl_planner.py`).
-
-Measured before the ruling (pendulum, 20 knots, a new `x0` and mass each call): the compiled
-planner `pv.solve` 8 ms a solve after a 0.54 s build, the old start-only route 11 ms after
-0.89 s. The old route was never specialized: `transcribe_parametric` returns the same program and
-binds the whole tree. Freezing every number but `x0` is 0–35 % faster per program evaluation and
-within noise per tick (SLSQP's own loop dominates), so no partial freezing is built; revisit only if
-a GPU or Ipopt case shows program evaluation dominating (API then: `planner.compile(free=("x0",))`).
-Removing the route also clears the last item of TODO's "No cache left" row that it names.
-
 ## What the branch also carries (the maintainer's picks, 2026-11-05)
 
 Small rows on the same lines as the rulings, bundled so one run lands them; each keeps its own

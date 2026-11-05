@@ -34,7 +34,6 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment, is_continuous
-from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
@@ -368,25 +367,6 @@ class ReinforcementLearningPlanner(Planner):
         u = np.asarray(u)
 
         return u, None
-
-    def solve_trajectory_from(self, x0, tf=None, *, evaluate=False) -> PlanningSolution:
-        """
-        Roll the learned law out from ``x0`` on the training environment, disturbances drawn.
-
-        The solution's trajectory is that rollout; ``evaluate=True`` scores it
-        under the problem's contract. The planner's stored solution is left as
-        it is.
-        """
-        jax = require_jax()
-
-        # The rollout, its disturbances drawn from a fresh key
-        self.key, key = jax.random.split(self.key)
-        trajectory = self.rollout_law(x0, tf, key)
-
-        # Its score under the problem's contract, when asked
-        evaluation = evaluate_trajectory(self.problem, trajectory) if evaluate else None
-
-        return self.learned_solution(trajectory, evaluation)
 
     def nominal_trajectory(self, tf=None) -> Trajectory:
         """The learned law from the problem's start, with nominal parameters and disturbances."""

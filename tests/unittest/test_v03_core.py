@@ -457,10 +457,9 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
 
 
 @pytest.mark.jax
-def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
-    compiled = bicycle_planner()
-    compiled.compile_parametric_program()
-    x0 = compiled.problem.x0
+def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
+    planner = bicycle_planner()
+    pv = planner.compile()
 
     plans = {}
     for mu, target_y in ((1.0, 0.0), (0.4, 0.0), (0.4, 0.6)):
@@ -468,35 +467,27 @@ def test_script_04_program_one_compiled_mpc_program_rebinds_like_the_rebuilds():
             "plant": {"mu": np.asarray(mu)},
             "cost": {"x_bar": bicycle_planner(target_y=target_y).problem.cost.x_bar},
         }
-        plan = compiled.solve_trajectory_from(
-            x0, params=edited(compiled.params, values)
-        )
+        tree = edited(pv.params, values)
+        z, status = pv.solve(tree)
+        plan = pv.solution(z, params=tree, status=status)
         rebuilt = bicycle_planner(mu, target_y).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.u, rebuilt.trajectory.u, atol=1e-5)
         plans[mu, target_y] = plan.trajectory
 
-        # The NumPy rebuild path answers the same values on the same API
-        numpy_planner = bicycle_planner(backend="numpy")
-        numpy_plan = numpy_planner.solve_trajectory_from(
-            x0, params=edited(numpy_planner.params, values)
-        )
-        # (SLSQP on finite differences: the same optimum on a flat valley)
-        assert numpy_plan.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
-        np.testing.assert_allclose(
-            numpy_plan.trajectory.x, plan.trajectory.x, atol=1e-3
-        )
+        # The offline route at the same tree answers the same plan
+        offline = planner.solve(params=edited(planner.params, values))
+        assert offline.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
+        np.testing.assert_allclose(offline.trajectory.x, plan.trajectory.x, atol=1e-3)
 
     # The friction and the target change the plan, and the user's plant keeps its mu
     assert not np.allclose(plans[1.0, 0.0].x, plans[0.4, 0.0].x, atol=1e-3)
     assert not np.allclose(plans[0.4, 0.0].x, plans[0.4, 0.6].x, atol=1e-3)
-    assert compiled.problem.sys.params["mu"] == 1.0
+    assert planner.problem.sys.params["mu"] == 1.0
 
     # An unknown path raises, naming the known ones
     with pytest.raises(ValueError, match="known entries"):
-        compiled.solve_trajectory_from(
-            x0, params=edited(compiled.params, {"plant": {"nu": 1.0}})
-        )
+        pv.solve(edited(pv.params, {"plant": {"nu": 1.0}}))
 
 
 def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
@@ -529,16 +520,14 @@ def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
 
 @pytest.mark.jax
 def test_script_04_program_ipopt_solves_the_compiled_program():
-    # The adapter's quasi-Newton (no Lagrangian Hessian, the plan's §6) needs
-    # thousands of iterations on the stiff bicycle: the clause runs on the
-    # pendulum's compiled program, rebound with a new mass (the run log, §4)
+    # The adapter's quasi-Newton (no Lagrangian Hessian) needs thousands of
+    # iterations on the stiff bicycle: the clause runs on the pendulum's compiled
+    # face, rebound with a new mass
     pytest.importorskip("cyipopt")
-    compiled = pendulum_planner(method="ipopt")
-    compiled.compile_parametric_program()
-    plan = compiled.solve_trajectory_from(
-        compiled.problem.x0,
-        params=edited(compiled.params, {"plant": {"m": np.asarray(1.3)}}),
-    )
+    pv = pendulum_planner(method="ipopt").compile()
+    tree = edited(pv.params, {"plant": {"m": np.asarray(1.3)}})
+    z, status = pv.solve(tree)
+    plan = pv.solution(z, params=tree, status=status)
     reference = pendulum_planner(1.3).solve()
     assert plan.success
     np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)

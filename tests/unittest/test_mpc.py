@@ -63,9 +63,9 @@ class JaxSingleIntegrator(DynamicSystem):
 
 @pytest.mark.optional
 @pytest.mark.jax
-@pytest.mark.optional
-@pytest.mark.jax
-class TestTrajectoryOptimizationPlanner(unittest.TestCase):
+class TestTwoReplanningRoutes(unittest.TestCase):
+    """Offline, ``planner.solve(params=)`` with the new start in the tree; in real time, the compiled face."""
+
     def setUp(self):
         configure_jax(enable_x64=True)
 
@@ -86,150 +86,53 @@ class TestTrajectoryOptimizationPlanner(unittest.TestCase):
         transcription = DirectCollocationTranscription(
             DirectCollocationOptions(n_steps=5)
         )
-        planner = TrajectoryOptimizationPlanner(
+        return TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
             backend="jax",
             options={"maxiter": 50, "ftol": 0.0001},
         )
-        planner.compile_parametric_program()
-        return planner
 
-    def test_step_smoke(self):
-        planner = self.make_planner(self.make_problem(0.0))
-        traj = planner.step(np.array([0.0]))
+    def test_the_face_solves_from_a_new_start_and_reads_the_plan_back(self):
+        pv = self.make_planner(self.make_problem(0.0)).compile()
+        tree = edited(pv.params, {"x0": np.array([0.35])})
+        z, status = pv.solve(tree)
+        traj = pv.solution(z, params=tree, status=status).trajectory
         self.assertEqual(traj.x.shape, (1, 5))
         self.assertEqual(traj.u.shape, (1, 5))
-        self.assertIsNotNone(planner.last_solution.record.optimization_result)
-        traj2 = planner.step(np.array([0.2]))
-        self.assertEqual(traj2.x.shape, (1, 5))
+        np.testing.assert_allclose(traj.x[:, 0], [0.35], atol=1e-05)
 
-    def test_compile_once_per_planner(self):
-        planner = self.make_planner(self.make_problem(0.0))
-        compile_s = planner.compile_time_s
-        self.assertIsNotNone(compile_s)
-        self.assertGreater(compile_s, 0.0)
-        planner.step(np.array([0.0]))
-        first_step_s = planner.last_solution.record.step_time_s
-        planner.step(np.array([0.15]))
-        second_step_s = planner.last_solution.record.step_time_s
-        self.assertIsNotNone(first_step_s)
-        self.assertIsNotNone(second_step_s)
-        self.assertLess(second_step_s, first_step_s)
-        self.assertLess(second_step_s, 0.5 * compile_s)
+        # The next tick from the last plan, a new start
+        z2, _ = pv.solve(edited(pv.params, {"x0": np.array([0.2])}), z)
+        self.assertEqual(np.asarray(z2).shape, np.asarray(z).shape)
 
-    def test_initial_boundary_satisfied(self):
-        x0 = np.array([0.35])
-        planner = self.make_planner(self.make_problem(float(x0[0])))
-        traj = planner.step(x0)
-        np.testing.assert_allclose(traj.x[:, 0], x0, atol=1e-05)
-
-    def test_solve_returns_trajectory_plan(self):
-        problem = self.make_problem(0.1)
+    def test_the_two_routes_agree_on_a_new_start(self):
+        problem = self.make_problem(0.0)
         planner = self.make_planner(problem)
-        plan = planner.solve()
-        traj = plan.trajectory
-        np.testing.assert_allclose(traj.x[:, 0], problem.x0, atol=1e-05)
-        self.assertIs(planner.last_solution, plan)
-        self.assertIsInstance(plan.record, TrajectoryOptimizationRecord)
-
-
-from minilink.planning.initial_guess import default_initial_trajectory
-
-
-@pytest.mark.optional
-@pytest.mark.jax
-class TestMPCSolveTrajectoryFrom(unittest.TestCase):
-    def setUp(self):
-        configure_jax(enable_x64=True)
-
-    def make_problem(self, x0=0.0):
-        sys = JaxSingleIntegrator()
-        cost = QuadraticCost.from_system(
-            sys, Q=np.zeros((1, 1)), R=np.eye(1), S=np.zeros((1, 1))
-        )
-        return PlanningProblem(
-            sys=sys,
-            horizon=1.0,
-            x0=np.array([x0]),
-            cost=cost,
-            U=sys.input_box,
-        )
-
-    def make_planner(self, problem):
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=5)
-        )
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            transcription=transcription,
-            backend="jax",
-            options={"maxiter": 50, "ftol": 0.0001},
-        )
-        planner.compile_parametric_program()
-        return planner
-
-    def test_parity_with_step(self):
         x0 = np.array([0.2])
-        planner_step = self.make_planner(self.make_problem(0.0))
-        traj = planner_step.step(x0)
-        planner_from = self.make_planner(self.make_problem(0.0))
-        plan = planner_from.solve_trajectory_from(x0)
-        np.testing.assert_allclose(plan.trajectory.x, traj.x, atol=1e-08)
-        np.testing.assert_allclose(plan.trajectory.u, traj.u, atol=1e-08)
-        np.testing.assert_allclose(
-            planner_from.last_solution.record.optimization_result.z,
-            planner_step.last_solution.record.optimization_result.z,
-            atol=1e-08,
-        )
-        self.assertIs(planner_from.last_solution, plan)
 
-    def test_solver_record_present(self):
-        planner = self.make_planner(self.make_problem(0.1))
-        plan = planner.solve_trajectory_from(np.array([0.1]))
-        self.assertIsInstance(plan.success, bool)
-        self.assertIsNotNone(plan.record.message)
-        self.assertIsNone(plan.record.feasible)  # an online tick runs no residual check
-        self.assertEqual(plan.success, plan.record.solver_success)
-        self.assertIsNone(plan.evaluation)  # not asked
-        self.assertIsNotNone(planner.last_solution.record.optimization_result.z)
+        offline = planner.solve(params=edited(planner.params, {"x0": x0}))
+        pv = planner.compile()
+        tree = edited(pv.params, {"x0": x0})
+        z, status = pv.solve(tree)
+        online = pv.solution(z, params=tree, status=status)
+
+        np.testing.assert_allclose(online.trajectory.x, offline.trajectory.x, atol=1e-6)
+        np.testing.assert_allclose(online.trajectory.u, offline.trajectory.u, atol=1e-6)
+        np.testing.assert_allclose(offline.trajectory.x[:, 0], x0, atol=1e-05)
+        self.assertIs(planner.last_solution, offline)  # the face keeps no solution
+        self.assertIsInstance(online.record, TrajectoryOptimizationRecord)
+        np.testing.assert_allclose(problem.x0, [0.0])  # the caller's problem as it was
 
     def test_params_none_or_the_planners_tree(self):
-        planner = self.make_planner(self.make_problem(0.0))
-        x0 = np.array([0.0])
-        plan_none = planner.solve_trajectory_from(x0, params=None)
-        plan_tree = planner.solve_trajectory_from(x0, params=planner.params)
-        np.testing.assert_allclose(plan_none.trajectory.x[:, 0], x0, atol=1e-05)
-        np.testing.assert_allclose(plan_tree.trajectory.x[:, 0], x0, atol=1e-05)
+        pv = self.make_planner(self.make_problem(0.0)).compile()
+        z_none, _ = pv.solve(None)
+        z_tree, _ = pv.solve(pv.params)
+        np.testing.assert_allclose(np.asarray(z_none), np.asarray(z_tree), atol=1e-8)
         with self.assertRaises(ValueError):  # an empty tree is no tree: None
-            planner.solve_trajectory_from(x0, params={})
-
-    def test_params_scene_not_implemented(self):
-        planner = self.make_planner(self.make_problem(0.0))
-        with self.assertRaises(NotImplementedError):
-            planner.solve_trajectory_from(np.array([0.0]), params={"scene": {}})
-
-    def test_params_unknown_keys_rejected(self):
-        planner = self.make_planner(self.make_problem(0.0))
+            pv.solve({})
         with self.assertRaises(ValueError):
-            planner.solve_trajectory_from(np.array([0.0]), params={"foo": 1})
-
-    def test_solve_trajectory_rebuild_and_from_compiled(self):
-        """Offline rebuild and compiled from-solve both honor ``x0``."""
-        problem = self.make_problem(0.15)
-        planner_from = self.make_planner(problem)
-        plan_from = planner_from.solve_trajectory_from(problem.x0)
-        np.testing.assert_allclose(plan_from.trajectory.x[:, 0], problem.x0, atol=1e-05)
-        planner_off = TrajectoryOptimizationPlanner(
-            problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
-            backend="jax",
-            options={"maxiter": 50, "ftol": 0.0001},
-        )
-        plan_off = planner_off.solve()
-        np.testing.assert_allclose(plan_off.trajectory.x[:, 0], problem.x0, atol=1e-05)
+            pv.solve({"foo": 1})
 
     def test_a_set_and_the_start_time_bind_like_a_rebuild(self):
         from minilink.core.sets import BallSet
@@ -249,19 +152,15 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
                 U=sys.input_box,
             )
 
-        planner = self.make_planner(problem_of(1.0))
-        self.assertIn("X", planner.program.params)  # a set read as margins is a leaf
-        x0 = np.array([0.0])
-        plan = planner.solve_trajectory_from(
-            x0, params=edited(planner.params, {"X": {"radius": 0.5}, "t0": 3.0})
-        )
-        rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve_trajectory_from(x0)
+        pv = self.make_planner(problem_of(1.0)).compile()
+        self.assertIn("X", pv.params)  # a set read as margins is a leaf
+        tree = edited(pv.params, {"X": {"radius": 0.5}, "t0": 3.0})
+        z, status = pv.solve(tree)
+        plan = pv.solution(z, params=tree, status=status)
+        rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 5))
         self.assertLessEqual(plan.trajectory.x.max(), 0.5 + 1e-6)
-
-        # A box lowered to the decision bounds is structure, not a leaf
-        self.assertNotIn("U", planner.program.params)
 
         # A moved ball takes its own bounds: none of the compile-time box stays
         def moved(center):
@@ -270,48 +169,19 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             return problem
 
         start = np.array([1.5])
-        plan = planner.solve_trajectory_from(
-            start, params=edited(planner.params, {"X": {"center": [1.0]}})
+        tree = edited(pv.params, {"X": {"center": [1.0]}, "x0": start})
+        z, status = pv.solve(tree)
+        plan = pv.solution(z, params=tree, status=status)
+        rebuilt = self.make_planner(moved(1.0)).solve(
+            params=edited(self.make_planner(moved(1.0)).params, {"x0": start})
         )
-        rebuilt = self.make_planner(moved(1.0)).solve_trajectory_from(start)
         self.assertTrue(plan.success)
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
 
-    def test_the_compiled_ticks_evaluation_is_the_ticks_problem(self):
-        sys = JaxSingleIntegrator()
-        cost = QuadraticCost.from_system(sys, Q=np.eye(1), R=0.1 * np.eye(1))
-        problem = PlanningProblem(
-            sys=sys, horizon=1.0, x0=np.array([0.0]), cost=cost, U=sys.input_box
-        )
-        values = {"t0": 3.0, "cost": {"Q": 4.0 * np.eye(1)}}
-        x0 = np.array([0.3])
-        planner = self.make_planner(problem)
-        compiled = planner.solve_trajectory_from(
-            x0, params=edited(planner.params, values), evaluate=True
-        )
-        numpy_planner = TrajectoryOptimizationPlanner(
-            problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
-            backend="numpy",
-            options={"maxiter": 50, "ftol": 0.0001},
-        )
-        rebuild = numpy_planner.solve_trajectory_from(
-            x0, params=edited(numpy_planner.params, values), evaluate=True
-        )
-        self.assertEqual(compiled.problem.t0, 3.0)
-        np.testing.assert_allclose(compiled.problem.x0, x0)
-        np.testing.assert_allclose(
-            compiled.evaluation.J, rebuild.evaluation.J, rtol=1e-3
-        )
-        self.assertEqual(problem.t0, 0.0)  # the caller's problem as it was
-
-    def test_the_compiled_tick_solves_with_ipopt(self):
+    def test_the_compiled_face_solves_with_ipopt(self):
         pytest.importorskip("cyipopt")
-        problem = self.make_problem(0.0)
         planner = TrajectoryOptimizationPlanner(
-            problem,
+            self.make_problem(0.0),
             transcription=DirectCollocationTranscription(
                 DirectCollocationOptions(n_steps=5)
             ),
@@ -319,8 +189,10 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
             method="ipopt",
             options={"max_iter": 100},
         )
-        planner.compile_parametric_program()
-        plan = planner.solve_trajectory_from(np.array([0.2]))
+        pv = planner.compile()
+        tree = edited(pv.params, {"x0": np.array([0.2])})
+        z, status = pv.solve(tree)
+        plan = pv.solution(z, params=tree, status=status)
         self.assertTrue(plan.success)
         np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.2], atol=1e-6)
 
@@ -328,15 +200,17 @@ class TestMPCSolveTrajectoryFrom(unittest.TestCase):
         np.testing.assert_allclose(plan.trajectory.u, 0.0, atol=1e-6)
         np.testing.assert_allclose(plan.trajectory.x, 0.2, atol=1e-6)
 
-    def test_initial_guess_accepted(self):
+    def test_a_guess_seeds_the_face(self):
         problem = self.make_problem(0.0)
-        planner = self.make_planner(problem)
+        pv = self.make_planner(problem).compile()
         guess = default_initial_trajectory(
-            problem, planner.transcription.initial_guess_time_grid(problem)
+            problem, pv.planner.transcription.initial_guess_time_grid(problem)
         )
-        plan = planner.solve_trajectory_from(np.array([0.05]), guess=guess)
+        tree = edited(pv.params, {"x0": np.array([0.05])})
+        z, status = pv.solve(tree, pv.pack(guess, tree))
+        plan = pv.solution(z, params=tree, status=status)
         np.testing.assert_allclose(plan.trajectory.x[:, 0], [0.05], atol=1e-05)
-        self.assertIsNotNone(planner.last_solution.record.optimization_result.z)
+        self.assertIsNotNone(plan.record.optimization_result.z)
 
 
 class SingleIntegrator(DynamicSystem):

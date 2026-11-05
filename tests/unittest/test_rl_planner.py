@@ -22,7 +22,7 @@ from minilink.learning.reinforcement_learning import (  # noqa: E402
     ReinforcementLearningPlanner,
     RolloutEnvironment,
 )
-from minilink.planning import evaluate, evaluate_trajectory  # noqa: E402
+from minilink.planning import evaluate  # noqa: E402
 
 pytestmark = [pytest.mark.optional, pytest.mark.jax]
 
@@ -156,11 +156,6 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     np.testing.assert_allclose(
         solution.policy.params["mlp"]["W0"], np.asarray(actor["W0"])
     )
-    rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.5, evaluate=True)
-    assert isinstance(rollout, PlanningSolution) and rollout.trajectory.n_samples == 6
-    J = evaluate_trajectory(prob, rollout.trajectory).J
-    np.testing.assert_allclose(rollout.evaluation.J, J)
-    assert planner.last_solution is solution  # an online rollout is not stored
     u, _ = planner.predict(np.zeros((3, 2)))
     assert u.shape == (3, 1)
 
@@ -265,15 +260,13 @@ def test_the_discount_has_one_owner_and_an_announced_default():
 def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32, verbose=0)
 
-    # no disturbance port: the same law on the same plant as a trajectory solve
+    # no disturbance port: the law from the start, no draw consumed
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(prob, **small)
     key = np.asarray(planner.key)
     nominal = planner.nominal_trajectory(tf=0.5)
-    np.testing.assert_array_equal(np.asarray(planner.key), key)  # no draw consumed
-    solved = planner.solve_trajectory_from(prob.x0, tf=0.5).trajectory
-    np.testing.assert_array_equal(nominal.x, solved.x)
-    np.testing.assert_array_equal(nominal.u, solved.u)
+    np.testing.assert_array_equal(np.asarray(planner.key), key)
+    np.testing.assert_allclose(nominal.x[:, 0], prob.x0)
 
     # a disturbance source: the nominal rollout reads it at its mean
     noisy = PlanningProblem(
@@ -289,8 +282,6 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
         planner.nominal_trajectory(tf=0.5),
     )
     np.testing.assert_array_equal(first.x, second.x)
-    disturbed = planner.solve_trajectory_from(noisy.x0, tf=0.5).trajectory
-    assert not np.array_equal(first.x, disturbed.x)
 
 
 def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
@@ -382,8 +373,6 @@ def test_sac_trains_through_the_same_planner_loop():
     assert "critic_loss" in planner.history[-1] and "alpha" in planner.history[-1]
     u = planner.get_controller().action(np.zeros(2))
     assert -4.0 <= u[0] <= 4.0
-    rollout = planner.solve_trajectory_from(np.zeros(2), tf=0.3)
-    assert isinstance(rollout, PlanningSolution) and rollout.evaluation is None
 
 
 def test_squashed_head_log_density_is_finite_outside_the_square():

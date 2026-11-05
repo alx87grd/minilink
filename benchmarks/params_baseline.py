@@ -343,24 +343,6 @@ def planners():
 
     section("mppi", out, mppi)
 
-    def mpc_tick():
-        planner = TrajectoryOptimizationPlanner(
-            reach().replace(Xf=None, horizon=1.0),
-            n_steps=8,
-            transcription="direct_collocation",
-            backend="jax",
-            options={"maxiter": 30},
-        )
-        planner.compile_parametric_program()
-        first = planner.solve_trajectory_from(np.array([0.1, 0.0]))
-        second = planner.solve_trajectory_from(np.array([0.2, 0.0]))
-        return {
-            "first": number(np.asarray(first.trajectory.x)),
-            "second": number(np.asarray(second.trajectory.x)),
-        }
-
-    section("mpc_tick", out, mpc_tick)
-
     def compiled_face():
         planner = TrajectoryOptimizationPlanner(
             reach().replace(Xf=None, X=None, horizon=1.0),

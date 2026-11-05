@@ -22,7 +22,6 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
     native_concatenate,
     program_backend_for_compile,
-    require_jax_compile_backend,
     stack_constraints,
     stack_parametric,
     trajectory_cost,
@@ -47,8 +46,6 @@ class DirectCollocationTranscription(Transcription):
 
     ``z = [x[0, :], ..., x[n-1, :], u[0, :], ..., u[m-1, :]]``.
     """
-
-    supports_parametric = True
 
     # The transcription's name in a program's metadata
     name = "direct_collocation"
@@ -99,24 +96,6 @@ class DirectCollocationTranscription(Transcription):
             },
         )
 
-    def transcribe_parametric(
-        self,
-        problem: PlanningProblem,
-        *,
-        backend: str = BACKEND_JAX,
-    ) -> MathematicalProgram:
-        """The JAX program an MPC compiles once: :meth:`transcribe`'s, its start pinned from ``params["x0"]``.
-
-        Requires a singleton ``X0``, so the measured start binds the initial
-        residual ``x[:, 0] − params["x0"]``.
-        """
-        require_jax_compile_backend(backend)
-        require_singleton_x0(problem)
-
-        return self.transcribe_jax(
-            problem, backend=backend, name="direct_collocation_parametric"
-        )
-
     def reconstruct_result(
         self,
         result: OptimizationResult,
@@ -128,7 +107,7 @@ class DirectCollocationTranscription(Transcription):
     ) -> Trajectory:
         """Read ``(x, u)`` from the optimizer result.
 
-        Prefer a cached ``dynamics`` callable (parametric compile path);
+        Prefer a compiled ``dynamics`` callable (a compiled face's);
         otherwise build one via ``backend``. ``params``, the tree a compiled
         program was solved with, gives the cost's numbers and the discount of
         the cost signals; ``None`` reads the problem's.
@@ -645,14 +624,6 @@ def input_margins(U, unpack_jax, grid):
         return native_concatenate(values, z)
 
     return margins
-
-
-def require_singleton_x0(problem):
-    """Refuse a parametric collocation program without a singleton initial set ``X0``."""
-    if not isinstance(problem.X0, SingletonSet):
-        raise ValueError(
-            "Parametric direct collocation requires a singleton initial boundary X0."
-        )
 
 
 def require_initial_guess(guess):

@@ -461,7 +461,7 @@ One model for every object, in seven rules:
    equation method (`f h tf g margin value sdf sample step`, which read it as given, no
    merge, no check) and on every tool verb (`Simulator.solve`, `ev.f/step/rollout/
    rollout_batch`, `pe.trajectory/evaluate/program`, `planner.solve`, `pv.solve/solution/
-   initial`, `solve_trajectory_from`, `Optimizer.solve`). Nothing merges anywhere. A one-off
+   initial`, `Optimizer.solve`). Nothing merges anywhere. A one-off
    tree is the tool's own, edited: a held tool's `params` is a copy (`p = sim.params;
    p["m"] = 2.0; sim.solve(params=p)`); a planner's is live on its problem's parts, so a solve
    that leaves the problem as it is copies it (`p = copy.deepcopy(planner.params)`), and one
@@ -551,9 +551,9 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   the weight held there. `FieldCost`'s params are its weight and its field's tree. Planners
   read each part's own parameters; a random plant's nominal draw is
   `nominal_plant_params(problem)`.
-  Online façade: `solve_trajectory_from(x0, params=)` binds any leaf of the program's tree
-  (§6, the parametric program); `params={"scene": …}` raises `NotImplementedError` (moving
-  obstacles online, A3). **Gap:** call-time `params` on the base `Shape` and the workspace
+  A new start is a number of the tree like a mass: offline, `planner.solve(params=p)` with
+  the new `p["x0"]`; in real time, the compiled face `pv.solve(p, z0)` (§6); moving obstacles
+  online wait for the geometry module. **Gap:** call-time `params` on the base `Shape` and the workspace
   fields (the geometry module's plan); the fields' wrappers hand their field no tree
   ([QUESTIONS.md](QUESTIONS.md)).
 
@@ -1433,8 +1433,8 @@ learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
 `cost_to_go` when the discounts match), `get_controller()` →
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
-map), `solve_trajectory_from(x0)` → a `PlanningSolution` carrying the
-learned law's rollout.
+map); the learned law's rollout with draws is
+`evaluate(problem, solution.policy, record=True)`.
 What the algorithm trains is a `ExplorationPolicy`: the controller block's mean action
 with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
@@ -1487,8 +1487,7 @@ diagnostics `last_program` and `last_optimizer` (RULES 2.4). A user's verb (`Opt
 `planner.solve`) always times the backend solve it wraps and fills `solve_time_s`; the
 machine-side solves (the compiled face's `pv.solve`, the fixed-iteration pure solve) are traced,
 have no wall clock, and leave it `None`.
-Online ticks (`solve_trajectory_from`, the MPC path) report
-the solver flag without a residual check. **I-level constructors** take flat kwargs
+**I-level constructors** take flat kwargs
 (`n_steps=…`, `transcription="direct_collocation"`, `backend=…`) like `Simulator` /
 `Optimizer`; teach demos pass `transcription=` explicitly. Tier-2 still accepts a
 `Transcription` instance. Offline
@@ -1497,13 +1496,11 @@ the solver flag without a residual check. **I-level constructors** take flat kwa
 (PP-2, PP-3): `x0` (the start's residual when `X0` is the start's singleton),
 `t0`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
-bounds is structure, not a leaf). Optional `compile_parametric_program()` compiles that program
-once (a singleton `X0` required) so `solve_trajectory_from(x0, params=)` is bind + solve
-only: `params` is `None` or the planner's complete tree (`planner.params`, a copy edited:
-`p["plant"]["mu"] = 0.6`, `p["t0"] = t`), checked once, with `x0` as `x0`, an unknown or a
-missing path raising and naming the known ones; with ``backend='numpy'`` or ``'direct'`` each from-solve rebuilds the NLP on a copy
-of the problem holding the values (the caller's parts unchanged): one API at two speeds. A
-one-time speed warning is emitted only when a JAX planner omits parametric compile. The
+bounds is structure, not a leaf). Two routes replan from new numbers, a new start among them:
+offline, `planner.solve(params=p, guess=prev)` with the new `p["x0"]` builds each call; in real
+time, `pv = planner.compile()` then `pv.solve(p, z)`, which the MPC uses, compiles once and never
+for new numbers (`params` is `None` or the complete tree, checked, an unknown or a missing path
+raising and naming the known ones). The
 reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
 tree stays under 2× the compile, the solve and an evaluator call of the same program with it
 frozen (the bicycle MPC is the check). Every transcription's objective is the

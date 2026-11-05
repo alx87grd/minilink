@@ -3,17 +3,14 @@
 from __future__ import annotations
 
 import time
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, normalize_backend
+from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.params import checked
-from minilink.core.sets import SingletonSet
 from minilink.core.trajectory import Trajectory
-from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
@@ -22,8 +19,6 @@ from minilink.optimization.optimizer import (
     NATIVE_METHODS,
     OptimizationProgressCallback,
     Optimizer,
-    make_optimizer_backend,
-    method_for,
     method_params_of,
 )
 from minilink.optimization.reporting import (
@@ -38,7 +33,6 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
     dynamics_function,
-    require_jax_compile_backend,
 )
 
 _UNSET = object()  # Marks a keyword the caller did not pass
@@ -61,11 +55,12 @@ class TrajectoryOptimizationPlanner(Planner):
     constraints. This planner owns the domain workflow:
     ``problem -> transcription -> mathematical program -> optimizer -> trajectory``.
 
-    Offline :meth:`solve` always rebuilds a fresh
-    :class:`~minilink.optimization.mathematical_program.MathematicalProgram`.
-    Online :meth:`solve_trajectory_from` rebuilds with the measured ``x0``
-    unless :meth:`compile_parametric_program` has been called, in which case
-    each from-solve is bind + solve only.
+    Two routes to a plan from new numbers (a new start among them): offline,
+    :meth:`solve` rebuilds a fresh
+    :class:`~minilink.optimization.mathematical_program.MathematicalProgram`
+    each call (``planner.solve(params=p, guess=previous)``); in real time,
+    :meth:`compile` is the planner's pure face, ``pv.solve(params, z0)``, which
+    compiles once and never for new numbers.
     """
 
     def __init__(
@@ -147,17 +142,7 @@ class TrajectoryOptimizationPlanner(Planner):
         self.last_program: MathematicalProgram | None = None
         self.last_optimizer: Optimizer | None = None
 
-        # The compiled parametric program, its optimizer and its dynamics
-        self.program = None
-        self.program_evaluator = None
-        self.optimizer_backend = None
-        self._dynamics = None
-
-        # Wall-clock time of the latest compile
-        self.compile_time_s: float | None = None
-
         # The rebuild path warns once, on JAX, that a compiled program is faster
-        self._warned_uncompiled_from = False
 
     @property
     def params(self) -> dict:
@@ -193,11 +178,6 @@ class TrajectoryOptimizationPlanner(Planner):
         backend = self.backend if backend is None else backend
 
         return CompiledTrajectoryPlanner(self, backend)
-
-    @property
-    def has_parametric_program(self) -> bool:
-        """True after a successful :meth:`compile_parametric_program`."""
-        return self.program_evaluator is not None and self.optimizer_backend is not None
 
     def solve(
         self,
@@ -329,105 +309,6 @@ class TrajectoryOptimizationPlanner(Planner):
             )
 
         return solution
-
-    def compile_parametric_program(self) -> None:
-        """Build and JIT-compile a parametric NLP once (idempotent).
-
-        Requires ``options.backend='jax'`` and a transcription that
-        implements :meth:`~Transcription.transcribe_parametric` (direct
-        collocation).
-        """
-        if self.has_parametric_program:
-            return
-
-        backend = normalize_backend(self.backend, allow_direct=True)
-        require_jax_compile_backend(self.backend)
-        require_parametric_transcription(self.transcription)
-
-        # The program with the start x0 as its parameter
-        t0 = time.perf_counter()
-        self.program = self.transcription.transcribe_parametric(
-            self.problem,
-            backend=backend,
-        )
-
-        # Its evaluator, traced on the default seed and bound to the problem's start
-        guess = default_initial_trajectory(
-            self.problem,
-            self.transcription.initial_guess_time_grid(self.problem),
-        )
-        z0 = self.transcription.pack_initial_guess(self.problem, guess)
-        self.program_evaluator = compile_program_evaluator(
-            self.program, BACKEND_JAX, sample_z=z0
-        )
-        self.program_evaluator.bind({"x0": self.problem.x0})
-        self.program_evaluator.warm_parametric()
-
-        # The compiled plant that reads each tick's plan back, on the tick's numbers
-        self._dynamics = self.problem.sys.compile(backend=backend).f
-
-        # The optimizer every online tick reuses
-        self.optimizer_backend = self.build_parametric_optimizer_backend()
-        self.compile_time_s = time.perf_counter() - t0
-
-    def solve_trajectory_from(
-        self,
-        x0,
-        *,
-        params=None,
-        guess=None,
-        evaluate: bool = False,
-        n_trials: int = 50,
-    ) -> PlanningSolution:
-        """
-        Online traj-family solve from measured ``x0``.
-
-        Parameters
-        ----------
-        x0 : array_like
-            Measured initial state.
-        params : mapping, optional
-            The values of this tick: ``None``, or the planner's complete tree
-            (:attr:`params`, a copy edited: ``p["plant"]["mu"] = 0.6``,
-            ``p["t0"] = t``), checked against it, with ``x0`` as its ``x0``:
-            an unknown or a missing path raises naming the known ones.
-            ``None`` binds ``x0`` only; ``scene`` is reserved for the
-            scene bind (A3) and raises.
-        guess : ndarray, Trajectory or PlanningSolution, optional
-            NLP seed (a schedule, a packed ``z``, or a solution's trajectory);
-            ``None`` the default schedule from ``x0``.
-
-        Notes
-        -----
-        Fast bind path when :attr:`has_parametric_program`; otherwise rebuilds
-        the NLP on a copy of the problem holding the values (one-time warning
-        suggesting :meth:`compile_parametric_program`): one API at two speeds.
-        """
-        require_no_scene(params)
-        if params is not None:
-            params, _ = planner_parts(checked(params, self.params))
-
-        # The fast bind path on a compiled program, else a rebuild from x0
-        if self.has_parametric_program:
-            return self.solve_trajectory_from_parametric(
-                x0,
-                params=params,
-                guess=guess,
-                evaluate=evaluate,
-                n_trials=n_trials,
-            )
-
-        return self.solve_trajectory_from_rebuild(
-            x0,
-            params=params,
-            guess=guess,
-            evaluate=evaluate,
-            n_trials=n_trials,
-        )
-
-    def step(self, x0, *, guess=None) -> Trajectory:
-        """Solve one from-tick and return the bare schedule (hand loops)."""
-        return self.solve_trajectory_from(x0, guess=guess).trajectory
 
     ###########################################################################
     # Internal machinery
@@ -659,137 +540,6 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print(DISP_RULE_MAIN)
 
-    def build_parametric_optimizer_backend(self):
-        """The solver of the online ticks: the method's preset from the one table, the planner's options over it."""
-        method = method_for(self.program, self.method)
-        options = {**self.options, **self.method_numbers}
-
-        return make_optimizer_backend(method, options=options)
-
-    def solve_trajectory_from_parametric(
-        self,
-        x0,
-        *,
-        params=None,
-        guess=None,
-        evaluate: bool = False,
-        n_trials: int = 50,
-    ) -> PlanningSolution:
-        """One online tick on the compiled program: bind ``x0`` and the tick's values, seed, solve, read the plan back."""
-        require_compiled_program(self.program_evaluator, self.optimizer_backend)
-
-        # The tick's tree: the given values, the measured state as x0, bound once
-        step_t0 = time.perf_counter()
-        x_arr = np.asarray(x0, dtype=float).reshape(-1)
-        require_x0_shape(x_arr, self.problem.sys)
-        self.program_evaluator.bind({**(params or {}), "x0": x_arr})
-        bound = self.program_evaluator.params
-
-        # The problem restarted at the measured state and the tick's start time, a
-        # copy holding the tick's other values when there are any
-        t0 = float(bound["t0"])
-        problem_k = problem_with(self.problem, host_tree(params)).replace(
-            x0=x_arr, X0=SingletonSet(x_arr), t0=t0
-        )
-
-        # The seed: the given guess, else the default schedule from the measured state
-        seed = self.resolve_guess(problem_k, guess)
-        z0 = self.transcription.pack_initial_guess(problem_k, seed)
-
-        # z* = argmin J(z; x0), timed
-        solve_t0 = time.perf_counter()
-        result = self.optimizer_backend.solve(
-            self.program_evaluator,
-            z0,
-        )
-        result = OptimizationResult(
-            z=result.z,
-            success=result.success,
-            cost=result.cost,
-            message=result.message,
-            stats=result.stats,
-            solve_time_s=time.perf_counter() - solve_t0,
-        )
-
-        # The plan read back from z* with the compiled dynamics on the tick's plant
-        plant = bound["plant"]
-        trajectory = self.transcription.reconstruct_result(
-            result,
-            problem=problem_k,
-            dynamics=lambda x, u, t: self._dynamics(x, u, t, plant),
-            params=bound,
-        )
-        step_time_s = time.perf_counter() - step_t0
-
-        # An online tick runs no residual check: its success is the solver's flag
-        record = TrajectoryOptimizationRecord(
-            cost=result.cost,
-            solver_success=bool(result.success),
-            message=str(result.message),
-            iterations=dict(result.stats).get("nit"),
-            solve_time_s=result.solve_time_s,
-            feasibility_tol=float(self.feasibility_tol),
-            max_equality_violation=None,
-            min_inequality_margin=None,
-            max_bound_violation=None,
-            feasible=None,
-            stats=dict(result.stats),
-            step_time_s=step_time_s,
-            optimization_result=result,
-        )
-        solution = self.store_solution(
-            self.trajectory_solution(
-                trajectory, record, evaluate, n_trials, problem=problem_k
-            )
-        )
-
-        if self.verbose:
-            self.print_step_report(record)
-
-        return solution
-
-    def print_step_report(self, record: TrajectoryOptimizationRecord) -> None:
-        """One line per online tick: the solver's flag, the cost and the timings."""
-        j_txt = "n/a" if record.cost is None else f"{float(record.cost):.6g}"
-        print(
-            f"TOP step: success={record.solver_success} "
-            f"J={j_txt} "
-            f"solve={record.solve_time_s:.6g}s "
-            f"step={record.step_time_s:.6g}s"
-        )
-
-    def solve_trajectory_from_rebuild(
-        self,
-        x0,
-        *,
-        params=None,
-        guess=None,
-        evaluate: bool = False,
-        n_trials: int = 50,
-    ) -> PlanningSolution:
-        """One online tick by an offline solve from ``x0`` and the tick's values (warns once, on JAX, to compile instead)."""
-        # Once: on JAX, a compiled parametric program would skip the rebuild
-        if not self._warned_uncompiled_from:
-            backend = normalize_backend(self.backend, allow_direct=True)
-            if backend == BACKEND_JAX:
-                warnings.warn(
-                    "TrajectoryOptimizationPlanner.solve_trajectory_from is rebuilding "
-                    "the NLP each call. Call compile_parametric_program() once for "
-                    "fast bind-only from-solves (requires backend='jax').",
-                    UserWarning,
-                    stacklevel=3,
-                )
-            self._warned_uncompiled_from = True
-
-        # One offline solve on a copy of the problem restarted at the measured state
-        x_arr = np.asarray(x0, dtype=float).reshape(-1)
-        require_x0_shape(x_arr, self.problem.sys)
-        problem_k = problem_with(self.problem, params).replace(
-            x0=x_arr, X0=SingletonSet(x_arr)
-        )
-
-        return self.solve_on(problem_k, guess, evaluate, n_trials)
-
 
 @dataclass(frozen=True)
 class TrajectoryOptimizationRecord:
@@ -799,9 +549,7 @@ class TrajectoryOptimizationRecord:
     ``success`` is *the returned plan satisfies the program constraints to
     ``feasibility_tol``*, nothing else: an iteration-limit stop on a feasible
     plan is not a failure, a solver that reports convergence on an infeasible
-    plan is. The solver's own flag and message stay beside it. An online tick
-    (``solve_trajectory_from`` on a compiled program) runs no residual check,
-    ``feasible`` is ``None`` and ``success`` is the solver's flag.
+    plan is. The solver's own flag and message stay beside it.
     """
 
     cost: float | None
@@ -862,28 +610,6 @@ class TrajectoryOptimizationIteration:
     cost: float
     max_eq: float
     min_ineq: float | None
-
-
-def require_no_scene(params) -> None:
-    """
-    Refuse online ``params`` that are not a tree, or that hold the reserved ``scene``.
-
-    The tree's own check is the program's (an unknown path raises naming the
-    known ones); ``scene`` waits for the scene bind (A3) and raises
-    :class:`NotImplementedError`.
-    """
-    if params is None:
-        return
-
-    if not hasattr(params, "keys"):
-        raise TypeError(
-            f"params must be a mapping or None; got {type(params).__name__}."
-        )
-    if "scene" in params:
-        raise NotImplementedError(
-            "the online params key 'scene' waits for the scene bind (A3); "
-            "bind the problem's own leaves (plant, cost, t0, …)"
-        )
 
 
 def warm_bound_form(optimizer) -> None:
@@ -995,30 +721,6 @@ def type_name(value: object | None) -> str | None:
         return None
 
     return type(value).__name__
-
-
-def require_parametric_transcription(transcription):
-    """Refuse a transcription that cannot build a parametric program."""
-    if not transcription.supports_parametric:
-        raise TypeError(
-            f"{type(transcription).__name__} does not support a "
-            "parametric program; use transcription='direct_collocation'."
-        )
-
-
-def require_compiled_program(program_evaluator, optimizer_backend):
-    """Refuse a parametric tick before :meth:`compile_parametric_program` has run."""
-    if program_evaluator is None or optimizer_backend is None:
-        raise RuntimeError(
-            "compile_parametric_program() must run before parametric from-solve."
-        )
-
-
-def require_x0_shape(x_arr, sys):
-    """Refuse a measured state without the system's ``n`` entries."""
-    n = int(sys.n)
-    if x_arr.shape != (n,):
-        raise ValueError(f"x0 must have shape ({n},)")
 
 
 def decision_vector_of(guess, program):

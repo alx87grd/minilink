@@ -2031,46 +2031,6 @@ def test_plot_track_smoke():
     assert len(ax.lines) >= 1
 
 
-class TestParametricCapabilityFlag(unittest.TestCase):
-    """S42: multiple shooting no longer inherits collocation's parametric build."""
-
-    def test_multiple_shooting_declares_no_parametric_support(self):
-        from minilink.planning.trajectory_optimization.direct_collocation import (
-            DirectCollocationTranscription,
-        )
-        from minilink.planning.trajectory_optimization.multiple_shooting import (
-            MultipleShootingTranscription,
-        )
-
-        self.assertTrue(DirectCollocationTranscription.supports_parametric)
-        self.assertFalse(MultipleShootingTranscription.supports_parametric)
-
-    @pytest.mark.optional
-    @pytest.mark.jax
-    def test_planner_refuses_parametric_compile_for_multiple_shooting(self):
-        pytest.importorskip("jax")
-        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-
-        plant = Pendulum()
-        goal = np.array([np.pi, 0.0])
-        problem = PlanningProblem(
-            plant,
-            x0=np.zeros(2),
-            Xf=SingletonSet(goal),
-            horizon=2.0,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
-            U=plant.input_box,
-        )
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=10,
-            transcription="multiple_shooting",
-            backend="jax",
-        )
-        with self.assertRaises(TypeError):
-            planner.compile_parametric_program()
-
-
 class TestTrajoptSuccessSemantics(unittest.TestCase):
     """S09: success means the plan satisfies the constraints, not the solver's mood."""
 
