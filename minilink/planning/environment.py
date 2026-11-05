@@ -121,7 +121,7 @@ class RolloutEnvironment:
         self.reward = reward if is_continuous(problem) else "stage"
 
         # The episode's realization: the plant's laws drawn, a seed per random source
-        self.laws = problem.laws.get("plant", {})
+        self.laws = problem.distributions.get("plant", {})
         self.sources = dict(problem.disturbances)
         require_stepped_sources(self.sys, self.sources)
         random_sources = any(block.is_random for block in self.sources.values())

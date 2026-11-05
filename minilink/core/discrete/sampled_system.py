@@ -13,6 +13,7 @@ from minilink.core.compile.evaluators.stepping import (
     step_with_cost,
 )
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.params import DelegatedParams
 from minilink.core.system import DynamicSystem, System, automatic_step_of
 
 SAMPLED_SOLVERS = ("rk4", "euler", "exact")
@@ -85,7 +86,7 @@ class SampledSystem(StepSystem):
         source.x0 = x0
         self.name = f"Discretized({source.name})"
         self.id = source.id
-        self.params = None
+        self.built = True
 
         # State: the source's (its x0 a view), labels, units, bounds and nominal value
         self.state = source.state
@@ -101,17 +102,21 @@ class SampledSystem(StepSystem):
         self.camera_follow_frame = source.camera_follow_frame
         self.camera_priority = source.camera_priority
 
-    @property
-    def params(self) -> dict:
-        """The source's live ``params`` while no override is assigned, else the override."""
-        if self.params_override is None:
-            return self.source.params
+    def source_params(self):
+        """The source's numbers: the view has none of its own."""
+        return self.source.params
 
-        return self.params_override
+    def write_source_params(self, value):
+        """Write through to the source, once built: the System shell's empty default never reaches it."""
+        if self.__dict__.get("built"):
+            self.source.params = value
 
-    @params.setter
-    def params(self, value: dict | None):
-        self.params_override = value
+    params = DelegatedParams(
+        source_params,
+        write_source_params,
+        "The source's ``params``, its one home: an edit through the view is the source's.",
+        "source",
+    )
 
     @property
     def x0(self):

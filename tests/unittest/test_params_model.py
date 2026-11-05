@@ -267,3 +267,66 @@ def test_a_composite_values_unknown_entry_is_refused_before_any_write():
     with pytest.raises(ValueError, match="no entry"):
         both.params = {"0": {"upper": np.array([2.0])}, "2": {"radius": 1.0}}
     np.testing.assert_array_equal(both.sets[0].upper, [1.0])
+
+
+# Composites hold their own numbers: a write to one lands
+
+
+def test_a_problems_own_numbers_land_where_they_are_written():
+    plant = Pendulum()
+    problem = regulation_problem(plant)
+
+    problem.params["discount_rate"] = 0.5
+    problem.params["t0"] = 1.0
+
+    assert problem.discount_rate == 0.5 and problem.t0 == 1.0
+    problem.discount_rate = 0.25
+    assert problem.params["discount_rate"] == 0.25
+
+
+def test_a_scaled_terms_weight_lands_through_the_sum():
+    base = QuadraticCost.from_system(Pendulum())
+    obstacle = 10.0 * TimeCost(np.zeros(2))
+    total = base + obstacle
+
+    total.params["TimeCost"]["weight"] = 20.0
+
+    assert obstacle.weight == 20.0
+
+
+def test_a_problem_holds_numbers_and_its_laws_are_its_distributions():
+    from minilink import Uniform
+
+    plant = Pendulum()
+    law = Uniform([0.8], [1.2])
+    problem = PlanningProblem(
+        plant,
+        x0=np.zeros(2),
+        horizon=1.0,
+        distributions={"plant": {"m": law}},
+    )
+
+    assert problem.distributions["plant"]["m"] is law
+    assert problem.params["plant"] is plant.params
+    with pytest.raises(TypeError, match="distributions"):
+        problem.params = {"plant": {**plant.params, "m": Uniform([1.0], [2.0])}}
+
+
+def test_a_sampled_view_reads_and_writes_its_sources_numbers():
+    plant = Pendulum()
+    sampled = plant.discretize(0.1)
+
+    sampled.params["m"] = 2.0
+
+    assert sampled.params is plant.params and plant.params["m"] == 2.0
+
+
+def test_a_diagram_refuses_a_block_added_twice():
+    from minilink import DiagramSystem
+
+    plant = Pendulum()
+    diagram = DiagramSystem()
+    diagram.add_subsystem(plant, "plant")
+
+    with pytest.raises(ValueError, match="already in the diagram as 'plant'"):
+        diagram.add_subsystem(plant, "plant2")

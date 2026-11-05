@@ -204,7 +204,7 @@ def stochastic_problem(**fields):
         horizon=1.0,
         U=BoxInputSet.from_bounds([-50.0], [50.0]),
         x0=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
-        params={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
+        distributions={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,
     )
 
@@ -719,8 +719,8 @@ def test_each_law_draws_from_its_own_stream():
     assert len({tuple(x) for x in first["x0"]}) == 4  # distinct trials
 
     # Adding a law leaves the other draws unchanged
-    laws = {"plant": {**problem.laws["plant"], "l": Uniform([0.9], [1.1])}}
-    more = problem.replace(params=laws).realize(0, 4)
+    laws = {"plant": {**problem.distributions["plant"], "l": Uniform([0.9], [1.1])}}
+    more = problem.replace(distributions=laws).realize(0, 4)
     np.testing.assert_array_equal(more["x0"], first["x0"])
     np.testing.assert_array_equal(more["plant"]["m"], first["plant"]["m"])
 
@@ -817,19 +817,20 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
 # --- the problem's laws, sources and starts: the seam review's cases ---
 
 
-def test_a_law_written_into_the_params_moves_the_laws_and_leaves_the_parts():
+def test_a_law_goes_in_the_distributions_never_in_the_params():
     problem = stochastic_problem()
     m_before = problem.sys.params["m"]
     law = Uniform(np.array([1.5]), np.array([1.6]))
     start = Gaussian(mean=np.array([0.2, 0.0]), std=np.array([0.01, 0.01]))
 
-    params = problem.params
-    params["plant"]["m"] = law
-    params["x0"] = start
-    problem.params = params
+    # The tree holds numbers: a law written into it is refused, the plant untouched
+    with pytest.raises(TypeError, match="distributions"):
+        problem.params = {"plant": {**problem.sys.params, "m": law}}
+    assert problem.sys.params["m"] is m_before
 
-    # The laws hold the new law, the plant keeps its own number
-    assert problem.laws["plant"]["m"] is law
+    # The laws are the problem's distributions, the start's law its x0
+    problem = problem.replace(x0=start, distributions={"plant": {"m": law}})
+    assert problem.distributions["plant"]["m"] is law
     assert problem.start_law is start
     assert problem.sys.params["m"] is m_before
     tree = problem.realize(0, 4)

@@ -6,7 +6,12 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
-from minilink.core.params import own_params, param_view, require_complete_part
+from minilink.core.params import (
+    held_params,
+    own_params,
+    param_view,
+    require_complete_part,
+)
 from minilink.core.trajectory import Trajectory
 
 ###############################################################################
@@ -415,31 +420,23 @@ class ScaledCost(CostFunction):
     Cost scaled by a weight, ``J = weight * J0``.
 
     Built by the ``*`` operator on :class:`CostFunction`, so a weighted sum
-    reads as ``base + weight * obstacle_cost``. Its :attr:`params` nest the
-    scaled cost's, ``{"weight": w, "cost": cost.params}``; in a sum it takes
-    the id of the cost it scales.
+    reads as ``base + weight * obstacle_cost``. Its :attr:`params` hold the
+    weight, its one home, beside the scaled cost's own tree,
+    ``{"weight": w, "cost": cost.params}``; in a sum it takes the id of the cost
+    it scales.
     """
+
+    params = held_params('``{"weight": w, "cost": the scaled cost\'s numbers}``.')
 
     def __init__(self, cost, weight):
         self.cost = cost
-        self.weight = float(weight)
+        self.params = {"weight": float(weight), "cost": cost.params}
 
-    @property
-    def params(self):
-        """Live view ``{"weight": w, "cost": cost.params}``."""
-        return {"weight": self.weight, "cost": self.cost.params}
+    weight = param_view("weight")
 
-    @params.setter
-    def params(self, value):
-        require_known_keys(value, ("weight", "cost"), "ScaledCost")
-        if value is None:
-            return
-        if "cost" in value:
-            require_complete_part(value["cost"], self.cost, ("cost",))
-        if "weight" in value:
-            self.weight = value["weight"]
-        if "cost" in value:
-            self.cost.params = value["cost"]
+    def param_parts(self) -> dict:
+        """The scaled cost: the part an assignment routes to."""
+        return {"cost": self.cost}
 
     def g(self, x, u, t=0.0, params=None):
         """Return the weighted running cost."""

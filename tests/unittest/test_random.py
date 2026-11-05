@@ -563,7 +563,7 @@ def test_the_nominal_problem_is_the_problem_at_its_means():
         horizon=1.0,
         cost=QuadraticCost.from_system(plant),
         x0=Gaussian([0.5, 0.0], [0.1, 0.1]),
-        params={"plant": {"m": Uniform([1.2], [1.6])}},
+        distributions={"plant": {"m": Uniform([1.2], [1.6])}},
         disturbances={
             "d": NoiseSource(Gaussian([0.3], [1.0]), sample_period=0.1, seed=4)
         },

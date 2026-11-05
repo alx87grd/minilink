@@ -256,8 +256,8 @@ def stochastic_problem_text(problem):
 
     if problem.start_law is not None:
         body.append(body_line("x0", inspect_inline(problem.start_law)))
-    if problem.laws:
-        paths = [".".join(path) for path, _ in flatten(problem.laws)]
+    if problem.distributions:
+        paths = [".".join(path) for path, _ in flatten(problem.distributions)]
         body.append(
             body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
         )

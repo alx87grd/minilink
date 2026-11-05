@@ -71,7 +71,7 @@ def pendulum_task(tf, x0, params=None):
         x0=x0,
         horizon=tf,
         U=plant.input_box,
-        params=params or {},
+        distributions=params or {},
     )
     return plant, problem
 

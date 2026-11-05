@@ -317,7 +317,7 @@ def test_the_plan_is_made_at_the_plant_design_point():
         horizon=0.5,
         x0=[0.0, 0.0],
         U=plant.input_box,
-        params={"plant": {"m": Uniform([2.5], [3.5])}},
+        distributions={"plant": {"m": Uniform([2.5], [3.5])}},
     )
     planner = MPPIPlanner(problem, dt=DT, n_rollouts=8)
     np.testing.assert_allclose(planner.params["plant"]["m"], 3.0)
