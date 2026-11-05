@@ -351,37 +351,6 @@ def canonical_tree(tree, reference):
     return canonical_leaf(tree, reference)
 
 
-class DeviceTree:
-    """
-    One tree kept on the device while its values repeat: a host loop's calls then transfer nothing.
-
-    The entry holds the leaves it was built from, so a tracer's identity (what
-    the digest reads of it) cannot be reused by another while the entry
-    lives. A tree holding a tracer (a call under an outer ``jit``, ``grad`` or
-    ``vmap``), or put on the device inside one, is returned, never kept: a tracer
-    outlives its trace.
-    """
-
-    def __init__(self):
-        self.entry = None
-
-    def get(self, tree, prepare, put):
-        """``put(prepare(tree))``, reused while ``tree``'s values repeat; ``prepare(tree)`` alone for a traced tree."""
-        leaves = [leaf for _, leaf in flatten_any(tree)]
-        if any(is_tracer(leaf) for leaf in leaves):
-            return prepare(tree)
-        digest = tree_digest(tree)
-        if self.entry is not None and self.entry[0] == digest:
-            return self.entry[2]
-
-        # Put inside an outer trace, the result is itself traced: returned, not kept
-        on_device = put(prepare(tree))
-        if not any(is_tracer(leaf) for _, leaf in flatten_any(on_device)):
-            self.entry = (digest, leaves, on_device)
-
-        return on_device
-
-
 def tree_digest(tree) -> bytes:
     """A digest of a tree's structure and values: every numeric leaf by its dtype, shape and bytes (a JAX array's too), a tracer by its identity."""
     digest = hashlib.blake2b(digest_size=16)
@@ -411,6 +380,12 @@ def canonical_leaf(leaf, reference):
     )
     dtype = np.result_type(reference)
     shape = np.shape(reference)
+
+    # A JAX value already in the reference's dtype and shape, strongly typed, passes
+    # as it is: a tree held on the device is never copied (a weak scalar converts)
+    if is_jax_value(leaf) and not getattr(leaf, "weak_type", True):
+        if leaf.dtype == dtype and tuple(leaf.shape) == shape:
+            return leaf
 
     # A value its reference's dtype cannot hold (2.5 for an integer default) promotes
     # instead: one more trace, never a truncated number

@@ -370,3 +370,77 @@ def test_an_optimizer_refuses_a_partial_tree():
     result = optimizer.solve(params=edited(optimizer.params, {"c": np.array(3.0)}))
 
     assert result.z[0] == pytest.approx(3.0, abs=1e-6)
+
+
+# A held simulator sweeps a parameter: one compile, each value read
+
+
+@pytest.mark.optional
+@pytest.mark.jax
+def test_a_held_simulator_sweeps_a_parameter_with_one_compile():
+    jax = pytest.importorskip("jax")
+    from minilink import Simulator
+
+    compiles = []
+    jax.monitoring.register_event_duration_secs_listener(
+        lambda name, secs, **kw: (
+            compiles.append(name)
+            if name == "/jax/core/compile/backend_compile_duration"
+            else None
+        )
+    )
+    plant = Pendulum()
+    plant.x0 = np.array([0.5, 0.0])
+    sim = Simulator(plant, tf=1.0, n_steps=101, solver="rk4_fixedsteps", backend="jax")
+
+    finals = [
+        sim.solve(params=edited(sim.evaluator.params, {"m": m})).x[0, -1]
+        for m in (0.5, 1.0)
+    ]
+    compiles.clear()
+    more = [
+        sim.solve(params=edited(sim.evaluator.params, {"m": m})).x[0, -1]
+        for m in (1.5, 2.0)
+    ]
+
+    assert len(compiles) == 0
+    assert len({*finals, *more}) == 4
+    assert plant.params["m"] == 1.0
+
+
+def test_a_solution_records_the_numbers_it_was_solved_on():
+    from minilink import LQRPlanner
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        x0=np.array([0.1, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+    )
+    solution = LQRPlanner(problem).solve()
+
+    plant.params["m"] = 3.0
+
+    assert solution.params["plant"]["m"] == 1.0
+    assert solution.problem.params["plant"]["m"] == 3.0  # the live problem moved
+
+
+# A held problem evaluator runs on the numbers taken at its compile
+
+
+def test_a_held_problem_evaluator_snapshots_and_a_new_compile_reads_the_edit():
+    from minilink import lqr
+
+    plant = Pendulum()
+    problem = regulation_problem(plant)
+    law = lqr(plant, np.eye(2), 0.1 * np.eye(1))
+    pe = problem.compile(law, dt=0.02, backend="numpy")
+    before = pe.evaluate().objective
+
+    plant.params["m"] = 3.0
+
+    assert pe.evaluate().objective == before
+    assert pe.params["plant"]["m"] == 1.0
+    assert problem.compile(law, dt=0.02, backend="numpy").evaluate().objective != before
+    heavy = edited(pe.params, {"plant": {"m": 3.0}})
+    assert pe.evaluate(heavy).objective != before

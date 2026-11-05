@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import warnings
 
 import numpy as np
@@ -19,7 +20,6 @@ from minilink.core.distributions import child_seed
 from minilink.core.options import require_one_of
 from minilink.core.params import (
     Batched,
-    DeviceTree,
     canonical_tree,
     flat_leaves,
     flatten,
@@ -150,7 +150,10 @@ class ProblemEvaluator:
         self.trials_fn = {}
         self.run_fn = None
         self.failure_cost_cache = {}
-        self.on_device = DeviceTree()
+
+        # The run's numbers, taken now: a held evaluator runs on them unless a call
+        # gives a tree (a later edit of the problem is a new compile's)
+        self.defaults = self.tree_of_objects()
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
         if backend == "auto" and self.backend == BACKEND_JAX and not self.traces():
@@ -158,8 +161,12 @@ class ProblemEvaluator:
 
     @property
     def params(self) -> dict:
+        """The run's numbers as one nested tree, taken at the compile: a copy, the tree a call edits (:meth:`tree_of_objects`)."""
+        return copy.deepcopy(self.defaults)
+
+    def tree_of_objects(self) -> dict:
         """
-        The run's parameters as one nested tree, fresh from the objects.
+        The run's parameters as one nested tree, read from the objects.
 
         ``{block_id: block params}`` for every block of the loop, a stateful block
         other than the plant with its start as the leaf ``"x0"`` (``controller.x0``,
@@ -189,7 +196,7 @@ class ProblemEvaluator:
         """
         One run of the loop, every block output recorded: the loop's trajectory.
 
-        ``params`` overrides entries of :attr:`params` (a partial tree is merged);
+        ``params`` is ``None`` (the numbers taken at the compile) or the complete tree of :attr:`params`, edited;
         ``key=None`` is the nominal run (a stochastic problem at its mean start).
         The plant's run is ``traj.of("plant")``.
         """
@@ -247,9 +254,9 @@ class ProblemEvaluator:
         realized once, from ``key``. The constraint rows ``g(z) ≥ 0`` are the
         per-trial feasibility margin when ``X`` or ``U`` is bounded and the
         reachability margin when ``Xf`` is set. ``bounds`` maps a path to
-        ``(lower, upper)`` (``None`` for an open side). ``params`` overrides
-        entries of :attr:`params` at the base point (the leaves not tuned keep
-        these values; the start ``z0`` reads the tuned ones).
+        ``(lower, upper)`` (``None`` for an open side). ``params`` is the base
+        point, ``None`` or the complete tree of :attr:`params` edited (the leaves
+        not tuned keep its values; the start ``z0`` reads the tuned ones).
 
         Three caveats of the failure switch: the failure cost is a step, with no
         gradient; with sets declared it counts beside their rows; with the switch
@@ -360,19 +367,13 @@ class ProblemEvaluator:
     ###########################################################################
 
     def merged(self, params):
-        """:attr:`params`, with the entries of ``params`` overriding, each in its default's dtype and shape (one trace for every value)."""
-        defaults = self.params
+        """The tree a call runs on: the compile's numbers for ``None``, else ``params`` checked complete against them, each leaf in its default's dtype and shape (one trace for every value)."""
+        defaults = self.defaults
         if params is None:
             return defaults
         require_complete(params, defaults)
 
         return canonical_tree(params, defaults)
-
-    def device_tree(self, tree):
-        """``tree`` on the device: put there once and kept while its values repeat, so a repeat transfers nothing."""
-        jax = ensure_jax_x64()
-
-        return self.on_device.get(tree, lambda same: same, jax.device_put)
 
     def run_compiled(self, params, x0):
         """:meth:`run` jitted once per problem parts: the recorded run in one dispatch."""
@@ -383,7 +384,7 @@ class ProblemEvaluator:
             self.run_fn = (jax.jit(self.run), parts)
         run, _ = self.run_fn
 
-        return run(self.device_tree(params), np.asarray(x0, dtype=float))
+        return run(params, np.asarray(x0, dtype=float))
 
     def failure_cost_and_bound(self, params):
         """
@@ -624,7 +625,6 @@ class ProblemEvaluator:
         # The trace reads the problem's cost and sets, so a part replaced on the
         # problem traces anew, in place of the entry it replaces
         tree, axes = batch_axes(params)
-        tree = self.device_tree(tree)
         parts = problem_parts(self.problem)
         layout = (record, tree_signature(axes))
         cached = self.trials_fn.get(layout)

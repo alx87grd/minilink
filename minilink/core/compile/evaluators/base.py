@@ -33,7 +33,6 @@ from minilink.core.compile.plan import (
     NOMINAL,
 )
 from minilink.core.params import (
-    DeviceTree,
     canonical_tree,
     flat_leaves,
     is_tracer,
@@ -79,7 +78,6 @@ class Evaluator(JacobianMixin):
         self._u_nominal = self.xp.array(np.asarray(u_nominal, dtype=float))
         self._frozen_params = None
         self.params_reader = None
-        self.on_device = DeviceTree()
         self.frozen_on_device = None
         self.frozen_large = None
 
@@ -101,9 +99,10 @@ class Evaluator(JacobianMixin):
 
         ``None`` stays ``None`` (the compiled values constants of the trace), unless
         a leaf is large (network weights), where the frozen tree is passed as an
-        argument instead, so the executable carries no copy. A tree is put on the
-        device in its compiled dtypes and shapes, kept there while its values
-        repeat: every value of every number type is then one trace.
+        argument instead, so the executable carries no copy. A tree is made the
+        compiled dtypes and shapes, so every value of every number type is one
+        trace, and passed as it is: no cache and no digest per call (a caller who
+        repeats a value holds it on the device, ``jax.device_put(tree)``).
         """
         frozen = self._frozen_params
         if params is None:
@@ -121,11 +120,9 @@ class Evaluator(JacobianMixin):
                 self.frozen_on_device = on_device
             return on_device
 
-        # The tree in its compiled types, on the device: put there once and kept
-        # while its values repeat (a host loop's calls transfer nothing)
-        return self.on_device.get(
-            params, lambda tree: canonical_tree(tree, frozen), self.jax.device_put
-        )
+        # The tree in its compiled types, passed as the traced argument: a host leaf
+        # is transferred by the call, a device leaf already in its types is passed as is
+        return canonical_tree(params, frozen)
 
     @property
     def nominal_input(self):

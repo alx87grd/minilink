@@ -10,6 +10,7 @@ from minilink.core.backends import (
     BACKEND_NUMPY,
 )
 from minilink.core.inspect import inspect_text
+from minilink.core.params import checked
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.compile_backend import resolve_auto_backend
@@ -170,10 +171,9 @@ class Simulator:
         # The initial state, checked
         self.x0 = require_x0(sys.x0 if x0 is None else x0, sys.n)
 
-        # Compile the system; the parameters it runs on
-        # (None while they are the compiled ones)
+        # Compile the system: its numbers, taken now, are what a solve runs on unless
+        # it is given a tree (solve(params=...))
         self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
-        self.params = self.evaluator.call_params()
 
         # Solver and time grid. With an automatic grid the solver is chosen
         # first and the grid is sized to it; with an explicit grid the solver
@@ -217,11 +217,15 @@ class Simulator:
     def __str__(self):
         return inspect_text(self)
 
-    def solve(self):
+    def solve(self, *, params=None):
         """
         Run the simulation over ``self.t`` with the **nominal** input.
 
         The input is the constant :math:`\\bar{u}` of the compiled evaluator.
+        ``params=None`` runs on the numbers taken when the simulator was built
+        (the compiled form); a tree, the system's complete tree at other
+        numbers (``p = copy.deepcopy(sim.evaluator.params)``, edited), runs
+        on those without a recompile: a sweep on one simulator compiles once.
 
         Returns
         -------
@@ -238,7 +242,7 @@ class Simulator:
             self.t,
             self.x0,
             args=self.solver_backend_options,
-            params=self.params,
+            params=self.tree_of(params),
         )
 
         if time_solve:
@@ -254,9 +258,13 @@ class Simulator:
         # The trajectory, kept with the solver's debug record
         return self.store_trajectory(x_traj, u_traj)
 
-    def solve_forced(self, u, input_port_id=None):
+    def tree_of(self, params):
+        """The tree a run takes: ``None`` (the compiled numbers), or ``params`` checked complete against them."""
+        return None if params is None else checked(params, self.evaluator.params)
+
+    def solve_forced(self, u, input_port_id=None, *, params=None):
         """
-        Run simulation with a prescribed input.
+        Run simulation with a prescribed input, at ``params`` as :meth:`solve`.
 
         ``u`` may be a full sampled input matrix, a callable ``u(t)``, a constant
         vector, or a scalar for one-dimensional inputs. If ``input_port_id`` is
@@ -268,9 +276,10 @@ class Simulator:
         Trajectory
             State and input time series.
         """
-        # The input sampled on the grid
+        # The input sampled on the grid, and the numbers of this run
         u_traj = coerce_forced_input(self.sys, self.t, u, input_port_id=input_port_id)
         self.require_forced_mode()
+        params = self.tree_of(params)
 
         # Integrate with the selected solver backend, timed when verbose
         time_solve = self.verbose
@@ -286,7 +295,7 @@ class Simulator:
                 return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
 
             x_traj = self.solver_backend.integrate_input(
-                self.evaluator, self.t, u_of_t, self.x0, params=self.params
+                self.evaluator, self.t, u_of_t, self.x0, params=params
             )
         else:
             x_traj = self.solver_backend.integrate_forced(
@@ -295,7 +304,7 @@ class Simulator:
                 u_traj,
                 self.x0,
                 args=self.solver_backend_options,
-                params=self.params,
+                params=params,
             )
 
         if time_solve:

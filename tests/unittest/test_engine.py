@@ -637,7 +637,7 @@ def test_a_plant_input_left_unwired_reads_its_nominal_value():
 @pytest.mark.parametrize(
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
-def test_an_evaluator_reads_the_failure_cost_and_the_sets_the_problem_holds_now(
+def test_an_evaluator_reads_the_failure_switch_now_and_a_new_compile_the_new_goal(
     backend,
 ):
     problem = upright_problem(x0=[0.0, 0.0], Xf=BallSet([np.pi, 0.0], 0.01))
@@ -645,13 +645,17 @@ def test_an_evaluator_reads_the_failure_cost_and_the_sets_the_problem_holds_now(
     before = pe.evaluate(upright(pe))
     assert not bool(before.reached[0])
 
-    # The failure charged, then the goal widened to hold the run's end
+    # The failure charged: the switch and its cost are read at each evaluation
     problem.penalize_failure = True
     problem.failure_cost = 1000.0
     charged = pe.evaluate(upright(pe))
     np.testing.assert_allclose(charged.J, before.J + 1000.0)
+
+    # A goal widened after the compile is a new compile's: the held one keeps its numbers
     problem.Xf = BallSet([np.pi, 0.0], 10.0)
-    widened = pe.evaluate(upright(pe))
+    assert not bool(pe.evaluate(upright(pe)).reached[0])
+    fresh = problem.compile(PID(Kp=1.0, Kd=0.1), dt=0.05, backend=backend)
+    widened = fresh.evaluate(upright(fresh))
     assert bool(widened.reached[0])
     np.testing.assert_allclose(widened.J, before.J)
 
