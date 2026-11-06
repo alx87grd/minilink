@@ -986,3 +986,25 @@ def test_a_selective_reconstruction_evaluates_only_what_the_port_reads():
     assert calls == []  # the plant's output reads its state, not the controller
     with pytest.raises(KeyError, match="no signal"):
         loop.reconstruct_internal_signals(traj, ports=["controller:nope"])
+
+
+def test_a_nested_blocks_signal_is_recorded_by_its_path():
+    from minilink import PID, Pendulum
+
+    inner = PID(Kp=10.0, Kd=1.0) @ Pendulum()
+    outer = PID(Kp=1.0) @ inner
+    traj = outer.compute_trajectory(tf=0.5, dt=0.01, record=("plant/plant:u",))
+
+    # The input recorded under the role's path, equal to the inner loop's own read-back
+    run = traj.of("plant/plant")
+    assert run.u.shape == (1, traj.n_samples)
+    expected = inner.reconstruct_internal_signals(
+        _inner_run(outer, traj), ports=("plant:u",)
+    ).get_signal("plant:u")
+    np.testing.assert_allclose(run.u, expected, atol=1e-12)
+
+
+def _inner_run(outer, traj):
+    from minilink.core.diagram import block_run
+
+    return block_run(outer, "plant", traj)

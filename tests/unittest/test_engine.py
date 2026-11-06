@@ -1003,3 +1003,16 @@ def test_the_failure_cost_follows_the_evaluations_discount_rate():
     cost_fast, _ = pe.failure_cost_and_bound({**pe.params, "discount_rate": 2.0})
     assert cost_fast == pytest.approx(problem.cost_bound(2.0, discount_rate=2.0))
     assert cost_fast < cost_own
+
+
+def test_a_run_with_no_recorded_plant_input_is_refused_by_name_when_scored():
+    from minilink.planning.evaluation import evaluate_trajectory
+
+    problem = upright_problem()
+    loop = pid() @ problem.sys
+    bare = loop.compute_trajectory(tf=0.5, dt=0.01)
+    with pytest.raises(ValueError, match="record=\\('plant:u',\\)"):
+        evaluate_trajectory(problem, bare)
+
+    recorded = loop.compute_trajectory(tf=0.5, dt=0.01, record=("plant:u",))
+    assert np.isfinite(evaluate_trajectory(problem, recorded).J).all()

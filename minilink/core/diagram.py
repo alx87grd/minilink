@@ -170,7 +170,14 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         return traj.with_signals(internal_signals)
 
     def port_samples(self, traj: Trajectory, name: str) -> np.ndarray:
-        """One port's value at every sample of ``traj``, ``(dim, N)``: an output port and the blocks it reads, or a block's input port (``"plant:u"``)."""
+        """One port's value at every sample of ``traj``, ``(dim, N)``: an output port and the blocks it reads, or a block's input port (``"plant:u"``); a nested block by its path (``"plant/arm:u"``)."""
+        path, _, port_id = name.rpartition(":")
+        outer, _, rest = path.partition("/")
+        if rest:
+            # Down one level: the nested diagram's own run, then its port
+            inner = self.subsystems[self.subsystem_id(outer)]
+            return inner.port_samples(block_run(self, outer, traj), f"{rest}:{port_id}")
+
         sys_id, port_id = signal_port_of(self, name)
         block = self.subsystems[sys_id]
 

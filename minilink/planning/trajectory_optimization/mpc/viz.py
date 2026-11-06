@@ -12,6 +12,7 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.planning.evaluation import require_recorded_input
 from minilink.planning.trajectory_optimization.compiled import require_state_knots
 
 ###############################################################################
@@ -306,6 +307,7 @@ def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
     each tick's input through the plan (a zero-delay MPC solves again).
     """
     if loop is None:
+        require_recorded_input(rollout, "plant")
         return rollout.of("plant")
 
     _, run = plant_run_of(loop, rollout, params)
