@@ -1,5 +1,7 @@
 """Tune MPPI's temperature for a lap of the dynamic racecar, the planner on the kinematic model."""
 
+import importlib.util
+
 import numpy as np
 
 from minilink import (
@@ -135,7 +137,7 @@ program = evaluator.program(wrt, bounds=bounds, n_trials=N_TRIALS, params=start)
 best = Optimizer(
     program,
     # method="l-bfgs",
-    method="ipopt",
+    method="ipopt" if importlib.util.find_spec("cyipopt") else "scipy_slsqp",
     options={"maxiter": 8},
 ).solve()
 print(best)
