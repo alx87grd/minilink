@@ -710,16 +710,18 @@ pillar names it.
 §1.9). Baselines first, as each plan states.
 
 - [ ] **Workspace geometry** (A3) **[ask — core]** (S57 was its earlier id).
-  [geometry-module.md](geometry-module.md) implementation steps 1–6: `core/geometry/`
-  package (shapes, paths, track, scene, probes, `mount`, spatial fields, grid, catalog
+  [geometry-module.md](geometry-module.md) implementation steps 1–6. Landed: the
+  `core/geometry/` package with the shapes and the paths (a polyline open or `closed`), and
+  the path-tracking laws reading a path. Left: track, scene, probes, `mount`, spatial
+  fields, grid, catalog
   `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
   plots and overlays under `graphical/` with lazy methods on `Scene` / `Track`;
   `planning.spatial` re-exports then deletes in the same change as the call sites;
-  `PurePursuit` takes a Path / Track. Done when the two UdeS racecar demos and the RRT forest demo
+  the path-tracking laws take a Track once it moves. Done when the two UdeS racecar demos and the RRT forest demo
   use the catalog, `control` imports geometry with no planning import, and the suite is
   green. Glyph rename stays S30.
   Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
-  `PurePursuit` sizes its measurement from the vehicle, not `state_dim=9` (scan: control#9);
+  the path-tracking laws size their measurement from the vehicle, not `state_dim=9` (scan: control#9);
   retarget `planning/trajectory_optimization/mpc/viz.py`'s `TrackCorridorOverlay` import in the change that deletes
   `planning.spatial.overlays` (scan: control#12).
 

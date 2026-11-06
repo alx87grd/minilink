@@ -33,6 +33,7 @@ planner = DynamicProgrammingPlanner(
     max_iterations=2000,
     out_of_bound_cost=INF,
     verbose=True,
+    # backend="jax",
 )
 planner.solve()
 

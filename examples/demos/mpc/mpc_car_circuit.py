@@ -9,7 +9,7 @@ from minilink import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.control import ModelPredictiveController
-from minilink.core.geometry import Sphere
+from minilink.core.geometry import Sphere, from_waypoints
 from minilink.core.shaping import (
     inverse_barrier,
     quadratic_excess,
@@ -17,7 +17,6 @@ from minilink.core.shaping import (
 )
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack

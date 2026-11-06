@@ -5,9 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from minilink.core.backends import array_module
+from minilink.core.geometry.paths import ReferencePath
 from minilink.core.params import held_params, param_view
 from minilink.planning.spatial.collision import CollisionBody
-from minilink.planning.spatial.paths import ReferencePath
 
 if TYPE_CHECKING:
     from minilink.core.fields import Field

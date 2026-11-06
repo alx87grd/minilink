@@ -37,6 +37,9 @@ Graphical catalog
 .. automodule:: minilink.graphical.catalog.skins
    :members:
 
+.. automodule:: minilink.graphical.catalog.racecar_skin
+   :members:
+
 .. automodule:: minilink.graphical.animation.camera
    :members:
 

@@ -11,12 +11,11 @@ from minilink import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.core import SingletonSet
-from minilink.core.geometry import Sphere
+from minilink.core.geometry import Sphere, from_waypoints
 from minilink.core.shaping import quadratic_excess
 from minilink.graphical.animation.primitives import CustomLine, TrajectoryPolyline
 from minilink.graphical.catalog import SceneHistory
 from minilink.planning.spatial.collision import disc, mount
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
 

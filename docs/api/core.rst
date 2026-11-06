@@ -59,5 +59,8 @@ Core
 .. automodule:: minilink.core.distributions
    :members:
 
-.. automodule:: minilink.core.geometry
+.. automodule:: minilink.core.geometry.shapes
+   :members:
+
+.. automodule:: minilink.core.geometry.paths
    :members:
