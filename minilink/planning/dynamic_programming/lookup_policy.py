@@ -87,11 +87,11 @@ class LookupPolicy(System):
         u_ub = self.u_ub
 
         levels = levels_of(params, n, xp)
-        X = xp.reshape(xp.asarray(x, dtype=float), (1, -1))
+        x = xp.reshape(xp.asarray(x, dtype=float), (-1,))
 
         # u read on the grid: multilinear in the cell holding x (or its nearest node),
         # the edge cell extended past the grid
-        u = grid_value(levels, u_table, X, nearest=nearest)[0]
+        u = grid_value(levels, u_table, x, nearest=nearest)
 
         # The command inside the grid's input box: the corners at a bound sum to it
         u = xp.clip(u, u_lb, u_ub)

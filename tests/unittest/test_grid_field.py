@@ -39,6 +39,8 @@ def test_a_spline_reads_as_scipy():
     reference = RegularGridInterpolator(tuple(LEVELS), TABLE, method="cubic")(X)
 
     np.testing.assert_allclose(V.value(X), reference, rtol=1e-12)
+    assert np.ndim(V(X[0])) == 0
+    assert V(X[0]) == pytest.approx(reference[0], rel=1e-12)
 
 
 def test_the_nodes_read_their_own_values():

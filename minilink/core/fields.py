@@ -574,7 +574,7 @@ class GridField(Field):
 
         levels = levels_of(params, self.n, xp)
         table = self.table_at(t, params)
-        X = xp.atleast_2d(xp.asarray(x, dtype=float))
+        X = xp.asarray(x, dtype=float)
 
         # x held inside the grid on each axis: the edge's value past it
         lower = xp.stack([level[0] for level in levels])
@@ -589,10 +589,10 @@ class GridField(Field):
 
         # A number outside the grid, when one is given
         if "outside" in params:
-            inside = xp.all((X >= lower) & (X <= upper), axis=1)
+            inside = xp.all((X >= lower) & (X <= upper), axis=-1)
             V = xp.where(inside, V, params["outside"])
 
-        return V if xp.ndim(x) > 1 else V[0]
+        return V
 
     def gradient(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -602,14 +602,14 @@ class GridField(Field):
 
         levels = levels_of(params, self.n, xp)
         table = self.table_at(t, params)
-        X = xp.atleast_2d(xp.asarray(x, dtype=float))
+        X = xp.asarray(x, dtype=float)
 
         # Zero along an axis where x is held, and everywhere outside with a number
         lower = xp.stack([level[0] for level in levels])
         upper = xp.stack([level[-1] for level in levels])
         inside = (X >= lower) & (X <= upper)
         if "outside" in params:
-            inside = inside & xp.all(inside, axis=1, keepdims=True)
+            inside = inside & xp.all(inside, axis=-1, keepdims=True)
 
         # ∂V/∂x_k of the cell's multilinear form; zero for the nearest node
         if self.method == "nearest":
@@ -618,7 +618,7 @@ class GridField(Field):
             dV_dx = grid_gradient(levels, table, xp.clip(X, lower, upper))
         dV_dx = xp.where(inside, dV_dx, 0.0)
 
-        return dV_dx if xp.ndim(x) > 1 else dV_dx[0]
+        return dV_dx
 
     def table_at(self, t=0.0, params=None):
         """The table at ``t``: the table itself, or its time axis read linearly in ``t`` and held past its ends."""
@@ -679,24 +679,28 @@ def field_cost_parts(cost) -> dict:
 
 def grid_value(levels, table, X, *, nearest=False):
     """
-    The table read at the rows of ``X`` ``(M, n)`` on the grid's ``levels``: multilinear in the cell holding each row, or its nearest node.
+    The table read at ``X`` on the grid's ``levels``: multilinear in the cell holding each point, or its nearest node.
 
-    A row past the grid reads the edge cell's form extended (callers clamp the
-    rows to hold the edge instead). ``table`` has the grid's shape, then any
-    trailing axes (a vector per node); the result is ``(M, …)``. NumPy or JAX
-    through the array module.
+    ``X`` is one point ``(n,)`` or a stack ``(M, n)``. A point past the grid
+    reads the edge cell's form extended (callers clamp it to hold the edge
+    instead). ``table`` has the grid's shape, then any trailing axes (a vector
+    per node); the result is ``(…)`` or ``(M, …)``. NumPy or JAX through the
+    array module.
     """
     xp = array_module(X, table)
     n = len(levels)
-    trailing = (1,) * (xp.ndim(table) - n)
+
+    # A stack's weights take one axis per trailing axis of the table, to multiply its
+    # vectors; a point's are numbers
+    trailing = (1,) * (xp.ndim(table) - n) if xp.ndim(X) > 1 else ()
 
     # On each axis the cell l_{i_k} ≤ x_k < l_{i_k + 1} (the edge cell past the grid)
     # and the position in it, y_k = (x_k − l_{i_k}) / (l_{i_k + 1} − l_{i_k})
     cells = []
     for k in range(n):
         level = levels[k]
-        i = xp.clip(xp.searchsorted(level, X[:, k]) - 1, 0, level.shape[0] - 2)
-        y = (X[:, k] - level[i]) / (level[i + 1] - level[i])
+        i = xp.clip(xp.searchsorted(level, X[..., k]) - 1, 0, level.shape[0] - 2)
+        y = (X[..., k] - level[i]) / (level[i + 1] - level[i])
         cells.append((i, y))
 
     # Nearest: the node of each axis's closer end, the lower one on a tie
@@ -704,21 +708,28 @@ def grid_value(levels, table, X, *, nearest=False):
         index = tuple(xp.where(y <= 0.5, i, i + 1) for i, y in cells)
         return table[index]
 
+    # Each axis's two weights, 1 − y_k toward its lower node and y_k toward its upper,
+    # shaped to multiply a vector per node
+    weights = [(1.0 - y, y) for _, y in cells]
+    if trailing:
+        weights = [
+            tuple(xp.reshape(w, w.shape + trailing) for w in pair) for pair in weights
+        ]
+
     # Linear: V = Σ_corners V_corner Πₖ (y_k or 1 − y_k) over the cell's 2ⁿ corners
     V = 0.0
     for corner in itertools.product((0, 1), repeat=n):
         index = tuple(i + upper for (i, _), upper in zip(cells, corner))
         term = table[index]
-        for (_, y), upper in zip(cells, corner):
-            w = y if upper else 1.0 - y
-            term = term * xp.reshape(w, w.shape + trailing)
+        for w, upper in zip(weights, corner):
+            term = term * w[upper]
         V = V + term
 
     return V
 
 
 def grid_gradient(levels, table, X):
-    """``∂V/∂x`` of the multilinear form of the cell holding each row of ``X`` ``(M, n)``: one column per axis."""
+    """``∂V/∂x`` of the multilinear form of the cell holding each point of ``X`` (``(n,)`` or ``(M, n)``): one entry per axis, last."""
     xp = array_module(X, table)
     n = len(levels)
 
@@ -726,9 +737,9 @@ def grid_gradient(levels, table, X):
     cells = []
     for k in range(n):
         level = levels[k]
-        i = xp.clip(xp.searchsorted(level, X[:, k]) - 1, 0, level.shape[0] - 2)
+        i = xp.clip(xp.searchsorted(level, X[..., k]) - 1, 0, level.shape[0] - 2)
         width = level[i + 1] - level[i]
-        y = (X[:, k] - level[i]) / width
+        y = (X[..., k] - level[i]) / width
         cells.append((i, y, width))
 
     # ∂V/∂x_k = Σ_corners V_corner (±1 / Δ_k) Π_{j ≠ k} (y_j or 1 − y_j)
@@ -746,16 +757,19 @@ def grid_gradient(levels, table, X):
             dV = dV + term
         columns.append(dV)
 
-    return xp.stack(columns, axis=1)
+    return xp.stack(columns, axis=-1)
 
 
 def spline_value(levels, table, X, method):
-    """The table read by SciPy's splines at the rows of ``X`` (NumPy only)."""
+    """The table read by SciPy's splines at ``X`` (one point ``(n,)`` or a stack ``(M, n)``; NumPy only)."""
+    X = np.asarray(X, dtype=float)
     interp = RegularGridInterpolator(
         tuple(np.asarray(level) for level in levels), np.asarray(table), method=method
     )
 
-    return interp(np.asarray(X, dtype=float))
+    V = interp(np.atleast_2d(X))
+
+    return V if X.ndim > 1 else V[0]
 
 
 def levels_of(params, n, xp):
