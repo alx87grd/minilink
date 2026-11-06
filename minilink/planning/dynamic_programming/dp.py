@@ -32,6 +32,29 @@ BACKEND_LOOP = "loop"
 ###############################################################################
 
 
+def bellman_backup(J_next, G, arrival, gamma):
+    """
+    One Bellman backup: ``J(x) = min_u [ c(x, u) + γ J_next(x_next) ]``, with ``π(x)`` its argmin.
+
+    ``G`` is the stage cost of every (node, action) pair, shape ``(N, A)``, the
+    failure cost on an inadmissible pair; ``arrival(J_next)`` reads the
+    cost-to-go one step ahead at every pair's successor, shape ``(N, A)``, zero
+    off the grid (the pair is inadmissible and ``G`` already prices it). The
+    same backup on NumPy and JAX: each engine passes its own reading of the grid.
+    """
+    # The cost-to-go one step ahead at every pair's successor
+    J_arrival = arrival(J_next)
+
+    # Q(x, u) = c(x, u) + γ J_next(x_next), for every (node, action) pair at once
+    Q = G + gamma * J_arrival
+
+    # The best action at every node
+    J = Q.min(axis=1)
+    pi = Q.argmin(axis=1)
+
+    return J, pi
+
+
 class DynamicProgrammingPlanner(Planner):
     """
     Value-iteration planner over a discretized state space.
@@ -369,17 +392,13 @@ class DynamicProgrammingPlanner(Planner):
         if G is None:
             G = self.running_cost_table(t, admissible, x_next)
 
-        # Estimated (interpolation) cost-to-go of all the arrival states:
+        # The cost-to-go one step ahead read at the successors (zero off the grid):
         # the (N, A, n) successors flattened to N*A states, then back to (N, A)
-        J_arrival = grid.interpolate(J_next, x_next.reshape(-1, n), method)
-        J_arrival = J_arrival.reshape(N, A)
+        def arrival(J):
+            return grid.interpolate(J, x_next.reshape(-1, n), method).reshape(N, A)
 
-        # Q(x, u) = c(x, u, t) + γ J_next(x_next), for every pair at once
-        Q = G + gamma * J_arrival
-
-        # Best action at every node
-        J = Q.min(axis=1)
-        pi = Q.argmin(axis=1)
+        # J(x) = min_u [ c(x, u, t) + γ J_next(x_next) ]
+        J, pi = bellman_backup(J_next, G, arrival, gamma)
 
         return J, pi
 

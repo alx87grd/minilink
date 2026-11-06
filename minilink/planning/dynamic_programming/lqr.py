@@ -32,6 +32,31 @@ from minilink.planning.results import PlanningSolution
 ###############################################################################
 
 
+def lqr_matrices(
+    sys, x_bar, u_bar, Q, R, S, *, t=0.0, params=None, method="auto", eps=1e-6
+):
+    """
+    ``(A, B, Q, R, S)``: a quadratic problem lowered to the textbook LQR matrices at ``(x̄, ū, t)``.
+
+    The plant linearized at the operating point, ``B`` over its command port
+    alone (a disturbance ``d`` or a noise ``n`` is never decided), and the
+    weights over that port: ``R[c, c]`` of a weight that spans every input.
+    ``params`` are the plant's numbers to linearize with (its own for
+    ``None``); ``method`` and ``eps`` the differentiation of
+    :func:`~minilink.analysis.derivatives.jacobian`. The Riccati solvers of
+    :mod:`minilink.control.design` take the result.
+    """
+    # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    A = model.A()
+    B = model.B()
+
+    # The input weight over the command port: R[c, c]
+    R = command_block(sys, R)
+
+    return A, B, Q, R, S
+
+
 class LQRPlanner(Planner):
     """
     Linear-quadratic regulator design as a planner.
@@ -132,13 +157,11 @@ class LQRPlanner(Planner):
         n_steps = self.n_steps
         dt = self.dt
 
-        # The plant linearized at the operating point: A = ∂f/∂x, B = ∂f/∂u
-        A, B = self.linear_model()
+        # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
+        # weights over the command port
+        A, B, Q, R, S_f = self.lqr_matrices()
 
-        # The weights and the operating point over the command port: R[c, c], ū[c]
-        Q = self.cost.Q
-        R = command_block(sys, self.cost.R)
-        S_f = self.cost.S
+        # The operating point, ū over the command port: ū[c]
         x_bar = self.x_bar
         u_bar = command_block(sys, self.u_bar)
 
@@ -218,20 +241,27 @@ class LQRPlanner(Planner):
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
-        sys = self.problem.sys
-        x_bar = self.x_bar
-        u_bar = self.u_bar
-        t = self.t
-        params = nominal_plant_params(self.problem)
-        method = self.method
-        eps = self.eps
-
-        # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
-        model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-        A = model.A()
-        B = model.B()
+        A, B, _, _, _ = self.lqr_matrices()
 
         return A, B
+
+    def lqr_matrices(self):
+        """``(A, B, Q, R, S)`` of :func:`lqr_matrices` at this planner's operating point, the plant at its design numbers."""
+        cost = self.cost
+        params = nominal_plant_params(self.problem)
+
+        return lqr_matrices(
+            self.problem.sys,
+            self.x_bar,
+            self.u_bar,
+            cost.Q,
+            cost.R,
+            cost.S,
+            t=self.t,
+            params=params,
+            method=self.method,
+            eps=self.eps,
+        )
 
 
 @dataclass(frozen=True)
