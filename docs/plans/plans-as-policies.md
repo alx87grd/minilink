@@ -1,7 +1,9 @@
 # Plans as policies: one face for every planner, two horizons, the cost-to-go as a field
 
-Status: written 2026-11-06 from the maintainer's design session; the rulings of that session
-are §8 (`PP-D1` to `PP-D12`). Lane: core. The rows: [TODO.md](TODO.md) §1.8 ("Plans as
+Status: written 2026-11-06 from the maintainer's design session (rulings `PP-D1` to `PP-D12`,
+§9), then consolidated the same day after two independent reviews (one on the code and the
+contracts, one on the control theory and the user API); what the reviews changed is §11, and
+the decisions they raised are §10. Lane: core. The rows: [TODO.md](TODO.md) §1.8 ("Plans as
 policies"); the order of work and each step's "done when" live there. Contracts in code today:
 [DESIGN.md](../dev/DESIGN.md) §4 ("Fields") and §6 (the compiled face, the MPC).
 
@@ -17,17 +19,17 @@ a plan is a policy, finite or infinite in time, with its cost-to-go a field.
 | --- | --- |
 | The face contract on two axes, every planner's place on it (§3) | this doc until it lands, then DESIGN §6 |
 | Value iteration's two modes, its pure backup (§4) | this doc, then DESIGN §6 ("RRT / DP") |
-| LQR's pure core and face (§5) | this doc, then DESIGN §6 |
+| LQR's lowering and face (§5) | this doc, then DESIGN §6 |
 | `GridField` and the planners' cost-to-go as fields (§6) | this doc, then DESIGN §4 ("Fields") |
-| The MPC reading the state (§7) | this doc, then DESIGN §6 ("MPC on the planner's face") |
-| The rest of the field object (`CallableField`, `LinearApproximator`, `PolicyEvaluator`, tabular RL's `Q`) | TODO §4, v0.5 (unchanged, shaped by §6.4) |
+| The MPC and the follower reading the state (§7) | this doc, then DESIGN §6 ("MPC on the planner's face") |
+| The rest of the field object (`CallableField`, `LinearApproximator`, `PolicyEvaluator`, tabular RL's `Q`) | TODO §4, v0.5 (shaped by §6.5) |
 
 ---
 
 ## 1. The goal
 
-One interface that any planner fits, checked by one test: every planner closes in the MPC
-loop, and in the dual-rate loop, without a special case.
+One interface that any planner fits, checked by one conformance test: every planner's face
+closes in the MPC loop and in the dual-rate loop without a special case.
 
 1. **A plan is a policy.** Whatever a planner computes, its plan `z` gives the command at a
    state and a time, `u = command(z, x, t)`. An open-loop plan ignores `x`; a feedback plan
@@ -35,35 +37,57 @@ loop, and in the dual-rate loop, without a special case.
 2. **Two horizons, one algorithm.** A planner reads the problem's horizon: finite, the plan
    varies in time over `[t0, tf]`; infinite, the plan is stationary. LQR already does this
    (the differential or the algebraic Riccati equation); value iteration gets it.
-3. **The core math first.** Each planner's file opens with a pure function holding the
-   textbook equation, arrays and the parameter tree in, arrays out. The planner and the face
-   both call it; neither holds a second copy of the algorithm.
+3. **The core math first.** Each planner's file opens with the pure function that holds its
+   textbook equation; the planner and the face both call it; neither holds a second copy.
 4. **The cost-to-go is a field.** `J(x)` or `J(x, t)` is the constitution's `Field`: it traces,
    takes `params`, and converts to a set or a cost like every field.
+
+**What the conformance test is not.** Closing LQR or value iteration in the MPC loop proves
+the contract; it is not how they are used. An LQR or value-iteration solve does not read the
+measured state (`x0` enters neither the Riccati equation nor the grid tables), so re-solving
+every tick recomputes the same plan. Their use stays the offline one,
+`solution.policy @ plant`, or a plan refreshed at a slow rate when the problem's numbers move
+(the dual-rate loop, §7).
 
 ## 2. The state of the code (2026-11-06)
 
 - **The face contract already gives the command the state.** DESIGN §6 writes
   `pv.command(z, x, t)`; the MPC's `PlanCommand` and `PlanFollower` pass `x = None`, because
-  every face built so far (trajectory optimization, MPPI) is open loop.
-- **Replanning every `M` ticks already exists.** The dual-rate loop
-  `(mpc % slow) >> (PlanFollower(planner) % fast)` solves at the slow rate and applies the
-  last plan at the fast one.
+  every face built so far (trajectory optimization, MPPI) is open loop. Both existing faces
+  append `t0` last in `z` (`z[-1]`).
+- **Replanning at a slow rate already exists.** The dual-rate loop
+  `(mpc % slow) >> (PlanFollower(planner) % fast)` solves at the slow rate and applies the last
+  plan at the fast one. `>>` wires exactly one output to one input (`z`), so a follower has no
+  measurement today.
 - **Value iteration has one mode.** `solve()` sweeps to convergence whatever the problem's
-  horizon; its terminal time is read from the horizon but its sweep count is not.
-  `solve_steps(n)` runs `n` sweeps and keeps only the last table, a stationary law. The
-  GRO860 notebooks teach that a finite-horizon policy is non-stationary; the library does not
-  deliver one. Every notebook and demo runs value iteration on an infinite problem; only unit
-  tests solve a finite one with `solve()`.
+  horizon; its terminal time is read from the horizon (`final_time = t0 + horizon`) but its
+  sweep count is not. `solve_steps(n)` runs `n` sweeps and keeps the last table, a stationary
+  law; its record says `fixed_horizon=True`. The GRO860 notebooks teach that a finite-horizon
+  policy is non-stationary and map their hand-written `exact_dp(N)` to `solve_steps(N)`.
+- **Three student-facing examples solve value iteration on a finite-horizon problem:** the
+  README's comparison of planners (`README.md`, `examples/demos/core/readme_examples.py`:
+  `horizon=4.0`, the loop then simulated to `tf=10`), `examples/tutorial/showcase_minilink.ipynb`
+  (`horizon=4.0`) and `examples/tutorial/advanced/02_optimal_control.ipynb` (`horizon=5.0`). The
+  horizon is there for the trajectory planners on the same problem; value iteration ignores it
+  and returns the converged stationary law. The GRO860 notebooks and the value-iteration demos
+  run infinite problems.
 - **Each sweep's `(J_k, π_k)` pair is consistent:** `π_k` is the best action with `k` steps left
   and `J_k` its cost. Nothing in the numbers needs correcting.
+- **Off the grid, four readers disagree.** The sweeps price a successor that leaves the grid as
+  inadmissible (`G` holds the failure cost) and read its arrival cost as `0` (SciPy
+  `fill_value=0`; JAX `jnp.where(in_bounds, …, 0)`); value iteration's `cost_to_go` returns
+  `0` past the grid; `LookupPolicy` extends its edge cells and clips `u`.
 - **No planner returns a field.** LQR's `cost_to_go` is a closure that copies
-  `QuadraticField`'s math and calls `float()`; value iteration's is SciPy interpolation
-  (`fill_value=0`: a state past the grid costs nothing); RL's wraps the critic. None traces,
-  takes `params`, or offers `as_terminal_cost` or `as_set`.
-- **The math sits in methods that unpack `self`.** `LQRPlanner.solve` holds the linearization
-  and the Riccati solve inline; `value_iteration` holds the sweep loop and calls
-  `backward_step_table`, which reads `self.grid`, `self.gamma`, `self.interpolation`.
+  `QuadraticField`'s math and calls `float()`; value iteration's is SciPy interpolation; RL's
+  wraps the critic. None traces, takes `params`, or offers `as_terminal_cost` or `as_set`.
+- **LQR ignores two numbers of the problem.** `lqr.py` never reads `discount_rate` (a
+  discounted problem gets undiscounted gains), and the finite schedule runs over `0 … T`
+  whatever `t0` is.
+- **Where the math sits.** `LQRPlanner.linear_model()` linearizes and `solve` holds the Riccati
+  solve; `care`, `lqr_gain` and `lqr_gain_schedule` (`control/design.py`,
+  `analysis/riccati.py`) are already pure. Value iteration's `backward_step_table` reads
+  `self.grid`, `self.gamma`, `self.interpolation`; the JAX engine's `step` has the pure shape;
+  the `"loop"` backend is the reference double loop written for teaching.
 
 ## 3. The contract: two axes, one face
 
@@ -72,49 +96,55 @@ A plan sits on two independent axes:
 - **law form:** open loop, `u(t)`, or feedback, `u(x, t)`;
 - **time:** stationary (an infinite-horizon problem) or time-varying over `[t0, tf]`.
 
+A command is deterministic: a stochastic law takes its noise from a noise block, never from
+the face. Discrete-time LQR on step problems is out of scope here.
+
 | Face method | Rule, every planner |
 | --- | --- |
-| `z`, `pv.n_z` | one flat array: the law's numbers, plus what `solve` warm-starts from, plus the origin `t0` when the plan varies in time |
+| `z`, `pv.n_z` | one flat array: the law's numbers, plus what `solve` warm-starts from, plus the origin `t0` **last** when the plan varies in time |
+| `pv.feedback` | whether `command` reads the state; the MPC and the follower add a measurement input only when it is true |
 | `pv.params` | the planner's tree (a copy), as today |
-| `pv.initial(params)` | the default `z` at the tree |
-| `pv.solve(params=None, z0=None) -> (z, status)` | a function of the tree; a method that cannot warm-start ignores `z0` |
+| `pv.initial(params)` | a usable default plan at the tree (never a corner command) |
+| `pv.solve(params=None, z0=None) -> (z, status)` | a function of the tree; a method that cannot warm-start ignores `z0`; `status["cost"]` is the plan's cost from `x0` |
 | `pv.command(z, x, t)` | always called with the state; an open-loop plan ignores `x`, a stationary plan ignores `t` |
-| past the plan's end | the last stage holds |
-| `pv.shift(z, t, x0=None)` | identity for a stationary plan; a time-varying plan re-based to the tick (`t0 ← t`) |
+| past the plan's end | the rule of §10, `PP-Q2` |
+| `pv.shift(z, t, x0=None)` | the warm guess for the next solve: the trajectory faces re-read their knots at the tick and hold the tail; a method that ignores `z0` returns `z` unchanged |
 | `pv.prediction(z, t)` | only on a plan that carries its states (`pv.predicts`) |
-| `pv.solution(z, params, status)` | the host-side `PlanningSolution`, byte-identical to `planner.solve()` at the same tree |
+| `pv.solution(z, params, status)` | the host-side `PlanningSolution`, equal to `planner.solve()` at the same tree on the fields of §8 |
 
 The face keeps no last solution (RULES 2.4) and compiles once (DESIGN §4 rule 6). Every
 planner on the two axes:
 
-| Planner | Law | Time | `z` | `command(z, x, t)` | `shift` | Built |
-| --- | --- | --- | --- | --- | --- | --- |
-| Trajectory optimization | open loop | varying (finite only) | knots, `t0` | `u(t)` | knots re-read at the tick | yes |
-| MPPI | open loop | varying (finite only) | input sequence, `t0` | `u(t)` | first input dropped, last held | yes |
-| LQR, infinite | feedback | stationary | `K`, `x̄`, `ū` | `ū − K (x − x̄)` | identity | §5 |
-| LQR, finite | feedback | varying | `t0`, `K(t)`, `x̄`, `ū` | `ū − K(t − t0) (x − x̄)` | re-based | §5 |
-| Value iteration, infinite | feedback | stationary | `J`, `π` | `π(x)` | identity | §4 |
-| Value iteration, finite | feedback | varying | `t0`, the stacks `J_k`, `π_k` | `π_k(x)`, `k` the stage of `t` | re-based | §4 |
-| Tabular RL | feedback | stationary | the `Q` table | the greedy action of `Q` at `x` | identity | v0.5 |
-| Neural RL | feedback | stationary | the weights | the network at `x` | identity | v0.5 |
-| RRT, RRT* (never traced) | open loop | varying | path resampled, `t0` | `u(t)` | the passed part dropped | v0.5 |
+| Planner | Law | Time | `z` | `command(z, x, t)` | Built |
+| --- | --- | --- | --- | --- | --- |
+| Trajectory optimization | open loop | varying (finite only) | knots, `t0` | `u(t)` | yes |
+| MPPI | open loop | varying (finite only) | input sequence, `t0` | `u(t)` | yes |
+| Trajectory plus tracking (`trajectory_lqr`) | feedback | varying | knots, `K(t)`, `t0` | `u_d(t) − K(t)(x − x_d(t))` | later, same contract |
+| LQR, infinite | feedback | stationary | `K`, `x̄`, `ū` | `ū − K (x − x̄)` | §5 |
+| LQR, finite | feedback | varying | `K(t)`, `x̄`, `ū`, `t0` | `ū − K(t − t0)(x − x̄)` | §5 |
+| Value iteration, infinite | feedback | stationary | `J`, the command table `u` | the lookup of `u` at `x` | §4 |
+| Value iteration, finite | feedback | varying | the stacks `J_k`, `u_k`, `t0` | the lookup of `u_k`, `k` the stage of `t` | §4 |
+| Tabular RL | feedback | stationary | the `Q` table | the greedy action of `Q` at `x` | v0.5 |
+| Neural RL | feedback | stationary | the weights | the network at `x` | v0.5 |
+| RRT, RRT* (never traced) | open loop | varying | path resampled, `t0` | `u(t)` | v0.5 |
 
-**The test of the contract.** Each row closes in `ModelPredictiveController(planner) % dt` and
-in the dual-rate loop: the command block passes the measurement and the tick's time. A
-time-varying feedback plan holds its whole schedule, so a shrinking-horizon loop applies it
-without re-solving, and a receding one re-solves with `t0` at the tick: both through `shift`
-and `t0`, no special case. An infinite problem under trajectory optimization stays the
-classic receding finite plan (the problem's horizon is the plan's).
+**The test of the contract.** Each built row closes in `ModelPredictiveController(planner) % dt`
+and in the dual-rate loop, the command reading the state bound to `x0` (§7). Every MPC tick is
+receding: `t0` is the tick and the horizon a length from it. A finite value-iteration plan is
+refused in the MPC loop (its stacks are `(2N + 1)` grid tables per tick, recomputed to the same
+numbers) and closes in the follower only; an infinite one is refused above a size limit
+(§10, `PP-Q6`).
 
 ## 4. Value iteration: one backup, two modes
 
 ### 4.1 The pure core, first in `dp.py`
 
 ```python
-def bellman_backup(J_next, G, x_next, levels, gamma, method="linear"):
-    """One Bellman backup on a grid: J(x) = min_u [ c(x, u) + γ J_next(x_next) ], with π(x) its argmin."""
-    # The cost-to-go one step ahead at every successor, read on the grid
-    J_arrival = grid_interpolation(levels, J_next, x_next, method)
+def bellman_backup(J_next, G, arrival, gamma):
+    """One Bellman backup: J(x) = min_u [ c(x, u) + γ J_next(x_next) ], with π(x) its argmin."""
+    # The cost-to-go one step ahead at every pair's successor (zero off the grid: the pair
+    # is inadmissible and G already holds its failure cost)
+    J_arrival = arrival(J_next)
 
     # Q(x, u) = c(x, u) + γ J_next(x_next), for every (node, action) pair at once
     Q = G + gamma * J_arrival
@@ -126,12 +156,14 @@ def bellman_backup(J_next, G, x_next, levels, gamma, method="linear"):
     return J, pi
 ```
 
-The table step's body, lifted out with its numbers unchanged; the JAX engine's `step` already
-has this shape (`step(J_next, G, coords, in_bounds, gamma)`) and reads the same. The per-node
-double loop (`backend="loop"`, the reference written for teaching) stays a method: it reads the
-plant one pair at a time. Whether the backup reads the grid through its levels (the shared
-interpolation of §6.2) or through the grid's own SciPy interpolator is decided by the
-byte-identity of the sweeps (§9, open point 1).
+`arrival` reads `J_next` at the successors of every pair, shape `(nodes, actions)`, zero off
+the grid: on NumPy the grid's SciPy reader (today's numbers, bit for bit), on JAX the engine's
+`map_coordinates` reader with its `in_bounds` mask. The backup is then one function on both
+backends (the JAX `step` calls it), and the reading of the grid stays the grid's. The `"loop"`
+backend stays the reference double loop written for teaching, the one deliberate second
+spelling. The transition-matrix form, `J_arrival = W J_next` with the interpolation weights
+`W` built once (the successors never move), is a later speed-up of `arrival` alone (§10,
+`PP-Q7`).
 
 ### 4.2 The loop, visible in the planner
 
@@ -140,98 +172,122 @@ history; it calls `bellman_backup` once per sweep. The pure function is one back
 loop: the loop is where the workflow lives (`verbose`, `record_history`), and it reads as the
 textbook recursion.
 
-### 4.3 The two modes, chosen by the problem
+### 4.3 The two modes
 
 | | Finite horizon | Infinite horizon |
 | --- | --- | --- |
-| Problem | `horizon=T` (or a step problem's `n_steps`) | `horizon=inf` or unset |
-| Sweeps | exactly `N = T / dt`; refused when `T` is not a multiple of `dt` | until `max |J − J_next| < tol`, at most `max_iterations` |
-| Kept | every `J_k` and `π_k`, ordered forward in time (`k = 0` at `t0`) | the last `J`, `π` |
-| Law | `π_k(x)`, held over the stage `[t_k, t_k + dt)`, the last stage past `tf` | `π(x)` |
-| Cost-to-go | `J(x, t)`, a `GridField` with a time axis (§6) | `J(x)`, a `GridField` |
-| JAX | one `lax.scan` over `N` sweeps, stacking the tables | today's `lax.while_loop` |
-| Record | the mode, the sweeps, the stacks in `tables` | as today |
+| Problem | `horizon=T`, or a step problem's `n_steps` | `horizon=inf` or unset |
+| Sweeps | `N = steps_of(T, dt)` (the library's rule: refused unless `dt` divides `T`); a step problem's `N = n_steps` | until `max |J − J_next| < tol`, at most `max_iterations` |
+| Kept | the stacks, forward in time: `J_0 … J_N` (`J_N = h`) and `u_0 … u_{N−1}`, stage `i` at `t_i = t0 + i dt` | the last `J` and its law |
+| Law | `u_i(x)` for `t ∈ [t_i, t_{i+1})`; past `tf`, the rule of `PP-Q2` | the lookup of `u` |
+| Stage of `t` | `i = round((t − t0) / dt)` taken down when `t` falls short of `t_i` beyond a tolerance (no `floor` on float ticks); a step problem's tick difference | — |
+| Cost-to-go | `J(x, t)`, the value discounted to `t` (the problem's from `t0` is `γ^i J_i`) | `J(x)` |
+| JAX | one `lax.scan(reverse=True)` over `N` sweeps, stacking the tables | today's `lax.while_loop` |
+| Record | `mode="finite"`, `N`, the stacks in `tables` | `mode="converged"`; `tol` documented as a change per sweep, not an error bound on `J` (with `γ < 1` the bound is `γ·tol/(1 − γ)`; with `γ = 1` none) |
 
-`solve()` reads `problem.horizon_kind()`, as LQR does. `solve_steps(n)` stays, documented for
-what it is: the **receding `n`-step law**, `n` sweeps from the terminal cost and the last
-table used as a stationary law (`n` steps always left). The cart-pole and double-pendulum
-demos rely on it to simulate past the horizon. The memory of the finite mode is
-`N × nodes` for each stack; a solve whose stacks exceed a limit is refused with the numbers
-(§9, open point 2).
+Symbols: `i` is the stage counted forward from `t0`; `k` stays the sweep count (steps left),
+`i = N − k`. The stacks are the per-sweep history, reversed: they are the solution's single
+home, and `record_history` stays the workflow switch of the infinite mode's animation.
+
+- **How `solve()` picks the mode:** the decision `PP-Q1` of §10 (the problem's horizon, as
+  ruled, with the three examples above migrated; or opt-in).
+- **`solve_steps(n)`** stays, documented for what it is: the receding `n`-step law, `n`
+  sweeps from the terminal cost and the stage-0 table used as a stationary law (Bertsekas'
+  receding horizon). Its record says `mode="receding"` (`fixed_horizon` goes, it would clash
+  with the finite mode). A test ties the two: the finite mode's `J_0` equals `solve_steps(N)`'s
+  `J`, and its `u_i` equals `solve_steps(N − i)`'s law.
+- **The failure cost on a finite horizon** is the cost bound over `N` steps, not the geometric
+  limit (`grid_failure_cost` takes `N`).
+- **Tables frozen at `tf`.** A precomputed grid builds the running-cost table once, at `tf`; a
+  finite solve on a problem whose `f` or `g` reads `t` needs `precompute=False`, and the record
+  says which tables were frozen.
+- **Memory:** `N × nodes` per stack, refused above a limit with the numbers (`PP-Q6`).
 
 ### 4.4 The lookup law gains a schedule
 
 `LookupPolicy(grid, pi, t=None)`: `pi` one table, or a stack `(N, nodes)` on the stage times
-`t`, read held per stage (the stage of `t`, the last one past the end). Its `params` gain the
-times: `{"u_table", "levels", "t"}`, `u_table` then `(N, *grid_shape, m)`. One class, no new
-name (the stationary law is the schedule of one stage).
+`t`, held per stage (the stage rule of §4.3). Its `params` gain the times: `{"u_table",
+"levels", "t"}`, `u_table` then `(N, *grid_shape, m)`. One class, no new name. Outside the grid
+it keeps its own rule (edge cells extended, `u` clipped to the input box): a law and a field
+treat the outside differently on purpose (§6.3).
 
 ### 4.5 The face
 
-`DynamicProgrammingPlanner.compile()` gives `pv` on the contract of §3:
+`DynamicProgrammingPlanner.compile()` gives `pv` on the contract of §3, `pv.feedback = True`:
 
-- `z`: infinite, `[J ; π]` flat (`π` as floats, exact below `2⁵³`), `n_z = 2 · nodes`; finite,
-  `[t0 ; J_0 … J_N ; π_0 … π_{N−1}]`. The policy stays in `z`: rebuilding it from `J` costs a
-  full backup and needs the model, and a pure command cannot cache it (LQR keeps `K` in `z`
-  for the same reason). `J` remains the solution in the textbook's sense, and becomes the
-  `GridField` of §6.
-- `pv.solve(params, z0)`: the grid tables (successors, running costs) are built at
-  compilation, at the default tree. A tree that changes the plant's numbers rebuilds them on
-  the host (refused under a trace, with the leaf named); any other tree reuses them. The
-  infinite mode warm-starts from `z0`'s `J`; the finite mode always sweeps from the terminal
-  cost.
-- `pv.initial(params)`: `J` the terminal cost, `π` zeros.
-- `pv.command(z, x, t)`: the lookup law of `z` at `x` (finite: at the stage of `t`), the
-  same arithmetic as `LookupPolicy.action`.
-- A fixed number of sweeps per solve (the real-time dynamic programming of an MPC tick,
-  warm-started from the last `J`): a planner keyword, `n_iterations=k` (RULES 2.7: an exact
-  count), beside the cap `max_iterations`.
+- **`z`:** infinite, `[J ; u_table]` flat, the command table the law reads (the
+  `LookupPolicy`'s `u_table`, `nodes · m` numbers, never action ids as floats); finite,
+  `[J_0 … J_N ; u_0 … u_{N−1} ; t0]`.
+- **`pv.solve(params, z0)`:** the grid tables (successors, running costs, terminal cost) are
+  built at compilation, at the default tree. A tree that changes any leaf the tables read
+  (the plant, the cost, `X`, `U`, `gamma`, `out_of_bound_cost`) rebuilds them on the host,
+  refused under a trace with the leaf named; `x0` and `t0` never rebuild them (the sweeps'
+  times shift with `t0`, under the frozen-tables rule of §4.3). The infinite mode warm-starts
+  from `z0`'s `J`; the finite mode sweeps from the terminal cost.
+- **`pv.initial(params)`:** `J` the terminal cost, the command table at the input nearest `ū`
+  (never action `0`, the corner of the input box).
+- **`pv.command(z, x, t)`:** the lookup law's arithmetic on `z`'s table at `x` (finite: at the
+  stage of `t`).
+- **`status`:** `{"success", "iterations", "delta", "cost"}`, `cost = J(x0)`.
+- **A fixed number of sweeps per solve,** in the infinite mode only: truncated, warm-started
+  value iteration (not "real-time dynamic programming", which backs up states asynchronously
+  along simulated paths). Its spelling is `PP-Q8`.
 
-## 5. LQR: the pure core and its face
+## 5. LQR: the lowering first, the existing pure solvers, the face
 
 ### 5.1 The pure core, first in `lqr.py`
 
+The Riccati solvers are already pure and live in `control/design.py` (`lqr_gain`,
+`lqr_gain_schedule`) and `analysis/riccati.py` (`care`); a second spelling of them would be a
+second copy. What `lqr.py` adds is the lowering of the problem to the textbook matrices, so its
+file opens with that, a function of the plant and the tree:
+
 ```python
-def lqr_gains(sys, params, *, horizon=None, n_steps=1001, method="auto", eps=1e-6):
-    """The LQR law of the plant linearized at the tree's operating point: K and P, or the schedule (t, K(t), S(t))."""
+def lqr_matrices(sys, params):
+    """(A, B, Q, R, S): the plant linearized at the tree's operating point, the weights over its command port."""
     x_bar = params["method"]["x_bar"]
     u_bar = params["method"]["u_bar"]
     t = params["method"]["t"]
+    plant = nominal_plant_params(params["plant"])
 
     # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port
-    model = design_model(sys, x_bar, u_bar, t, params["plant"], method=method, eps=eps)
+    model = design_model(sys, x_bar, u_bar, t, plant)
     A = model.A()
     B = model.B()
 
-    # The weights over the command port
+    # The weights, R over the command port
     Q = params["cost"]["Q"]
     R = command_block(sys, params["cost"]["R"])
-    S_f = params["cost"]["S"]
+    S = params["cost"]["S"]
 
-    if horizon is None:
-        # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0, and K = R⁻¹ Bᵀ P
-        P = care(A, B, Q, R)
-        K = np.linalg.solve(R, B.T @ P)
-        return K, P
-
-    # −Ṡ = Aᵀ S + S A − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f, and K(t) = R⁻¹ Bᵀ S(t)
-    return lqr_gain_schedule(A, B, Q, R, S_f, horizon, n_steps=n_steps)
+    return A, B, Q, R, S
 ```
 
-`LQRPlanner.solve` calls it at its own tree, then builds the law, the poles, the record and the
-cost-to-go; the face calls it at the solve's tree. The textbook lines are those of
-`LQRPlanner.solve` today, unchanged.
+`LQRPlanner.solve` and the face both call `lqr_matrices`, then the existing solvers, with the
+textbook lines of today's `solve` unchanged (`P = care(A, B, Q, R)`, `K = R⁻¹ Bᵀ P`, or the
+backward sweep of `S(t)`). The differentiation options (`method`, `eps`) stay planner
+keywords passed through.
 
-### 5.2 The face
+### 5.2 Two numbers LQR must read
 
-- `z`: infinite, `[K ; x̄ ; ū]` flat; finite, `[t0 ; K(t) ; x̄ ; ū]` on the schedule's
-  relative times.
-- `pv.solve(params)`: `lqr_gains` at the tree (milliseconds on the host; the method warm-starts
-  from nothing, `z0` ignored).
-- `pv.command(z, x, t)`: `ū − K (x − x̄)`, or `ū − K(t − t0) (x − x̄)` read on the schedule
-  and held past its end (the `TimeVaryingFeedback` arithmetic).
-- `pv.solution(z, params)`: the law, the record (`P` or `S(t)` and the poles at the tree) and
-  the cost-to-go, `QuadraticField(x̄, P)` or `QuadraticField(x̄, S, t)` (§6).
+- **The discount rate** (`PP-Q4`): on `e^{−ρt}`-discounted costs the textbook equivalence is
+  the undiscounted problem on `A − (ρ/2) I`; or a discounted problem is refused.
+- **The time origin:** the finite schedule is computed on `0 … T` and read relative to `t0`
+  (`K(t − t0)`); the solution's `TimeVaryingFeedback` and `QuadraticField(x̄, S, t)` carry the
+  absolute times `t0 + s`. This was an open point; it is the only consistent reading.
+
+### 5.3 The face
+
+- **`z`:** infinite, `[K ; x̄ ; ū]`; finite, `[K(s) ; x̄ ; ū ; t0]` on the relative times `s`.
+- **`pv.solve(params)`:** `lqr_matrices` and the Riccati solve at the tree, on the host (SciPy:
+  refused under a trace, with the message naming the host loop); `z0` ignored; `status["cost"]
+  = (x0 − x̄)ᵀ P (x0 − x̄)` (or `S(t0)`).
+- **`pv.initial(params)`:** the solve at the tree (a direct method has no other guess).
+- **`pv.command(z, x, t)`:** `ū − K (x − x̄)`, or `ū − K(t − t0)(x − x̄)` read on the schedule,
+  with the past-the-end rule of `PP-Q2`.
+- **`pv.solution(z, params)`:** the law, the record (`P` or `S(t)`, the poles at the tree) and
+  the cost-to-go, `QuadraticField(x̄, P)` or `QuadraticField(x̄, S, t)`. A test checks that a
+  long schedule's `S(t)` passes the field's symmetry check.
 
 ## 6. The cost-to-go as a field
 
@@ -248,126 +304,205 @@ ends a short MPC with the LQR value (`examples/demos/compile/terminal_field_mpc.
 
 ```python
 class GridField(Field):
-    """J(x), or J(x, t), read on a regular grid: multilinear between nodes, the edge held outside."""
+    """J(x), or J(x, t), read on a regular grid: multilinear between nodes."""
 
     def __init__(self, levels, values, t=None, *, method="linear", outside=None): ...
 
     def value(self, x, u=None, t=0.0, params=None):
-        # x held inside the grid on each axis (or `outside` past it, when a number is given)
+        # Outside the grid: the edge held (x clamped on each axis), or the number `outside`
         # J(x) = Σ_corners J_corner Πₖ (yₖ or 1 − yₖ); a time axis read linearly in t
         ...
 ```
 
 - **Its place:** `core/fields.py`, beside `QuadraticField`. It needs the levels per axis and the
   table, never the `StateSpaceGrid`; the planner builds it from its grid (`grid.field(J)`).
-- **Its arithmetic:** one native interpolation, multilinear and nearest, through `xp`, shared
-  with `LookupPolicy` (one function, *a table on a regular grid read at `x`*). It traces, takes
-  `params` (`levels`, `values`, `t`), and its gradient is `jax.grad` or central differences.
-  The spline methods (`"cubic"`, `"quintic"`) stay NumPy-only, as today.
-- **Outside the grid:** the edge held (`x` clamped to the grid on each axis); `outside=` a
-  number when a user asks for one. Today's `J = 0` past the grid goes.
+- **Its arithmetic:** one native multilinear (and nearest) reading of a table on a regular
+  grid through `xp`, shared with `LookupPolicy` (the cell search and the corner weights, one
+  function; each caller applies its own outside rule). It reads a stack of states `(M, n)`,
+  one value per row, as `QuadraticField` does; it traces and takes `params` (`levels`,
+  `values`, `t`); its gradient is the exact per-cell multilinear gradient, never a finite
+  difference across a cell edge. The spline methods (`"cubic"`, `"quintic"`) stay NumPy-only
+  and do not trace in `params`.
 - **Time:** a leading axis of `values` on the times `t`, read linearly in `t` and held past its
-  ends, the rule of `QuadraticField` (every field reads time the same way). The lookup law
-  holds per stage (§4.4): the law and the field each follow their own meaning.
-- **Its numbers:** the sweeps keep their own interpolation, so the tables stay byte-identical.
-  `cost_to_go(x)` read natively may differ from SciPy's in the last bits (about `1e-16`), and
-  a query past the grid now returns the edge value: each change gets its own test.
+  ends, the rule of `QuadraticField`; the law holds per stage (§4.4).
 
-### 6.3 The planners' cost-to-go
+### 6.3 Outside the grid, and the infeasible cells
 
-- Value iteration: `GridField(levels, J)`, or `GridField(levels, J_stack, t=t_k)` on a finite
-  horizon.
+- **The sweeps keep their rule** (arrival cost `0` off the grid, the pair priced by `G`):
+  `bellman_backup` never sees the field's outside rule, so the tables stay byte-identical.
+- **A bare `GridField` holds the edge** (`PP-D10`); `outside=` a number on request.
+- **The planner's cost-to-go** is `PP-Q3`: the edge held, as ruled, or `out_of_bound_cost`, the
+  meaning the sweeps give to leaving the grid. With the edge held, a state off the grid reads
+  as cheap as its nearest edge node, so `J.as_set(upper=…)` can contain it and
+  `J.as_terminal_cost()` can pull a plan out of the box.
+- **The infeasible cells:** the cells pinned at the failure cost are a cliff, and linear
+  reading ramps across it (the gradient there is about `INF / Δx`). The feasible set is
+  `J.as_set(upper=threshold)` with the threshold the planner's `out_of_bound_cost`, named on the
+  solution, never a magic `INF − 1`; `as_terminal_cost` on such a field is documented as a
+  terminal cost for a sampling or host solver, not a gradient one, across that cliff.
+
+### 6.4 The planners' cost-to-go
+
+- Value iteration: `grid.field(J)`, or `grid.field(J_stack, t=t_i)` on a finite horizon.
 - LQR: `QuadraticField(x̄, P)`, or `QuadraticField(x̄, S, t)`; `quadratic_cost_to_go` goes.
 - `sol.cost_to_go(x)` keeps working (`Field.__call__`), and the plots read the field.
 
-What it opens:
-
 ```python
 J = DynamicProgrammingPlanner(problem, ...).solve().cost_to_go
-J(x); J(x, t)                    # as today; the finite horizon
-J.as_terminal_cost()             # the VI value ends a short nonlinear MPC
-J.as_set(upper=INF - 1)          # the states that reach the goal: the capture basin
-J.gradient(x)                    # ∂J/∂x
+J(x); J(x, t)                     # as today; the finite horizon
+J.as_terminal_cost()              # the VI value ends a short nonlinear MPC (a sampling solver)
+J.as_set(upper=planner.out_of_bound_cost)   # the states that reach the goal
+J.gradient(x)                     # ∂J/∂x, exact inside a cell
 ```
 
-### 6.4 The `Q` table, later
+### 6.5 The `Q` table, later
 
 A table over the grid's states × actions is a table on a joint grid: `Q` is a `GridField` over
 the joint levels of `(x, u)`, with `min_over_u()` (the `J` field) and `greedy()` (the
 `LookupPolicy`) its two reductions. They land with tabular RL in v0.5; nothing about `Q` is
-built here, and `GridField` needs no special shape for it.
+built here.
 
-## 7. The MPC reads the state
+## 7. The MPC and the follower read the state
 
-`PlanCommand` and `PlanFollower` gain the measurement as an input and pass it to
-`pv.command(z, x̂, t)`. The trajectory and MPPI faces ignore it, so their loops stay
-byte-identical. With it:
+- **Which state:** the command of a feedback face reads the port bound to `x0` (the default
+  binding `{"x0": "y"}`, the measurement). An MPC on a feedback face refuses to build without an
+  `x0` binding. A predictor bound to `x0` feeds the solve; the command reads the same port, so a
+  user who wants the law on the raw measurement binds it there and puts the predictor on the
+  solve's own port (the worked snippet goes in DESIGN with `PP-5`).
+- **With `delay=True`:** the delayed plan meets the current measurement (the law of the plan
+  solved at `k − 1`, applied to `x̂_k`).
+- **The follower:** `PlanFollower` gains a measurement input `y` only when `pv.feedback` is
+  true, so every open-loop dual-rate loop keeps its wiring and its numbers. `>>` wires `z`; the
+  follower's `y` is closed by `@` on the plant like the MPC's (the snippet and its test land
+  before the faces: `examples/projects/mpc/mpc_dual_rate.py`, `test_mpc.py`, `test_v03_core.py`
+  and `benchmarks/scenarios/f_mpc_parity.py` keep passing unchanged). A follower on a feedback
+  face whose `y` is left open refuses to run rather than read a nominal state.
+- **"Replan every `M` ticks"** is that dual-rate loop: the plan solved at the slow rate, the
+  feedback law applied at the fast one; no new option.
 
-- LQR and value-iteration plans close in `ModelPredictiveController(planner) % dt`;
-- "replan every `M` ticks" is the dual-rate loop, `(mpc % (M dt)) >> (PlanFollower(planner) % dt)`,
-  a feedback plan applied at the fast rate between solves; no new option;
-- value iteration with `n_iterations=k` per tick is real-time dynamic programming, warm-started
-  from the last `J` (the MPC tick binds `x0` and `t0`, which never touch the grid tables, so the
-  sweeps trace with no rebuild).
+## 8. What "equal to `planner.solve()`" means
 
-## 8. The rulings of 2026-11-06
+`pv.solution(pv.solve(p)[0], p, status)` and `planner.solve(params=p)` are compared, per
+backend, on: the policy's `params` (value iteration's `u_table`, `levels`, `t`; LQR's `K`,
+`x̄`, `ū`, `t`), the record's numbers (`iterations`, `delta`, `converged`, `mode`, the tables or
+`P`, `S`, the poles), and the cost-to-go's `params`. A run's history and its timings are
+workflow, outside the comparison.
+
+## 9. The rulings of 2026-11-06
 
 - `PP-D1` **The contract** of §3: two axes (open loop or feedback; stationary or
   time-varying); `command(z, x, t)` always receives the state; a time-varying `z` carries `t0`;
-  the last stage holds past the end; the test is that every planner closes in the MPC loop.
-- `PP-D2` **Value iteration supports both horizons**, chosen by the problem (§4.3); the finite
-  horizon (formerly S63, v0.5) moves to this work.
-- `PP-D3` **The policy stays in `z`** (§4.5).
+  the test is that every planner closes in the MPC loop.
+- `PP-D2` **Value iteration supports both horizons**, chosen by the problem; the finite
+  horizon (formerly S63, v0.5) moves to this work. (`PP-Q1` asks how it meets the three
+  examples of §2.)
+- `PP-D3` **The policy stays in `z`** (as the command table, §4.5).
 - `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law.
 - `PP-D5` **`LookupPolicy` takes a schedule** for the finite horizon (§4.4).
 - `PP-D6` **The core math first:** a pure function at the top of each planner's file,
-  `bellman_backup` (one backup; the loop stays in the planner, with the workflow) and
-  `lqr_gains`; the planner and the face both call it.
-- `PP-D7` **The MPC reads the state** (§7); replanning every `M` ticks is the dual-rate loop.
+  `bellman_backup` (one backup; the loop stays in the planner) and, for LQR, `lqr_matrices`
+  (§5.1: the Riccati solvers are already pure); the planner and the face both call them.
+- `PP-D7` **The MPC reads the state** (§7); replanning at a slow rate is the dual-rate loop.
 - `PP-D8` **Every planner's cost-to-go is a `Field`:** LQR and value iteration in this work, RL
   with the rest of the field object in v0.5.
-- `PP-D9` **`GridField(levels, values, t=None)` in `core/fields.py`,** on one native
-  interpolation shared with the lookup law.
-- `PP-D10` **Outside the grid, the edge is held,** `outside=` a number on request.
+- `PP-D9` **`GridField(levels, values, t=None)` in `core/fields.py`,** on one native reading of
+  a table shared with the lookup law.
+- `PP-D10` **Outside the grid, a `GridField` holds the edge,** `outside=` a number on request.
+  (`PP-Q3` asks whether the planner's cost-to-go uses it.)
 - `PP-D11` **A `Q` table is a `GridField` over `(x, u)`;** its reductions land with tabular RL
   in v0.5.
 - `PP-D12` **A grid field reads time linearly,** held past its ends; the law holds per stage.
 
-## 9. Open points (details, the agent's call unless the maintainer says otherwise)
+## 10. Decisions the reviews raised
 
-1. **The backup's interpolation.** If the shared native interpolation reproduces SciPy's
-   linear one bit for bit inside the grid, `bellman_backup` uses it on every backend; if not,
-   the sweeps keep the grid's SciPy interpolator (their tables byte-identical) and only the
-   field and the law read natively.
-2. **The finite mode's memory limit.** The default refusal threshold (proposed: 1 GB for the two
-   stacks, the message giving `N`, `nodes` and the bytes), and whether `record_history=False`
-   lets a user keep `π_k` only.
-3. **The LQR schedule's time origin.** `lqr_gain_schedule` samples `0 … tf`, not `t0 … t0 + T`:
-   the planner and the face read it relative to `t0` (as the `z` of §5.2 does), and the
-   finite `QuadraticField(x̄, S, t)` is built on absolute times.
-4. **`n_iterations` on value iteration.** The spelling of the fixed sweep count per face solve
-   (RULES 2.7's exact count); whether the offline `solve()` takes it too.
-5. **A finite horizon that is not a multiple of `dt`.** Refused (proposed), or rounded with a
-   warning.
+For the maintainer (each with the agent's recommendation):
 
-## 10. Steps and the split
+- `PP-Q1` **The three examples that solve value iteration on a finite-horizon problem** (§2:
+  the README comparison, the showcase, the optimal-control tutorial). Under `PP-D2` they switch
+  from the converged law to `T / dt` sweeps and a time-varying law, and their `compare()` scores
+  move. Options: (a) the problem decides, as ruled, and the three examples are migrated in the
+  same change (`problem.replace(horizon=None)` for value iteration, or the finite law shown on
+  purpose); (b) the finite mode is opt-in (`solve(horizon="problem")`), the default stays the
+  converged law. *Recommendation:* (a): one rule, the LQR rule; the migration is three cells.
+- `PP-Q2` **The law past the horizon's end.** Holding the last stage is harmful: with `h = 0`
+  the last stage's action is a tie broken at action `0` (the double-integrator notebook's time
+  cost gives full negative input everywhere), and finite LQR with `S = 0` has `K(tf) = 0`, open
+  loop. Options: (a) hold the last stage, documented; (b) hold stage 0, the full-horizon law
+  (the receding law, the one `solve_steps` gives); (c) refuse a time past `tf`.
+  *Recommendation:* (b) for both planners' laws (`TimeVaryingFeedback` already takes
+  `K_after`); the trajectory faces keep holding their tail input.
+- `PP-Q3` **The planner's cost-to-go outside the grid:** (a) the edge held, as `PP-D10` rules
+  for a bare field; (b) `out_of_bound_cost`, the sweeps' own meaning. *Recommendation:* (b) for
+  the planner's field (`grid.field(J)` passes it), (a) stays the bare field's default: the
+  planner's value should say what the planner computed.
+- `PP-Q4` **Discounted LQR:** (a) the undiscounted equivalent on `A − (ρ/2) I`, the textbook
+  form; (b) refuse a discounted problem. Today it is silently wrong (a known issue to record).
+  *Recommendation:* (a), with a test against value iteration on a discounted double integrator.
+- `PP-Q5` **The GRO860 notebooks' words on `solve_steps`** (student-facing): they call it the
+  finite-horizon recursion; after this work the faithful twin of `exact_dp(N)` is `solve()` on
+  `horizon = N dt`. The library changes nothing in the notebooks; the maintainer decides whether
+  their text changes.
+
+The agent's to settle, recorded here:
+
+- `PP-Q6` **Size limits:** the finite mode's stacks and a face's `n_z` refused above a limit
+  (proposed: 1 GB for the stacks; a face in the MPC loop above 10⁶ numbers), the message giving
+  `N`, the nodes and the bytes. Finite value iteration is refused in the MPC loop, accepted in
+  the follower.
+- `PP-Q7` **The transition-matrix form of `arrival`** (`W` built once): a speed-up measured
+  after the change, adopted only if the tables stay byte-identical or the maintainer accepts the
+  move.
+- `PP-Q8` **The fixed sweep count of a face solve** (infinite mode only): `n_iterations=k` on
+  the planner (RULES 2.7's exact count), beside `max_iterations` the cap; refused in the finite
+  mode, where `N` is the horizon's.
+
+## 11. What the reviews changed
+
+- §1: the MPC test is a conformance check, not the use of LQR and value iteration.
+- §2: corrected: three examples run value iteration on a finite horizon; the off-grid readers;
+  LQR's discount and time origin; where LQR's linearization sits.
+- §3: `t0` last in `z`; `pv.feedback`; `initial` never a corner; `status["cost"]`; `shift` the
+  warm guess, unchanged for a method that ignores `z0`; the shrinking-horizon claim dropped;
+  trajectory plus tracking added as a row; commands deterministic; discrete LQR out of scope.
+- §4: `bellman_backup` takes an `arrival` reader (zero off the grid), one backup on NumPy and
+  JAX; stage index with a tolerance, `steps_of` for `T / dt`, one symbol each for the stage and
+  the sweep count; the discounted meaning of `J(x, t)`; `solve_steps`' record and a test tying it
+  to the finite mode; the failure cost over `N`; frozen tables named; the stacks the single
+  home; `z` holds the command table, not action ids; the table-rebuild rule covers every leaf
+  the tables read; truncated value iteration, not real-time dynamic programming.
+- §5: no new Riccati spelling: `lqr_matrices` lowers the problem, the existing pure solvers
+  solve it; nominal plant numbers; the discount and the time origin; the host-only face.
+- §6: the outside rules kept apart (sweeps, law, field); the infeasible cliff and the
+  feasibility threshold; batched reading; the exact multilinear gradient.
+- §7: which state the command reads; the follower's measurement input and its wiring.
+- §8: the fields "equal to `planner.solve()`" compares.
+- §12: the MPC and follower wiring land before the faces; the shared reading's change to the
+  law gets its own test.
+
+## 12. Steps and the split
 
 Local steps; the order of work and "done when" are TODO §1.8's.
 
-**First change: contract, pure cores, fields** (no number moves but the two field changes of
-§6.2):
-- `PP-1` The contract in DESIGN §6 (§3's two tables).
-- `PP-2` `bellman_backup` and `lqr_gains` lifted out, the planners calling them: seeded
-  baselines byte-identical.
-- `PP-3` The shared grid interpolation; `GridField` in `core/fields.py`; value iteration's and
-  LQR's `cost_to_go` as fields; `quadratic_cost_to_go` removed.
+**First change: contract, pure cores, fields** (the sweeps' tables byte-identical; the moves
+listed are the field's, each with its own test):
+- `PP-1` The contract in DESIGN §6 (§3's two tables, §7, §8).
+- `PP-2` `bellman_backup` (with its `arrival` reader, NumPy and JAX) and `lqr_matrices` lifted
+  out, the planners calling them: seeded baselines byte-identical.
+- `PP-3` The shared grid reading; `GridField` in `core/fields.py`; value iteration's and LQR's
+  `cost_to_go` as fields; `quadratic_cost_to_go` removed. Number moves, each tested: the
+  cost-to-go read natively (about `1e-16` inside the grid), the cost-to-go outside the grid
+  (`PP-Q3`), the lookup law if the shared reading changes it anywhere.
 
-**Second change: the two modes, the faces, the MPC:**
+**Second change: the two modes, the MPC, the faces:**
 - `PP-4` Value iteration's finite mode: the stacks, `LookupPolicy`'s schedule, `J(x, t)`, the
-  JAX `lax.scan`, the record, `solve_steps` documented; tests on the grid world's tables
-  checked by hand (GRO860's notebook holds them).
-- `PP-5` The two compiled faces: `pv.solution(pv.solve(p)[0])` byte-identical to
-  `planner.solve()` in both modes, NumPy and JAX; `test_no_recompile.py` extended.
-- `PP-6` The MPC reads the state: LQR, value iteration (both modes) in the MPC loop and the
-  dual-rate loop; trajectory and MPPI loops byte-identical.
-- `PP-7` DESIGN §4 and §6, ROADMAP's ledger rows, TODO; this doc deleted once landed.
+  JAX scan, the record's `mode`, `solve_steps` documented, the size limit; the three examples
+  of `PP-Q1` as ruled; tests: the finite mode against `solve_steps`, LQR and value iteration
+  agreeing on the finite-horizon double integrator, the `h = 0` case past `tf` (`PP-Q2`), the
+  stage index on float ticks; every demo calling `solve_steps` run.
+- `PP-5` The MPC and the follower read the state (`pv.feedback`, the `x0` binding, the
+  follower's `y`): open-loop loops byte-identical; the dual-rate snippet and its test.
+- `PP-6` The two compiled faces: §8's comparison in both modes, NumPy and JAX;
+  `test_no_recompile.py` extended; LQR and value iteration (infinite in the MPC loop, both modes
+  in the follower) closing; the discounted LQR of `PP-Q4`.
+- `PP-7` DESIGN §4 and §6, ROADMAP's ledger rows, TODO, KNOWN_ISSUES for anything left; this
+  doc deleted once landed.

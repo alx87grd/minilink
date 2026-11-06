@@ -37,6 +37,7 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
+| Plans as policies: the decisions the reviews raised | PP-Q1–PP-Q5 | v0.4 | each decision's option ([plans-as-policies.md](plans-as-policies.md) §10): the three examples on a finite horizon, the law past `tf`, the planner's cost-to-go off the grid, discounted LQR, the GRO860 notebooks' words on `solve_steps` |
 | The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
@@ -228,21 +229,22 @@ solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
   loop tuned by gradient landed in the v0.3 runs; the RL and RRT faces stay with their v0.5
   rows, on the same contract. Two changes, in order:
   - **contract, pure cores, fields** (`PP-1` to `PP-3`): done when the face contract is in
-    DESIGN §6; `bellman_backup` and `lqr_gains` open their files and the planners call them,
+    DESIGN §6; `bellman_backup` and `lqr_matrices` open their files and the planners call them,
     the seeded value-iteration and LQR baselines `cmp` byte-identical; `GridField` is in
-    `core/fields.py` on the interpolation shared with `LookupPolicy`, traces under JAX, and is
-    value iteration's `cost_to_go`, `QuadraticField` LQR's; the two intended changes (the native
-    read, the edge held outside the grid) have their own tests; `test_planning_solution.py`,
+    `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
+    iteration's `cost_to_go`, `QuadraticField` LQR's; each number move of the plan's `PP-3`
+    has its own test; `test_planning_solution.py`,
     `test_dynamic_programming.py`, `test_lqr_planner.py` and the GRO860 value-iteration
     notebooks pass;
-  - **the two modes, the faces, the MPC** (`PP-4` to `PP-7`): done when `solve()` on a
-    finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, and LQR
-    and value iteration agree on the finite-horizon double integrator; the infinite mode stays
-    byte-identical; `pv.solution(pv.solve(p)[0])` reproduces `planner.solve()` byte-identically
-    for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py` covers the
-    two faces; LQR and value iteration close in the MPC loop and the dual-rate loop, the
-    trajectory and MPPI loops byte-identical; DESIGN §4 and §6 carry the landed contracts and
-    the plan doc is deleted.
+  - **the two modes, the MPC, the faces** (`PP-4` to `PP-7`, after the go on `PP-Q1` to
+    `PP-Q4` **[ask]**): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
+    with a time-varying law and `J(x, t)`, its `J_0` equals `solve_steps(N)`'s, and LQR and
+    value iteration agree on the finite-horizon double integrator; the infinite mode stays
+    byte-identical; the MPC and the follower read the state, the open-loop loops
+    byte-identical; `pv.solution(pv.solve(p)[0])` equals `planner.solve()` on the fields of the
+    plan's §8 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py`
+    covers the two faces; DESIGN §4 and §6 carry the landed contracts and the plan doc is
+    deleted.
 
 ### 1.9 Fields
 
