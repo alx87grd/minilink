@@ -1243,7 +1243,8 @@ side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
 one scale; `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
-and one backend (NumPy for all when one entry does not trace), and `difference(a, b)` is
+and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
+it (a sampled controller on its own clock, `dt` only for a continuous one), and `difference(a, b)` is
 the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to `(A, B, Q, R, S)` at the cost's `(x_bar, u_bar)`

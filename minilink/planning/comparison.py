@@ -43,6 +43,9 @@ def compare(
     one backend for all, so the trials are paired): an entry is a
     :class:`~minilink.planning.results.PlanningSolution`, a controller block, or
     an :class:`~minilink.planning.evaluation.Evaluation` already computed.
+    ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
+    controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
+    continuous one needs ``dt``, the period its loop is integrated on.
     """
     problem, named = split_entries(args, entries)
 
@@ -52,8 +55,8 @@ def compare(
         require_solutions(named)
         return Comparison(named)
 
-    # Every entry scored on the same draws, its solution kept for the overlays
-    require_dt(dt)
+    # Every entry scored on the same draws, its solution kept for the overlays (each
+    # loop's period as evaluate reads it: a sampled one's own clock, else dt)
     evaluations = score_entries(
         problem,
         named,
@@ -457,14 +460,8 @@ def require_no_scoring(dt, n_trials):
     """Refuse scoring settings without a problem to score on."""
     if dt is not None or n_trials is not None:
         raise TypeError(
-            "compare scores its entries only on a problem: compare(problem, ..., dt=)"
+            "compare scores its entries only on a problem: compare(problem, ...)"
         )
-
-
-def require_dt(dt):
-    """Refuse a scored comparison without the sample period."""
-    if dt is None:
-        raise TypeError("compare(problem, ...) needs dt, the period of the runs")
 
 
 def require_scores(evaluations, names):
@@ -472,7 +469,7 @@ def require_scores(evaluations, names):
     missing = [name for name in names if not evaluations or name not in evaluations]
     if missing:
         raise ValueError(
-            f"{missing} carry no evaluation: compare(problem, ..., dt=) scores them"
+            f"{missing} carry no evaluation: compare(problem, ...) scores them"
         )
 
 
