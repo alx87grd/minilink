@@ -4,7 +4,8 @@ Status: written 2026-11-06 from the maintainer's design session (rulings `PP-D1`
 §9), then consolidated the same day after two independent reviews (one on the code and the
 contracts, one on the control theory and the user API); what the reviews changed is §11; the
 decisions they raised were ruled the same day (`PP-D13` to `PP-D17`), and none is open. On
-2026-11-06 the steps were re-sliced into three changes ordered by value (§12). Lane: core.
+2026-11-06 the steps were re-sliced into three changes ordered by value (§12); change 1 (the
+math and the fields) is built on the branch `plans-as-policies-1` (§13). Lane: core.
 The rows: [TODO.md](TODO.md) §1.8, three rows, one per change; the order of work and each
 change's "done when" live there. Contracts in code today:
 [DESIGN.md](../dev/DESIGN.md) §4 ("Fields") and §6 (the compiled face, the MPC).
@@ -239,44 +240,38 @@ treat the outside differently on purpose (§6.3).
 
 ## 5. LQR: the lowering first, the existing pure solvers, the face
 
-### 5.1 The pure core, first in `lqr.py`
+### 5.1 The pure core, first in `lqr.py` (landed with change 1)
 
 The Riccati solvers are already pure and live in `control/design.py` (`lqr_gain`,
 `lqr_gain_schedule`) and `analysis/riccati.py` (`care`); a second spelling of them would be a
 second copy. What `lqr.py` adds is the lowering of the problem to the textbook matrices, so its
-file opens with that, a function of the plant and the tree:
+file opens with that, arrays and numbers in, arrays out (the planner passes its operating
+point, its cost's weights and the plant's design numbers; the face will pass the tree's):
 
 ```python
-def lqr_matrices(sys, params):
-    """(A, B, Q, R, S): the plant linearized at the tree's operating point, the weights over its command port."""
-    x_bar = params["method"]["x_bar"]
-    u_bar = params["method"]["u_bar"]
-    t = params["method"]["t"]
-    plant = nominal_plant_params(params["plant"])
-
-    # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port
-    model = design_model(sys, x_bar, u_bar, t, plant)
+def lqr_matrices(sys, x_bar, u_bar, Q, R, S, *, t=0.0, params=None, method="auto", eps=1e-6):
+    """(A, B, Q, R, S): a quadratic problem lowered to the textbook LQR matrices at (x̄, ū, t)."""
+    # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A = model.A()
     B = model.B()
 
-    # The weights, R over the command port
-    Q = params["cost"]["Q"]
-    R = command_block(sys, params["cost"]["R"])
-    S = params["cost"]["S"]
+    # The input weight over the command port: R[c, c]
+    R = command_block(sys, R)
 
     return A, B, Q, R, S
 ```
 
-`LQRPlanner.solve` and the face both call `lqr_matrices`, then the existing solvers, with the
-textbook lines of today's `solve` unchanged (`P = care(A, B, Q, R)`, `K = R⁻¹ Bᵀ P`, or the
-backward sweep of `S(t)`). The differentiation options (`method`, `eps`) stay planner
-keywords passed through.
+`LQRPlanner.solve` calls it, then the existing solvers, with the textbook lines of the solve
+unchanged (`P = care(A_ρ, B, Q, R)`, `K = R⁻¹ Bᵀ P`, or the backward sweep of `S(t)`).
 
 ### 5.2 Two numbers LQR must read
 
-- **The discount rate** (`PP-D16`): on `e^{−ρt}`-discounted costs the planner solves the
-  textbook equivalent, the undiscounted problem on `A − (ρ/2) I` (the finite sweep too), and
-  warns once that the problem is discounted (unusual for LQR), naming the shift. The
+- **The discount rate** (`PP-D16`, landed with change 1): on `e^{−ρt}`-discounted costs the
+  planner solves the textbook equivalent, the undiscounted problem on `A_ρ = A − (ρ/2) I`
+  (the finite sweep too), and warns that the problem is discounted (unusual for LQR). The
+  shift sits in `solve`, where the Riccati equations read `A_ρ`, not in `lqr_matrices`: the
+  closed-loop poles in the record are the plant's, `eig(A − B K)`. The
   equivalence holds as the problem weighs its terms: the running cost by `e^{−ρ(t − t0)}` and
   the terminal cost by `e^{−ρT}` (`problems.py`'s cost bound reads it so); with
   `x̃ = e^{−ρ(t − t0)/2} x`, `ũ = e^{−ρ(t − t0)/2} u`, the terminal weight `S` is unchanged and the
@@ -526,3 +521,24 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
   `test_no_recompile.py` extended; the conformance loops of §1.
 - `PP-9` The contract of §3, §7 and §8 into DESIGN §6 (written when it lands, DESIGN holding
   landed contracts only); ROADMAP's ledger rows; this doc deleted.
+
+## 13. What change 1 built (branch `plans-as-policies-1`)
+
+- `bellman_backup(J_next, G, arrival, gamma)` opens `dp.py`; the NumPy table step and the JAX
+  step call it, each with its own `arrival` (SciPy; `map_coordinates` with the in-bounds mask).
+  `lqr_matrices` opens `lqr.py`. Seeded baseline byte-identical (NumPy, loop and JAX engines;
+  `solve` and `solve_steps`; a discounted, a finite-horizon and a `gamma`-overridden problem;
+  the lookup law inside and outside the grid; LQR in both horizons).
+- `GridField` in `core/fields.py`, with `grid_value` (the cell reading), `grid_gradient` (the
+  exact multilinear gradient) and `StateSpaceGrid.field`. `LookupPolicy` reads its command
+  table through `grid_value`: byte-identical inside and outside the grid.
+- Value iteration's `cost_to_go` is `grid.field(J)`: bit-exact with the SciPy reading inside
+  the grid, the failure cost past it (it read 0). `planner.value_at` reads it. LQR's is
+  `QuadraticField` (within `1e-14` of the closure it replaced, removed).
+- One API consequence: a field is `V(x, u, t)`, so time goes by keyword, `J(x, t=t)`; the one
+  library caller that passed it positionally (the cost-to-go heatmap) and one test follow.
+- Discounted LQR on `A_ρ`, with its warning; tested against the discounted Riccati residual and
+  against value iteration on a discounted double integrator. The core tutorial
+  `08_planners.ipynb` solves LQR on a discounted problem (`discount_rate=0.2`): its LQR numbers
+  move to the discounted problem's and the warning shows; the notebook itself is unchanged
+  (the maintainer's).

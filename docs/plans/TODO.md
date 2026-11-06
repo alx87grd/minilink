@@ -87,7 +87,8 @@ breaks nothing goes last and may follow the tag.
    API proposals and `refresh()` (§1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
    root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
    Each ruling unblocks its row in phase 3 or 5.
-1. **The planners' math and fields** (§1.8, plans as policies, change 1; ruled): the pure
+1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
+   `plans-as-policies-1`, in review): the pure
    cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
    discounted LQR. First because it changes a public shape (`solution.cost_to_go` becomes a
    `Field`) and fixes a known issue, while the tables stay byte-identical.
@@ -252,7 +253,8 @@ MPPI planners, the MPC as one box on them and its closed loop tuned by gradient 
 v0.3 runs; the RL and RRT faces stay with their v0.5 rows, on the same contract. Three changes,
 each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
 
-- [ ] **The planners' math and fields** (`PP-1` to `PP-3`): done when `bellman_backup` and
+- [ ] **The planners' math and fields** (`PP-1` to `PP-3`; built on the branch
+  `plans-as-policies-1`, in review: the row leaves at the merge): done when `bellman_backup` and
   `lqr_matrices` open their files and the planners call them, the seeded value-iteration and
   LQR baselines `cmp` byte-identical (NumPy, loop and JAX engines); `GridField` is in
   `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value

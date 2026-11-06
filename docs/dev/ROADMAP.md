@@ -405,7 +405,8 @@ additive work last):
 - **Plans as policies** ([plans-as-policies.md](../plans/plans-as-policies.md), ruled
   2026-11-06; TODO §1.8), in three changes:
   - the planners' math and fields: the pure cores first in their files, `GridField`, the
-    cost-to-go of LQR and value iteration as fields, discounted LQR;
+    cost-to-go of LQR and value iteration as fields, discounted LQR (built on its branch,
+    in review);
   - value iteration's finite horizon, the law past the horizon, three examples migrated;
   - last, additive: the compiled faces of LQR and value iteration and the MPC reading the state
     (before the tag if ready, else 0.4.x or v0.5 with the RL and RRT faces).
