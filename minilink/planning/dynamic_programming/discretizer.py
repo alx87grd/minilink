@@ -194,9 +194,12 @@ class StateSpaceGrid:
         if self.verbose and not self.precomputed:
             self.print_mesh_summary()
 
-        # The tables traced on device; a plant JAX cannot trace is refused
+        # The tables traced on device; a plant JAX cannot trace is refused (JAX missing
+        # says so itself)
         try:
             self.x_next, self.action_ok, self.x_next_ok = self.compute_transition_jax(t)
+        except ImportError:
+            raise
         except Exception as exc:
             raise ValueError(
                 "JAX grid precompute requires a JAX-traceable plant f and BoxSet X"
