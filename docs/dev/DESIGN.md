@@ -817,7 +817,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   and four conversions named by what they return: `as_set(lower=, upper=)` (a `FieldSet`;
   `as_set(upper=level)` is the sublevel set), `as_input_set` (an `InputSet` over `u` at `x`),
   `as_cost(weight=, shaping=)` (the running cost `g = weight · shaping(V)`) and
-  `as_terminal_cost` (the terminal cost `h`). The shaping functions (`quadratic_hinge`,
+  `as_terminal_cost` (the terminal cost `h`). Time goes by keyword, `V(x, t=t)`: the
+  second positional argument is `u`. The shaping functions (`quadratic_hinge`,
   `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
@@ -833,7 +834,17 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
-  a short-horizon MPC.
+  a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
+  `(x̄, S, t)` on a finite horizon).
+  `GridField(levels, values, t=None, *, method="linear", outside=None)` is a table on a
+  regular grid read as a field: multilinear in the cell holding `x` (`"nearest"` its closest
+  node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only; a leading time
+  axis on `t` read linearly and held past its ends, the `QuadraticField` rule. Outside the grid
+  the edge holds (`x` clamped on each axis), or `V = outside` when a number is given. Its
+  `params` are `{"levels", "values"}` and, as given, `t` and `outside`; its gradient is the
+  cell's exact multilinear one. The cell reading is one function (`grid_value`), which
+  `LookupPolicy` shares for its command table (extending the edge cell past the grid, then
+  clipping `u`). Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
@@ -1211,9 +1222,9 @@ bounds the command, since the Riccati law never reads `U` (LQR never
 warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
-`cost_to_go` where the method produces one (the DP and tabular tables; the
-Riccati form of `LQRPlanner`; the RL critic when the training discount equals
-the problem's). Everything on the solution is the solver's own claim under its
+`cost_to_go` where the method produces one (a `GridField` for value iteration,
+a `QuadraticField` for `LQRPlanner`, read `J(x)` or `J(x, t=t)`; the tabular table and
+the RL critic, when the training discount equals the problem's, plain callables of `x`). Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
@@ -1599,7 +1610,12 @@ the discount the face's `γ` and the failure cost its rule; a `StepPlanningProbl
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
-interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
+is `J` as a `GridField` on the grid (`grid.field(J)`: read by the planner's interpolation,
+the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
+callable; `planner.value_at` reads it). The backup is one function at the top of `dp.py`,
+`bellman_backup(J_next, G, arrival, gamma)`, `J = min_u [G + γ J_next(x_next)]` with its
+argmin, each engine passing its reading of the grid (`arrival`, zero off the grid); the
+`"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
 `solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each

@@ -1,10 +1,9 @@
 """Lookup-table feedback: a dynamic-programming policy as a state-feedback block."""
 
-import itertools
-
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.fields import grid_value, levels_of
 from minilink.core.system import System
 
 ###############################################################################
@@ -87,31 +86,12 @@ class LookupPolicy(System):
         u_lb = self.u_lb
         u_ub = self.u_ub
 
-        x = xp.reshape(xp.asarray(x, dtype=float), (-1,))
+        levels = levels_of(params, n, xp)
+        X = xp.reshape(xp.asarray(x, dtype=float), (1, -1))
 
-        # On each axis k the cell l_{i_k} ≤ x_k < l_{i_k + 1} (the edge cell past the
-        # grid) and the position in it, y_k = (x_k − l_{i_k}) / (l_{i_k + 1} − l_{i_k})
-        cells = []
-        for k in range(n):
-            level = xp.asarray(params["levels"][str(k)])
-            i = xp.clip(xp.searchsorted(level, x[k]) - 1, 0, level.shape[0] - 2)
-            y = (x[k] - level[i]) / (level[i + 1] - level[i])
-            cells.append((i, y))
-
-        # Nearest: the node of each axis's closer end, the lower one on a tie
-        if nearest:
-            index = tuple(xp.where(y <= 0.5, i, i + 1) for i, y in cells)
-            u = u_table[index]
-
-        # Linear: u = Σ_corners u_corner Πₖ (y_k or 1 − y_k) over the cell's 2ⁿ corners
-        else:
-            u = 0.0
-            for corner in itertools.product((0, 1), repeat=n):
-                index = tuple(i + upper for (i, _), upper in zip(cells, corner))
-                term = u_table[index]
-                for (_, y), upper in zip(cells, corner):
-                    term = term * (y if upper else 1.0 - y)
-                u = u + term
+        # u read on the grid: multilinear in the cell holding x (or its nearest node),
+        # the edge cell extended past the grid
+        u = grid_value(levels, u_table, X, nearest=nearest)[0]
 
         # The command inside the grid's input box: the corners at a bound sum to it
         u = xp.clip(u, u_lb, u_ub)

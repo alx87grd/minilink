@@ -83,8 +83,8 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     x = UPRIGHT + [0.1, 0.3]
     for k in (0, 100, 200):
         dx = x - UPRIGHT
-        assert solution.cost_to_go(x, t[k]) == pytest.approx(dx @ S[k] @ dx)
-    assert solution.cost_to_go(x, tf) == pytest.approx(
+        assert solution.cost_to_go(x, t=t[k]) == pytest.approx(dx @ S[k] @ dx)
+    assert solution.cost_to_go(x, t=tf) == pytest.approx(
         (x - UPRIGHT) @ S_f @ (x - UPRIGHT)
     )
 

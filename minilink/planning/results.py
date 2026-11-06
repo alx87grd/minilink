@@ -55,13 +55,16 @@ class PlanningSolution:
         The cost over the problem's draws under the one scoring contract
         (one trial on a deterministic problem), when the solve was asked to
         evaluate; ``None`` otherwise, or when the problem declares no cost.
-    cost_to_go : callable or None
+    cost_to_go : Field, callable or None
         ``J(x)``, the method's own estimate under its own model, where the
-        method produces one: the interpolated table of dynamic programming
-        and tabular learning, the Riccati form of a linear-quadratic design,
-        the critic of a learned law when it estimates the problem's own
-        discount. On a stochastic problem it is the expected cost-to-go
-        when the method takes the distributions.
+        method produces one: a :class:`~minilink.core.fields.GridField` for
+        dynamic programming (the failure cost past its grid), a
+        :class:`~minilink.core.fields.QuadraticField` for a linear-quadratic
+        design (``J(x, t=t)`` on a finite horizon); the interpolated table of
+        tabular learning and the critic of a learned law (when it estimates
+        the problem's own discount) are plain callables of ``x``. On a
+        stochastic problem it is the expected cost-to-go when the method
+        takes the distributions.
     params : dict, optional
         The numbers the solve ran on: the problem's tree as it was when the
         solution was made, a copy. ``None`` (the default) takes it from

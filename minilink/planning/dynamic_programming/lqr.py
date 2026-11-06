@@ -14,9 +14,9 @@ from minilink.control.state import (
     TimeVaryingFeedback,
 )
 from minilink.core.costs import QuadraticCost
+from minilink.core.fields import QuadraticField
 from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
-from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
@@ -187,7 +187,7 @@ class LQRPlanner(Planner):
                 schedule=(t, K, S),
                 U_ignored=is_bounded(problem.U.bounding_box()),
             )
-            cost_to_go = quadratic_cost_to_go(x_bar, S, t)
+            cost_to_go = QuadraticField(x_bar, S, t)
         else:
             # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
             P = care(A, B, Q, R)
@@ -209,7 +209,7 @@ class LQRPlanner(Planner):
                 horizon=np.inf,
                 U_ignored=is_bounded(problem.U.bounding_box()),
             )
-            cost_to_go = quadratic_cost_to_go(x_bar, P)
+            cost_to_go = QuadraticField(x_bar, P)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -304,39 +304,6 @@ class RiccatiRecord:
             )
 
         return f"K = {K}, closed-loop poles {poles}{ignored}"
-
-
-def quadratic_cost_to_go(x_bar, P, t_samples=None):
-    """``J(x) = (x − x̄)ᵀ P (x − x̄)``; with a schedule ``P = S(t)`` on ``t_samples``, ``J(x, t)``."""
-    x_bar = np.asarray(x_bar, dtype=float)
-
-    if t_samples is None:
-
-        def J(x, t=0.0):
-            dx = np.asarray(x, dtype=float) - x_bar
-
-            # J = dxᵀ P dx
-            value = float(dx @ P @ dx)
-
-            return value
-
-    else:
-
-        def J(x, t=0.0):
-            dx = np.asarray(x, dtype=float) - x_bar
-            S = interpolate_schedule(np, t_samples, P, float(t))
-
-            # J(x, t) = dxᵀ S(t) dx
-            value = float(dx @ S @ dx)
-
-            return value
-
-    return J
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
 
 
 def require_quadratic_cost(cost):

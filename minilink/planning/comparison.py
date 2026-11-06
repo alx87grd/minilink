@@ -315,7 +315,7 @@ def sample_cost_to_go(
     for i, xi in enumerate(x_level):
         for j, yj in enumerate(y_level):
             x[axes[0]], x[axes[1]] = xi, yj
-            J[i, j] = float(field(x) if t == 0.0 else field(x, t))
+            J[i, j] = float(field(x) if t == 0.0 else field(x, t=t))
 
     return x_level, y_level, J
 

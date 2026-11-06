@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from functools import partial
 
 import numpy as np
 
@@ -492,9 +491,10 @@ class DynamicProgrammingPlanner(Planner):
         return LookupPolicy(self.result.grid, self.result.pi, **kwargs)
 
     def value_at(self, x) -> float:
-        """Interpolate the cost-to-go at the latest solve, by the options' interpolation."""
-        self.require_solution()
-        return self.result.value_at(x, self.interpolation)
+        """The latest solution's cost-to-go at ``x``: its field, read by the options' interpolation."""
+        solution = self.require_solution()
+
+        return float(solution.cost_to_go(x))
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
@@ -599,9 +599,13 @@ class DynamicProgrammingPlanner(Planner):
             trajectory = nominal_trajectory(self.problem, policy, dt=dt)
             evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
 
-        # The solution: the law, the record, the rollout, the cost-to-go interpolated
-        # as the planner's options say
-        cost_to_go = partial(result.value_at, method=self.interpolation)
+        # The solution: the law, the record, the rollout, and the cost-to-go as a field
+        # on the grid, read as the planner's options say, the failure cost past the
+        # grid (the price the sweeps give to leaving it)
+        outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
+        cost_to_go = result.grid.field(
+            result.J, method=self.interpolation, outside=outside
+        )
         solution = PlanningSolution(
             self.problem, policy, record, trajectory, evaluation, cost_to_go
         )
