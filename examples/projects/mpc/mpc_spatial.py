@@ -20,7 +20,6 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
-from minilink.core.sets import BoxSet
 from minilink.core.shaping import (
     inverse_barrier,
     quadratic_excess,
@@ -185,7 +184,7 @@ cost = (
 )
 
 X = (
-    BoxSet.from_system_state(sys_mpc)
+    sys_mpc.state.box
     & scene.clearance_field(body).as_set(lower=0.0)
     & track.corridor_field(body).as_set(lower=0.0)
 )

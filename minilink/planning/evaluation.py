@@ -276,6 +276,7 @@ def evaluate_trajectory(problem, traj: Trajectory) -> Evaluation:
 def plant_run_of(problem, traj):
     """The plant's run in ``traj``: its ``plant`` role, else ``traj`` when it is a logged plant run."""
     if "plant" in traj.roles:
+        require_recorded_input(traj, "plant")
         return traj.of("plant")
 
     plant = problem.sys
@@ -411,3 +412,13 @@ def register_evaluation_pytree():
         return Evaluation(**dict(zip(fields, children)), criterion=criterion)
 
     jax.tree_util.register_pytree_node(Evaluation, flatten, unflatten)
+
+
+def require_recorded_input(traj, role):
+    """Refuse a block's run whose input the run did not record: a score of it needs the input."""
+    if traj.roles[role]["u"] is None:
+        raise ValueError(
+            f"this run records no input for {role!r}: simulate with "
+            f"record=({role + ':u'!r},), or score the loop with "
+            f"loop.compute_cost(cost, of={role!r})"
+        )

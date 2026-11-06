@@ -17,8 +17,6 @@ from minilink.simulation.solvers.solver import (
 class RK4SolverBackend(SolverBackend):
     """Fixed-step RK4 on the ``times`` grid."""
 
-    reads_input_at_stages = True
-
     def __init__(self) -> None:
         self.last_debug = None
 
@@ -69,7 +67,7 @@ class RK4SolverBackend(SolverBackend):
 
         return x_traj
 
-    def integrate_input(self, evaluator, times, u_of_t, x0, params=None) -> np.ndarray:
+    def integrate_input(self, evaluator, times, u_of_t, x0, args=None, params=None):
         """The RK4 step with the input ``u(t)`` read at each stage time, not held."""
         n_pts = times.shape[0]
         t0 = times[0]

@@ -143,10 +143,9 @@ class DynamicProgrammingPlanner(Planner):
         self.record_history = bool(record_history)
         self.verbose = bool(verbose)
 
-        # Memory
-        self._G = None  # Running-cost table, built once when the grid is precomputed
-        self._jax_cache = {}  # The JAX engine's device tables and compiled loops
-        self._cached_numbers = None  # The numbers those two were built with
+        # The JAX engine's compiled step and loops, by structure (their numbers are
+        # arguments)
+        self.compiled = {}
 
         # The JAX engine builds the grid's transition tables with JAX
         if self.backend == BACKEND_JAX:
@@ -235,10 +234,6 @@ class DynamicProgrammingPlanner(Planner):
         dt = self.grid.dt
         tol = opt.tol
 
-        # The cached tables and compiled loops, rebuilt when an option they bake in
-        # has changed since they were built
-        self.forget_stale_caches()
-
         # The JAX engine runs these same sweeps, jitted on device
         if opt.backend == BACKEND_JAX:
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
@@ -253,6 +248,10 @@ class DynamicProgrammingPlanner(Planner):
             backward_step = self.backward_step_table
 
         log = SweepLog(opt, max_sweeps, stop_on_tol)
+
+        # The running-cost table of this solve, once on a precomputed grid (its
+        # transitions do not depend on time); per sweep otherwise
+        G = self.running_cost_table(tf) if self.grid.precomputed else None
 
         # Cost-to-go at the final time
         J = self.terminal_cost(tf)
@@ -273,7 +272,7 @@ class DynamicProgrammingPlanner(Planner):
             # Bellman backup from the cost-to-go one step ahead:
             # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and step
             J_next = J
-            J, pi = backward_step(J_next, t)
+            J, pi = backward_step(J_next, t, G)
 
             # Largest change of the cost-to-go: the convergence measure
             delta = float(np.max(np.abs(J - J_next)))
@@ -291,9 +290,9 @@ class DynamicProgrammingPlanner(Planner):
             history=log.history,
         )
 
-    def backward_step_loop(self, J_next, t):
+    def backward_step_loop(self, J_next, t, G=None):
         """
-        One backward Bellman step as an explicit loop over nodes and actions.
+        One backward Bellman step as an explicit loop over nodes and actions (``G`` unused: each pair prices its own step).
 
         The readable reference (pyro's ``DynamicProgramming``): for every
         state node and every control action, take a forward-Euler step, look
@@ -352,8 +351,8 @@ class DynamicProgrammingPlanner(Planner):
 
         return J, pi
 
-    def backward_step_table(self, J_next, t):
-        """The same backward step, vectorized over the successor and running-cost tables."""
+    def backward_step_table(self, J_next, t, G=None):
+        """The same backward step, vectorized over the successor and running-cost tables (``G`` the solve's table, else built at ``t``)."""
         grid = self.grid
         gamma = self.gamma
         method = self.interpolation
@@ -367,7 +366,8 @@ class DynamicProgrammingPlanner(Planner):
         admissible = action_ok & x_next_ok
 
         # Running-cost table, with the out-of-bound cost on inadmissible pairs
-        G = self.running_cost_table(t, admissible, x_next)
+        if G is None:
+            G = self.running_cost_table(t, admissible, x_next)
 
         # Estimated (interpolation) cost-to-go of all the arrival states:
         # the (N, A, n) successors flattened to N*A states, then back to (N, A)
@@ -411,16 +411,12 @@ class DynamicProgrammingPlanner(Planner):
         The mask and the successors are read from the grid's transition tables
         when not given.
 
-        Warning: on a precomputed grid the table is built once, at the first
-        sweep's time, and reused for every sweep. A running cost ``g``, or a
+        Warning: on a precomputed grid a solve builds the table once, at the
+        final time, and reuses it for every sweep. A running cost ``g``, or a
         cost ``out_of_bound_cost(x_next, t)``, that depends on ``t`` is then
         frozen at that time. Use a grid with ``precompute=False`` for a
         time-varying cost.
         """
-        # Built once on a precomputed grid: this assumes g does not depend on t
-        if self._G is not None:
-            return self._G
-
         grid = self.grid
         params = grid.face.params
         N = grid.nodes_n
@@ -463,9 +459,6 @@ class DynamicProgrammingPlanner(Planner):
             G[~admissible] = [infeasible_penalty(INF, x, t) for x in exits]
         else:
             G[~admissible] = INF
-
-        if grid.precomputed:
-            self._G = G
 
         return G
 
@@ -545,15 +538,6 @@ class DynamicProgrammingPlanner(Planner):
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def forget_stale_caches(self) -> None:
-        """Clear the running-cost table and the JAX engine's caches when an option they bake in has changed."""
-        snapshot = cached_numbers_of(self)
-
-        if snapshot != self._cached_numbers:
-            self._G = None
-            self._jax_cache = {}
-            self._cached_numbers = snapshot
 
     def dp_result_to_planning_solution(
         self, result: DynamicProgrammingResult, *, fixed_horizon, evaluate, n_trials
@@ -799,17 +783,6 @@ def grid_failure_cost(grid, gamma):
     N = None if gamma < 1.0 and not native else face.n_steps
 
     return face.failure_cost_over(N, gamma)
-
-
-def cached_numbers_of(options) -> tuple:
-    """The numbers the cached tables and compiled loops bake in: ``gamma``, ``tol``, ``interpolation``, ``final_time``, ``out_of_bound_cost``."""
-    return (
-        options.gamma,
-        options.tol,
-        options.interpolation,
-        options.final_time,
-        options.out_of_bound_cost,
-    )
 
 
 def infeasible_penalty(failure_cost, x_next, t):

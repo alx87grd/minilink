@@ -12,7 +12,6 @@ from minilink.analysis.derivatives import jacobian
 from minilink.analysis.equilibria import find_equilibrium
 from minilink.core.backends import BACKEND_JAX, require_jax, require_jax_numpy
 from minilink.core.fields import EllipsoidSet, QuadraticField
-from minilink.core.params import tree_digest
 from minilink.core.sets import BoxSet, Set
 
 #: Families of Lyapunov function this tool can build.
@@ -521,13 +520,13 @@ def dynamics_on(backend, evaluator, u_bar, t, params):
         jax = require_jax()
         jnp = require_jax_numpy()
 
-        # One jitted batch per evaluator and point, kept for every later call
-        key = ("certificate dynamics", tree_digest({"u": u_bar, "t": t, "p": params}))
+        # One jitted batch per evaluator, the point its arguments
+        key = "certificate dynamics"
         forms = evaluator.compiled_forms
         if key not in forms:
-            forms[key] = jax.jit(jax.vmap(lambda x: evaluator.f(x, u_bar, t, params)))
+            forms[key] = jax.jit(jax.vmap(evaluator.f, in_axes=(0, None, None, None)))
         batch = forms[key]
-        return lambda states: np.asarray(batch(jnp.asarray(states)))
+        return lambda states: np.asarray(batch(jnp.asarray(states), u_bar, t, params))
 
     # NumPy: f state by state
     return lambda states: np.stack([evaluator.f(x, u_bar, t, params) for x in states])
@@ -695,16 +694,17 @@ def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
         jax = require_jax()
         jnp = require_jax_numpy()
 
-        def one(x0):
-            return evaluator.rollout(x0, u_seq, t, dt)[-1]
+        def finals(states, u_seq, t, dt):
+            return jax.vmap(lambda x0: evaluator.rollout(x0, u_seq, t, dt)[-1])(states)
 
-        # One jitted batch per evaluator, point and horizon, kept for every later call
-        key = ("certificate rollout", tree_digest({"u": u_seq, "t": t, "dt": dt}))
+        # One jitted batch per evaluator, the input sequence and the time its
+        # arguments (the step is a static shape of the rollout)
+        key = "certificate rollout"
         forms = evaluator.compiled_forms
         if key not in forms:
-            forms[key] = jax.jit(jax.vmap(one))
+            forms[key] = jax.jit(finals, static_argnums=(3,))
         batch = forms[key]
-        return lambda states: np.asarray(batch(jnp.asarray(states)))
+        return lambda states: np.asarray(batch(jnp.asarray(states), u_seq, t, dt))
 
     # NumPy: x_{k+1} = RK4(x_k, ū, t_k), n_steps times, state by state
     def rollout_numpy(states):

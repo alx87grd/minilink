@@ -11,7 +11,7 @@ import numpy as np
 
 from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
-from minilink.core.distributions import Distribution, child_seed, split_keys
+from minilink.core.distributions import Distribution, child_seed, split_keys, tiled_mean
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import (
     flatten,
@@ -98,7 +98,7 @@ class PlanningProblem:
         failure. Unconstrained by default (the whole state space); pass
         ``X=sys.state.box`` to constrain the plant to its declared state range,
         or any set (``sys.state.box & free``).
-    U : InputSet, optional
+    U : InputSet or BoxSet, optional
         Input constraint ``u(t) in U(x, t)``: a hard constraint, like ``X``.
         Unconstrained by default; pass ``U=sys.input_box`` to constrain the input
         to its ports' declared range. A planner that needs a finite box (value
@@ -206,6 +206,9 @@ class PlanningProblem:
         disturbances: Mapping[str, System] | None = None,
         criterion="expectation",
     ):
+        # The problem's own numbers: x0, t0 and the discount rate
+        self.held_params = {}
+
         # The start: a point, or a law over x(0) (a set is the uniform law on it)
         self.start_law = start_law_of(x0)
         if self.start_law is not None:
@@ -215,7 +218,7 @@ class PlanningProblem:
 
         # The fields as given, coerced below; a vector boundary is its singleton
         self.sys = sys
-        self.start_point = x0
+        self.held_params["x0"] = x0
         self.cost = cost
         self.X = X
         self.U = U
@@ -245,6 +248,8 @@ class PlanningProblem:
         # Xf as given (none by default)
         X = unconstrained(n) if self.X is None else self.X
         U = BoxInputSet(unconstrained(int(self.sys.m))) if self.U is None else self.U
+        if isinstance(U, Set):
+            U = BoxInputSet(require_input_box(U))
         X0 = SingletonSet(x0) if self.X0 is None else self.X0
         Xf = self.Xf
 
@@ -266,7 +271,7 @@ class PlanningProblem:
 
         # The coerced fields
         self.horizon = horizon
-        self.start_point = x0
+        self.held_params["x0"] = x0
         self.X = X
         self.U = U
         self.X0 = X0
@@ -294,7 +299,7 @@ class PlanningProblem:
         Assigning a dictionary routes each entry to its part, so
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
-        tree = self.__dict__.setdefault("held_params", {})
+        tree = self.held_params
         parts = self.part_trees()
         own = {key: tree.get(key) for key in OWN_LEAVES}
 
@@ -334,38 +339,27 @@ class PlanningProblem:
                 getattr(self, role).params = entry
 
     @property
-    def start_point(self):
-        """The evaluation start's point, the leaf ``params["x0"]`` (``None`` while the constructor resolves it)."""
-        return self.__dict__.setdefault("held_params", {}).get("x0")
-
-    @start_point.setter
-    def start_point(self, value):
-        self.__dict__.setdefault("held_params", {})["x0"] = value
-
-    @property
     def t0(self) -> float:
         """The start time of the horizon, the leaf ``params["t0"]``."""
-        return self.__dict__["held_params"]["t0"]
+        return self.held_params["t0"]
 
     @t0.setter
     def t0(self, value):
-        self.__dict__.setdefault("held_params", {})["t0"] = coerce_start_time(value)
+        self.held_params["t0"] = coerce_start_time(value)
 
     @property
     def discount_rate(self) -> float:
         """The continuous discount rate ``ρ``, the leaf ``params["discount_rate"]``."""
-        return self.__dict__["held_params"]["discount_rate"]
+        return self.held_params["discount_rate"]
 
     @discount_rate.setter
     def discount_rate(self, value):
-        self.__dict__.setdefault("held_params", {})["discount_rate"] = coerce_rate(
-            value
-        )
+        self.held_params["discount_rate"] = coerce_rate(value)
 
     @property
     def x0(self) -> np.ndarray:
         """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
-        return self.start_point
+        return self.held_params.get("x0")
 
     @x0.setter
     def x0(self, value):
@@ -379,7 +373,7 @@ class PlanningProblem:
             self.X0 = SingletonSet(start)
         self.require_member(self.X0, start, set_label="X0", point_label="x0")
 
-        self.start_point = start
+        self.held_params["x0"] = start
 
     def goal_point(self) -> np.ndarray:
         """
@@ -790,8 +784,8 @@ class PlanningProblem:
         With no ``X0`` the start is ``sys.x0``; a region holding neither its
         centre nor ``sys.x0`` is refused.
         """
-        if self.start_point is not None:
-            return self.start_point
+        if self.held_params.get("x0") is not None:
+            return self.held_params["x0"]
         if self.start_law is not None:
             return self.start_law.mean
         X0 = self.X0
@@ -873,7 +867,7 @@ class SetStart(Distribution):
 
     def sample(self, key, n=None, params=None):
         if key is None:
-            return self.mean_draw(n)
+            return tiled_mean(self.mean, n)
         return self.support.sample(key, n, params)
 
 
@@ -1189,3 +1183,14 @@ def coerce_rate(rate) -> float:
 def unconstrained(n):
     """The whole state space as a set: no constraint on ``x``."""
     return BoxSet(np.full(int(n), -np.inf), np.full(int(n), np.inf))
+
+
+def require_input_box(U):
+    """Refuse a state set as ``U`` unless it is a box: the input box is state-independent."""
+    if U.bounding_box() is not U:
+        raise TypeError(
+            "U given as a Set must be a box over the inputs, BoxSet(lower, upper); "
+            "a state-dependent input set is an InputSet"
+        )
+
+    return U

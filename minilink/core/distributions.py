@@ -64,23 +64,11 @@ class Distribution(ABC):
 
         ``key`` is a :class:`numpy.random.Generator`, an integer seed, or a
         JAX PRNG key (JAX arrays out, traceable); ``key=None`` draws nothing
-        and returns the mean (:meth:`mean_draw`), as a noise block's
-        ``seed=None`` gives its mean signal.
+        and returns the mean at ``params`` (``(n, dim)`` tiled with ``n``), as
+        a noise block's ``seed=None`` gives its mean signal.
         ``params=None`` reads the law's own :attr:`params`.
         """
         ...
-
-    def mean_at(self, params=None):
-        """The law's mean at its numbers ``params`` (``None``: its own)."""
-        return self.mean
-
-    def mean_draw(self, n=None, params=None):
-        """The draw of no key: the mean at ``params``, ``(dim,)``, or ``(n, dim)`` tiled."""
-        params = self.params if params is None else params
-        mean = self.mean_at(params)
-        xp = array_module(mean)
-
-        return mean if n is None else xp.tile(mean, (int(n), 1))
 
 
 class Gaussian(Distribution):
@@ -106,34 +94,26 @@ class Gaussian(Distribution):
         return self.params.get("std")
 
     @property
-    def full_cov(self):
-        """The covariance ``(dim, dim)`` given to a full law, ``None`` for a diagonal one."""
-        return self.params.get("cov")
-
-    @property
     def dim(self) -> int:
         return int(np.size(self.mean))
 
     @property
     def cov(self) -> np.ndarray:
-        if self.full_cov is None:
+        cov = self.params.get("cov")
+        if cov is None:
             return np.diag(self.std**2)
 
-        return self.full_cov
-
-    def mean_at(self, params=None):
-        params = self.params if params is None else params
-        return params["mean"]
+        return cov
 
     def sample(self, key, n=None, params=None):
-        if key is None:
-            return self.mean_draw(n, params)
         params = self.params if params is None else params
 
         mean = params["mean"]
         std = params.get("std")
         cov = params.get("cov")
         dim = self.dim
+        if key is None:
+            return tiled_mean(mean, n)
 
         shape = (dim,) if n is None else (int(n), dim)
 
@@ -173,7 +153,7 @@ class Uniform(Distribution):
     @property
     def mean(self) -> np.ndarray:
         """The box's center, ``(a + b) / 2``."""
-        return self.mean_at()
+        return 0.5 * (self.box.lower + self.box.upper)
 
     @property
     def dim(self) -> int:
@@ -189,17 +169,14 @@ class Uniform(Distribution):
 
         return cov
 
-    def mean_at(self, params=None):
+    def sample(self, key, n=None, params=None):
         params = self.params if params is None else params
 
-        # The box's center, (a + b) / 2
-        mean = 0.5 * (params["lower"] + params["upper"])
-
-        return mean
-
-    def sample(self, key, n=None, params=None):
         if key is None:
-            return self.mean_draw(n, params)
+            # The box's center, (a + b) / 2
+            mean = 0.5 * (params["lower"] + params["upper"])
+            return tiled_mean(mean, n)
+
         return self.box.sample(key, n, params)
 
 
@@ -217,7 +194,7 @@ class Particles(Distribution):
     @property
     def mean(self) -> np.ndarray:
         """The points' mean, ``p̄ = (1/N) Σᵢ pᵢ``."""
-        return self.mean_at()
+        return np.mean(self.points, axis=0)
 
     @property
     def dim(self) -> int:
@@ -232,23 +209,16 @@ class Particles(Distribution):
 
         return cov
 
-    def mean_at(self, params=None):
-        params = self.params if params is None else params
-        points = params["points"]
-        xp = array_module(points)
-
-        # p̄ = (1/N) Σᵢ pᵢ
-        mean = xp.mean(points, axis=0)
-
-        return mean
-
     def sample(self, key, n=None, params=None):
-        if key is None:
-            return self.mean_draw(n, params)
         params = self.params if params is None else params
+        xp = array_module(params["points"])
 
         points = params["points"]
         count = points.shape[0]
+        if key is None:
+            # p̄ = (1/N) Σᵢ pᵢ
+            mean = xp.mean(points, axis=0)
+            return tiled_mean(mean, n)
 
         # A uniform index into the points: x = points[idx]
         if is_counter_key(key):
@@ -287,6 +257,13 @@ class CounterKey:
 
     seed: object
     k: object
+
+
+def tiled_mean(mean, n):
+    """The draw of no key: the mean, ``(dim,)``, or ``(n, dim)`` tiled."""
+    xp = array_module(mean)
+
+    return mean if n is None else xp.tile(mean, (int(n), 1))
 
 
 def is_counter_key(key) -> bool:

@@ -106,7 +106,7 @@ class FirstOrderOptimizer(OptimizerBackend):
         converged = False
         for k in range(maxiter):
             # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ gtol (‖∇J‖ inside the box)
-            grad = program_evaluator.gradient(z)
+            grad = program_evaluator.grad_J(z)
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
             if grad_norm <= gtol:
                 converged = True
@@ -127,7 +127,7 @@ class FirstOrderOptimizer(OptimizerBackend):
                 callback(z.copy())
         else:
             k = maxiter
-            grad = program_evaluator.gradient(z)
+            grad = program_evaluator.grad_J(z)
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
 
         J = program_evaluator.objective(z)

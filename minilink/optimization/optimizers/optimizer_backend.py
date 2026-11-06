@@ -62,13 +62,13 @@ def scipy_constraints_of(program_evaluator: MathematicalProgramEvaluator) -> lis
     if program_evaluator.n_h > 0:
         entry = {"type": "eq", "fun": program_evaluator.equality_residual}
         if program_evaluator.has_jacobian_h:
-            entry["jac"] = program_evaluator.jacobian_h
+            entry["jac"] = program_evaluator.jac_h
         constraints.append(entry)
 
     if program_evaluator.n_g > 0:
         entry = {"type": "ineq", "fun": program_evaluator.inequality_margin}
         if program_evaluator.has_jacobian_g:
-            entry["jac"] = program_evaluator.jacobian_g
+            entry["jac"] = program_evaluator.jac_g
         constraints.append(entry)
 
     return constraints

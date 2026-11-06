@@ -20,7 +20,6 @@ import numpy as np
 from gymnasium import spaces
 
 from minilink.core.compile.evaluators.stepping import require_step_knobs
-from minilink.core.sets import BoxInputSet
 from minilink.core.system import System
 
 # Public API
@@ -409,5 +408,5 @@ def _state_bounds(sys):
 
 def _input_bounds(sys):
     """Return stacked input-port bounds ``(lb, ub)`` as float32 arrays."""
-    box = BoxInputSet.from_system_inputs(sys).box
+    box = sys.input_box.box
     return box.lower.astype(np.float32), box.upper.astype(np.float32)

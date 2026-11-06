@@ -367,9 +367,9 @@ class TestComputeRollout(unittest.TestCase):
     def test_rollout_sequence_u(self):
         plant = AffineStep()
         ev = compile(plant)
-        u_seq = np.array([[1.0], [0.0], [2.0]])
+        u_seq = np.array([[1.0, 0.0, 2.0]])  # a column per step, the layout of traj.u
         rollout = plant.compute_rollout(n_steps=3, u=u_seq)
-        np.testing.assert_array_equal(rollout.x.T, ev.rollout(plant.x0, u_seq))
+        np.testing.assert_array_equal(rollout.x.T, ev.rollout(plant.x0, u_seq.T))
         np.testing.assert_allclose(rollout.u[0, :3], [1.0, 0.0, 2.0])
         np.testing.assert_allclose(rollout.u[0, 3], 2.0)
 

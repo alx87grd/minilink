@@ -305,13 +305,25 @@ class WiredDiagramMixin:
     # Naming a block and its signals
 
     def subsystem_id(self, subsystem):
-        """Return the diagram id for a subsystem instance added to this diagram."""
+        """The diagram id of a block: the id itself, checked, or the id of a block instance added to this diagram."""
+        if isinstance(subsystem, str):
+            require_known_id(subsystem, self.subsystems)
+            return subsystem
         matches = [
             sys_id for sys_id, sub in self.subsystems.items() if sub is subsystem
         ]
         require_added_once(matches, self.subsystems)
 
         return matches[0]
+
+    def of(self, block):
+        """The block of this diagram named by its id or role, ``diagram.of("plant")``, or a block inside a nested diagram by its path, ``"inner/plant"``."""
+        sys_id, _, rest = (
+            block.partition("/") if isinstance(block, str) else (block, "", "")
+        )
+        subsystem = self.subsystems[self.subsystem_id(sys_id)]
+
+        return subsystem if not rest else subsystem.of(rest)
 
     def subsystem_signal(self, subsystem, port_id: str) -> str:
         """Return ``'{sys_id}:{port_id}'`` for a subsystem output port."""
@@ -885,6 +897,14 @@ def require_new_block(sys, sys_id, subsystems):
             f"this block is already in the diagram as {held[0]!r}; a block is added "
             f"once (its params have one home): add a copy under {sys_id!r}, "
             "copy.deepcopy(block)"
+        )
+
+
+def require_known_id(sys_id, subsystems):
+    """Refuse an id no block of the diagram carries, naming the known ones."""
+    if sys_id not in subsystems:
+        raise ValueError(
+            f"no block {sys_id!r} in this diagram; its blocks are {list(subsystems)}"
         )
 
 

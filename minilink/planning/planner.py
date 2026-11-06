@@ -106,10 +106,6 @@ class Planner(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__}.solve is not implemented")
 
-    def solve_trajectory_from(self, x0, **kwargs) -> PlanningSolution:
-        """Online traj-family solve from measured ``x0``."""
-        raise NotImplementedError(f"{type(self).__name__} has no solve_trajectory_from")
-
     # The latest solution, and the parts of the problem a solver needs
 
     def require_solution(self) -> PlanningSolution:

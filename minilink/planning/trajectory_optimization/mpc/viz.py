@@ -12,6 +12,7 @@ from minilink.graphical.animation.primitives import (
     HorizonPolyline,
     TrajectoryPolyline,
 )
+from minilink.planning.evaluation import require_recorded_input
 from minilink.planning.trajectory_optimization.compiled import require_state_knots
 
 ###############################################################################
@@ -300,12 +301,13 @@ def plant_run(rollout: Trajectory, loop=None, params=None) -> Trajectory:
     With ``loop``, ``x`` is the plant's state slice and ``u`` the input the
     loop fed it, as its compiled plan gathers it at each tick (an open port at
     its nominal value) and held over the period, so the run can be handed on as
-    the plant's own (to a diagram's ``trajectory_of`` when the plant is itself
-    a diagram). ``params`` is the tree the run was made with (``None``: the
+    the plant's own (a block inside a plant that is itself a diagram is
+    ``rollout.of("plant/<id>")``). ``params`` is the tree the run was made with (``None``: the
     loop's own). A dense run reads ``u`` from its record; a state-only run gathers
     each tick's input through the plan (a zero-delay MPC solves again).
     """
     if loop is None:
+        require_recorded_input(rollout, "plant")
         return rollout.of("plant")
 
     _, run = plant_run_of(loop, rollout, params)

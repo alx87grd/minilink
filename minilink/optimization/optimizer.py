@@ -183,7 +183,6 @@ class Optimizer:
         params=None,
         z0=None,
         callback: OptimizationProgressCallback | None = None,
-        record_solve_time: bool = False,
         verbose: bool = False,
     ) -> OptimizationResult:
         """
@@ -201,11 +200,6 @@ class Optimizer:
         z0 : array_like, optional
             One-off initial decision vector, the warm start. If omitted, use
             the default ``z0`` supplied to :class:`Optimizer`.
-        record_solve_time : bool, optional
-            If True, set
-            :attr:`~minilink.optimization.mathematical_program.OptimizationResult.solve_time_s`
-            to the wall-clock duration (seconds) of the backend solve only,
-            measured with :func:`time.perf_counter`.
         callback : callable, optional
             If not ``None``, called during the solve as ``callback(z, J, t)``:
             current decision ``z`` (1-D :class:`~numpy.ndarray`), objective
@@ -227,15 +221,13 @@ class Optimizer:
             return self.solve_count(params, z0, method)
 
         z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
-        time_solve = record_solve_time or verbose
 
         # The values of this solve, bound once at the boundary
         self.program_evaluator.bind(params)
 
         if verbose:
             self.print_solve_preamble(z_start)
-        if time_solve:
-            t0 = time.perf_counter()
+        t0 = time.perf_counter()
 
         # The user's hook, fed (z, J(z), elapsed time) at each iterate of the backend
         backend_cb: BackendIterateCallback | None = None
@@ -258,9 +250,8 @@ class Optimizer:
         )
 
         # The wall-clock time of the backend solve alone
-        if time_solve:
-            elapsed = time.perf_counter() - t0
-            result = replace(result, solve_time_s=elapsed)
+        elapsed = time.perf_counter() - t0
+        result = replace(result, solve_time_s=elapsed)
 
         if verbose:
             self.print_solve_report(result)

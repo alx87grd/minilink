@@ -320,7 +320,7 @@ def test_bounding_boxes():
     np.testing.assert_allclose(tight.lower, [-0.5, -1.0])
     np.testing.assert_allclose(tight.upper, [1.0, 1.0])
     np.testing.assert_allclose(
-        BoxInputSet.from_bounds([-3.0], [3.0]).bounding_box().lower, [-3.0]
+        BoxInputSet(BoxSet([-3.0], [3.0])).bounding_box().lower, [-3.0]
     )
 
 

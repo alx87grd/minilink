@@ -174,25 +174,25 @@ class JaxMathematicalProgramEvaluator(MathematicalProgramEvaluator):
 
     # The compiled derivatives, as flat NumPy arrays
 
-    def gradient(self, z) -> np.ndarray:
+    def grad_J(self, z) -> np.ndarray:
         value = self.form("grad_J")(self.jax_decision_vector(z))
         return self.as_vector(value, self.n_z, "objective gradient")
 
-    def hessian(self, z) -> np.ndarray:
+    def hess_J(self, z) -> np.ndarray:
         if self._jit_hess_J is None:
-            return super().hessian(z)
+            return super().hess_J(z)
         value = self.form("hess_J")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_z, self.n_z), "objective Hessian")
 
-    def jacobian_h(self, z) -> np.ndarray:
+    def jac_h(self, z) -> np.ndarray:
         if self.n_h == 0 or self._jit_jac_h is None:
-            return super().jacobian_h(z)
+            return super().jac_h(z)
         value = self.form("jac_h")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_h, self.n_z), "equality Jacobian")
 
-    def jacobian_g(self, z) -> np.ndarray:
+    def jac_g(self, z) -> np.ndarray:
         if self.n_g == 0 or self._jit_jac_g is None:
-            return super().jacobian_g(z)
+            return super().jac_g(z)
         value = self.form("jac_g")(self.jax_decision_vector(z))
         return self.as_matrix(value, (self.n_g, self.n_z), "inequality Jacobian")
 

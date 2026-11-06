@@ -124,6 +124,23 @@ class DelegatedParams(property):
         self.attribute = attribute
 
 
+def member_keys(members) -> list:
+    """
+    The keys of a composite's members in its tree: each member's class name, a repeat numbered from 2 (``"BallSet"``, ``"BallSet_2"``).
+
+    A member keyed by what it is, not by its position, keeps its key when the
+    members are reordered, so a recorded tree still names it.
+    """
+    keys = []
+    seen = {}
+    for member in members:
+        name = type(member).__name__
+        seen[name] = seen.get(name, 0) + 1
+        keys.append(name if seen[name] == 1 else f"{name}_{seen[name]}")
+
+    return keys
+
+
 def holds_own_tree(obj) -> bool:
     """
     Whether assigning ``obj.params`` replaces its tree whole: a leaf's own dict, not a composite's routing.

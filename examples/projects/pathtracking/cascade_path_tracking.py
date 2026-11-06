@@ -428,7 +428,7 @@ diagram.plot_diagram()
 diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
 diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
 
-xv = diagram.trajectory_of(vehicle).x
+xv = diagram.traj.of("vehicle").x
 px, py = xv[0, :], xv[1, :]
 y_des = A * np.sin(2.0 * np.pi * px / LAMBDA)
 print(

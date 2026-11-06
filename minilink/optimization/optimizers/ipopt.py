@@ -50,8 +50,8 @@ class IpoptOptimizer(OptimizerBackend):
         raw_result = minimize_ipopt(
             program_evaluator.objective,
             np.asarray(z0, dtype=float).reshape(program_evaluator.n_z),
-            jac=program_evaluator.gradient if program_evaluator.has_gradient else None,
-            hess=program_evaluator.hessian if program_evaluator.has_hessian else None,
+            jac=program_evaluator.grad_J if program_evaluator.has_gradient else None,
+            hess=program_evaluator.hess_J if program_evaluator.has_hessian else None,
             bounds=program_evaluator.scipy_bounds(),
             constraints=constraints,
             tol=self.tol,

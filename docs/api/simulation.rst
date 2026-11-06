@@ -7,9 +7,6 @@ Simulation
 .. automodule:: minilink.simulation.static_simulator
    :members:
 
-.. automodule:: minilink.simulation.input_interpolation
-   :members:
-
 .. automodule:: minilink.simulation.solvers.solver
    :members:
 

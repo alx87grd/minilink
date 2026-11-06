@@ -28,18 +28,20 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
     With ``verbose`` or ``record_history`` the sweeps run one at a time from
     Python instead, so each one can be reported or recorded.
 
-    Warning: the device tables are built once, at ``final_time``, and reused
-    for every sweep, so the dynamics ``f``, the running cost ``g`` and a callable
-    ``out_of_bound_cost`` must not depend on time. Use the ``"numpy"`` backend on
+    Warning: a solve builds the device tables once, at ``final_time``, and reuses
+    them for every sweep, so the dynamics ``f``, the running cost ``g`` and a
+    callable ``out_of_bound_cost`` must not depend on time. Use the ``"numpy"`` backend on
     a grid with ``precompute=False`` for a time-varying problem.
     """
     jax = ensure_jax_x64()
 
     opt = planner
 
-    # Device tables and the cost-to-go at the final time
+    # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner)
     J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time))
+    gamma = float(planner.gamma)
+    tol = float(planner.tol)
 
     # Reported or recorded: one jitted step at a time, driven from Python
     if opt.verbose or opt.record_history:
@@ -47,9 +49,9 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
             planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol
         )
 
-    # All the backward sweeps in one compiled call
+    # All the backward sweeps in one compiled call, the numbers its arguments
     run = compiled_loop(planner, stop_on_tol, max_sweeps)
-    J, pi, k, delta = run(J0, G, coords, in_bounds)
+    J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
 
     return DynamicProgrammingResult(
@@ -177,12 +179,7 @@ def running_cost_table(planner, t) -> np.ndarray:
 
 
 def device_tables(planner):
-    """Device copies of the running-cost table and of the successors as fractional grid indices."""
-    # Built once per planner, at the final time
-    cached = planner._jax_cache.get("tables")
-    if cached is not None:
-        return cached
-
+    """Device copies of the running-cost table and of the successors as fractional grid indices, at the final time."""
     jnp = ensure_jax_x64().numpy
 
     grid = planner.grid
@@ -206,8 +203,6 @@ def device_tables(planner):
     shape = jnp.asarray([int(s) for s in grid.x_grid_shape])
     in_bounds = jnp.all((coords >= 0.0) & (coords <= shape[:, None] - 1), axis=0)
 
-    planner._jax_cache["tables"] = (G, coords, in_bounds)
-
     return G, coords, in_bounds
 
 
@@ -227,6 +222,7 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
     dt = planner.grid.dt
     N = planner.grid.nodes_n
     tol = float(opt.tol)
+    gamma = float(opt.gamma)
     step = jitted_step(planner)
 
     log = SweepLog(opt, max_sweeps, stop_on_tol)
@@ -248,7 +244,7 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
 
         # Bellman backup from the cost-to-go one step ahead, on device
         J_next = J
-        J, pi = step(J_next, G, coords, in_bounds)
+        J, pi = step(J_next, G, coords, in_bounds, gamma)
         jax.block_until_ready(J)
 
         # Largest change of the cost-to-go: the convergence measure
@@ -269,21 +265,19 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
 
 
 def compiled_loop(planner, stop_on_tol, max_sweeps):
-    """Return (and cache) the jitted whole value-iteration loop."""
-    # Compiled once per (stop_on_tol, max_sweeps)
+    """The jitted whole value-iteration loop, compiled once per loop shape ``(stop_on_tol, max_sweeps)``; the discount and the tolerance are its arguments."""
     key = (bool(stop_on_tol), int(max_sweeps))
-    cached = planner._jax_cache.get(key)
-    if cached is not None:
-        return cached
+    compiled = planner.compiled.get(key)
+    if compiled is not None:
+        return compiled
 
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
     N = planner.grid.nodes_n
-    tol = float(planner.tol)
     step = jitted_step(planner)
 
-    def run(J0, G, coords, in_bounds):
+    def run(J0, G, coords, in_bounds, gamma, tol):
         # At most max_sweeps sweeps, and with stop_on_tol only until delta ≤ tol
         def keep_going(carry):
             _, _, k, delta = carry
@@ -296,7 +290,7 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
             k = k + 1
 
             # Bellman backup from the cost-to-go one step ahead
-            J, pi = step(J_next, G, coords, in_bounds)
+            J, pi = step(J_next, G, coords, in_bounds, gamma)
 
             # Largest change of the cost-to-go: the convergence measure
             delta = jnp.max(jnp.abs(J - J_next))
@@ -308,17 +302,16 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
 
         return jax.lax.while_loop(keep_going, sweep, init)
 
-    planner._jax_cache[key] = jax.jit(run)
+    planner.compiled[key] = jax.jit(run)
 
-    return planner._jax_cache[key]
+    return planner.compiled[key]
 
 
 def jitted_step(planner):
-    """Return (and cache) the jitted single Bellman backup."""
-    # Compiled once per planner
-    cached = planner._jax_cache.get("step")
-    if cached is not None:
-        return cached
+    """The jitted single Bellman backup, compiled once per planner; the discount is its argument."""
+    compiled = planner.compiled.get("step")
+    if compiled is not None:
+        return compiled
 
     jax = ensure_jax_x64()
     jnp = jax.numpy
@@ -327,10 +320,9 @@ def jitted_step(planner):
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
     N = planner.grid.nodes_n
     A = planner.grid.actions_n
-    gamma = float(planner.gamma)
     order = 0 if planner.interpolation == "nearest" else 1
 
-    def step(J_next, G, coords, in_bounds):
+    def step(J_next, G, coords, in_bounds, gamma):
         # Estimated (interpolation) cost-to-go of all the arrival states, zero off
         # the grid
         J_arrival = map_coordinates(
@@ -347,9 +339,9 @@ def jitted_step(planner):
 
         return J, pi
 
-    planner._jax_cache["step"] = jax.jit(step)
+    planner.compiled["step"] = jax.jit(step)
 
-    return planner._jax_cache["step"]
+    return planner.compiled["step"]
 
 
 def build_jax_sa_chunks(pair_fn, N, A, jax, jnp, *, interval, verbose, prefix):

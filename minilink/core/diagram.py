@@ -134,8 +134,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         traj : Trajectory
             State-input trajectory sampled on a time grid.
         ports : sequence of str, optional
-            The signals to compute, ``"sys_id:port_id"``: only those ports and
-            the blocks they read are evaluated. ``None``: every port.
+            The signals to compute, ``"sys_id:port_id"``, an output port or a
+            block's input port (``"plant:u"``): only those and the blocks they
+            read are evaluated. ``None``: every output port.
 
         Returns
         -------
@@ -169,58 +170,35 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         return traj.with_signals(internal_signals)
 
     def port_samples(self, traj: Trajectory, name: str) -> np.ndarray:
-        """One port's value at every sample of ``traj``, ``(dim, N)``: the port and the blocks it reads, nothing else."""
-        sys_id, port_id = signal_port_of(self, name)
+        """One port's value at every sample of ``traj``, ``(dim, N)``: an output port and the blocks it reads, or a block's input port (``"plant:u"``); a nested block by its path (``"plant/arm:u"``)."""
+        path, _, port_id = name.rpartition(":")
+        outer, _, rest = path.partition("/")
+        if rest:
+            # Down one level: the nested diagram's own run, then its port
+            inner = self.subsystems[self.subsystem_id(outer)]
+            return inner.port_samples(block_run(self, outer, traj), f"{rest}:{port_id}")
 
-        values = [
-            self.compute_subsys_output_port(
-                traj.x[:, i], traj.u[:, i], t, sys_id, port_id
-            )
-            for i, t in enumerate(traj.t)
-        ]
+        sys_id, port_id = signal_port_of(self, name)
+        block = self.subsystems[sys_id]
+
+        # An output port's value, or an input port's: the block's input the diagram fed it
+        if port_id in block.outputs:
+            values = [
+                self.compute_subsys_output_port(
+                    traj.x[:, i], traj.u[:, i], t, sys_id, port_id
+                )
+                for i, t in enumerate(traj.t)
+            ]
+        else:
+            port_slice = block.get_input_port_slice(port_id)
+            values = [
+                self.get_local_input(traj.x[:, i], traj.u[:, i], t, sys_id)[port_slice]
+                for i, t in enumerate(traj.t)
+            ]
 
         return np.stack(
             [np.asarray(v, dtype=float).reshape(-1) for v in values], axis=1
         )
-
-    def trajectory_of(self, subsystem, traj=None) -> Trajectory:
-        """
-        The trajectory of one block of this diagram, as that block saw it.
-
-        ``x`` is the block's own state and ``u`` the input it received from
-        the diagram (connected signals, boundary inputs, or nominal values), on
-        the time grid of the diagram trajectory. The input is recomputed from
-        the stored states with the blocks' current ``params``, so change them
-        only after scoring the trajectory they produced. Anything written for
-        the block alone applies to it, such as the cost of the plant inside a
-        closed loop: ``closed_loop.compute_cost(cost, of=plant)``.
-
-        Parameters
-        ----------
-        subsystem : System
-            A block added to this diagram (for a block inside a nested diagram,
-            call ``trajectory_of`` once per level).
-        traj : Trajectory, optional
-            Trajectory of this diagram; defaults to the last one computed.
-
-        Returns
-        -------
-        Trajectory
-            ``t`` of ``traj``, ``x`` with shape ``(subsystem.n, N)`` and ``u``
-            with shape ``(subsystem.m, N)``.
-        """
-        traj = self.traj if traj is None else traj
-        require_trajectory(traj)
-        sys_id = self.subsystem_id(subsystem)
-
-        # The block's own state, and the input the diagram fed it, at each sample
-        x = np.zeros((subsystem.n, traj.n_samples))
-        u = np.zeros((subsystem.m, traj.n_samples))
-        for k, t in enumerate(traj.t):
-            x[:, k] = self.get_local_state(traj.x[:, k], sys_id)
-            u[:, k] = self.get_local_input(traj.x[:, k], traj.u[:, k], t, sys_id)
-
-        return Trajectory(t=traj.t, x=x, u=u)
 
 
 ###############################################################################
@@ -238,10 +216,52 @@ def require_flow_subsystem(sys, sys_id):
         )
 
 
-def require_trajectory(traj):
-    """Refuse a missing trajectory: none was passed and none was computed."""
-    if traj is None:
-        raise ValueError("no trajectory: pass traj or call compute_trajectory()")
+def block_run(diagram, path, traj) -> Trajectory:
+    """
+    The run of one block of ``diagram`` as the block saw it, reconstructed from the diagram's run.
+
+    ``x`` is the block's own state and ``u`` the input it received from the
+    diagram (connected signals, boundary inputs, or nominal values), at each
+    sample of ``traj``; the input is recomputed from the stored states with the
+    blocks' current ``params``. ``path`` is a block id, or ``"a/b"`` for a block
+    inside a nested diagram, one level at a time.
+    """
+    sys_id, _, rest = path.partition("/")
+    sys_id = diagram.subsystem_id(sys_id)
+    subsystem = diagram.subsystems[sys_id]
+
+    # The block's own state, and the input the diagram fed it, at each sample
+    x = np.zeros((subsystem.n, traj.n_samples))
+    u = np.zeros((subsystem.m, traj.n_samples))
+    for k, t in enumerate(traj.t):
+        x[:, k] = diagram.get_local_state(traj.x[:, k], sys_id)
+        u[:, k] = diagram.get_local_input(traj.x[:, k], traj.u[:, k], t, sys_id)
+    run = Trajectory(t=traj.t, x=x, u=u)
+
+    return run if not rest else block_run(subsystem, rest, run)
+
+
+def block_roles(diagram, recorded=(), offset=0, prefix=""):
+    """
+    Every block's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
+
+    A block inside a nested diagram is keyed by its path (``"inner/plant"``),
+    its slice offset into the outer state; ``recorded`` names the signals the
+    run kept, the block's input among them as ``"plant:u"``.
+    """
+    roles = {}
+    for sys_id, block in diagram.subsystems.items():
+        start, end = diagram.state_index[sys_id]
+        path = f"{prefix}{sys_id}"
+        u_name = f"{path}:u"
+        roles[path] = {
+            "x": (offset + start, offset + end),
+            "u": u_name if u_name in recorded else None,
+        }
+        if hasattr(block, "state_index"):
+            roles.update(block_roles(block, recorded, offset + start, f"{path}/"))
+
+    return roles
 
 
 if __name__ == "__main__":
@@ -264,14 +284,16 @@ if __name__ == "__main__":
 
 
 def signal_port_of(diagram, name):
-    """``(sys_id, port_id)`` of a signal named ``"sys_id:port_id"``, refused unless the diagram has it."""
+    """``(sys_id, port_id)`` of a signal named ``"sys_id:port_id"``, an output or an input port, refused unless the diagram has it."""
     sys_id, _, port_id = name.partition(":")
     subsystem = diagram.subsystems.get(sys_id)
-    if subsystem is None or port_id not in subsystem.outputs:
+    if subsystem is None or (
+        port_id not in subsystem.outputs and port_id not in subsystem.inputs
+    ):
         known = [
             f"{block_id}:{port}"
             for block_id, block in diagram.subsystems.items()
-            for port in block.outputs
+            for port in (*block.outputs, *block.inputs)
         ]
         raise KeyError(f"no signal {name!r} in {diagram.name}; its signals are {known}")
 

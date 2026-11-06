@@ -55,6 +55,7 @@ class ShootingTranscription(Transcription):
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> MathematicalProgram:
         """Build the input-knot nonlinear program."""
         # The JAX backend builds the same program, its rollout scanned over the knots
@@ -64,7 +65,7 @@ class ShootingTranscription(Transcription):
         problem.require_cost()
 
         # The states are not decision variables: each function of z rolls them out
-        rollout = self.make_rollout(problem, backend)
+        rollout = self.make_rollout(problem, backend, dynamics)
         equalities: list[ConstraintFunction] = []
         inequalities: list[ConstraintFunction] = []
 
@@ -99,11 +100,13 @@ class ShootingTranscription(Transcription):
         *,
         problem: PlanningProblem,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> Trajectory:
         """Roll out the optimized input sequence."""
         # The program's rollout, and the dynamics for the state rates
-        rollout = self.make_rollout(problem, backend)
-        dynamics = dynamics_function(problem, backend)
+        if dynamics is None:
+            dynamics = dynamics_function(problem, backend)
+        rollout = self.make_rollout(problem, backend, dynamics)
 
         # The optimized input knots, and the states they roll out
         u = self.unpack(result.z, problem)
@@ -343,8 +346,9 @@ class ShootingTranscription(Transcription):
         self,
         problem: PlanningProblem,
         backend: str,
+        dynamics=None,
     ):
-        """``rollout(u) -> x``: the compiled RK4 integrator, or the knot loop (direct mode, system params)."""
+        """``rollout(u) -> x``: the compiled RK4 integrator, or the knot loop (direct mode, system params) on ``dynamics``."""
         x0 = self.initial_state(problem)
         key = normalize_backend(backend, allow_direct=True)
 
@@ -366,7 +370,7 @@ class ShootingTranscription(Transcription):
             return rollout
 
         # Direct mode or explicit system params: step the dynamics per knot
-        f = dynamics_function(problem, backend)
+        f = dynamics_function(problem, backend) if dynamics is None else dynamics
         return lambda u: self.rollout_loop(f, u, x0, problem)
 
     def initial_state(self, problem: PlanningProblem) -> np.ndarray:

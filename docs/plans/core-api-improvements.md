@@ -1,6 +1,6 @@
 # Core API improvements from the core tutorial audit
 
-**Status:** the `examples/tutorial/core/` (`01`–`08`) API review's proposals; CA-1 to CA-6 open, scheduled in v0.4 (TODO §1.11, each **[ask — core]**); CA-7 landed. The diffs' line numbers are from the review and drift.
+**Status:** the `examples/tutorial/core/` (`01`–`08`) API review's proposals; CA-1, CA-2 and CA-5 open, scheduled in v0.4 (TODO §1.11, each **[ask — core]**); CA-3, CA-6 and CA-7 landed. The diffs' line numbers are from the review and drift.
 
 Each item below records:
 1. **The problem and concrete reproducer**
@@ -191,61 +191,6 @@ To get the primary output array `y`, the caller must write `ev.outputs(x, u)["y"
 
 ---
 
-## CA-3. Add `diagram.of(...)` and accept string subsystem IDs in `WiredDiagramMixin.subsystem_id` / `trajectory_of`
-
-`trajectory_of` itself goes by AR-7 of [api-surface-rulings.md](api-surface-rulings.md) (`traj.of("plant")` on both loop kinds); the string ids in `subsystem_id` and `diagram.of` stay this proposal's.
-
-### Problem and reproducer
-1. `SumCost`'s docstring (`minilink/core/costs.py:337`) states:
-   > *"``SumCost.of(track=..., effort=...)`` builds a sum with the given ids (like :meth:`of` on a diagram or a trajectory)."*
-   Yet `DiagramSystem` (`WiredDiagramMixin`) has **no `.of(...)` method**.
-2. On a `Trajectory`, `traj.of("plant")` accepts a string subsystem ID or role name. On a `DiagramSystem`, `diagram.trajectory_of(sub, traj)` delegates to `WiredDiagramMixin.subsystem_id(subsystem)` (`minilink/core/wiring.py:275`), which checks `if sub is subsystem:` by object identity only:
-
-```python
-from minilink.catalog import Pendulum
-from minilink.control import PID
-
-loop = PID(Kp=10.0, Ki=1.0, Kd=2.0) @ Pendulum()
-traj = loop.compute_trajectory(2.0)
-
-traj.of("plant")                  # works -> Trajectory
-loop.trajectory_of("plant", traj) # ValueError: Subsystem is not part of this diagram.
-loop.of("plant")                  # AttributeError: 'DiagramSystem' object has no attribute 'of'
-```
-
-### Why it is worth doing & design/rule evolution
-- **Why it is worth doing:** Unifies the `.of(...)` selector across `DiagramSystem`, `Trajectory`, and `SumCost`, and lets users pass either the subsystem object (`plant`) or its string ID (`"plant"`) to `diagram.of(...)`, `diagram.subsystem_id(...)`, `diagram.trajectory_of(...)`, and `diagram.compute_cost(..., of="plant")`.
-- **Design/Rule evolution:**
-  - Aligns with `RULES.md` §5.25 (`of` / `*_of` resolution methods) and fulfills the existing reference in `minilink/core/costs.py:337`.
-  - Update `DESIGN.md` §4 (`DiagramSystem`) to note that `diagram.of(block_or_id)`, `diagram.trajectory_of(block_or_id, traj=None)`, and `sys.compute_cost(cost, of=block_or_id)` accept either the subsystem instance or its string ID.
-
-### Proposed code diff
-- `minilink/core/wiring.py`:
-```diff
---- a/minilink/core/wiring.py
-+++ b/minilink/core/wiring.py
-@@ -275,9 +275,20 @@ class WiredDiagramMixin:
-     def subsystem_id(self, subsystem: System | str) -> str:
-         """Subsystem id for *subsystem* inside this diagram."""
-+        if isinstance(subsystem, str):
-+            if subsystem in self.subsystems:
-+                return subsystem
-+            known = ", ".join(repr(k) for k in self.subsystems)
-+            raise ValueError(
-+                f"Unknown subsystem id {subsystem!r}; known subsystems: {known}."
-+            )
-         for sys_id, sub in self.subsystems.items():
-             if sub is subsystem:
-                 return sys_id
-         raise ValueError("Subsystem is not part of this diagram.")
-+
-+    def of(self, subsystem: str | System) -> System:
-+        """Return the subsystem for a subsystem id or instance."""
-+        return self.subsystems[self.subsystem_id(subsystem)]
-```
-
----
-
 ## CA-4. Parameter ergonomics across core objects (closed)
 
 Absorbed by the one parameters model (DESIGN §4, "Parameters"), ruled and merged 2026-11-05: `with_params` goes
@@ -303,63 +248,6 @@ Furthermore, `Field` and `QuadraticField` are exported from `minilink.core` but 
 +    "IntersectionSet": ("minilink.core.sets", "IntersectionSet"),
      "Set": ("minilink.core.sets", "Set"),
      "SingletonSet": ("minilink.core.sets", "SingletonSet"),
-```
-
----
-
-## CA-6. Derivative method aliases (`grad_J`, `hess_J`, `jac_h`, `jac_g`) on `MathematicalProgramEvaluator`
-
-### Problem and reproducer
-On `MathematicalProgram` (`minilink/optimization/mathematical_program.py`), the 7 mathematical callables are named:
-- Values: `J`, `h`, `g`
-- Derivatives: `grad_J`, `hess_J`, `jac_h`, `jac_g`
-
-When compiled via `ev = prog.compile(backend="jax")`, `MathematicalProgramEvaluator` (`minilink/optimization/evaluators/program_evaluator.py`) provides short value aliases `ev.J(z)`, `ev.h(z)`, `ev.g(z)` alongside the verbose names `ev.objective(z)`, `ev.equality_residual(z)`, `ev.inequality_margin(z)`, but only provides the verbose derivative names (`ev.gradient(z)`, `ev.hessian(z)`, `ev.jacobian_h(z)`, `ev.jacobian_g(z)`):
-```python
-ev = prog.compile(backend="jax")
-ev.J(z)      # works!
-ev.grad_J(z) # AttributeError: 'JaxProgramEvaluator' object has no attribute 'grad_J'
-```
-
-### Why it is worth doing & design/rule evolution
-- **Why it is worth doing:** Since `MathematicalProgramEvaluator` already exposes `ev.J`, `ev.h`, and `ev.g` to match `MathematicalProgram`'s textbook notation, completing the set with `ev.grad_J`, `ev.hess_J`, `ev.jac_h`, and `ev.jac_g` makes `MathematicalProgram` and its compiled evaluator symmetric, while keeping `gradient`, `hessian`, `jacobian_h`, `jacobian_g` for internal solver adapters.
-- **Design/Rule evolution:**
-  - Note in `DESIGN.md` §6 that `MathematicalProgramEvaluator` mirrors `MathematicalProgram`'s callable names (`J`, `grad_J`, `hess_J`, `h`, `jac_h`, `g`, `jac_g`) alongside the solver-adapter methods (`objective`, `gradient`, `hessian`, `equality_residual`, `jacobian_h`, `inequality_margin`, `jacobian_g`).
-
-### Proposed code diff
-- `minilink/optimization/evaluators/program_evaluator.py`:
-```diff
---- a/minilink/optimization/evaluators/program_evaluator.py
-+++ b/minilink/optimization/evaluators/program_evaluator.py
-@@ -94,6 +94,9 @@ class MathematicalProgramEvaluator(ABC):
-     def gradient(self, z: np.ndarray, params=None) -> np.ndarray:
-         raise NotImplementedError
- 
-+    def grad_J(self, z: np.ndarray, params=None) -> np.ndarray:
-+        return self.gradient(z, params)
-+
-     @abstractmethod
-     def hessian(self, z: np.ndarray, params=None) -> np.ndarray:
-         raise NotImplementedError
- 
-+    def hess_J(self, z: np.ndarray, params=None) -> np.ndarray:
-+        return self.hessian(z, params)
-+
-     def equality_residual(self, z: np.ndarray, params=None) -> np.ndarray:
-@@ -112,6 +118,9 @@ class MathematicalProgramEvaluator(ABC):
-     def jacobian_h(self, z: np.ndarray, params=None) -> np.ndarray:
-         raise NotImplementedError
- 
-+    def jac_h(self, z: np.ndarray, params=None) -> np.ndarray:
-+        return self.jacobian_h(z, params)
-+
-     def inequality_margin(self, z: np.ndarray, params=None) -> np.ndarray:
-@@ -130,6 +139,9 @@ class MathematicalProgramEvaluator(ABC):
-     def jacobian_g(self, z: np.ndarray, params=None) -> np.ndarray:
-         raise NotImplementedError
- 
-+    def jac_g(self, z: np.ndarray, params=None) -> np.ndarray:
-+        return self.jacobian_g(z, params)
 ```
 
 ---

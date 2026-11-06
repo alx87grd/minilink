@@ -12,7 +12,13 @@ from minilink.core.backends import (
     require_jax,
 )
 from minilink.core.inspect import inspect_text, repr_pretty
-from minilink.core.params import delegated_params, held_params, own_params, param_view
+from minilink.core.params import (
+    delegated_params,
+    held_params,
+    member_keys,
+    own_params,
+    param_view,
+)
 
 ###############################################################################
 # Public API
@@ -187,11 +193,6 @@ class BoxSet(Set):
         """Dimension of the boxed vector."""
         return int(np.size(self.lower))
 
-    @classmethod
-    def from_system_state(cls, sys) -> "BoxSet":
-        """The state box of ``sys``: its state bounds (``sys.state.box``)."""
-        return sys.state.box
-
     def margin(self, z, t=0.0, params=None):
         """Return the margins to the lower and upper faces, shape ``(2n,)``."""
         params = self.params if params is None else params
@@ -247,20 +248,6 @@ class BoxInputSet(InputSet):
 
     def __init__(self, box: BoxSet):
         self.box = box
-
-    @classmethod
-    def from_bounds(cls, lower: np.ndarray, upper: np.ndarray) -> "BoxInputSet":
-        """Create an input box from lower and upper arrays."""
-        return cls(BoxSet(lower, upper))
-
-    @classmethod
-    def from_system_inputs(cls, sys) -> "BoxInputSet":
-        """The input box of ``sys``: its input ports' bounds, stacked in port order."""
-        boxes = [port.box for port in sys.inputs.values()]
-        lower = np.concatenate([box.lower for box in boxes]) if boxes else np.zeros(0)
-        upper = np.concatenate([box.upper for box in boxes]) if boxes else np.zeros(0)
-
-        return cls(BoxSet(lower, upper))
 
     def margin(self, u, x=None, t=0.0, params=None):
         """Return the margins to the input box faces, shape ``(2m,)``."""
@@ -426,22 +413,24 @@ class IntersectionSet(Set):
 
     Built by the ``&`` operator on :class:`Set`; ``a & b & c`` is one flat
     intersection of three members. ``params`` holds the members' own trees by
-    position, ``{"0": ..., "1": ...}``: an edit of a member's numbers is the
+    class name (a repeat numbered, ``{"BoxSet": ..., "BallSet": ...}``): an edit of a member's numbers is the
     intersection's, and an assignment routes each entry to its member.
     """
 
-    params = held_params('The members\' numbers by position: ``{"0": ..., "1": ...}``.')
+    params = held_params(
+        'The members\' numbers by class name: ``{"BoxSet": ..., "BallSet": ...}``, a repeat numbered.'
+    )
 
     def __init__(self, sets):
         sets = tuple(sets)
         require_members(sets)
 
         self.sets = sets
-        self.params = {str(i): set_.params for i, set_ in enumerate(sets)}
+        self.params = {key: set_.params for key, set_ in zip(member_keys(sets), sets)}
 
     def param_parts(self) -> dict:
-        """The members by position: the parts an assignment routes to."""
-        return {str(i): set_ for i, set_ in enumerate(self.sets)}
+        """The members by key: the parts an assignment routes to."""
+        return dict(zip(member_keys(self.sets), self.sets))
 
     @classmethod
     def of(cls, *sets: Set) -> "IntersectionSet":
@@ -464,8 +453,8 @@ class IntersectionSet(Set):
 
         # Each member's margins as a vector, a scalar margin as one entry
         margins = [
-            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params[str(i)])), (-1,))
-            for i, set_ in enumerate(sets)
+            xp.reshape(xp.asarray(set_.margin(z, t=t, params=params[key])), (-1,))
+            for key, set_ in zip(member_keys(sets), sets)
         ]
 
         # z ∈ Z₁ ∩ Z₂ ∩ … ⇔ every member's margins ≥ 0

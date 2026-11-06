@@ -12,7 +12,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
 | **v0.3** | **The complete core** (§5.3): one architecture from the plant to the evaluation and the optimizer, supporting stochastic problems and the sampled loop, built in the natural order of the code. First (DESIGN §4–§6): **the convergence pass** (the core kept, side features to the experimental tier) and **the continuous core** (one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters; a closing PID-tuning example by hand and by the pipeline, S77). Then two invariants (every object pure, every number a parameter; the step algebra first-class) and seven pillars (the eight items the maintainer named, the parametric and the stochastic programs grouped as one): one discrete judge, the draws over starts, parameters, disturbances and block seeds, the seeded stochastic policy, the sampled loop as a step diagram with two run verbs, one generic parametric program with the stochastic program its case, a native solver and an MPC on the planner's pure face as a proof of concept (MPPI on the same face), Fields. The teaching surface covers every GMC714 lab (§4.3); the course material stays on `main` until v0.3 merges. | `0.3.0` on PyPI (2026-10-30), from the GitHub tag; the core's small leftovers carried into v0.4 |
-| **v0.4** | **The clean surface** (§5.4, [TODO §1](../plans/TODO.md#1-v04--the-clean-surface)): the API one vocabulary and one shape across the tools (RULES 2.4 and 2.7, the planner's four kinds of argument; landed on `dev` after the tag), the tutorials in three layers (landed), the one parameters model and no cache (DESIGN §4; landed 2026-11-05), the nine API surface rulings AR-1 to AR-9 ([api-surface-rulings.md](../plans/api-surface-rulings.md); ruled, the next build), the core API proposals CA-1 to CA-6, the demos, notebooks, tests and CI redrafted on the core ([minimal-surface.md](../plans/minimal-surface.md)), the root exports, and the v0.3 core's small leftovers. Breaking names land here, once, with every notebook in the same change. | After v0.3 (no date) |
+| **v0.4** | **The clean surface** (§5.4, [TODO §1](../plans/TODO.md#1-v04--the-clean-surface)): the API one vocabulary and one shape across the tools (RULES 2.4 and 2.7, the planner's four kinds of argument; landed on `dev` after the tag), the tutorials in three layers (landed), the one parameters model and no cache (DESIGN §4; landed 2026-11-05), the nine API surface rulings (landed 2026-11-05 on their branch), the core API proposals CA-1, CA-2 and CA-5, the demos, notebooks, tests and CI redrafted on the core ([minimal-surface.md](../plans/minimal-surface.md)), the root exports, and the v0.3 core's small leftovers. Breaking names land here, once, with every notebook in the same change. | After v0.3 (no date) |
 | **v0.5** | **Features on the core** (§5.5), not intertwined with it: identification as the program export's first data consumer; `LQGPlanner`; workspace geometry; the RL follow-ups; native solvers beyond the proof of concept; the general serial chain (C6); pyro parity and the former wave G rows; traceable linear analysis. | After v0.3 (no date) |
 | **v0.9** | **Freeze candidate** (§5.6): the foundation questions that could still break a public name are decided (Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 (indicative, set before 2026-10-26; the releases carry no dates now) |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.7): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 (indicative, set before 2026-10-26; v1.0 comes when the API feels mature) |
@@ -94,6 +94,23 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   solver's dict; every planner's `params` tree and `solve(params=)`; trajectory
   optimization's `last_optimization_result`, `iteration_history`, `last_solve_time_s` and
   `last_step_time_s` gone for `solution.record` (RULES 2.4).
+- 2026-11-05 (on the branch `api-surface-rulings-review`, for `0.4.0`; every notebook migrated in
+  the same commits, no alias): `mean_at`, `mean_draw` and `Gaussian.full_cov` → `sample(None,
+  params=)` and `cov`; `BoxSet.from_system_state`, `BoxInputSet.from_system_inputs` and
+  `from_bounds` → `sys.state.box`, `sys.input_box`, `BoxSet(lower, upper)` (`U=` takes a box);
+  `traj.sample` / `t2x` / `t2u` / `with_signal` / `time_duration` / `copy` → `traj.at(t, name)`,
+  `with_signals`, `tf - t0`; `ev.jacobian(of, wrt)` returns the array at a point (no callable);
+  the program evaluator's `gradient` / `hessian` / `jacobian_h` / `jacobian_g` → `grad_J` /
+  `hess_J` / `jac_h` / `jac_g`; `record_solve_time` gone, the solve time always recorded at a
+  user's verb; `solve_trajectory_from`, `step`, `compile_parametric_program` and the parametric
+  transcription gone for `planner.solve(params=)` and `planner.compile()`, the RL planner's
+  rollout verb gone for `evaluate(problem, solution.policy, record=True)`,
+  `PlanningProblem.start_point` gone for `x0`; `diagram.trajectory_of` → `traj.of("plant")` on
+  every diagram run (`record=("plant:u",)` for the input), `diagram.of("plant")`;
+  `compute_forced` / `solve_forced` → `compute_trajectory(u=)` / `solve(u=)`, one input rule on
+  every solver (a sampled input held, a function read where the solver evaluates `f`),
+  `compute_rollout`'s input sequence `(m, n_steps)`; an intersection's, a union's and a scene's
+  members keyed by class name; the `input_interp` solver option gone.
 
 ## 3. Maturity (TRL)
 
@@ -363,13 +380,20 @@ last answer per object (RULES 2.4: a run's result carries its whole account, `la
 the one shortcut, enforced by `test_last_answer.py`); the one parameters model (DESIGN §4
 "Parameters": one `params` tree per object, complete trees at every boundary, a tool's `params`
 a copy); no cache (DESIGN §4 rule 6: `planner.solve` builds every call, the held compiled
-planner never compiles for new numbers, enforced by `test_no_recompile.py`).
+planner never compiles for new numbers, enforced by `test_no_recompile.py`); the nine API
+surface rulings of 2026-11-05 (one spelling for a law's mean, `evaluate` on a sampled
+controller's clock, two box spellings and `U=` a box, `traj.at`, `jacobian` an array with one
+name, the solve time at the user's verb, `traj.of("plant")` on every diagram run with
+`diagram.of`, one simulate verb `compute_trajectory(u=)` with one input rule on every solver,
+two replanning routes), with the clean-up rows bundled on them (the RL default policy sized from
+`problem.U`, the value-iteration command clipped to its box, no cache left, the program
+evaluator's textbook derivative names, members keyed by class name); their contracts are
+DESIGN's, enforced by `test_vocabulary.py`.
 
 **Left** (the order of work: TODO §1, "Next, in order"):
-- **The API surface rulings** ([api-surface-rulings.md](../plans/api-surface-rulings.md), AR-1
-  to AR-9, ruled 2026-11-05, to build; TODO §1.11): 22 fewer names to learn.
+- **A continuous run records its signals from its own pass** (TODO §1.11), benchmarked first.
 - **The core API proposals** ([core-api-improvements.md](../plans/core-api-improvements.md),
-  CA-1 to CA-6; TODO §1.11) **[ask — core]**.
+  CA-1, CA-2 and CA-5; TODO §1.11) **[ask — core]**, and a later round of API proposals.
 - **The minimal surface** ([minimal-surface.md](../plans/minimal-surface.md), its decisions
   MS-D1 to MS-D6; TODO §1.12): the test layers and CI shape, one demo per feature (K4), the
   notebooks, the benchmarks.

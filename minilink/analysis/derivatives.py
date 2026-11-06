@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from minilink.core.backends import require_jax
+
 ###############################################################################
 # Public API
 ###############################################################################
@@ -29,8 +31,9 @@ def jacobian(
     ``"t"``, ``"params"``, or a wire). The point follows in the order of
     ``f(x, u, t, params)`` with the textbook defaults, and each call compiles its
     own evaluator (about a millisecond): exact under JAX when the system traces,
-    central finite differences otherwise. Nothing is stored on the system; keep
-    ``evaluator.jacobian(of, wrt)`` when a loop needs the callable.
+    central finite differences otherwise. Nothing is stored on the system; a
+    loop takes a compiled evaluator's ``jacobian`` as its function,
+    ``partial(evaluator.jacobian, of, wrt)``.
 
     Parameters
     ----------
@@ -123,11 +126,11 @@ def jacobian_with_fd_fallback(sys, of, wrt, point, method, eps):
     """
     evaluator = compiled(sys, method)
     try:
-        J = evaluator.jacobian(of, wrt, eps=eps)(*point)
+        J = evaluator.jacobian(of, wrt, *point, eps=eps)
     except Exception as exc:
         if method != "auto" or evaluator.backend != "jax" or not is_tracing_error(exc):
             raise
-        J = compiled(sys, "fd").jacobian(of, wrt, eps=eps)(*point)
+        J = compiled(sys, "fd").jacobian(of, wrt, *point, eps=eps)
 
     return J
 
@@ -152,12 +155,9 @@ def compiled(sys, method="auto"):
 
 def is_tracing_error(exc):
     """True for JAX's "concrete value needed" family of tracer errors."""
-    # The exception type only: require_jax() would also apply the x64 policy
-    try:
-        from jax.errors import JAXTypeError
-    except ImportError:  # pragma: no cover - JAX evaluators imply JAX
-        return False
-    return isinstance(exc, JAXTypeError)
+    jax = require_jax()
+
+    return isinstance(exc, jax.errors.JAXTypeError)
 
 
 def as_numpy(value):

@@ -8,7 +8,7 @@ from minilink.blocks.sources import WhiteNoise
 from minilink.core.closed_loop import closed_loop
 from minilink.core.costs import QuadraticCost
 from minilink.core.distributions import Gaussian, Uniform
-from minilink.core.sets import BallSet, BoxInputSet
+from minilink.core.sets import BallSet, BoxSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation, reduce_criterion, score_run
 from minilink.planning.evaluator import closed_loop_of, evaluate
@@ -33,7 +33,7 @@ def upright_problem(**fields):
         sys, x_bar=np.array([np.pi, 0.0]), R=0.01 * np.eye(1)
     )
     fields.setdefault("horizon", 2.0)
-    fields.setdefault("U", BoxInputSet.from_bounds([-50.0], [50.0]))
+    fields.setdefault("U", BoxSet([-50.0], [50.0]))
     return PlanningProblem(sys, cost=cost, **fields)
 
 
@@ -208,7 +208,7 @@ def stochastic_problem(**fields):
         sys=sys,
         cost=cost,
         horizon=1.0,
-        U=BoxInputSet.from_bounds([-50.0], [50.0]),
+        U=BoxSet([-50.0], [50.0]),
         x0=Gaussian(mean=np.array([0.5, 0.0]), std=np.array([0.1, 0.1])),
         distributions={"plant": {"m": Uniform(np.array([0.9]), np.array([1.1]))}},
         **fields,
@@ -244,6 +244,19 @@ def test_a_stochastic_problem_draws_its_trials(backend):
 def test_the_facade_is_compile_then_evaluate():
     report = evaluate(stochastic_problem(), pid(), dt=0.01, n_trials=4, backend="numpy")
     assert isinstance(report, Evaluation) and report.n_trials == 4
+
+
+def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_for_dt():
+    problem = upright_problem()
+
+    # A sampled controller runs on its own clock
+    on_clock = evaluate(problem, pid() % 0.01, backend="numpy")
+    assert isinstance(on_clock, Evaluation)
+    assert on_clock.trajectories is None
+
+    # A continuous controller's loop needs the period it is integrated on
+    with pytest.raises(TypeError, match="needs dt"):
+        evaluate(problem, pid(), backend="numpy")
 
 
 # --- the gradient and the program ---
@@ -905,7 +918,7 @@ def test_a_start_set_that_cannot_draw_is_refused():
         PlanningProblem(plant(), x0=BallSet(np.zeros(2), 1.0), horizon=1.0)
 
 
-def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
+def test_the_failure_cost_follows_the_overridden_weights():
     sys = plant()
     cost = QuadraticCost.from_system(sys)
     problem = PlanningProblem(
@@ -934,10 +947,13 @@ def test_the_failure_cost_follows_the_overridden_weights_once_per_value():
         2.0 * own_cost, rel=1e-12
     )  # the bound scales with g
 
-    # Cached by the value: the same weights again sample g no more
+    # The compile's own numbers (a call with no tree) take the bound of the build and
+    # sample g no more
     n_calls = len(calls)
-    pe.evaluate(edited(pe.params, doubled))
-    pe.evaluate(edited(pe.params, doubled))
+    assert pe.failure_cost_and_bound(pe.merged(None)) == (
+        pe.failure_cost,
+        pe.cost_bound,
+    )
     assert len(calls) == n_calls
 
 
@@ -987,3 +1003,16 @@ def test_the_failure_cost_follows_the_evaluations_discount_rate():
     cost_fast, _ = pe.failure_cost_and_bound({**pe.params, "discount_rate": 2.0})
     assert cost_fast == pytest.approx(problem.cost_bound(2.0, discount_rate=2.0))
     assert cost_fast < cost_own
+
+
+def test_a_run_with_no_recorded_plant_input_is_refused_by_name_when_scored():
+    from minilink.planning.evaluation import evaluate_trajectory
+
+    problem = upright_problem()
+    loop = pid() @ problem.sys
+    bare = loop.compute_trajectory(tf=0.5, dt=0.01)
+    with pytest.raises(ValueError, match="record=\\('plant:u',\\)"):
+        evaluate_trajectory(problem, bare)
+
+    recorded = loop.compute_trajectory(tf=0.5, dt=0.01, record=("plant:u",))
+    assert np.isfinite(evaluate_trajectory(problem, recorded).J).all()

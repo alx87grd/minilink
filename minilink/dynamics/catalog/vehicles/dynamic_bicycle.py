@@ -687,6 +687,6 @@ if __name__ == "__main__":
     x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     u = np.array([5.0, 0.1])
     sys.x0 = x
-    sys.compute_forced(u=u, tf=10)
+    sys.compute_trajectory(u=u, tf=10)
     sys.plot_trajectory()
     sys.animate()

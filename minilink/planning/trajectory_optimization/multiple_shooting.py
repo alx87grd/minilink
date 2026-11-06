@@ -41,10 +41,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
     Dynamics are enforced by RK4 shooting defects between neighboring knots.
     """
 
-    # The collocation parametric build assumes collocation defects; multiple
-    # shooting has no parametric (MPC) form.
-    supports_parametric = False
-
     # The transcription's name in a program's metadata
     name = "multiple_shooting"
 
@@ -56,6 +52,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> MathematicalProgram:
         """Build the multiple-shooting nonlinear program."""
         # The JAX backend builds the same program, vectorized over the knots
@@ -63,7 +60,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
             return self.transcribe_jax(problem, backend=backend)
 
         problem.require_cost()
-        step = self.make_step(problem, backend)
+        step = self.make_step(problem, backend, dynamics)
 
         # Dynamics: the shooting defect of every interval vanishes
         equalities: list[ConstraintFunction] = [
@@ -92,13 +89,6 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
                 "transcription": "multiple_shooting",
                 "backend": backend,
             },
-        )
-
-    def transcribe_parametric(self, *args, **kwargs):
-        """Refuse: multiple shooting has no parametric (MPC) form."""
-        raise NotImplementedError(
-            "MultipleShootingTranscription has no parametric (MPC) form; use "
-            "transcription='direct_collocation' for compile_parametric_program"
         )
 
     ###########################################################################
@@ -156,9 +146,9 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
 
         return unpack_jax, J, dynamics_residual
 
-    def make_step(self, problem: PlanningProblem, backend: str):
+    def make_step(self, problem: PlanningProblem, backend: str, dynamics=None):
         """One RK4 step between knots, ``step(x, u0, u1, t)``, on the grid's ``dt``."""
-        f = dynamics_function(problem, backend)
+        f = dynamics_function(problem, backend) if dynamics is None else dynamics
         dt = self.options.dt(problem)
 
         def step(x, u0, u1, t):

@@ -634,7 +634,6 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="numpy",
-            record_solve_time=True,
             options={"maxiter": 20, "ftol": 0.001},
         )
         flat = TrajectoryOptimizationPlanner(
@@ -642,13 +641,11 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             n_steps=5,
             transcription="direct_collocation",
             backend="numpy",
-            record_solve_time=True,
             options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
         self.assertEqual(flat.transcription.options.n_steps, 5)
         self.assertEqual(flat.backend, nested.backend)
-        self.assertEqual(flat.record_solve_time, nested.record_solve_time)
         self.assertEqual(flat.options, nested.options)
 
     def test_string_presets(self):
@@ -827,7 +824,7 @@ def test_kdtree_requires_euclidean_metric():
         sys=sys,
         x0=np.array([-3.0, -3.0, 0.0]),
         Xf=SingletonSet(np.array([3.0, 3.0, np.pi / 2])),
-        X=BoxSet.from_system_state(sys),
+        X=sys.state.box,
         U=sys.input_box,
     )
     dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
@@ -980,7 +977,7 @@ def test_dubins_rrt_reaches_goal_pose():
     sys = make_dubins_problem()
     x0 = np.array([-3.0, -3.0, 0.0])
     x_goal = np.array([3.0, 3.0, np.pi / 2])
-    X = BoxSet.from_system_state(sys)
+    X = sys.state.box
     problem = PlanningProblem(
         sys=sys,
         x0=x0,
@@ -2034,46 +2031,6 @@ def test_plot_track_smoke():
     assert len(ax.lines) >= 1
 
 
-class TestParametricCapabilityFlag(unittest.TestCase):
-    """S42: multiple shooting no longer inherits collocation's parametric build."""
-
-    def test_multiple_shooting_declares_no_parametric_support(self):
-        from minilink.planning.trajectory_optimization.direct_collocation import (
-            DirectCollocationTranscription,
-        )
-        from minilink.planning.trajectory_optimization.multiple_shooting import (
-            MultipleShootingTranscription,
-        )
-
-        self.assertTrue(DirectCollocationTranscription.supports_parametric)
-        self.assertFalse(MultipleShootingTranscription.supports_parametric)
-
-    @pytest.mark.optional
-    @pytest.mark.jax
-    def test_planner_refuses_parametric_compile_for_multiple_shooting(self):
-        pytest.importorskip("jax")
-        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
-
-        plant = Pendulum()
-        goal = np.array([np.pi, 0.0])
-        problem = PlanningProblem(
-            plant,
-            x0=np.zeros(2),
-            Xf=SingletonSet(goal),
-            horizon=2.0,
-            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
-            U=plant.input_box,
-        )
-        planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=10,
-            transcription="multiple_shooting",
-            backend="jax",
-        )
-        with self.assertRaises(TypeError):
-            planner.compile_parametric_program()
-
-
 class TestTrajoptSuccessSemantics(unittest.TestCase):
     """S09: success means the plan satisfies the constraints, not the solver's mood."""
 
@@ -2167,9 +2124,13 @@ class TestTextbookOptions(unittest.TestCase):
             problem, n_steps=5, transcription="direct_collocation", live_plot=True
         )
         self.assertTrue(planner.live_plot)
-        self.assertIsNotNone(planner.build_callback(None, planner.problem, "numpy", []))
+        self.assertIsNotNone(
+            planner.build_callback(None, planner.problem, "numpy", [], None)
+        )
         planner.live_plot = False
-        self.assertIsNone(planner.build_callback(None, planner.problem, "numpy", []))
+        self.assertIsNone(
+            planner.build_callback(None, planner.problem, "numpy", [], None)
+        )
         self.assertTrue(callable(LiveTrajectoryPlotCallback))
 
     def test_trajopt_live_plot_composes_with_a_user_callback(self):
@@ -2202,7 +2163,7 @@ class TestTextbookOptions(unittest.TestCase):
             return_value=live,
         ):
             progress = planner.build_callback(
-                mock.MagicMock(), planner.problem, "numpy", []
+                mock.MagicMock(), planner.problem, "numpy", [], None
             )
             planner.iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)

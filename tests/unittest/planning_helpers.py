@@ -8,7 +8,7 @@ import numpy as np
 
 from minilink.core.geometry import Sphere
 from minilink.core.params import flatten, set_leaf
-from minilink.core.sets import BallSet, BoxSet
+from minilink.core.sets import BallSet
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import disc, mount
@@ -29,7 +29,7 @@ def make_holonomic_obstacle_problem():
 
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
     body = mount(disc(0.2), on=sys)
-    X = BoxSet.from_system_state(sys) & scene.clearance_field(body).as_set()
+    X = sys.state.box & scene.clearance_field(body).as_set()
     Xf = BallSet(X_GOAL, GOAL_TOLERANCE)
     return PlanningProblem(sys=sys, x0=X_START, Xf=Xf, X=X, U=sys.input_box), X
 

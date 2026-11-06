@@ -381,8 +381,8 @@ def torque_arc(sweep, radius):
 if __name__ == "__main__":
     sys = Pendulum()
     sys.x0 = np.array([0.7, 0.0])
-    sys.compute_forced(
-        lambda t: np.array([2.0 * np.sin(t)]),
+    sys.compute_trajectory(
+        u=lambda t: np.array([2.0 * np.sin(t)]),
         tf=5.0,
         n_steps=160,
         show=True,

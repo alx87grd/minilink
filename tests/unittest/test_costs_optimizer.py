@@ -261,10 +261,16 @@ def test_compute_cost_scores_a_system_or_a_block_inside_a_diagram():
 
     # Closed loop: the plant as it ran inside the loop, last or given trajectory
     loop = StateFeedback(K=[[5.0, 1.0]]) @ plant
-    loop_traj = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
-    J = total(cost, loop.trajectory_of(plant, loop_traj))
+    loop_traj = loop.compute_trajectory(
+        tf=1.0, dt=0.05, record=("plant:u",), verbose=False
+    )
+    J = total(cost, loop_traj.of("plant"))
     assert loop.compute_cost(cost, of=plant) == pytest.approx(J)
-    assert loop.compute_cost(cost, of=plant, traj=loop_traj) == pytest.approx(J)
+    assert loop.compute_cost(cost, of="plant", traj=loop_traj) == pytest.approx(J)
+
+    # A run without the plant's input recorded: the cost rebuilds it from the states
+    bare = loop.compute_trajectory(tf=1.0, dt=0.05, verbose=False)
+    assert loop.compute_cost(cost, of="plant", traj=bare) == pytest.approx(J)
 
     # of=None scores the loop in its own (x, u): here x = plant state, u = r
     loop_cost = QuadraticCost.from_system(loop, S=np.eye(2))
@@ -326,7 +332,7 @@ def _quadratic_program() -> MathematicalProgram:
     return MathematicalProgram(n_z=1, J=J, grad_J=grad_J)
 
 
-def test_scipy_minimize_record_solve_time_default_none():
+def test_a_solve_always_records_the_backend_solves_wall_time():
     prog = _quadratic_program()
     opt = Optimizer(
         prog,
@@ -335,19 +341,6 @@ def test_scipy_minimize_record_solve_time_default_none():
         options={"disp": False, "maxiter": 50},
     )
     out = opt.solve()
-    assert out.solve_time_s is None
-
-
-def test_scipy_minimize_record_solve_time_sets_duration():
-    prog = _quadratic_program()
-    opt = Optimizer(
-        prog,
-        z0=np.array([1.0]),
-        method="scipy_slsqp",
-        options={"disp": False, "maxiter": 50},
-    )
-    out = opt.solve(record_solve_time=True)
-    assert out.solve_time_s is not None
     assert isinstance(out.solve_time_s, float)
     assert out.solve_time_s >= 0.0
     assert out.success
@@ -520,7 +513,7 @@ def test_ipopt_inequality_with_bounds():
 
 
 @pytest.mark.ipopt
-def test_ipopt_record_solve_time():
+def test_ipopt_records_the_solve_time():
     pytest.importorskip("cyipopt")
 
     def J(z: np.ndarray):
@@ -531,7 +524,7 @@ def test_ipopt_record_solve_time():
 
     prog = MathematicalProgram(n_z=1, J=J, grad_J=grad_J)
     opt = Optimizer(prog, z0=np.array([1.0]), method="ipopt", options=_IPOPT_QUIET)
-    out = opt.solve(record_solve_time=True)
+    out = opt.solve()
     assert out.success
     assert out.solve_time_s is not None and out.solve_time_s >= 0.0
 

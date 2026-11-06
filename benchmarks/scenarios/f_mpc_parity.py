@@ -85,7 +85,6 @@ def _bicycle_planner():
             DirectCollocationOptions(n_steps=N_STEPS)
         ),
         backend="jax",
-        record_solve_time=True,
         method="scipy_slsqp",
         options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
     )

@@ -85,3 +85,68 @@ def test_the_compiled_path_integral_planner_at_new_numbers_compiles_nothing():
 
     assert compiles_of(pv) == 0
     assert pv.params["plant"]["m"] == 1.0  # its params is a copy
+
+
+def test_the_problem_evaluator_at_new_numbers_compiles_nothing():
+    from minilink import PID
+
+    configure_jax(enable_x64=True)
+    pe = swing_problem().compile(PID(Kp=5.0, Kd=1.0), dt=0.05, backend="jax")
+    p = pe.params
+    pe.evaluate(p)
+    COMPILES.clear()
+    for k in (2, 3):
+        p["plant"]["m"] = 1.0 + 0.05 * k
+        p["controller"]["Kp"] = np.array([5.0 + k])
+        pe.evaluate(p)
+
+    assert len(COMPILES) == 0
+
+
+def test_a_cost_edit_inside_the_problem_is_seen_by_the_next_value_iteration_solve():
+    from minilink import DynamicProgrammingPlanner
+
+    problem = swing_problem().replace(Xf=None, horizon=np.inf)
+    for backend in ("numpy", "jax"):
+        planner = DynamicProgrammingPlanner(
+            problem,
+            x_grid=(9, 9),
+            u_grid=(3,),
+            dt=0.1,
+            backend=backend,
+            max_iterations=5,
+        )
+        planner.solve()
+        J_before = planner.result.J.copy()
+        problem.cost.params["R"] = 100.0 * problem.cost.params["R"]
+        planner.solve()
+        J_after = planner.result.J.copy()
+        problem.cost.params["R"] = problem.cost.params["R"] / 100.0
+
+        assert not np.allclose(J_before, J_after), backend
+
+
+def test_one_planner_solve_compiles_the_plant_once():
+    from unittest import mock
+
+    problem = swing_problem()
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=DirectCollocationTranscription(
+            DirectCollocationOptions(n_steps=8)
+        ),
+        backend="numpy",
+        method="scipy_slsqp",
+        options={"maxiter": 5, "disp": False},
+        record_history=True,
+    )
+    compile_system = problem.sys.compile
+    with mock.patch.object(
+        type(problem.sys),
+        "compile",
+        autospec=True,
+        side_effect=lambda self, *a, **k: compile_system(*a, **k),
+    ) as compiles:
+        planner.solve()
+
+    assert compiles.call_count == 1

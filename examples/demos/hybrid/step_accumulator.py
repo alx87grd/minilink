@@ -24,6 +24,6 @@ class DiscreteAccumulator(StepSystem):
 
 
 plant = DiscreteAccumulator()
-u_seq = np.ones((20, 1))
+u_seq = np.ones((1, 20))
 plant.compute_rollout(n_steps=20, u=u_seq)
 plant.plot_rollout()

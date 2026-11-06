@@ -38,7 +38,7 @@ if __name__ == "__main__":
     print("Low-pass poles:", lpf.poles)
 
     # Drive a 2 Hz sinusoid through the 0.5 Hz low-pass; expect strong attenuation.
-    traj = lpf.compute_forced(
-        lambda t: np.array([np.sin(2.0 * np.pi * 2.0 * t)]), tf=10.0
+    traj = lpf.compute_trajectory(
+        u=lambda t: np.array([np.sin(2.0 * np.pi * 2.0 * t)]), tf=10.0
     )
     print("output amplitude (last 2 s):", float(np.max(np.abs(traj.x[:, -200:]))))

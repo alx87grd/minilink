@@ -179,24 +179,24 @@ class MathematicalProgramEvaluator(ABC):
 
     # The derivatives a backend has not supplied
 
-    def gradient(self, z) -> np.ndarray:
+    def grad_J(self, z) -> np.ndarray:
         """Return objective gradient ``dJ/dz`` or raise if unavailable."""
         raise ValueError(
             "This mathematical-program evaluator has no objective gradient"
         )
 
-    def hessian(self, z) -> np.ndarray:
+    def hess_J(self, z) -> np.ndarray:
         """Return objective Hessian ``d2J/dz2`` or raise if unavailable."""
         raise ValueError("This mathematical-program evaluator has no objective Hessian")
 
-    def jacobian_h(self, z) -> np.ndarray:
+    def jac_h(self, z) -> np.ndarray:
         """Return equality Jacobian ``dh/dz``."""
         # With no equalities the Jacobian is the empty (0, n_z) matrix
         if self.n_h == 0:
             return np.zeros((0, self.n_z), dtype=float)
         raise ValueError("This mathematical-program evaluator has no equality Jacobian")
 
-    def jacobian_g(self, z) -> np.ndarray:
+    def jac_g(self, z) -> np.ndarray:
         """Return inequality Jacobian ``dg/dz``."""
         # With no inequalities the Jacobian is the empty (0, n_z) matrix
         if self.n_g == 0:
@@ -243,13 +243,13 @@ class MathematicalProgramEvaluator(ABC):
         self.equality_residual(z)
         self.inequality_margin(z)
         if self.has_gradient:
-            self.gradient(z)
+            self.grad_J(z)
         if self.has_hessian:
-            self.hessian(z)
+            self.hess_J(z)
         if self.has_jacobian_h:
-            self.jacobian_h(z)
+            self.jac_h(z)
         if self.has_jacobian_g:
-            self.jacobian_g(z)
+            self.jac_g(z)
 
     def decision_vector(self, z) -> np.ndarray:
         """``z`` as a flat float array of shape ``(n_z,)``."""

@@ -413,10 +413,10 @@ def test_a_set_reads_its_numbers_from_params_and_moves_by_them():
         moved_box.margin(z),
     )
     both = box & BallSet([0.0, 0.0], 1.0)
-    assert set(both.params) == {"0", "1"}
+    assert set(both.params) == {"BoxSet", "BallSet"}
     moved = copy.deepcopy(both)
-    moved.params["1"]["center"] = np.ones(2)
-    moved.params["1"]["radius"] = 0.1
+    moved.params["BallSet"]["center"] = np.ones(2)
+    moved.params["BallSet"]["radius"] = 0.1
     assert moved.margin(z)[-1] < 0.0 <= both.margin(z)[-1]
     assert SingletonSet([1.0]).params["point"].tolist() == [1.0]
 

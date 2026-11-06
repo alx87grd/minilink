@@ -265,37 +265,37 @@ class TestNewSimulator(unittest.TestCase):
         self.assertEqual(traj.x.shape, (1, 3))
         self.assertEqual(traj.u.shape, (1, 3))
 
-    def test_solve_forced_validates_shape(self):
+    def test_solve_with_u_validates_shape(self):
         sim = Simulator(
             StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
         bad_u = np.zeros((3, 1))
         with self.assertRaises(ValueError):
-            sim.solve_forced(bad_u)
+            sim.solve(u=bad_u)
 
-    def test_solve_forced_accepts_callable_full_input(self):
+    def test_solve_with_u_accepts_callable_full_input(self):
         sim = Simulator(
             StableLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-        traj = sim.solve_forced(lambda t: 10.0 * t)
+        traj = sim.solve(u=lambda t: 10.0 * t)
         np.testing.assert_allclose(traj.u, np.array([[0.0, 1.0, 2.0]]))
 
-    def test_solve_forced_accepts_constant_vector(self):
+    def test_solve_with_u_accepts_constant_vector(self):
         sim = Simulator(
             TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-        traj = sim.solve_forced(np.array([3.0, 4.0]))
+        traj = sim.solve(u=np.array([3.0, 4.0]))
         np.testing.assert_allclose(traj.u, np.array([[3.0, 3.0, 3.0], [4.0, 4.0, 4.0]]))
 
-    def test_solve_forced_accepts_scalar_on_one_named_port(self):
+    def test_solve_with_u_accepts_scalar_on_one_named_port(self):
         sim = Simulator(
             TwoPortLinearSystem(), tf=0.2, n_steps=3, solver="euler", verbose=False
         )
-        traj = sim.solve_forced(5.0, input_port_id="left")
+        traj = sim.solve(u=5.0, input_port_id="left")
         np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
-    def test_solve_forced_supports_fixed_step_rk4(self):
+    def test_solve_with_u_supports_fixed_step_rk4(self):
         sim = Simulator(
             StableLinearSystem(),
             tf=0.2,
@@ -304,7 +304,7 @@ class TestNewSimulator(unittest.TestCase):
             verbose=False,
         )
         u_traj = np.zeros((1, 3))
-        traj = sim.solve_forced(u_traj)
+        traj = sim.solve(u=u_traj)
         self.assertEqual(sim.last_debug["solver"], "rk4_fixedsteps")
         np.testing.assert_allclose(traj.u, u_traj)
         np.testing.assert_allclose(traj.x[:, 0], [1.0])
@@ -320,19 +320,19 @@ class TestNewSimulator(unittest.TestCase):
         self.assertEqual(traj.u.shape, (1, 3))
         self.assertEqual(traj.t.shape, (3,))
 
-    def test_wrapper_compute_forced_accepts_full_input_trajectory(self):
+    def test_wrapper_compute_trajectory_with_u_accepts_full_input_trajectory(self):
         sys = StableLinearSystem()
         u_traj = np.array([[0.0, 0.5, 1.0]])
-        traj = sys.compute_forced(
-            u_traj, tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
+        traj = sys.compute_trajectory(
+            u=u_traj, tf=0.2, n_steps=3, solver="euler", show=False, verbose=False
         )
         self.assertIs(sys.traj, traj)
         np.testing.assert_allclose(traj.u, u_traj)
 
-    def test_wrapper_compute_forced_samples_callable_on_one_named_port(self):
+    def test_wrapper_compute_trajectory_with_u_samples_callable_on_one_named_port(self):
         sys = TwoPortLinearSystem()
-        traj = sys.compute_forced(
-            lambda t: 10.0 * t,
+        traj = sys.compute_trajectory(
+            u=lambda t: 10.0 * t,
             input_port_id="left",
             tf=0.2,
             n_steps=3,
@@ -381,7 +381,7 @@ class TestEulerSolverModes(unittest.TestCase):
     def test_forced_callable_of_another_size_is_named(self):
         sim = Simulator(StableLinearSystem(), tf=0.2, n_steps=3, verbose=False)
         with self.assertRaisesRegex(ValueError, "u callable returned wrong dimension"):
-            sim.solve_forced(lambda t: [t, t])
+            sim.solve(u=lambda t: [t, t])
 
     def test_rk4_fixedsteps_rejects_nonuniform_grid(self):
         from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
@@ -471,7 +471,7 @@ class TestStaticSimulator(unittest.TestCase):
     def test_static_simulator_direct(self):
         gain = Gain(K=3.0, dim=1)
         sim = StaticSimulator(gain, t0=0, tf=0.2, n_steps=3)
-        traj = sim.solve_forced(np.array([[1.0, 2.0, 3.0]]))
+        traj = sim.solve(u=np.array([[1.0, 2.0, 3.0]]))
         np.testing.assert_allclose(traj.signals["y"], [[3.0, 6.0, 9.0]])
 
 
@@ -647,7 +647,6 @@ class TestTheClockOperator(unittest.TestCase):
                 DirectCollocationOptions(n_steps=5)
             ),
             backend="jax",
-            record_solve_time=True,
             method="scipy_slsqp",
             options={"maxiter": 5, "ftol": 0.1},
         )
@@ -1441,8 +1440,8 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
     dt = t[1] - t[0]
     u = 0.5 * np.sin(2.0 * t)[None, :]
 
-    sampled = plant.compute_forced(
-        u, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    sampled = plant.compute_trajectory(
+        u=u, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
     )
     held = ev.rollout(plant.x0, u[:, :-1].T, 0.0, dt)
     np.testing.assert_allclose(sampled.x, held.T, rtol=1e-12)
@@ -1450,8 +1449,8 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
     def u_of_t(tt):
         return np.array([0.5 * np.sin(2.0 * tt)])
 
-    forced = plant.compute_forced(
-        u_of_t, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
+    forced = plant.compute_trajectory(
+        u=u_of_t, tf=1.0, n_steps=20, solver="rk4_fixedsteps", verbose=False
     )
     x = plant.x0
     for k in range(19):
@@ -1492,3 +1491,38 @@ def test_rk4_on_a_held_noise_converges_as_the_step_shrinks(backend):
 
     # A third of the step, an error about 3 times smaller: first order at the switches
     assert errors[0] / errors[1] > 2.0
+
+
+def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evaluates_f():
+    """One input rule: ẋ = u on an integrator, the same held samples and the same u(t) on every solver."""
+    from minilink.core.system import DynamicSystem
+
+    class Integrator(DynamicSystem):
+        def __init__(self):
+            super().__init__(n=1, input_dim=1, output_dim=1)
+
+        def f(self, x, u, t=0.0, params=None):
+            return np.array([u[0]])
+
+    plant = Integrator()
+    t = np.linspace(0.0, 1.0, 11)
+    dt = t[1] - t[0]
+    u_samples = np.array([[0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0]])
+
+    # Each sample held over its period: x(tf) = Σ u_k Δt, on every solver
+    for solver in ("rk4_fixedsteps", "euler", "euler_fixedsteps", "scipy"):
+        run = plant.compute_trajectory(u=u_samples, tf=1.0, n_steps=11, solver=solver)
+        np.testing.assert_allclose(run.x[0, -1], 5.0 * dt, rtol=1e-6)
+        np.testing.assert_allclose(run.u, u_samples)
+
+    # A function of time read where the method evaluates f: x(tf) = ∫ t dt = tf² / 2
+    for solver in ("rk4_fixedsteps", "scipy"):
+        run = plant.compute_trajectory(
+            u=lambda tt: np.array([tt]), tf=1.0, n_steps=11, solver=solver
+        )
+        np.testing.assert_allclose(run.x[0, -1], 0.5, rtol=1e-6)
+    # Euler reads it at the grid times, the held sample: the left Riemann sum
+    run = plant.compute_trajectory(
+        u=lambda tt: np.array([tt]), tf=1.0, n_steps=11, solver="euler"
+    )
+    np.testing.assert_allclose(run.x[0, -1], dt * np.sum(t[:-1]), rtol=1e-9)

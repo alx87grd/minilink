@@ -157,9 +157,13 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     def input_box(self):
         """The input ports' bounds as an input set, stacked in port order: ``U=sys.input_box``."""
         # Lazy import: the sets import the backends, which load after the system
-        from minilink.core.sets import BoxInputSet
+        from minilink.core.sets import BoxInputSet, BoxSet
 
-        return BoxInputSet.from_system_inputs(self)
+        boxes = [port.box for port in self.inputs.values()]
+        lower = np.concatenate([box.lower for box in boxes]) if boxes else np.zeros(0)
+        upper = np.concatenate([box.upper for box in boxes]) if boxes else np.zeros(0)
+
+        return BoxInputSet(BoxSet(lower, upper))
 
     # Core output contract (static IO)
 

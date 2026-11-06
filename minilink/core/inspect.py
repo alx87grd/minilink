@@ -205,8 +205,8 @@ def distribution_text(obj):
     if isinstance(obj, Gaussian):
         return f"Gaussian, dim={obj.dim}, mean={array_text(obj.mean)}, " + (
             f"std={array_text(obj.std)}"
-            if obj.full_cov is None
-            else f"cov={array_text(obj.full_cov)}"
+            if obj.params.get("cov") is None
+            else f"cov={array_text(obj.params['cov'])}"
         )
     if isinstance(obj, Uniform):
         box = obj.box
@@ -274,7 +274,7 @@ def solution_text(solution):
     else:
         trajectory = (
             f"{solution.trajectory.n_samples} samples over "
-            f"{solution.trajectory.time_duration:.3g} s"
+            f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
     success = "yes" if solution.success else "no"

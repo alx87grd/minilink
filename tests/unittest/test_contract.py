@@ -208,7 +208,7 @@ def other_cases():
         ("BallSet", ball, set_call),
         ("SingletonSet", SingletonSet([0.3, 0.0]), set_call),
         ("IntersectionSet", box & ball, set_call),
-        ("BoxInputSet", BoxInputSet.from_bounds([-1.0], [1.0]), input_set_call),
+        ("BoxInputSet", BoxInputSet(BoxSet([-1.0], [1.0])), input_set_call),
         (
             "CallableSet",
             CallableSet(lambda z, t, p: p["r"] - z @ z, params={"r": np.asarray(1.0)}),

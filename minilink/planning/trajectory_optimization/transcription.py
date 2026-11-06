@@ -38,19 +38,15 @@ class Transcription(ABC):
     output.
     """
 
-    #: True when :meth:`transcribe_parametric` builds a correct parametric
-    #: program (the receding-horizon / MPC path). Checked by the planner
-    #: instead of ``hasattr`` so a subclass cannot inherit a wrong one.
-    supports_parametric = False
-
     @abstractmethod
     def transcribe(
         self,
         problem: PlanningProblem,
         *,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> MathematicalProgram:
-        """Convert ``problem`` into a finite-dimensional mathematical program."""
+        """Convert ``problem`` into a finite-dimensional mathematical program; ``dynamics`` the compiled ``(x, u, t) -> f`` when the caller holds one."""
         ...
 
     @abstractmethod
@@ -69,8 +65,9 @@ class Transcription(ABC):
         *,
         problem: PlanningProblem,
         backend: str = BACKEND_NUMPY,
+        dynamics=None,
     ) -> Trajectory:
-        """Convert an optimizer result back into a trajectory."""
+        """Convert an optimizer result back into a trajectory; ``dynamics`` the compiled ``(x, u, t) -> f`` when the caller holds one."""
         ...
 
     @abstractmethod
@@ -296,11 +293,3 @@ def require_fixed_grid_horizon(tf):
     """Refuse a fixed-grid horizon that is not positive and finite."""
     if not np.isfinite(tf) or tf <= 0.0:
         raise ValueError("fixed-grid horizon must be positive and finite")
-
-
-def require_jax_compile_backend(backend):
-    """Refuse a parametric program on any compile backend but JAX."""
-    if normalize_backend(backend, allow_direct=True) != BACKEND_JAX:
-        raise ValueError(
-            f"a parametric program requires backend='jax' (got {backend!r})."
-        )

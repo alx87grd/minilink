@@ -130,7 +130,6 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
             "ftol": PENDULUM_FTOL,
             "disp": False,
         },
-        record_solve_time=True,
         verbose=False,
     )
 
@@ -176,7 +175,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
 def run_bicycle_parametric(
     *, n_runs: int = 1, tiny: bool = False
 ) -> list[MetricRecord]:
-    """Small rate-bicycle MPC tick via current TrajectoryOptimizationPlanner.solve_trajectory_from."""
+    """Small rate-bicycle MPC tick on the planner's compiled face, ``pv.solve(params, z0)``."""
     del tiny  # accuracy goldens require full iteration budget
     if not jax_trajopt_available():
         raise ModuleNotFoundError(
@@ -235,14 +234,16 @@ def run_bicycle_parametric(
         ),
         backend="jax",
         method="scipy_slsqp",
-        record_solve_time=True,
         options={
             "maxiter": maxiter,
             "ftol": BICYCLE_FTOL,
             "disp": False,
         },
     )
-    planner.compile_parametric_program()
+    pv = planner.compile()
+    tree = pv.params
+    tree["x0"] = np.asarray(x0, dtype=float)
+    pv.solve(tree)  # the face compiles at its first call, once; the ticks are timed
 
     total_times: list[float] = []
     solve_times: list[float] = []
@@ -252,17 +253,13 @@ def run_bicycle_parametric(
 
     for _ in range(n_runs):
         t0 = time.perf_counter()
-        plan = planner.solve_trajectory_from(x0)
+        z, status = pv.solve(tree)
+        solve_times.append(time.perf_counter() - t0)
+        plan = pv.solution(z, params=tree, status=status)
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
         cost_val = float(plan.record.cost)
-        success = bool(plan.success)
-        if planner.last_solution.record.solve_time_s is not None:
-            solve_times.append(float(planner.last_solution.record.solve_time_s))
-        elif plan.record.solve_time_s is not None:
-            solve_times.append(float(plan.record.solve_time_s))
-        else:
-            solve_times.append(float(total_times[-1]))
+        success = bool(status["success"])  # the solver's flag, as a tick reports it
 
     assert traj is not None
     assert_simulation_finite(traj)
@@ -282,7 +279,7 @@ def run_bicycle_parametric(
         prefix="e4.bicycle_parametric",
         result=result,
         notes=(
-            "BicycleDynRate(named_ports=True) TrajectoryOptimizationPlanner.solve_trajectory_from, "
+            "BicycleDynRate(named_ports=True) TrajectoryOptimizationPlanner.compile().solve, "
             f"tf={BICYCLE_TF}, n_steps={n_steps}, jax+slsqp"
         ),
     )

@@ -11,6 +11,8 @@ import numpy as np
 
 from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
+from minilink.core.roles import command_port
+from minilink.core.sets import BoxSet
 from minilink.core.trajectory import Trajectory
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
@@ -32,7 +34,6 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment, is_continuous
-from minilink.planning.evaluation import evaluate_trajectory
 from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 
@@ -194,6 +195,7 @@ class ReinforcementLearningPlanner(Planner):
         # bound to the algorithm with the one discount
         self.controller = policy or NeuralPolicy(
             problem.sys,
+            input_box=require_finite_input_box(problem),
             features=features,
             hidden=hidden,
             activation=activation,
@@ -365,25 +367,6 @@ class ReinforcementLearningPlanner(Planner):
         u = np.asarray(u)
 
         return u, None
-
-    def solve_trajectory_from(self, x0, tf=None, *, evaluate=False) -> PlanningSolution:
-        """
-        Roll the learned law out from ``x0`` on the training environment, disturbances drawn.
-
-        The solution's trajectory is that rollout; ``evaluate=True`` scores it
-        under the problem's contract. The planner's stored solution is left as
-        it is.
-        """
-        jax = require_jax()
-
-        # The rollout, its disturbances drawn from a fresh key
-        self.key, key = jax.random.split(self.key)
-        trajectory = self.rollout_law(x0, tf, key)
-
-        # Its score under the problem's contract, when asked
-        evaluation = evaluate_trajectory(self.problem, trajectory) if evaluate else None
-
-        return self.learned_solution(trajectory, evaluation)
 
     def nominal_trajectory(self, tf=None) -> Trajectory:
         """The learned law from the problem's start, with nominal parameters and disturbances."""
@@ -782,6 +765,29 @@ class ReinforcementLearningRecord:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_finite_input_box(problem):
+    """Refuse a problem whose ``U`` has no finite box on the command port: the default policy's action spans it."""
+    plant = problem.sys
+    command = plant.get_input_port_slice(command_port(plant))
+    box = problem.U.bounding_box()
+    if box is None:
+        raise ValueError(
+            "ReinforcementLearningPlanner needs an input set with a bounding box: "
+            "U=plant.input_box"
+        )
+
+    # The command port's slice of the problem's input box
+    lower = np.asarray(box.lower, dtype=float)[command]
+    upper = np.asarray(box.upper, dtype=float)[command]
+    if not (np.all(np.isfinite(lower)) and np.all(np.isfinite(upper))):
+        raise ValueError(
+            "ReinforcementLearningPlanner needs finite input bounds on the problem, "
+            "the box its default policy's action spans: U=plant.input_box"
+        )
+
+    return BoxSet(lower, upper)
 
 
 def snapshot_of(controller):

@@ -27,8 +27,8 @@ Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or rev
 agent starts. They are details, versions and demos, not design questions (those are
 [QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
 
-**The API surface rulings have the go** (§1.11, ruled 2026-11-05: each ruling is taken, build it as
-written), and so does **No cache left** (§1.11, internal structure under DESIGN §4 rule 6).
+**The nine API surface rulings of 2026-11-05 landed** (the branch `api-surface-rulings-review`; their
+contracts are DESIGN's).
 
 **The core's leftover rows have the go**: every row of §1.1 to §1.10 is cleared to start under its
 "done when"; the internal choices an agent meets (the default output stub's type under JAX, the
@@ -37,8 +37,8 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| The core API proposals | CA-1–CA-6 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
-| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions ([api-surface-rulings.md](api-surface-rulings.md), "Not ruled yet") |
+| The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
+| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
@@ -78,17 +78,13 @@ maintainer would and logged in the run's record.
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-05, `dev` at the API surface plan; every branch before it merged):
-1. **The API surface rulings** (§1.11, [api-surface-rulings.md](api-surface-rulings.md)): one
-   branch, nine commits, AR-9 (the start-only route removed) and AR-7 (with its signal-recording
-   benchmark) the largest. Cleared to start.
-2. **No cache left** (§1.11): the problem evaluator, value iteration and the Lyapunov analysis
-   rebuilt in their verbs or snapshotted at build. Cleared to start; AR-9 clears its last item.
-3. **The parameters model's follow-ups** (§1.11): four small rows, each byte-identical.
-4. **The decisions waiting for the maintainer** before their rows can start: the core API
-   proposals CA-1 to CA-6, the minimal surface's MS-D1 to MS-D6, and `refresh()` retired (all
-   §1.11 and §1.12); a later round of API proposals (api-surface-rulings.md, "Not ruled yet").
-5. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
+**Next, in order** (as of 2026-11-05, the nine API surface rulings built on `api-surface-rulings-review`):
+1. **A diagram run records the plant's input by default** (§1.11, ruled 2026-11-06,
+   [signals-from-the-run.md](signals-from-the-run.md)). Cleared to start.
+2. **The decisions waiting for the maintainer** before their rows can start: the core API
+   proposals CA-1, CA-2 and CA-5, the minimal surface's MS-D1 to MS-D6, `refresh()` retired and
+   a later round of API proposals (all §1.11 and §1.12).
+3. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
    merge to `main`, `0.4.0`.
 
 **How the work flows.**
@@ -134,7 +130,6 @@ maintainer would and logged in the run's record.
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.5 row.
 - [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
-  - one time-interpolation for trajectories and gain schedules;
   - one warm-start helper on the plan `Trajectory`;
   - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
 
@@ -153,8 +148,6 @@ maintainer would and logged in the run's record.
   - **Read by the loop lane:**
     - the automatic `dt` as `auto_dt(sys)` in `time_grid.py`, with the discontinuous scale made
       finer or DESIGN's promise dropped (the duplicated constant goes with it);
-    - the forced-input hold as one `input_interp` option every solver obeys (its sampled side
-      is S75; today the automatic solver choice changes the hold model);
     - what `n_steps` counts on each verb.
   - **The rest, which no pillar reads and which reviewer C §3.2 would return to standing
     work:**
@@ -282,44 +275,32 @@ commit per proposal, its callers and DESIGN in the same change.
   y_dependencies=)` as `DynamicSystem` and `StepSystem` do. Done when the reproducer builds.
 - [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
-- [ ] **Subsystems by name** (CA-3): `diagram.of("plant")` and string ids in `subsystem_id` and
-  `trajectory_of`. Done when both forms return the same block.
-- [ ] **The API surface rulings** (AR-1 to AR-9 in
-  [api-surface-rulings.md](api-surface-rulings.md), ruled 2026-11-05, none built): a
-  distribution's mean one spelling; `evaluate` without `dt` for a sampled controller; two box
-  spellings, `U=` a box; `traj.at(t, name)`; `jacobian` an array everywhere; the start point on
-  `solve` only, the solve time always recorded; `traj.of("plant")` on both loop kinds, with a
-  continuous run recording its signals from its own pass (benchmarked first); one simulate verb,
-  inputs `(m, N)`; two replanning routes, the start-only route removed. One branch, one commit per
-  ruling, the plan doc's checks. Done when each ruling's contract is in DESIGN and the plan doc is
-  deleted.
+- [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
+  public-surface scan, after its nine rulings landed; each needs its own context and options
+  before a ruling): the planner's shortcuts taking the solution's names (`plot_solution` →
+  `plot_trajectory`; `get_controller` and `value_at`; student-facing); training budgets
+  `n_episodes` and `n_timesteps` (RULES 2.7); workflow keywords on constructors;
+  `problem.compile()` always returning the evaluator, the step face from
+  `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the
+  evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
+  `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
+  a result object for `pv.solve`. Done when the maintainer rules on each.
+- [ ] **A diagram run records the plant's input by default** (ruled 2026-11-06, replacing the
+  2026-11-05 few-percent bar; design: [signals-from-the-run.md](signals-from-the-run.md)):
+  `record="plant"` the default on every diagram run, `None` nothing, a tuple of names (nested
+  paths), `"all"`; a fixed-step run records from its step's own first stage, an adaptive run by
+  a pass at the saved samples inside the `Simulator` on the run's numbers; the sampled loop on
+  the same spelling. Done when `traj.of("plant")` is complete on every default diagram run, the
+  unrecorded run is byte-identical and as fast as on `dev` (the A/B of the plan), and the
+  contract is in DESIGN with the plan doc deleted.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
-  contract DESIGN §4 "Parameters"; each small, each byte-identical on
-  `benchmarks/params_baseline.py`):
-  - the problem evaluator's frozen form: it snapshots at its compile but always runs its tree
-    as an argument;
-  - a planner's method numbers and seed as views of its tree (they are attributes today, so
-    `planner.params["method"]` is a fresh view, `solve(params=)` their route);
-  - the problem's internal helpers (`parts_view`, `sample_params`, `nominal_plant_params`,
-    `drawn_paths`) folded into its held tree;
-  - a union's members and a scene's obstacles keyed by id, else class name numbered, rather
-    than by position (it changes a recorded tree's keys).
-  Done when each has landed or been dropped.
-- [ ] **No cache left** (DESIGN §4 rule 6, "Minilink keeps no cache"; the trajectory planner's
-  saved program and its transcription's held plant went 2026-11-05). Hidden state that decides
-  by itself when to rebuild, keyed on an identity or a digest, still lives in:
-  - the problem evaluator: its run and trial functions jitted again when a problem part is
-    replaced (`planning/evaluator.py`, `problem_parts`/`replaced`), and the failure cost kept
-    under a numbers key and a digest of the live boxes (DESIGN "once per value (cached)");
-  - value iteration: `_G`, `_jax_cache`, `_cached_numbers` and `forget_stale_caches`
-    (`dp.py`, `dp_jax.py`), keyed on option numbers, so a cost edit inside the problem is not
-    seen; its transition tables are built at construction (a held tool, to say so);
-  - `analysis/lyapunov.py`: jitted forms keyed on a digest of the point;
-  - `TrajectoryOptimizationPlanner.compile_parametric_program`, a second held program on the
-    planner, goes with the start-only route (the core API proposals' replanning ruling).
-  Each: rebuilt in the convenience verb, or snapshotted at the held tool's build. Also: one
-  planner solve compiles its plant up to three times (transcribe, read-back, iterate history),
-  once would do. Done when no identity or digest key decides a rebuild.
+  contract DESIGN §4 "Parameters"). Three of its four landed (the problem evaluator was found to
+  run its tree as an argument already, its run jitted on the tree; a planner's method numbers and
+  seed are views of its tree; an intersection's, a union's and a scene's members are keyed by
+  class name, a repeat numbered). Left, deferred in the rulings run (it spans twelve modules and
+  moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
+  `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
+  been dropped.
 - [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
   diagram's re-stacks the state layout after a block's state size changes, the sampled view and
   the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)
@@ -328,10 +309,6 @@ commit per proposal, its callers and DESIGN in the same change.
   now). Done when the maintainer picks and the sites follow.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
   import from `minilink.core`.
-- [ ] **The textbook derivative names on the program evaluator** (CA-6): `grad_J`, `hess_J`,
-  `jac_h`, `jac_g` beside today's names, or instead of them (a choice, RULES 2.7). Done when
-  one name per derivative is on the surface.
-
 ### 1.12 The minimal surface
 
 Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, CI and
@@ -526,9 +503,9 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
   instead of raising, with `link_lengths` the base contract (scan: dynamics#7).
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
-- [ ] **planning** (T5): `trajectory_optimization/planner.py` probes
-  `getattr(transcription, "supports_parametric", False)`; `direct_collocation.py` /
-  `shooting.py` / `multiple_shooting.py` read `self.options.*` inside their bodies.
+- [ ] **planning** (T5): `direct_collocation.py` / `shooting.py` / `multiple_shooting.py`
+  read `self.options.*` inside their bodies (the planner's parametric probe went with the
+  start-only replanning route).
   `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
   method table went with OPW-1, in the v0.3 run.)
 - [ ] **the MPC block's contract** (T6): answered by the compiled face (DESIGN §6);
@@ -1032,7 +1009,7 @@ One line each; open a plan doc only when a design needs a writeup.
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
 - Multiple shooting with the problem's parameters: shooting and collocation take the
-  parametric program's tree; `MultipleShootingTranscription.transcribe_parametric` refuses.
+  program's tree on the compiled face; multiple shooting does not yet.
 - A training run that rebinds its numbers: the RL planner's `params` is a report
   today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.

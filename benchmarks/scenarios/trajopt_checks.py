@@ -85,7 +85,6 @@ def run_showcase_cartpole_trajopt(
             "ftol": SHOWCASE_TRAJOPT_FTOL,
             "disp": False,
         },
-        record_solve_time=True,
         verbose=False,
     )
 
