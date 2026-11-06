@@ -293,6 +293,43 @@ def test_an_open_path_stops_at_its_end_instead_of_wrapping():
     assert delta[0] == pytest.approx(0.0, abs=1e-9)
 
 
+# The drawing
+
+
+def test_the_target_is_the_first_waypoint_a_lookahead_away():
+    """``target`` returns the waypoint the steer is computed from."""
+    straight = straight_path(n_points=101)
+    tracker = PurePursuit(
+        straight, wheelbase=WHEELBASE, lookahead=1.0, lookahead_gain=0.0
+    )
+    offset = 0.25
+
+    target = tracker.target(np.zeros(0), state_at(0.0, offset, 0.0, 2.0))
+
+    reach = np.hypot(straight[:, 0], straight[:, 1] - offset)
+    assert np.array_equal(target, straight[np.argmax(reach >= 1.0)])
+
+
+@pytest.mark.parametrize("rear_offset", [0.0, 0.17])
+def test_the_drawn_arc_runs_from_the_rear_axle_to_the_target(rear_offset):
+    """Off the end stops, the drawn arc starts at the rear axle and ends on the target."""
+    tracker = PurePursuit(
+        circle_path(3.0), wheelbase=WHEELBASE, rear_offset=rear_offset
+    )
+    state = state_at(3.0 + 0.2, 0.0, 0.5 * np.pi + 0.1, 2.0)
+
+    arc, aim = tracker.get_dynamic_geometry(np.zeros(0), state)["world"]
+    target = tracker.target(np.zeros(0), state)
+
+    rear_axle = state[0:2] - rear_offset * np.array(
+        [np.cos(state[2]), np.sin(state[2])]
+    )
+    assert abs(tracker.ctl(np.zeros(0), state)[0]) < tracker.params["delta_max"]
+    assert np.allclose(arc.pts[0, :2], rear_axle, atol=1e-12)
+    assert np.allclose(arc.pts[-1, :2], target, atol=1e-9)
+    assert np.allclose(aim.pt[:2], target)
+
+
 # Backends
 
 
