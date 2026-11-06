@@ -37,6 +37,7 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
+| A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
 | The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
@@ -238,6 +239,22 @@ Design: [native-optimizers.md](native-optimizers.md) §7.
   `ModelPredictiveController(planner, inputs={"x0": "y", "plant.mu": "mu_hat"})`
   Done when the example runs as a demo and
   its plan follows a moved `mu_hat` without a recompile.
+
+- [ ] **A demo: an MPC's hyperparameter tuned by minilink's native methods** **[ask]** (design
+  first): a script that tunes an MPC (or MPPI) hyperparameter on a closed loop richer than the
+  pendulum of `examples/demos/compile/native_mpc_tuning.py` (which tunes a native planner's cost
+  weights by gradient), through the evaluator's program (`problem.compile(mpc % dt)`,
+  `evaluator.program(wrt, bounds=, n_trials=)`) and minilink's own optimizers, no external
+  solver needed. The first attempt (the maintainer's MPPI temperature on the dynamic racecar,
+  removed 2026-11-06) shows the points to design: the solver (Ipopt was assumed; the SLSQP
+  fallback stopped on "Inequality constraints incompatible" and the tuned temperature scored
+  worse than its start), the cost of each evaluation (a JAX MPPI lap took about 76 s of solve
+  for 8 iterations), a hyperparameter with a clear effect on the score, and a gradient through
+  the loop or a derivative-free search, depending on the planner (MPPI's sampling). Options for
+  the maintainer: the planner (native trajectory optimization or MPPI), the plant (racecar lap,
+  cart-pole), the hyperparameter (temperature, horizon, weights). Done when the script runs
+  headless in its time budget, the tuned score beats the start, and its README row says what
+  it teaches.
 
 ### 1.8 The native proof of concept: the planner's pure face and an MPC on it
 
