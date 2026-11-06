@@ -27,17 +27,6 @@ lands. Last checked against the code: 2026-11-05.
 - **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
   ruling of 2026-11-05 (DESIGN §4, "Parameters", rule 5).
 
-## Planning and learning
-
-### Direct collocation fails on a ball-shaped goal set
-- **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
-  problem whose `Xf` is a `BallSet` stops with SLSQP's "Inequality constraints
-  incompatible"; a point `Xf` solves. A failed solve still returns its initial guess as an
-  open-loop policy, and `compare` scores it like a solution.
-- **Workaround:** `problem.replace(Xf=SingletonSet(x_goal))` for the trajectory optimizer;
-  check `solution.success` before comparing.
-- **Fix:** none planned yet.
-
 ## Tooling
 
 ### The RL-to-Bode showcase notebook runs close to the notebook checker's time limit
