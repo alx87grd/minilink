@@ -106,12 +106,13 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
 def compile_auto(system, verbose=False):
     """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
 
-    Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
+    Returns ``(backend, evaluator)``. Three verdicts fall back to NumPy: a block
+    of ``system`` prefers it (:attr:`~minilink.core.system.System.prefers_numpy`),
     JAX cannot be imported, or the system is "not JAX-traceable"; any other
     error from the JAX compile surfaces.
     """
 
-    if jax_installed():
+    if jax_installed() and not holds_numpy_preferred(system):
         try:
             return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
         except ImportError:
@@ -120,6 +121,17 @@ def compile_auto(system, verbose=False):
             if "JAX-traceable" not in str(exc):
                 raise
     return BACKEND_NUMPY, compile(system, backend=BACKEND_NUMPY, verbose=verbose)
+
+
+def holds_numpy_preferred(system) -> bool:
+    """Whether ``system``, or a block nested in it, prefers NumPy under ``backend="auto"``."""
+    if system.prefers_numpy:
+        return True
+
+    return any(
+        holds_numpy_preferred(block)
+        for block in getattr(system, "subsystems", {}).values()
+    )
 
 
 def compile_diagram(

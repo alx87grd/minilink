@@ -86,6 +86,11 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     #: Whether the block draws random numbers from a seed in its ``params``.
     is_random = False
 
+    #: Whether ``backend="auto"`` compiles a system holding the block with NumPy even
+    #: when it traces: a block faster there than through JAX's compile at the sizes it
+    #: serves (a lookup table). ``backend="jax"`` still compiles it with JAX.
+    prefers_numpy = False
+
     def __init__(self, n=0):
         """
         Initialize the system with ``n`` continuous states (default 0).

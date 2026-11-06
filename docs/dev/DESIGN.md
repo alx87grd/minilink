@@ -844,7 +844,11 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `params` are `{"levels", "values"}` and, as given, `t` and `outside`; its gradient is the
   cell's exact multilinear one. The cell reading is one function (`grid_value`), which
   `LookupPolicy` shares for its command table (extending the edge cell past the grid, then
-  clipping `u`). Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
+  clipping `u`); the reading takes its table into the point's array module, so the lookup law
+  traces (a JAX closed loop runs it with `backend="jax"`). It declares `prefers_numpy`: one
+  table lookup per call is faster on NumPy than through JAX's compile at the sizes it serves,
+  so `backend="auto"` (`compile_auto`) keeps a system holding it on NumPy (ruled 2026-11-06).
+  `System.prefers_numpy` is that one class attribute, `False` by default. Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`

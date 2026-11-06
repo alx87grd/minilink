@@ -688,6 +688,7 @@ def grid_value(levels, table, X, *, nearest=False):
     array module.
     """
     xp = array_module(X, table)
+    table = xp.asarray(table)
     n = len(levels)
 
     # A stack's weights take one axis per trailing axis of the table, to multiply its
@@ -731,6 +732,7 @@ def grid_value(levels, table, X, *, nearest=False):
 def grid_gradient(levels, table, X):
     """``∂V/∂x`` of the multilinear form of the cell holding each point of ``X`` (``(n,)`` or ``(M, n)``): one entry per axis, last."""
     xp = array_module(X, table)
+    table = xp.asarray(table)
     n = len(levels)
 
     # The cell and the position in it on each axis, and the cell's width

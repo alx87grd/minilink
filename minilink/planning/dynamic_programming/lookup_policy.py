@@ -39,6 +39,10 @@ class LookupPolicy(System):
 
     INTERPOLATIONS = ("linear", "nearest")
 
+    # One table lookup per call: NumPy beats JAX's compile at the grids it serves, so
+    # backend="auto" keeps NumPy; backend="jax" traces it
+    prefers_numpy = True
+
     def __init__(self, grid, pi, *, interpolation: str = "linear") -> None:
         require_interpolation(interpolation, self.INTERPOLATIONS)
 
