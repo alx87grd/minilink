@@ -77,12 +77,36 @@ maintainer would and logged in the run's record.
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-06, the nine API surface rulings built on `api-surface-rulings-review`, the recording ruling on `signals-from-the-run` stacked on it):
-1. **The decisions waiting for the maintainer** before their rows can start: the core API
-   proposals CA-1, CA-2 and CA-5, the minimal surface's MS-D1 to MS-D6, `refresh()` retired and
-   a later round of API proposals (all §1.11 and §1.12).
-2. **The release** (§1.10) once the surface holds: the course notebooks on the new names, the
-   merge to `main`, `0.4.0`.
+**Next, in order** (as of 2026-11-06). One rule orders v0.4: what changes a public name or a
+behaviour lands first, so the demos, notebooks and tests are redrafted once, on the settled
+surface, and the student-facing numbers are re-pinned once, at the release. Additive work that
+breaks nothing goes last and may follow the tag.
+
+0. **The decisions waiting for the maintainer**, in parallel with phases 1 to 4 (the
+   agent does not wait on them): the core API proposals CA-1, CA-2 and CA-5, the later round of
+   API proposals and `refresh()` (§1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
+   root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
+   Each ruling unblocks its row in phase 3 or 5.
+1. **The planners' math and fields** (§1.8, plans as policies, change 1; ruled): the pure
+   cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
+   discounted LQR. First because it changes a public shape (`solution.cost_to_go` becomes a
+   `Field`) and fixes a known issue, while the tables stay byte-identical.
+2. **Value iteration's finite horizon** (§1.8, change 2; ruled): the two modes, the law past
+   the horizon for both planners, the three examples migrated. A behaviour change: before the
+   notebooks' redraft.
+3. **The core API proposals as ruled** (§1.11): CA-1, CA-2, CA-5, the later round's rulings,
+   `refresh()`, and the parameters model's internal follow-up (no number moves). Names: before
+   the redraft.
+4. **The core's small leftovers** (§1.1, §1.2, §1.6, §1.7, and §1.13's two quirks), each
+   independent; any of them that renames a public name lands before phase 5.
+5. **The surface redrafted on the settled names**: the minimal surface (§1.12: the test
+   layers, the demo set with the maintainer's pass K4, the notebooks, the benchmarks), the root
+   exports (§1.13), the clean-up lane (§2: K8, K9, G3's pins, the car family's time constant).
+6. **The release** (§1.10): the student-facing numbers re-pinned once, the course notebooks on
+   the new names, the PR from `dev` to `main`, `0.4.0`; the cart-pole RL demo re-measured.
+7. **The faces and the MPC protocol** (§1.8, change 3; ruled): additive (no name breaks, the
+   open-loop loops byte-identical), so it lands before the tag if it is ready, else in a 0.4.x
+   or with the RL and RRT faces in v0.5 (§4).
 
 **How the work flows.**
 - **Status:** [ROADMAP §5.4](../dev/ROADMAP.md#54-v04--the-clean-surface). v0.3 shipped as
@@ -220,34 +244,43 @@ Design: [native-optimizers.md](native-optimizers.md); the face and the MPC's con
 DESIGN §6. Better
 solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
 
-- [ ] **Plans as policies** (design and rulings of 2026-11-06:
-  [plans-as-policies.md](plans-as-policies.md), its steps `PP-1` to `PP-7`; it absorbs the
-  compiled face of the LQR and value-iteration planners, value iteration on a finite horizon
-  (formerly S63, v0.5) and the part of the field object the two planners need). The faces of
-  the trajectory-optimization and MPPI planners, the MPC as one box on them and its closed
-  loop tuned by gradient landed in the v0.3 runs; the RL and RRT faces stay with their v0.5
-  rows, on the same contract. Two changes, in order:
-  - **contract, pure cores, fields** (`PP-1` to `PP-3`): done when the face contract is in
-    DESIGN §6; `bellman_backup` and `lqr_matrices` open their files and the planners call them,
-    the seeded value-iteration and LQR baselines `cmp` byte-identical; `GridField` is in
-    `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
-    iteration's `cost_to_go`, `QuadraticField` LQR's; each number move of the plan's `PP-3`
-    has its own test; `test_planning_solution.py`,
-    `test_dynamic_programming.py`, `test_lqr_planner.py` and the GRO860 value-iteration
-    notebooks pass;
-  - **the two modes, the MPC, the faces** (`PP-4` to `PP-7`; the reviews' decisions ruled,
-    `PP-D13` to `PP-D17`): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
-    with a time-varying law and `J(x, t)`, its `J_0` equals `solve_steps(N)`'s, and LQR and
-    value iteration agree on the finite-horizon double integrator; the infinite mode stays
-    byte-identical; the MPC and the follower read the state, the open-loop loops
-    byte-identical; `pv.solution(pv.solve(p)[0])` equals `planner.solve()` on the fields of the
-    plan's §8 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py`
-    covers the two faces; DESIGN §4 and §6 carry the landed contracts and the plan doc is
-    deleted.
-  - **Later, the maintainer's own pass:** the GRO860 notebooks' wording on `solve_steps`
-    (`grid_world_dynamic_programming.ipynb`, `double_integrator_minimum_time.ipynb` §4) when the
-    course is next taught: after this work the time-varying finite-horizon law is `solve()` on
-    `horizon = N dt`; their cells and plots are unchanged (`PP-D17`).
+**Plans as policies** (design, rulings `PP-D1` to `PP-D17` and steps `PP-1` to `PP-9`:
+[plans-as-policies.md](plans-as-policies.md)). It absorbs the compiled face of the LQR and
+value-iteration planners, value iteration on a finite horizon (formerly S63, v0.5) and the
+part of the field object the two planners need. The faces of the trajectory-optimization and
+MPPI planners, the MPC as one box on them and its closed loop tuned by gradient landed in the
+v0.3 runs; the RL and RRT faces stay with their v0.5 rows, on the same contract. Three changes,
+each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
+
+- [ ] **The planners' math and fields** (`PP-1` to `PP-3`): done when `bellman_backup` and
+  `lqr_matrices` open their files and the planners call them, the seeded value-iteration and
+  LQR baselines `cmp` byte-identical (NumPy, loop and JAX engines); `GridField` is in
+  `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
+  iteration's `cost_to_go` (the failure cost outside the grid), `QuadraticField` LQR's; each
+  number move of the plan's `PP-2` has its own test; discounted LQR solves on `A − (ρ/2) I`
+  with its warning and agrees with value iteration on a discounted double integrator (its known
+  issue deleted); `test_planning_solution.py`, `test_dynamic_programming.py`,
+  `test_lqr_planner.py` and the GRO860 value-iteration notebooks pass; DESIGN §4 and §6 say what
+  landed.
+- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`): done when `solve()` on a
+  finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, its `J_0`
+  equals `solve_steps(N)`'s and its stage-`i` law `solve_steps(N − i)`'s, and LQR and value
+  iteration agree on the finite-horizon double integrator; past the horizon LQR's finite law
+  applies `K∞` at its final operating point and value iteration's its stage 0 (the `h = 0`
+  case tested); the infinite mode stays byte-identical; the README comparison, the showcase and
+  the optimal-control tutorial say their intent and run; every demo calling `solve_steps` runs;
+  DESIGN §6 carries the two modes.
+- [ ] **The faces and the MPC protocol** (`PP-7` to `PP-9`): done when the MPC and the
+  follower read the state for a feedback face (`pv.feedback`), the open-loop loops
+  byte-identical (`mpc_dual_rate.py`, `test_mpc.py`, `test_v03_core.py`, the MPC parity
+  benchmark); `pv.solution(pv.solve(p)[0])` equals `planner.solve()` on the fields of the plan's
+  §8 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py` covers the
+  two faces; LQR and value iteration close in the dual-rate loop (and the MPC loop where `z` fits
+  a tick); DESIGN §6 carries the contract and the plan doc is deleted.
+- **Later, the maintainer's own pass:** the GRO860 notebooks' wording on `solve_steps`
+  (`grid_world_dynamic_programming.ipynb`, `double_integrator_minimum_time.ipynb` §4) when the
+  course is next taught: after this work the time-varying finite-horizon law is `solve()` on
+  `horizon = N dt`; their cells and plots are unchanged (`PP-D17`).
 
 ### 1.9 Fields
 
@@ -257,7 +290,7 @@ No open row: `Field`, `QuadraticField` and the four conversions landed in the v0
 (acceptance script 7).
 
 `GridField` and the cost-to-go of LQR and value iteration as fields are §1.8 (plans as
-policies). The rest of the field object (`CallableField`, `LinearApproximator`, tabular RL's
+policies, its first change). The rest of the field object (`CallableField`, `LinearApproximator`, tabular RL's
 `Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4, after the core.
 
 ### 1.10 Hardening and the release

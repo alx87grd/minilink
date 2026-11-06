@@ -3,8 +3,10 @@
 Status: written 2026-11-06 from the maintainer's design session (rulings `PP-D1` to `PP-D12`,
 §9), then consolidated the same day after two independent reviews (one on the code and the
 contracts, one on the control theory and the user API); what the reviews changed is §11; the
-decisions they raised were ruled the same day (`PP-D13` to `PP-D16`), one stays open (§10). Lane: core. The rows: [TODO.md](TODO.md) §1.8 ("Plans as
-policies"); the order of work and each step's "done when" live there. Contracts in code today:
+decisions they raised were ruled the same day (`PP-D13` to `PP-D17`), and none is open. On
+2026-11-06 the steps were re-sliced into three changes ordered by value (§12). Lane: core.
+The rows: [TODO.md](TODO.md) §1.8, three rows, one per change; the order of work and each
+change's "done when" live there. Contracts in code today:
 [DESIGN.md](../dev/DESIGN.md) §4 ("Fields") and §6 (the compiled face, the MPC).
 
 **Why this doc.** The compiled face of the LQR and value-iteration planners was a v0.4
@@ -29,7 +31,9 @@ a plan is a policy, finite or infinite in time, with its cost-to-go a field.
 ## 1. The goal
 
 One interface that any planner fits, checked by one conformance test: every planner's face
-closes in the MPC loop and in the dual-rate loop without a special case.
+closes in the dual-rate loop, and every face whose `z` fits a tick closes in the MPC loop,
+without a special case (a finite value-iteration plan, whose `z` is the stacks, closes in the
+follower only, §3).
 
 1. **A plan is a policy.** Whatever a planner computes, its plan `z` gives the command at a
    state and a time, `u = command(z, x, t)`. An open-loop plan ignores `x`; a feedback plan
@@ -272,7 +276,11 @@ keywords passed through.
 
 - **The discount rate** (`PP-D16`): on `e^{−ρt}`-discounted costs the planner solves the
   textbook equivalent, the undiscounted problem on `A − (ρ/2) I` (the finite sweep too), and
-  warns once that the problem is discounted (unusual for LQR), naming the shift.
+  warns once that the problem is discounted (unusual for LQR), naming the shift. The
+  equivalence holds as the problem weighs its terms: the running cost by `e^{−ρ(t − t0)}` and
+  the terminal cost by `e^{−ρT}` (`problems.py`'s cost bound reads it so); with
+  `x̃ = e^{−ρ(t − t0)/2} x`, `ũ = e^{−ρ(t − t0)/2} u`, the terminal weight `S` is unchanged and the
+  law `u = −K(t) x` is the same. A test checks it against value iteration.
 - **The time origin:** the finite schedule is computed on `0 … T` and read relative to `t0`
   (`K(t − t0)`); the solution's `TimeVaryingFeedback` and `QuadraticField(x̄, S, t)` carry the
   absolute times `t0 + s`. This was an open point; it is the only consistent reading.
@@ -371,7 +379,7 @@ built here.
   binding `{"x0": "y"}`, the measurement). An MPC on a feedback face refuses to build without an
   `x0` binding. A predictor bound to `x0` feeds the solve; the command reads the same port, so a
   user who wants the law on the raw measurement binds it there and puts the predictor on the
-  solve's own port (the worked snippet goes in DESIGN with `PP-5`).
+  solve's own port (the worked snippet goes in DESIGN with `PP-7`).
 - **With `delay=True`:** the delayed plan meets the current measurement (the law of the plan
   solved at `k − 1`, applied to `x̂_k`).
 - **The follower:** `PlanFollower` gains a measurement input `y` only when `pv.feedback` is
@@ -395,7 +403,8 @@ workflow, outside the comparison.
 
 - `PP-D1` **The contract** of §3: two axes (open loop or feedback; stationary or
   time-varying); `command(z, x, t)` always receives the state; a time-varying `z` carries `t0`;
-  the test is that every planner closes in the MPC loop.
+  the test is that every planner closes in the dual-rate loop, and in the MPC loop when its
+  `z` fits a tick (§1).
 - `PP-D2` **Value iteration supports both horizons**, chosen by the problem; the finite
   horizon (formerly S63, v0.5) moves to this work. The three examples of §2 migrate (`PP-D13`).
 - `PP-D3` **The policy stays in `z`** (as the command table, §4.5).
@@ -478,32 +487,42 @@ The agent's to settle, recorded here:
 - §7: which state the command reads; the follower's measurement input and its wiring.
 - §8: the fields "equal to `planner.solve()`" compares.
 - §12: the MPC and follower wiring land before the faces; the shared reading's change to the
-  law gets its own test.
+  law gets its own test; re-sliced on 2026-11-06 into three changes ordered by value.
 
-## 12. Steps and the split
+## 12. Steps, in three changes ordered by value
 
-Local steps; the order of work and "done when" are TODO §1.8's.
+Local steps; the order of work and each change's "done when" are TODO §1.8's. Re-sliced on
+2026-11-06: the work users feel (the readable math, the fields, the finite horizon, the LQR
+fixes) comes first; the faces and the MPC protocol, additive and with the least practical
+payoff (§1: the two methods do not read the measured state, and their faces run on the host),
+come last. Each change merges on its own.
 
-**First change: contract, pure cores, fields** (the sweeps' tables byte-identical; the moves
-listed are the field's, each with its own test):
-- `PP-1` The contract in DESIGN §6 (§3's two tables, §7, §8).
-- `PP-2` `bellman_backup` (with its `arrival` reader, NumPy and JAX) and `lqr_matrices` lifted
-  out, the planners calling them: seeded baselines byte-identical.
-- `PP-3` The shared grid reading; `GridField` in `core/fields.py`; value iteration's and LQR's
-  `cost_to_go` as fields; `quadratic_cost_to_go` removed. Number moves, each tested: the
-  cost-to-go read natively (about `1e-16` inside the grid), the cost-to-go outside the grid
-  (`PP-D15`), the lookup law if the shared reading changes it anywhere.
+**Change 1: the math and the fields** (no table moves; each field move has its own test):
+- `PP-1` `bellman_backup` (with its `arrival` reader, NumPy and JAX) and `lqr_matrices` first in
+  their files, the planners calling them: seeded baselines byte-identical.
+- `PP-2` The shared grid reading; `GridField` in `core/fields.py`; value iteration's and LQR's
+  `cost_to_go` as fields (`PP-D15` outside the grid); `quadratic_cost_to_go` removed. Number
+  moves, each tested: the cost-to-go read natively (about `1e-16` inside the grid), the
+  cost-to-go outside the grid, the lookup law if the shared reading changes it anywhere.
+- `PP-3` Discounted LQR (`PP-D16`): the shifted `A`, the warning, the test against value
+  iteration on a discounted double integrator; the known issue closes.
+- DESIGN §4 ("Fields") and §6 ("RRT / DP") carry what landed.
 
-**Second change: the two modes, the MPC, the faces:**
+**Change 2: the finite horizon** (a behaviour change; the infinite mode byte-identical):
 - `PP-4` Value iteration's finite mode: the stacks, `LookupPolicy`'s schedule, `J(x, t)`, the
-  JAX scan, the record's `mode`, `solve_steps` documented, the size limit; the three examples
-  migrated (`PP-D13`); tests: the finite mode against `solve_steps`, LQR and value iteration
-  agreeing on the finite-horizon double integrator, the `h = 0` case past `tf` (`PP-D14`), the
-  stage index on float ticks; every demo calling `solve_steps` run.
-- `PP-5` The MPC and the follower read the state (`pv.feedback`, the `x0` binding, the
-  follower's `y`): open-loop loops byte-identical; the dual-rate snippet and its test.
-- `PP-6` The two compiled faces: §8's comparison in both modes, NumPy and JAX;
-  `test_no_recompile.py` extended; LQR and value iteration (infinite in the MPC loop, both modes
-  in the follower) closing; the discounted LQR of `PP-D16` (its warning, and against value iteration on a discounted double integrator).
-- `PP-7` DESIGN §4 and §6, ROADMAP's ledger rows, TODO, KNOWN_ISSUES for anything left; this
-  doc deleted once landed.
+  JAX scan, the record's `mode`, `solve_steps` documented, the size limit.
+- `PP-5` The law past the horizon for both planners (`PP-D14`): `K∞` at the final operating
+  point in LQR's finite law (`K_after`), value iteration's stage 0.
+- `PP-6` The three examples migrated (`PP-D13`); tests: the finite mode against `solve_steps`,
+  LQR and value iteration agreeing on the finite-horizon double integrator, the `h = 0` case
+  past `tf`, the stage index on float ticks; every demo calling `solve_steps` run.
+- DESIGN §6 carries the two modes.
+
+**Change 3: the faces and the MPC protocol** (additive: no public name breaks, the open-loop
+loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
+- `PP-7` The MPC and the follower read the state (`pv.feedback`, the `x0` binding, the
+  follower's `y`); the dual-rate snippet and its test.
+- `PP-8` The two compiled faces: §8's comparison in both modes, NumPy and JAX;
+  `test_no_recompile.py` extended; the conformance loops of §1.
+- `PP-9` The contract of §3, §7 and §8 into DESIGN §6 (written when it lands, DESIGN holding
+  landed contracts only); ROADMAP's ledger rows; this doc deleted.
