@@ -29,15 +29,6 @@ lands. Last checked against the code: 2026-11-05.
 
 ## Planning and learning
 
-### `LQRPlanner` ignores the problem's discount rate
-- **Symptom:** `LQRPlanner(PlanningProblem(plant, cost=cost, discount_rate=2.0)).solve()` returns
-  the same gain `K` and cost-to-go as the undiscounted problem: the planner never reads
-  `discount_rate`, so its law and its `cost_to_go` are not the discounted problem's.
-- **Workaround:** solve the undiscounted equivalent by hand: the gain of `(A − (ρ/2) I, B, Q, R)`
-  (`lqr_gain` on `planner.linear_model()`'s `A`, shifted).
-- **Fix:** plans as policies, TODO §1.8 ([plans-as-policies.md](../plans/plans-as-policies.md)
-  §5.2), ruled `PP-D16`: the shifted `A`, with a warning on a discounted problem.
-
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
   problem whose `Xf` is a `BallSet` stops with SLSQP's "Inequality constraints

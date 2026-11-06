@@ -1243,12 +1243,15 @@ one scale; `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
 and one backend (NumPy for all when one entry does not trace), and `difference(a, b)` is
 the paired `J_a − J_b`. `LQRPlanner
-(problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
-`B` at the cost's `(x_bar, u_bar)`, the algebraic Riccati equation for an
-infinite `tf`, the differential one swept from `S` for a finite `tf`; its
-`RiccatiRecord` holds `K`, `P`, the closed-loop poles (success = Hurwitz) and
-the finite-horizon schedule. `control.design` stays the array-in / block-out
-factory the planner calls.
+(problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
+first function of `lqr.py`, lowers it to `(A, B, Q, R, S)` at the cost's `(x_bar, u_bar)`
+(`B` and `R` over the command port), then the algebraic Riccati equation for an
+infinite `tf`, the differential one swept from `S` for a finite `tf`. A discounted problem
+(`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
+`A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
+unusual; the poles stay the plant's, `eig(A − B K)`. Its `RiccatiRecord` holds `K`, `P`, the
+closed-loop poles (success = Hurwitz) and the finite-horizon schedule. `control.design` stays
+the array-in / block-out factory the planner calls.
 
 **Horizon and the constraint set:** the horizon has one owner, `problem.horizon` — a
 finite length is a finite horizon and `h` is charged at `t0 + horizon`; `+inf` or unset is an

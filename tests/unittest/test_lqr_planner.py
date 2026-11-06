@@ -4,13 +4,21 @@ import numpy as np
 import pytest
 from scipy.linalg import solve_continuous_are
 
-from minilink import LQRPlanner, Pendulum, PlanningProblem, QuadraticCost
+from minilink import (
+    DoubleIntegrator,
+    DynamicProgrammingPlanner,
+    LQRPlanner,
+    Pendulum,
+    PlanningProblem,
+    QuadraticCost,
+)
 from minilink.control.design import lqr_gain, lqr_gain_schedule
 from minilink.control.state import (
     StateFeedback,
     TimeVaryingFeedback,
 )
 from minilink.core.costs import TimeCost
+from minilink.core.sets import BoxSet
 from minilink.planning.dynamic_programming.lqr import RiccatiRecord
 
 UPRIGHT = np.array([np.pi, 0.0])
@@ -136,3 +144,60 @@ def test_evaluate_rolls_out_and_scores_and_the_loop_balances_the_pendulum():
     loop = solution.policy @ plant
     traj = loop.compute_trajectory(tf=6.0, verbose=False)
     np.testing.assert_allclose(traj.x[:, -1], UPRIGHT, atol=1e-3)
+
+
+# A discounted problem
+
+
+def discounted_double_integrator(rho):
+    plant = DoubleIntegrator()
+    cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1))
+    return PlanningProblem(
+        plant,
+        cost=cost,
+        X=BoxSet([-1.0, -1.0], [1.0, 1.0]),
+        U=BoxSet([-2.0], [2.0]),
+        discount_rate=rho,
+    )
+
+
+def test_a_discounted_problem_solves_the_discounted_riccati_equation_and_warns():
+    rho = 1.0
+    with pytest.warns(UserWarning, match="discounted"):
+        solution = LQRPlanner(discounted_double_integrator(rho)).solve()
+    A = np.array([[0.0, 1.0], [0.0, 0.0]])
+    B = np.array([[0.0], [1.0]])
+    P = solution.record.P
+    K = solution.record.K
+
+    # Aᵀ P + P A − ρ P − P B R⁻¹ Bᵀ P + Q = 0, the discounted HJB of the quadratic form
+    residual = A.T @ P + P @ A - rho * P - P @ B @ B.T @ P + np.eye(2)
+    np.testing.assert_allclose(residual, np.zeros((2, 2)), atol=1e-10)
+    np.testing.assert_allclose(K, B.T @ P)
+
+    # The poles are the plant's closed loop, eig(A − B K)
+    np.testing.assert_allclose(
+        np.sort_complex(solution.record.poles),
+        np.sort_complex(np.linalg.eigvals(A - B @ K)),
+    )
+
+
+def test_discounted_lqr_agrees_with_value_iteration_where_the_undiscounted_does_not():
+    rho = 1.0
+    with pytest.warns(UserWarning, match="discounted"):
+        lqr = LQRPlanner(discounted_double_integrator(rho)).solve()
+    undiscounted = LQRPlanner(discounted_double_integrator(0.0)).solve()
+    vi = DynamicProgrammingPlanner(
+        discounted_double_integrator(rho),
+        x_grid=(41, 41),
+        u_grid=(41,),
+        dt=0.02,
+        max_iterations=4000,
+        tol=1e-7,
+    ).solve()
+
+    for x in ([0.5, 0.0], [0.0, 0.5], [0.4, -0.4]):
+        x = np.array(x)
+        J_vi = vi.cost_to_go(x)
+        assert lqr.cost_to_go(x) == pytest.approx(J_vi, rel=0.15)
+        assert abs(lqr.cost_to_go(x) - J_vi) < abs(undiscounted.cost_to_go(x) - J_vi)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -156,10 +157,17 @@ class LQRPlanner(Planner):
         sys = problem.sys
         n_steps = self.n_steps
         dt = self.dt
+        rho = problem.discount_rate
 
         # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
         # weights over the command port
         A, B, Q, R, S_f = self.lqr_matrices()
+
+        # An e^{−ρt}-discounted cost is the undiscounted one on A_ρ = A − (ρ/2) I (in
+        # x̃ = e^{−ρt/2} x, ũ = e^{−ρt/2} u, the same law); A_ρ = A undiscounted
+        if rho > 0.0:
+            warn_discounted_lqr(rho)
+        A_rho = A - 0.5 * rho * np.eye(A.shape[0])
 
         # The operating point, ū over the command port: ū[c]
         x_bar = self.x_bar
@@ -168,9 +176,9 @@ class LQRPlanner(Planner):
         if problem.horizon_kind() == "finite":
             tf = problem.require_finite_horizon()
 
-            # −Ṡ = Aᵀ S + S A − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
+            # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t)
-            t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+            t, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, tf, n_steps=n_steps)
 
             # The law u = ū − K(t) (x − x̄)
             policy = TimeVaryingFeedback(t, K, x_bar=x_bar, u_bar=u_bar)
@@ -189,8 +197,8 @@ class LQRPlanner(Planner):
             )
             cost_to_go = QuadraticField(x_bar, S, t)
         else:
-            # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
-            P = care(A, B, Q, R)
+            # A_ρᵀ P + P A_ρ − P B R⁻¹ Bᵀ P + Q = 0
+            P = care(A_rho, B, Q, R)
 
             # K = R⁻¹ Bᵀ P
             K = np.linalg.solve(R, B.T @ P)
@@ -314,6 +322,16 @@ def require_quadratic_cost(cost):
             "g = (x - x_bar)ᵀ Q (x - x_bar) + (u - u_bar)ᵀ R (u - u_bar); "
             f"got {type(cost).__name__}"
         )
+
+
+def warn_discounted_lqr(rho):
+    """Warn that the problem is discounted, unusual for LQR, and how it is solved."""
+    warnings.warn(
+        f"LQRPlanner on a discounted problem (discount_rate={rho:g}): solved as the "
+        "undiscounted problem on A − (ρ/2) I, the textbook equivalent; the closed-loop "
+        "poles are the plant's, eig(A − B K)",
+        stacklevel=3,
+    )
 
 
 def command_block(sys, value):
