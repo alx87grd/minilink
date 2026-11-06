@@ -332,7 +332,7 @@ def plant_run_of(loop, rollout, params=None):
     if op is None:
         return None, None
     plant = getattr(op.system, "source", op.system)
-    if "plant" in rollout.roles:
+    if "plant" in rollout.roles and rollout.roles["plant"]["u"] is not None:
         return plant, rollout.of("plant")
     t0 = float(rollout.t[0])
     n_samples = rollout.t.size

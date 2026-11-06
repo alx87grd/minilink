@@ -81,6 +81,50 @@ class DiagramEvaluator(ContinuousEvaluator):
         dtype = self.dtype_of(x, u)
         return self.port_signals(x, u, t, dtype, params)
 
+    def record_layout(self, record):
+        """
+        ``((name, slice, op), …)`` of the named signals, in the buffer: an output port's slice, or a block's whole input (its state operation's gather).
+
+        ``"block:port"`` is an output port when the block has one by that name;
+        ``"block:u"`` otherwise is the input the diagram feeds the block, every
+        port stacked in port order. A block inside a nested diagram has no slice
+        here (the run reads it after, one level at a time).
+        """
+        outputs = self.plan.output_slices
+        inputs = {op.sys_id: op for op in self.plan.state_ops}
+
+        layout = []
+        for name in record:
+            sys_id, _, port_id = name.partition(":")
+            if (sys_id, port_id) in outputs:
+                layout.append((name, outputs[(sys_id, port_id)], None))
+            elif port_id == "u" and sys_id in inputs:
+                layout.append((name, None, inputs[sys_id]))
+            else:
+                known = [f"{b}:{p}" for b, p in outputs] + [f"{b}:u" for b in inputs]
+                raise KeyError(f"no signal {name!r} to record; the signals are {known}")
+
+        return tuple(layout)
+
+    def first_stage(self, x, u, t, params, layout):
+        """``(k₁, record)``: ``f(x, u, t)`` and the recorded values, from one signal pass."""
+        dtype = self.dtype_of(x, u)
+        signals = self.port_signals(x, u, t, dtype, params)
+
+        k1 = self.dx_from_signals(x, u, t, dtype, params, signals)
+        values = self.recorded_values(layout, signals, u, dtype)
+
+        return k1, values
+
+    def record_at(self, x, u, t, params, layout):
+        """The recorded values at one point ``(x, u, t)``, stacked: the signal pass alone."""
+        dtype = self.dtype_of(x, u)
+        signals = self.port_signals(x, u, t, dtype, params)
+
+        values = self.recorded_values(layout, signals, u, dtype)
+
+        return values
+
     def f_and_block(self, x, u, t, params, sys_id):
         """``(dx, x_b, u_b)``: the loop's ``dx`` and one block's own state and input, from one signal pass."""
         self.require_params(params)
@@ -202,6 +246,29 @@ class DiagramEvaluator(ContinuousEvaluator):
             if inject is not None and op.out_slice == inject[0]:
                 signals = added(xp, signals, op.out_slice, inject[1])
         return signals
+
+    def recorded_values(self, layout, signals, u, dtype):
+        """The record of one signal pass: each named port's slice or block input, stacked."""
+        xp = self.xp
+
+        # NumPy: the pieces gathered in place, as the hot path gathers a block's input
+        if xp is np:
+            pieces = [
+                signals[sl]
+                if op is None
+                else gathered_on_host(op.gather_sources, op.u_dim, signals, u, dtype)
+                for _, sl, op in layout
+            ]
+            return np.concatenate(pieces)
+
+        pieces = [
+            signals[sl]
+            if op is None
+            else gather_u(op.gather_sources, op.u_dim, signals, u, xp, dtype)
+            for _, sl, op in layout
+        ]
+
+        return xp.concatenate([xp.reshape(piece, (-1,)) for piece in pieces])
 
     def dx_from_signals(self, x, u, t, dtype, params, signals):
         """Every block's ``dx`` from the filled signal buffer."""

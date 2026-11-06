@@ -253,7 +253,7 @@ class ContinuousEvaluator(Evaluator):
 
         return x_next
 
-    @compiled(static=("solver", "substeps", "hold", "n_steps"))
+    @compiled(static=("solver", "substeps", "hold", "n_steps", "record"))
     def rollout(
         self,
         x0,
@@ -266,12 +266,18 @@ class ContinuousEvaluator(Evaluator):
         substeps=1,
         hold="zoh",
         n_steps=None,
+        record=(),
     ):
         """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the step model run over ``u_seq``.
 
         ``hold="zoh"`` holds each row of ``u_seq`` (shape ``(N, m)``) over its
         period; ``hold="foh"`` reads ``u_seq`` as ``N + 1`` knots, linear between
         them. ``u_seq=None`` holds the nominal input for ``n_steps`` periods.
+        ``record`` (a diagram's) names signals kept from each step's own first
+        stage, ``"block:port"`` or a block's input ``"block:u"``: the run then
+        returns ``(x_samples, records)``, ``records`` ``(N, r)`` at the start of
+        each period, the names' values stacked (:meth:`record_layout`); the
+        states are the unrecorded run's, bit for bit.
         """
         xp = self.xp
         require_step_knobs(solver, substeps, hold)
@@ -283,12 +289,37 @@ class ContinuousEvaluator(Evaluator):
         ks = self.indices(u_start.shape[0])
 
         # x_{k+1} = Φ(x_k, u_k, t_k), t_k = t0 + k dt
-        def period(x, k, ua, ub):
-            return step_body(f, x, ua, ub, t0 + k * dt, dt, solver, substeps)
+        if not record:
 
-        x_samples = iterate(self, period, x0, (ks, u_start, u_end))
+            def period(x, k, ua, ub):
+                return step_body(f, x, ua, ub, t0 + k * dt, dt, solver, substeps)
 
-        return x_samples
+            x_samples = iterate(self, period, x0, (ks, u_start, u_end))
+
+            return x_samples
+
+        # The same step, its first stage k₁ = f(x_k, u_k, t_k) read off the signal
+        # pass that also gives the record
+        layout = self.record_layout(record)
+
+        def recorded_period(x, k, ua, ub):
+            t_k = t0 + k * dt
+            k1, values = self.first_stage(x, ua, t_k, params, layout)
+            x_next = step_body(f, x, ua, ub, t_k, dt, solver, substeps, k1)
+            return x_next, values
+
+        x_samples, records = iterate(
+            self, recorded_period, x0, (ks, u_start, u_end), records=True
+        )
+
+        return x_samples, records
+
+    def record_layout(self, record):
+        """Refuse a record on a lone block: its signals are its ``x`` and ``u``, already in the run."""
+        raise TypeError(
+            "a lone block's run holds its x and u: record= names the internal "
+            "signals of a diagram"
+        )
 
     def rollout_batch(
         self, x0s, u_sequences=None, *, t0=0.0, dt, n_steps=None, params=None

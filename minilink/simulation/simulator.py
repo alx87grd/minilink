@@ -217,7 +217,7 @@ class Simulator:
     def __str__(self):
         return inspect_text(self)
 
-    def solve(self, *, u=None, input_port_id=None, params=None):
+    def solve(self, *, u=None, input_port_id=None, params=None, record=()):
         """
         Run the simulation over ``self.t``: the nominal input, or ``u`` prescribed.
 
@@ -232,12 +232,21 @@ class Simulator:
         copy, edited), runs on those without a recompile: a sweep on one
         simulator compiles once.
 
+        ``record`` names a diagram's signals to keep in the trajectory's
+        ``signals`` (``"block:port"``, a block's whole input ``"block:u"``, a
+        nested block by its path): a fixed-step run reads them off each step's
+        own first stage, any other run computes them at the saved samples after
+        the run, both on the numbers the run was made with.
+
         Returns
         -------
         Trajectory
             State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
         """
         params = self.tree_of(params)
+        local, nested = split_record(record)
+        from_pass = bool(local) and self.solver_backend.records_from_pass
+        records = None
 
         # Integrate with the selected solver backend, timed when verbose
         time_solve = self.verbose
@@ -252,6 +261,7 @@ class Simulator:
                 self.x0,
                 args=self.solver_backend_options,
                 params=params,
+                **({"record": local} if from_pass else {}),
             )
             m = self.sys.m
             u_traj = np.zeros((m, self.n_pts))
@@ -259,7 +269,8 @@ class Simulator:
                 u_bar = self.evaluator._u_nominal
                 u_traj[:, :] = u_bar.reshape(m, 1)
         elif callable(u):
-            # A function of time, read where the solver evaluates f
+            # A function of time, read where the solver evaluates f: recorded after
+            from_pass = False
             sys = self.sys
 
             def u_of_t(t):
@@ -288,13 +299,19 @@ class Simulator:
                 self.x0,
                 args=self.solver_backend_options,
                 params=params,
+                **({"record": local} if from_pass else {}),
             )
+        if from_pass:
+            x_traj, records = x_traj
+
+        # The named signals: off the steps' own pass, or at the saved samples
+        signals = self.recorded_signals(x_traj, u_traj, params, local, nested, records)
 
         if time_solve:
             self.last_solve_time_s = time.perf_counter() - t0
 
         # The trajectory, kept with the solver's debug record
-        return self.store_trajectory(x_traj, u_traj)
+        return self.store_trajectory(x_traj, u_traj, signals)
 
     @property
     def params(self) -> dict:
@@ -392,9 +409,47 @@ class Simulator:
             return RK4SolverBackend()
         raise ValueError(f"Unknown solver '{solver_backend_key}'")
 
-    def store_trajectory(self, x_traj, u_traj):
+    def recorded_signals(self, x_traj, u_traj, params, local, nested, records):
+        """
+        The run's named signals by name, ``(dim, n_pts)`` each, on the run's numbers.
+
+        ``records`` are the fixed-step run's own, at the start of each step, the
+        last sample one more signal pass; without them every saved sample takes
+        one pass (vectorized on JAX). A nested block's signal is read one level at
+        a time by the diagram.
+        """
+        signals = {}
+        if local:
+            ev = self.evaluator
+            layout = ev.record_layout(local)
+            xs = np.asarray(x_traj, dtype=float).T
+            us = np.asarray(u_traj, dtype=float).T
+            if records is None:
+                values = values_at_samples(ev, layout, xs, us, self.t, params)
+            else:
+                last = ev.record_at(xs[-1], us[-1], self.t[-1], params, layout)
+                values = np.concatenate(
+                    [np.asarray(records, dtype=float), np.asarray(last)[None, :]]
+                )
+
+            # Each name's columns of the stacked record
+            start = 0
+            for name, sl, op in layout:
+                dim = (sl.stop - sl.start) if op is None else int(op.u_dim)
+                signals[name] = values[:, start : start + dim].T
+                start += dim
+
+        if nested:
+            tree = self.evaluator.params if params is None else params
+            run = Trajectory(t=self.t, x=x_traj, u=u_traj)
+            for name in nested:
+                signals[name] = self.sys.port_samples(run, name, tree)
+
+        return signals
+
+    def store_trajectory(self, x_traj, u_traj, signals=None):
         """The run's trajectory, kept as ``last_traj`` with the solver's debug record."""
-        traj = Trajectory(t=self.t, x=x_traj, u=u_traj)
+        traj = Trajectory(t=self.t, x=x_traj, u=u_traj, signals=signals or {})
         self.last_debug = self.solver_backend.last_debug
         self.last_traj = traj
 
@@ -412,6 +467,29 @@ class Simulator:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def split_record(record):
+    """``(local, nested)``: the names a run's own signal pass reads, and those of a block inside a nested diagram."""
+    names = tuple(record or ())
+    local = tuple(name for name in names if "/" not in name.rpartition(":")[0])
+    nested = tuple(name for name in names if name not in local)
+
+    return local, nested
+
+
+def values_at_samples(ev, layout, xs, us, ts, params):
+    """The recorded values at every saved sample, ``(n_pts, r)``: one signal pass each, one ``vmap`` on JAX."""
+    if ev.backend == "jax":
+        jax = ev.jax
+        at = jax.vmap(
+            lambda x, u, t: ev.record_at(x, u, t, params, layout), in_axes=(0, 0, 0)
+        )
+        return np.asarray(jax.jit(at)(xs, us, ts))
+
+    return np.stack(
+        [ev.record_at(x, u, t, params, layout) for x, u, t in zip(xs, us, ts)]
+    )
 
 
 def require_dynamic_system(sys) -> None:

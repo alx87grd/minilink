@@ -14,7 +14,9 @@ from minilink.simulation.solvers.solver import (
 
 
 class EulerFixedStepSolverBackend(SolverBackend):
-    """Fixed-step Euler via compiled rollout primitives (uniform ``times`` only)."""
+    """Fixed-step Euler via compiled rollout primitives (uniform ``times`` only); a diagram's ``record`` read off each step's pass."""
+
+    records_from_pass = True
 
     def __init__(self) -> None:
         self.last_debug = None
@@ -26,6 +28,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x0: np.ndarray,
         args=None,
         params=None,
+        record=(),
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
@@ -33,15 +36,16 @@ class EulerFixedStepSolverBackend(SolverBackend):
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
-        x_seq = evaluator.rollout(
-            x0, None, t0, dt, params, solver="euler", n_steps=n_steps
+        run = evaluator.rollout(
+            x0, None, t0, dt, params, solver="euler", n_steps=n_steps, record=record
         )
+        x_seq, records = run if record else (run, None)
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: one evaluation of f per step
         self.last_debug = fixed_step_debug("euler_fixedsteps", "nominal", n_pts, 1)
 
-        return x_traj
+        return x_traj if not record else (x_traj, records)
 
     def integrate_forced(
         self,
@@ -51,6 +55,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x0: np.ndarray,
         args=None,
         params=None,
+        record=(),
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
@@ -60,10 +65,13 @@ class EulerFixedStepSolverBackend(SolverBackend):
         u_sequence = np.asarray(u[:, : n_pts - 1].T)
 
         # x_{k+1} = x_k + Δt f(x_k, u_k, t_k), each u_k held, in one compiled rollout
-        x_seq = evaluator.rollout(x0, u_sequence, t0, dt, params, solver="euler")
+        run = evaluator.rollout(
+            x0, u_sequence, t0, dt, params, solver="euler", record=record
+        )
+        x_seq, records = run if record else (run, None)
         x_traj = np.asarray(x_seq).T
 
         # The run's record: one evaluation of f per step
         self.last_debug = fixed_step_debug("euler_fixedsteps", "forced", n_pts, 1)
 
-        return x_traj
+        return x_traj if not record else (x_traj, records)

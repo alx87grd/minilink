@@ -20,11 +20,11 @@ UNROLLED_SUBSTEPS = 64
 ###############################################################################
 
 
-def rk4(f, x, ua, ub, t, h):
-    """One RK4 step over ``h``, the input linear from ``ua`` to ``ub`` (equal for a hold)."""
+def rk4(f, x, ua, ub, t, h, k1=None):
+    """One RK4 step over ``h``, the input linear from ``ua`` to ``ub`` (equal for a hold); ``k1`` the first stage when the caller computed it."""
     um = 0.5 * (ua + ub)
 
-    k1 = f(x, ua, t)
+    k1 = f(x, ua, t) if k1 is None else k1
     k2 = f(x + 0.5 * h * k1, um, t + 0.5 * h)
     k3 = f(x + 0.5 * h * k2, um, t + 0.5 * h)
     k4 = f(x + h * k3, ub, t + h)
@@ -35,16 +35,18 @@ def rk4(f, x, ua, ub, t, h):
     return x_next
 
 
-def euler(f, x, ua, ub, t, h):
-    """One explicit Euler step over ``h``, the input at the start of the step."""
+def euler(f, x, ua, ub, t, h, k1=None):
+    """One explicit Euler step over ``h``, the input at the start of the step; ``k1`` its one stage when the caller computed it."""
+    k1 = f(x, ua, t) if k1 is None else k1
+
     # x_{k+1} = x_k + h f(x_k, u_k, t_k)
-    x_next = x + h * f(x, ua, t)
+    x_next = x + h * k1
 
     return x_next
 
 
-def step_body(f, x, u0, u1, t, dt, solver, substeps):
-    """``x(t + dt)`` from ``x(t)``: ``substeps`` steps of ``solver``, the input linear from ``u0`` to ``u1``."""
+def step_body(f, x, u0, u1, t, dt, solver, substeps, k1=None):
+    """``x(t + dt)`` from ``x(t)``: ``substeps`` steps of ``solver``, the input linear from ``u0`` to ``u1``; ``k1`` the first substep's first stage when the caller computed it."""
     integrate = rk4 if solver == "rk4" else euler
     h = dt / substeps
     if rolled(x, substeps):
@@ -54,7 +56,7 @@ def step_body(f, x, u0, u1, t, dt, solver, substeps):
     for i in range(substeps):
         ua = u0 if i == 0 else u0 + (i / substeps) * (u1 - u0)
         ub = u1 if i == substeps - 1 else u0 + ((i + 1) / substeps) * (u1 - u0)
-        x = integrate(f, x, ua, ub, t + i * h, h)
+        x = integrate(f, x, ua, ub, t + i * h, h, k1 if i == 0 else None)
 
     return x
 

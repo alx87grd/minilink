@@ -113,9 +113,10 @@ class SystemSimulation:
             Cost written for the system that is scored.
         of : System or str, optional
             On a diagram, the block to score, as it ran inside the diagram: the
-            block or its id, ``of="plant"`` (its recorded run, ``traj.of``, else
-            its input rebuilt from the diagram's states). ``None`` scores this
-            whole system in its own ``(x, u)``.
+            block or its id, ``of="plant"``: its recorded run, ``traj.of`` (a
+            default run records the plant's input), else its input rebuilt from
+            the diagram's states with the blocks' current numbers. ``None``
+            scores this whole system in its own ``(x, u)``.
         traj : Trajectory, optional
             Trajectory of this system; defaults to the last one computed.
 
@@ -153,7 +154,7 @@ class DynamicSimulation:
         backend="numpy",
         verbose=False,
         solver_warnings="warn",
-        record=None,
+        record="plant",
     ):
         """
         Convenience shortcut to simulate the system, under its nominal input or ``u``, and return a trajectory.
@@ -184,13 +185,17 @@ class DynamicSimulation:
         solver_warnings : str
             ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
             warnings (see :mod:`minilink.simulation.solver_warnings`).
-        record : sequence of str, optional
-            A diagram's signals to keep in the trajectory's ``signals``,
-            ``"sys_id:port_id"``, an output port or a block's input
-            (``"plant:u"``, what ``traj.of("plant")`` reads as the plant's
-            input): each evaluated once per sample after the run (the adaptive
-            solver has no fixed samples to record inside the run). A diagram's
-            run always carries every block's state slice (``traj.of("plant")``).
+        record : "plant", None, sequence of str or "all"
+            A diagram's signals kept in the trajectory's ``signals``, from the
+            run itself on the run's numbers: ``"plant"`` (the default) the
+            plant's whole input ``"plant:u"`` when the diagram has a ``plant``
+            block, so ``traj.of("plant")`` is the plant's complete run; ``None``
+            nothing (the fastest run); names, ``"block:port"``, a block's whole
+            input ``"block:u"``, a nested block by its path; ``"all"`` every
+            output port of every block. A fixed-step run reads them off each
+            step's own first stage; an adaptive run computes them at the saved
+            samples after the run. A lone block records nothing (its ``x`` and
+            ``u`` are the trajectory) and refuses names.
 
         Returns
         -------
@@ -214,10 +219,9 @@ class DynamicSimulation:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-        traj = sim.solve(u=u, input_port_id=input_port_id)
-        if record:
-            require_signals_to_record(self)
-            traj = self.reconstruct_internal_signals(traj, ports=tuple(record))
+        traj = sim.solve(
+            u=u, input_port_id=input_port_id, record=recorded_names_of(self, record)
+        )
         if hasattr(self, "state_index"):
             # A diagram's run: every block's state slice, the inputs recorded
             traj = Trajectory(
@@ -260,7 +264,7 @@ class StepSimulation:
         dt=None,
         solver=None,
         backend="numpy",
-        record=None,
+        record="plant",
         show=False,
         verbose=False,
     ):
@@ -293,12 +297,14 @@ class StepSimulation:
             ``None``: the scan with the plant's own formula (RK4); ``"rk4"`` or
             ``"euler"``: the scan with that formula; ``"scipy"``: the host clock
             runner.
-        record : sequence of str, optional
+        record : "plant", None, sequence of str or "all"
             Signals kept from the run's own signal pass, in the trajectory's
-            ``signals``: ``"path/block:port"`` (a block's output) or ``"plant:u"``.
-            A loop with a plant always records ``"plant:u"`` and its ``plant`` role,
-            so ``traj.of("plant")`` and the read-backs (plots, animation, overlays)
-            compute nothing again. The scan only (``solver=None``).
+            ``signals``: ``"plant"`` (the default) the plant's input
+            ``"plant:u"`` when the loop has a plant, so ``traj.of("plant")`` and
+            the read-backs (plots, animation, overlays) compute nothing again;
+            ``None`` nothing; names, ``"path/block:port"`` (a block's output) or
+            ``"plant:u"``; ``"all"`` every block output and the plant's input.
+            The host clock runner (``solver="scipy"``) records nothing.
         """
         # A real cycle through minilink.core.system
         from minilink.core.compile.plan import PLANT_INPUT
@@ -318,7 +324,7 @@ class StepSimulation:
 
         # What the run records: the named signals, and a loop's plant input
         plant_op = plant_op_of(ev)
-        record = recorded_names(record, plant_op, host)
+        record = recorded_names(record, ev, host)
         signals = {}
         roles = {}
 
@@ -350,11 +356,11 @@ class StepSimulation:
 
         # The plant role: its state slice and its recorded input, and the
         # blocks inside a plant that is itself a diagram
-        if PLANT_INPUT in signals:
+        if plant_op is not None:
             plant_slice = plant_op.local_x_slice
             roles["plant"] = {
                 "x": (plant_slice.start, plant_slice.stop),
-                "u": PLANT_INPUT,
+                "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
             roles.update(plant_block_roles(plant_op, plant_slice.start))
 
@@ -380,7 +386,7 @@ class StepSimulation:
         x0=None,
         t0=0.0,
         dt=None,
-        record=None,
+        record="plant",
         backend="numpy",
         show=False,
         verbose=False,
@@ -405,10 +411,9 @@ class StepSimulation:
             The clock's origin, the time of the first tick (a system on a clock).
         dt : float, optional
             The continuous plant's integration step, as for :meth:`compute_trajectory`.
-        record : sequence of str, optional
+        record : "plant", None, sequence of str or "all"
             Signals kept at the ticks from the run's own signal pass, as for
-            :meth:`compute_trajectory`; a loop with a plant always records
-            ``"plant:u"`` and its ``plant`` role.
+            :meth:`compute_trajectory`: the plant's input by default.
         backend : str
             Backend passed to :meth:`compile`.
         show : bool
@@ -431,9 +436,9 @@ class StepSimulation:
 
         # What the run records: the named signals, and a loop's plant input
         plant_op = plant_op_of(ev)
-        if record:
+        if record is not None and record != "plant":
             require_clocked_signals_to_record(self)
-        record = recorded_names(record, plant_op, False)
+        record = recorded_names(record, ev, False)
         signals = {}
         roles = {}
 
@@ -460,11 +465,11 @@ class StepSimulation:
 
         # The plant role: its state slice and its recorded input, and the
         # blocks inside a plant that is itself a diagram
-        if PLANT_INPUT in signals:
+        if plant_op is not None:
             plant_slice = plant_op.local_x_slice
             roles["plant"] = {
                 "x": (plant_slice.start, plant_slice.stop),
-                "u": PLANT_INPUT,
+                "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
             roles.update(plant_block_roles(plant_op, plant_slice.start))
 
@@ -552,6 +557,36 @@ def require_clocked_signals_to_record(system):
         )
 
 
+def recorded_names_of(system, record):
+    """The names a run records: ``"plant"`` the plant's input when there is one, ``None`` nothing, ``"all"`` every output port, else the names given."""
+    diagram = hasattr(system, "state_index")
+    if record is None:
+        return ()
+    if isinstance(record, str) and record == "plant":
+        return ("plant:u",) if diagram and "plant" in system.subsystems else ()
+    if isinstance(record, str) and record == "all":
+        if not diagram:
+            return ()
+        return tuple(
+            f"{sys_id}:{port_id}"
+            for sys_id, block in system.subsystems.items()
+            for port_id in block.outputs
+        )
+    require_record_names(record)
+    require_signals_to_record(system)
+
+    return tuple(record)
+
+
+def require_record_names(record):
+    """Refuse a record that is not ``"plant"``, ``"all"``, ``None`` or a sequence of names."""
+    if isinstance(record, str):
+        raise ValueError(
+            f"record={record!r}: pass 'plant', 'all', None, or a sequence of names "
+            f"such as ({record!r},)"
+        )
+
+
 def require_signals_to_record(system):
     """Refuse a record on a leaf: its signals are its state and input, already in the trajectory."""
     if not hasattr(system, "reconstruct_internal_signals"):
@@ -561,19 +596,43 @@ def require_signals_to_record(system):
         )
 
 
-def recorded_names(record, plant_op, host) -> tuple:
-    """The signals a dense run records: the names asked, and a loop's plant input first; none on the host runner."""
+def recorded_names(record, ev, host) -> tuple:
+    """
+    The signals a sampled loop's dense run records.
+
+    ``"plant"`` the plant's input when the loop has a plant; ``None`` nothing;
+    ``"all"`` every block output and the plant's input; else the names given.
+    The host clock runner records nothing, and refuses names.
+    """
     # A real cycle: the plan imports the diagrams, which import these facades
     from minilink.core.compile.plan import PLANT_INPUT
 
-    names = tuple(record or ())
+    plant_op = plant_op_of(ev)
+    if record is None or (host and record == "plant"):
+        return ()
+    if isinstance(record, str) and record == "plant":
+        return (PLANT_INPUT,) if plant_op is not None else ()
+    if isinstance(record, str) and record == "all":
+        names = all_output_names(ev) + ((PLANT_INPUT,) if plant_op is not None else ())
+    else:
+        require_record_names(record)
+        names = tuple(record)
     if host:
         require_no_record(names)
-        return ()
-    if plant_op is not None and PLANT_INPUT not in names:
-        names = (PLANT_INPUT, *names)
 
     return names
+
+
+def all_output_names(ev) -> tuple:
+    """Every block output of a compiled sampled loop, ``"path/block:port"``."""
+    plan = getattr(ev, "plan", None)
+    if plan is None or not hasattr(plan, "paths"):
+        return ()
+    paths = plan.paths
+
+    return tuple(
+        f"{'/'.join(paths[sys_id])}:{port_id}" for sys_id, port_id in plan.output_slices
+    )
 
 
 def require_no_record(names):
