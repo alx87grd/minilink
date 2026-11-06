@@ -17,7 +17,7 @@ examples/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
   demos/<chapter>/             # Canonical single-file textbook scripts, by topic (the chapters' areas)
-  demos/udes_racecar/          # Plant folder: MPC and pure pursuit on the 1/10 car
+  demos/udes_racecar/          # Plant folder: MPC and path tracking on the 1/10 car
 
   # --- Research Lane (Repo-only, unconstrained, exploratory) ---
   projects/<name>/             # Multi-file applications (pathtracking, car_trajopt, mpc)
@@ -33,7 +33,7 @@ untested by default (ROADMAP §2).
 | [`teaching/topics/`](teaching/topics/) | teaching, smoked unless long | Learn a **subject** — course-agnostic textbook page |
 | [`teaching/courses/<id>/`](teaching/courses/) | teaching, smoked unless long | Homework cited by a live course — do not rename without the notes |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
-| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC on the kinematic and dynamic models, pure pursuit on the dynamic model) |
+| [`demos/udes_racecar/`](demos/udes_racecar/) | teaching, nightly | 1/10 racecar plant folder (MPC on the kinematic and dynamic models; pure pursuit, Stanley, line of sight and their comparison on the dynamic model) |
 | [`projects/<name>/`](projects/) | research | Multi-file experiment — outside release contract, repo-only |
 | [`../experimental/<topic>/`](../experimental/) | experimental tier | Non-core single files, scenario sprawl, WIP; `scratch/` for personal checks; outside `examples/` |
 
@@ -64,8 +64,8 @@ twin → README / `tutorial` only if core-tool canonical.
 `experimental/<topic>/` or `projects/`.
 
 **Demo naming:** no `demo_` prefix. Keep the topic in the stem when needed —
-e.g. `mpc/mpc_car_minimal.py`. **Demo style:** RULES 6.1, 6.10, 6.11 and 6.13 — the
-shortest sequence of library verbs, native object `print` and plots (not diagnostic f-strings), flat, side work in its own cell. Do not mix
+e.g. `mpc/mpc_car_minimal.py`. **Demo style:** RULES 6.1, 6.10, 6.11, 6.13, 6.16 and 6.17 — the
+shortest sequence of library verbs, native object `print` and plots (not diagnostic f-strings), flat, side work in its own cell, at most three knobs in capitals on top and the other numbers named where the story needs them, each system named by the dynamics it is (`plant`, `closed_loop`). Do not mix
 `.ipynb` and `.py` in the same leaf folder (except inside one named project).
 
 ## Open in Colab
@@ -200,7 +200,7 @@ above); the research lane sits apart.
 | Planning | [`demos/trajopt/`](demos/trajopt/), [`demos/rrt/`](demos/rrt/), [`demos/value_iteration/`](demos/value_iteration/) | [cost+VI](teaching/courses/udes_gro860/pendulum_value_iteration.ipynb), [VI vs LQR](teaching/courses/udes_gro860/pendulum_value_iteration_vs_lqr.ipynb), [grid world DP](teaching/courses/udes_gro860/grid_world_dynamic_programming.ipynb), [minimum-time VI](teaching/courses/udes_gro860/double_integrator_minimum_time.ipynb), [policy evaluation](teaching/courses/udes_gro860/double_integrator_policy_evaluation.ipynb), [cart-pole LQR](teaching/courses/udes_gro860/cartpole_lqr.ipynb); [`projects/car_trajopt/`](projects/car_trajopt/), [`projects/pathtracking/`](projects/pathtracking/) |
 | Reinforcement learning | [`demos/rl/`](demos/rl/) (pendulum swing-up, cart-pole, rocket landing, learn to fly) | [Gymnasium interface](teaching/courses/udes_gro860/gymnasium_interface.ipynb), [VI vs LQR vs RL](teaching/topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb), [learn to fly](teaching/topics/reinforcement_learning/drone_ppo.ipynb), [function approximation by SGD](teaching/topics/machine_learning/least_squares_sgd.ipynb), [cost-to-go approximation](teaching/courses/udes_gro860/pendulum_cost_to_go_approximation.ipynb); Lyapunov check in [`experimental/rl/`](../experimental/rl/) |
 | Graphical | [`demos/graphical/`](demos/graphical/), [`demos/realtime/`](demos/realtime/) (keyboard/gamepad game mode: `game_cartpole.py`, `game_car.py`, `game_ur5_setpoint.py`) | |
-| UdeS racecar | [`demos/udes_racecar/`](demos/udes_racecar/) (MPC on the kinematic model, MPC on the dynamic model, pure pursuit on the dynamic model) | [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5: kinematic MPC, then the same MPC on the dynamic car) |
+| UdeS racecar | [`demos/udes_racecar/`](demos/udes_racecar/) (MPC on the kinematic model, MPC on the dynamic model; pure pursuit, Stanley, line of sight and their comparison on the dynamic model) | [racecar_toward_mpc](teaching/courses/udes_gro501/racecar_toward_mpc.ipynb) (GRO501 C5.5: kinematic MPC, then the same MPC on the dynamic car) |
 | Experimental tier | [`../experimental/`](../experimental/) (`c_export/`, `compile/` diagram flattening, `engine/`, `symbolic/`, `robotic/` UR5, `boat/` parking in a current: cascade vs MPC vs PPO, `mppi/` pendulum and racecar MPPI, `rl/` Lyapunov check, `random/` noise and seeds) | not nightly-swept; C export demos: `experimental/c_export/c_export_proportional.py`, `experimental/c_export/c_export.py` |
 
 Run demos from the repo root, e.g.

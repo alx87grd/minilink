@@ -62,16 +62,26 @@ class PolylinePath(ReferencePath):
     """
     Piecewise-linear path through waypoints (C⁰).
 
+    A closed path loops: the segment from the last waypoint back to the first belongs
+    to it, its arc length runs once round the loop and wraps there. An open path ends
+    at its last waypoint, and an arc length past either end is held at that end.
+
     Parameters
     ----------
     waypoints : array_like, shape (N, d)
-        Vertices with ``N >= 2``; ``params`` is ``{"waypoints"}``.
+        Vertices with ``N >= 2``; ``params`` is ``{"waypoints"}``. A closed loop does
+        not repeat its first point at the end.
+    closed : bool
+        Whether the path loops back to its first waypoint (structure, not a parameter).
     """
 
-    def __init__(self, waypoints):
+    def __init__(self, waypoints, closed: bool = False):
         # The vertices, as an (N, d) float array of at least two points
         wp = np.asarray(waypoints, dtype=float)
         require_polyline(wp)
+
+        # Structure: whether the closing segment belongs to the path
+        self.closed = bool(closed)
 
         self.params = {"waypoints": wp}
 
@@ -83,14 +93,16 @@ class PolylinePath(ReferencePath):
 
     @property
     def total_length(self) -> float:
-        _, s_knots = arc_lengths(self.waypoints, np)
+        verts = vertices_of(self.waypoints, self.closed, np)
+        _, s_knots = arc_lengths(verts, np)
         return float(s_knots[-1])
 
     def distance(self, p, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(p)
 
-        verts = xp.asarray(params["waypoints"], dtype=float)
+        closed = self.closed
+        verts = vertices_of(xp.asarray(params["waypoints"], dtype=float), closed, xp)
 
         p = xp.asarray(p, dtype=float).reshape(-1)
         a = verts[:-1]
@@ -114,7 +126,8 @@ class PolylinePath(ReferencePath):
         params = self.params if params is None else params
         xp = array_module(p)
 
-        verts = xp.asarray(params["waypoints"], dtype=float)
+        closed = self.closed
+        verts = vertices_of(xp.asarray(params["waypoints"], dtype=float), closed, xp)
         seg, s_knots = arc_lengths(verts, xp)
 
         p = xp.asarray(p, dtype=float).reshape(-1)
@@ -141,10 +154,13 @@ class PolylinePath(ReferencePath):
         params = self.params if params is None else params
         xp = array_module(s)
 
-        verts = xp.asarray(params["waypoints"], dtype=float)
+        closed = self.closed
+        verts = vertices_of(xp.asarray(params["waypoints"], dtype=float), closed, xp)
         seg, s_knots = arc_lengths(verts, xp)
 
-        s = xp.clip(xp.asarray(s, dtype=float), 0.0, s_knots[-1])
+        # The arc length on the path: wrapped round a loop, held at the ends of a line
+        s = xp.asarray(s, dtype=float)
+        s = s % s_knots[-1] if closed else xp.clip(s, 0.0, s_knots[-1])
         n_seg = verts.shape[0] - 1
 
         # The segment i with sᵢ ≤ s < s_{i+1}, and τ = (s − sᵢ) / max(ℓᵢ, 10⁻¹²)
@@ -160,11 +176,14 @@ class PolylinePath(ReferencePath):
         params = self.params if params is None else params
         xp = array_module(s)
 
-        verts = xp.asarray(params["waypoints"], dtype=float)
+        closed = self.closed
+        verts = vertices_of(xp.asarray(params["waypoints"], dtype=float), closed, xp)
         _, s_knots = arc_lengths(verts, xp)
         dim = self.workspace_dim
 
-        s = xp.clip(xp.asarray(s, dtype=float), 0.0, s_knots[-1])
+        # The arc length on the path: wrapped round a loop, held at the ends of a line
+        s = xp.asarray(s, dtype=float)
+        s = s % s_knots[-1] if closed else xp.clip(s, 0.0, s_knots[-1])
         n_seg = verts.shape[0] - 1
 
         # The segment i with sᵢ ≤ s < s_{i+1}
@@ -179,7 +198,9 @@ class PolylinePath(ReferencePath):
         return T
 
 
-def from_waypoints(waypoints, *, kind: str = "polyline") -> ReferencePath:
+def from_waypoints(
+    waypoints, *, kind: str = "polyline", closed: bool = False
+) -> ReferencePath:
     """
     Build a reference path from a waypoint polyline.
 
@@ -189,10 +210,12 @@ def from_waypoints(waypoints, *, kind: str = "polyline") -> ReferencePath:
         Path vertices with ``N >= 2``.
     kind : {"polyline"}
         Path primitive; default is the robust piecewise-linear polyline.
+    closed : bool
+        Whether the path loops back to its first waypoint (:func:`is_closed` tells).
     """
     require_path_kind(kind)
 
-    return PolylinePath(np.asarray(waypoints, dtype=float))
+    return PolylinePath(np.asarray(waypoints, dtype=float), closed=closed)
 
 
 def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
@@ -215,7 +238,8 @@ def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
     waypoints : array of shape (N, 2)
         Polyline [m] going once around the loop. The first point is not repeated at
         the end: a zero-length closing segment has no tangent, and the path objects
-        that consume waypoints divide by it.
+        that consume waypoints divide by it. Its path is
+        ``from_waypoints(waypoints, closed=True)``.
     """
     # The corner centres, inset by the radius, and the quarter turn each arc starts at
     half_l = 0.5 * length - radius
@@ -251,9 +275,38 @@ def circuit_waypoints(length=14.0, width=9.0, radius=2.5, spacing=0.25):
     return waypoints
 
 
+def is_closed(waypoints):
+    """True when the polyline loops back on itself within one waypoint spacing.
+
+    A closed path is written without repeating its first point at the end — the repeat
+    would leave a zero-length segment with no tangent — so the loop shows up as a
+    last-to-first gap no wider than the other steps.
+    """
+    path = np.asarray(waypoints, dtype=float)
+
+    # The steps between neighbours, and the gap from the last point back to the first
+    steps = np.linalg.norm(np.diff(path, axis=0), axis=1)
+    gap = float(np.linalg.norm(path[0] - path[-1]))
+
+    # Closed when the gap is no wider than one and a half median steps
+    closed = bool(gap <= 1.5 * float(np.median(steps)))
+
+    return closed
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def vertices_of(waypoints, closed, xp):
+    """The vertices the segments join: the waypoints, and the first again when the path loops."""
+    if not closed:
+        return waypoints
+
+    verts = xp.concatenate([waypoints, waypoints[:1]], axis=0)
+
+    return verts
 
 
 def arc_lengths(verts, xp):

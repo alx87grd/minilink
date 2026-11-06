@@ -508,7 +508,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **6.1 A demo is the API, and nothing else.** *Simplicity is the ultimate sophistication*
   holds for a demo or a teaching notebook as it does for the core: the shortest sequence of
   library verbs that tells the story — build, compose, solve, evaluate, plot, animate — run
-  from the top level, with constants at the top, a one-line title docstring and the story in
+  from the top level, its numbers named as 6.16 says, a one-line title docstring and the story in
   short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
   themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
   `plot_solution`, `plot_control_law`, `plot_cost_to_go`, `plot_learning_curve`, `plot_tree`,
@@ -589,6 +589,49 @@ concrete formatting, ordered by the cost of being wrong:
   demo and notebook uses the tool. One place per mechanism, named in the doc that owns the tool
   (the closing PID example,
   `examples/demos/compile/pid_autotuning_jax.py`, for gradient descent).
+- **6.16 A demo's numbers: a few knobs on top, the rest where the story needs them.** A demo
+  reads like a worked example: sections in the order a textbook builds it (the world, the
+  plant, its start, the law, the loop, the run, the look), each a title comment (a sentence
+  naming the object, its equation when it has one), then the section's named numbers, then
+  the code that builds the object, a blank line between the three. Its numbers are of two
+  kinds, and both can sit in one script:
+  - **Knobs**, the two or three numbers a reader is invited to change and rerun (the final
+    time, the floor's grip, a cruise speed): in capitals at the top, under the imports, each
+    with its unit. At most three; a demo that wants more is a research script.
+  - **The narrative's numbers**, everything else: lowercase in the textbook's symbols (`mu`,
+    `v_0`, the law's own `L_0`, `k_v`), each with its unit, named just before the object it
+    sets. A number used once stays an inline keyword with its meaning in a comment
+    (`compute_trajectory(tf=12.0, dt=0.002)`). The plant's numbers are read once, by symbol,
+    under the plant; geometry and state go through the objects' methods (`path.project`,
+    `path.tangent`) rather than array searches.
+
+  ```python
+  # Good — the circuit, its number and its code, apart:
+  # The circuit: a rounded rectangle, and a lane 0.6 m either side of its line
+
+  width = 8.0  # [m]
+
+  path = from_waypoints(circuit_waypoints(length=12.0, width=width, radius=2.0), closed=True)
+  track = ReferenceTrack(path, half_width=0.6)
+
+  # Bad — a wall of capitals the reader scrolls back to:
+  LENGTH, WIDTH, RADIUS = 12.0, 8.0, 2.0
+  CORRIDOR_HALF_WIDTH = 0.6
+  ```
+
+  Research scripts (`examples/projects/`, benchmarks) keep whatever settings block they
+  need. A demo over three knobs is listed in `tests/unittest/demo_knob_allowlist.txt`, which
+  only shrinks (6.12).
+- **6.17 A system is named by the dynamics it is.** A variable holding a system, in a demo,
+  a notebook or the library, names what it is in the block diagram: `sys`, `plant`,
+  `controller`, `observer`, `inner_loop`, `closed_loop`, `diagram`. Never the scenario it is
+  run on (`lap`, `episode`, `sim`, `run`): the scenario is the run, and the run is the
+  trajectory it returns (`result`, `traj`).
+
+  ```python
+  closed_loop = (mpc % dt) @ car  # Good
+  lap = (mpc % dt) @ car  # Bad: a lap is what the closed loop drives, not what it is
+  ```
 
 ---
 

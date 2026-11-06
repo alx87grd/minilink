@@ -1,0 +1,28 @@
+# file  ceiling — demos with more than three knobs in capitals, predating RULES 6.16.
+# This list only shrinks, and a ceiling only falls; see test_demo_knobs.py.
+examples/demos/analysis/analysis_frequency.py 4
+examples/demos/compile/digital_pid_tuning.py 5
+examples/demos/compile/grid_world_step_problem.py 4
+examples/demos/compile/lqg_monte_carlo.py 15
+examples/demos/compile/native_mpc_tuning.py 4
+examples/demos/compile/pid_autotuning_jax.py 8
+examples/demos/compile/terminal_field_mpc.py 8
+examples/demos/control/lqg_cartpole.py 7
+examples/demos/control/trajectory_lqr_cartpole.py 5
+examples/demos/hybrid/sampled_smc_pendulum.py 4
+examples/demos/mpc/mpc_car_circuit.py 17
+examples/demos/mpc/mpc_car_minimal.py 6
+examples/demos/mpc/mpc_integrator_numpy.py 4
+examples/demos/mpc/mppi_pendulum.py 9
+examples/demos/mpc/mppi_racecar.py 12
+examples/demos/rl/rocket_landing_rl.py 7
+examples/demos/robotic/custom_one_link_arm.py 4
+examples/demos/rrt/rrt_holonomic_obstacles.py 15
+examples/demos/rrt/rrt_star_live.py 12
+examples/demos/trajopt/trajopt_holonomic_corridor.py 16
+examples/demos/udes_racecar/mpc_racecar_dynamic.py 30
+examples/demos/udes_racecar/mpc_racecar_kinematic.py 4
+examples/demos/value_iteration/vi_cartpole_swingup.py 4
+examples/demos/value_iteration/vi_double_pendulum_jax.py 12
+examples/demos/value_iteration/vi_pendulum_lqr.py 8
+examples/demos/value_iteration/vi_pendulum_swingup.py 4
