@@ -546,10 +546,11 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
   loop trace to the identical program (about 29 ms per compiled solve either way); the traced
   lookup law computes `1 − y` once per axis instead of per corner (two fewer operations, the
   same values). On `dev` the lookup law cannot be compiled with JAX (its NumPy table is
-  indexed by a traced cell), although its docstring says it traces; that keeps
-  `backend="auto"` on NumPy for it, the faster backend on the small systems it serves. Ruled
-  2026-11-06: no per-block backend preference; the law stays NumPy-only as on `dev`, the JAX
-  closed loop a known issue to decide later; `GridField` converts its own table, so the field
-  traces as its contract requires. The core planners tutorial gives LQR the undiscounted problem
+  indexed by a traced cell), although its docstring says it traces. Ruled 2026-11-06, after a
+  per-block backend preference was tried and dropped: the law takes its table into the point's
+  array module (one line), so a JAX closed loop runs it and matches NumPy, and
+  `backend="auto"` scores it on JAX like every law that traces (one evaluation pays the JAX
+  compile, about 0.7 s here; `backend="numpy"` keeps the old timing). `GridField` converts its
+  own table the same way. The core planners tutorial gives LQR the undiscounted problem
   (value iteration keeps its `ρ = 0.2`, which its sweeps need to converge: undiscounted they
   stop at the 1000-sweep cap with `ΔJ = 19`).

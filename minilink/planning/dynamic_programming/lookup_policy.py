@@ -80,7 +80,7 @@ class LookupPolicy(System):
         params = self.params if params is None else params
         xp = array_module(x, params["u_table"])
 
-        u_table = params["u_table"]
+        u_table = xp.asarray(params["u_table"])
         n = self.grid.n
         nearest = self.interpolation == "nearest"
         u_lb = self.u_lb
