@@ -36,7 +36,7 @@ lands. Last checked against the code: 2026-11-05.
 - **Workaround:** solve the undiscounted equivalent by hand: the gain of `(A − (ρ/2) I, B, Q, R)`
   (`lqr_gain` on `planner.linear_model()`'s `A`, shifted).
 - **Fix:** plans as policies, TODO §1.8 ([plans-as-policies.md](../plans/plans-as-policies.md)
-  §5.2), its decision `PP-Q4`: the shifted `A`, or a refusal.
+  §5.2), ruled `PP-D16`: the shifted `A`, with a warning on a discounted problem.
 
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a

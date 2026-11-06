@@ -37,7 +37,7 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| Plans as policies: the decisions the reviews raised | PP-Q1–PP-Q5 | v0.4 | each decision's option ([plans-as-policies.md](plans-as-policies.md) §10): the three examples on a finite horizon, the law past `tf`, the planner's cost-to-go off the grid, discounted LQR, the GRO860 notebooks' words on `solve_steps` |
+| Plans as policies: the GRO860 notebooks' words on `solve_steps` | PP-Q5 | v0.4 | leave them, one sentence each, or switch them to `solve()` ([plans-as-policies.md](plans-as-policies.md) §10); left as they are until then |
 | The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
@@ -236,8 +236,8 @@ solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
     has its own test; `test_planning_solution.py`,
     `test_dynamic_programming.py`, `test_lqr_planner.py` and the GRO860 value-iteration
     notebooks pass;
-  - **the two modes, the MPC, the faces** (`PP-4` to `PP-7`, after the go on `PP-Q1` to
-    `PP-Q4` **[ask]**): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
+  - **the two modes, the MPC, the faces** (`PP-4` to `PP-7`; the reviews' decisions ruled,
+    `PP-D13` to `PP-D16`): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
     with a time-varying law and `J(x, t)`, its `J_0` equals `solve_steps(N)`'s, and LQR and
     value iteration agree on the finite-horizon double integrator; the infinite mode stays
     byte-identical; the MPC and the follower read the state, the open-loop loops

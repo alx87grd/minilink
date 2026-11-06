@@ -2,8 +2,8 @@
 
 Status: written 2026-11-06 from the maintainer's design session (rulings `PP-D1` to `PP-D12`,
 §9), then consolidated the same day after two independent reviews (one on the code and the
-contracts, one on the control theory and the user API); what the reviews changed is §11, and
-the decisions they raised are §10. Lane: core. The rows: [TODO.md](TODO.md) §1.8 ("Plans as
+contracts, one on the control theory and the user API); what the reviews changed is §11; the
+decisions they raised were ruled the same day (`PP-D13` to `PP-D16`), one stays open (§10). Lane: core. The rows: [TODO.md](TODO.md) §1.8 ("Plans as
 policies"); the order of work and each step's "done when" live there. Contracts in code today:
 [DESIGN.md](../dev/DESIGN.md) §4 ("Fields") and §6 (the compiled face, the MPC).
 
@@ -107,7 +107,7 @@ the face. Discrete-time LQR on step problems is out of scope here.
 | `pv.initial(params)` | a usable default plan at the tree (never a corner command) |
 | `pv.solve(params=None, z0=None) -> (z, status)` | a function of the tree; a method that cannot warm-start ignores `z0`; `status["cost"]` is the plan's cost from `x0` |
 | `pv.command(z, x, t)` | always called with the state; an open-loop plan ignores `x`, a stationary plan ignores `t` |
-| past the plan's end | the rule of §10, `PP-Q2` |
+| past the plan's end | a feedback plan continues with its stationary law at its final point (`PP-D14`); an open-loop plan holds its last input |
 | `pv.shift(z, t, x0=None)` | the warm guess for the next solve: the trajectory faces re-read their knots at the tick and hold the tail; a method that ignores `z0` returns `z` unchanged |
 | `pv.prediction(z, t)` | only on a plan that carries its states (`pv.predicts`) |
 | `pv.solution(z, params, status)` | the host-side `PlanningSolution`, equal to `planner.solve()` at the same tree on the fields of §8 |
@@ -119,9 +119,9 @@ planner on the two axes:
 | --- | --- | --- | --- | --- | --- |
 | Trajectory optimization | open loop | varying (finite only) | knots, `t0` | `u(t)` | yes |
 | MPPI | open loop | varying (finite only) | input sequence, `t0` | `u(t)` | yes |
-| Trajectory plus tracking (`trajectory_lqr`) | feedback | varying | knots, `K(t)`, `t0` | `u_d(t) − K(t)(x − x_d(t))` | later, same contract |
+| Trajectory plus tracking (`trajectory_lqr`) | feedback | varying | knots, `K(t)`, `K∞` at `x_d(tf)`, `t0` | `u_d(t) − K(t)(x − x_d(t))`; the stationary law at the goal past `tf` | later, same contract |
 | LQR, infinite | feedback | stationary | `K`, `x̄`, `ū` | `ū − K (x − x̄)` | §5 |
-| LQR, finite | feedback | varying | `K(t)`, `x̄`, `ū`, `t0` | `ū − K(t − t0)(x − x̄)` | §5 |
+| LQR, finite | feedback | varying | `K(t)`, `K∞`, `x̄`, `ū`, `t0` | `ū − K(t − t0)(x − x̄)`; `K∞` past `tf` | §5 |
 | Value iteration, infinite | feedback | stationary | `J`, the command table `u` | the lookup of `u` at `x` | §4 |
 | Value iteration, finite | feedback | varying | the stacks `J_k`, `u_k`, `t0` | the lookup of `u_k`, `k` the stage of `t` | §4 |
 | Tabular RL | feedback | stationary | the `Q` table | the greedy action of `Q` at `x` | v0.5 |
@@ -179,7 +179,7 @@ textbook recursion.
 | Problem | `horizon=T`, or a step problem's `n_steps` | `horizon=inf` or unset |
 | Sweeps | `N = steps_of(T, dt)` (the library's rule: refused unless `dt` divides `T`); a step problem's `N = n_steps` | until `max |J − J_next| < tol`, at most `max_iterations` |
 | Kept | the stacks, forward in time: `J_0 … J_N` (`J_N = h`) and `u_0 … u_{N−1}`, stage `i` at `t_i = t0 + i dt` | the last `J` and its law |
-| Law | `u_i(x)` for `t ∈ [t_i, t_{i+1})`; past `tf`, the rule of `PP-Q2` | the lookup of `u` |
+| Law | `u_i(x)` for `t ∈ [t_i, t_{i+1})`; past `tf`, `u_0(x)`, the full-horizon law (`PP-D14`: the stationary law at the end, approximated without a second solve, documented as such) | the lookup of `u` |
 | Stage of `t` | `i = round((t − t0) / dt)` taken down when `t` falls short of `t_i` beyond a tolerance (no `floor` on float ticks); a step problem's tick difference | — |
 | Cost-to-go | `J(x, t)`, the value discounted to `t` (the problem's from `t0` is `γ^i J_i`) | `J(x)` |
 | JAX | one `lax.scan(reverse=True)` over `N` sweeps, stacking the tables | today's `lax.while_loop` |
@@ -189,8 +189,8 @@ Symbols: `i` is the stage counted forward from `t0`; `k` stays the sweep count (
 `i = N − k`. The stacks are the per-sweep history, reversed: they are the solution's single
 home, and `record_history` stays the workflow switch of the infinite mode's animation.
 
-- **How `solve()` picks the mode:** the decision `PP-Q1` of §10 (the problem's horizon, as
-  ruled, with the three examples above migrated; or opt-in).
+- **How `solve()` picks the mode:** the problem's horizon (`PP-D2`); the three examples of §2
+  are migrated in the same change, each saying its intent (`PP-D13`).
 - **`solve_steps(n)`** stays, documented for what it is: the receding `n`-step law, `n`
   sweeps from the terminal cost and the stage-0 table used as a stationary law (Bertsekas'
   receding horizon). Its record says `mode="receding"` (`fixed_horizon` goes, it would clash
@@ -270,21 +270,24 @@ keywords passed through.
 
 ### 5.2 Two numbers LQR must read
 
-- **The discount rate** (`PP-Q4`): on `e^{−ρt}`-discounted costs the textbook equivalence is
-  the undiscounted problem on `A − (ρ/2) I`; or a discounted problem is refused.
+- **The discount rate** (`PP-D16`): on `e^{−ρt}`-discounted costs the planner solves the
+  textbook equivalent, the undiscounted problem on `A − (ρ/2) I` (the finite sweep too), and
+  warns once that the problem is discounted (unusual for LQR), naming the shift.
 - **The time origin:** the finite schedule is computed on `0 … T` and read relative to `t0`
   (`K(t − t0)`); the solution's `TimeVaryingFeedback` and `QuadraticField(x̄, S, t)` carry the
   absolute times `t0 + s`. This was an open point; it is the only consistent reading.
 
 ### 5.3 The face
 
-- **`z`:** infinite, `[K ; x̄ ; ū]`; finite, `[K(s) ; x̄ ; ū ; t0]` on the relative times `s`.
+- **`z`:** infinite, `[K ; x̄ ; ū]`; finite, `[K(s) ; K∞ ; x̄ ; ū ; t0]` on the relative times
+  `s`, `K∞` the stationary gain at the final operating point (one more `care`; the
+  `K_after` slot of `TimeVaryingFeedback`).
 - **`pv.solve(params)`:** `lqr_matrices` and the Riccati solve at the tree, on the host (SciPy:
   refused under a trace, with the message naming the host loop); `z0` ignored; `status["cost"]
   = (x0 − x̄)ᵀ P (x0 − x̄)` (or `S(t0)`).
 - **`pv.initial(params)`:** the solve at the tree (a direct method has no other guess).
 - **`pv.command(z, x, t)`:** `ū − K (x − x̄)`, or `ū − K(t − t0)(x − x̄)` read on the schedule,
-  with the past-the-end rule of `PP-Q2`.
+  `ū − K∞ (x − x̄)` past `tf`.
 - **`pv.solution(z, params)`:** the law, the record (`P` or `S(t)`, the poles at the tree) and
   the cost-to-go, `QuadraticField(x̄, P)` or `QuadraticField(x̄, S, t)`. A test checks that a
   long schedule's `S(t)` passes the field's symmetry check.
@@ -331,10 +334,10 @@ class GridField(Field):
 - **The sweeps keep their rule** (arrival cost `0` off the grid, the pair priced by `G`):
   `bellman_backup` never sees the field's outside rule, so the tables stay byte-identical.
 - **A bare `GridField` holds the edge** (`PP-D10`); `outside=` a number on request.
-- **The planner's cost-to-go** is `PP-Q3`: the edge held, as ruled, or `out_of_bound_cost`, the
-  meaning the sweeps give to leaving the grid. With the edge held, a state off the grid reads
-  as cheap as its nearest edge node, so `J.as_set(upper=…)` can contain it and
-  `J.as_terminal_cost()` can pull a plan out of the box.
+- **The planner's cost-to-go** charges `out_of_bound_cost` outside the grid (`PP-D15`): the
+  meaning the sweeps give to leaving it, so `J.as_set(upper=…)` never contains an off-grid
+  state and `J.as_terminal_cost()` never pulls a plan out of the box (`grid.field(J)` passes
+  it).
 - **The infeasible cells:** the cells pinned at the failure cost are a cliff, and linear
   reading ramps across it (the gradient there is about `INF / Δx`). The feasible set is
   `J.as_set(upper=threshold)` with the threshold the planner's `out_of_bound_cost`, named on the
@@ -394,8 +397,7 @@ workflow, outside the comparison.
   time-varying); `command(z, x, t)` always receives the state; a time-varying `z` carries `t0`;
   the test is that every planner closes in the MPC loop.
 - `PP-D2` **Value iteration supports both horizons**, chosen by the problem; the finite
-  horizon (formerly S63, v0.5) moves to this work. (`PP-Q1` asks how it meets the three
-  examples of §2.)
+  horizon (formerly S63, v0.5) moves to this work. The three examples of §2 migrate (`PP-D13`).
 - `PP-D3` **The policy stays in `z`** (as the command table, §4.5).
 - `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law.
 - `PP-D5` **`LookupPolicy` takes a schedule** for the finite horizon (§4.4).
@@ -408,40 +410,42 @@ workflow, outside the comparison.
 - `PP-D9` **`GridField(levels, values, t=None)` in `core/fields.py`,** on one native reading of
   a table shared with the lookup law.
 - `PP-D10` **Outside the grid, a `GridField` holds the edge,** `outside=` a number on request.
-  (`PP-Q3` asks whether the planner's cost-to-go uses it.)
+  (The planner's cost-to-go charges the failure cost instead, `PP-D15`.)
 - `PP-D11` **A `Q` table is a `GridField` over `(x, u)`;** its reductions land with tabular RL
   in v0.5.
 - `PP-D12` **A grid field reads time linearly,** held past its ends; the law holds per stage.
 
+After the reviews (asked one by one, same day):
+
+- `PP-D13` **The problem decides the mode, and the three examples migrate** (the README
+  comparison, the showcase, the optimal-control tutorial): value iteration on
+  `problem.replace(horizon=None)` where the converged law is meant, the finite law where it is
+  shown on purpose; one rule, LQR's.
+- `PP-D14` **Past its horizon, a feedback plan applies its stationary law at its final point.**
+  Holding the last stage is myopic (a tie at action `0` when `h = 0`; `K(tf) = 0` for LQR with
+  `S = 0`), and stage 0 is wrong for a law linearized along a trajectory (the maintainer's
+  point: `K(t0)` of a swing-up is designed with the pendulum down). So: LQR, `K∞` at the final
+  operating point (`x̄`; `x_d(tf)`, `u_d(tf)` for tracking), one more Riccati solve, carried in
+  `z`; value iteration, stage 0, the full-horizon law, its stationary law approximated without a
+  second solve (the grid is global, no linearization point); open-loop plans hold their last
+  input. A simulation longer than the horizon is the only reader: scoring stops at `tf`, and the
+  MPC re-solves every tick.
+- `PP-D15` **The planner's cost-to-go charges the failure cost outside the grid;** a bare
+  `GridField` keeps the edge held (`PP-D10`).
+- `PP-D16` **Discounted LQR solves the undiscounted equivalent on `A − (ρ/2) I`,** with a
+  warning that the problem is discounted (unusual for LQR); the known issue closes with it.
+
 ## 10. Decisions the reviews raised
 
-For the maintainer (each with the agent's recommendation):
+Ruled on 2026-11-06 (`PP-Q1` to `PP-Q4` became `PP-D13` to `PP-D16`, §9). Open:
 
-- `PP-Q1` **The three examples that solve value iteration on a finite-horizon problem** (§2:
-  the README comparison, the showcase, the optimal-control tutorial). Under `PP-D2` they switch
-  from the converged law to `T / dt` sweeps and a time-varying law, and their `compare()` scores
-  move. Options: (a) the problem decides, as ruled, and the three examples are migrated in the
-  same change (`problem.replace(horizon=None)` for value iteration, or the finite law shown on
-  purpose); (b) the finite mode is opt-in (`solve(horizon="problem")`), the default stays the
-  converged law. *Recommendation:* (a): one rule, the LQR rule; the migration is three cells.
-- `PP-Q2` **The law past the horizon's end.** Holding the last stage is harmful: with `h = 0`
-  the last stage's action is a tie broken at action `0` (the double-integrator notebook's time
-  cost gives full negative input everywhere), and finite LQR with `S = 0` has `K(tf) = 0`, open
-  loop. Options: (a) hold the last stage, documented; (b) hold stage 0, the full-horizon law
-  (the receding law, the one `solve_steps` gives); (c) refuse a time past `tf`.
-  *Recommendation:* (b) for both planners' laws (`TimeVaryingFeedback` already takes
-  `K_after`); the trajectory faces keep holding their tail input.
-- `PP-Q3` **The planner's cost-to-go outside the grid:** (a) the edge held, as `PP-D10` rules
-  for a bare field; (b) `out_of_bound_cost`, the sweeps' own meaning. *Recommendation:* (b) for
-  the planner's field (`grid.field(J)` passes it), (a) stays the bare field's default: the
-  planner's value should say what the planner computed.
-- `PP-Q4` **Discounted LQR:** (a) the undiscounted equivalent on `A − (ρ/2) I`, the textbook
-  form; (b) refuse a discounted problem. Today it is silently wrong (a known issue to record).
-  *Recommendation:* (a), with a test against value iteration on a discounted double integrator.
-- `PP-Q5` **The GRO860 notebooks' words on `solve_steps`** (student-facing): they call it the
-  finite-horizon recursion; after this work the faithful twin of `exact_dp(N)` is `solve()` on
-  `horizon = N dt`. The library changes nothing in the notebooks; the maintainer decides whether
-  their text changes.
+- `PP-Q5` **The GRO860 notebooks' words on `solve_steps`** (student-facing): two notebooks call
+  it the finite-horizon recursion (`grid_world_dynamic_programming.ipynb`,
+  `double_integrator_minimum_time.ipynb` §4). After this work `solve_steps(N)` still gives the
+  same `J_0` (their plots unchanged) but a stationary law; the time-varying law is `solve()` on
+  `horizon = N dt`. Options: leave them; one sentence each pointing to `solve()`; switch them to
+  `solve()`. The library changes nothing in them; until the maintainer says otherwise, they are
+  left as they are.
 
 The agent's to settle, recorded here:
 
@@ -491,18 +495,18 @@ listed are the field's, each with its own test):
 - `PP-3` The shared grid reading; `GridField` in `core/fields.py`; value iteration's and LQR's
   `cost_to_go` as fields; `quadratic_cost_to_go` removed. Number moves, each tested: the
   cost-to-go read natively (about `1e-16` inside the grid), the cost-to-go outside the grid
-  (`PP-Q3`), the lookup law if the shared reading changes it anywhere.
+  (`PP-D15`), the lookup law if the shared reading changes it anywhere.
 
 **Second change: the two modes, the MPC, the faces:**
 - `PP-4` Value iteration's finite mode: the stacks, `LookupPolicy`'s schedule, `J(x, t)`, the
   JAX scan, the record's `mode`, `solve_steps` documented, the size limit; the three examples
-  of `PP-Q1` as ruled; tests: the finite mode against `solve_steps`, LQR and value iteration
-  agreeing on the finite-horizon double integrator, the `h = 0` case past `tf` (`PP-Q2`), the
+  migrated (`PP-D13`); tests: the finite mode against `solve_steps`, LQR and value iteration
+  agreeing on the finite-horizon double integrator, the `h = 0` case past `tf` (`PP-D14`), the
   stage index on float ticks; every demo calling `solve_steps` run.
 - `PP-5` The MPC and the follower read the state (`pv.feedback`, the `x0` binding, the
   follower's `y`): open-loop loops byte-identical; the dual-rate snippet and its test.
 - `PP-6` The two compiled faces: §8's comparison in both modes, NumPy and JAX;
   `test_no_recompile.py` extended; LQR and value iteration (infinite in the MPC loop, both modes
-  in the follower) closing; the discounted LQR of `PP-Q4`.
+  in the follower) closing; the discounted LQR of `PP-D16` (its warning, and against value iteration on a discounted double integrator).
 - `PP-7` DESIGN §4 and §6, ROADMAP's ledger rows, TODO, KNOWN_ISSUES for anything left; this
   doc deleted once landed.
