@@ -79,8 +79,8 @@ maintainer would and logged in the run's record.
 ## 1. v0.4 — the clean surface
 
 **Next, in order** (as of 2026-11-05, the nine API surface rulings built on `api-surface-rulings-review`):
-1. **A continuous run records its signals from its own pass** (§1.11): the companion split off
-   the block-selector ruling, benchmarked first. Cleared to start.
+1. **A diagram run records the plant's input by default** (§1.11, ruled 2026-11-06,
+   [signals-from-the-run.md](signals-from-the-run.md)). Cleared to start.
 2. **The decisions waiting for the maintainer** before their rows can start: the core API
    proposals CA-1, CA-2 and CA-5, the minimal surface's MS-D1 to MS-D6, `refresh()` retired and
    a later round of API proposals (all §1.11 and §1.12).
@@ -285,20 +285,14 @@ commit per proposal, its callers and DESIGN in the same change.
   evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
   `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
   a result object for `pv.solve`. Done when the maintainer rules on each.
-- [ ] **A continuous run records its signals from its own pass** (was the companion of the
-  block-selector ruling AR-7; split off 2026-11-05, its own branch after the rulings). Today an
-  adaptive run computes every internal signal at its own stage points and throws them away, then
-  `record=` and `reconstruct_internal_signals` evaluate them again at the saved samples, one
-  Python call per sample. On a fixed-step or compiled run the named signals come out of the step
-  loop at each step's first evaluation (as the sampled loop does); on an adaptive run one batched
-  pass at the saved samples (`vmap` on JAX). Benchmark before any default changes: nothing
-  recorded, the plant's input only, every port; NumPy and JAX; short and long runs and a gradient
-  through a rollout; run time and peak memory (asking a compiled run for every port forces XLA to
-  compute and store what it would otherwise drop). The plant's input becomes recorded by default
-  only if it costs a few percent at most; every port stays opt-in (`record="all"`) unless the
-  measurements say otherwise. A behaviour-preserving restructure: AGENTS' baseline recipe, the
-  math read next to `dp.py`. Done when the signals come from the run's own pass on both
-  backends, the benchmark is in `benchmarks/`, and the default is set by its numbers.
+- [ ] **A diagram run records the plant's input by default** (ruled 2026-11-06, replacing the
+  2026-11-05 few-percent bar; design: [signals-from-the-run.md](signals-from-the-run.md)):
+  `record="plant"` the default on every diagram run, `None` nothing, a tuple of names (nested
+  paths), `"all"`; a fixed-step run records from its step's own first stage, an adaptive run by
+  a pass at the saved samples inside the `Simulator` on the run's numbers; the sampled loop on
+  the same spelling. Done when `traj.of("plant")` is complete on every default diagram run, the
+  unrecorded run is byte-identical and as fast as on `dev` (the A/B of the plan), and the
+  contract is in DESIGN with the plan doc deleted.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
   contract DESIGN §4 "Parameters"). Three of its four landed (the problem evaluator was found to
   run its tree as an argument already, its run jitted on the tree; a planner's method numbers and

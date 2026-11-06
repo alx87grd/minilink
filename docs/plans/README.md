@@ -37,6 +37,7 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
 | [core-api-improvements.md](core-api-improvements.md) | The core API proposals from the `examples/tutorial/core/` review (`CA-1`, `CA-2` and `CA-5` open; `CA-3`, `CA-6` and `CA-7` landed), with reproducers and diffs | v0.4 (TODO §1.11) |
+| [signals-from-the-run.md](signals-from-the-run.md) | **Ruled, to build.** A diagram run records the plant's input by default (`record="plant"`, `None`, names, `"all"`): where the signals come from on each solver, the reasons and the cost | v0.4 (TODO §1.11) |
 | [minimal-surface.md](minimal-surface.md) | **Decisions open.** Demos, notebooks, tests and CI redrafted on the core: the audit, the decisions `MS-D1`–`MS-D6` with options, the order | v0.4 (TODO §1.12) |
 | [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.5 (the proof of concept landed in v0.3) |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
