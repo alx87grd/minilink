@@ -29,6 +29,18 @@ lands. Last checked against the code: 2026-11-05.
 
 ## Planning and learning
 
+### A value-iteration law cannot run in a JAX closed loop
+- **Symptom:** `(solution.policy @ plant).compute_trajectory(..., backend="jax")` with a
+  value-iteration solution's `LookupPolicy` raises "Block ... is not JAX-traceable": the law
+  indexes its NumPy command table with a traced cell. `backend="auto"` (the default of
+  `evaluate` and `compare(problem, ...)`) falls back to NumPy, which is the faster backend at
+  the grid sizes the law serves.
+- **Workaround:** run the loop on NumPy (the default); the value-iteration solve itself runs on
+  JAX with `DynamicProgrammingPlanner(..., backend="jax")`.
+- **Fix:** none planned yet: taking the table into the point's array module makes the law trace
+  (one line), but `backend="auto"` would then move it to JAX; how `"auto"` should choose for it
+  waits for the maintainer ([plans-as-policies.md](../plans/plans-as-policies.md) §13).
+
 ### Direct collocation fails on a ball-shaped goal set
 - **Symptom:** `TrajectoryOptimizationPlanner(..., transcription="direct_collocation")` on a
   problem whose `Xf` is a `BallSet` stops with SLSQP's "Inequality constraints

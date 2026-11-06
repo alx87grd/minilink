@@ -545,10 +545,11 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
 - The JAX compiled path, checked against `dev`: the jitted Bellman step and the compiled sweep
   loop trace to the identical program (about 29 ms per compiled solve either way); the traced
   lookup law computes `1 − y` once per axis instead of per corner (two fewer operations, the
-  same values). A defect found there: on `dev` the lookup law could not be compiled with JAX
-  (its NumPy table indexed by a traced cell), although its docstring said it traces. The shared
-  reading now takes its table into the point's array module (a no-op on NumPy), so a JAX closed
-  loop with a value-iteration law runs with `backend="jax"` and matches NumPy. Under
-  `backend="auto"` the law stays on NumPy (ruled 2026-11-06: faster on the small systems it
-  serves; one JAX evaluation paid about 0.7 s of compile): `LookupPolicy.prefers_numpy`, read by
-  `compile_auto`. `solve(evaluate=True)` stays on NumPy.
+  same values). On `dev` the lookup law cannot be compiled with JAX (its NumPy table is
+  indexed by a traced cell), although its docstring says it traces; that keeps
+  `backend="auto"` on NumPy for it, the faster backend on the small systems it serves. Ruled
+  2026-11-06: no per-block backend preference; the law stays NumPy-only as on `dev`, the JAX
+  closed loop a known issue to decide later; `GridField` converts its own table, so the field
+  traces as its contract requires. The core planners tutorial gives LQR the undiscounted problem
+  (value iteration keeps its `ρ = 0.2`, which its sweeps need to converge: undiscounted they
+  stop at the 1000-sweep cap with `ΔJ = 19`).

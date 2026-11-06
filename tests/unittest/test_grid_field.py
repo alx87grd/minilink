@@ -124,6 +124,11 @@ def test_the_field_traces_and_its_gradient_is_jaxs():
     traced = jax.jit(lambda X, p: V.value(X, params=p))(jnp.asarray(X), V.params)
     np.testing.assert_allclose(np.asarray(traced), V.value(X), rtol=1e-12)
 
+    # Its own table, a constant of the trace
+    np.testing.assert_allclose(
+        np.asarray(jax.jit(V.value)(jnp.asarray(X))), V.value(X), rtol=1e-12
+    )
+
     x = jnp.asarray(X[0])
     np.testing.assert_allclose(
         np.asarray(jax.grad(V.value)(x)), V.gradient(X[0]), rtol=1e-10
@@ -164,18 +169,3 @@ def test_lqrs_cost_to_go_is_a_quadratic_field_in_both_horizons():
     assert isinstance(finite.cost_to_go, QuadraticField)
     np.testing.assert_array_equal(finite.cost_to_go.t, t)
     assert finite.cost_to_go(x, t=t[40]) == pytest.approx(d @ S[40] @ d, rel=1e-12)
-
-
-@pytest.mark.jax
-def test_value_iterations_law_closes_a_jax_loop_as_on_numpy():
-    pytest.importorskip("jax")
-    problem = regulation()
-    law = DynamicProgrammingPlanner(problem, max_iterations=30, **GRID).solve().policy
-    plant = problem.sys
-    plant.x0 = np.array([0.5, 0.0])
-    loop = law @ plant
-
-    on_numpy = loop.compute_trajectory(tf=2.0, solver="rk4_fixedsteps")
-    on_jax = loop.compute_trajectory(tf=2.0, solver="rk4_fixedsteps", backend="jax")
-
-    np.testing.assert_allclose(np.asarray(on_jax.x), on_numpy.x, rtol=1e-9, atol=1e-12)

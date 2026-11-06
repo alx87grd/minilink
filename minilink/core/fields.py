@@ -573,7 +573,7 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = self.table_at(t, params)
+        table = xp.asarray(self.table_at(t, params))
         X = xp.asarray(x, dtype=float)
 
         # x held inside the grid on each axis: the edge's value past it
@@ -601,7 +601,7 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = self.table_at(t, params)
+        table = xp.asarray(self.table_at(t, params))
         X = xp.asarray(x, dtype=float)
 
         # Zero along an axis where x is held, and everywhere outside with a number
@@ -688,7 +688,6 @@ def grid_value(levels, table, X, *, nearest=False):
     array module.
     """
     xp = array_module(X, table)
-    table = xp.asarray(table)
     n = len(levels)
 
     # A stack's weights take one axis per trailing axis of the table, to multiply its
@@ -732,7 +731,6 @@ def grid_value(levels, table, X, *, nearest=False):
 def grid_gradient(levels, table, X):
     """``∂V/∂x`` of the multilinear form of the cell holding each point of ``X`` (``(n,)`` or ``(M, n)``): one entry per axis, last."""
     xp = array_module(X, table)
-    table = xp.asarray(table)
     n = len(levels)
 
     # The cell and the position in it on each axis, and the cell's width
