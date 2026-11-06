@@ -37,7 +37,6 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| Plans as policies: the GRO860 notebooks' words on `solve_steps` | PP-Q5 | v0.4 | leave them, one sentence each, or switch them to `solve()` ([plans-as-policies.md](plans-as-policies.md) §10); left as they are until then |
 | The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
@@ -237,7 +236,7 @@ solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
     `test_dynamic_programming.py`, `test_lqr_planner.py` and the GRO860 value-iteration
     notebooks pass;
   - **the two modes, the MPC, the faces** (`PP-4` to `PP-7`; the reviews' decisions ruled,
-    `PP-D13` to `PP-D16`): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
+    `PP-D13` to `PP-D17`): done when `solve()` on a finite-horizon problem runs `T / dt` sweeps
     with a time-varying law and `J(x, t)`, its `J_0` equals `solve_steps(N)`'s, and LQR and
     value iteration agree on the finite-horizon double integrator; the infinite mode stays
     byte-identical; the MPC and the follower read the state, the open-loop loops
@@ -245,6 +244,10 @@ solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
     plan's §8 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py`
     covers the two faces; DESIGN §4 and §6 carry the landed contracts and the plan doc is
     deleted.
+  - **Later, the maintainer's own pass:** the GRO860 notebooks' wording on `solve_steps`
+    (`grid_world_dynamic_programming.ipynb`, `double_integrator_minimum_time.ipynb` §4) when the
+    course is next taught: after this work the time-varying finite-horizon law is `solve()` on
+    `horizon = N dt`; their cells and plots are unchanged (`PP-D17`).
 
 ### 1.9 Fields
 

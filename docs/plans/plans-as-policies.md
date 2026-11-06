@@ -434,18 +434,15 @@ After the reviews (asked one by one, same day):
   `GridField` keeps the edge held (`PP-D10`).
 - `PP-D16` **Discounted LQR solves the undiscounted equivalent on `A − (ρ/2) I`,** with a
   warning that the problem is discounted (unusual for LQR); the known issue closes with it.
+- `PP-D17` **The GRO860 notebooks stay as they are.** Their `solve_steps(N)` cells keep the same
+  `J_0` tables and plots, and their words stay true of what they plot; the wording (the
+  time-varying law is `solve()` on `horizon = N dt`) is revisited when the course is next
+  taught, a note in TODO, not a change here.
 
 ## 10. Decisions the reviews raised
 
-Ruled on 2026-11-06 (`PP-Q1` to `PP-Q4` became `PP-D13` to `PP-D16`, §9). Open:
-
-- `PP-Q5` **The GRO860 notebooks' words on `solve_steps`** (student-facing): two notebooks call
-  it the finite-horizon recursion (`grid_world_dynamic_programming.ipynb`,
-  `double_integrator_minimum_time.ipynb` §4). After this work `solve_steps(N)` still gives the
-  same `J_0` (their plots unchanged) but a stationary law; the time-varying law is `solve()` on
-  `horizon = N dt`. Options: leave them; one sentence each pointing to `solve()`; switch them to
-  `solve()`. The library changes nothing in them; until the maintainer says otherwise, they are
-  left as they are.
+Ruled on 2026-11-06: `PP-Q1` to `PP-Q4` became `PP-D13` to `PP-D16` (§9); `PP-Q5` became
+`PP-D17`. No decision is open.
 
 The agent's to settle, recorded here:
 
