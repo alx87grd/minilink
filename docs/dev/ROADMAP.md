@@ -111,6 +111,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   every solver (a sampled input held, a function read where the solver evaluates `f`),
   `compute_rollout`'s input sequence `(m, n_steps)`; an intersection's, a union's and a scene's
   members keyed by class name; the `input_interp` solver option gone.
+- 2026-11-06 (on the branch `signals-from-the-run`, for `0.4.0`): a diagram run records the
+  plant's whole input by default, `record="plant"`, on every solver and on the sampled loop
+  (`record=None` records nothing, a tuple names signals, nested paths included, `"all"` every
+  output port), so `traj.of("plant")` is complete on every default run; `record=None` turns off
+  the sampled loop's forced record of `"plant:u"`; a default adaptive run of a diagram takes one
+  signal pass per saved sample after the run (about 0.13 s on 10 001 samples); a fixed-step run
+  records from its own first stage at no measurable cost.
 
 ## 3. Maturity (TRL)
 
@@ -388,10 +395,11 @@ name, the solve time at the user's verb, `traj.of("plant")` on every diagram run
 two replanning routes), with the clean-up rows bundled on them (the RL default policy sized from
 `problem.U`, the value-iteration command clipped to its box, no cache left, the program
 evaluator's textbook derivative names, members keyed by class name); their contracts are
-DESIGN's, enforced by `test_vocabulary.py`.
+DESIGN's, enforced by `test_vocabulary.py`. The recording ruling of 2026-11-06: every diagram run
+records the plant's input by default (DESIGN, `DiagramSystem`), from the run's own pass on a
+fixed-step run.
 
 **Left** (the order of work: TODO §1, "Next, in order"):
-- **A continuous run records its signals from its own pass** (TODO §1.11), benchmarked first.
 - **The core API proposals** ([core-api-improvements.md](../plans/core-api-improvements.md),
   CA-1, CA-2 and CA-5; TODO §1.11) **[ask — core]**, and a later round of API proposals.
 - **The minimal surface** ([minimal-surface.md](../plans/minimal-surface.md), its decisions

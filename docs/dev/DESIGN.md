@@ -249,14 +249,13 @@ is refused at compile, since it would tick faster there than in its box alone. T
 (the one continuous system, at any depth) is what the dense run keeps the substeps of and the
 host runner integrates adaptively; the dense run, the substeps and the host runner exist exactly
 when the loop has one. Signals propagate within the tick: a delay is a
-block. A run records signals from its own signal pass: `compute_trajectory(record=("path/block:port",
-…))` keeps each tick's value held over its period (the end sample the last tick's) in the
-trajectory's `signals`, `compute_rollout(record=)` the same at the ticks, and a loop with a
-plant always records `"plant:u"` and its `plant` role,
-so `traj.of("plant")`, the plots, the animation and the MPC overlays compute nothing again; the
+block. A run records signals from its own signal pass, by the one `record=` rule of every
+diagram run (below, `DiagramSystem`): `compute_trajectory(record=…)` keeps each tick's value
+held over its period (the end sample the last tick's) in the trajectory's `signals`,
+`compute_rollout(record=)` the same at the ticks; by default the plant's input `"plant:u"`, so
+`traj.of("plant")`, the plots, the animation and the MPC overlays compute nothing again; the
 planning evaluator's run takes its signals from the same pass (`rollout_with_cost(signals=True)`).
-A continuous diagram's `record=` and `reconstruct_internal_signals(traj, ports=…)` evaluate
-only the named ports and the blocks they read, once per sample after the run.
+The host clock runner records nothing.
 
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`
@@ -573,11 +572,24 @@ the mixin, `diagram.of("plant")` the block by its id or role (a path, `"inner/pl
 nested diagram) and `subsystem_id` a block or its id. **One block selector on every run:** a
 diagram's run carries `roles`, every block's state slice by id (a nested block by its path), so
 `traj.of("plant")` is the plant's own `(t, x, u)` by static indexing on a continuous loop as on
-a sampled one; the input is the recorded signal `"plant:u"` (a sampled loop records its plant's
-always; a continuous run with `record=("plant:u",)`, an input port being a recordable signal like
-an output port), else empty. A cost written for the plant alone scores the plant inside any loop,
-`loop.compute_cost(cost, of="plant")` (the block or its id): the recorded run, else the plant's
-input rebuilt from the stored states with the blocks' current `params` (`block_run`).
+a sampled one; the input is the recorded signal `"<block>:u"`, else empty, `(0, N)`.
+**What a diagram run records** (ruled 2026-11-06), one rule on every solver and both kinds of
+loop: `record="plant"`, the default, the plant's whole input `"plant:u"` when the diagram has a
+`plant` block, so `traj.of("plant")` is complete on every default run; `record=None` nothing
+(the fastest run: hand sweeps, benchmarks, library loops); a tuple of names (`"block:port"` an
+output port, `"block:u"` a block's whole input when it has no output port named `u`, a nested
+block by its path, `"plant/arm:u"`); `record="all"` every output port. A lone block records
+nothing and refuses names. A fixed-step run reads the record off each step's own first stage
+(`rollout(record=)`: `k₁` and the record from one signal pass, the states bit for bit the
+unrecorded run's, its program the same when the record is empty); an adaptive run, the
+variable-step Euler and a run forced by a function of time take one signal pass per saved
+sample after the run, inside the `Simulator`, on the numbers the run was made with. A cost
+written for the plant alone scores the plant inside any loop, `loop.compute_cost(cost,
+of="plant")` (the block or its id): the recorded run, else the plant's input rebuilt from the
+stored states (`block_run`, which, with `reconstruct_internal_signals` and `port_samples`,
+takes `params=`, the run's tree, and reads the blocks' current numbers without it). Scoring a
+run whose plant input was not recorded (`evaluate_trajectory`, the MPC overlays) is refused,
+naming `record=("plant:u",)`.
 Every `System` has the two cost shortcuts over that path:
 `sys.compute_cost(cost, of=None, traj=None)` returns `J` as a number and
 `sys.plot_cost(...)` plots the running cost and `J(t)`; `of=None` scores the
@@ -785,7 +797,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   the plots) NumPy by contract; `traj.at(t, name="x")` reads one channel at a time, linear
   between the samples and held outside (`interpolate_schedule`, the one time-interpolation
   the gain schedules read too); a diagram's run carries `roles`, every block's state slice by
-  id, so `traj.of("plant")` is the plant's run by static indexing (its input when recorded).
+  id, so `traj.of("plant")` is the plant's run by static indexing (its input recorded by
+  default, `DiagramSystem` below).
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
   boolean under JAX); `sample(key, n=None, params=None)` follows the distributions' draw
@@ -1029,7 +1042,8 @@ differences on NumPy, `jax.jacfwd` on the uncompiled body on JAX).
 
 **Frozen evaluator subset.** The stable evaluator API is the methods above: `f`,
 `outputs`, `signals`, `step`, `rollout`, `rollout_batch` and `jacobian`, each with
-`params=None`, and `nominal_input`.
+`params=None`, and `nominal_input`. A diagram evaluator's `rollout(record=names)` returns
+`(x_samples, records)`, the named signals at the start of each period from its first stage.
 
 Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 
