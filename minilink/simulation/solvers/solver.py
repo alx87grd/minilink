@@ -13,8 +13,14 @@ class SolverBackend(ABC):
     """
     Integrate ``ẋ = f(x, u, t)`` through an evaluator of the dynamics primitives.
 
-    The evaluator provides ``f(x, u, t)`` and its ``nominal_input``.
+    The evaluator provides ``f(x, u, t)`` and its ``nominal_input``. A backend
+    whose ``records_from_pass`` is true takes ``record=`` on :meth:`integrate`
+    and :meth:`integrate_forced` and returns ``(x, records)``, a diagram's named
+    signals read off each step's own pass; the others record nothing (the
+    simulator reads the signals at the saved samples after the run).
     """
+
+    records_from_pass = False
 
     @abstractmethod
     def integrate(

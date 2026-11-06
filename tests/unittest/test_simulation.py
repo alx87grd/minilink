@@ -1526,3 +1526,83 @@ def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evalua
         u=lambda tt: np.array([tt]), tf=1.0, n_steps=11, solver="euler"
     )
     np.testing.assert_allclose(run.x[0, -1], dt * np.sum(t[:-1]), rtol=1e-9)
+
+
+# --- a diagram run records the plant's input by default ---
+
+
+def _pid_pendulum():
+    from minilink import PID, Pendulum
+
+    loop = PID(Kp=10.0, Kd=1.0) @ Pendulum()
+    loop.x0 = np.array([0.0, 0.0, 0.4, 0.0])
+    return loop
+
+
+@pytest.mark.parametrize(
+    "run",
+    [
+        {},
+        {"solver": "rk4_fixedsteps", "n_steps": 201},
+        {"solver": "euler_fixedsteps", "n_steps": 201},
+        {"solver": "euler"},
+        pytest.param(
+            {"solver": "rk4_fixedsteps", "n_steps": 201, "backend": "jax"},
+            marks=pytest.mark.jax,
+        ),
+    ],
+)
+def test_a_diagram_run_records_the_plants_input_from_the_run_itself(run):
+    loop = _pid_pendulum()
+    traj = loop.compute_trajectory(tf=1.0, **run)
+    bare = loop.compute_trajectory(tf=1.0, record=None, **run)
+
+    # The plant's complete run by default; the unrecorded run's states, bit for bit
+    np.testing.assert_array_equal(traj.x, bare.x)
+    assert traj.of("plant").u.shape == (1, traj.n_samples)
+    expected = loop.reconstruct_internal_signals(bare, ports=("plant:u",))
+    np.testing.assert_allclose(
+        traj.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+    )
+
+    # record=None keeps nothing, the plant's role still names its state slice
+    assert bare.signal_names == ("x", "u")
+    assert bare.roles["plant"]["u"] is None
+
+
+def test_record_names_all_and_the_refusals():
+    loop = _pid_pendulum()
+    every = loop.compute_trajectory(tf=0.5, record="all")
+    for sys_id, block in loop.subsystems.items():
+        for port_id in block.outputs:
+            assert every.has_signal(f"{sys_id}:{port_id}")
+    named = loop.compute_trajectory(tf=0.5, record=("controller:u",))
+    assert named.signal_names == ("x", "u", "controller:u")
+
+    with pytest.raises(ValueError, match="a sequence of names"):
+        loop.compute_trajectory(tf=0.5, record="controller:u")
+    with pytest.raises(TypeError, match="leaf"):
+        loop.subsystems["plant"].compute_trajectory(tf=0.5, record=("plant:u",))
+    assert loop.subsystems["plant"].compute_trajectory(tf=0.5).signal_names == (
+        "x",
+        "u",
+    )
+
+
+def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
+    from minilink import Simulator
+
+    loop = _pid_pendulum()
+    for solver in ("scipy", "rk4_fixedsteps"):
+        sim = Simulator(loop, tf=1.0, n_steps=201, solver=solver)
+        tree = sim.params
+        tree["controller"]["Kp"] = np.array([2.0])
+        run = sim.solve(params=tree, record=("plant:u",))
+
+        # The reader at the run's tree agrees; at the blocks' own numbers it would not
+        expected = loop.reconstruct_internal_signals(run, ("plant:u",), params=tree)
+        stale = loop.reconstruct_internal_signals(run, ("plant:u",))
+        np.testing.assert_allclose(
+            run.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+        )
+        assert not np.allclose(run.get_signal("plant:u"), stale.get_signal("plant:u"))

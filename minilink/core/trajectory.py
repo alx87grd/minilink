@@ -132,9 +132,10 @@ class Trajectory(SampledSignals):
         ``traj.of("plant")`` indexes the diagram's samples by the static layout in
         :attr:`roles`, so it traces under JAX like any slice; a block inside a
         nested diagram is a path, ``traj.of("inner/plant")``. A diagram's run
-        records every block's state slice; the input is the recorded signal
-        ``"plant:u"`` (a sampled loop records its plant's; a continuous run with
-        ``record=("plant:u",)``), else empty, ``(0, N)``.
+        records every block's state slice and, by default, the plant's input
+        ``"plant:u"``; another block's input is there when the run named it
+        (``record=("controller:u",)``), else empty, ``(0, N)`` (a run made with
+        ``record=None`` keeps no input at all).
         """
         require_role(self, role)
         start, stop = self.roles[role]["x"]

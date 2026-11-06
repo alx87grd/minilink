@@ -125,7 +125,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return compile_diagram(self, backend=backend, verbose=verbose, flatten=flatten)
 
-    def reconstruct_internal_signals(self, traj: Trajectory, ports=None) -> Trajectory:
+    def reconstruct_internal_signals(
+        self, traj: Trajectory, ports=None, params=None
+    ) -> Trajectory:
         """
         Reconstruct subsystem output-port trajectories for this diagram.
 
@@ -135,8 +137,12 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             State-input trajectory sampled on a time grid.
         ports : sequence of str, optional
             The signals to compute, ``"sys_id:port_id"``, an output port or a
-            block's input port (``"plant:u"``): only those and the blocks they
-            read are evaluated. ``None``: every output port.
+            block's whole input (``"plant:u"``), a nested block by its path
+            (``"plant/arm:u"``): only those and the blocks they read are
+            evaluated. ``None``: every output port.
+        params : dict, optional
+            The tree the run was made with; ``None`` reads the blocks' current
+            numbers, which are the run's only when they were not changed since.
 
         Returns
         -------
@@ -146,7 +152,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         """
         if ports is not None:
             return traj.with_signals(
-                {name: self.port_samples(traj, name) for name in ports}
+                {name: self.port_samples(traj, name, params) for name in ports}
             )
 
         evaluator = self.compile(backend="numpy")
@@ -162,37 +168,52 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # Every port's value at each sample, from the compiled evaluator
         for i, t in enumerate(traj.t):
             step_signals = evaluator.compute_internal_signals_dict(
-                traj.x[:, i], traj.u[:, i], t
+                traj.x[:, i], traj.u[:, i], t, params
             )
             for key, value in step_signals.items():
                 internal_signals[key][:, i] = value
 
         return traj.with_signals(internal_signals)
 
-    def port_samples(self, traj: Trajectory, name: str) -> np.ndarray:
-        """One port's value at every sample of ``traj``, ``(dim, N)``: an output port and the blocks it reads, or a block's input port (``"plant:u"``); a nested block by its path (``"plant/arm:u"``)."""
+    def port_samples(self, traj: Trajectory, name: str, params=None) -> np.ndarray:
+        """
+        One signal's value at every sample of ``traj``, ``(dim, N)``.
+
+        ``"block:port"`` is an output port and the blocks it reads; ``"block:u"``
+        on a block without an output port named ``u`` is its whole input, every
+        port stacked; another input port by its name; a nested block by its path
+        (``"plant/arm:u"``), one level at a time. ``params`` is the tree the run
+        was made with (``None``: the blocks' current numbers).
+        """
         path, _, port_id = name.rpartition(":")
         outer, _, rest = path.partition("/")
         if rest:
-            # Down one level: the nested diagram's own run, then its port
-            inner = self.subsystems[self.subsystem_id(outer)]
-            return inner.port_samples(block_run(self, outer, traj), f"{rest}:{port_id}")
+            # Down one level: the nested diagram's own run, then its signal
+            sys_id = self.subsystem_id(outer)
+            inner = self.subsystems[sys_id]
+            inner_params = None if params is None else params[sys_id]
+            return inner.port_samples(
+                block_run(self, outer, traj, params), f"{rest}:{port_id}", inner_params
+            )
 
         sys_id, port_id = signal_port_of(self, name)
         block = self.subsystems[sys_id]
 
-        # An output port's value, or an input port's: the block's input the diagram fed it
+        # An output port's value; else the block's whole input, or one input port
         if port_id in block.outputs:
             values = [
                 self.compute_subsys_output_port(
-                    traj.x[:, i], traj.u[:, i], t, sys_id, port_id
+                    traj.x[:, i], traj.u[:, i], t, sys_id, port_id, params=params
                 )
                 for i, t in enumerate(traj.t)
             ]
         else:
-            port_slice = block.get_input_port_slice(port_id)
+            whole = port_id == "u"
+            port_slice = slice(None) if whole else block.get_input_port_slice(port_id)
             values = [
-                self.get_local_input(traj.x[:, i], traj.u[:, i], t, sys_id)[port_slice]
+                self.get_local_input(
+                    traj.x[:, i], traj.u[:, i], t, sys_id, params=params
+                )[port_slice]
                 for i, t in enumerate(traj.t)
             ]
 
@@ -216,15 +237,16 @@ def require_flow_subsystem(sys, sys_id):
         )
 
 
-def block_run(diagram, path, traj) -> Trajectory:
+def block_run(diagram, path, traj, params=None) -> Trajectory:
     """
     The run of one block of ``diagram`` as the block saw it, reconstructed from the diagram's run.
 
     ``x`` is the block's own state and ``u`` the input it received from the
     diagram (connected signals, boundary inputs, or nominal values), at each
-    sample of ``traj``; the input is recomputed from the stored states with the
-    blocks' current ``params``. ``path`` is a block id, or ``"a/b"`` for a block
-    inside a nested diagram, one level at a time.
+    sample of ``traj``; the input is recomputed from the stored states on
+    ``params``, the tree the run was made with (``None``: the blocks' current
+    numbers). ``path`` is a block id, or ``"a/b"`` for a block inside a nested
+    diagram, one level at a time.
     """
     sys_id, _, rest = path.partition("/")
     sys_id = diagram.subsystem_id(sys_id)
@@ -235,10 +257,13 @@ def block_run(diagram, path, traj) -> Trajectory:
     u = np.zeros((subsystem.m, traj.n_samples))
     for k, t in enumerate(traj.t):
         x[:, k] = diagram.get_local_state(traj.x[:, k], sys_id)
-        u[:, k] = diagram.get_local_input(traj.x[:, k], traj.u[:, k], t, sys_id)
+        u[:, k] = diagram.get_local_input(
+            traj.x[:, k], traj.u[:, k], t, sys_id, params=params
+        )
     run = Trajectory(t=traj.t, x=x, u=u)
+    inner_params = None if params is None else params[sys_id]
 
-    return run if not rest else block_run(subsystem, rest, run)
+    return run if not rest else block_run(subsystem, rest, run, inner_params)
 
 
 def block_roles(diagram, recorded=(), offset=0, prefix=""):
@@ -288,7 +313,9 @@ def signal_port_of(diagram, name):
     sys_id, _, port_id = name.partition(":")
     subsystem = diagram.subsystems.get(sys_id)
     if subsystem is None or (
-        port_id not in subsystem.outputs and port_id not in subsystem.inputs
+        port_id not in subsystem.outputs
+        and port_id not in subsystem.inputs
+        and port_id != "u"
     ):
         known = [
             f"{block_id}:{port}"

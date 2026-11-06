@@ -1005,14 +1005,15 @@ def test_the_failure_cost_follows_the_evaluations_discount_rate():
     assert cost_fast < cost_own
 
 
-def test_a_run_with_no_recorded_plant_input_is_refused_by_name_when_scored():
+def test_a_run_made_with_record_none_is_refused_by_name_when_scored():
     from minilink.planning.evaluation import evaluate_trajectory
 
     problem = upright_problem()
     loop = pid() @ problem.sys
-    bare = loop.compute_trajectory(tf=0.5, dt=0.01)
+    bare = loop.compute_trajectory(tf=0.5, dt=0.01, record=None)
     with pytest.raises(ValueError, match="record=\\('plant:u',\\)"):
         evaluate_trajectory(problem, bare)
 
-    recorded = loop.compute_trajectory(tf=0.5, dt=0.01, record=("plant:u",))
+    # The default run records the plant's input: it scores as it is
+    recorded = loop.compute_trajectory(tf=0.5, dt=0.01)
     assert np.isfinite(evaluate_trajectory(problem, recorded).J).all()
