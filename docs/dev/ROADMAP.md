@@ -148,7 +148,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.5). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point. | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`; `NoiseSource`, sampled noise of any law, `WhiteNoise` its subclass), TF, `MLP`, `UnitDelay`. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.5). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side, and `compare(problem, …, dt=)` scores them on the problem; an inadmissible pair priced by the problem's cost bound; `dp.py` is the textbook reference of the style; the grid reads the problem's step face. | Cost-to-go as a `GridField` (v0.5); policy iteration (S51); DP reading a finite horizon (S63), v0.5. |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution`; `compare()` reads solutions side by side, and `compare(problem, …, dt=)` scores them on the problem; an inadmissible pair priced by the problem's cost bound; `dp.py` is the textbook reference of the style; the grid reads the problem's step face. | The cost-to-go as a `GridField`, DP reading a finite horizon and the compiled face (v0.4, [plans-as-policies.md](../plans/plans-as-policies.md)); policy iteration (S51), v0.5. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt; the method table (`gd`, `adam`, `l-bfgs`, `method="auto"`) with a first-order backend, `z0` optional (S74); the generic parametric program on the backend table, the stochastic program its case; a native fixed-step solver with `n_iterations=K` as a proof of concept. | Harden SciPy/Ipopt before TRL 6; the friction-aware MPC example from a port (S76's rest, TODO §1.7); native solvers beyond the proof of concept in v0.5 ([native-optimizers.md](../plans/native-optimizers.md)). |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |
@@ -421,7 +421,7 @@ fixed-step run.
 | 5 | The sampled loop: a step diagram, two runners | nothing (the realtime runner on the pure blocks is v0.5) |
 | 6 | One score | a step problem's own tree: `realize` and the tick offset |
 | 7 | The parametric program; the stochastic program its seed case | the friction-aware MPC example from a port |
-| 8 | The native proof of concept | the compiled face of the LQR and value-iteration planners |
+| 8 | The native proof of concept | plans as policies ([plans-as-policies.md](../plans/plans-as-policies.md)): the compiled face of the LQR and value-iteration planners, value iteration on a finite horizon, their cost-to-go as fields |
 | 9 | Fields | nothing |
 | 10 | Hardening and the release | the student-facing numbers re-pinned, the merge, the `0.4.0` tag |
 
@@ -474,7 +474,7 @@ a core pillar names it.
   GMC714 arm topic's modelling rung; design first. **[ask — core]**
 - The former wave G rows: **C1** pyro parity and the pyro → minilink migration guide,
   **C2**'s robotic PID wrappers, **C3** the blocks (`Ramp` / `Chirp` / `Delay` / `Switch`),
-  **S63** DP reading a finite horizon, **S64** catalog hygiene.
+  **S64** catalog hygiene (DP reading a finite horizon moved to v0.4, plans as policies).
 - **S73** Traceable linear analysis, any time, self-contained.
 
 ### 5.6 v0.9 — freeze candidate (spring 2027, indicative, set before 2026-10-26)

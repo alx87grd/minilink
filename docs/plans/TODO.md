@@ -56,7 +56,6 @@ maintainer would and logged in the run's record.
 | Approximate dynamic programming | C5 | v0.5 | design first; it touches the planner API |
 | The general serial chain | C6 | v0.5 | one mechanism description (DH table or URDF) |
 | The pyro → minilink migration guide | C1 | v0.5 | its section in README |
-| Value iteration on a finite horizon | S63 | v0.5 | backward sweeps for a finite `tf`, or a warning |
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | The move of the course material | K6 | v0.9 | only if K5 says so |
@@ -221,22 +220,29 @@ Design: [native-optimizers.md](native-optimizers.md); the face and the MPC's con
 DESIGN §6. Better
 solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
 
-- [ ] **The compiled face beyond trajectory optimization** (the rest of the compiled face; the face on
-  trajectory optimization, its `"method"` and `seed` leaves, the MPC as one box on it and its
-  closed loop tuned by gradient landed in the v0.3 runs): `planner.compile()` for the LQR and
-  value-iteration planners, the others as they are wrapped; the face keeps no last solution
-  (RULES 2.4: only the offline planner's shortcuts keep one). What each face holds (`z`; `initial`;
-  `shift`; `command`):
-  - LQR: `K`, `x̄`, `ū`; the gain at the operating point; identity; `ū − K(x − x̄)`;
-  - value iteration: the `J` and `π` tables; `J` from the terminal cost (or zeros); identity;
-    the lookup `π(x)`;
-  - RL: the weights; the network initialized from `seed`; identity; the network at `x`;
-  - RRT (never traced, its algorithm is not pure): the path resampled to `n_steps` knots and
-    `t0`; the straight line from `x0` to the goal; drop the part already passed; the
-    path's input at `t`.
-
-  Done when `pv.solution(pv.solve(p)[0])` reproduces `planner.solve()` byte-identically for
-  LQR and value iteration.
+- [ ] **Plans as policies** (design and rulings of 2026-11-06:
+  [plans-as-policies.md](plans-as-policies.md), its steps `PP-1` to `PP-7`; it absorbs the
+  compiled face of the LQR and value-iteration planners, value iteration on a finite horizon
+  (formerly S63, v0.5) and the part of the field object the two planners need). The faces of
+  the trajectory-optimization and MPPI planners, the MPC as one box on them and its closed
+  loop tuned by gradient landed in the v0.3 runs; the RL and RRT faces stay with their v0.5
+  rows, on the same contract. Two changes, in order:
+  - **contract, pure cores, fields** (`PP-1` to `PP-3`): done when the face contract is in
+    DESIGN §6; `bellman_backup` and `lqr_gains` open their files and the planners call them,
+    the seeded value-iteration and LQR baselines `cmp` byte-identical; `GridField` is in
+    `core/fields.py` on the interpolation shared with `LookupPolicy`, traces under JAX, and is
+    value iteration's `cost_to_go`, `QuadraticField` LQR's; the two intended changes (the native
+    read, the edge held outside the grid) have their own tests; `test_planning_solution.py`,
+    `test_dynamic_programming.py`, `test_lqr_planner.py` and the GRO860 value-iteration
+    notebooks pass;
+  - **the two modes, the faces, the MPC** (`PP-4` to `PP-7`): done when `solve()` on a
+    finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, and LQR
+    and value iteration agree on the finite-horizon double integrator; the infinite mode stays
+    byte-identical; `pv.solution(pv.solve(p)[0])` reproduces `planner.solve()` byte-identically
+    for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py` covers the
+    two faces; LQR and value iteration close in the MPC loop and the dual-rate loop, the
+    trajectory and MPPI loops byte-identical; DESIGN §4 and §6 carry the landed contracts and
+    the plan doc is deleted.
 
 ### 1.9 Fields
 
@@ -245,8 +251,9 @@ Contract: DESIGN §4, "Fields". Baselines first.
 No open row: `Field`, `QuadraticField` and the four conversions landed in the v0.3 run
 (acceptance script 7).
 
-The rest of the field object (`GridField`, `CallableField`, `LinearApproximator` and
-`PolicyEvaluator`'s field-shaped result) is a row of §4, after the core.
+`GridField` and the cost-to-go of LQR and value iteration as fields are §1.8 (plans as
+policies). The rest of the field object (`CallableField`, `LinearApproximator`, tabular RL's
+`Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4, after the core.
 
 ### 1.10 Hardening and the release
 
@@ -647,18 +654,17 @@ pillar names it.
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
 
-- [ ] **The rest of the field object** **[ask — core]** (A1, after the minimal `Field` of §1.9): `GridField(grid, values)`
-  (`value(x)` interpolates a `StateSpaceGrid` table with `grid.interpolate`'s `fill_value=0`
-  outside, so the DP numbers hold; a leading time axis, the per-sweep tables of
-  `record_history=True` / `solve_steps`, gives `value(x, t)`, the finite-horizon `J(x, t)`; a
-  trailing action axis over `grid.actions` gives `value(x, u) = Q(x, u)`, with `min_over_u()`
-  the `J` field and `greedy()` the `LookupPolicy`; DP's and tabular RL's `cost_to_go` become
-  one, `sol.cost_to_go(x)` working either way); `CallableField` (RL critics); `LinearApproximator` as a field;
-  `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the field (its
-  `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon` handing out
-  `QuadraticField(x̄, S, t)` beside its controller (later, with the fields' consumers); `PolicyEvaluator` takes the evaluators' verb and returns a
-  field-shaped result (scan: planning#4). Done when the DP baselines `cmp` and
-  `test_planning_solution.py`, `test_rl_tabular.py` and `test_rl_planner.py` pass.
+- [ ] **The rest of the field object** **[ask — core]** (A1; `GridField` itself and the
+  cost-to-go of LQR and value iteration as fields are §1.8, plans as policies): tabular RL's
+  `Q` as a `GridField` over the joint levels of `(x, u)`, with `min_over_u()` the `J` field and
+  `greedy()` the `LookupPolicy` (ruled 2026-11-06, [plans-as-policies.md](plans-as-policies.md)
+  §6.4), and tabular RL's `cost_to_go` on it; `CallableField` (RL critics); `LinearApproximator`
+  as a field; `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the
+  field (its `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon`
+  handing out `QuadraticField(x̄, S, t)` beside its controller; `PolicyEvaluator` takes the
+  evaluators' verb and returns a field-shaped result (scan: planning#4). Done when the DP
+  baselines `cmp` and `test_planning_solution.py`, `test_rl_tabular.py` and
+  `test_rl_planner.py` pass.
 
 **Workspace geometry.** Design: [geometry-module.md](geometry-module.md) (the field object is
 §1.9). Baselines first, as each plan states.
@@ -730,10 +736,6 @@ pillar names it.
     Also: one constructor contract for the robotic laws (scan: control#6).
   - [ ] **Blocks** (C3): `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `UnitDelay` take
     a `dim` like every static block (scan: graphics#11).
-  - [ ] **DP reads the horizon** (S63) **[ask — planner API]** (scan: planning#1): a finite
-    `problem.tf` runs `round(tf / dt)` backward sweeps as `solve_steps` does, the way
-    `LQRPlanner` picks the Riccati ODE, or warns once. Done when LQR and DP agree on the
-    finite-horizon double integrator.
   - [ ] **Catalog hygiene** (S64) **[ask — catalog]** (scan: dynamics#0, dynamics#1,
     dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8; the mechanical default
     bounds landed, each plant states its own): output ports that are
