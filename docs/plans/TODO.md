@@ -340,8 +340,11 @@ commit per proposal, its callers and DESIGN in the same change.
   `m`, `p` unchanged. Done when the reproducer builds without `y_dependencies`, no `n=` keyword
   is left, `test_vocabulary.py` pins `state_dim`, and DESIGN §4 states the shortcut, its static
   default and the naming.
-- [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
-  `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
+- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract):
+  `evaluator.h(x, u, t, params)` on `Evaluator` and `DiscreteEvaluator`, the `"y"` port, empty
+  when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
+  port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
+  pins `sys.h == outputs["y"]` on every block and catalog plant.
 - [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
   public-surface scan, after its nine rulings landed; each needs its own context and options
   before a ruling): the planner's shortcuts taking the solution's names (`plot_solution` →

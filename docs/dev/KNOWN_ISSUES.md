@@ -27,6 +27,16 @@ lands. Last checked against the code: 2026-11-05.
 - **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
   ruling of 2026-11-05 (DESIGN §4, "Parameters", rule 5).
 
+## Blocks
+
+### `sys.h` returns zeros on `Mux`, `Saturation` and `Sum`
+- **Symptom:** `Saturation().h(x, u)` returns `[0.]` while its `"y"` port gives the saturated
+  input (the same on `Mux` and `Sum`): these blocks compute `"y"` by another function and keep
+  the base `h`, whose default is zeros. Diagrams and simulations read the port and are right;
+  a direct call of `h` is not.
+- **Workaround:** `block.outputs["y"].compute(x, u, t, params)`.
+- **Fix:** the output map on the compiled evaluators (CA-2, TODO §1.11), ruled 2026-11-07.
+
 ## Tooling
 
 ### The RL-to-Bode showcase notebook runs close to the notebook checker's time limit

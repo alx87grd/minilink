@@ -118,6 +118,13 @@ Instead, a user authoring a static `System` must write explicit `add_input_port`
 
 ## CA-2. Add `.h(x, u=None, t=0.0, params=None)` on compiled evaluators (`Evaluator` and `DiscreteEvaluator`)
 
+**Ruled 2026-11-07: one contract, enforced.** `h` *is* the `"y"` port everywhere, empty when a
+block has none (a `PID`, whose output is the command `"u"`): `ev.h(x, u=None, t=0.0, params=None)`
+returns the `"y"` port or an empty array, exactly as `sys.h` (no fallback to a lone port, which
+would make `ev.h` on a PID its command while `pid.h` is empty). A defect found in the review is
+fixed with it: `Mux`, `Saturation` and `Sum` compute their `"y"` port by another function and
+`sys.h` returns zeros; a test pins `sys.h == outputs["y"]` on every block and catalog plant.
+
 ### Problem and reproducer
 On any `System`, the two primary textbook equations (`CONSTITUTION.md` §2) are:
 - `sys.f(x, u, t=0.0, params=None) -> ndarray (n,)`
