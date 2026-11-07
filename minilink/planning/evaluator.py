@@ -679,9 +679,9 @@ def evaluate(
     return pe.evaluate(key=key, n_trials=n_trials, record=record)
 
 
-def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
+def nominal_trajectory(problem, controller, *, dt, tf=None) -> Trajectory:
     """
-    The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
+    The planner's evidence: ``controller``'s law held over each period of ``dt`` from the problem's start.
 
     ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
     takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
@@ -697,14 +697,14 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     from minilink.core.roles import command_port
 
     nominal = problem.nominal() if problem.is_stochastic else problem
-    policy = controller_of(policy)
+    controller = controller_of(controller)
     plant = nominal.sys
     n_steps = steps_of(horizon_of(nominal, tf), float(dt))
 
     # The face's step, the law on the grid, the command's slice of the plant input
     face = face_of(nominal, float(dt))
     t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
-    law = held_law(policy, t)
+    law = held_law(controller, t)
     command = plant.get_input_port_slice(command_port(plant))
     u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
 
@@ -833,12 +833,12 @@ def integrate_adaptive(f, x0, u, ts, options):
     return solution.y.T
 
 
-def held_law(policy, t):
-    """``u = π(x, t)`` of a policy block on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
-    if int(policy.m) == 0:
-        return time_law(policy, t)
+def held_law(controller, t):
+    """``u = π(x, t)`` of a controller on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
+    if int(controller.m) == 0:
+        return time_law(controller, t)
 
-    return static_law(policy)
+    return static_law(controller)
 
 
 def time_law(source, t):

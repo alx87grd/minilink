@@ -1259,11 +1259,11 @@ def problem_parts(problem):
     return headline, body
 
 
-def planning_horizon_text(tf):
+def planning_horizon_text(horizon):
     """The horizon as printed: ``None``, ``inf`` or its number."""
-    if tf is None:
+    if horizon is None:
         return "None"
-    if not np.isfinite(tf):
+    if not np.isfinite(horizon):
         return "inf"
 
-    return f"{tf:g}"
+    return f"{horizon:g}"
