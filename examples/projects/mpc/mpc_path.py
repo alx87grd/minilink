@@ -17,6 +17,7 @@ import numpy as np
 from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
+from minilink.core.geometry.paths import from_waypoints
 from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.core.trajectory import Trajectory
 from minilink.graphical.animation.primitives import (
@@ -28,7 +29,6 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import sample_field_costs
 from minilink.planning.spatial.overlays import TrackCorridorOverlay
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_3d
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.planner import (

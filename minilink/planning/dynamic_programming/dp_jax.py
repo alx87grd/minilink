@@ -6,7 +6,10 @@ import numpy as np
 
 from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
-from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.dp import (
+    DynamicProgrammingResult,
+    bellman_backup,
+)
 from minilink.planning.dynamic_programming.progress import (
     SweepLog,
     maybe_print_build_progress,
@@ -323,21 +326,17 @@ def jitted_step(planner):
     order = 0 if planner.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds, gamma):
-        # Estimated (interpolation) cost-to-go of all the arrival states, zero off
-        # the grid
-        J_arrival = map_coordinates(
-            J_next.reshape(shape), coords, order=order, mode="constant", cval=0.0
-        )
-        J_arrival = jnp.where(in_bounds, J_arrival, 0.0)
+        # The cost-to-go one step ahead read at the successors, zero off the grid
+        def arrival(J):
+            J_arrival = map_coordinates(
+                J.reshape(shape), coords, order=order, mode="constant", cval=0.0
+            )
+            return jnp.where(in_bounds, J_arrival, 0.0).reshape(N, A)
 
-        # Q(x, u) = g(x, u) dt + γ J_next(x_next), for every pair at once
-        Q = G + gamma * J_arrival.reshape(N, A)
+        # J(x) = min_u [ g(x, u) dt + γ J_next(x_next) ]
+        J, pi = bellman_backup(J_next, G, arrival, gamma)
 
-        # Best action at every node
-        J = Q.min(axis=1)
-        pi = Q.argmin(axis=1).astype(jnp.int32)
-
-        return J, pi
+        return J, pi.astype(jnp.int32)
 
     planner.compiled["step"] = jax.jit(step)
 

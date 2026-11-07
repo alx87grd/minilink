@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from minilink.catalog import UdeSRacecar, UdeSRacecarDyn, UdeSRacecarDyn3D
+from minilink.core.geometry.paths import circuit_waypoints
 from minilink.graphical.catalog.racecar_skin import (
     ASSETS,
     GEOMETRY,
@@ -16,7 +17,6 @@ from minilink.graphical.catalog.racecar_skin import (
     track_lines,
     track_scene,
 )
-from minilink.planning.spatial.paths import circuit_waypoints
 
 STL_FILES = (
     "chassis.STL",

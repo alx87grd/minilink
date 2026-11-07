@@ -71,7 +71,7 @@ in [ROADMAP.md](ROADMAP.md) §5 and the workboard
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (`geometry.py`; **planned package** `core/geometry/` — Path, Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (the package `core/geometry/`: `shapes.py`, the solids by their signed distance, and `paths.py`, the reference paths, a polyline open or `closed`; **planned** in it — Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `SampledSystem` (`sampled_system.py`: a system on a clock), `StepDiagramSystem` (`step_diagram.py`), `SampledDiagramSystem` (`sampled_diagram.py`: the sampled loop, its holds and the plant's run inside it) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -84,7 +84,7 @@ or neural network alike):
 | `blocks/` | plant-agnostic wiring: sources, `Integrator`, `TransferFunction` (and `Lead`, its lead compensator), routing (`Error`/`Sum`/`Gain`/`Mux`/`Demux`), nonlinear (`Saturation`), filters (`LowPassFilter`), neural (`MLP`), the step block `UnitDelay` |
 | `dynamics/` | plants: `abstraction/` mother classes, `catalog/` by physical domain |
 | `catalog/` | **teaching alias** of `dynamics/catalog/` — flat re-exports for short imports (`from minilink.catalog import Pendulum`); ownership stays in `dynamics/` |
-| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `stochastic.py` (`GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, `u = μ(x) + σ(x) ε(t)` with `ε` the noise block's counter signal of its seed at `⌊t/Δ⌋`, `seed=None` the mean; `log_prob` and `entropy` as methods; `SquashedGaussianPolicy` in a box), `geometric.py` (`PurePursuit`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
+| `control/` | control laws and design verbs: `design.py` (`lqr`, `place`, `lqr_finite_horizon`, `lqg`, `trajectory_lqr` on a linear model or a plant; their gains on arrays), `siso.py` (`P`, `PI`, `PD`, `PID`), `state.py`, `impedance.py`, `robotic.py`, `modelbased.py`, `neural.py`, `stochastic.py` (`GaussianPolicy(mean, log_std, *, sample_period, seed=None)`, `u = μ(x) + σ(x) ε(t)` with `ε` the noise block's counter signal of its seed at `⌊t/Δ⌋`, `seed=None` the mean; `log_prob` and `entropy` as methods; `SquashedGaussianPolicy` in a box), `geometric.py` (the path-tracking laws `PurePursuit`, `Stanley`, `LineOfSight`, each reading a `core/geometry` path, and the heading loop `HeadingController`); `ModelPredictiveController` re-exported from `planning/trajectory_optimization/mpc/`. The port contract is §4, 'Control laws' |
 | `estimation/` | state observers and their designs: `observer.py` (`StateObserver`, the innovation form, ports `u`, `y` → `x`, role `observer`), `design.py` (`luenberger`, `kalman`, the duals of `place` and `lqr`) |
 
 **Tools** — verbs on a `System`; they return data or plots and never define
@@ -817,7 +817,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   and four conversions named by what they return: `as_set(lower=, upper=)` (a `FieldSet`;
   `as_set(upper=level)` is the sublevel set), `as_input_set` (an `InputSet` over `u` at `x`),
   `as_cost(weight=, shaping=)` (the running cost `g = weight · shaping(V)`) and
-  `as_terminal_cost` (the terminal cost `h`). The shaping functions (`quadratic_hinge`,
+  `as_terminal_cost` (the terminal cost `h`). Time goes by keyword, `V(x, t=t)`: the
+  second positional argument is `u`. The shaping functions (`quadratic_hinge`,
   `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
@@ -833,7 +834,19 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
-  a short-horizon MPC.
+  a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
+  `(x̄, S, t)` on a finite horizon).
+  `GridField(levels, values, t=None, *, method="linear", outside=None)` is a table on a
+  regular grid read as a field: multilinear in the cell holding `x` (`"nearest"` its closest
+  node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only; a leading time
+  axis on `t` read linearly and held past its ends, the `QuadraticField` rule. Outside the grid
+  the edge holds (`x` clamped on each axis), or `V = outside` when a number is given. Its
+  `params` are `{"levels", "values"}` and, as given, `t` and `outside`; its gradient is the
+  cell's exact multilinear one. The cell reading is one function (`grid_value`), which
+  `LookupPolicy` shares for its command table (extending the edge cell past the grid, then
+  clipping `u`); the field and the lookup law each take their table into the point's array
+  module, so both trace with their table a constant: a JAX closed loop runs the law, and
+  `backend="auto"` scores it on JAX like every law that traces (ruled 2026-11-06). Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
@@ -883,7 +896,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `traj.with_cost(cost)` the plotting signals. Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`); parameters nest by term id ('Parameters').
   The horizon, the discount, the sets and the failure cost are the problem's.
-- Geometry (`geometry.py`; its planned package `core/geometry/` is in §3): `Shape.sdf(p)` is the signed distance to a workspace
+- Geometry (`core/geometry/shapes.py`; the rest of its package is in §3): `Shape.sdf(p)` is the signed distance to a workspace
   *solid* — `< 0` inside (occupied), the dual of an allowable `Set` (`margin ≥ 0`).
   Primitives `Sphere`/`Box`/`Union`/`Inflated`; native-array math path (NumPy and
   JAX-traceable). `sdf(p, t, params)` is threaded by the spatial scene pipeline;
@@ -1211,9 +1224,9 @@ bounds the command, since the Riccati law never reads `U` (LQR never
 warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
-`cost_to_go` where the method produces one (the DP and tabular tables; the
-Riccati form of `LQRPlanner`; the RL critic when the training discount equals
-the problem's). Everything on the solution is the solver's own claim under its
+`cost_to_go` where the method produces one (a `GridField` for value iteration,
+a `QuadraticField` for `LQRPlanner`, read `J(x)` or `J(x, t=t)`; the tabular table and
+the RL critic, when the training discount equals the problem's, plain callables of `x`). Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
@@ -1230,14 +1243,18 @@ side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
 one scale; `compare(problem, VI=..., PID=pid, dt=, n_trials=, key=)` also scores every
 entry (a solution, a controller, or a given `Evaluation`) by `evaluate` on the same draws
-and one backend (NumPy for all when one entry does not trace), and `difference(a, b)` is
+and one backend (NumPy for all when one entry does not trace), its `dt` as `evaluate` reads
+it (a sampled controller on its own clock, `dt` only for a continuous one), and `difference(a, b)` is
 the paired `J_a − J_b`. `LQRPlanner
-(problem)` is the linear-quadratic method on a `QuadraticCost` problem: `A`,
-`B` at the cost's `(x_bar, u_bar)`, the algebraic Riccati equation for an
-infinite `tf`, the differential one swept from `S` for a finite `tf`; its
-`RiccatiRecord` holds `K`, `P`, the closed-loop poles (success = Hurwitz) and
-the finite-horizon schedule. `control.design` stays the array-in / block-out
-factory the planner calls.
+(problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
+first function of `lqr.py`, lowers it to `(A, B, Q, R, S)` at the cost's `(x_bar, u_bar)`
+(`B` and `R` over the command port), then the algebraic Riccati equation for an
+infinite `tf`, the differential one swept from `S` for a finite `tf`. A discounted problem
+(`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
+`A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
+unusual; the poles stay the plant's, `eig(A − B K)`. Its `RiccatiRecord` holds `K`, `P`, the
+closed-loop poles (success = Hurwitz) and the finite-horizon schedule. `control.design` stays
+the array-in / block-out factory the planner calls.
 
 **Horizon and the constraint set:** the horizon has one owner, `problem.horizon` — a
 finite length is a finite horizon and `h` is charged at `t0 + horizon`; `+inf` or unset is an
@@ -1599,7 +1616,12 @@ the discount the face's `γ` and the failure cost its rule; a `StepPlanningProbl
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
 to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
 `policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
-interpolates `J` (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
+is `J` as a `GridField` on the grid (`grid.field(J)`: read by the planner's interpolation,
+the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
+callable; `planner.value_at` reads it). The backup is one function at the top of `dp.py`,
+`bellman_backup(J_next, G, arrival, gamma)`, `J = min_u [G + γ J_next(x_next)]` with its
+argmin, each engine passing its reading of the grid (`arrival`, zero off the grid); the
+`"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
 `solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
@@ -1638,8 +1660,10 @@ geometry: :func:`~minilink.planning.spatial.collision.disc`,
 `X = bounds & free`, `cost = base + w * terrain`. Scene param overrides online are the reserved `scene` tier (§4,
 'Parameters'): rebuild the `Scene` and recompile the parametric program.
 
-**Reference track** (`planning/spatial/paths.py`, `track.py`): workspace centerlines
-from waypoint polylines via `from_waypoints` (default `kind="polyline"`), wrapped in
+**Reference track** (`core/geometry/paths.py`, `planning/spatial/track.py`): workspace centerlines
+from waypoint polylines via `from_waypoints` (default `kind="polyline"`; `closed=True` adds the
+segment back to the first waypoint and wraps the arc length round the loop, a structural
+switch held on the path, not in its `params`), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
 `corridor_field(body).as_set(lower=0)` for a hard tube. Probe semantics match

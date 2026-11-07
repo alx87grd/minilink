@@ -387,16 +387,16 @@ def racecar_mpc() -> None:
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d
 
-    lap = (mpc % MPC_DT) @ car
-    result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
+    closed_loop = (mpc % MPC_DT) @ car
+    result = closed_loop.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
     # one sample per video frame: the trail's pages stay small
     frames = result.resample(n_samples=int(30 * TF_SIM / PLAYBACK) + 1)
-    traj = plant_run(frames, lap)
+    traj = plant_run(frames, closed_loop)
     overlays = mpc_animation_overlays(
-        result, mpc, loop=lap, scene=scene, track=track, traj=traj
+        result, mpc, loop=closed_loop, scene=scene, track=track, traj=traj
     )
     save_meshcat(
-        lap,
+        closed_loop,
         frames,
         "racecar_mpc.html",
         "racecar_mpc.gif",

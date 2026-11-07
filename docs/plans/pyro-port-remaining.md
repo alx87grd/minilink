@@ -51,7 +51,7 @@ Release criterion carried over: every **in-scope** pyro library module has a min
 | Minilink | What | Notes |
 | --- | --- | --- |
 | `minilink/core/compile/` | `compile`, the execution plans (`plan.py`), one evaluator per system kind on either backend (`DynamicEvaluator`, `DiagramEvaluator`, `StaticEvaluator`, `StepEvaluator`, `StepDiagramEvaluator`) | Compile band; pyro has no separate compile layer |
-| `minilink/core/geometry.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
+| `minilink/core/geometry/shapes.py` | SDF shapes (`Shape`, `Sphere`, `Box`, `Union`, `Inflated`); the cost algebra is `core/costs.py` | Spatial primitives (planned package `core/geometry/`, [geometry-module.md](geometry-module.md)) |
 | `minilink/optimization/` | MathematicalProgram, Optimizer | General NLP; pyro trajopt is narrower |
 | `minilink/planning/spatial/` | Scene, WorkspaceField, CollisionBody (`mount`) | Obstacle/clearance layer replaces *withObstacles plants (retires into `core/geometry/`) |
 | `minilink/planning/search/dubins.py` | Dubins steering | Extra beyond pyro RRT |

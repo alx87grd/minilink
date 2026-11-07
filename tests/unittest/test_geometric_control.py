@@ -1,11 +1,10 @@
-"""Contract of the pure-pursuit tracker, of the test circuit and of the rate limiter."""
+"""Contract of the geometric path-tracking laws, of the paths they read, and of the heading loop."""
 
 import numpy as np
 import pytest
 
-from minilink.control import PurePursuit
-from minilink.control.geometric import is_closed
-from minilink.planning.spatial.paths import circuit_waypoints
+from minilink.control import HeadingController, LineOfSight, PurePursuit, Stanley
+from minilink.core.geometry import circuit_waypoints, from_waypoints, is_closed
 
 WHEELBASE = 0.34
 LOOKAHEAD = 0.6
@@ -20,18 +19,28 @@ def state_at(x, y, theta, speed, dim=9):
 
 
 def straight_path(length=10.0, n_points=51):
-    """Waypoints along ``y = 0``, from the origin forward."""
-    return np.column_stack([np.linspace(0.0, length, n_points), np.zeros(n_points)])
+    """An open path along ``y = 0``, from the origin forward."""
+    waypoints = np.column_stack(
+        [np.linspace(0.0, length, n_points), np.zeros(n_points)]
+    )
+
+    return from_waypoints(waypoints)
 
 
-def circle_path(radius, n_points=721):
-    """Waypoints on a circle centred on the origin, counter-clockwise, not closed up."""
+def circle_path(radius, n_points=3601):
+    """A closed path on a circle centred on the origin, counter-clockwise."""
     angles = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=False)
+    waypoints = radius * np.column_stack([np.cos(angles), np.sin(angles)])
 
-    return radius * np.column_stack([np.cos(angles), np.sin(angles)])
+    return from_waypoints(waypoints, closed=True)
 
 
-# The test circuit
+def circuit_path(**dimensions):
+    """The closed test circuit as a path."""
+    return from_waypoints(circuit_waypoints(**dimensions), closed=True)
+
+
+# The path
 
 
 def test_circuit_is_a_closed_loop_with_even_spacing():
@@ -59,105 +68,127 @@ def test_circuit_turns_counter_clockwise():
 
 
 def test_a_loop_is_read_as_closed_and_a_line_as_open():
-    """The closing gap tells the two apart, and the tracker picks it up by itself."""
+    """The closing gap tells the two apart; a path is open unless told it loops."""
+    line = np.column_stack([np.linspace(0.0, 10.0, 51), np.zeros(51)])
+
     assert is_closed(circuit_waypoints()) is True
-    assert is_closed(straight_path()) is False
-    assert PurePursuit(circuit_waypoints()).params["closed"] is True
-    assert PurePursuit(straight_path()).params["closed"] is False
-    assert PurePursuit(straight_path(), closed=True).params["closed"] is True
+    assert is_closed(line) is False
+    assert from_waypoints(circuit_waypoints()).closed is False
+    assert from_waypoints(circuit_waypoints(), closed=True).closed is True
 
 
-def test_a_path_needs_at_least_two_points_in_the_plane():
+def test_a_path_needs_at_least_two_points():
     """A malformed path is refused at construction, not at the first solver step."""
     with pytest.raises(ValueError):
-        PurePursuit(np.zeros((1, 2)))
-    with pytest.raises(ValueError):
-        PurePursuit(np.zeros((5, 3)))
+        from_waypoints(np.zeros((1, 2)))
 
 
-# The steering law
+def test_a_closed_path_wraps_round_its_closing_segment():
+    """A loop's length includes the closing gap, and its arc length wraps there."""
+    waypoints = circuit_waypoints(length=12.0, width=8.0, radius=2.0)
+    loop = from_waypoints(waypoints, closed=True)
+    line = from_waypoints(waypoints)
+    gap = np.linalg.norm(waypoints[0] - waypoints[-1])
+    L = loop.total_length
+
+    # the gap between the last waypoint and the first belongs to the loop only
+    middle = 0.5 * (waypoints[0] + waypoints[-1])
+    s, c = loop.project(middle)
+
+    assert L == pytest.approx(line.total_length + gap, rel=1e-12)
+    assert loop.sample(L + 0.3) == pytest.approx(loop.sample(0.3), abs=1e-12)
+    assert loop.sample(-0.3) == pytest.approx(loop.sample(L - 0.3), abs=1e-12)
+    assert c == pytest.approx(middle, abs=1e-12)
+    assert s == pytest.approx(L - 0.5 * gap, rel=1e-12)
 
 
-def test_straight_path_ahead_needs_no_steering():
+def test_an_open_path_holds_its_ends():
+    """Past either end of an open path, the point is that end."""
+    line = straight_path()
+
+    assert line.sample(-1.0) == pytest.approx([0.0, 0.0])
+    assert line.sample(15.0) == pytest.approx([10.0, 0.0])
+
+
+# Pure pursuit
+
+
+def test_pursuit_on_a_straight_path_ahead_needs_no_steering():
     """A car already on a straight line, pointing along it, holds the wheel still."""
-    tracker = PurePursuit(straight_path(), wheelbase=WHEELBASE, lookahead=LOOKAHEAD)
+    law = PurePursuit(straight_path(), wheelbase=WHEELBASE, lookahead=LOOKAHEAD)
 
-    delta = tracker.ctl(np.zeros(0), state_at(1.0, 0.0, 0.0, 3.0))
+    delta = law.ctl(np.zeros(0), state_at(1.0, 0.0, 0.0, 3.0))
 
-    assert delta[0] == pytest.approx(0.0, abs=1e-9)
+    assert delta[0] == pytest.approx(0.0, abs=1e-12)
 
 
-def test_steering_follows_the_side_the_path_is_on():
-    """A path to the left steers left, a path to the right steers right."""
-    tracker = PurePursuit(straight_path(), wheelbase=WHEELBASE, lookahead=LOOKAHEAD)
+def test_pursuit_steers_toward_the_side_the_path_is_on():
+    """A path to the left steers left, a path to the right steers right, alike."""
+    law = PurePursuit(straight_path(), wheelbase=WHEELBASE, lookahead=LOOKAHEAD)
 
-    from_the_right = tracker.ctl(np.zeros(0), state_at(1.0, -0.3, 0.0, 3.0))
-    from_the_left = tracker.ctl(np.zeros(0), state_at(1.0, 0.3, 0.0, 3.0))
+    from_the_right = law.ctl(np.zeros(0), state_at(1.0, -0.3, 0.0, 3.0))
+    from_the_left = law.ctl(np.zeros(0), state_at(1.0, 0.3, 0.0, 3.0))
 
     assert from_the_right[0] > 0.0
-    assert from_the_left[0] == pytest.approx(-from_the_right[0], rel=1e-6)
+    assert from_the_left[0] == pytest.approx(-from_the_right[0], rel=1e-12)
 
 
-def test_steering_matches_the_pursuit_arc():
-    """``delta = arctan(L * 2 y_t / d^2)`` for the target the tracker picked."""
-    straight = straight_path(n_points=101)
-    tracker = PurePursuit(
-        straight, wheelbase=WHEELBASE, lookahead=1.0, lookahead_gain=0.0
+def test_pursuit_aims_one_lookahead_along_the_path():
+    """``δ = arctan(L 2 y_t / d²)`` for the point one lookahead past the projection."""
+    law = PurePursuit(
+        straight_path(), wheelbase=WHEELBASE, lookahead=1.0, lookahead_gain=0.0
     )
     offset = 0.25
 
-    delta = tracker.ctl(np.zeros(0), state_at(0.0, offset, 0.0, 2.0))
+    delta = law.ctl(np.zeros(0), state_at(2.0, offset, 0.0, 2.0))
 
-    # the chosen target is the first sample at least 1 m away, on the line y = 0
-    reach = np.hypot(straight[:, 0], straight[:, 1] - offset)
-    target = straight[np.argmax(reach >= 1.0)]
-    x_t, y_t = target[0], target[1] - offset
+    # the projection is (2, 0), so the target is (3, 0): one metre down the line
+    x_t, y_t = 1.0, -offset
     assert delta[0] == pytest.approx(
-        np.arctan(WHEELBASE * 2.0 * y_t / (x_t**2 + y_t**2)), rel=1e-9
+        np.arctan(WHEELBASE * 2.0 * y_t / (x_t**2 + y_t**2)), rel=1e-12
     )
 
 
 @pytest.mark.parametrize("radius", [1.0, 2.5, 8.0])
 @pytest.mark.parametrize("lookahead", [0.05, 0.6, 2.0])
-def test_a_car_on_a_circle_holds_the_kinematic_steer_angle(radius, lookahead):
-    """On a circle of radius R the law gives ``arctan(L / R)`` — at any lookahead.
+def test_pursuit_on_a_circle_holds_the_kinematic_steer_angle(radius, lookahead):
+    """On a circle of radius R the law gives ``arctan(L / R)``, at any lookahead.
 
     The chord from the car to a target on the same circle subtends the tangent by
     ``eta`` with ``d = 2 R sin(eta)``, so the pursuit curvature ``2 sin(eta) / d`` is
-    ``1 / R`` however far ahead the target sits. Shrinking the lookahead is therefore
-    not what makes the answer right — it only makes the target a nearer point of the
-    same circle.
+    ``1 / R`` however far ahead the target sits. The tolerance is the polygon's: the
+    target lies on a chord a hair inside the circle, which tells most over a lookahead
+    of a few chords.
     """
-    path = circle_path(radius)
-    tracker = PurePursuit(
-        path, wheelbase=WHEELBASE, lookahead=lookahead, lookahead_gain=0.0
+    law = PurePursuit(
+        circle_path(radius),
+        wheelbase=WHEELBASE,
+        lookahead=lookahead,
+        lookahead_gain=0.0,
     )
     psi = 0.7  # anywhere on the circle; tangent heading for a counter-clockwise lap
     state = state_at(radius * np.cos(psi), radius * np.sin(psi), psi + 0.5 * np.pi, 3.0)
 
-    delta = tracker.ctl(np.zeros(0), state)
+    delta = law.ctl(np.zeros(0), state)
 
-    assert delta[0] == pytest.approx(np.arctan(WHEELBASE / radius), abs=1e-9)
+    assert delta[0] == pytest.approx(np.arctan(WHEELBASE / radius), abs=1e-3)
 
 
-def test_lookahead_grows_with_speed():
+def test_pursuit_lookahead_grows_with_speed():
     """Faster means aiming further ahead, so the same offset asks for less steering."""
-    tracker = PurePursuit(
-        straight_path(20.0, 201),
-        wheelbase=WHEELBASE,
-        lookahead=0.5,
-        lookahead_gain=0.5,
+    law = PurePursuit(
+        straight_path(20.0, 201), wheelbase=WHEELBASE, lookahead=0.5, lookahead_gain=0.5
     )
 
-    slow = tracker.ctl(np.zeros(0), state_at(0.0, 0.4, 0.0, 1.0))
-    fast = tracker.ctl(np.zeros(0), state_at(0.0, 0.4, 0.0, 8.0))
+    slow = law.ctl(np.zeros(0), state_at(0.0, 0.4, 0.0, 1.0))
+    fast = law.ctl(np.zeros(0), state_at(0.0, 0.4, 0.0, 8.0))
 
     assert abs(fast[0]) < abs(slow[0])
 
 
-def test_steering_is_clipped_to_the_end_stops():
+def test_pursuit_is_clipped_to_the_end_stops():
     """A target abeam of the car still asks only for what the servo can give."""
-    tracker = PurePursuit(
+    law = PurePursuit(
         straight_path(),
         wheelbase=WHEELBASE,
         lookahead=0.3,
@@ -165,155 +196,402 @@ def test_steering_is_clipped_to_the_end_stops():
         delta_max=0.52,
     )
 
-    delta = tracker.ctl(np.zeros(0), state_at(0.0, 1.0, 0.0, 2.0))
+    delta = law.ctl(np.zeros(0), state_at(1.0, 1.0, 0.0, 2.0))
 
     assert delta[0] == pytest.approx(-0.52)
 
 
-def test_the_geometry_is_written_at_the_rear_axle():
-    """``rear_offset`` moves the pursuit point back, which asks for more steering.
+def test_pursuit_is_written_at_the_rear_axle():
+    """``rear_offset`` moves the pursuit point back along the heading.
 
-    The same pose with the geometry written at the centre of gravity aims from a point
-    ``rear_offset`` further up the road, so it sees a smaller lateral error.
+    A state that already locates the rear axle is the zero-offset case.
     """
-    straight = straight_path()
-    at_the_cg = PurePursuit(
-        straight, wheelbase=WHEELBASE, lookahead=1.0, rear_offset=0.0
-    )
+    path = straight_path()
+    at_the_cg = PurePursuit(path, wheelbase=WHEELBASE, lookahead=1.0, rear_offset=0.0)
     at_the_axle = PurePursuit(
-        straight, wheelbase=WHEELBASE, lookahead=1.0, rear_offset=0.17
+        path, wheelbase=WHEELBASE, lookahead=1.0, rear_offset=0.17
     )
-    state = state_at(1.0, 0.3, 0.0, 3.0)
 
-    assert abs(at_the_axle.ctl(np.zeros(0), state)[0]) > abs(
-        at_the_cg.ctl(np.zeros(0), state)[0]
-    )
-    # a state that already locates the rear axle is the zero-offset case
-    assert at_the_axle.ctl(np.zeros(0), state_at(1.17, 0.3, 0.0, 3.0))[
-        0
-    ] == pytest.approx(at_the_cg.ctl(np.zeros(0), state)[0], rel=1e-12)
+    behind = at_the_axle.ctl(np.zeros(0), state_at(1.17, 0.3, 0.0, 3.0))
+    there = at_the_cg.ctl(np.zeros(0), state_at(1.0, 0.3, 0.0, 3.0))
+
+    assert behind[0] == pytest.approx(there[0], rel=1e-12)
 
 
-# The seam of a closed path
-
-
-def test_a_whole_lap_of_a_circle_holds_the_same_steer_angle():
-    """Round a closed circle the law gives ``arctan(L / R)`` at every waypoint.
-
-    The array ends in the middle of the lap, so the last fifth of the poses can only
-    be served by a target at the start of it. Searching by array index instead of
-    along the path leaves those poses with nothing ahead, and the fallback — the last
-    waypoint, the one under the car — divides by a zero-length arc. Here they all
-    give the one right answer, so the search crossed the seam.
-    """
-    radius, n_points = 2.5, 361
-    path = circle_path(radius, n_points)
-    tracker = PurePursuit(
+def test_pursuit_holds_one_steer_angle_round_a_whole_circle():
+    """Round a closed circle the law gives ``arctan(L / R)`` everywhere, seam included."""
+    radius = 2.5
+    path = circle_path(radius, n_points=721)
+    law = PurePursuit(
         path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD, lookahead_gain=0.0
     )
-    psi = np.linspace(0.0, 2.0 * np.pi, n_points, endpoint=False)
+    psi = np.linspace(0.0, 2.0 * np.pi, 360, endpoint=False)
 
     deltas = np.array(
         [
-            tracker.ctl(
+            law.ctl(
                 np.zeros(0),
-                state_at(point[0], point[1], angle + 0.5 * np.pi, 3.0),
+                state_at(radius * np.cos(a), radius * np.sin(a), a + 0.5 * np.pi, 3.0),
             )[0]
-            for point, angle in zip(path, psi)
+            for a in psi
         ]
     )
 
-    assert np.all(np.isfinite(deltas))
-    assert deltas == pytest.approx(np.arctan(WHEELBASE / radius), abs=1e-9)
+    assert deltas == pytest.approx(np.arctan(WHEELBASE / radius), abs=1e-4)
 
 
-def test_a_lap_of_the_circuit_has_no_jump_in_it():
+def test_pursuit_laps_the_circuit_without_a_jump():
     """Driven along its own waypoints, the circuit asks for one smooth corner each.
 
     The corner is taken at less than the ``arctan(L / R)`` a steady turn would need:
-    a lookahead of a quarter of the corner radius cuts the corner, which is the
-    known price of the method, not a defect of the search.
+    the lookahead cuts the corner, the known price of the method.
     """
     radius = 2.5
-    path = circuit_waypoints(length=14.0, width=9.0, radius=radius)
-    tracker = PurePursuit(
-        path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD, lookahead_gain=0.0
+    waypoints = circuit_waypoints(length=14.0, width=9.0, radius=radius)
+    law = PurePursuit(
+        from_waypoints(waypoints, closed=True),
+        wheelbase=WHEELBASE,
+        lookahead=LOOKAHEAD,
+        lookahead_gain=0.0,
     )
 
-    heading = np.arctan2(*(np.roll(path, -1, axis=0) - path)[:, ::-1].T)
+    heading = np.arctan2(*(np.roll(waypoints, -1, axis=0) - waypoints)[:, ::-1].T)
     deltas = np.array(
         [
-            tracker.ctl(np.zeros(0), state_at(point[0], point[1], angle, 3.0))[0]
-            for point, angle in zip(path, heading)
+            law.ctl(np.zeros(0), state_at(point[0], point[1], angle, 3.0))[0]
+            for point, angle in zip(waypoints, heading)
         ]
     )
 
-    assert np.all(np.isfinite(deltas))
     assert (
         0.5 * np.arctan(WHEELBASE / radius)
         < deltas.max()
         < np.arctan(WHEELBASE / radius)
     )
     assert deltas.min() > -0.01  # four left-hand corners, no right-hand flick
-    # and the lap has no jump in it, seam included
     assert np.abs(np.diff(deltas, append=deltas[0])).max() < 0.05
 
 
-def test_the_target_crosses_the_seam_instead_of_stopping_at_it():
-    """At the last waypoint the tracker aims at the start of the array."""
-    path = circuit_waypoints(length=14.0, width=9.0, radius=2.5)
-    tracker = PurePursuit(
-        path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD, lookahead_gain=0.0
-    )
-    heading = np.arctan2(path[0, 1] - path[-1, 1], path[0, 0] - path[-1, 0])
-    state = state_at(path[-1, 0], path[-1, 1], heading, 3.0)
-
-    delta = tracker.ctl(np.zeros(0), state)
-
-    # the arc the tracker drew reaches a point of the path a lookahead away, ahead
-    curvature = np.tan(delta[0]) / WHEELBASE
-    reach = np.linalg.norm(path - path[-1], axis=1)
-    wrapped = reach[: len(path) // 2]
-    assert np.isfinite(delta[0])
-    assert abs(curvature) < 1.0 / LOOKAHEAD
-    assert wrapped.max() > LOOKAHEAD  # a target does exist across the seam
-
-
-def test_an_open_path_stops_at_its_end_instead_of_wrapping():
-    """Past the end of a line the car keeps aiming at the last point, not the first."""
-    straight = straight_path()
-    tracker = PurePursuit(
-        straight, wheelbase=WHEELBASE, lookahead=1.0, lookahead_gain=0.0
+def test_pursuit_aims_at_the_end_of_an_open_path_near_it():
+    """Within one lookahead of the end, the target is the end point, never the start."""
+    law = PurePursuit(
+        straight_path(), wheelbase=WHEELBASE, lookahead=1.0, lookahead_gain=0.0
     )
 
-    # abeam the end of the path, heading along it: the last point is behind and to the
-    # left, the first point is far behind — a wrap would swing the wheel hard over
-    delta = tracker.ctl(np.zeros(0), state_at(12.0, 0.0, 0.0, 3.0))
+    delta = law.ctl(np.zeros(0), state_at(9.5, 0.1, 0.0, 3.0))
 
-    assert delta[0] == pytest.approx(0.0, abs=1e-9)
+    # the end point (10, 0) is half a metre ahead and 0.1 m to the right
+    x_t, y_t = 0.5, -0.1
+    assert delta[0] == pytest.approx(
+        np.arctan(WHEELBASE * 2.0 * y_t / (x_t**2 + y_t**2)), rel=1e-12
+    )
+
+
+def test_pursuit_target_is_the_point_the_steer_aims_at():
+    """``target`` is one lookahead past the rear axle's projection, and the steer's arc."""
+    law = PurePursuit(
+        straight_path(),
+        wheelbase=WHEELBASE,
+        lookahead=1.0,
+        lookahead_gain=0.5,
+        rear_offset=0.17,
+    )
+    state = state_at(2.17, 0.25, 0.0, 2.0)
+
+    target = law.target(np.zeros(0), state)
+    delta = law.ctl(np.zeros(0), state)
+
+    # the rear axle (2, 0.25) projects to (2, 0), and L_d = 1 + 0.5 * 2 = 2 m further on
+    x_t, y_t = 2.0, -0.25
+    assert target == pytest.approx([4.0, 0.0], abs=1e-12)
+    assert delta[0] == pytest.approx(
+        np.arctan(WHEELBASE * 2.0 * y_t / (x_t**2 + y_t**2)), rel=1e-12
+    )
+
+
+# Stanley
+
+
+def test_stanley_on_a_straight_path_ahead_needs_no_steering():
+    """On the line and along it: no heading error, no cross-track error, no steer."""
+    law = Stanley(straight_path())
+
+    delta = law.ctl(np.zeros(0), state_at(1.0, 0.0, 0.0, 3.0))
+
+    assert delta[0] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_stanley_on_the_path_steers_the_heading_error():
+    """With the front axle on the path, the steer is the heading error alone."""
+    law = Stanley(straight_path())
+
+    delta = law.ctl(np.zeros(0), state_at(1.0, 0.0, -0.2, 3.0))
+
+    assert delta[0] == pytest.approx(0.2, rel=1e-12)
+
+
+def test_stanley_corrects_the_cross_track_error():
+    """Parallel to the path, ``δ = arctan(−k e / (k_s + |vx|))``, toward the path."""
+    law = Stanley(straight_path(), gain=2.0, softening=0.5)
+    e, vx = 0.3, 3.0
+
+    delta = law.ctl(np.zeros(0), state_at(1.0, e, 0.0, vx))
+
+    assert delta[0] == pytest.approx(np.arctan(-2.0 * e / (0.5 + vx)), rel=1e-12)
+    assert delta[0] < 0.0
+
+
+def test_stanley_is_softened_at_rest_and_clipped():
+    """At rest the correction is finite; far off the path it stops at the end stops."""
+    law = Stanley(straight_path(), gain=2.0, softening=0.5, delta_max=0.52)
+
+    at_rest = law.ctl(np.zeros(0), state_at(1.0, 0.05, 0.0, 0.0))
+    far_off = law.ctl(np.zeros(0), state_at(1.0, 2.0, 0.0, 3.0))
+
+    assert at_rest[0] == pytest.approx(np.arctan(-2.0 * 0.05 / 0.5), rel=1e-12)
+    assert far_off[0] == pytest.approx(-0.52)
+
+
+def test_stanley_is_written_at_the_front_axle():
+    """``front_offset`` moves the projected point forward along the heading."""
+    path = straight_path()
+    at_the_cg = Stanley(path, front_offset=0.17)
+    at_the_axle = Stanley(path, front_offset=0.0)
+
+    ahead = at_the_cg.ctl(np.zeros(0), state_at(1.0, 0.0, 0.3, 3.0))
+    there = at_the_axle.ctl(
+        np.zeros(0), state_at(1.0 + 0.17 * np.cos(0.3), 0.17 * np.sin(0.3), 0.3, 3.0)
+    )
+
+    assert ahead[0] == pytest.approx(there[0], rel=1e-12)
+
+
+# Line of sight
+
+
+def test_line_of_sight_on_the_path_is_the_path_heading():
+    """With no cross-track error the course to steer is the path's own heading."""
+    law = LineOfSight(circle_path(2.0), lookahead=1.0)
+    psi = 0.7
+
+    reference = law.ctl(
+        np.zeros(0), state_at(2.0 * np.cos(psi), 2.0 * np.sin(psi), 0.0, 3.0)
+    )
+
+    assert reference[0] == pytest.approx(psi + 0.5 * np.pi, abs=1e-3)
+
+
+def test_line_of_sight_turns_toward_the_path_by_the_angle_of_sight():
+    """Off the path, ``ψ_ref = ψ_p − arctan(e / Δ)``, whatever the car's own heading."""
+    law = LineOfSight(straight_path(), lookahead=1.5)
+    e = 0.4
+
+    pointing_along = law.ctl(np.zeros(0), state_at(2.0, e, 0.0, 3.0))
+    pointing_away = law.ctl(np.zeros(0), state_at(2.0, e, 1.0, 3.0))
+
+    assert pointing_along[0] == pytest.approx(-np.arctan(e / 1.5), rel=1e-12)
+    assert pointing_away[0] == pytest.approx(pointing_along[0], rel=1e-12)
+
+
+def test_line_of_sight_reads_its_control_point():
+    """``control_point`` moves the projected point forward along the heading."""
+    path = straight_path()
+    ahead = LineOfSight(path, lookahead=1.0, control_point=0.5)
+    there = LineOfSight(path, lookahead=1.0, control_point=0.0)
+
+    from_ahead = ahead.ctl(np.zeros(0), state_at(1.0, 0.0, 0.4, 3.0))
+    from_there = there.ctl(
+        np.zeros(0), state_at(1.0 + 0.5 * np.cos(0.4), 0.5 * np.sin(0.4), 0.4, 3.0)
+    )
+
+    assert from_ahead[0] == pytest.approx(from_there[0], rel=1e-12)
+
+
+def test_line_of_sight_is_wrapped_to_a_half_turn():
+    """Going round a loop, the reference stays in (−π, π]."""
+    law = LineOfSight(circle_path(2.0), lookahead=1.0)
+    psi = np.linspace(0.0, 2.0 * np.pi, 73)
+
+    references = np.array(
+        [
+            law.ctl(
+                np.zeros(0),
+                state_at(2.1 * np.cos(a), 2.1 * np.sin(a), a + 0.5 * np.pi, 3.0),
+            )[0]
+            for a in psi
+        ]
+    )
+
+    assert np.all(references > -np.pi)
+    assert np.all(references <= np.pi)
+
+
+# The heading loop
+
+
+def test_heading_controller_holds_the_wheel_on_the_reference():
+    """Heading on the reference: no steer."""
+    law = HeadingController()
+
+    delta = law.ctl(np.zeros(0), np.r_[0.3, state_at(0.0, 0.0, 0.3, 3.0)])
+
+    assert delta[0] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_heading_controller_inverts_the_kinematic_bicycle():
+    """Off the end stops, ``vx tan(δ) / L = k_ψ e_ψ`` with the softened speed."""
+    law = HeadingController(gain=2.0, wheelbase=WHEELBASE, softening=0.5)
+    e_psi, vx = 0.1, 3.0
+
+    delta = law.ctl(np.zeros(0), np.r_[e_psi, state_at(0.0, 0.0, 0.0, vx)])
+
+    assert (vx + 0.5) * np.tan(delta[0]) / WHEELBASE == pytest.approx(
+        2.0 * e_psi, rel=1e-12
+    )
+
+
+def test_heading_controller_turns_the_short_way_round():
+    """A reference a full turn away less 0.1 rad steers as 0.1 rad the other way."""
+    law = HeadingController()
+
+    wrapped = law.ctl(np.zeros(0), np.r_[2.0 * np.pi - 0.1, state_at(0, 0, 0.0, 3.0)])
+    short = law.ctl(np.zeros(0), np.r_[-0.1, state_at(0, 0, 0.0, 3.0)])
+
+    assert wrapped[0] == pytest.approx(short[0], rel=1e-9)
+    assert wrapped[0] < 0.0
+
+
+def test_heading_controller_is_finite_at_rest_and_clipped():
+    """At rest the steer is finite; a large error stops at the end stops."""
+    law = HeadingController(delta_max=0.52)
+
+    at_rest = law.ctl(np.zeros(0), np.r_[0.05, state_at(0, 0, 0.0, 0.0)])
+    large = law.ctl(np.zeros(0), np.r_[1.5, state_at(0, 0, 0.0, 0.5)])
+
+    assert np.isfinite(at_rest[0])
+    assert large[0] == pytest.approx(0.52)
+
+
+# Refusals
+
+
+@pytest.mark.parametrize(
+    ("build", "name"),
+    [
+        (lambda path: PurePursuit(path, wheelbase=0.0), "wheelbase"),
+        (lambda path: PurePursuit(path, lookahead=0.0), "lookahead"),
+        (lambda path: Stanley(path, gain=-1.0), "gain"),
+        (lambda path: Stanley(path, softening=0.0), "softening"),
+        (lambda path: LineOfSight(path, lookahead=0.0), "lookahead"),
+        (lambda path: LineOfSight(path, lookahead=-1.0), "lookahead"),
+        (lambda path: HeadingController(gain=0.0), "gain"),
+        (lambda path: HeadingController(wheelbase=0.0), "wheelbase"),
+        (lambda path: HeadingController(softening=-0.5), "softening"),
+    ],
+)
+def test_the_laws_refuse_numbers_they_divide_by_or_read_the_sign_of(build, name):
+    """A zero or negative length, speed or gain is refused at construction, by name."""
+    with pytest.raises(ValueError, match=name):
+        build(straight_path())
+
+
+# The drawing
+
+
+@pytest.mark.parametrize("rear_offset", [0.0, 0.17])
+def test_the_pursuit_arc_runs_from_the_rear_axle_to_the_target(rear_offset):
+    """Off the end stops, the drawn arc starts at the rear axle and ends on the target."""
+    path = circle_path(3.0)
+    law = PurePursuit(path, wheelbase=WHEELBASE, rear_offset=rear_offset)
+    state = state_at(3.0 + 0.2, 0.0, 0.5 * np.pi + 0.1, 2.0)
+
+    arc, aim = law.get_dynamic_geometry(np.zeros(0), state)["world"]
+
+    rear_axle = state[0:2] - rear_offset * np.array(
+        [np.cos(state[2]), np.sin(state[2])]
+    )
+    s, _ = path.project(rear_axle)
+    target = path.sample(s + LOOKAHEAD + 0.25 * 2.0)
+    assert abs(law.ctl(np.zeros(0), state)[0]) < law.params["delta_max"]
+    assert arc.pts[0, :2] == pytest.approx(rear_axle, abs=1e-12)
+    assert arc.pts[-1, :2] == pytest.approx(target, abs=1e-9)
+    assert aim.pt[:2] == pytest.approx(target)
+
+
+def test_the_stanley_segment_ends_on_the_projection():
+    """The drawn cross-track segment joins the front axle to its projection."""
+    law = Stanley(straight_path(), front_offset=0.17)
+
+    segment, foot = law.get_dynamic_geometry(np.zeros(0), state_at(2.0, 0.3, 0.0, 3.0))[
+        "world"
+    ]
+
+    assert segment.pts[0, :2] == pytest.approx([2.17, 0.3])
+    assert segment.pts[1, :2] == pytest.approx([2.17, 0.0])
+    assert foot.pt[:2] == pytest.approx([2.17, 0.0])
+
+
+def test_the_line_of_sight_ends_down_the_path():
+    """The drawn line of sight runs from the control point to Δ down the tangent."""
+    law = LineOfSight(straight_path(), lookahead=1.5)
+
+    sight, point = law.get_dynamic_geometry(np.zeros(0), state_at(2.0, 0.4, 0.0, 3.0))[
+        "world"
+    ]
+
+    assert sight.pts[0, :2] == pytest.approx([2.0, 0.4])
+    assert sight.pts[1, :2] == pytest.approx([3.5, 0.0])
+    assert point.pt[:2] == pytest.approx([3.5, 0.0])
 
 
 # Backends
 
 
+LAWS = {
+    "pursuit": lambda path: PurePursuit(path, wheelbase=WHEELBASE, rear_offset=0.17),
+    "stanley": lambda path: Stanley(path, front_offset=0.17),
+    "line of sight": lambda path: LineOfSight(path, lookahead=1.0),
+}
+
+
 @pytest.mark.jax
+@pytest.mark.parametrize("law", sorted(LAWS))
 @pytest.mark.parametrize("where", ["corner", "seam", "off the path"])
-def test_the_law_traces_under_jax(where):
-    """The tracker runs inside a compiled loop, with the same number out."""
+def test_the_laws_trace_under_jax(law, where):
+    """Each law runs inside a compiled loop with the same number out, the path's
+    numbers traced too, and a finite gradient with respect to the waypoints."""
     jax = pytest.importorskip("jax")
     jnp = jax.numpy
-    path = circuit_waypoints(length=8.0, width=6.0, radius=1.5)
-    tracker = PurePursuit(
-        path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD, rear_offset=0.17
-    )
+    waypoints = circuit_waypoints(length=8.0, width=6.0, radius=1.5)
+    block = LAWS[law](from_waypoints(waypoints, closed=True))
     poses = {
-        "corner": state_at(path[20, 0], path[20, 1], 1.2, 3.0),
-        "seam": state_at(path[-1, 0], path[-1, 1], 1.5708, 3.0),
-        "off the path": state_at(path[0, 0], path[0, 1] + 0.2, 0.3, 3.0),
+        "corner": state_at(waypoints[20, 0], waypoints[20, 1], 1.2, 3.0),
+        "seam": state_at(waypoints[-1, 0], waypoints[-1, 1], 1.5708, 3.0),
+        "off the path": state_at(waypoints[0, 0], waypoints[0, 1] + 0.2, 0.3, 3.0),
     }
+    y = poses[where]
 
-    on_numpy = tracker.ctl(np.zeros(0), poses[where])
-    on_jax = np.asarray(jax.jit(tracker.ctl)(jnp.zeros(0), jnp.asarray(poses[where])))
+    def steer(y, params):
+        return block.ctl(jnp.zeros(0), y, params=params)[0]
+
+    on_numpy = block.ctl(np.zeros(0), y)
+    on_jax = jax.jit(steer)(jnp.asarray(y), block.params)
+    gradient = jax.grad(steer, argnums=1)(jnp.asarray(y), block.params)
 
     assert np.isfinite(on_numpy[0])
+    assert float(on_jax) == pytest.approx(float(on_numpy[0]), rel=1e-6, abs=1e-6)
+    assert np.all(np.isfinite(gradient["path"]["waypoints"]))
+
+
+@pytest.mark.jax
+def test_the_heading_controller_traces_under_jax():
+    """The heading loop runs inside a compiled loop with the same number out."""
+    jax = pytest.importorskip("jax")
+    jnp = jax.numpy
+    law = HeadingController()
+    u = np.r_[2.5, state_at(0.0, 0.0, -2.8, 2.0)]
+
+    on_numpy = law.ctl(np.zeros(0), u)
+    on_jax = np.asarray(jax.jit(law.ctl)(jnp.zeros(0), jnp.asarray(u)))
+
     assert on_jax == pytest.approx(on_numpy, rel=1e-6)

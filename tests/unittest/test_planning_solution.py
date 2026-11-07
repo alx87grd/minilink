@@ -448,7 +448,7 @@ def test_compare_reads_the_solutions_side_by_side():
 @pytest.mark.jax
 def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     """The default backend is chosen once per race: NumPy for all when one law does not trace."""
-    from minilink.planning import compare
+    from minilink.planning import ProblemEvaluator, compare
 
     problem, vi, lqr = solved_pendulum()
     spread = PlanningProblem(
@@ -463,18 +463,64 @@ def test_compare_scores_every_policy_on_one_backend_and_the_same_draws():
     )
     settings = dict(dt=0.1, n_trials=3, episode_length=1.0)
 
-    # the lookup table runs on NumPy only, so the LQR law is scored there too
+    # a law that runs on NumPy only puts the LQR law there too, on the same draws
+    assert ProblemEvaluator(spread, numpy_only_law(lqr), 0.1).backend == "numpy"
+    scored = compare(spread, NumPy=numpy_only_law(lqr), LQR=lqr, **settings)
+    np.testing.assert_array_equal(
+        scored.evaluations["NumPy"].x0, scored.evaluations["LQR"].x0
+    )
+    on_numpy = evaluate(spread, lqr, backend="numpy", **settings)
+    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_numpy.J)
+
+    # the value-iteration law traces: scored beside LQR on JAX, the same draws
     scored = compare(spread, VI=vi, LQR=lqr, **settings)
     np.testing.assert_array_equal(
         scored.evaluations["VI"].x0, scored.evaluations["LQR"].x0
     )
-    on_numpy = evaluate(spread, lqr, backend="numpy", **settings)
-    np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_numpy.J)
 
     # laws that all trace keep the JAX backend and its numbers
     scored = compare(spread, LQR=lqr, **settings)
     on_jax = evaluate(spread, lqr, backend="jax", **settings)
     np.testing.assert_array_equal(scored.evaluations["LQR"].J, on_jax.J)
+
+
+def numpy_only_law(solution):
+    """The LQR law of ``solution``, written so it runs on NumPy only (``float`` of its command)."""
+    from minilink.core.system import System
+
+    K = np.asarray(solution.record.K)
+    x_bar = np.asarray(solution.problem.cost.x_bar)
+
+    law = System(0)
+    law.add_input_port("x", dim=K.shape[1])
+    law.add_output_port(
+        "u",
+        dim=1,
+        function=lambda x, u, t=0, params=None: np.array([-float(K[0] @ (u - x_bar))]),
+        dependencies=("x",),
+    )
+
+    return law
+
+
+def test_compare_reads_dt_as_evaluate_does():
+    """A sampled controller runs on its own clock, dt omitted; a continuous one needs dt."""
+    from minilink.control import lqr as lqr_design
+    from minilink.planning import compare
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    problem = PlanningProblem(plant, x0=np.array([0.3, 0.0]), cost=cost, horizon=2.0)
+    law = lqr_design(plant, np.eye(2), np.eye(1))
+
+    on_clock = compare(problem, LQR=law % 0.1, backend="numpy").evaluations["LQR"]
+    alone = evaluate(problem, law % 0.1, backend="numpy")
+    np.testing.assert_array_equal(on_clock.J, alone.J)
+
+    with pytest.raises(TypeError, match="needs dt"):
+        compare(problem, LQR=law, backend="numpy")
+    with pytest.raises(ValueError, match="own clock"):
+        compare(problem, LQR=law % 0.1, dt=0.05, backend="numpy")
 
 
 def test_compare_returns_a_comparison_of_the_solutions_and_their_scores():

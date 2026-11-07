@@ -24,10 +24,10 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
+from minilink.core.geometry.paths import from_waypoints
 from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.track import ReferenceTrack
 from minilink.planning.trajectory_optimization.mpc import (
     ModelPredictiveController,

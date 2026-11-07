@@ -1894,7 +1894,7 @@ def test_plot_cost_field_exports_smoke(tmp_path):
 import os
 from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 from minilink.planning.spatial.collision import mount, disc, point_probe
-from minilink.planning.spatial.paths import PolylinePath, from_waypoints
+from minilink.core.geometry.paths import PolylinePath, from_waypoints
 from minilink.core.shaping import quadratic_excess
 from minilink.planning.spatial.track import ReferenceTrack
 

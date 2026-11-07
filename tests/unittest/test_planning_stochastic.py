@@ -538,8 +538,8 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     assert plant.params["m"] == 1.0  # the draw never touched the nominal plant
 
 
-def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
-    """A DP law runs on NumPy only: "auto" falls back, an explicit JAX backend refuses."""
+def test_the_default_backend_scores_a_lookup_table_law_on_jax_when_it_traces():
+    """A DP law traces like every law: "auto" takes JAX when it is installed, and both backends score it alike."""
     from minilink.control import StateFeedback
     from minilink.planning import ProblemEvaluator
 
@@ -561,14 +561,15 @@ def test_the_default_backend_scores_a_lookup_table_law_on_numpy():
     ).solve()
 
     auto = ProblemEvaluator(problem, vi, 0.1)
-    assert auto.backend == "numpy"
     on_numpy = ProblemEvaluator(problem, vi, 0.1, backend="numpy")
-    np.testing.assert_array_equal(auto.evaluate().J, on_numpy.evaluate().J)
     if not jax_available():
+        assert auto.backend == "numpy"
         return
 
-    with pytest.raises(RuntimeError, match="JAX"):
-        ProblemEvaluator(problem, vi, 0.1, backend="jax")
+    assert auto.backend == "jax"
+    np.testing.assert_allclose(
+        np.asarray(auto.evaluate().J), on_numpy.evaluate().J, rtol=1e-9
+    )
 
     # a law that traces keeps the JAX backend
     law = StateFeedback(K=[[5.0, 1.0]])

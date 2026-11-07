@@ -61,9 +61,17 @@ course notebook breaks a student's link unless the PDF changes with it.
   only the cases a coverage diff shows uncovered, then delete the old suite.
 
 *Agent's recommendation:* B, or C if the maintainer wants to read every test that stays.
-**Answer:**
+**Answer (2026-11-07):** B on the short term, the net for v0.4's sweeps. At the end of v0.4 the
+maintainer deletes all demos and rebuilds a minimalist set himself; once the new demos are
+what he wants, the last step is a clean slate (A) for the test infrastructure, rebuilt around
+the new library.
 
 ### MS-D2. The test layers
+
+**Deferred (2026-11-07):** MS-D2a–e are decided at the end-of-v0.4 clean-slate rebuild of the
+tests (MS-D1), around the maintainer's new demos; until then the short-term restructure is
+small: the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
+relief), the files otherwise stay.
 
 **Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder
 per layer; two are essential, the contract and the textbook math. What the other kinds
@@ -107,6 +115,9 @@ build in the gate).
 
 ### MS-D4. Demos: what the set is
 
+**Deferred (2026-11-07):** the maintainer deletes all demos and rebuilds a minimalist set at
+the end of v0.4 (MS-D1); the set is decided then.
+
 - **A. Clean slate.** Delete `examples/demos/` and `examples/projects/`; write a new set,
   one demo per core feature, against the v0.3 core.
 - **B. Curate.** Keep the demos that already show one core feature well, delete the rest.
@@ -142,11 +153,13 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 ### MS-D5. Notebooks
 
 - **Course notebooks** (`examples/teaching/courses/`, 20): keep their paths (the PDFs link
-  16); their content is the maintainer's teaching design. **Answer:**
+  16); their content is the maintainer's teaching design. **Answer (2026-11-07):** yes.
 - **Tutorial**: settled. The tutorials were redrafted in three layers (basics, core, advanced)
   and landed on `dev` (2026-11-01).
 - **Topics** (`examples/teaching/topics/`, 7): A. fold into the tutorial or the courses and
-  delete; B. keep. **Answer:**
+  delete; B. keep. **Answer (2026-11-07):** C, the two duplicates of GRO860 notebooks go
+  (`drone_ppo`, identical; `pendulum_value_iteration_vs_lqr_vs_rl`, 97% the same), the five
+  unique pages stay until the repository-structure decision (K5, v0.9).
 
 ### MS-D6. Benchmarks
 
@@ -156,7 +169,11 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 - **B.** Delete `benchmarks/` entirely; speed is watched by the acceptance layer's budget.
 - **C.** Keep as is.
 
-*Agent's recommendation:* A. **Answer:**
+*Agent's recommendation:* A. **Answer (2026-11-07):** A: the regression gate stays
+(`run_regression_check.py`, its suites, the trajectory and MPC parity scenarios, the pinned
+baselines); the studies, the one-off baselines (`params_baseline.py`, `step_model_baseline.py`,
+`v03_baseline.py`, `v03_budget.py`) and the pyro parity scripts go, with `tests/README.md`'s
+study row.
 
 ### MS-D7. The release numbering
 
