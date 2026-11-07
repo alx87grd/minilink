@@ -170,7 +170,7 @@ breaks nothing goes last and may follow the tag.
   (`core_perf`'s `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last
   gated in CI) and the static grid (one `vmap` on JAX: `Gain` on 10 001 points 204 → 31 ms,
   NumPy 26 ms). **Not reached, the 2× bar:** measured warm on a cloud CPU (JAX, median of 7),
-  the plain batch takes 118 ms and the family 693 ms (5.9×; the 27 ms the README quotes is not
+  the plain batch takes 118 ms and the family 693 ms (5.9×; the 27 ms the README quoted was not
   this machine's). The cost is not the `m·l²` lines: it is `MechanicalSystem.forward_dynamics`'s
   `solve(H, …)`; with `l` per member, `H` differs per member and each RK4 stage runs `B`
   one-by-one LAPACK solves where the plain batch runs one. Carrying the parameters in the
@@ -178,8 +178,8 @@ breaks nothing goes last and may follow the tag.
   does not move the batched solve out of the loop). A closed-form `v̇ = rhs / H` for one
   joint runs the family in 38 ms but changes the pendulum's numbers at 5·10⁻¹⁵ and the
   textbook line: the **[ask]**, a design change (a closed-form small-`H` solve, or a plant hook
-  for its parameter-only block), or the bar dropped. The README's "27 ms" waits for the
-  maintainer's number.
+  for its parameter-only block), or the bar dropped. The README's "27 ms" became DESIGN §5's
+  measured range, 0.12–0.16 s on a cloud CPU, in README and ROADMAP (ruled 2026-11-07).
 - [ ] **One owner per rule** (S65; scan: compile-sim#0, #1, #2, #3, #6, #7, #8, #10, #13,
   planning#0, #5, #8, #11, core#8, #10). One item per step:
   - **Read by the loop lane:**

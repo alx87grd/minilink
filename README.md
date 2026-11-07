@@ -150,7 +150,7 @@ The exact same equation $f(x, u, t; p)$ traces under JAX without rewriting physi
 
 - **Exact Machine-Precision Sensitivities:** Analytical Jacobians:
   $$A = \frac{\partial f}{\partial x}, \quad B = \frac{\partial f}{\partial u}, \quad S_p = \frac{\partial f}{\partial p}$$
-- **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 27 ms vs. 32 s in pure Python).
+- **Parallel GPU-Batched Rollouts:** Vectorized simulation across parameter sweeps via JAX `vmap` (1,000 rollouts in 0.12–0.16 s on a cloud CPU vs. 32 s in pure Python).
 - **Plant & Controller Co-Design:** Compute closed-loop objective gradients $\nabla_\theta J$ to optimize control gains and physical parameters simultaneously.
 - **Opt-In Acceleration:** Pure NumPy remains the default classroom engine; JAX is activated with a single flag (`backend="jax"`).
 
