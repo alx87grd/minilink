@@ -319,9 +319,12 @@ def step_response(A, B, C, D, t, period=None):
 def settling_horizon(A, period=None):
     """Default step-response horizon: eight times the slowest stable time constant.
 
-    With ``period``, ``A`` is a difference equation's and its poles are in ``z``.
+    With ``period``, ``A`` is a difference equation's and its poles are in ``z``;
+    its horizon spans at least ``n + 1`` ticks, so a deadbeat system (every pole
+    at the origin, settled in ``n`` ticks) shows its whole response.
     """
     p = poles(A)
+    n = p.size
 
     # The decay rates σ = −Re p of the stable poles (σ > 10⁻⁹)
     if period is None:
@@ -331,7 +334,6 @@ def settling_horizon(A, period=None):
     else:
         with np.errstate(divide="ignore"):
             decay = -np.log(np.abs(p)) / period
-        decay = decay[np.isfinite(decay)]
 
     decay = decay[decay > 1e-9]
 
@@ -339,8 +341,12 @@ def settling_horizon(A, period=None):
     if decay.size == 0:
         return 10.0
 
-    # Eight times the slowest time constant 1/σ
+    # Eight times the slowest time constant 1/σ (0 when every pole dies in one tick)
     horizon = float(8.0 / decay.min())
+
+    # A difference equation: at least n + 1 ticks
+    if period is not None:
+        horizon = max(horizon, (n + 1) * float(period))
 
     return horizon
 

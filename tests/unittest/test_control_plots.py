@@ -290,6 +290,13 @@ class TestInZ(unittest.TestCase):
         time, _ = step_response(self.G)
         self.assertEqual(time[-1], 0.1 * 11)
 
+    def test_a_deadbeat_system_shows_a_few_ticks_not_ten_seconds(self):
+        # Its pole at z = 0 settles in n = 1 tick: the horizon spans n + 1 ticks
+        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]], period=0.001)
+        time, y = step_response(G)
+        np.testing.assert_allclose(time, [0.0, 0.001, 0.002])
+        np.testing.assert_allclose(y, [0.0, 1.0, 1.0])
+
     def test_a_tick_law_steps_once_per_unit_of_time(self):
         G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]])
         time, y = step_response(G, tf=4.0)
