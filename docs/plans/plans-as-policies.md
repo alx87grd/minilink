@@ -401,7 +401,8 @@ workflow, outside the comparison.
 - `PP-D2` **Value iteration supports both horizons**, chosen by the problem; the finite
   horizon (formerly S63, v0.5) moves to this work. The three examples of §2 migrate (`PP-D13`).
 - `PP-D3` **The policy stays in `z`** (as the command table, §4.5).
-- `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law.
+- `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law. Its parameter
+  is `n_steps` (ruled 2026-11-07, RULES 2.7: a count of time steps is `n_steps`).
 - `PP-D5` **`LookupPolicy` takes a schedule** for the finite horizon (§4.4).
 - `PP-D6` **The core math first:** for LQR, `lqr_matrices` at the top of its file (§5.1: the
   Riccati solvers are already pure); the planner and the face both call it. Amended

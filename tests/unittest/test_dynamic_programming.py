@@ -229,7 +229,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             "plot_cost_to_go": planner.plot_cost_to_go,
             "plot_control_law": planner.plot_control_law,
             "animate_cost_to_go": planner.animate_cost_to_go,
-            "animate_policy": planner.animate_policy,
+            "animate_control_law": planner.animate_control_law,
             "clean_infeasible_set": planner.clean_infeasible_set,
         }
         for name, verb in verbs.items():

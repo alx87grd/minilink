@@ -1532,9 +1532,10 @@ learns a neural law in pure JAX: `solve(n_timesteps=)` → `PlanningSolution`
 weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's runs with draws are
 `evaluate(problem, solution.controller, record=True)`. The block being trained, updated in
-place every learning iteration, is `planner.actor`.
-What the algorithm trains is a `ExplorationPolicy` (`planner.exploration_policy`): the actor's mean action
-with an exploration head around it (`GaussianHead` for the policy-gradient family,
+place every learning iteration, is `planner.actor`; the plant steps trained so far,
+`planner.n_timesteps`.
+What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy`): the actor's
+mean action (its `actor`, the planner's) with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
 `sample`, `log_prob`, `entropy` and `input(a)`. Critics `ValueFunction` and `QFunction` sit
 on the same features. One file per algorithm under `algorithms/` (`REINFORCE`,
@@ -1698,8 +1699,8 @@ falls under `tol` (not an error bound on `J`: with `γ < 1` the bound is `γ·to
 a finite one (`horizon = T`, `N = steps_of(T, dt)`, or a step problem's `n_steps`) runs
 exactly `N` sweeps and keeps every stage forward in time, `J_0 … J_N` (`J_N = h`) and the
 laws `π_0 … π_{N−1}`, stage `i` at `t_i = t0 + i dt` (`record.tables.schedule = (t, J, pi)`,
-refused past 1 GiB of tables, the failure cost summed over the `N` steps). `solve_steps(n)`
-is the receding `n`-step law: `n` sweeps, the last table used at every time. The
+refused past 1 GiB of tables, the failure cost summed over the `N` steps). `solve_steps(n_steps)`
+is the receding `n_steps`-step law: `n_steps` sweeps, the last table used at every time. The
 `PlanningSolution`'s `controller` is the `LookupPolicy` of the greedy table (on a finite horizon
 a schedule: stage `i` for `t_i ≤ t < t_{i+1}`, a float tick a hair short of `t_i` counted in
 it, and stage 0, the full-horizon law, outside `[t_0, t_N)`: past the horizon the

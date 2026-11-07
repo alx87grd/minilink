@@ -218,7 +218,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def solve_steps(
         self,
-        n: int,
+        n_steps: int,
         *,
         evaluate=False,
         n_trials=50,
@@ -226,16 +226,19 @@ class DynamicProgrammingPlanner(Planner):
         record_history: bool = False,
     ) -> PlanningSolution:
         """
-        The receding ``n``-step law: ``n`` backward sweeps from the terminal cost, the last table used at every time.
+        The receding ``n_steps``-step law: ``n_steps`` backward sweeps from the terminal cost, the last table used at every time.
 
-        Bertsekas' receding horizon: the stage-0 law of an ``n``-step problem
+        Bertsekas' receding horizon: the stage-0 law of an ``n_steps``-step problem
         applied as a stationary law, whatever the problem's own horizon. Its
         record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
         every stage instead. ``verbose`` and ``record_history`` as for :meth:`solve`.
         """
-        # Exactly n backward sweeps from the terminal cost
+        # Exactly n_steps backward sweeps from the terminal cost
         result = self.value_iteration(
-            int(n), stop_on_tol=False, verbose=verbose, record_history=record_history
+            int(n_steps),
+            stop_on_tol=False,
+            verbose=verbose,
+            record_history=record_history,
         )
 
         # The cost-to-go and policy tables as a planning solution
@@ -609,9 +612,9 @@ class DynamicProgrammingPlanner(Planner):
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
         return plotting.animate_cost_to_go(self.result, **kwargs)
 
-    def animate_policy(self, **kwargs):
+    def animate_control_law(self, **kwargs):
         require_solution(self)
-        return plotting.animate_policy(self.result, **kwargs)
+        return plotting.animate_control_law(self.result, **kwargs)
 
     ###########################################################################
     # Internal machinery

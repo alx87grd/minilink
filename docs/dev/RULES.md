@@ -135,7 +135,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
   | Print text / draw a figure | `verbose` (default `False`) / `show` | |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
-  | Cost-to-go and control-law plots | `plot_cost_to_go`, `plot_control_law` | `plot_cost2go`, `plot_policy` |
+  | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
 
   **A naming pattern, not a hard rule (the maintainer, 2026-11-07): the controller is the block,
   the policy the function.** Use it where it fits:

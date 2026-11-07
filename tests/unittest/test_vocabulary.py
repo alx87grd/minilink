@@ -99,6 +99,9 @@ RETIRED = {
     "live_plot_pause": ("LiveSearchPlot(pause=)", None),
     "live_plot_after_goal_only": ("LiveSearchPlot(after_goal_only=)", None),
     "live_plot_ax": ("LiveSearchPlot(ax=)", None),
+    "animate_policy": ("animate_control_law", None),
+    "num_timesteps": ("n_timesteps", ("ReinforcementLearningPlanner",)),
+    "controller": ("actor", ("ExplorationPolicy",)),
 }
 
 

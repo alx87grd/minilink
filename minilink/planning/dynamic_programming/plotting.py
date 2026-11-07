@@ -208,7 +208,7 @@ def animate_cost_to_go(
     )
 
 
-def animate_policy(
+def animate_control_law(
     result,
     *,
     axis=0,
@@ -218,7 +218,7 @@ def animate_policy(
     save_path=None,
     show=True,
 ):
-    """Animate policy sweeps recorded on ``result.history``."""
+    """Animate the control-law sweeps recorded on ``result.history``."""
     require_history(result)
 
     return animate(

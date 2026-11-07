@@ -168,7 +168,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert isinstance(solution, PlanningSolution) and solution.success
     assert solution.record.n_timesteps == 256 and solution.record.algorithm == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
-    assert planner.num_timesteps == 256 and len(planner.history) == 2
+    assert planner.n_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller
     assert isinstance(ctl, NeuralPolicy) and isinstance(
         solution.controller, NeuralPolicy
@@ -350,7 +350,7 @@ def test_plain_planning_problem_trains_from_its_single_start():
     )
     np.testing.assert_allclose(np.asarray(planner.carry[0]), [[0.2, 0.0], [0.2, 0.0]])
     planner.learn(32)
-    assert planner.num_timesteps == 32
+    assert planner.n_timesteps == 32
 
 
 # --- the evaluation of a learned law ---
@@ -729,6 +729,7 @@ def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
     np.testing.assert_allclose(pi.input(jnp.array([1.0])), [4.0])
     np.testing.assert_allclose(pi.input(jnp.array([-3.0])), [-4.0])
     assert pi.deterministic is planner.actor
+    assert pi.actor is planner.actor
 
 
 def test_numpy_and_jax_environments_take_the_same_step():
