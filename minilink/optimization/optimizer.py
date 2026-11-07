@@ -27,6 +27,7 @@ from minilink.optimization.evaluators.program_evaluator import require_declared_
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
+    program_class,
 )
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
@@ -112,9 +113,11 @@ class Optimizer:
         Optimizer method preset, named by algorithm: ``"gd"`` and ``"adam"``
         (first-order, projected on the box), ``"l-bfgs"``, ``"scipy_slsqp"``,
         ``"scipy_trust_constr"``, ``"ipopt"``; or ``"auto"``, the default of the
-        program's class (see :func:`program_class`): L-BFGS for an unconstrained
-        or box-bounded program, SLSQP for a constrained one. A method the class
-        does not admit is refused (``gd`` on a program with constraint rows).
+        program's class (see
+        :func:`~minilink.optimization.mathematical_program.program_class`):
+        L-BFGS for an unconstrained or box-bounded program, SLSQP for a
+        constrained one. A method the class does not admit is refused (``gd``
+        on a program with constraint rows).
     backend : str, optional
         Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
         Defaults to ``program.backend`` (the native backend of the program's
@@ -536,18 +539,6 @@ def require_no_hook(callback):
             "a fixed-count solve (n_iterations=) is one pure scan: no callback; "
             "use as_step_system().compute_rollout(K) for the iterates"
         )
-
-
-def program_class(program) -> str:
-    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
-    if program.g is not None or program.h is not None:
-        return "constrained"
-
-    faces = [side for side in (program.lower, program.upper) if side is not None]
-    if any(np.any(np.isfinite(side)) for side in faces):
-        return "bounded"
-
-    return "unconstrained"
 
 
 def method_for(program, method):

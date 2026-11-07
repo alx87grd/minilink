@@ -565,7 +565,7 @@ def quadratic_program(**fields):
 
 
 def test_the_program_class_is_read_from_its_fields():
-    from minilink.optimization.optimizer import program_class
+    from minilink.optimization.mathematical_program import program_class
 
     assert program_class(quadratic_program()) == "unconstrained"
     assert program_class(quadratic_program(lower=[0.0, -np.inf])) == "bounded"

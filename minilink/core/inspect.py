@@ -15,6 +15,11 @@ def format_inspect(headline, body=None):
     return "\n".join([headline, *body])
 
 
+def body_line(label, value):
+    """One indented ``label: value`` line of a summary's body."""
+    return f"  {label}: {value}"
+
+
 def inspect_inline(obj):
     """One line for nesting inside another object's body."""
     return inspect_text(obj).replace("\n", "; ")
@@ -78,10 +83,6 @@ def repr_pretty(obj, p, cycle):
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def body_line(label, value):
-    return f"  {label}: {value}"
 
 
 def array_text(values):

@@ -179,6 +179,18 @@ class OptimizationResult:
         repr_pretty(self, p, cycle)
 
 
+def program_class(program) -> str:
+    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
+    if program.g is not None or program.h is not None:
+        return "constrained"
+
+    faces = [side for side in (program.lower, program.upper) if side is not None]
+    if any(np.any(np.isfinite(side)) for side in faces):
+        return "bounded"
+
+    return "unconstrained"
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -216,9 +228,6 @@ def require_ordered_bounds(lower, upper):
 
 def program_text(program):
     """The print text of a program: its class, constraint rows, backend and bounds."""
-    # A real cycle: optimizer imports this module
-    from minilink.optimization.optimizer import program_class
-
     kind = program_class(program)
     has_h = program.h is not None
     has_g = program.g is not None

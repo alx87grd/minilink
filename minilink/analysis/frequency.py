@@ -13,6 +13,7 @@ from minilink.analysis.linear import Margins
 from minilink.analysis.linearization import (
     channel_label,
     channel_subtitle,
+    discrete_period,
     siso_matrices,
 )
 from minilink.graphical.common import PlotResult
@@ -484,19 +485,6 @@ def frequency_grid(A, B, C, D, w, n, period=None):
         raise ValueError("Frequencies must be positive.")
 
     return w
-
-
-def discrete_period(sys):
-    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
-    # Lazy import: the step system loads with the first discrete analysis
-    from minilink.analysis.linearization import period_of
-    from minilink.core.discrete.step_system import StepSystem
-
-    if not isinstance(sys, StepSystem):
-        return None
-    period = period_of(sys)
-
-    return 1.0 if period is None else period
 
 
 def loop_response(A, B, C, D, period=None):

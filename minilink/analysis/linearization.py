@@ -202,6 +202,15 @@ def design_model(
 ###############################################################################
 
 
+def discrete_period(sys):
+    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
+    if not isinstance(sys, StepSystem):
+        return None
+    period = period_of(sys)
+
+    return 1.0 if period is None else period
+
+
 def period_of(sys):
     """The sample period ``Δ`` a step system runs at, in seconds; ``None`` for a tick law."""
     if isinstance(sys, DiscreteLTISystem):
