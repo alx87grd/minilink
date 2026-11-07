@@ -764,9 +764,6 @@ pick):
   assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
   read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
   entry still requires Ipopt).
-- [ ] Bare `import jax` in `simulation/compile_backend.py` and `from jax.errors` in
-  `analysis/derivatives.py` → `require_jax()` (RULES 5.12); the two rows the textbook-style
-  allowlist still carries.
 
 **S67–S69 — one plot vocabulary, contracts as tests, students' laptops** (S65 and S66 moved to
 §1):

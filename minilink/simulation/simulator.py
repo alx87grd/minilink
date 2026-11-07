@@ -9,11 +9,11 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
+from minilink.core.compile.compiler import build_on_auto
 from minilink.core.inspect import body_line, format_inspect, inspect_inline
 from minilink.core.params import checked
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
 from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
@@ -388,7 +388,7 @@ class Simulator:
 
     def resolve_and_build_evaluator(self, sys, backend):
         """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
-        return resolve_auto_backend(
+        return build_on_auto(
             lambda backend: self.build_evaluator(sys, backend), backend
         )
 

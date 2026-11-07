@@ -9,6 +9,7 @@ import numpy as np
 
 from minilink.core.assembly import flatten_diagram
 from minilink.core.backends import (
+    BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
     jax_installed,
@@ -114,14 +115,18 @@ def compile_auto(system, verbose=False):
     )
 
 
-def build_on_auto(build):
-    """``(backend, build(backend))``: JAX when it imports and the build traces, else NumPy.
+def build_on_auto(build, backend=BACKEND_AUTO):
+    """``(backend, build(backend))``: a named backend as requested; ``"auto"`` JAX when it imports and the build traces, else NumPy.
 
     Only two verdicts fall back to NumPy: JAX cannot be imported, or a block is
     not JAX-traceable (:class:`NotTraceableError`); any other error from the
     JAX build surfaces. Every automatic backend (``compile_auto``, the
     simulators' ``backend="auto"``) reads this one rule.
     """
+    # A named backend compiles as requested
+    if backend != BACKEND_AUTO:
+        return backend, build(backend)
+
     # JAX first; NumPy when JAX is on disk but does not import (blocked, a broken
     # install) or a block does not trace
     if jax_installed():

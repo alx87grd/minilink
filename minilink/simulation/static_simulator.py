@@ -5,10 +5,10 @@ import warnings
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.compile.compiler import build_on_auto
 from minilink.core.compile.evaluators.compiled import body_of
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input
 from minilink.simulation.simulator import COMPILE_BACKEND_AUTO
 from minilink.simulation.time_grid import build_time_grid
@@ -83,9 +83,7 @@ class StaticSimulator:
 
     def resolve_and_build_evaluator(self, sys, backend):
         """The backend and its evaluator: ``backend``, or JAX then NumPy for ``"auto"``."""
-        return resolve_auto_backend(
-            lambda backend: sys.compile(backend=backend), backend
-        )
+        return build_on_auto(lambda backend: sys.compile(backend=backend), backend)
 
     def nominal_u_traj(self):
         """The nominal input held over the grid, ``(m, n_pts)``."""

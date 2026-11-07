@@ -26,10 +26,10 @@ import warnings
 import numpy as np
 
 from minilink.core.backends import BACKEND_AUTO, BACKEND_NUMPY
+from minilink.core.compile.compiler import build_on_auto
 from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.realtime.io import RealtimeInput, RealtimeOutput
 from minilink.simulation.realtime.live_plot import LiveSignalPlotOutput
 from minilink.simulation.sim_reporting import (
@@ -185,7 +185,7 @@ class RealtimeSimulator:
         self._compile_s = 0.0
 
         t_compile = time.perf_counter()
-        self.backend, self.evaluator = self._resolve_and_build_evaluator(backend)
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(backend)
         self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
@@ -387,13 +387,11 @@ class RealtimeSimulator:
 
     # Internal machinery
 
-    def _resolve_and_build_evaluator(self, backend):
+    def resolve_and_build_evaluator(self, backend):
         """Compile with an explicit backend, or for ``None`` and ``"auto"`` by the compiler's one rule (JAX, else NumPy)."""
         backend = BACKEND_AUTO if backend is None else backend
 
-        return resolve_auto_backend(
-            lambda backend: self.sys.compile(backend=backend), backend
-        )
+        return build_on_auto(lambda backend: self.sys.compile(backend=backend), backend)
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.
