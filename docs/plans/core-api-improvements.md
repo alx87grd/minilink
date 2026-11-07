@@ -313,4 +313,4 @@ Choices the rulings left open, each taken as recommended; the maintainer may ove
 - **Helpers to module functions:** `move_start` folded into the `x0` setter;
   `open_loop_controller_of` takes the plant; `store_solution`, `build_kwargs` and `parts_view`
   stay methods (the planner's own memory, overridden per planner, the deferred parameters
-  fold); `require_goal(problem)` has no caller left (the final review decides).
+  fold); `require_goal(problem)`, left with no caller, was deleted in the review pass.
