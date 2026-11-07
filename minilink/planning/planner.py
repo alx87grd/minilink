@@ -55,6 +55,9 @@ class Planner(ABC):
     #: law is continuous (the LQR) clears this and scores the continuous loop.
     holds_policy = True
 
+    #: The constructor keywords that are the method's numbers, ``params["method"]``
+    number_names: tuple = ()
+
     def __init__(self, problem: PlanningProblem) -> None:
         # The declarative problem, and the seed of a planner that draws (None: none)
         self.problem = problem
@@ -73,9 +76,6 @@ class Planner(ABC):
                 "the mean start alone.",
                 stacklevel=2,
             )
-
-    #: The constructor keywords that are the method's numbers, ``params["method"]``
-    number_names: tuple = ()
 
     @property
     def params(self) -> dict:
