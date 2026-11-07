@@ -818,14 +818,6 @@ def require_cost(problem) -> CostFunction:
     return problem.cost
 
 
-def require_goal(problem) -> Set:
-    """Refuse a problem without a terminal set; return it."""
-    if problem.Xf is None:
-        raise ValueError("This planner requires a terminal set: give the problem Xf")
-
-    return problem.Xf
-
-
 def require_finite_horizon(problem) -> float:
     """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
     if problem.horizon is None:
