@@ -516,21 +516,21 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
         problem = self.problem if problem is None else problem
-        policy = open_loop_controller_of(trajectory, self.problem.sys)
+        controller = open_loop_controller_of(trajectory, self.problem.sys)
 
         evaluation = None
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
             evaluation = planner_evidence(
                 self,
-                policy,
+                controller,
                 dt=dt,
                 n_trials=n_trials,
                 tf=float(trajectory.tf - trajectory.t[0]),
                 problem=problem,
             )
 
-        return PlanningSolution(problem, policy, record, trajectory, evaluation)
+        return PlanningSolution(problem, controller, record, trajectory, evaluation)
 
     def print_solve_report(
         self,

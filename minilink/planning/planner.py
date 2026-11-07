@@ -202,16 +202,16 @@ def open_loop_controller_of(
 
 
 def planner_evidence(
-    planner, policy, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
+    planner, controller, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
 ) -> Evaluation | None:
     """
     The evidence a planner's ``solve(evaluate=True)`` records: its law scored on the real plant.
 
-    The :func:`~minilink.planning.evaluator.evaluate` of ``policy`` on the
+    The :func:`~minilink.planning.evaluator.evaluate` of ``controller`` on the
     planner's problem (or ``problem``): one run when nothing is random,
     ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
     no cost (a search without one). A feedback law with no clock of its own
-    is held over each period of ``dt`` (``policy % dt``), the loop its planner
+    is held over each period of ``dt`` (``controller % dt``), the loop its planner
     designs for, and the plant is integrated at the automatic step; an
     open-loop source keeps the interpolation its planner states. The public
     way to score a law is the problem's evaluator,
@@ -229,7 +229,7 @@ def planner_evidence(
 
     # The law the run holds: a feedback law on the clock of dt, when the
     # planner designs it on that grid
-    law = held_feedback(policy, dt) if planner.holds_policy else policy
+    law = held_feedback(controller, dt) if planner.holds_policy else controller
 
     return evaluate(
         problem,
@@ -242,18 +242,18 @@ def planner_evidence(
     )
 
 
-def held_feedback(policy, dt):
-    """A feedback law with no clock of its own on the clock of ``dt`` (``policy % dt``); a source, a tick law or a clocked law as given."""
+def held_feedback(controller, dt):
+    """A feedback controller with no clock of its own on the clock of ``dt`` (``controller % dt``); a source, a tick law or a clocked law as given."""
     # Lazy import: the step system loads with the compile chain
     from minilink.core.discrete.step_system import StepSystem
 
-    policy = controller_of(policy)
-    reads_input = int(policy.m) > 0
-    tick_or_clocked = isinstance(policy, StepSystem)
+    controller = controller_of(controller)
+    reads_input = int(controller.m) > 0
+    tick_or_clocked = isinstance(controller, StepSystem)
     if reads_input and not tick_or_clocked:
-        return policy % float(dt)
+        return controller % float(dt)
 
-    return policy
+    return controller
 
 
 def planner_at(planner, params) -> "Planner":

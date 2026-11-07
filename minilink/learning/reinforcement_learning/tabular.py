@@ -226,7 +226,7 @@ class TabularLearningPlanner(Planner):
 
         # The greedy law of the learned table
         result = self.result
-        policy = plotting.lookup_controller_of(result)
+        controller = plotting.lookup_controller_of(result)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -235,13 +235,15 @@ class TabularLearningPlanner(Planner):
         if evaluate:
             dt = self.grid.dt
             tf = self.env.tf
-            trajectory = nominal_trajectory(self.problem, policy, dt=dt, tf=tf)
-            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials, tf=tf)
+            trajectory = nominal_trajectory(self.problem, controller, dt=dt, tf=tf)
+            evaluation = planner_evidence(
+                self, controller, dt=dt, n_trials=n_trials, tf=tf
+            )
 
         # The solution: the law, the record, the rollout, the interpolated cost-to-go
         record = self.learning_record(result)
         solution = PlanningSolution(
-            self.problem, policy, record, trajectory, evaluation, result.value_at
+            self.problem, controller, record, trajectory, evaluation, result.value_at
         )
         if verbose:
             print(record)

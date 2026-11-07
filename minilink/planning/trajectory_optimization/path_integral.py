@@ -468,13 +468,13 @@ class CompiledMPPIPlanner:
             iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
-        policy = open_loop_controller_of(
+        controller = open_loop_controller_of(
             trajectory, self.planner.problem.sys, interpolation="previous"
         )
 
         return PlanningSolution(
             problem_with(self.problem, host_tree(problem_part(self.merged(params)))),
-            policy,
+            controller,
             record,
             trajectory,
             None,

@@ -458,7 +458,7 @@ class RRTPlanner(Planner):
         self, trajectory: Trajectory, evaluate, n_trials
     ) -> PlanningSolution:
         """The path as a solution: its input held by a source block, the search's record, scored when asked."""
-        policy = open_loop_controller_of(
+        controller = open_loop_controller_of(
             trajectory, self.problem.sys, interpolation="previous"
         )
 
@@ -467,11 +467,11 @@ class RRTPlanner(Planner):
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
             evaluation = planner_evidence(
-                self, policy, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+                self, controller, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
             )
 
         solution = PlanningSolution(
-            self.problem, policy, self.search_record(), trajectory, evaluation
+            self.problem, controller, self.search_record(), trajectory, evaluation
         )
 
         return self.store_solution(solution)
