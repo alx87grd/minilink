@@ -1636,3 +1636,42 @@ def test_the_stiff_preset_tightens_only_the_method_and_takes_the_jacobian_on_bot
     plant.x0[0] = 1.0
     smooth_run = Simulator(plant, tf=2.0, solver="scipy").solve().x
     np.testing.assert_allclose(runs["numpy"], smooth_run, atol=1e-3)
+
+
+from minilink.planning.trajectory_optimization.transcription import (  # noqa: E402
+    fixed_grid_t,
+)
+
+N_STEPS_COUNTS = {
+    # A horizon verb: n_steps points on [t0, tf], endpoints included
+    "Simulator": lambda N: Simulator(Integrator(), tf=1.0, n_steps=N).solve().t.size,
+    "compute_trajectory": lambda N: (
+        Integrator().compute_trajectory(tf=1.0, n_steps=N).t.size
+    ),
+    "static compute_trajectory": lambda N: (
+        Gain(K=2.0, dim=1).compute_trajectory(tf=1.0, n_steps=N).t.size
+    ),
+    "transcription knots": lambda N: fixed_grid_t(1.0, N).size,
+    # A run of periods: n_steps transitions, n_steps + 1 samples
+    "rollout": lambda N: (
+        Integrator().compile().rollout(np.zeros(1), None, 0.0, 0.01, n_steps=N).shape[0]
+        - 1
+    ),
+    "compute_rollout": lambda N: (
+        Integrator().discretize(0.01).compute_rollout(N).t.size - 1
+    ),
+}
+
+
+@pytest.mark.parametrize("verb", sorted(N_STEPS_COUNTS))
+def test_n_steps_counts_points_on_a_horizon_and_transitions_on_a_run(verb):
+    """One rule (DESIGN §5): n_steps is the grid's points on a horizon verb, the transitions on a stepping verb."""
+    assert N_STEPS_COUNTS[verb](7) == 7
+
+
+def test_rollout_batch_counts_transitions_like_rollout():
+    """rollout_batch(n_steps=N) gives N + 1 samples per member, as rollout does."""
+    pytest.importorskip("jax")
+    ev = Pendulum().compile(backend="jax")
+    xs = ev.rollout_batch(np.zeros((3, 2)), dt=0.01, n_steps=7)
+    assert xs.shape == (3, 8, 2)

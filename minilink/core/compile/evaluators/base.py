@@ -353,6 +353,9 @@ class ContinuousEvaluator(Evaluator):
             required), one sequence shared by the batch, or one per member.
         t0, dt : float
             Start time and step, shared by the batch.
+        n_steps : int, optional
+            Number of periods: ``n_steps + 1`` samples per member (required
+            with the nominal input, else read off ``u_sequences``).
         params : None or pytree
             ``None`` uses the compiled values. Otherwise a params pytree whose
             leaves are either shared by the batch or carry a leading axis of

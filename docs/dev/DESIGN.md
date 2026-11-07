@@ -1112,6 +1112,14 @@ Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
 via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
 
+**What `n_steps` counts.** One rule, by the kind of verb: on a horizon `[t0, tf]` it counts the
+grid's points, endpoints included (`Simulator`, a continuous or static `compute_trajectory`,
+a transcription's knots, the LQR gain schedule: `N` points, `N − 1` intervals); on a run of
+periods it counts the transitions (`rollout`, `rollout_batch`, `compute_rollout`, a step
+problem: `N` periods, `N + 1` samples `x_0 … x_N`). `n_steps=100` on `[0, 1]` is thus a
+step of `1/99` on the first and `100` steps of `dt` on the second
+(`test_simulation.py` pins each verb).
+
 **Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `rk4_fixedsteps` when a block
 holds a signal over a `sample_period`, else `scipy`) and the grid
