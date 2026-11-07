@@ -7,7 +7,7 @@ import pytest
 
 from minilink import Pendulum, StepSystem, WhiteNoise
 from minilink.core.backends import array_module
-from minilink.core.costs import CostFunction, StepCost
+from minilink.core.costs import CostFunction, QuadraticCost, StepCost
 from minilink.core.distributions import Uniform
 from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 from minilink.planning.problems import PlanningProblem
@@ -92,6 +92,24 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
     np.testing.assert_allclose(
         float(r_exit), expected
     )  # the running cost only, no failure_cost
+
+
+def test_environment_refuses_a_law_it_would_not_draw():
+    """An episode draws the plant's laws only: a law on another number is refused by name."""
+    plant = bounded_pendulum()
+    cost = QuadraticCost.from_system(plant)
+    lawful = PlanningProblem(
+        plant,
+        cost=cost,
+        U=plant.input_box,
+        x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
+        distributions={
+            "plant": {"m": Uniform(0.8, 1.2)},
+            "discount_rate": Uniform(0.1, 0.5),
+        },
+    )
+    with pytest.raises(ValueError, match=r"plant's laws only.*\['discount_rate'\]"):
+        RolloutEnvironment(lawful, dt=0.1)
 
 
 def test_environment_finite_horizon_charges_h_and_the_failure_cost():

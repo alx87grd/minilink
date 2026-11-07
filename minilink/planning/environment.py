@@ -133,6 +133,7 @@ class RolloutEnvironment:
         self.reward = reward if is_continuous(problem) else "stage"
 
         # The episode's realization: the plant's laws drawn, a seed per random source
+        require_plant_laws_only(problem.distributions)
         self.laws = problem.distributions.get("plant", {})
         self.sources = dict(problem.disturbances)
         require_stepped_sources(self.sys, self.sources)
@@ -397,6 +398,17 @@ def episode_seed(key, port):
         return child_seed(int(key), port)
 
     return int(numpy_generator(key).integers(0, MAX_SEED))
+
+
+def require_plant_laws_only(laws):
+    """Refuse a law on anything but the plant: an episode draws the plant's laws only (the start's law is the problem's ``x0``)."""
+    others = [".".join(path) for path, _ in flatten(laws) if path[0] != "plant"]
+    if others:
+        raise ValueError(
+            f"the RL episode draws the plant's laws only; the laws on {sorted(others)} "
+            "would be ignored: train on the problem without them, and score them with "
+            "problem.compile(controller).evaluate()"
+        )
 
 
 def require_stepped_sources(sys, sources):

@@ -1384,7 +1384,9 @@ untouched), the random sources kept with seed `None`, their mean signal. The eva
 under the port's name; its seed is the leaf `"disturbance.seed"`. An evaluation draws a seed per
 trial for every random block of the loop, the problem's sources or the loop's own, even on a
 deterministic problem: a block's own seed is only its default realization, never the trials' seed. The stepped
-environment reads each source at `t_k` with the episode's seed. A deterministic planner given a stochastic problem plans
+environment reads each source at `t_k` with the episode's seed, and draws the plant's laws
+only: a law on another number (the cost's, a set's, the discount) is refused, naming its
+path. A deterministic planner given a stochastic problem plans
 from the mean start and warns; `Sys2Gym(sys, cost, x0=law)` draws each episode's start
 from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
