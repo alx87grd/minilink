@@ -157,11 +157,11 @@ class MPPIPlanner(Planner):
 
         if evaluate:
             evaluation = planner_evidence(
-                self, solution.policy, dt=self.dt, n_trials=n_trials
+                self, solution.controller, dt=self.dt, n_trials=n_trials
             )
             solution = PlanningSolution(
                 solution.problem,
-                solution.policy,
+                solution.controller,
                 solution.record,
                 solution.trajectory,
                 evaluation,
@@ -463,7 +463,7 @@ class CompiledMPPIPlanner:
             iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
-        policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
+        policy = self.planner.open_loop_controller(trajectory, interpolation="previous")
 
         return PlanningSolution(
             problem_with(self.problem, host_tree(problem_part(self.merged(params)))),

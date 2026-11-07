@@ -148,13 +148,15 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert solution.record.timesteps == 256 and solution.record.algorithm == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
-    ctl = planner.get_controller()
-    assert isinstance(ctl, NeuralPolicy) and isinstance(solution.policy, NeuralPolicy)
+    ctl = planner.controller
+    assert isinstance(ctl, NeuralPolicy) and isinstance(
+        solution.controller, NeuralPolicy
+    )
     # the controller and the solution's law carry the trained weights
     actor = planner.algorithm.params(planner.train_state)["policy"]["mlp"]
     np.testing.assert_allclose(ctl.params["mlp"]["W0"], np.asarray(actor["W0"]))
     np.testing.assert_allclose(
-        solution.policy.params["mlp"]["W0"], np.asarray(actor["W0"])
+        solution.controller.params["mlp"]["W0"], np.asarray(actor["W0"])
     )
     u, _ = planner.predict(np.zeros((3, 2)))
     assert u.shape == (3, 1)
@@ -367,11 +369,11 @@ def test_sac_trains_through_the_same_planner_loop():
         verbose=0,
     )
     assert isinstance(planner.algorithm, SAC) and not planner.algorithm.on_policy
-    assert planner.controller.squash == "tanh"
+    assert planner.actor.squash == "tanh"
     planner.learn(48)  # three collections: fill the buffer, then two update rounds
     assert planner.replay.size == 48
     assert "critic_loss" in planner.history[-1] and "alpha" in planner.history[-1]
-    u = planner.get_controller().action(np.zeros(2))
+    u = planner.actor.action(np.zeros(2))
     assert -4.0 <= u[0] <= 4.0
 
 
@@ -566,7 +568,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     )
     assert planner.env.action_port == "r" and planner.env.m == 2
     planner.learn(64)
-    ctl = planner.get_controller()
+    ctl = planner.actor
     u = ctl.action(np.zeros(2))
     assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
     report = evaluate(prob, ctl, dt=0.1, n_trials=3, episode_length=0.5)
@@ -634,10 +636,10 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
         assert planner.critic is None and planner.n_steps == 5  # one episode length
     else:
         assert planner.critic is not None and planner.n_steps == 16
-    before = np.asarray(planner.get_controller().params["mlp"]["W0"]).copy()
+    before = np.asarray(planner.actor.params["mlp"]["W0"]).copy()
     planner.learn(2 * planner.n_steps * planner.n_envs)
     assert len(planner.history) == 2
-    assert not np.array_equal(planner.get_controller().params["mlp"]["W0"], before)
+    assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
     solution = planner.solve(timesteps=planner.n_steps * planner.n_envs)
     assert (
         solution.success
@@ -683,7 +685,7 @@ def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
         batch_size=16,
         verbose=0,
     )
-    pi, V = planner.policy, planner.critic
+    pi, V = planner.exploration_policy, planner.critic
     theta, w = planner.algorithm.params(planner.train_state).values()
     x = jnp.array([[0.1, 0.2], [-0.3, 0.4], [0.5, -0.6]])
     keys = jax.random.split(jax.random.PRNGKey(1), 3)
@@ -698,7 +700,7 @@ def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
     # the plant input of a normalized action spans the port bounds
     np.testing.assert_allclose(pi.input(jnp.array([1.0])), [4.0])
     np.testing.assert_allclose(pi.input(jnp.array([-3.0])), [-4.0])
-    assert pi.deterministic is planner.get_controller()
+    assert pi.deterministic is planner.actor
 
 
 def test_numpy_and_jax_environments_take_the_same_step():
@@ -768,7 +770,7 @@ def test_the_planner_trains_on_a_substepped_step_model():
     np.testing.assert_allclose(
         np.asarray(env.plant_step(x, u, 0.0)), np.asarray(expected)
     )
-    assert solution.policy is not None
+    assert solution.controller is not None
 
 
 def test_angle_features_map_each_angle_to_its_cosine_and_sine():
@@ -863,12 +865,12 @@ def test_training_again_leaves_an_earlier_solution_as_it_was():
         verbose=0,
     )
     first = planner.solve(timesteps=128)
-    W0 = np.array(first.policy.params["mlp"]["W0"])
+    W0 = np.array(first.controller.params["mlp"]["W0"])
     second = planner.solve(timesteps=128)
 
-    assert first.policy is not second.policy
-    np.testing.assert_array_equal(first.policy.params["mlp"]["W0"], W0)
-    assert not np.array_equal(second.policy.params["mlp"]["W0"], W0)
+    assert first.controller is not second.controller
+    np.testing.assert_array_equal(first.controller.params["mlp"]["W0"], W0)
+    assert not np.array_equal(second.controller.params["mlp"]["W0"], W0)
     x = np.array([0.3, 0.0])
-    u_first = first.policy.outputs["u"].compute(None, x, 0.0)
-    np.testing.assert_allclose(u_first, first.policy.action(x))
+    u_first = first.controller.outputs["u"].compute(None, x, 0.0)
+    np.testing.assert_allclose(u_first, first.controller.action(x))

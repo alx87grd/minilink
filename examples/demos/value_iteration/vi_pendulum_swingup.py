@@ -40,7 +40,7 @@ planner.solve()
 planner.plot_cost_to_go(jmax=INF, show_3d=True)
 planner.plot_control_law()
 
-controller = planner.get_controller()
+controller = planner.controller
 diagram = controller @ plant
 
 plant.x0 = X0

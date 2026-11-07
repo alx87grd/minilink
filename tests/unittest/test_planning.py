@@ -300,7 +300,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         with self.assertRaises(ValueError):
             planner.require_solution()
         with self.assertRaises(ValueError):
-            planner.get_controller()
+            planner.controller
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -816,7 +816,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
         planner.tree.nodes
     )
     assert (
-        int(solution.policy.m) == 0 and solution.evaluation is None
+        int(solution.controller.m) == 0 and solution.evaluation is None
     )  # open loop; no cost to score
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))

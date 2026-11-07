@@ -84,16 +84,16 @@ opt = TrajectoryOptimizationPlanner(
     problem, n_steps=40, transcription="direct_collocation"
 )
 
-vi_sol = vi.solve()  # value iteration: the policy is a controller
+vi_sol = vi.solve()  # value iteration: the controller is a lookup table
 rrt_sol = rrt.solve()  # kinodynamic tree search, bang-bang inputs
 opt_sol = opt.solve()  # direct collocation
 
-loop = vi_sol.policy @ plant  # the script closes the loop
+loop = vi_sol.controller @ plant  # the script closes the loop
 print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))
 loop.compute_trajectory(tf=10.0)
 loop.plot_trajectory()
 rrt.plot_tree(x_axis=0, y_axis=1)
-opt.plot_solution(signals=("x", "u"))
+opt.plot_trajectory(signals=("x", "u"))
 
 
 ########################################################

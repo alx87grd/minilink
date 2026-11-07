@@ -118,6 +118,14 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   the sampled loop's forced record of `"plant:u"`; a default adaptive run of a diagram takes one
   signal pass per saved sample after the run (about 0.13 s on 10 001 samples); a fixed-step run
   records from its own first stage at no measurable cost.
+- 2026-11-07 (on the branch `v04-build`, for `0.4.0`; every notebook migrated in the same
+  commit, no alias): the controller is the block, the policy the function.
+  `PlanningSolution.policy` (the block) → `solution.controller`, and `solution.policy(x, t)` is
+  the command `u = π(x, t)`; on every planner `get_controller()` → the property `controller`
+  (its `interpolation=` variant built directly, `LookupPolicy(grid, pi, interpolation=)`),
+  `value_at(x)` → `cost_to_go(x, t=None)`, `plot_solution` / `animate_solution` →
+  `plot_trajectory` / `animate`, and the new `planner.policy(x, t)`; the deep RL planner's
+  trained block is `planner.actor` and its exploration law `planner.exploration_policy`.
 
 ## 3. Maturity (TRL)
 

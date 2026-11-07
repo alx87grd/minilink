@@ -103,7 +103,7 @@ def test_the_solution_is_a_held_schedule_with_its_record():
     solution = swing_up_planner().solve()
     assert isinstance(solution.record, MPPIRecord)
     assert solution.trajectory.t.size == 41
-    source = solution.policy
+    source = solution.controller
     u_mid = source.h(np.zeros(0), np.zeros(0), 0.5 * DT)
     np.testing.assert_allclose(u_mid, solution.trajectory.u[:, 0])
 

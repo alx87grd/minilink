@@ -52,8 +52,8 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 planner.solve()
-planner.plot_solution()
-planner.animate_solution()
+planner.plot_trajectory()
+planner.animate()
 
 # traj2 = traj.resample(n_samples=200)
 # planner.problem.sys.animate(traj2)

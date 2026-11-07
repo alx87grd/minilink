@@ -8,7 +8,7 @@ from minilink.planning.dynamic_programming.dp import (
     infeasible_penalty,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-from minilink.planning.evaluator import policy_of
+from minilink.planning.evaluator import controller_of
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -34,7 +34,7 @@ class PolicyEvaluator:
     grid : StateSpaceGrid
         Discretization of the state and input spaces.
     policy : callable, System or PlanningSolution
-        State-feedback law ``u = policy(x)``, a solution (its policy), or a
+        State-feedback law ``u = policy(x)``, a solution (its controller), or a
         controller block that reads the state on an input named ``x`` (or
         ``y``) and commands ``u`` (:func:`minilink.core.roles.block_roles`):
         the grid state feeds that port, the reference stays pinned at its
@@ -66,8 +66,8 @@ class PolicyEvaluator:
         self.problem = problem
         self.grid = grid
 
-        # The fixed law u = π(x): a callable, a solution's policy, or a controller block
-        policy = policy_of(policy)
+        # The fixed law u = π(x): a callable, a solution's controller, or a controller block
+        policy = controller_of(policy)
         self.policy = policy if callable(policy) else policy_from_block(policy)
 
         # The numbers, the problem's unless given, and the terminal time
@@ -212,11 +212,11 @@ def require_problem_cost(problem):
 
 
 def policy_from_block(block):
-    """Adapt a controller block into a ``u = policy(x)`` callable.
+    """Adapt a feedback controller block into its policy, a ``u = policy(x, t=0.0)`` callable.
 
-    The block is evaluated through its control-port compute at nominal
-    internal state, with the grid state on the measurement port and every
-    other input (reference) pinned at its port nominal.
+    The block is evaluated through its control-port compute at its own
+    initial state ``x0``, with ``x`` on the measurement port, every other
+    input (a reference) pinned at its port nominal, and the time ``t``.
     """
     roles = block_roles(block)
     require_feedback_roles(block, roles)
@@ -226,11 +226,33 @@ def policy_from_block(block):
     u_base = block.get_u_from_input_ports().astype(float)
     x_ctrl = np.asarray(block.x0, dtype=float)
 
-    # The command of the block, the grid state on its measurement port
-    def policy(x):
+    # The command of the block at t, the state on its measurement port
+    def policy(x, t=0.0):
         u = u_base.copy()
         u[measurement] = np.asarray(x, dtype=float).reshape(-1)
-        command = np.asarray(output.compute(x_ctrl, u, 0.0, None), dtype=float)
+        command = np.asarray(output.compute(x_ctrl, u, t, None), dtype=float)
+        command = command.reshape(-1)
+
+        return command
+
+    return policy
+
+
+def policy_from_source(block):
+    """Adapt an open-loop controller, a source with no input port, into its policy ``u = policy(x=None, t=0.0)``.
+
+    The command is the source's output ``y = h(x_c, t)`` at its own initial
+    state ``x0``, the signal ``block >> plant`` feeds the plant; the state
+    ``x`` is not read.
+    """
+    require_source(block)
+
+    u_none = block.get_u_from_input_ports().astype(float)
+    x_ctrl = np.asarray(block.x0, dtype=float)
+
+    # The command of the source at t, whatever the state
+    def policy(x=None, t=0.0):
+        command = np.asarray(block.h(x_ctrl, u_none, t), dtype=float)
         command = command.reshape(-1)
 
         return command
@@ -246,6 +268,16 @@ def require_feedback_roles(block, roles):
             "reads the state on an input named 'x' (or 'y') and commands 'u'; "
             f"{type(block).__name__} reads {list(block.inputs)} and gives "
             f"{list(block.outputs)}"
+        )
+
+
+def require_source(block):
+    """Refuse a block with an input port: an open-loop policy reads the time alone."""
+    if int(block.m) > 0:
+        raise ValueError(
+            "an open-loop policy u = pi(t) is a source with no input port; "
+            f"{type(block).__name__} reads {list(block.inputs)}: "
+            "policy_from_block adapts a feedback controller"
         )
 
 

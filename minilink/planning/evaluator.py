@@ -75,7 +75,7 @@ class ProblemEvaluator:
         The task: plant, cost, sets, horizon, failure switch (and, for a stochastic
         problem, the draws and the criterion).
     controller : System or PlanningSolution
-        A controller block (or a solution's policy) closed on the plant, a source
+        A controller block (or a solution's controller) closed on the plant, a source
         block (no input) driving the plant's command, or a built loop with a
         ``plant`` block.
     dt : float, optional
@@ -684,7 +684,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
     takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
     parameters, on NumPy, from ``t0``: the sampled loop a feedback planner
-    designs for (its grid, its model), reported beside its policy; the
+    designs for (its grid, its model), reported beside its controller; the
     planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
     length for an infinite horizon. ``u`` is the plant's command port. The run
     carries the face's running cost, ``C_{k+1} = C_k + γᵏ c_k``, and the plant
@@ -695,7 +695,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     from minilink.core.roles import command_port
 
     nominal = problem.nominal() if problem.is_stochastic else problem
-    policy = policy_of(policy)
+    policy = controller_of(policy)
     plant = nominal.sys
     n_steps = steps_of(horizon_of(nominal, tf), float(dt))
 
@@ -731,13 +731,13 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     return Trajectory(t=t, x=xs, u=us, signals=signals, roles=roles)
 
 
-def policy_of(controller):
-    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+def controller_of(controller):
+    """The block itself, or the controller of a :class:`~minilink.planning.results.PlanningSolution`."""
     # A real cycle: results imports Evaluation from this module
     from minilink.planning.results import PlanningSolution
 
     if isinstance(controller, PlanningSolution):
-        return controller.policy
+        return controller.controller
 
     return controller
 
@@ -746,7 +746,7 @@ def closed_loop_of(problem, controller):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
     A built loop (a diagram with a block ``plant`` of the plant's state size) is
-    taken as it is; a solution gives its policy; a source block (no input) drives
+    taken as it is; a solution gives its controller; a source block (no input) drives
     the plant's command; any other block is closed by ``controller @ plant``.
     """
     # Lazy imports: the composition tools and the results load with the first loop
@@ -756,7 +756,7 @@ def closed_loop_of(problem, controller):
     from minilink.core.discrete.step_system import StepSystem
 
     plant = problem.sys
-    controller = policy_of(controller)
+    controller = controller_of(controller)
 
     require_continuous_or_clocked(controller)
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))

@@ -52,8 +52,8 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     np.testing.assert_allclose(solution.record.K, lqr_gain(A, B, Q, R))
     np.testing.assert_allclose(solution.record.P, P)
     assert np.all(np.real(solution.record.poles) < 0.0)
-    assert isinstance(solution.policy, StateFeedback)
-    np.testing.assert_allclose(solution.policy.inputs["r"].nominal_value, UPRIGHT)
+    assert isinstance(solution.controller, StateFeedback)
+    np.testing.assert_allclose(solution.controller.inputs["r"].nominal_value, UPRIGHT)
     x = UPRIGHT + [0.4, -0.2]
     assert solution.cost_to_go(x) == pytest.approx((x - UPRIGHT) @ P @ (x - UPRIGHT))
     assert solution.trajectory is None and solution.evaluation is None
@@ -84,9 +84,9 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     A, B = planner.linear_model()
     t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=201)
 
-    assert isinstance(solution.policy, TimeVaryingFeedback)
+    assert isinstance(solution.controller, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop
-    np.testing.assert_allclose(solution.policy.params["K"], K)
+    np.testing.assert_allclose(solution.controller.params["K"], K)
     np.testing.assert_allclose(solution.record.K, K[0])
     x = UPRIGHT + [0.1, 0.3]
     for k in (0, 100, 200):
@@ -109,7 +109,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
     stationary = LQRPlanner(
         PlanningProblem(plant, cost=cost, U=plant.input_box)
     ).solve()
-    K = stationary.policy.params["K"]
+    K = stationary.controller.params["K"]
     assert K.shape == (1, 4)
     np.testing.assert_allclose(
         K, lqr(plant, Q_x, R_all[:1, :1], x_bar=x_up).params["K"]
@@ -117,7 +117,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
     finite = LQRPlanner(
         PlanningProblem(plant, cost=cost, horizon=2.0, U=plant.input_box), n_steps=51
     ).solve()
-    assert finite.policy.params["K"].shape == (51, 1, 4)
+    assert finite.controller.params["K"].shape == (51, 1, 4)
 
 
 def test_lqr_needs_a_quadratic_cost():
@@ -141,7 +141,7 @@ def test_evaluate_rolls_out_and_scores_and_the_loop_balances_the_pendulum():
     # the loop is closed in the script: the policy is a controller block
     plant = problem.sys
     plant.x0 = problem.x0
-    loop = solution.policy @ plant
+    loop = solution.controller @ plant
     traj = loop.compute_trajectory(tf=6.0, verbose=False)
     np.testing.assert_allclose(traj.x[:, -1], UPRIGHT, atol=1e-3)
 

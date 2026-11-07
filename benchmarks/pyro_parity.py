@@ -211,7 +211,7 @@ def run_minilink_pendulum_dp(
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
-    controller = plotting.get_controller(result)
+    controller = plotting.lookup_controller_of(result)
     t_sim0 = time.perf_counter()
     traj = _minilink_closed_loop(
         problem.sys, controller, x0, tf=10.0, n_steps=10001, solver="euler"
@@ -273,7 +273,7 @@ def run_minilink_double_pendulum_dp(
         planner.clean_infeasible_set()
     t_solve = time.perf_counter()
 
-    controller = plotting.get_controller(result)
+    controller = plotting.lookup_controller_of(result)
     t_sim0 = time.perf_counter()
     traj = _minilink_closed_loop(
         problem.sys, controller, x0, tf=8.0, n_steps=4001, solver="euler"

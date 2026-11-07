@@ -79,12 +79,12 @@ print(solution.record)
 
 # The greedy walk on the same face: J = Σ c_k, the moves to the goal
 face = problem.compile()
-law = vi.get_controller()
+law = vi.controller
 xs, us, cs, J = face.run(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
 print(
-    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.value_at(problem.x0):g}"
+    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.cost_to_go(problem.x0):g}"
 )
 
 # The cost-to-go and the walk

@@ -36,7 +36,7 @@ planner = DynamicProgrammingPlanner(
 planner.solve()
 planner.plot_cost_to_go(jmax=INF, show_3d=True)
 
-controller = planner.get_controller()
+controller = planner.controller
 controller.plot_control_law()  # interpolated law the closed loop actually feels
 diagram = controller @ plant
 

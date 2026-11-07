@@ -44,7 +44,7 @@ class TabularLearningPlanner(Planner):
     SARSA with the action actually taken next, Monte Carlo control with the
     cost observed to the end of the episode. The result is the cost-to-go
     field and greedy policy that value iteration returns, so ``plot_cost_to_go``,
-    ``plot_control_law`` and ``get_controller`` (a lookup-table block) read the
+    ``plot_control_law`` and ``controller`` (a lookup-table block) read the
     same way, and the same grid solved by
     :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
     is the exact answer the learner approaches.
@@ -174,7 +174,7 @@ class TabularLearningPlanner(Planner):
         The table as it stands, as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
 
         The learner's own model, updated by every episode; the shortcuts
-        (:meth:`get_controller`, :meth:`value_at`, the plots) read the latest
+        (:attr:`controller`, :meth:`cost_to_go`, the plots) read the latest
         solution's tables instead, ``solution.record.tables``.
 
         A cell never visited keeps its initial value, zero: the optimistic
@@ -216,7 +216,7 @@ class TabularLearningPlanner(Planner):
 
         # The greedy law of the learned table
         result = self.result
-        policy = plotting.get_controller(result)
+        policy = plotting.lookup_controller_of(result)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -349,26 +349,14 @@ class TabularLearningPlanner(Planner):
             tables=tables,
         )
 
-    # Controller and plots
-
-    def get_controller(self, **kwargs):
-        """The latest solution's greedy policy; ``interpolation=`` builds a variant of it."""
-        solution = self.require_solution()
-        if not kwargs:
-            return solution.policy
-
-        return plotting.get_controller(solution.record.tables, **kwargs)
-
-    def value_at(self, x) -> float:
-        """Interpolate the latest solution's cost-to-go at a state ``x``."""
-        return self.require_solution().record.tables.value_at(x)
+    # Rollout and plots
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
         solution = self.require_solution() if solution is None else solution
         return nominal_trajectory(
             self.problem,
-            solution.policy,
+            solution.controller,
             dt=self.grid.dt,
             tf=self.env.tf if tf is None else tf,
         )

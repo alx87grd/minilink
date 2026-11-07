@@ -318,7 +318,7 @@ class CompiledTrajectoryPlanner:
             stats=dict(result.stats),
             optimization_result=result,
         )
-        policy = self.planner.open_loop_policy(trajectory)
+        policy = self.planner.open_loop_controller(trajectory)
 
         return PlanningSolution(problem, policy, record, trajectory, None)
 

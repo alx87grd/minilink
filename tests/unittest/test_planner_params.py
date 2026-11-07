@@ -147,8 +147,8 @@ def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
     x = np.array([0.5, 0.0])
 
     assert solution is planner.last_solution
-    assert planner.value_at(x) == solution.cost_to_go(x)
-    assert planner.get_controller() is solution.policy
+    assert planner.cost_to_go(x) == solution.cost_to_go(x)
+    assert planner.controller is solution.controller
     np.testing.assert_array_equal(
         planner.nominal_trajectory(1.0).x,
         planner.nominal_trajectory(1.0, solution=solution).x,

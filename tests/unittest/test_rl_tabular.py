@@ -64,10 +64,10 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     )
     solution = learner.solve(episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert isinstance(solution.policy, LookupPolicy)
+    assert isinstance(solution.controller, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
     assert solution.record.episodes == 2000 and len(learner.history) == 2000
-    assert solution.cost_to_go(np.zeros(2)) == learner.value_at(np.zeros(2))
+    assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
     J_vi = vi.result.J
@@ -75,7 +75,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     assert np.median(error) < 0.35 * np.median(J_vi)
 
     # The greedy law is a lookup-table block that closes the loop and regulates
-    ctl = learner.get_controller()
+    ctl = learner.controller
     assert isinstance(ctl, LookupPolicy)
     plant = problem.sys
     plant.x0 = np.array([1.0, 0.0])

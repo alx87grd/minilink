@@ -556,7 +556,7 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     )
 
     # The greedy walk from the start, rolled out on the face, pays J(x0)
-    law = vi.get_controller()
+    law = vi.controller
     walk = face.run(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
     )
@@ -583,7 +583,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         problem, x_grid=(41, 41), u_grid=(11,), dt=dt, solver="rk4"
     )
     solution = vi.solve(evaluate=True)
-    law = vi.get_controller()
+    law = vi.controller
 
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
@@ -800,7 +800,7 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
     )
     vi = DynamicProgrammingPlanner(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
     vi.solve()
-    law = vi.get_controller()
+    law = vi.controller
 
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)

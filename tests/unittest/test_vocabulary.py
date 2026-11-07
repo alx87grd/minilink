@@ -85,6 +85,13 @@ RETIRED = {
             "TabularLearningPlanner",
         ),
     ),
+    "get_controller": ("controller", None),
+    "value_at": (
+        "cost_to_go",
+        ("Planner", "DynamicProgrammingPlanner", "TabularLearningPlanner"),
+    ),
+    "plot_solution": ("plot_trajectory", None),
+    "animate_solution": ("animate", None),
 }
 
 

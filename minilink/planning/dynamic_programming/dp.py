@@ -181,11 +181,11 @@ class DynamicProgrammingPlanner(Planner):
         exactly ``N`` backward sweeps from the terminal cost and keeps every
         stage, forward in time: ``J_0 … J_N`` (``J_N = h``) and the laws
         ``π_0 … π_{N−1}``, stage ``i`` at ``t_i = t0 + i dt``. The solution's
-        policy then reads the stage of ``t`` (stage 0, the full-horizon law,
+        controller then reads the stage of ``t`` (stage 0, the full-horizon law,
         past the horizon) and its ``cost_to_go`` is ``J(x, t)``. An infinite
         horizon sweeps until the largest change of ``J`` falls under ``tol``
         (a change per sweep, not an error bound on ``J``), or after
-        ``max_iterations`` sweeps; its policy is the greedy lookup table and its
+        ``max_iterations`` sweeps; its controller is the greedy lookup table and its
         ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
         problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
@@ -518,31 +518,14 @@ class DynamicProgrammingPlanner(Planner):
 
         return G
 
-    # Controller, cleanup and plots
-
-    def get_controller(self, **kwargs):
-        """The solution's greedy lookup law; ``interpolation=`` builds a variant of it."""
-        solution = self.require_solution()
-        if not kwargs:
-            return solution.policy
-
-        result = self.result
-        if result.schedule is None:
-            return LookupPolicy(result.grid, result.pi, **kwargs)
-        t, _, pi = result.schedule
-
-        return LookupPolicy(result.grid, pi, t, **kwargs)
-
-    def value_at(self, x) -> float:
-        """The latest solution's cost-to-go at ``x``: its field, read by the options' interpolation."""
-        solution = self.require_solution()
-
-        return float(solution.cost_to_go(x))
+    # Rollout, cleanup and plots
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
         solution = self.require_solution() if solution is None else solution
-        return nominal_trajectory(self.problem, solution.policy, dt=self.grid.dt, tf=tf)
+        return nominal_trajectory(
+            self.problem, solution.controller, dt=self.grid.dt, tf=tf
+        )
 
     def clean_infeasible_set(
         self, tol: float = 1.0, *, tables=None

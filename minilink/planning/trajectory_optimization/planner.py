@@ -200,8 +200,8 @@ class TrajectoryOptimizationPlanner(Planner):
         a packed ``z`` (a compiled face's, its origin dropped), or a
         :class:`~minilink.planning.results.PlanningSolution`
         (a warm start: ``planner.solve(guess=previous)``); ``None`` takes the
-        options' guess, else the default. The solution's policy is the optimized
-        input as a source block, ``policy >> plant``; ``evaluate=True`` also
+        options' guess, else the default. The solution's controller is the optimized
+        input as a source block, ``controller >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
         """
         problem_params, method = planner_parts(
@@ -489,7 +489,7 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
         problem = self.problem if problem is None else problem
-        policy = self.open_loop_policy(trajectory)
+        policy = self.open_loop_controller(trajectory)
 
         evaluation = None
         if evaluate:

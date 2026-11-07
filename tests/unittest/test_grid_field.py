@@ -148,7 +148,7 @@ def test_value_iterations_cost_to_go_is_a_grid_field_charging_the_failure_cost_o
 
     assert isinstance(J, GridField)
     assert J(x_in) == pytest.approx(result.value_at(x_in), rel=1e-12)
-    assert planner.value_at(x_in) == float(J(x_in))
+    assert planner.cost_to_go(x_in) == float(J(x_in))
     assert J(np.array([10.0, 0.0])) == planner.out_of_bound_cost
     assert not J.as_set(upper=0.5 * planner.out_of_bound_cost).contains(
         np.array([10.0, 0.0])
@@ -175,7 +175,9 @@ def test_lqrs_cost_to_go_is_a_quadratic_field_in_both_horizons():
 def test_value_iterations_law_closes_a_jax_loop_as_on_numpy():
     pytest.importorskip("jax")
     problem = regulation()
-    law = DynamicProgrammingPlanner(problem, max_iterations=30, **GRID).solve().policy
+    law = (
+        DynamicProgrammingPlanner(problem, max_iterations=30, **GRID).solve().controller
+    )
     plant = problem.sys
     plant.x0 = np.array([0.5, 0.0])
     loop = law @ plant

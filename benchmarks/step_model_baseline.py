@@ -172,7 +172,7 @@ def dp_entries(out):
         .T
     )
     out["dp.cost_to_go"] = [solution.cost_to_go(x) for x in grid_points]
-    out["dp.policy"] = [solution.policy.ctl(None, x) for x in grid_points]
+    out["dp.policy"] = [solution.controller.ctl(None, x) for x in grid_points]
 
 
 def trajopt_entries(out):

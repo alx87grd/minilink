@@ -265,7 +265,7 @@ def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
     pe = PolicyEvaluator(
         problem,
         grid=vi.grid,
-        policy=vi.get_controller(),
+        policy=vi.controller,
         **vi.params["method"],
         tol=vi.tol,
         max_iterations=vi.max_iterations,

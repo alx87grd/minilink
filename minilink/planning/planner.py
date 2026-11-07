@@ -13,7 +13,7 @@ from minilink.core.roles import command_port
 from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.evaluator import evaluate, policy_of
+from minilink.planning.evaluator import controller_of, evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 
@@ -41,10 +41,11 @@ class Planner(ABC):
     Notes
     -----
     Offline entry is :meth:`solve`, which returns and stores the
-    :class:`~minilink.planning.results.PlanningSolution`; :meth:`get_controller`
-    is its policy, :meth:`plot_solution` and :meth:`animate_solution` its
-    trajectory, :meth:`plot_control_law` and :meth:`plot_cost_to_go` its law
-    and cost-to-go.
+    :class:`~minilink.planning.results.PlanningSolution`, and mirrors it:
+    :attr:`controller` is its block, :meth:`policy` its law ``u = pi(x, t)``,
+    :meth:`cost_to_go` its cost-to-go at a state, :meth:`plot_trajectory` and
+    :meth:`animate` its trajectory, :meth:`plot_control_law` and
+    :meth:`plot_cost_to_go` its law and cost-to-go.
     """
 
     #: Planners that read the uncertainty of a stochastic problem set this;
@@ -115,12 +116,24 @@ class Planner(ABC):
 
         return self.last_solution
 
-    def get_controller(self):
-        """The solution's policy: a feedback block, or the open-loop source of a trajectory planner."""
-        return self.require_solution().policy
+    @property
+    def controller(self):
+        """The latest solution's controller: a feedback block, or the open-loop source of a trajectory planner."""
+        return self.require_solution().controller
+
+    def policy(self, x=None, t=0.0):
+        """The latest solution's command ``u = pi(x, t)`` (:meth:`PlanningSolution.policy`)."""
+        return self.require_solution().policy(x, t)
+
+    def cost_to_go(self, x, t=None) -> float:
+        """The latest solution's cost-to-go at ``x`` (at ``t`` when given): its ``cost_to_go`` field, read."""
+        J = self.require_solution().cost_to_go
+        value = J(x) if t is None else J(x, t=t)
+
+        return float(value)
 
     def nominal_trajectory(self, tf=None, *, solution=None) -> Trajectory:
-        """``solution``'s policy from the problem's start on the planner's grid (feedback planners); the latest solution when none is given."""
+        """``solution``'s controller from the problem's start on the planner's grid (feedback planners); the latest solution when none is given."""
         raise NotImplementedError(f"{type(self).__name__} has no nominal_trajectory")
 
     def require_cost(self) -> CostFunction:
@@ -133,13 +146,13 @@ class Planner(ABC):
 
     # Views of the latest solution
 
-    def plot_solution(self, *, signals=("x", "u"), backend="matplotlib"):
+    def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib"):
         """Plot the latest solution's trajectory with the problem system."""
         return self.problem.sys.plot_trajectory(
             self.solution_trajectory(), signals=signals, backend=backend
         )
 
-    def animate_solution(self, **kwargs):
+    def animate(self, **kwargs):
         """Animate the latest solution's trajectory with the problem system."""
         return self.problem.sys.animate(self.solution_trajectory(), **kwargs)
 
@@ -167,11 +180,11 @@ class Planner(ABC):
 
     # What a family's solve builds its solution from
 
-    def open_loop_policy(
+    def open_loop_controller(
         self, trajectory, *, interpolation="linear"
     ) -> TrajectorySource:
         """
-        The trajectory's input as a source block ``u = pi(t)``: ``policy >> plant``.
+        The trajectory's input as a source block ``u = pi(t)``: ``controller >> plant``.
 
         The source carries the plant's action port (``u``, or its single
         input) so that series wiring and the evaluator feed it as the plant
@@ -244,7 +257,7 @@ def held_feedback(policy, dt):
     # Lazy import: the step system loads with the compile chain
     from minilink.core.discrete.step_system import StepSystem
 
-    policy = policy_of(policy)
+    policy = controller_of(policy)
     reads_input = int(policy.m) > 0
     tick_or_clocked = isinstance(policy, StepSystem)
     if reads_input and not tick_or_clocked:

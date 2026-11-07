@@ -98,7 +98,7 @@ planner = TrajectoryOptimizationPlanner(
 )
 
 traj = planner.solve().trajectory
-planner.plot_solution(signals=("x", "u"))
+planner.plot_trajectory(signals=("x", "u"))
 sys.traj = traj
 sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45)])
 

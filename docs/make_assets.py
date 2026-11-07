@@ -472,7 +472,7 @@ def gif_rocket() -> None:
     planner.solve(timesteps=TRAINING_TIMESTEPS)
 
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
-    cl_sys = planner.get_controller() @ plant
+    cl_sys = planner.controller @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
     camera = camera_matrix(
         target=(3.0, 7.0, 0.0), scale=8.0

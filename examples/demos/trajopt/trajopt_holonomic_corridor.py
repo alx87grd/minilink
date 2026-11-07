@@ -176,7 +176,7 @@ ax.legend(loc="upper left", fontsize=8)
 fig.tight_layout()
 plt.show()
 
-planner.plot_solution(signals=("x", "u"))
+planner.plot_trajectory(signals=("x", "u"))
 
 # --- Animation ---
 center, upper, lower = _sample_track_boundaries(track)

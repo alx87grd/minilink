@@ -139,7 +139,7 @@ class LQRPlanner(Planner):
         """
         Solve the Riccati equation of the linearized problem.
 
-        The solution's policy is the state-feedback block, its ``cost_to_go``
+        The solution's controller is the state-feedback block, its ``cost_to_go``
         the quadratic form of the linear model. ``evaluate=True`` also rolls
         the law out from the problem's start on the nonlinear plant and scores
         it over the problem's draws.
@@ -253,7 +253,7 @@ class LQRPlanner(Planner):
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s law (the latest when none is given) from the problem's start on the nonlinear plant, sampled every ``dt``."""
         solution = self.require_solution() if solution is None else solution
-        return nominal_trajectory(self.problem, solution.policy, dt=self.dt, tf=tf)
+        return nominal_trajectory(self.problem, solution.controller, dt=self.dt, tf=tf)
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
@@ -391,7 +391,7 @@ if __name__ == "__main__":
     solution = LQRPlanner(problem).solve(evaluate=True)
     print(solution)
 
-    loop = solution.policy @ plant
+    loop = solution.controller @ plant
     plant.x0 = problem.x0
     loop.compute_trajectory(tf=8.0)
     loop.plot_trajectory()

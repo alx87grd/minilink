@@ -1224,7 +1224,7 @@ A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refu
 unbounded one with the line to write. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner: the
 `problem` it solved (a reference), the
-`policy` (a controller block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
+`controller`, the block a loop closes on (a feedback block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
 for the trajectory family — `solution.open_loop` — or a time-varying feedback
 `u = pi(x, t)` for a finite-horizon LQR), the `record` (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
@@ -1239,9 +1239,14 @@ the RL critic, when the training discount equals the problem's, plain callables 
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
-n_trials=)` fills the rest through the evaluator. `get_controller()` returns
-the policy. **The planner's output is a controller or a trajectory, and the
-script closes the loop itself** (`solution.policy @ plant`): the solution's
+n_trials=)` fills the rest through the evaluator. `solution.policy(x, t)` is the
+controller's policy as a function, the command `u = π(x, t)` (a feedback controller reads `x`
+on its measurement port, its other inputs at their nominal values and its state at its `x0`;
+an open-loop one reads `t` alone). The planner mirrors its latest solution:
+`planner.controller` (a read-only property), `planner.policy(x, t)`,
+`planner.cost_to_go(x, t=None)` (the field read, a `float`), `planner.plot_trajectory` and
+`planner.animate`. **The planner's output is a controller or a trajectory, and the
+script closes the loop itself** (`solution.controller @ plant`): the solution's
 verbs draw what the planner produced — `plot_control_law` (the law over the
 problem's box, one colour scale from its inputs), `plot_cost_to_go` (the
 field over the box, anchored at the goal), `plot_trajectory` (the plan or the
@@ -1466,22 +1471,23 @@ own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
 `c + gamma min Q(x', .)`, off-policy), `SARSA` (the action taken next,
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
-returns a `PlanningSolution` (the greedy `LookupPolicy` as `policy`,
+returns a `PlanningSolution` (the greedy `LookupPolicy` as `controller`,
 `J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.result` is the
 table as it stands, a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), and
-`plot_cost_to_go`, `plot_control_law`, `value_at` and `get_controller` (a `LookupPolicy`)
+`plot_cost_to_go`, `plot_control_law`, `cost_to_go` and `controller` (a `LookupPolicy`)
 are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
 learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
-(the controller as `policy`, a `ReinforcementLearningRecord`, the critic as
-`cost_to_go` when the discounts match), `get_controller()` →
+(a copy of the trained block as `controller`, a `ReinforcementLearningRecord`, the critic as
+`cost_to_go` when the discounts match), `planner.controller` →
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's rollout with draws is
-`evaluate(problem, solution.policy, record=True)`.
-What the algorithm trains is a `ExplorationPolicy`: the controller block's mean action
+`evaluate(problem, solution.controller, record=True)`. The block being trained, updated in
+place every learning iteration, is `planner.actor`.
+What the algorithm trains is a `ExplorationPolicy` (`planner.exploration_policy`): the actor's mean action
 with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
 `sample`, `log_prob`, `entropy` and `input(a)`. Critics `ValueFunction` and `QFunction` sit
@@ -1519,9 +1525,9 @@ spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 import through the teaching surface.
 
 **Trajopt:** `TrajectoryOptimizationPlanner` → transcription → NLP →
-`PlanningSolution` whose policy is a linear `TrajectorySource` of the knot
+`PlanningSolution` whose controller is a linear `TrajectorySource` of the knot
 inputs (the transcriptions integrate a linear input between knots, so
-`policy >> plant` replays the plan). `TrajectoryOptimizationRecord.success`
+`controller >> plant` replays the plan). `TrajectoryOptimizationRecord.success`
 means *the returned plan satisfies the program constraints to
 `feasibility_tol`* — nothing else: an iteration-limit stop on a feasible plan
 is not a failure, a solver that reports convergence on an infeasible plan is,
@@ -1587,8 +1593,8 @@ planned `(x, u)` (collocation); `pv.solution(z, params, status)` the host-side
 planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (single shooting
 with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
 last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
-report) and keeps `last_solution` for its shortcuts only (`plot_solution`,
-`animate_solution`, `get_controller`, RULES 2.4); no solve and no tool reads it. Single backend-native
+report) and keeps `last_solution` for its shortcuts only (`plot_trajectory`,
+`animate`, `controller`, `policy`, `cost_to_go`, RULES 2.4); no solve and no tool reads it. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the
@@ -1610,8 +1616,8 @@ solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a finite
 horizon, and `solve_steps`, always succeed); the record carries `mode`
 (`"converged"`, `"finite"` or `"receding"`), the sweep count, the last cost-to-go change
-and the tables themselves (`record.tables`, the `J` and `pi` the planner's `result`,
-`value_at` and plots read; a finite horizon's stages in `record.tables.schedule`).
+and the tables themselves (`record.tables`, the `J` and `pi` the planner's `result`
+and plots read; a finite horizon's stages in `record.tables.schedule`).
 
 **Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -1631,14 +1637,14 @@ exactly `N` sweeps and keeps every stage forward in time, `J_0 … J_N` (`J_N = 
 laws `π_0 … π_{N−1}`, stage `i` at `t_i = t0 + i dt` (`record.tables.schedule = (t, J, pi)`,
 refused past 1 GiB of tables, the failure cost summed over the `N` steps). `solve_steps(n)`
 is the receding `n`-step law: `n` sweeps, the last table used at every time. The
-`PlanningSolution`'s `policy` is the `LookupPolicy` of the greedy table (on a finite horizon
+`PlanningSolution`'s `controller` is the `LookupPolicy` of the greedy table (on a finite horizon
 a schedule: stage `i` for `t_i ≤ t < t_{i+1}`, a float tick a hair short of `t_i` counted in
 it, and stage 0, the full-horizon law, outside `[t_0, t_N)`: past the horizon the
 stationary law approximated without a second solve) and its `cost_to_go`
 is `J` as a `GridField` on the grid (`J(x, t)` on a finite horizon, the stages read
 linearly in `t`; `grid.field(J)`: read by the planner's interpolation,
 the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
-callable; `planner.value_at` reads it). The backup is one function at the top of `dp.py`,
+callable; `planner.cost_to_go` reads it). The backup is one function at the top of `dp.py`,
 `bellman_backup(J_next, G, arrival, gamma)`, `J = min_u [G + γ J_next(x_next)]` with its
 argmin, each engine passing its reading of the grid (`arrival`, zero off the grid); the
 `"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
@@ -1654,7 +1660,9 @@ built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest o
 engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the
 textbook algorithm. `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support); a precomputed
-grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `get_controller()` returns a `LookupPolicy` (a static `System`); `PolicyEvaluator`
+grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `planner.controller` is a `LookupPolicy` (a static `System`; a variant with another
+`interpolation` is built directly, `LookupPolicy(grid, pi, interpolation="nearest")`, with the
+stage times on a finite horizon, `LookupPolicy(grid, pi_stages, t)`); `PolicyEvaluator`
 gives the cost-to-go of any fixed law. **Function approximation**
 (`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
 features — `QuadraticFeatures(x_bar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads

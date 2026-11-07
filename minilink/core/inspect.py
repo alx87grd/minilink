@@ -280,7 +280,7 @@ def solution_text(solution):
     success = "yes" if solution.success else "no"
     headline = f"PlanningSolution, method={solution.method}, success={success}"
     body = [
-        body_line("policy", f"{solution.policy.name} ({law})"),
+        body_line("controller", f"{solution.controller.name} ({law})"),
         body_line("trajectory", trajectory),
         body_line("evaluation", evaluation),
         body_line(

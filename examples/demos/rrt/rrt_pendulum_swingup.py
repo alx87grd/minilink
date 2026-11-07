@@ -34,5 +34,5 @@ print(solution.record)
 
 planner.plot_tree(x_axis=0, y_axis=1)
 planner.animate_search(x_axis=0, y_axis=1)
-planner.plot_solution(signals=("x", "u"))
-planner.animate_solution()
+planner.plot_trajectory(signals=("x", "u"))
+planner.animate()

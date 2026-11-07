@@ -337,7 +337,7 @@ def plot_solution_trajectory(solution, *, signals, backend, show):
         show=False,
     )
 
-    # The title says which: the plan of an open-loop policy, or the nominal rollout
+    # The title says which: the plan of an open-loop controller, or the nominal rollout
     kind = "plan" if solution.open_loop else "nominal rollout"
     if backend == "matplotlib":
         import matplotlib.pyplot as plt
@@ -449,7 +449,7 @@ def solution_of(problem, entry):
 
     return PlanningSolution(
         problem=problem,
-        policy=entry,
+        controller=entry,
         record=GivenPolicy(),
         trajectory=None,
         evaluation=None,

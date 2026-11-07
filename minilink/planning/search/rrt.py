@@ -125,8 +125,8 @@ class RRTPlanner(Planner):
         """
         Grow the tree until the goal region is reached or the budget is spent.
 
-        The solution's policy is the path's input held by a source block,
-        ``policy >> plant``; ``evaluate=True`` replays it over the problem's
+        The solution's controller is the path's input held by a source block,
+        ``controller >> plant``; ``evaluate=True`` replays it over the problem's
         draws when the problem declares a cost.
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
@@ -425,7 +425,7 @@ class RRTPlanner(Planner):
         self, trajectory: Trajectory, evaluate, n_trials
     ) -> PlanningSolution:
         """The path as a solution: its input held by a source block, the search's record, scored when asked."""
-        policy = self.open_loop_policy(trajectory, interpolation="previous")
+        policy = self.open_loop_controller(trajectory, interpolation="previous")
 
         # Scored over the problem's draws, on the path's median time step
         evaluation = None

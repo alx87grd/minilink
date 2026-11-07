@@ -74,8 +74,9 @@ class ReinforcementLearningPlanner(Planner):
     is an :class:`~minilink.learning.reinforcement_learning.algorithms.Algorithm`,
     so a new method is one file, not a new planner. The law being trained is
     a :class:`~minilink.learning.reinforcement_learning.policy.ExplorationPolicy`:
-    the controller block's mean action with the algorithm family's
-    exploration head around it.
+    the actor block's mean action with the algorithm family's exploration head
+    around it; each solution's controller is a copy of the actor at its
+    weights when solved.
 
     Parameters
     ----------
@@ -116,10 +117,11 @@ class ReinforcementLearningPlanner(Planner):
 
     Attributes
     ----------
-    controller : NeuralPolicy
-        The law, updated in place after every learning iteration.
-    policy : ExplorationPolicy
-        The controller with its exploration head, what the algorithm trains.
+    actor : NeuralPolicy
+        The law being trained, updated in place after every learning
+        iteration (``controller`` is the latest solution's copy of it).
+    exploration_policy : ExplorationPolicy
+        The actor with its exploration head, what the algorithm trains.
     critic : ValueFunction or QFunction or None
         The critic of the algorithm's family.
     history : list of dict
@@ -193,7 +195,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The law, the exploration head and the critic of the algorithm's family,
         # bound to the algorithm with the one discount
-        self.controller = policy or NeuralPolicy(
+        self.actor = policy or NeuralPolicy(
             problem.sys,
             input_box=require_finite_input_box(problem),
             features=features,
@@ -203,9 +205,11 @@ class ReinforcementLearningPlanner(Planner):
             seed=seed,
         )
         head = self.build_head(hidden, activation, log_std_init, seed)
-        self.policy = ExplorationPolicy(self.controller, head)
+        self.exploration_policy = ExplorationPolicy(self.actor, head)
         self.critic = self.build_critic(hidden, activation, seed)
-        self.algorithm.bind(self.policy, self.critic, self.resolve_discount(gamma))
+        self.algorithm.bind(
+            self.exploration_policy, self.critic, self.resolve_discount(gamma)
+        )
 
         # Trained on the stage cost with a discount of its own: the stage integral at
         # the same rate, ρ = −ln γ / dt, so one discount runs inside and between
@@ -234,7 +238,11 @@ class ReinforcementLearningPlanner(Planner):
         # updates from a replay of its transitions
         self.rollout_jit = jax.jit(
             partial(
-                rollout, self.env, self.policy, n_steps=self.n_steps, n_envs=self.n_envs
+                rollout,
+                self.env,
+                self.exploration_policy,
+                n_steps=self.n_steps,
+                n_envs=self.n_envs,
             )
         )
         self.replay = None
@@ -246,7 +254,7 @@ class ReinforcementLearningPlanner(Planner):
             )
             self.update_jit = jax.jit(self.replay_updates)
         self.action_jit = jax.jit(
-            lambda theta, x: self.controller.action(x, {"mlp": theta["mlp"]})
+            lambda theta, x: self.actor.action(x, {"mlp": theta["mlp"]})
         )
 
         # The law's rollouts, one jitted scan per number of periods and source draw
@@ -310,8 +318,8 @@ class ReinforcementLearningPlanner(Planner):
             self.train_time += time.time() - t0
             self.num_timesteps += steps_per_iteration
 
-            # The new weights, copied into the controller block
-            self.sync_controller()
+            # The new weights, copied into the actor block
+            self.sync_actor()
 
             # The iteration's record, and its progress line
             record = self.record_iteration(batch, stats, t0)
@@ -320,18 +328,12 @@ class ReinforcementLearningPlanner(Planner):
 
         return self
 
-    def sync_controller(self):
-        """Copy the current policy network weights into the controller block."""
+    def sync_actor(self):
+        """Copy the current policy network weights into the actor block."""
         theta = self.algorithm.params(self.train_state)["policy"]
-        self.controller.params["mlp"] = {
-            k: np.asarray(v) for k, v in theta["mlp"].items()
-        }
+        self.actor.params["mlp"] = {k: np.asarray(v) for k, v in theta["mlp"].items()}
 
     # The learned law
-
-    def get_controller(self):
-        """The learned law as a controller block (``controller @ plant``)."""
-        return self.controller
 
     def predict(self, x, deterministic=True):
         """
@@ -361,8 +363,8 @@ class ReinforcementLearningPlanner(Planner):
             self.key, key = jax.random.split(self.key)
             if x.ndim == 2:
                 key = jax.random.split(key, x.shape[0])
-            a = self.policy.sample(theta, x, key)
-            u = self.policy.input(a)
+            a = self.exploration_policy.sample(theta, x, key)
+            u = self.exploration_policy.input(a)
 
         u = np.asarray(u)
 
@@ -416,7 +418,7 @@ class ReinforcementLearningPlanner(Planner):
 
     def build_head(self, hidden, activation, log_std_init, seed):
         """The exploration head of the algorithm's family."""
-        ctl = self.controller
+        ctl = self.actor
         m = self.env.m
 
         # A Gaussian around the block's mean action
@@ -432,7 +434,7 @@ class ReinforcementLearningPlanner(Planner):
 
     def build_critic(self, hidden, activation, seed):
         """The critic of the algorithm's family: a state value, an action value, or none."""
-        ctl = self.controller
+        ctl = self.actor
         m = self.env.m
         n_features = int(ctl.mlp.inputs["u"].dim)
         kind = self.algorithm.critic_kind
@@ -588,7 +590,7 @@ class ReinforcementLearningPlanner(Planner):
             trajectory = self.nominal_trajectory()
             evaluation = planner_evidence(
                 self,
-                self.controller,
+                self.actor,
                 dt=self.dt,
                 n_trials=n_trials,
                 tf=self.env.tf,
@@ -601,11 +603,11 @@ class ReinforcementLearningPlanner(Planner):
         """The learned law as a solution: a copy of the law at its weights when solved (training again moves only the planner's own), its training record, the rollout and score given, the critic's cost-to-go."""
         record = self.training_record()
         cost_to_go = self.critic_cost_to_go()
-        policy = snapshot_of(self.controller)
+        controller = snapshot_of(self.actor)
 
         return PlanningSolution(
             problem=self.problem,
-            policy=policy,
+            controller=controller,
             record=record,
             trajectory=trajectory,
             evaluation=evaluation,

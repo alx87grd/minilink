@@ -70,7 +70,7 @@ print(solution.record)
 planner.plot_learning_curve()
 
 # The learned law is a controller block: draw it, score it, close the loop
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=0, y_axis=1, u_axis=0)  # torque vs (theta, dtheta)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

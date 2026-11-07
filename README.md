@@ -214,7 +214,7 @@ The identical problem definition is handed to completely different solver paradi
 - **Trajectory Optimization (TrajOpt):** Direct collocation and multiple shooting NLP.
 - **Reinforcement Learning (RL):** PPO / SAC neural policy optimization.
 
-Every planner returns a `PlanningSolution` whose policy is itself a `System` that closes the loop via `policy @ plant`:
+Every planner returns a `PlanningSolution` whose controller is itself a `System` that closes the loop via `controller @ plant`, and whose policy `solution.policy(x, t)` is the command `u = π(x, t)`:
 
 ```python
 import numpy as np
@@ -237,12 +237,12 @@ vi = DynamicProgrammingPlanner(problem.replace(horizon=None), x_grid=(101, 101),
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
 
-vi_sol  = vi.solve()   # policy is a lookup controller
+vi_sol  = vi.solve()   # the controller is a lookup table
 rrt_sol = rrt.solve()  # kinodynamic trajectory
 opt_sol = opt.solve()  # continuous trajectory solution
 
-# Closed-loop composition: policy is a standard System
-loop = vi_sol.policy @ plant
+# Closed-loop composition: the controller is a standard System
+loop = vi_sol.controller @ plant
 
 # Objective benchmark across solver paradigms
 print(compare(problem, VI=vi_sol, RRT=rrt_sol, TrajOpt=opt_sol, dt=0.05))

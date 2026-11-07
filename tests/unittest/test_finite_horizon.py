@@ -49,7 +49,10 @@ def test_the_horizon_picks_the_mode():
     assert record.mode == "finite" and record.iterations == N and record.success
     assert t.shape == (N + 1,) and J.shape[0] == N + 1 and pi.shape[0] == N
     np.testing.assert_allclose(t, np.linspace(0.0, 5.0, N + 1), atol=1e-12)
-    assert isinstance(solution.policy, LookupPolicy) and "t" in solution.policy.params
+    assert (
+        isinstance(solution.controller, LookupPolicy)
+        and "t" in solution.controller.params
+    )
     assert isinstance(solution.cost_to_go, GridField)
     np.testing.assert_array_equal(solution.cost_to_go.t, t)
 
@@ -58,7 +61,7 @@ def test_the_horizon_picks_the_mode():
     ).solve()
     assert infinite.record.mode == "converged"
     assert infinite.record.tables.schedule is None
-    assert "t" not in infinite.policy.params
+    assert "t" not in infinite.controller.params
 
 
 def test_the_last_stage_is_the_terminal_cost_and_the_first_the_full_horizon_tables():
@@ -87,7 +90,7 @@ def test_the_law_holds_each_stage_and_stage_zero_outside_the_horizon():
     solution = finite()
     t, _, pi = solution.record.tables.schedule
     grid = solution.record.tables.grid
-    law = solution.policy
+    law = solution.controller
     stage = {
         i: LookupPolicy(grid, pi[i]) for i in (0, 1, 3, N - 1)
     }  # each stage's own law
@@ -164,7 +167,7 @@ def test_value_iteration_and_lqr_agree_on_the_finite_double_integrator():
 def test_past_the_horizon_lqr_applies_the_stationary_gain():
     # S = 0: K(tf) = 0, so holding the last gain would stop regulating
     problem = double_integrator(S=np.zeros((2, 2)))
-    finite_law = LQRPlanner(problem).solve().policy
+    finite_law = LQRPlanner(problem).solve().controller
     stationary = LQRPlanner(problem.replace(horizon=None)).solve().record.K
     x = np.array([0.5, -0.2, 0.0, 0.0])  # the state, then the reference x̄
 
@@ -189,9 +192,9 @@ def test_past_the_horizon_value_iteration_applies_stage_zero_not_a_tie():
 
     assert np.all(pi[-1] == pi[-1][0])  # The tie: one action everywhere
     np.testing.assert_array_equal(
-        solution.policy.action(x, t=2.0), solution.policy.action(x, t=0.0)
+        solution.controller.action(x, t=2.0), solution.controller.action(x, t=0.0)
     )
-    assert solution.policy.action(x, t=2.0)[0] < 0.0  # Regulating, toward 0
+    assert solution.controller.action(x, t=2.0)[0] < 0.0  # Regulating, toward 0
 
 
 def test_lqrs_schedule_runs_on_the_problems_clock():
@@ -220,7 +223,7 @@ def test_the_jax_engine_keeps_the_same_stages():
 def test_the_staged_law_closes_a_jax_loop_as_on_numpy():
     pytest.importorskip("jax")
     problem = reach()
-    law = finite().policy
+    law = finite().controller
     plant = problem.sys
     plant.x0 = np.array([0.5, 0.0])
     loop = law @ plant

@@ -1,4 +1,4 @@
-"""The planning solution: the policy, its cost-to-go, and the evidence for them."""
+"""The planning solution: the controller, its policy, its cost-to-go, and the evidence for them."""
 
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ from minilink.planning.problems import PlanningProblem
 @dataclass(frozen=True)
 class PlanningSolution:
     """
-    What every planner returns: the optimal-control pair and the evidence for it.
+    What every planner returns: the controller, its cost-to-go and the evidence for them.
 
     Everything here is the solver's own claim under its own model — the table
     on its grid, the Riccati form on the linear model, the critic's fit. A
@@ -33,12 +33,13 @@ class PlanningSolution:
     problem : PlanningProblem
         What was solved: the system, its sets, the cost and the horizon. A
         frozen record; its ``sys`` is a live reference, not a snapshot.
-    policy : System
-        The law. Feedback ``u = pi(x)`` is a controller block, ``policy @ plant``
-        closes the loop; open loop ``u = pi(t)`` is a
-        :class:`~minilink.blocks.sources.TrajectorySource`, ``policy >> plant``
-        drives the plant; a finite-horizon design is feedback in time,
-        ``u = pi(x, t)``.
+    controller : System
+        The block a loop closes on. A feedback controller reads the state,
+        ``controller @ plant`` closes the loop; an open-loop controller is a
+        source such as a :class:`~minilink.blocks.sources.TrajectorySource`,
+        ``controller >> plant`` drives the plant. Its policy, the law
+        ``u = pi(x, t)`` as a function, is :meth:`policy`; a finite-horizon
+        design is feedback in time.
     record : record
         The planner's account of the solve, one dataclass per planner
         (``TrajectoryOptimizationRecord``, ``TreeSearchRecord``,
@@ -46,11 +47,11 @@ class PlanningSolution:
         ``ReinforcementLearningRecord``, ``RiccatiRecord``), each with a
         ``success`` flag and a one-line ``str``.
     trajectory : Trajectory or None
-        What the policy produces from the problem's start on the planner's
+        What the controller produces from the problem's start on the planner's
         grid with nominal parameters: the schedule of an open-loop planner,
         the rollout of a feedback law when the solve was asked to evaluate.
         It is the planner's evidence, not a closed-loop simulation: close the
-        loop in the script, ``policy @ plant``, and simulate that.
+        loop in the script, ``controller @ plant``, and simulate that.
     evaluation : Evaluation or None
         The cost over the problem's draws under the one scoring contract
         (one trial on a deterministic problem), when the solve was asked to
@@ -73,7 +74,7 @@ class PlanningSolution:
     """
 
     problem: PlanningProblem
-    policy: System
+    controller: System
     record: object
     trajectory: Trajectory | None
     evaluation: Evaluation | None
@@ -92,8 +93,8 @@ class PlanningSolution:
 
     @property
     def open_loop(self) -> bool:
-        """``True`` for a time-based policy (a source with no input port)."""
-        return int(self.policy.m) == 0
+        """``True`` for an open-loop controller, a source with no input port: ``u = pi(t)``."""
+        return int(self.controller.m) == 0
 
     @property
     def method(self) -> str:
@@ -103,13 +104,40 @@ class PlanningSolution:
 
         return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
 
+    def policy(self, x=None, t=0.0):
+        """
+        The command ``u = pi(x, t)`` of the controller, a 1-D array: its policy as a function.
+
+        A feedback controller reads ``x`` on its measurement port, its other
+        inputs (a reference) at their nominal values and its own state at its
+        ``x0``; an open-loop controller reads the time ``t`` alone and
+        ignores ``x``.
+        """
+        # A real cycle: the policy adapters import the planners, which import this module
+        from minilink.planning.dynamic_programming.policy_eval import (
+            policy_from_block,
+            policy_from_source,
+        )
+
+        # The law of the block: the time alone for a source, the state and the time
+        # for a feedback controller
+        if self.open_loop:
+            pi = policy_from_source(self.controller)
+        else:
+            self.require_state(x)
+            pi = policy_from_block(self.controller)
+
+        u = pi(x, t)
+
+        return u
+
     # Views of what the planner produced — never a closed-loop simulation
 
     def plot_control_law(self, **kwargs):
         """
         Draw the feedback law over the problem's state box.
 
-        The policy's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
+        The controller's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
         with ``bounds`` filled from the problem's constraint set (or the
         plant's state box) and the colour limits from its input set, so that
         laws of one problem share one scale. Every keyword passes through
@@ -120,7 +148,7 @@ class PlanningSolution:
 
         self.require_feedback_law()
 
-        return self.policy.plot_control_law(**control_law_kwargs(self, kwargs))
+        return self.controller.plot_control_law(**control_law_kwargs(self, kwargs))
 
     def plot_cost_to_go(self, **kwargs):
         """
@@ -140,7 +168,7 @@ class PlanningSolution:
         Draw ``trajectory`` on the problem's system: the plan, or the nominal rollout.
 
         The figure says which. A closed-loop simulation is not this: wire
-        ``policy @ plant`` and plot that diagram's trajectory.
+        ``controller @ plant`` and plot that diagram's trajectory.
         """
         # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_solution_trajectory
@@ -170,8 +198,16 @@ class PlanningSolution:
     # Internal machinery
     ###########################################################################
 
+    def require_state(self, x) -> None:
+        """Refuse a feedback policy read without a state."""
+        if x is None:
+            raise ValueError(
+                "a feedback controller's policy u = pi(x, t) reads the state: "
+                "pass x, policy(x, t)"
+            )
+
     def require_feedback_law(self) -> None:
-        """Refuse to draw the control law of an open-loop policy ``u = pi(t)``."""
+        """Refuse to draw the control law of an open-loop controller ``u = pi(t)``."""
         if self.open_loop:
             raise ValueError(
                 "an open-loop policy u = pi(t) has no control law to draw; "

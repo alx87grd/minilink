@@ -201,15 +201,17 @@ class TestValueIteration(unittest.TestCase):
 
 
 class TestControllerAndEvaluation(unittest.TestCase):
-    def test_get_controller_builds_an_interpolation_variant(self):
+    def test_the_controller_is_the_solutions_and_a_variant_is_built_from_the_tables(
+        self,
+    ):
         problem = make_problem()
         planner = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, max_iterations=20
         )
         planner.solve()
-        self.assertIs(planner.get_controller(), planner.require_solution().policy)
-        nearest = planner.get_controller(interpolation="nearest")
-        self.assertIsNot(nearest, planner.get_controller())
+        self.assertIs(planner.controller, planner.require_solution().controller)
+        nearest = plotting.lookup_controller_of(planner.result, interpolation="nearest")
+        self.assertIsNot(nearest, planner.controller)
         np.testing.assert_array_equal(nearest.pi, planner.result.pi)
 
     def test_verbs_before_solve_raise_the_no_solution_error(self):
@@ -217,8 +219,9 @@ class TestControllerAndEvaluation(unittest.TestCase):
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
         verbs = {
-            "value_at": lambda: planner.value_at([0.0, 0.0]),
-            "get_controller": lambda: planner.get_controller(interpolation="nearest"),
+            "cost_to_go": lambda: planner.cost_to_go([0.0, 0.0]),
+            "controller": lambda: planner.controller,
+            "policy": lambda: planner.policy([0.0, 0.0]),
             "plot_cost_to_go": planner.plot_cost_to_go,
             "plot_control_law": planner.plot_control_law,
             "animate_cost_to_go": planner.animate_cost_to_go,
@@ -234,7 +237,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         planner.clean_infeasible_set()
-        controller = plotting.get_controller(result)
+        controller = plotting.lookup_controller_of(result)
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
         diagram = DiagramSystem()
@@ -248,7 +251,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
     def test_policy_evaluator_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
-        controller = plotting.get_controller(result)
+        controller = plotting.lookup_controller_of(result)
         evaluator = PolicyEvaluator(
             problem,
             grid=result.grid,
@@ -559,7 +562,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         planner, _ = solve(problem)
         fig, ax = planner.plot_cost_to_go(show=False)
         self.assertIsNotNone(fig)
-        controller = planner.get_controller()
+        controller = planner.controller
         self.assertTrue(hasattr(controller, "action"))
 
     def test_cost2go_colour_scale_tops_at_the_failure_cost_of_leaving(self):
@@ -620,9 +623,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
         self.assertEqual(plotting.cost_scale_limit(500), 500.0)
 
-    def test_get_controller_smoke(self):
+    def test_lookup_controller_of_smoke(self):
         _, result = solve(make_problem())
-        controller = plotting.get_controller(result)
+        controller = plotting.lookup_controller_of(result)
         u = controller.action(result.grid.states[0])
         self.assertEqual(u.shape, (1,))
 
@@ -635,7 +638,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         planner.clean_infeasible_set()
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
-        diagram = plotting.get_controller(result) @ plant
+        diagram = plotting.lookup_controller_of(result) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
         _, ax = plotting.plot_control_law(result, trajectory=trajectory, show=False)
         self.assertGreaterEqual(len(ax.lines), 1)
@@ -643,7 +646,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
     def test_lookup_controller_matmul_wires_state_feedback(self):
         problem = make_problem()
         planner, _ = solve(problem)
-        diagram = planner.get_controller() @ problem.sys
+        diagram = planner.controller @ problem.sys
         self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
         self.assertNotIn("r", diagram.inputs)
@@ -654,14 +657,14 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         matplotlib.use("Agg")
         problem = make_problem()
         planner, _ = solve(problem)
-        controller = planner.get_controller()
+        controller = planner.controller
         res = controller.plot_control_law(grid_shape=(9, 9), show=False)
         self.assertIsNotNone(res.figure)
 
     def test_policy_evaluator_accepts_declared_block(self):
         problem = make_problem()
         planner, result = solve(problem)
-        controller = planner.get_controller()
+        controller = planner.controller
         J_callable = PolicyEvaluator(
             problem,
             grid=result.grid,
@@ -745,7 +748,7 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
         evaluator = PolicyEvaluator(
             problem,
             grid=result.grid,
-            policy=planner.get_controller(),
+            policy=planner.controller,
             **planner.params["method"],
             tol=planner.tol,
             max_iterations=planner.max_iterations,
@@ -764,8 +767,8 @@ class TestPolicyEvaluatorPlots(unittest.TestCase):
         self.assertIsNotNone(fig)
 
 
-class TestValueAtInterpolation(unittest.TestCase):
-    """value_at reads the cost-to-go by the options' interpolation, linear by default."""
+class TestCostToGoInterpolation(unittest.TestCase):
+    """The cost-to-go is read by the options' interpolation, linear by default."""
 
     def test_planner_solution_and_evaluator_follow_the_option(self):
         problem = make_problem()
@@ -774,7 +777,7 @@ class TestValueAtInterpolation(unittest.TestCase):
         nearest = float(result.grid.interpolate(result.J, x, "nearest")[0])
         linear = float(result.grid.interpolate(result.J, x, "linear")[0])
         self.assertNotEqual(nearest, linear)
-        self.assertEqual(planner.value_at(x[0]), nearest)
+        self.assertEqual(planner.cost_to_go(x[0]), nearest)
         self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
         self.assertEqual(result.value_at(x[0]), linear)
         self.assertEqual(result.value_at(x[0], "nearest"), nearest)
@@ -782,7 +785,7 @@ class TestValueAtInterpolation(unittest.TestCase):
         evaluator = PolicyEvaluator(
             problem,
             grid=result.grid,
-            policy=planner.get_controller(),
+            policy=planner.controller,
             **planner.params["method"],
             tol=planner.tol,
             max_iterations=planner.max_iterations,
@@ -838,8 +841,10 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertIn("converged", str(converged.record))
         self.assertLessEqual(converged.record.delta, 1.0)
         # the solution is the pair: the greedy lookup law and the interpolated cost-to-go
-        self.assertIs(converged.policy, planner.get_controller())
-        self.assertEqual(converged.cost_to_go(problem.x0), planner.value_at(problem.x0))
+        self.assertIs(converged.controller, planner.controller)
+        self.assertEqual(
+            converged.cost_to_go(problem.x0), planner.cost_to_go(problem.x0)
+        )
         self.assertIsNone(converged.trajectory)  # not rolled out unless asked
 
         fixed = DynamicProgrammingPlanner(
@@ -1012,7 +1017,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         evaluator = PolicyEvaluator(
             table.problem,
             grid=table.grid,
-            policy=table.get_controller().action,
+            policy=table.controller.action,
             **table.params["method"],
             tol=table.tol,
             max_iterations=table.max_iterations,

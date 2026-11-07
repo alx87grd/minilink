@@ -37,7 +37,7 @@ planner.solve()
 planner.plot_cost_to_go(jmax=INF, show_3d=True)
 planner.plot_control_law()
 
-controller = planner.get_controller()
+controller = planner.controller
 controller.plot_control_law()  # interpolated law next to the discrete policy table
 diagram = controller @ plant
 
