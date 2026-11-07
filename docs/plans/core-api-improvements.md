@@ -219,6 +219,14 @@ history before this change.
 
 ## CA-5. Export core mathematical types on `minilink.core` (and optional root prelude `minilink`)
 
+**Ruled 2026-11-07, with the root exports row (TODO §1.13):** `minilink.core` exports the core
+objects' family, `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+`ScaledCost`, `SampledSystem` and `SampledDiagramSystem`, so none needs a deep import; the root
+prelude gains only the concrete fields users build, `QuadraticField` and `GridField` (its rule:
+the concrete objects you build); `Field` stays on `minilink.core` beside `Set` and
+`Distribution`; `ModelPredictiveController` and `MPPIPlanner` stay on `minilink.control` and
+`minilink.planning`, where every example imports them.
+
 ### Problem and reproducer
 Several core classes used in the core tutorials are missing from `minilink/core/__init__.py`:
 - `MarginField` (returned by `Set.as_field()`),

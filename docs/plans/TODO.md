@@ -38,7 +38,6 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
-| The core API proposals | CA-1, CA-2, CA-5 | v0.4 | each proposal's go, §1.11 ([core-api-improvements.md](core-api-improvements.md)) |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
@@ -84,8 +83,8 @@ surface, and the student-facing numbers are re-pinned once, at the release. Addi
 breaks nothing goes last and may follow the tag.
 
 0. **The decisions waiting for the maintainer**, in parallel with phases 1 to 4 (the
-   agent does not wait on them): the core API proposals CA-1, CA-2 and CA-5, the later round of
-   API proposals and `refresh()` (§1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
+   agent does not wait on them; CA-1, CA-2, CA-5 and the root exports ruled 2026-11-07): the
+   later round of API proposals and `refresh()` (§1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
    root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
    Each ruling unblocks its row in phase 3 or 5.
 1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
@@ -369,8 +368,12 @@ commit per proposal, its callers and DESIGN in the same change.
   remove it, the diagram re-stacking its layout at each read of `n` and `state_index` as it
   already reads its `x0` and solver hints; (b) keep it, internal only, out of the tutorials (as
   now). Done when the maintainer picks and the sites follow.
-- [ ] **The core's mathematical types on `minilink.core`** (CA-5). Done when the five names
-  import from `minilink.core`.
+- [ ] **The core's mathematical types on `minilink.core`** (CA-5; ruled 2026-11-07, with §1.13's
+  root exports): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+  `ScaledCost`, `SampledSystem`, `SampledDiagramSystem` on `minilink.core`; `QuadraticField` and
+  `GridField` on the root. Done when they import from there, `test_teaching_surface.py` pins the
+  two root names, and the tutorials' deep `minilink.core.fields` import and its allowlist entry
+  are gone.
 ### 1.12 The minimal surface
 
 Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, CI and
@@ -384,9 +387,9 @@ benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the main
 ### 1.13 The root exports and the tutorials' quirks
 
 From the three-layer tutorials' audit (the notebooks work around each today):
-- [ ] **The root exports** **[ask — public names]**: `MPPIPlanner`, `ModelPredictiveController`,
-  `SampledSystem`, `SampledDiagramSystem`, `Field` and `QuadraticField` are not on `minilink`'s
-  root; with CA-5 and the K8 prelude trim. Done when `test_teaching_surface.py` pins them.
+- [ ] **The root exports** (ruled 2026-11-07, built with CA-5, §1.11): only `QuadraticField` and
+  `GridField` join the root; `Field` and the sampled classes go on `minilink.core`, MPC and MPPI
+  stay on their bands. Done with CA-5's row.
 - [ ] **A linear model's matrices by name**: `lin.A` is a method, so the tutorials read
   `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form.
 - [ ] **`plot_bode` on a sampled loop**: a method on continuous systems only, the function form
