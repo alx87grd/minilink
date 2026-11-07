@@ -119,7 +119,7 @@ breaks nothing goes last and may follow the tag.
   relative differences in the step's report.
 - **A rename or keyword change** lands with all its callers, with no alias.
 - **A step that restructures a computation** records a seeded baseline first (AGENTS' recipe,
-  the JSONs and scripts under `benchmarks/`), and its math is read next to
+  a scratch script and its JSON, run twice and `cmp`'d), and its math is read next to
   `planning/dynamic_programming/dp.py`.
 - **Re-pinning:** an intended change re-pins the regression baselines it moves
   (`benchmarks/baselines/`) in its own commit, with its closeness report, so CI stays green;
@@ -398,7 +398,7 @@ Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, C
 benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
 **[ask]**; the order is the plan's §4.
 
-- [ ] **The tests' short-term restructure** (MS-D1 ruled 2026-11-07: the net for v0.4's sweeps,
+- [ ] **The tests' short-term restructure** (built on `v04-build`, in review: the row leaves at the merge; the tests of the deleted benchmark helpers went, eleven tests over about 15 s carry a `slow` marker, run by `--runslow` in the regression job, the nightly and the release check, the per-change run 8 min 50 s → 4 min 22 s; MS-D1 ruled 2026-11-07: the net for v0.4's sweeps,
   kept small): the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
   CI relief), the files otherwise stay; the layers' details (MS-D2a–e) wait for the clean slate.
 - [ ] **The maintainer's demo rebuild, then the tests' clean slate** (MS-D1, 2026-11-07), the
@@ -719,8 +719,9 @@ pick):
 §1):
 
 - [ ] **The compile-time flatten default**: `compile_diagram(..., flatten=False)` inlines nested
-  boxes with `__` ids; the parity tests and `benchmarks/scenarios/nested_compile_flatten.py`
-  compare the nested compile, `flatten=True` and hand-flat wiring. Run the benchmark once on the
+  boxes with `__` ids; the parity tests compare the nested compile, `flatten=True` and
+  hand-flat wiring (the timing scenario, `benchmarks/scenarios/nested_compile_flatten.py`, left
+  with the studies in v0.4: in history at `b5b9892`). Run it once on the
   maintainer's reference machine, then keep the default off, turn it on, or drop the flag and
   always flatten if parity holds (reviewer A's lean) **[ask — core]**.
 - [ ] **One plot vocabulary** (S67) (scan: graphics#0, graphics#4, graphics#5, graphics#6,
