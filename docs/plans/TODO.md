@@ -37,7 +37,6 @@ maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -81,7 +80,8 @@ breaks nothing goes last and may follow the tag.
    agent does not wait on them; CA-1, CA-2, CA-5 and the root exports ruled 2026-11-07): the
    later round of API proposals and `refresh()` ruled 2026-11-07, §1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
    root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
-   Each ruling unblocks its row in phase 3 or 5.
+   All ruled 2026-11-07, or deferred to the end-of-v0.4 rebuilds (the demo set, the test layers,
+   the unsupported plants, GMC714's pins, the tuning demo) and the mechanical hierarchy's review.
 1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
    `plans-as-policies-1`, in review): the pure
    cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
@@ -234,8 +234,9 @@ Design: [native-optimizers.md](native-optimizers.md) §7.
   Done when the example runs as a demo and
   its plan follows a moved `mu_hat` without a recompile.
 
-- [ ] **A demo: an MPC's hyperparameter tuned by minilink's native methods** **[ask]** (design
-  first): a script that tunes an MPC (or MPPI) hyperparameter on a closed loop richer than the
+- [ ] **A demo: an MPC's hyperparameter tuned by minilink's native methods** (ruled 2026-11-07:
+  folded into the maintainer's end-of-v0.4 demo rebuild, which decides whether the new set has
+  it and on which planner and plant; this row is its input): a script that tunes an MPC (or MPPI) hyperparameter on a closed loop richer than the
   pendulum of `examples/demos/compile/native_mpc_tuning.py` (which tunes a native planner's cost
   weights by gradient), through the evaluator's program (`problem.compile(mpc % dt)`,
   `evaluator.program(wrt, bounds=, n_trials=)`) and minilink's own optimizers, no external
