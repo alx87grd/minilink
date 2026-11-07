@@ -332,6 +332,14 @@ v0.3's review and its six release points are done (`0.3.0`). K4 and the hand-loo
 - [ ] **The cart-pole RL demo re-measured**: the training reward moved to `−g·dt` and no
   RL demo was re-run for its numbers; its reliability re-measured on 8 seeds at its budget and
   reported, no constant changed; the budget after that is the maintainer's **[ask]**.
+  **Measured 2026-11-07** (`v04-build`, the demo unchanged: PPO, 3 M steps, `dt = 0.05`; seeds 0–7;
+  the demo's own `evaluate(n_trials=100, key=1)` and its 10 s run from hanging; success =
+  upright `cos θ < −0.95` and `|cart| < 5 m` over the last 2 s): **1 seed of 8** swings up and
+  balances (seed 2, `J = 1.23 ± 0.84`, every start upright); the other seven swing up once and
+  spin (eval `J` 21 to 1756, median about 32); the training's final episode cost (1.17–1.85)
+  does not tell them apart. The **[ask]**: a larger budget, another reward or exploration
+  setting, or the demo shown as a single seed's result. Also seen: `evaluate` reports every
+  seed feasible and reached at `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`).
 
 ### 1.11 The core API proposals
 
