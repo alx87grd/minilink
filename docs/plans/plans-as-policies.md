@@ -554,3 +554,47 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
   own table the same way. The core planners tutorial gives LQR the undiscounted problem
   (value iteration keeps its `ρ = 0.2`, which its sweeps need to converge: undiscounted they
   stop at the 1000-sweep cap with `ΔJ = 19`).
+
+## 14. What change 2 built (branch `v04-build`)
+
+- `solve()` reads the problem's horizon: `face.n_steps` set, exactly `N` sweeps with every
+  stage kept (`record.mode == "finite"`); unset, today's sweeps to `tol` (`"converged"`,
+  byte-identical: the seeded baseline of change 1, its finite case swapped for the same problem
+  on no horizon, `cmp` equal on the NumPy, loop and JAX engines). `solve_steps(n)` is the
+  receding law (`"receding"`); `fixed_horizon` is gone from the record.
+- The stages live on the raw result as `record.tables.schedule = (t, J, pi)`, LQR's
+  `record.schedule` shape: `t_0 … t_N`, `J_0 … J_N` (`J_N = h`), `π_0 … π_{N−1}`.
+  `record.tables.J` and `pi` stay stage 0, so the plots, `value_at` and `save` read what they
+  read. On JAX the `N` sweeps are one `lax.scan` (`compiled_scan`, one compile per `N`);
+  verbose or recorded, one jitted sweep at a time as before.
+- `LookupPolicy(grid, pi, t=None)`: a stacked `pi` on its stage times, the stage of `t` by
+  `stage_of` (traced), stage 0 outside `[t_0, t_N)`. `action(x, params=None, *, t=0.0)`.
+- `cost_to_go` is `J(x, t)`, `grid.field(J_stack, t)`.
+- The failure cost sums over the sweeps' horizon: `face.failure_cost_over(face.n_steps, γ)`
+  (a discounted finite problem's moves from the geometric limit to the `N`-step sum).
+- LQR's finite law runs on the problem's clock (`t0 + s`) and applies `K∞` past `tf`
+  (`stationary_gain`, `K(tf)` held when the algebraic equation has no stabilizing solution).
+- The three examples solve value iteration on `problem.replace(horizon=None)`, each saying why:
+  on the README's 4 s swing-up the finite law stays down (`J = 39.3`, the pendulum hanging for
+  4 s, cheaper than pumping with no terminal cost), which is right for that problem and not
+  what the example shows.
+- Measured (pendulum, 101 × 101 nodes, 11 inputs, `dt = 0.05`, best of 3, 300-sweep cap): the
+  infinite mode NumPy 2.81 s against 2.70 s on the base (noise, same code path), JAX 260 ms
+  against 256 ms; the finite mode (`N = 80`) NumPy 1.30 s, JAX 165 ms.
+
+## 15. Decisions taken during the automatic run (2026-11-07)
+
+Choices the plan left open, each taken as recommended; the maintainer may overturn any.
+
+- **Where the stages live:** `DynamicProgrammingResult.schedule = (t, J, pi)`, mirroring LQR's
+  `RiccatiRecord.schedule`, with `J` and `pi` kept as stage 0 (no reader of the tables moves).
+- **The frozen tables:** the record's `frozen_at` (the final time) on a finite solve whose
+  running-cost and transition tables served every sweep (a precomputed grid, the JAX engine);
+  `None` otherwise.
+- **The stage tolerance:** `1e-9` of a period, so a tick summed from `dt` reads its own stage.
+- **The memory limit:** 1 GiB over `J`, `π` and the law's command table, refused with the
+  numbers and the two ways out (a coarser grid, or the converged law).
+- **LQR without `K∞`:** a finite horizon needs no stabilizability, so a pair without a
+  stabilizing algebraic solution holds `K(tf)` past the horizon instead of failing.
+- **The examples:** none shows the finite law on purpose, so all three migrate to the converged
+  law; the finite mode is shown by its tests.

@@ -835,7 +835,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
   a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
-  `(x̄, S, t)` on a finite horizon).
+  `(x̄, S, t)` on a finite horizon, `t` on the problem's clock `t0 … t0 + tf`; its law
+  applies the stationary gain `K∞` at `x̄` past `tf`, `K(tf)` held when the algebraic
+  equation has no stabilizing solution).
   `GridField(levels, values, t=None, *, method="linear", outside=None)` is a table on a
   regular grid read as a field: multilinear in the cell holding `x` (`"nearest"` its closest
   node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only; a leading time
@@ -1598,10 +1600,11 @@ cost-to-go cells to `out_of_bound_cost` (`clean_infeasible=False` keeps the raw
 table; `clean_infeasible_set(tol)` reruns the pass with another tolerance). A
 callable `out_of_bound_cost` has no single saturation level, so it leaves the table as
 solved.
-`ValueIterationRecord.success` means the sweeps converged to `tol` (a
-fixed-horizon `solve_steps` always succeeds); the record carries the sweep
-count, the last cost-to-go change and the tables themselves (`record.tables`, the
-`J` and `pi` the planner's `result`, `value_at` and plots read).
+`ValueIterationRecord.success` means the sweeps converged to `tol` (a finite
+horizon, and `solve_steps`, always succeed); the record carries `mode`
+(`"converged"`, `"finite"` or `"receding"`), the sweep count, the last cost-to-go change
+and the tables themselves (`record.tables`, the `J` and `pi` the planner's `result`,
+`value_at` and plots read; a finite horizon's stages in `record.tables.schedule`).
 
 **Dynamic programming** (`planning/dynamic_programming/`): offline dynamic programming on a
 continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid *extent*
@@ -1613,10 +1616,20 @@ Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwi
 step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
 `c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
 the discount the face's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
-solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward — `solve`
-to tolerance, `solve_steps` for a fixed horizon — returning a `PlanningSolution` whose
-`policy` is the `LookupPolicy` of the greedy table and whose `cost_to_go`
-is `J` as a `GridField` on the grid (`grid.field(J)`: read by the planner's interpolation,
+solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward, and the problem's horizon
+picks the mode of `solve` (LQR's rule): an infinite one sweeps until the change per sweep
+falls under `tol` (not an error bound on `J`: with `γ < 1` the bound is `γ·tol/(1 − γ)`);
+a finite one (`horizon = T`, `N = steps_of(T, dt)`, or a step problem's `n_steps`) runs
+exactly `N` sweeps and keeps every stage forward in time, `J_0 … J_N` (`J_N = h`) and the
+laws `π_0 … π_{N−1}`, stage `i` at `t_i = t0 + i dt` (`record.tables.schedule = (t, J, pi)`,
+refused past 1 GiB of tables, the failure cost summed over the `N` steps). `solve_steps(n)`
+is the receding `n`-step law: `n` sweeps, the last table used at every time. The
+`PlanningSolution`'s `policy` is the `LookupPolicy` of the greedy table (on a finite horizon
+a schedule: stage `i` for `t_i ≤ t < t_{i+1}`, a float tick a hair short of `t_i` counted in
+it, and stage 0, the full-horizon law, outside `[t_0, t_N)`: past the horizon the
+stationary law approximated without a second solve) and its `cost_to_go`
+is `J` as a `GridField` on the grid (`J(x, t)` on a finite horizon, the stages read
+linearly in `t`; `grid.field(J)`: read by the planner's interpolation,
 the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
 callable; `planner.value_at` reads it). The backup is one function at the top of `dp.py`,
 `bellman_backup(J_next, G, arrival, gamma)`, `J = min_u [G + γ J_next(x_next)]` with its
@@ -1628,7 +1641,8 @@ transitions are charged a finite `out_of_bound_cost` (pyro's
 such transition's successor. Three interchangeable
 backward-step backends share this workflow: `loop` (per-node Python, pyro's reference),
 `numpy` (vectorized over the precomputed lookup table, the default),
-and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, on tables
+and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, a finite
+horizon's `N` sweeps one `lax.scan` stacking the stages, on tables
 built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest only). The JAX
 engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the
 textbook algorithm. `precompute` trades the `(N,A,n)`

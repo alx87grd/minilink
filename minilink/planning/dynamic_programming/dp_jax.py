@@ -9,6 +9,7 @@ from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
     bellman_backup,
+    stage_schedule,
 )
 from minilink.planning.dynamic_programming.progress import (
     SweepLog,
@@ -21,15 +22,18 @@ from minilink.planning.dynamic_programming.progress import (
 ###############################################################################
 
 
-def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgrammingResult:
+def value_iteration(
+    planner, max_sweeps, stop_on_tol=True, keep_stages=False
+) -> DynamicProgrammingResult:
     """
     The planner's value iteration, run on device.
 
     The same backward sweeps as
     :meth:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.value_iteration`
-    over the lookup tables, with the whole loop compiled as one ``lax`` loop.
-    With ``verbose`` or ``record_history`` the sweeps run one at a time from
-    Python instead, so each one can be reported or recorded.
+    over the lookup tables, with the whole loop compiled as one ``lax`` loop
+    (``keep_stages``: one ``lax.scan`` over the ``max_sweeps`` sweeps, every
+    stage stacked). With ``verbose`` or ``record_history`` the sweeps run one
+    at a time from Python instead, so each one can be reported or recorded.
 
     Warning: a solve builds the device tables once, at ``final_time``, and reuses
     them for every sweep, so the dynamics ``f``, the running cost ``g`` and a
@@ -49,8 +53,12 @@ def value_iteration(planner, max_sweeps, stop_on_tol=True) -> DynamicProgramming
     # Reported or recorded: one jitted step at a time, driven from Python
     if opt.verbose or opt.record_history:
         return sweep_by_sweep(
-            planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol
+            planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol, keep_stages
         )
+
+    # A finite horizon: its N sweeps in one compiled scan, every stage kept
+    if keep_stages:
+        return finite_sweeps(planner, J0, G, coords, in_bounds, max_sweeps)
 
     # All the backward sweeps in one compiled call, the numbers its arguments
     run = compiled_loop(planner, stop_on_tol, max_sweeps)
@@ -215,7 +223,68 @@ def require_device_interpolation(interpolation):
         raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
-def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
+def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingResult:
+    """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
+    jax = ensure_jax_x64()
+
+    tf = planner.final_time
+    dt = planner.grid.dt
+    gamma = float(planner.gamma)
+
+    # J_{N−1} … J_0 and π_{N−1} … π_0, the sweeps' order
+    run = compiled_scan(planner, N)
+    J_swept, pi_swept = run(J0, G, coords, in_bounds, gamma)
+    jax.block_until_ready(J_swept)
+    J_swept = np.array(J_swept)
+    pi_swept = np.array(pi_swept, dtype=int)
+
+    # The last sweep's largest change of the cost-to-go
+    J_before = np.array(J0) if N == 1 else J_swept[-2]
+    delta = float(np.max(np.abs(J_swept[-1] - J_before)))
+
+    # The stages forward in time: J_0 … J_N (J_N = h) and π_0 … π_{N−1}
+    schedule = stage_schedule(tf, dt, [np.array(J0), *J_swept], list(pi_swept))
+
+    return DynamicProgrammingResult(
+        grid=planner.grid,
+        J=np.array(J_swept[-1]),
+        pi=np.array(pi_swept[-1], dtype=int),
+        iterations=N,
+        delta=delta,
+        history=None,
+        schedule=schedule,
+    )
+
+
+def compiled_scan(planner, N):
+    """The jitted scan of a finite horizon's ``N`` sweeps, compiled once per ``N``; the discount is its argument."""
+    key = ("finite", int(N))
+    compiled = planner.compiled.get(key)
+    if compiled is not None:
+        return compiled
+
+    jax = ensure_jax_x64()
+    step = jitted_step(planner)
+
+    def run(J0, G, coords, in_bounds, gamma):
+        # One sweep: the Bellman backup from the cost-to-go one step ahead, its
+        # tables kept
+        def sweep(J_next, _):
+            J, pi = step(J_next, G, coords, in_bounds, gamma)
+            return J, (J, pi)
+
+        _, (J_swept, pi_swept) = jax.lax.scan(sweep, J0, None, length=N)
+
+        return J_swept, pi_swept
+
+    planner.compiled[key] = jax.jit(run)
+
+    return planner.compiled[key]
+
+
+def sweep_by_sweep(
+    planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol, keep_stages=False
+):
     """The backward sweeps one jitted step at a time, so each can be reported or recorded."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
@@ -234,6 +303,10 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
     J = J0
     pi = jnp.zeros(N, dtype=jnp.int32)
     log.start(tf, J, pi)
+
+    # The tables of every stage, from the final one back (a finite horizon's)
+    J_stages = [np.array(J)] if keep_stages else None
+    pi_stages = [] if keep_stages else None
 
     # Backward sweeps: at most max_sweeps of them, and with stop_on_tol
     # only until the largest change of the cost-to-go falls under tol
@@ -254,8 +327,16 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
         delta = float(jnp.max(jnp.abs(J - J_next)))
 
         log.sweep(k, t, J, J_next, pi)
+        if keep_stages:
+            J_stages.append(np.array(J))
+            pi_stages.append(np.array(pi, dtype=int))
 
     log.done(k, delta)
+
+    # The stages forward in time: J_0 … J_N and π_0 … π_{N−1}
+    schedule = None
+    if keep_stages:
+        schedule = stage_schedule(tf, dt, J_stages, pi_stages)
 
     return DynamicProgrammingResult(
         grid=planner.grid,
@@ -264,6 +345,7 @@ def sweep_by_sweep(planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol):
         iterations=k,
         delta=delta,
         history=log.history,
+        schedule=schedule,
     )
 
 

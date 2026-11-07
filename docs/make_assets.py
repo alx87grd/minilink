@@ -143,7 +143,9 @@ def tool_montage() -> None:
     swing.x0[0] = 2.0
     swing.compute_trajectory(tf=10.0)
     loop = lqr(plant, np.eye(2), np.eye(1), x_bar=x_up) @ plant
-    vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+    vi = DynamicProgrammingPlanner(
+        problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05
+    )
     vi.solve()
     rrt = RRTPlanner(problem, seed=0)
     rrt.solve()

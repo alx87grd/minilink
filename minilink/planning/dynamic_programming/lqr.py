@@ -72,7 +72,8 @@ class LQRPlanner(Planner):
     model and the closed-loop poles. The problem's horizon picks the equation:
     infinite, the algebraic one; finite, the differential one swept backward
     from the terminal weight ``S``, and the law is then
-    ``u = ū − K(t) (x − x̄)``.
+    ``u = ū − K(t) (x − x̄)`` on the problem's clock ``t0 … t0 + tf``, and
+    past it the stationary law ``K∞`` at the operating point.
 
     Parameters
     ----------
@@ -177,11 +178,18 @@ class LQRPlanner(Planner):
             tf = problem.require_finite_horizon()
 
             # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
-            # and K(t) = R⁻¹ Bᵀ S(t)
-            t, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, tf, n_steps=n_steps)
+            # and K(t) = R⁻¹ Bᵀ S(t), on the problem's clock t0 … t0 + t_f
+            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, tf, n_steps=n_steps)
+            t = problem.t0 + s
+
+            # Past the horizon, the stationary law at the operating point: K∞ of
+            # A_ρᵀ P + P A_ρ − P B R⁻¹ Bᵀ P + Q = 0 (K(t_f) held when there is none)
+            K_after = stationary_gain(A_rho, B, Q, R)
 
             # The law u = ū − K(t) (x − x̄)
-            policy = TimeVaryingFeedback(t, K, x_bar=x_bar, u_bar=u_bar)
+            policy = TimeVaryingFeedback(
+                t, K, x_bar=x_bar, u_bar=u_bar, K_after=K_after
+            )
 
             # Closed-loop poles at t = 0: eig(A − B K(0))
             poles = np.linalg.eigvals(A - B @ K[0])
@@ -312,6 +320,24 @@ class RiccatiRecord:
             )
 
         return f"K = {K}, closed-loop poles {poles}{ignored}"
+
+
+def stationary_gain(A, B, Q, R):
+    """
+    The infinite-horizon gain ``K∞ = R⁻¹ Bᵀ P`` of ``Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0``; ``None`` without a stabilizing solution.
+
+    A finite horizon needs no stabilizability, so a pair the algebraic
+    equation cannot solve keeps its last gain past the horizon instead.
+    """
+    try:
+        P = care(A, B, Q, R)
+    except (np.linalg.LinAlgError, ValueError):
+        return None
+
+    # K∞ = R⁻¹ Bᵀ P
+    K = np.linalg.solve(R, B.T @ P)
+
+    return K
 
 
 def require_quadratic_cost(cost):

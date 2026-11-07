@@ -263,16 +263,17 @@ class TestControllerAndEvaluation(unittest.TestCase):
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
 
-    def test_the_failure_cost_covers_the_converged_sum_at_a_finite_horizon(self):
+    def test_the_failure_cost_covers_the_sum_over_the_sweeps_horizon(self):
         from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
         from minilink.planning.dynamic_programming.dp import grid_failure_cost
 
-        # solve() sweeps to convergence: its sum is Σₖ γᵏ dt = dt / (1 − γ), tf or not
+        # An infinite horizon sweeps to convergence: Σₖ γᵏ dt = dt / (1 − γ); a finite
+        # one sweeps N = tf / dt times: Σ_{k<N} γᵏ dt = dt (1 − γᴺ) / (1 − γ)
         sys = DoubleIntegrator()
         X, U = sys.state.box, sys.input_box.box
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         g_max = cost.g_max(X, U)
-        for tf in (np.inf, 2.0):
+        for tf, N in ((np.inf, np.inf), (2.0, 20)):
             problem = PlanningProblem(
                 sys, cost=cost, horizon=tf, X=sys.state.box, U=sys.input_box
             )
@@ -281,7 +282,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             )
             failure_cost = grid_failure_cost(grid, 0.9)
             self.assertGreaterEqual(
-                failure_cost, g_max * 0.1 / (1.0 - 0.9) * (1 - 1e-12)
+                failure_cost, g_max * 0.1 * (1.0 - 0.9**N) / (1.0 - 0.9) * (1 - 1e-12)
             )
 
     def test_result_save_load_round_trip(self):
@@ -433,7 +434,7 @@ class TestBackends(unittest.TestCase):
             np.testing.assert_array_equal(tables.pi, planner.result.pi)
             self.assertTrue(solution.success)
 
-    def test_jax_fixed_horizon_matches_numpy(self):
+    def test_jax_receding_horizon_matches_numpy(self):
         import pytest
 
         pytest.importorskip("jax")
@@ -505,7 +506,7 @@ class TestBackends(unittest.TestCase):
         sys = DrivenIntegrator()
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
 
-        def fixed_horizon(backend, final_time):
+        def receding(backend, final_time):
             # The sweeps end at the problem's t0 + horizon
             problem = PlanningProblem(
                 sys, cost=cost, U=sys.input_box, horizon=1.0, t0=final_time - 1.0
@@ -521,13 +522,13 @@ class TestBackends(unittest.TestCase):
             planner.solve_steps(6)
             return planner.result
 
-        loop = fixed_horizon("loop", final_time=1.0)
-        table = fixed_horizon("numpy", final_time=1.0)
+        loop = receding("loop", final_time=1.0)
+        table = receding("numpy", final_time=1.0)
         np.testing.assert_allclose(loop.J, table.J)
         np.testing.assert_array_equal(loop.pi, table.pi)
 
         # The sweeps read the time: another horizon gives another cost-to-go
-        shifted = fixed_horizon("numpy", final_time=0.0)
+        shifted = receding("numpy", final_time=0.0)
         self.assertFalse(np.allclose(shifted.J, table.J))
 
 

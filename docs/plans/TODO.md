@@ -87,7 +87,7 @@ breaks nothing goes last and may follow the tag.
    cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
    discounted LQR. First because it changes a public shape (`solution.cost_to_go` becomes a
    `Field`) and fixes a known issue, while the tables stay byte-identical.
-2. **Value iteration's finite horizon** (§1.8, change 2; ruled): the two modes, the law past
+2. **Value iteration's finite horizon** (§1.8, change 2; built on `v04-build`, in review): the two modes, the law past
    the horizon for both planners, the three examples migrated. A behaviour change: before the
    notebooks' redraft.
 3. **The core API proposals as ruled** (§1.11): CA-1, CA-2, CA-5, the later round's rulings,
@@ -276,7 +276,9 @@ each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
   issue deleted); `test_planning_solution.py`, `test_dynamic_programming.py`,
   `test_lqr_planner.py` and the GRO860 value-iteration notebooks pass; DESIGN §4 and §6 say what
   landed.
-- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`): done when `solve()` on a
+- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`; built on the branch `v04-build`,
+  stacked on change 1, in review: the row leaves at the merge; what it built and the choices
+  taken: plans-as-policies.md §14 and §15): done when `solve()` on a
   finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, its `J_0`
   equals `solve_steps(N)`'s and its stage-`i` law `solve_steps(N − i)`'s, and LQR and value
   iteration agree on the finite-horizon double integrator; past the horizon LQR's finite law

@@ -54,7 +54,7 @@ class SweepLog:
     Bookkeeping of the backward sweeps: the pyro-style report and the ``(t, J, pi)`` history.
 
     Verbose solves print a banner, one line per sweep (a progress line for a
-    fixed horizon) and a closing line. ``history`` is the recorded list, or
+    finite or receding horizon's fixed number of sweeps) and a closing line. ``history`` is the recorded list, or
     ``None`` when the options do not ask for it.
     """
 
@@ -102,7 +102,7 @@ class SweepLog:
                 f"max:{J.max():7.2f} dmax:{delta.max():7.2f} dmin:{delta.min():7.2f}"
             )
         else:
-            # A fixed horizon: the throttled progress line over its sweeps
+            # A fixed number of sweeps: the throttled progress line over them
             maybe_print_build_progress(
                 k,
                 self.max_sweeps,

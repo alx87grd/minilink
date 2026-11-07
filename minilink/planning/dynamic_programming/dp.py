@@ -175,11 +175,18 @@ class DynamicProgrammingPlanner(Planner):
 
     def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
         """
-        Infinite horizon: sweep backward until the cost-to-go stops changing.
+        Solve on the problem's horizon: a law per stage on a finite one, the converged law on an infinite one.
 
-        Stops once the largest change of ``J`` falls under ``tol``, or after
-        ``max_iterations`` sweeps. The solution's policy is the greedy lookup
-        table and its ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
+        A finite horizon (``horizon=T``, or a step problem's ``n_steps``) runs
+        exactly ``N`` backward sweeps from the terminal cost and keeps every
+        stage, forward in time: ``J_0 … J_N`` (``J_N = h``) and the laws
+        ``π_0 … π_{N−1}``, stage ``i`` at ``t_i = t0 + i dt``. The solution's
+        policy then reads the stage of ``t`` (stage 0, the full-horizon law,
+        past the horizon) and its ``cost_to_go`` is ``J(x, t)``. An infinite
+        horizon sweeps until the largest change of ``J`` falls under ``tol``
+        (a change per sweep, not an error bound on ``J``), or after
+        ``max_iterations`` sweeps; its policy is the greedy lookup table and its
+        ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
         problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
@@ -192,22 +199,39 @@ class DynamicProgrammingPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        # Backward sweeps until the cost-to-go stops changing
-        result = self.value_iteration(self.max_iterations, stop_on_tol=True)
+        N = self.grid.face.n_steps
+
+        # Infinite horizon: backward sweeps until the cost-to-go stops changing
+        if N is None:
+            result = self.value_iteration(self.max_iterations, stop_on_tol=True)
+            mode = "converged"
+
+        # Finite horizon: exactly N backward sweeps, every stage kept
+        else:
+            require_stage_memory(N, self.grid)
+            result = self.value_iteration(N, stop_on_tol=False, keep_stages=True)
+            mode = "finite"
 
         # The cost-to-go and policy tables as a planning solution
         return self.dp_result_to_planning_solution(
-            result, fixed_horizon=False, evaluate=evaluate, n_trials=n_trials
+            result, mode=mode, evaluate=evaluate, n_trials=n_trials
         )
 
     def solve_steps(self, n: int, *, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Finite horizon: exactly ``n`` backward sweeps from the terminal cost."""
+        """
+        The receding ``n``-step law: ``n`` backward sweeps from the terminal cost, the last table used at every time.
+
+        Bertsekas' receding horizon: the stage-0 law of an ``n``-step problem
+        applied as a stationary law, whatever the problem's own horizon. Its
+        record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
+        every stage instead.
+        """
         # Exactly n backward sweeps from the terminal cost
         result = self.value_iteration(int(n), stop_on_tol=False)
 
         # The cost-to-go and policy tables as a planning solution
         return self.dp_result_to_planning_solution(
-            result, fixed_horizon=True, evaluate=evaluate, n_trials=n_trials
+            result, mode="receding", evaluate=evaluate, n_trials=n_trials
         )
 
     @property
@@ -240,16 +264,17 @@ class DynamicProgrammingPlanner(Planner):
         return {**kwargs, **self.given}
 
     def value_iteration(
-        self, max_sweeps: int, *, stop_on_tol: bool = True
+        self, max_sweeps: int, *, stop_on_tol: bool = True, keep_stages: bool = False
     ) -> DynamicProgrammingResult:
         """
         Sweep the Bellman equation backward from the terminal cost.
 
         Each sweep steps time back by ``dt`` and replaces the cost-to-go with
         the best one-step backup. Stops after ``max_sweeps`` or, with
-        ``stop_on_tol``, once the largest change falls under ``tol``. Returns
-        the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
-        solution.
+        ``stop_on_tol``, once the largest change falls under ``tol``.
+        ``keep_stages`` keeps every sweep's tables as the result's
+        ``schedule``, forward in time. Returns the raw tables; :meth:`solve`
+        and :meth:`solve_steps` wrap them in a solution.
         """
         opt = self
         tf = opt.final_time
@@ -261,7 +286,7 @@ class DynamicProgrammingPlanner(Planner):
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
             from minilink.planning.dynamic_programming import dp_jax
 
-            return dp_jax.value_iteration(self, max_sweeps, stop_on_tol)
+            return dp_jax.value_iteration(self, max_sweeps, stop_on_tol, keep_stages)
 
         # The backward step: the textbook loop, or the same step over lookup tables
         if opt.backend == BACKEND_LOOP:
@@ -279,6 +304,10 @@ class DynamicProgrammingPlanner(Planner):
         J = self.terminal_cost(tf)
         pi = np.zeros(self.grid.nodes_n, dtype=int)
         log.start(tf, J, pi)
+
+        # The tables of every stage, from the final one back (a finite horizon's)
+        J_stages = [J] if keep_stages else None
+        pi_stages = [] if keep_stages else None
 
         # Backward sweeps: at most max_sweeps of them, and with stop_on_tol
         # only until the largest change of the cost-to-go falls under tol
@@ -300,8 +329,16 @@ class DynamicProgrammingPlanner(Planner):
             delta = float(np.max(np.abs(J - J_next)))
 
             log.sweep(k, t, J, J_next, pi)
+            if keep_stages:
+                J_stages.append(J)
+                pi_stages.append(pi)
 
         log.done(k, delta)
+
+        # The stages forward in time: J_0 … J_N and π_0 … π_{N−1}
+        schedule = None
+        if keep_stages:
+            schedule = stage_schedule(tf, dt, J_stages, pi_stages)
 
         return DynamicProgrammingResult(
             grid=self.grid,
@@ -310,6 +347,7 @@ class DynamicProgrammingPlanner(Planner):
             iterations=k,
             delta=delta,
             history=log.history,
+            schedule=schedule,
         )
 
     def backward_step_loop(self, J_next, t, G=None):
@@ -488,7 +526,12 @@ class DynamicProgrammingPlanner(Planner):
         if not kwargs:
             return solution.policy
 
-        return LookupPolicy(self.result.grid, self.result.pi, **kwargs)
+        result = self.result
+        if result.schedule is None:
+            return LookupPolicy(result.grid, result.pi, **kwargs)
+        t, _, pi = result.schedule
+
+        return LookupPolicy(result.grid, pi, t, **kwargs)
 
     def value_at(self, x) -> float:
         """The latest solution's cost-to-go at ``x``: its field, read by the options' interpolation."""
@@ -508,7 +551,8 @@ class DynamicProgrammingPlanner(Planner):
         Flag states whose cost-to-go has saturated at ``out_of_bound_cost``.
 
         Their value is pinned to the penalty and their policy to the action
-        nearest the system's nominal input, mirroring pyro's cleanup pass. A
+        nearest the system's nominal input, mirroring pyro's cleanup pass, at
+        every stage of a finite horizon. A
         callable ``out_of_bound_cost(x_next, t)`` has no single saturation
         level: the tables are then left as solved. ``tables`` defaults to the
         latest solution's; a solve passes its own before building its solution.
@@ -531,6 +575,13 @@ class DynamicProgrammingPlanner(Planner):
 
         result.J[infeasible] = INF
         result.pi[infeasible] = default_action
+
+        # The same at every stage of a finite horizon (π_i is read on J_i's cells)
+        if result.schedule is not None:
+            _, J_stages, pi_stages = result.schedule
+            infeasible = J_stages > (INF - tol)
+            J_stages[infeasible] = INF
+            pi_stages[infeasible[:-1]] = default_action
 
         return result
 
@@ -559,14 +610,14 @@ class DynamicProgrammingPlanner(Planner):
     ###########################################################################
 
     def dp_result_to_planning_solution(
-        self, result: DynamicProgrammingResult, *, fixed_horizon, evaluate, n_trials
+        self, result: DynamicProgrammingResult, *, mode, evaluate, n_trials
     ) -> PlanningSolution:
         """
         Turn the value-iteration tables into the planner's :class:`PlanningSolution`.
 
-        Cleans the infeasible cells, builds the greedy lookup law, records how
-        the sweeps ended with the tables themselves, optionally rolls the law
-        out, and stores the solution.
+        Cleans the infeasible cells, builds the greedy lookup law (per stage in
+        the ``"finite"`` mode), records how the sweeps ended with the tables
+        themselves, optionally rolls the law out, and stores the solution.
         """
         tol = float(self.tol)
         dt = self.grid.dt
@@ -576,18 +627,25 @@ class DynamicProgrammingPlanner(Planner):
             self.clean_infeasible_set(tables=result)
 
         # The greedy policy: the minimizing action of every node, interpolated between
-        # nodes
-        policy = LookupPolicy(result.grid, result.pi)
+        # nodes, and held per stage on a finite horizon
+        if result.schedule is None:
+            policy = LookupPolicy(result.grid, result.pi)
+        else:
+            t_stages, _, pi_stages = result.schedule
+            policy = LookupPolicy(result.grid, pi_stages, t_stages)
 
-        # How the sweeps ended: converged to tol (a fixed horizon always completes
-        # its sweeps)
+        # How the sweeps ended: converged to tol (a finite or receding horizon always
+        # completes its sweeps); a finite horizon's tables frozen at the final time
+        # when one table served every sweep
+        frozen = self.grid.precomputed or self.backend == BACKEND_JAX
         record = ValueIterationRecord(
             iterations=result.iterations,
             delta=float(result.delta),
             tol=tol,
-            converged=fixed_horizon or result.delta <= tol,
-            fixed_horizon=fixed_horizon,
+            converged=mode != "converged" or result.delta <= tol,
+            mode=mode,
             discount_rate=self.discount_rate,
+            frozen_at=self.final_time if mode == "finite" and frozen else None,
             tables=result,
         )
 
@@ -603,9 +661,15 @@ class DynamicProgrammingPlanner(Planner):
         # on the grid, read as the planner's options say, the failure cost past the
         # grid (the price the sweeps give to leaving it)
         outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
-        cost_to_go = result.grid.field(
-            result.J, method=self.interpolation, outside=outside
-        )
+        if result.schedule is None:
+            cost_to_go = result.grid.field(
+                result.J, method=self.interpolation, outside=outside
+            )
+        else:
+            t_stages, J_stages, _ = result.schedule
+            cost_to_go = result.grid.field(
+                J_stages, t_stages, method=self.interpolation, outside=outside
+            )
         solution = PlanningSolution(
             self.problem, policy, record, trajectory, evaluation, cost_to_go
         )
@@ -623,15 +687,20 @@ class DynamicProgrammingResult:
     grid : StateSpaceGrid
         Grid the result is defined on.
     J : np.ndarray
-        Cost-to-go by node id, shape ``(nodes_n,)``.
+        Cost-to-go by node id, shape ``(nodes_n,)`` (a finite horizon's: stage 0).
     pi : np.ndarray
-        Greedy policy as action ids by node id, shape ``(nodes_n,)``.
+        Greedy policy as action ids by node id, shape ``(nodes_n,)`` (stage 0).
     iterations : int
         Number of backward sweeps performed.
     delta : float
         Largest cost-to-go change in the final sweep.
     history : list, optional
         ``(t, J, pi)`` tuples per sweep when recorded.
+    schedule : tuple, optional
+        A finite horizon's stages forward in time, ``(t, J, pi)``: the stage
+        times ``t_0 … t_N`` ``(N + 1,)``, the cost-to-go ``J_0 … J_N``
+        ``(N + 1, nodes_n)`` with ``J_N = h``, and the laws ``π_0 … π_{N−1}``
+        ``(N, nodes_n)``.
     """
 
     grid: StateSpaceGrid
@@ -640,6 +709,7 @@ class DynamicProgrammingResult:
     iterations: int
     delta: float
     history: list | None = None
+    schedule: tuple | None = None
 
     def value_at(self, x, method="linear") -> float:
         """Interpolate the cost-to-go at an arbitrary state ``x`` (``method``: the grid's interpolation)."""
@@ -663,21 +733,36 @@ class DynamicProgrammingResult:
 
 @dataclass(frozen=True)
 class ValueIterationRecord:
-    """Sweeps run, the last cost-to-go change, whether the sweeps converged to ``tol``, the planner's own discount rate when ``gamma`` overrode the problem's (``None``: the problem's), and the tables ``J`` and ``pi`` the sweeps ended on."""
+    """
+    How the sweeps ended, with the tables they ended on.
+
+    ``mode`` is ``"converged"`` (an infinite horizon, swept until the change
+    per sweep fell under ``tol``, at most ``max_iterations`` times),
+    ``"finite"`` (the problem's ``N`` sweeps, every stage kept) or
+    ``"receding"`` (:meth:`~DynamicProgrammingPlanner.solve_steps`' ``n``
+    sweeps, the last table used at every time). ``delta`` is the last sweep's
+    largest change of the cost-to-go: with ``γ < 1`` the converged ``J`` is
+    within ``γ·delta/(1 − γ)`` of the fixed point, with ``γ = 1`` no bound
+    follows. ``discount_rate`` is the planner's own rate when ``gamma``
+    overrode the problem's (``None``: the problem's); ``frozen_at`` the time a
+    finite horizon's running-cost and transition tables were built at, when
+    one table served every sweep (a precomputed grid, the JAX engine).
+    """
 
     iterations: int
     delta: float
     tol: float
     converged: bool
-    fixed_horizon: bool
+    mode: str
     discount_rate: float | None = None
+    frozen_at: float | None = None
     tables: DynamicProgrammingResult | None = field(
         default=None, repr=False, compare=False
     )
 
     @property
     def success(self) -> bool:
-        """The sweeps converged (a fixed-horizon solve always completes its sweeps)."""
+        """The sweeps converged (a finite or receding horizon always completes its sweeps)."""
         return bool(self.converged)
 
     def __str__(self) -> str:
@@ -686,8 +771,11 @@ class ValueIterationRecord:
             if self.discount_rate is None
             else f"; planned at rho={self.discount_rate:.4g}/s (gamma), scored at the problem's"
         )
-        if self.fixed_horizon:
-            return f"{self.iterations} backward sweeps (fixed horizon){rate}"
+        if self.mode == "finite":
+            return f"{self.iterations} backward sweeps (finite horizon, a law per stage){rate}"
+
+        if self.mode == "receding":
+            return f"{self.iterations} backward sweeps (receding horizon){rate}"
 
         if self.converged:
             return (
@@ -794,18 +882,49 @@ def grid_failure_cost(grid, gamma):
     """
     The cost of an inadmissible pair at the discount ``gamma`` per step: the face's failure cost over the sweeps' horizon.
 
-    With ``γ < 1`` the sweeps of a continuous (or discretized) problem run to
-    convergence, so the face's sum is its geometric limit
-    ``g_max dt / (1 − γ)``; with ``γ = 1``, and on a native step problem, it is
-    over the problem's own horizon.
+    A finite horizon's ``N`` sweeps sum over ``N`` steps; an infinite one's
+    sweeps run to convergence, so the face's sum is its geometric limit
+    ``g_max dt / (1 − γ)``.
     """
     face = grid.face
-    native = (
-        isinstance(face.problem, StepPlanningProblem) and face.problem.origin is None
-    )
-    N = None if gamma < 1.0 and not native else face.n_steps
 
-    return face.failure_cost_over(N, gamma)
+    return face.failure_cost_over(face.n_steps, gamma)
+
+
+#: The largest finite-horizon stacks a solve keeps, in bytes (``J``, ``π`` and the law's table).
+STAGE_MEMORY_LIMIT = 2**30
+
+
+def require_stage_memory(N, grid):
+    """Refuse a finite horizon whose stacks pass :data:`STAGE_MEMORY_LIMIT`: ``N + 1`` cost-to-go tables, ``N`` policies and ``N`` command tables."""
+    nodes = grid.nodes_n
+    size = 8 * ((N + 1) * nodes + N * nodes + N * nodes * grid.m)
+    if size > STAGE_MEMORY_LIMIT:
+        raise ValueError(
+            f"a finite horizon of N={N} stages on {nodes:,} nodes keeps "
+            f"{size / 2**30:.1f} GiB of tables (limit {STAGE_MEMORY_LIMIT / 2**30:.0f} "
+            "GiB): coarsen the grid, lengthen dt, or solve problem.replace(horizon=None) "
+            "for the converged law"
+        )
+
+
+def stage_schedule(tf, dt, J_stages, pi_stages):
+    """
+    A finite horizon's stages forward in time, ``(t, J, pi)``, from the sweeps' tables (the final stage first).
+
+    Sweep ``k`` ends at ``t = tf − k dt``: stage ``i = N − k``, so the
+    sweeps' order reversed is the stages'.
+    """
+    N = len(pi_stages)
+
+    # t_i = tf − (N − i) dt, the times the sweeps ran at
+    t = np.array([tf - k * dt for k in range(N, -1, -1)], dtype=float)
+
+    # J_0 … J_N (J_N = h) and π_0 … π_{N−1}
+    J = np.array(J_stages[::-1], dtype=float)
+    pi = np.array(pi_stages[::-1], dtype=int)
+
+    return t, J, pi
 
 
 def infeasible_penalty(failure_cost, x_next, t):
