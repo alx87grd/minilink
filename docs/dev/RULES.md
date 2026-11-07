@@ -121,6 +121,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
   | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
+  | A training budget, episodes / plant steps (the RL planners' `solve`, their records) | `n_episodes` / `n_timesteps` | `episodes`, `timesteps` |
   | Operating point, target | `x_bar`, `u_bar`, `y_bar` (keyword, `params` key, attribute) | `xbar`, `ubar`, `ybar` |
   | Initial state, `x(t0) = x0 ∈ X0`: a system's, a run's, a problem's (a point or a law) | `x0` | `x_start` |
   | Discount rate ρ (1/s) | `discount_rate` | |

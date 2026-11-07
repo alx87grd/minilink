@@ -353,7 +353,9 @@ commit per proposal, its callers and DESIGN in the same change.
   `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
   `animate_solution()`; the `*Policy` class names stay, naming the law a block implements; one
   sweep, no alias, CONSTITUTION's line amended); training budgets
-  `n_episodes` and `n_timesteps` (RULES 2.7); workflow keywords on constructors;
+  `n_episodes` and `n_timesteps` (RULES 2.7; ruled 2026-11-07: the keyword and the record's
+  fields, `solve(n_episodes=)`, `solve(n_timesteps=)`, `record.n_episodes`, `record.n_timesteps`,
+  one sweep, no alias); workflow keywords on constructors;
   `problem.compile()` always returning the evaluator, the step face from
   `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the
   evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
