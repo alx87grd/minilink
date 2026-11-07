@@ -483,7 +483,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
-        hint = undiscounted_hint(problem, face, horizon)
+        hint = effective_horizon_text(problem, face, horizon)
         warnings.warn(
             f"the problem is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
             f"per control period, an effective horizon of {hint} or pass gamma to "
@@ -777,7 +777,7 @@ class ReinforcementLearningRecord:
 ###############################################################################
 
 
-def undiscounted_hint(problem, face, horizon):
+def effective_horizon_text(problem, face, horizon):
     """The effective horizon in the problem's time, and where its discount is declared."""
     if face.dt is None:
         return f"{horizon:.1f} ticks; declare gamma on the step problem"
