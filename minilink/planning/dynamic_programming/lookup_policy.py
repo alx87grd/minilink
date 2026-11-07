@@ -97,19 +97,18 @@ class LookupPolicy(System):
         params = self.params if params is None else params
         xp = array_module(x, params["u_table"])
 
-        u_table = xp.asarray(params["u_table"])
-
-        # On a schedule, the table of the stage of t
-        if "t" in params:
-            u_table = u_table[stage_of(xp.asarray(params["t"]), t, xp)]
-
         n = self.grid.n
         nearest = self.interpolation == "nearest"
         u_lb = self.u_lb
         u_ub = self.u_ub
-
+        u_table = xp.asarray(params["u_table"])
         levels = levels_of(params, n, xp)
+
         x = xp.reshape(xp.asarray(x, dtype=float), (-1,))
+
+        # On a schedule, the table of the stage of t
+        if "t" in params:
+            u_table = u_table[stage_of(xp.asarray(params["t"]), t, xp)]
 
         # u read on the grid: multilinear in the cell holding x (or its nearest node),
         # the edge cell extended past the grid
