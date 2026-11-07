@@ -43,9 +43,8 @@ maintainer would and logged in the run's record.
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
 | `Source.show_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
-| Your demo pass, and a tabular Q-learning demo | K4 | v0.4 (the clean-up lane) | your pass; the demo beside value iteration |
+| Your demo pass, and a tabular Q-learning demo | K4 | v0.4 (the clean-up lane) | now the maintainer's end-of-v0.4 demo rebuild (MS-D1, 2026-11-07) |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
-| GMC714's names pinned | G3 | v0.4 (the clean-up lane) | `test_teaching_surface.py` pins the teaching names, each with a demo |
 | The unsupported plants to the experimental tier | K8-3 | v0.4 (the clean-up lane) | per plant, from K1's table |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.5 | the critic before the update (today) or after it |
@@ -486,7 +485,9 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 §4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this
 workboard; the former wave G rows are §4 rows.
 
-- [ ] **GMC714's names pinned** (G3) **[ask — public names]** (pinned when v0.4 merges).
+- [ ] **GMC714's names pinned** (G3; ruled 2026-11-07: pinned once, at the very end of v0.4,
+  after the renames and the maintainer's demo rebuild; the agent drafts the list from the GMC714
+  labs, every name they import or call, for the maintainer's review).
   The moves and renames landed (A6's names,
   `RRTPlanner` in the teaching lane, `JointImpedance`, `TaskKinematic` and
   `TaskKinematicNullspace` on the root prelude, the `minilink.dynamics` band facade,
