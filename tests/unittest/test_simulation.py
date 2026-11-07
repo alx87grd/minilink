@@ -1606,3 +1606,33 @@ def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
             run.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
         )
         assert not np.allclose(run.get_signal("plant:u"), stale.get_signal("plant:u"))
+
+
+def test_the_stiff_preset_tightens_only_the_method_and_takes_the_jacobian_on_both_backends():
+    """scipy_stiff is Radau at scipy's tolerances, with ∂f/∂x from the evaluator on NumPy and JAX alike."""
+    from minilink.simulation.simulator import _USER_SOLVER_MODES
+
+    smooth = _USER_SOLVER_MODES["scipy"][1]
+    stiff = _USER_SOLVER_MODES["scipy_stiff"][1]
+    assert stiff["method"] == "Radau"
+    assert (stiff["rtol"], stiff["atol"]) == (smooth["rtol"], smooth["atol"])
+
+    runs = {}
+    backends = ("numpy", "jax") if _have_jax() else ("numpy",)
+    for backend in backends:
+        plant = Pendulum()
+        plant.x0[0] = 1.0
+        sim = Simulator(plant, tf=2.0, solver="scipy_stiff", backend=backend)
+        runs[backend] = sim.solve().x
+        assert sim.solver_backend.last_debug["jac_applied"]
+        assert sim.solver_backend.last_debug["njev"] >= 1
+
+    # The two Jacobians (central differences, forward mode) give one trajectory
+    if len(runs) == 2:
+        np.testing.assert_allclose(runs["numpy"], runs["jax"], atol=1e-9)
+
+    # At scipy's tolerances, the stiff run meets the default one
+    plant = Pendulum()
+    plant.x0[0] = 1.0
+    smooth_run = Simulator(plant, tf=2.0, solver="scipy").solve().x
+    np.testing.assert_allclose(runs["numpy"], smooth_run, atol=1e-3)

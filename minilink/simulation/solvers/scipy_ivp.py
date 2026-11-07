@@ -33,15 +33,14 @@ class SciPySolverBackend(SolverBackend):
         def rhs(t, x):
             return np.asarray(f(x, u_nominal, t, params))
 
-        # Solver options: the analytic Jacobian only from a JAX evaluator
+        # Solver options: ∂f/∂x supplied by the evaluator when asked (forward mode on
+        # JAX, central differences on NumPy)
         kw = dict(args or {})
         use_jac = kw.pop("use_jac", False)
         method = kw.get("method", "RK45")
-        if use_jac and evaluator.backend == "jax":
+        if use_jac:
             kw["jac"] = nominal_jacobian_of(evaluator, params)
-            jac_applied = True
-        else:
-            jac_applied = False
+        jac_applied = bool(use_jac)
 
         # x(t) = x₀ + ∫ f(x(s), ū, s) ds, solved adaptively and reported on the grid
         sol = solve_ivp(rhs, [t0, tf], x0, t_eval=times, **kw)
@@ -163,12 +162,19 @@ def require_success(sol, mode, method):
 
 
 def nominal_jacobian_of(evaluator, params=None):
-    """``(t, x) -> ∂f/∂x`` at the nominal input, compiled once per JAX evaluator (``params=None``: the compiled ones)."""
+    """``(t, x) -> ∂f/∂x`` at the nominal input (``params=None``: the compiled ones).
+
+    On JAX, forward mode compiled once per evaluator; on NumPy, the evaluator's
+    central differences (:meth:`jacobian`).
+    """
+    u_nominal = evaluator.nominal_input
+    if evaluator.backend != "jax":
+        return lambda t, x: evaluator.jacobian("f", "x", x, u_nominal, t, params)
+
     forms = evaluator.compiled_forms
     if "scipy_jacobian" not in forms:
         jax = evaluator.jax
         f = evaluator.f
-        u_nominal = evaluator.nominal_input
         forms["scipy_jacobian"] = jax.jit(
             jax.jacfwd(lambda x, t, p: f(x, u_nominal, t, p), argnums=0)
         )

@@ -39,7 +39,12 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     ),
     "scipy_stiff": (
         "scipy",
-        {"method": "Radau", "use_jac": True},
+        {
+            "method": "Radau",
+            "rtol": 1e-4,
+            "atol": 1e-7,
+            "use_jac": True,
+        },
     ),
     "scipy_max": (
         "scipy",

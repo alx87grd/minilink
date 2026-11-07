@@ -1146,7 +1146,9 @@ diagram's layout is computed as blocks are added. The problem owns the plant's s
 evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
 `observer.x0`), read from the block at compile.
 
-Solver presets: `scipy`, `scipy_stiff`, `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
+Solver presets: `scipy`, `scipy_stiff` (Radau at `scipy`'s tolerances, `rtol=1e-4`,
+`atol=1e-7`, with `∂f/∂x` from the evaluator: forward mode on JAX, central differences on
+NumPy), `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 `euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
 model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
 **One input rule on every solver** (`Simulator.solve(u=)`, `compute_trajectory(u=)`): a sampled
