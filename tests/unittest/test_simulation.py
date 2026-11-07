@@ -23,7 +23,7 @@ def _have_jax() -> bool:
 
 class StableLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "StableLinearSystem"
         self.x0 = np.array([1.0])
 
@@ -38,7 +38,7 @@ class StableLinearSystem(DynamicSystem):
 
 class TwoPortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, output_dim=1, y_dependencies=())
         self.name = "TwoPortLinearSystem"
         self.add_input_port("left", nominal_value=1.0)
         self.add_input_port("right", nominal_value=2.0)
@@ -1087,7 +1087,7 @@ class UndeclaredPlant(DynamicSystem):
     """A custom plant that declares no time constant: ``ẋ = −x + u``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         xp = array_module(x)
@@ -1499,7 +1499,7 @@ def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evalua
 
     class Integrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         def f(self, x, u, t=0.0, params=None):
             return np.array([u[0]])

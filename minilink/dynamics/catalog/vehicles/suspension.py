@@ -21,7 +21,7 @@ class QuarterCar(DynamicSystem):
     """Quarter-car suspension moving over prescribed rough terrain."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=1, output_dim=3, expose_state=True)
 
         # Parameters
         self.params = {

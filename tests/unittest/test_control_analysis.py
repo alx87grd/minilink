@@ -32,7 +32,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum, Pendul
 
 class _PortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2)
+        super().__init__(state_dim=2)
         self.name = "Port Linear System"
         self.add_input_port("force")
         self.add_input_port("bias")
@@ -716,7 +716,7 @@ from minilink.dynamics.catalog.mass_spring_damper.linear import TwoMass
 
 class _JAXFriendlyOscillator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
         self.name = "JAX Friendly Oscillator"
 
     def f(self, x, u, t=0, params=None):
@@ -815,7 +815,7 @@ from minilink.graphical.common import PlotResult
 
 class FrequencyPlant(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
         self.name = "Frequency Plant"
         self.add_input_port("force", dim=2, labels=["left_force", "right_force"])
         self.add_input_port("bias", labels=["bias"])
@@ -1067,7 +1067,7 @@ from minilink.graphical.phase_plane import build_phase_plane_spec, plot_phase_pl
 
 class PhasePlaneTestSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, y_dependencies=())
         self.name = "PhasePlaneTestSystem"
         self.state.labels = ["position", "velocity"]
         self.state.units = ["m", "m/s"]
@@ -1081,7 +1081,7 @@ class PhasePlaneTestSystem(DynamicSystem):
 
 class OneStateSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, output_dim=1, y_dependencies=())
         self.name = "OneStateSystem"
         self.state.lower_bound = np.array([-1.0])
         self.state.upper_bound = np.array([1.0])
@@ -1092,7 +1092,7 @@ class OneStateSystem(DynamicSystem):
 
 class UnboundedPlanarSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, output_dim=2, y_dependencies=())
+        super().__init__(state_dim=2, output_dim=2, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([x[1], -x[0]])
@@ -1211,7 +1211,7 @@ def _rk4_step(f, x, u, t, dt, params):
 
 class _GainIntegrator(DynamicSystem):
     def __init__(self, gain=1.0):
-        super().__init__(n=1, input_dim=1, output_dim=1, expose_state=True)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, expose_state=True)
         self.params = {"gain": float(gain)}
 
     def f(self, x, u, t=0.0, params=None):
@@ -1433,7 +1433,7 @@ class TestDiscretize(unittest.TestCase):
     def test_a_tick_law_keeps_its_count_and_has_no_seconds_face(self):
         class Counter(StepSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
             def step(self, x, u, k=0, params=None):
                 return x + k
@@ -1526,7 +1526,7 @@ class TestStateSpaceSystem(unittest.TestCase):
 
         class Gain(StateSpaceSystem):
             def __init__(self):
-                super().__init__(n=1, m=1, p=1, name="Gain")
+                super().__init__(state_dim=1, input_dim=1, output_dim=1, name="Gain")
                 self.params = {"a": -2.0, "b": 3.0}
 
             def A(self, t=0.0, params=None):
@@ -1934,7 +1934,7 @@ class _NonlinearTank(DynamicSystem):
     """A SISO plant whose linearization depends on the operating point."""
 
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
         self.name = "Nonlinear Tank"
         self.add_input_port("u")
         self.add_output_port("y", dim=1, function=self.h)

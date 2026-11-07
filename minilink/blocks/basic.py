@@ -16,7 +16,7 @@ class Integrator(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
         # Parameters: the integrator gain
         self.params = {"k": 1.0}

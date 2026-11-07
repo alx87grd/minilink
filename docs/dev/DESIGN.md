@@ -294,8 +294,13 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   where its deviations are measured from.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `get_port_values_from_u(u, "r", "y")`.
-- **DynamicSystem shortcut:** `input_dim`, `output_dim`, `expose_state`,
-  `y_dependencies` create standard `u`/`y`/`x`.
+- **Constructor shortcuts:** `System(state_dim=0, *, input_dim=, output_dim=, expose_state=,
+  y_dependencies=)`, the same on `DynamicSystem(state_dim, ...)` and
+  `StepSystem(state_dim, ...)`, create the standard ports `u`/`y`/`x`. Words in the
+  constructor, textbook symbols as attributes: `state_dim`, `input_dim`, `output_dim` build
+  the block, `n`, `m`, `p` read its dimensions (`m` and `p` totals over the ports). A static
+  `System` given an input feeds it through by definition: its `y_dependencies` default to
+  `("u",)` (`()` on `DynamicSystem` and `StepSystem`, which declare their feedthrough).
 - **StepSystem (discrete leaf):** same port shortcut as `DynamicSystem`; evolution is
   `step(x, u, k, params)` → `x_new`. Facades: `compute_rollout` (a `Trajectory` of the
   ticks, kept on `self.traj` like every run) / `plot_rollout`.
@@ -364,7 +369,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   horizons and animation overlays: `planning/trajectory_optimization/mpc/viz.py`
   (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
   from the memory's state). A sampled-data law written in seconds whose equation needs its
-  period is a `NativeSampledSystem(n, sample_period=Δ)`: its period set at construction, `%`
+  period is a `NativeSampledSystem(state_dim, sample_period=Δ)`: its period set at construction, `%`
   on it refused. Out of the MPC's contract: a shrinking horizon (`N` is structural) and
   event-triggered replanning (a later option in the tick).
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`

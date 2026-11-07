@@ -14,7 +14,7 @@ class DiscreteLowPass(StepSystem):
     """First-order low-pass: ``x_{k+1} = α x_k + (1-α) u_k``, ``y = x``."""
 
     def __init__(self, alpha=0.25):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
         self.x0 = np.zeros(1)
 

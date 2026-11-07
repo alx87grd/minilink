@@ -43,7 +43,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
         class TestPlant(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+                super().__init__(
+                    state_dim=2, input_dim=1, output_dim=2, y_dependencies=()
+                )
                 self.state.lower_bound = np.array([-1.0, -2.0])
                 self.state.upper_bound = np.array([1.0, 2.0])
                 self.inputs["u"].lower_bound = np.array([-3.0])
@@ -62,7 +64,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
         class SingleIntegrator(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+                super().__init__(
+                    state_dim=1, input_dim=1, output_dim=1, y_dependencies=()
+                )
                 self.state.lower_bound = np.array([-10.0])
                 self.state.upper_bound = np.array([10.0])
                 self.inputs["u"].lower_bound = np.array([-10.0])
@@ -587,7 +591,7 @@ from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
 
 class _SingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.state.lower_bound = np.array([-10.0])
         self.state.upper_bound = np.array([10.0])
         self.inputs["u"].lower_bound = np.array([-10.0])
@@ -602,7 +606,7 @@ class _SingleIntegrator(DynamicSystem):
 
 class _DoubleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
         self.state.lower_bound = np.array([-3.0, -3.0])
         self.state.upper_bound = np.array([3.0, 3.0])
         self.inputs["u"].lower_bound = np.array([-1.0])
@@ -1504,7 +1508,7 @@ class _Point3D(DynamicSystem):
     """Velocity-controlled point in 3-D whose ``body`` frame sits at its position."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=3, output_dim=3)
+        super().__init__(state_dim=3, input_dim=3, output_dim=3)
 
     def f(self, x, u, t=0, params=None):
         return np.asarray(u)
@@ -2212,7 +2216,7 @@ def test_collocation_bounds_survive_an_intersection():
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
             self.state.lower_bound = np.array([-2.0, -3.0])
             self.state.upper_bound = np.array([2.0, 3.0])
             self.inputs["u"].lower_bound = np.array([-1.0])

@@ -142,7 +142,7 @@ class IntegralImpedance(DynamicSystem):
         n = int(dof)
         require_positive_dof(n)
 
-        super().__init__(n=n)
+        super().__init__(state_dim=n)
         self.dof = n
 
         # Parameters: stiffness and damping as (n, n) matrices, the integral gain,

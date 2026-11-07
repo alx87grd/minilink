@@ -24,7 +24,7 @@ class KinematicBicycle(DynamicSystem):
     """Kinematic bicycle model with speed and steering-angle inputs."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=2, output_dim=3, expose_state=True)
 
         # Parameters: a CG-centered wheelbase, ``length = a + b`` (the frame
         # convention of
@@ -168,7 +168,7 @@ class HolonomicMobileRobot(DynamicSystem):
     """Holonomic 2D point robot."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2, expose_state=True)
 
         # Signal labels and units
         self.state.labels = ["x", "y"]

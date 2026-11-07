@@ -118,7 +118,7 @@ def test_an_observer_is_not_a_controller():
 
     class SampledObserver(StepSystem):  # a discrete filter has the same ports
         def __init__(self):
-            super().__init__(n=2)
+            super().__init__(state_dim=2)
             self.add_input_port("u", dim=1)
             self.add_input_port("y", dim=1)
             self.add_output_port("x", dim=2, function=self.compute_state)

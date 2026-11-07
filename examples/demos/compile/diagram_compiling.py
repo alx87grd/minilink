@@ -14,7 +14,7 @@ PRINT_COMPILE_REPORT = True  # Print compile timing diagnostics.
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "Integrator"
 
     def f(self, x, u, t=0, params=None):

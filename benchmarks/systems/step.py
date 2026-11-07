@@ -11,7 +11,7 @@ class LogisticMap(StepSystem):
     """Scalar logistic map ``x_{k+1} = r x_k (1 - x_k)``."""
 
     def __init__(self, *, r=3.9):
-        super().__init__(n=1, input_dim=0, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=0, output_dim=1, y_dependencies=())
         self.name = "LogisticMap"
         self.r = r
         self.x0 = np.array([0.4])
@@ -28,7 +28,7 @@ class LogisticMap(StepSystem):
 
 class _DiscreteAccumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "DiscreteAccumulator"
         self.x0 = np.zeros(1)
 

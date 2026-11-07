@@ -86,16 +86,30 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
     #: Whether the block draws random numbers from a seed in its ``params``.
     is_random = False
 
-    def __init__(self, n=0):
+    def __init__(
+        self,
+        state_dim=0,
+        *,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=None,
+    ):
         """
-        Initialize the system with ``n`` continuous states (default 0).
+        Initialize the system with ``state_dim`` states (default 0), :attr:`n`.
 
-        Static blocks use ``n = 0``. Systems start with no input or output ports.
-        Add ports with :meth:`add_input_port` and :meth:`add_output_port`; the
-        input and output dimensions :attr:`m` and :attr:`p` are derived from ports.
+        Static blocks use ``state_dim = 0``. The keyword shortcuts create the
+        standard ports, as :class:`DynamicSystem` and ``StepSystem`` do: the
+        input ``u`` (``input_dim``), the output ``y = h(x, u, t)``
+        (``output_dim``) and the state output ``x`` (``expose_state``). A
+        static map feeds its input through by definition, so ``y_dependencies``
+        defaults to ``("u",)`` when an input is given (``()`` otherwise). Add
+        other ports with :meth:`add_input_port` and :meth:`add_output_port`;
+        the input and output dimensions :attr:`m` and :attr:`p` are totals over
+        the ports.
         """
-        # Structural model description
-        self.n = int(n)
+        # Structural model description: the state dimension n
+        self.n = int(state_dim)
         require_nonnegative_dimension(self.n)
 
         # The display name, the class name unless a subclass sets its own, and
@@ -104,11 +118,15 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         self.id = None
 
         # State metadata
-        self.state = VectorSignal("x", dim=n)
+        self.state = VectorSignal("x", dim=self.n)
 
-        # Ports
+        # Ports, each when asked: the input u, the output y = h(x, u), the state x; a
+        # static map's output reads its input, y = h(u, t)
         self.inputs = {}
         self.outputs = {}
+        if y_dependencies is None:
+            y_dependencies = ("u",) if input_dim is not None else ()
+        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
 
         # Model defaults: the initial condition of a simulation (the operating
         # point the analysis tools read is the nominal state,
@@ -561,7 +579,7 @@ class DynamicSystem(
 
     def __init__(
         self,
-        n,
+        state_dim,
         *,
         input_dim=None,
         output_dim=None,
@@ -573,8 +591,8 @@ class DynamicSystem(
 
         Parameters
         ----------
-        n : int
-            Number of continuous states.
+        state_dim : int
+            Number of continuous states, :attr:`n`.
         input_dim : int, optional
             If provided, create a standard input port named ``u``.
         output_dim : int, optional
@@ -585,10 +603,15 @@ class DynamicSystem(
         y_dependencies : tuple or "all", optional
             Direct-feedthrough dependencies for the standard ``y`` output.
         """
-        System.__init__(self, n)
-
         # Ports, each when asked: the input u, the output y = h(x, u), the state x
-        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
+        System.__init__(
+            self,
+            state_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            expose_state=expose_state,
+            y_dependencies=y_dependencies,
+        )
 
     def f(self, x, u, t=0, params=None):
         """
@@ -732,7 +755,7 @@ def require_initialized(system, name):
     if "inputs" not in vars(system):
         raise AttributeError(
             f"{type(system).__name__}.__init__() must call "
-            f"super().__init__(n=...) before the system is used "
+            f"super().__init__(state_dim=...) before the system is used "
             f"(missing attribute {name!r})"
         )
 
@@ -753,7 +776,7 @@ if __name__ == "__main__":
     # Hello world: a double integrator dx = [x[1], u[0]]
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
 
         def f(self, x, u, t=0, params=None):
             xp = array_module(x)

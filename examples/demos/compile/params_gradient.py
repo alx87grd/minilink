@@ -19,7 +19,7 @@ class TraceablePendulum(DynamicSystem):
     """Pendulum with all physical constants in ``params`` (JAX-traceable)."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, y_dependencies=())
         self.name = "TraceablePendulum"
         self.params = {"m": 1.0, "l": 1.0, "gravity": 9.81, "d": 0.2}
         self.state.labels = ["theta", "dtheta"]

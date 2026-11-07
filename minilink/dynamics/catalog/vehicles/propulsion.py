@@ -21,7 +21,7 @@ class LongitudinalSlipCar(DynamicSystem):
     """Longitudinal front-wheel-drive car with wheel slip as input."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
 
         # Parameters
         self.params = {
@@ -153,7 +153,7 @@ class LongitudinalTorqueCar(LongitudinalSlipCar):
     def __init__(self):
         DynamicSystem.__init__(
             self,
-            n=4,
+            state_dim=4,
             input_dim=1,
             output_dim=1,
             expose_state=True,

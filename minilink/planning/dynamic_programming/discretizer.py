@@ -627,7 +627,7 @@ if __name__ == "__main__":
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
             self.state.lower_bound = np.array([-2.0, -2.0])
             self.state.upper_bound = np.array([2.0, 2.0])
             self.inputs["u"].lower_bound = np.array([-1.0])

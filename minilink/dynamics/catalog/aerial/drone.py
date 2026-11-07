@@ -219,7 +219,7 @@ class SpeedControlledDrone2D(DynamicSystem):
     """Planar drone abstraction with velocity inputs."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2, expose_state=True)
 
         # Signal labels and units
         self.state.labels = ["x", "y"]
@@ -267,7 +267,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
     """Constant-speed tunnel helicopter with vertical force input."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=1, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=1, output_dim=3, expose_state=True)
 
         # Parameters
         self.params = {

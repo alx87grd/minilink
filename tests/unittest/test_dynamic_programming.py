@@ -26,7 +26,7 @@ class DoubleIntegrator(DynamicSystem):
     """Minimal double integrator: dx = [x[1], u[0]]."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
         self.state.lower_bound = np.array([-3.0, -3.0])
         self.state.upper_bound = np.array([3.0, 3.0])
         self.inputs["u"].lower_bound = np.array([-1.0])
@@ -1075,7 +1075,7 @@ def test_grid_exposes_the_boxes_it_spans():
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
             self.state.lower_bound = np.array([-2.0, -3.0])
             self.state.upper_bound = np.array([2.0, 3.0])
             self.inputs["u"].lower_bound = np.array([-1.0])

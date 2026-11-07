@@ -85,7 +85,7 @@ class MassSpringDamper(DynamicSystem):
     """The README's model, kept in step with its "Write a model" section."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
         m, k, b = 1.0, 4.0, 0.3

@@ -16,7 +16,7 @@ class LowPass(StepSystem):
     """``z_{k+1} = α z_k + (1 − α) u_k``, ``y = z``."""
 
     def __init__(self, alpha=0.6):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
 
     def step(self, x, u, k=0, params=None):
@@ -412,7 +412,7 @@ class TickCount(StepSystem):
     """A tick law whose output is its own count: ``y_k = k``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def step(self, x, u, k=0, params=None):
         return x
@@ -545,8 +545,8 @@ def test_a_sampled_data_law_takes_its_period_at_construction():
     from minilink.core.discrete.sampled_system import NativeSampledSystem
 
     with pytest.raises(TypeError, match="at construction"):
-        NativeSampledSystem(n=0)
-    law = NativeSampledSystem(n=0, sample_period=0.1)
+        NativeSampledSystem(state_dim=0)
+    law = NativeSampledSystem(state_dim=0, sample_period=0.1)
     with pytest.raises(TypeError, match="never by %"):
         law % 0.2
     with pytest.raises(TypeError, match="already on a clock"):

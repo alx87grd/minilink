@@ -43,7 +43,7 @@ from minilink.planning.search.rrt import RRTPlanner
 
 class _TinyStable(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "TinyStable"
         self.x0 = np.array([1.0])
 
@@ -56,7 +56,7 @@ class _TinyStable(DynamicSystem):
 
 class _TinyStep(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "TinyStep"
         self.x0 = np.array([1.0])
 

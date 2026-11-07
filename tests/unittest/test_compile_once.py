@@ -222,7 +222,7 @@ class Decay(DynamicSystem):
     """``dx = −a x``, ``a`` written as an integer, as a student writes it."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.params = {"a": 1}
         self.x0 = np.array([1.0])
 
@@ -256,7 +256,7 @@ class Weighted(DynamicSystem):
     """``dx = −x + mean(w) u``: a block with a large parameter, as a network's weights."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"w": np.ones(5_000)}
 
     def f(self, x, u, t=0.0, params=None):
@@ -447,7 +447,7 @@ def test_an_edit_of_the_programs_numbers_reaches_the_frozen_form():
 def test_a_list_leaf_runs_on_jax_like_an_array():
     class Decay(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=0, output_dim=1)
+            super().__init__(state_dim=1, input_dim=0, output_dim=1)
             self.params = {"k": [1.0]}
             self.x0 = np.array([1.0])
 

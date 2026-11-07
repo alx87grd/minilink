@@ -396,7 +396,7 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
         """A point driven in velocity on three axes: dx = u."""
 
         def __init__(self):
-            super().__init__(n=3, input_dim=3, output_dim=3)
+            super().__init__(state_dim=3, input_dim=3, output_dim=3)
             self.state.lower_bound = -2.0 * np.ones(3)
             self.state.upper_bound = 2.0 * np.ones(3)
             self.inputs["u"].lower_bound = -np.ones(3)
@@ -578,7 +578,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
 
     class Explosive(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
             self.inputs["u"].lower_bound = np.array([-1.0])
             self.inputs["u"].upper_bound = np.array([1.0])
             self.state.lower_bound = np.array([-10.0])

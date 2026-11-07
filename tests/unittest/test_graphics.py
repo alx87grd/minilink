@@ -1086,7 +1086,7 @@ from minilink.simulation.simulator import Simulator
 
 class Integrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -1367,7 +1367,7 @@ def debug_state_skin(plant):
 
 class Integrator_plotly_renderer(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])

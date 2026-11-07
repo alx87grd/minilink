@@ -319,7 +319,7 @@ class NativeSampledSystem(SampledSystem):
     (rule 1 of the loop's grammar).
     """
 
-    def __init__(self, n=0, sample_period=None):
+    def __init__(self, state_dim=0, sample_period=None):
         # No source: the clock alone, set at construction
         self.source = None
         self.solver = None
@@ -328,7 +328,7 @@ class NativeSampledSystem(SampledSystem):
         self.sample_period = positive_period(require_period(sample_period))
 
         # The System shell: its own state, ports, parameters and hints
-        System.__init__(self, n)
+        System.__init__(self, state_dim)
 
     @property
     def params(self) -> dict:

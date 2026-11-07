@@ -14,7 +14,7 @@ class VanderPol(DynamicSystem):
     """Van der Pol oscillator."""
 
     def __init__(self, mu=0.5):
-        super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
 
         # Parameters
         self.params = {"mu": float(mu)}
@@ -50,7 +50,7 @@ class Lorenz(DynamicSystem):
     """Lorenz chaotic attractor."""
 
     def __init__(self, sigma=10.0, rho=28.0, beta=8.0 / 3.0):
-        super().__init__(n=3, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, output_dim=3, expose_state=True)
 
         # Parameters
         self.params = {

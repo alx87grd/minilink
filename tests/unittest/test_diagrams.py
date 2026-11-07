@@ -787,7 +787,7 @@ from minilink.simulation.static_simulator import StaticSimulator
 
 class _Counter(StepSystem):
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
 
 
 def _unity_feedback_diagram():
@@ -890,7 +890,7 @@ class TestFeedbackMissingPortMessage(unittest.TestCase):
 
         class NoOutput(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, expose_state=True)
+                super().__init__(state_dim=2, input_dim=1, expose_state=True)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], u[0] - x[0]])

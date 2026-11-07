@@ -29,7 +29,7 @@ class DiscreteLowPass(StepSystem):
     """``z_{k+1} = α z_k + (1 − α) u_k``, ``y = z``: a tick law."""
 
     def __init__(self, alpha=0.6):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
 
     def step(self, x, u, k=0, params=None):

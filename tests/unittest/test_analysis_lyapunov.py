@@ -21,7 +21,7 @@ class StableLinear(DynamicSystem):
     """``dx = A x`` with a Hurwitz ``A``: the region of attraction is the plane."""
 
     def __init__(self, a=-1.0, b=-2.0):
-        super().__init__(n=2, input_dim=1, output_dim=2)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2)
         self.params = {"a": float(a), "b": float(b)}
         self.state.lower_bound = np.array([-10.0, -10.0])
         self.state.upper_bound = np.array([10.0, 10.0])
@@ -39,7 +39,7 @@ class UntraceableSpring(DynamicSystem):
     """``dx = -k(x) x`` with a Python branch: JAX cannot trace it, NumPy can."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2)
         self.state.lower_bound = np.array([-5.0, -5.0])
         self.state.upper_bound = np.array([5.0, 5.0])
 

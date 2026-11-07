@@ -115,6 +115,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Final time, absolute (a run's end, `Trajectory.tf`) | `tf` | `tf` as a length |
   | Start time (a run's, a problem's) | `t0` | `t_start` |
   | A problem's length, from `t0` (`[t0, t0 + horizon]`) | `horizon` | `tf` on a problem |
+  | A system's dimensions, in its constructor (words), and as its attributes (textbook symbols) | `state_dim`, `input_dim`, `output_dim`; `n`, `m`, `p` | `n=` as the constructor's keyword |
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |

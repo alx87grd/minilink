@@ -16,7 +16,7 @@ class Walker(StepSystem):
     """A walker on the cells: ``x_{k+1} = x_k + u_k`` (a move to any of the 8 neighbours, or none), blocked by the wall and the edges."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2)
         self.state.lower_bound[:] = [0.0, 0.0]
         self.state.upper_bound[:] = [SIZE - 1.0, SIZE - 1.0]
         self.inputs["u"].lower_bound[:] = [-1.0, -1.0]

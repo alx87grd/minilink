@@ -102,7 +102,7 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
 
     class Walk(StepSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
             self.state.lower_bound[:] = [0.0]
             self.state.upper_bound[:] = [5.0]
             self.inputs["u"].lower_bound[:] = [-1.0]
@@ -151,7 +151,7 @@ def grid_world():
 
     class Walker(StepSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=2, output_dim=2)
+            super().__init__(state_dim=2, input_dim=2, output_dim=2)
             self.state.lower_bound[:] = [0.0, 0.0]
             self.state.upper_bound[:] = [6.0, 6.0]
             self.inputs["u"].lower_bound[:] = [-1.0, -1.0]

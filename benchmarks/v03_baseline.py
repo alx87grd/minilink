@@ -47,7 +47,7 @@ class DiscreteLowPass(StepSystem):
     """``x_{k+1} = α x_k + (1 − α) u_k``, ``y = x``."""
 
     def __init__(self, alpha=0.25):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
         self.x0 = np.zeros(1)
 
@@ -65,7 +65,7 @@ class Accumulator(StepSystem):
     """``x_{k+1} = x_k + u_k``, ``y = x``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -159,7 +159,7 @@ def mpc_entries(out):
 
     class SingleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+            super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
             self.state.lower_bound = np.array([-10.0])
             self.state.upper_bound = np.array([10.0])
             self.inputs["u"].lower_bound = np.array([-10.0])

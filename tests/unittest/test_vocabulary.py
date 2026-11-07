@@ -58,6 +58,7 @@ RETIRED = {
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
     "sample": ("at", ("Trajectory",)),
+    "n": ("state_dim", ("System", "DynamicSystem", "StepSystem")),
     "with_signal": ("with_signals", ("Trajectory",)),
     "time_duration": ("tf - t0", ("Trajectory",)),
     "copy": ("a frozen record needs no copy", ("Trajectory",)),

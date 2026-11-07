@@ -19,7 +19,9 @@ class UnitDelay(StepSystem):
     """
 
     def __init__(self, dim=1):
-        super().__init__(n=dim, input_dim=dim, output_dim=dim, y_dependencies=())
+        super().__init__(
+            state_dim=dim, input_dim=dim, output_dim=dim, y_dependencies=()
+        )
 
         # Initial state: the delay holds zero
         self.x0 = np.zeros(dim)
