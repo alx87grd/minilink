@@ -406,6 +406,8 @@ workflow, outside the comparison.
 - `PP-D5` **`LookupPolicy` takes a schedule** for the finite horizon (§4.4).
 - `PP-D6` **The core math first:** for LQR, `lqr_matrices` at the top of its file (§5.1: the
   Riccati solvers are already pure); the planner and the face both call it. Amended
+  2026-11-07: it keeps returning `(A, B, Q, R, S)`, the LQR problem in its matrices, and the
+  planner's method that shadowed it is `LQRPlanner.design_matrices()`. Amended
   2026-11-07: value iteration's backup is written in the body of each engine's step, its
   helper `bellman_backup` removed (§4.1).
 - `PP-D7` **The MPC reads the state** (§7); replanning at a slow rate is the dual-rate loop.

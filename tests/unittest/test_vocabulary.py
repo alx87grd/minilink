@@ -102,6 +102,7 @@ RETIRED = {
     "animate_policy": ("animate_control_law", None),
     "num_timesteps": ("n_timesteps", ("ReinforcementLearningPlanner",)),
     "controller": ("actor", ("ExplorationPolicy",)),
+    "lqr_matrices": ("design_matrices", ("LQRPlanner",)),
 }
 
 
@@ -230,8 +231,14 @@ VERB_WORKFLOW = {
 
 def planner_classes():
     """Every planner class of the library: the subclasses of Planner, at any depth."""
-    import minilink.learning  # noqa: F401  (the learners register as subclasses)
+    import minilink.learning
+    import minilink.planning
     from minilink.planning.planner import Planner
+
+    # The facades load lazily: every exported name read once, so each planner registers
+    for facade in (minilink.planning, minilink.learning):
+        for name in facade.__all__:
+            getattr(facade, name)
 
     found = []
     pending = list(Planner.__subclasses__())

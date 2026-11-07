@@ -41,9 +41,11 @@ def lqr_matrices(
     sys, x_bar, u_bar, Q, R, S, *, t=0.0, params=None, method="auto", eps=1e-6
 ):
     """
-    ``(A, B, Q, R, S)``: a quadratic problem lowered to the textbook LQR matrices at ``(x̄, ū, t)``.
+    The LQR problem in its matrices, ``(A, B, Q, R, S)``: a quadratic problem lowered at ``(x̄, ū, t)``.
 
-    The plant linearized at the operating point, ``B`` over its command port
+    The linear model ``(A, B)``, the running weights ``Q`` and ``R`` and the
+    terminal weight ``S``: the textbook linear-quadratic problem the Riccati
+    equations solve. The plant is linearized at the operating point, ``B`` over its command port
     alone (a disturbance ``d`` or a noise ``n`` is never decided), and the
     weights over that port: ``R[c, c]`` of a weight that spans every input.
     ``params`` are the plant's numbers to linearize with (its own for
@@ -164,7 +166,7 @@ class LQRPlanner(Planner):
 
         # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
         # weights over the command port
-        A, B, Q, R, S_f = self.lqr_matrices()
+        A, B, Q, R, S_f = self.design_matrices()
 
         # An e^{−ρt}-discounted cost is the undiscounted one on A_ρ = A − (ρ/2) I (in
         # x̃ = e^{−ρt/2} x, ũ = e^{−ρt/2} u, the same law); A_ρ = A undiscounted
@@ -255,12 +257,12 @@ class LQRPlanner(Planner):
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
-        A, B, _, _, _ = self.lqr_matrices()
+        A, B, _, _, _ = self.design_matrices()
 
         return A, B
 
-    def lqr_matrices(self):
-        """``(A, B, Q, R, S)`` of :func:`lqr_matrices` at this planner's operating point, the plant at its design numbers."""
+    def design_matrices(self):
+        """The LQR problem in its matrices, ``(A, B, Q, R, S)`` of :func:`lqr_matrices`, at this planner's operating point, the plant at its design numbers."""
         cost = self.cost
         params = nominal_plant_params(self.problem)
 

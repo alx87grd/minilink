@@ -1289,8 +1289,10 @@ and one backend (NumPy for all when one entry does not trace), its `dt` as `eval
 it (a sampled controller on its own clock, `dt` only for a continuous one), and `difference(a, b)` is
 the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
-first function of `lqr.py`, lowers it to `(A, B, Q, R, S)` at the cost's `(x_bar, u_bar)`
-(`B` and `R` over the command port), then the algebraic Riccati equation for an
+first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
+the cost's `(x_bar, u_bar)` (`B` and `R` over the command port; the planner's
+`design_matrices()` at its own operating point, ruled 2026-11-07 so the method no longer
+shadows the function), then the algebraic Riccati equation for an
 infinite horizon, the differential one swept from `S` over a finite horizon. A discounted problem
 (`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
 `A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
