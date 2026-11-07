@@ -13,10 +13,10 @@ from minilink.core.compile.evaluators.base import (
     added,
     assigned,
     blocks_params,
-    check_jax_compatible,
     every_block,
     gather_u,
     outputs_from_ports,
+    require_jax_traceable,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
@@ -382,7 +382,7 @@ def check_plan_traces(evaluator, plan, verbose):
 
     dummy_x = jnp.zeros(plan.state_dim)
     for op in plan.port_ops:
-        check_jax_compatible(
+        require_jax_traceable(
             op.compute_func,
             op.label,
             dummy_x[op.local_x_slice],
@@ -392,7 +392,7 @@ def check_plan_traces(evaluator, plan, verbose):
             jax,
         )
     for op in plan.step_ops:
-        check_jax_compatible(
+        require_jax_traceable(
             op.step_func,
             op.label,
             dummy_x[op.local_x_slice],
@@ -809,7 +809,7 @@ def check_sampled_plan_traces(evaluator, plan, verbose):
     dummy_x = jnp.zeros(plan.state_dim)
     for op in (*plan.port_ops, *plan.step_ops):
         func = op.compute_func if isinstance(op, SampledPortOperation) else op.step_func
-        check_jax_compatible(
+        require_jax_traceable(
             func,
             op.label,
             dummy_x[op.local_x_slice],

@@ -509,14 +509,14 @@ class NotTraceableError(RuntimeError):
     """A block function that JAX cannot trace: the verdict on which an automatic backend falls back to NumPy."""
 
 
-def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
+def require_jax_traceable(func, label, dummy_x, dummy_u, dummy_t, params, jax):
     """Refuse a block function that does not trace (``jax.make_jaxpr``), with a :class:`NotTraceableError`."""
     try:
         jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(dummy_x, dummy_u, dummy_t)
     except Exception as e:
         raise NotTraceableError(
             f"\n\nBlock '{label}' is not JAX-traceable.\n"
-            f"Its f()/compute() likely performs in-place array mutation "
+            f"Its f()/h() likely performs in-place array mutation "
             f"(e.g., x[0] = ...)\n"
             f"or uses Python control flow on traced values "
             f"(e.g., if t < threshold).\n"
