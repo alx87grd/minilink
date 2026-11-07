@@ -298,3 +298,19 @@ Choices the rulings left open, each taken as recommended; the maintainer may ove
   `MLP.compute` callers in the RL critics and policies follow) and the transfer-function
   compensator (`Lead`, `ports="error"`): it has no `"y"` port, so its command moved to `ctl`
   and its `h` is empty, as a `PID`'s.
+- **The controller/policy split:** the deep RL planner's own live block and exploration law
+  were `self.controller` and `self.policy`, which would shadow the new mirror; they are
+  `planner.actor` and `planner.exploration_policy`. `planner.controller` is the latest
+  solution's (after a solve, the same weights). An open-loop solution's `policy(x, t)` reads
+  `t` alone; a feedback one refuses no `x`. `get_controller(interpolation=)` variants go: build
+  `LookupPolicy(grid, pi, interpolation=)` directly.
+- **Workflow on the verb:** each planner's own workflow keywords moved (no dead `callback` on
+  value iteration or LQR); RRT*'s `history_stride` went with `record_history`; a notebook whose
+  planner was verbose keeps `verbose=True` on each later solve, so its output is unchanged.
+- **`problem.compile`:** the library builds its faces with `StepFace(problem, dt=)` directly
+  (value iteration byte-identical); a discretized problem's face now reads a random plant at
+  its mean (a defect found with it).
+- **Helpers to module functions:** `move_start` folded into the `x0` setter;
+  `open_loop_controller_of` takes the plant; `store_solution`, `build_kwargs` and `parts_view`
+  stay methods (the planner's own memory, overridden per planner, the deferred parameters
+  fold); `require_goal(problem)` has no caller left (the final review decides).

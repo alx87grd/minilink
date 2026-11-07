@@ -90,7 +90,7 @@ breaks nothing goes last and may follow the tag.
 2. **Value iteration's finite horizon** (§1.8, change 2; built on `v04-build`, in review): the two modes, the law past
    the horizon for both planners, the three examples migrated. A behaviour change: before the
    notebooks' redraft.
-3. **The core API proposals as ruled** (§1.11): CA-1, CA-2, CA-5, the later round's rulings,
+3. **The core API proposals as ruled** (§1.11; built on `v04-build`, in review, the parameters model's follow-up left as deferred): CA-1, CA-2, CA-5, the later round's rulings,
    `refresh()`, and the parameters model's internal follow-up (no number moves). Names: before
    the redraft.
 4. **The core's small leftovers** (§1.1, §1.2, §1.6, §1.7, and §1.13's two quirks), each
@@ -342,7 +342,7 @@ commit per proposal, its callers and DESIGN in the same change.
   when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
   port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
   pins `sys.h == outputs["y"]` on every block and catalog plant.
-- [ ] **A later round of API proposals** (all five ruled 2026-11-07; from the 2026-11-05
+- [ ] **A later round of API proposals** (all five ruled 2026-11-07; all five built on `v04-build`, in review: the row leaves at the merge; from the 2026-11-05
   public-surface scan, after its nine rulings landed; each needs its own context and options
   before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
   full mirror and one meaning per word: the **controller** is the block a loop closes on, the
