@@ -934,7 +934,12 @@ compiles all run this check.
 Speed lives in batches and compiled integrators, not in single calls: a
 jitted `f` call costs about the same as the NumPy one (dispatch dominates),
 while `rollout_batch` and the compiled `rollout` run 1000 rollouts of
-1000 RK4 steps in tens of milliseconds. Quote those; never a per-call ratio.
+1000 RK4 steps in a fraction of a second (0.12–0.16 s on a cloud CPU). Quote those; never a
+per-call ratio. The `core_perf` regression suite gates the batch: the pendulum's plain batch
+(`rollout_batch.pendulum.plain_s`), a family of rod lengths (`family_s`), and their ratio
+(`family_speedup`, gated in CI). A family costs about 4–6× the plain batch on CPU: the
+pendulum's mass matrix `H = m l² + I` then differs per member, so each RK4 stage solves `B`
+one-by-one systems where the plain batch solves one.
 
 `compile(system, backend)` returns one evaluator class per system kind, on either
 backend (`backend` picked at construction; JAX imported only by a JAX evaluator):

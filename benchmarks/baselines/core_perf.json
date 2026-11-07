@@ -358,6 +358,30 @@
       "value": 0.00010029200348071754,
       "unit": "s",
       "notes": "metadata only"
+    },
+    {
+      "id": "rollout_batch.pendulum.plain_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.1569,
+      "unit": "s",
+      "notes": "1000 rollouts x 1000 RK4 steps, warm median of 5 (recorded on a Linux cloud VM, JAX CPU)"
+    },
+    {
+      "id": "rollout_batch.pendulum.family_s",
+      "gate": "speed",
+      "direction": "lower_better",
+      "value": 0.683,
+      "unit": "s",
+      "notes": "1000 rollouts x 1000 RK4 steps, warm median of 5, one rod length per member (recorded on a Linux cloud VM, JAX CPU)"
+    },
+    {
+      "id": "rollout_batch.pendulum.family_speedup",
+      "gate": "speed",
+      "direction": "higher_better",
+      "value": 0.2298,
+      "unit": "ratio",
+      "notes": "plain_s / family_s: the price of a parameter family"
     }
   ]
 }

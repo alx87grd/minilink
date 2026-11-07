@@ -48,7 +48,7 @@ python benchmarks/run_regression_check.py --update             # refresh committ
 
 | Suite | Baseline | What it gates |
 | --- | --- | --- |
-| `core_perf` (default) | [`baselines/core_perf.json`](baselines/core_perf.json) | Compile/`f()` speed ratios, diagram `dx` accuracy, sim final-state goldens |
+| `core_perf` (default) | [`baselines/core_perf.json`](baselines/core_perf.json) | Compile/`f()` speed ratios, diagram `dx` accuracy, sim final-state goldens, the batch-rollout claim (`rollout_batch` on the pendulum, plain and a parameter family, and their ratio **`family_speedup`**) |
 | `integration` | [`baselines/integration_check.json`](baselines/integration_check.json) | Trajectory checkpoints, showcase cart-pole JAX trajopt accuracy + **`solve_s`** |
 | `solve_speed` | [`baselines/solve_speed.json`](baselines/solve_speed.json) | **`Optimizer.solve_s`** on textbook NLPs + **NumPy pendulum trajopt `solve_s`** |
 | `dp_speed` | [`baselines/dp_speed.json`](baselines/dp_speed.json) | Value-iteration **`solve_s`** (numpy table + jax device loop), jax **`speedup`**, and jax-vs-numpy `J` / policy agreement |
