@@ -166,6 +166,20 @@ breaks nothing goes last and may follow the tag.
   batched state so they ride the same memory stream. Done when the family path is within 2× of
   the plain batch. Also: gate the quoted
   batch-rollout claim, and batch the static-leaf time grid (scan: compile-sim#11, #12).
+  Built on `v04-build`, in review: the row leaves at the merge. Landed: the gate
+  (`core_perf`'s `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last
+  gated in CI) and the static grid (one `vmap` on JAX: `Gain` on 10 001 points 204 → 31 ms,
+  NumPy 26 ms). **Not reached, the 2× bar:** measured warm on a cloud CPU (JAX, median of 7),
+  the plain batch takes 118 ms and the family 693 ms (5.9×; the 27 ms the README quotes is not
+  this machine's). The cost is not the `m·l²` lines: it is `MechanicalSystem.forward_dynamics`'s
+  `solve(H, …)`; with `l` per member, `H` differs per member and each RK4 stage runs `B`
+  one-by-one LAPACK solves where the plain batch runs one. Carrying the parameters in the
+  scan's carry measured 696 ms (no gain); a hoist out of the scan has no generic hook (XLA
+  does not move the batched solve out of the loop). A closed-form `v̇ = rhs / H` for one
+  joint runs the family in 38 ms but changes the pendulum's numbers at 5·10⁻¹⁵ and the
+  textbook line: the **[ask]**, a design change (a closed-form small-`H` solve, or a plant hook
+  for its parameter-only block), or the bar dropped. The README's "27 ms" waits for the
+  maintainer's number.
 - [ ] **One owner per rule** (S65; scan: compile-sim#0, #1, #2, #3, #6, #7, #8, #10, #13,
   planning#0, #5, #8, #11, core#8, #10). One item per step:
   - **Read by the loop lane:**
@@ -184,6 +198,23 @@ breaks nothing goes last and may follow the tag.
     - one owner of the sets between `StateSpaceGrid` and its planner;
     - one print-text rule for the textbook objects;
     - one verbose and empty-cache rule across the `compute_*` facades.
+
+  Built on `v04-build`, in review: the row leaves at the merge. Landed: `n_steps` stated (one
+  rule by kind of verb in DESIGN §5, a test per verb; a rename would change public behaviour);
+  `build_on_auto` with `NotTraceableError`; `core/reporting.py`; `scipy_stiff` at `scipy`'s
+  tolerances with the Jacobian on both backends (the pendulum's stiff run moves by 2.8·10⁻⁴);
+  `compile(verbose=True)` named steps; `require_grid_on_sets`; the print-text rule (and the
+  LaTeX one; DESIGN §3's `inspect.py` exception gone). Found already done: the automatic `dt`
+  (one owner, `automatic_step_of` in `core/system.py`, one `AUTO_DT_SCALE`, DESIGN's promise
+  dropped; its stale verbose note fixed), the flat-kwarg keys (the option bags are gone; the
+  unused `_UNSET` removed), the verbose default (`False` on every `compute_*`). **Skipped,
+  each a public change the row does not state, the [ask]:** the Monte Carlo defaults
+  (`evaluate` takes `backend="auto"` and needs `n_trials` on a stochastic problem; the
+  planners' evidence `backend="numpy"`, `n_trials=50`: evidence on `"auto"` moves the
+  stochastic scores by one ulp and adds a JAX compile to every `solve(evaluate=True)`;
+  `evaluate` defaulting to 50 relaxes its documented refusal), and the empty-cache rule
+  (`plot_rollout()` with no rollout raises because `compute_rollout(n_steps)` has no default
+  length to compute one with).
 - [ ] **The root locus and the step response in `z`**: `linearize`, `bode`, `margins`,
   `nyquist` and `pzmap` read a `StepSystem` or a `SampledSystem` in `z`; `root_locus`
   and `step_response` stay continuous. Done when both give the discrete answer on a
