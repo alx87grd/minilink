@@ -161,11 +161,8 @@ class Sys2Gym(gym.Env):
         tf = float(problem.horizon) if finite else float(episode_length or 10.0)
 
         kwargs.setdefault("t0", float(problem.t0))
-        env = ProblemEnv(problem.sys, require_cost(problem), dt=dt, tf=tf, **kwargs)
-        env.problem = problem
-        env.finite_horizon = finite
-        env.failure_cost = problem.failure_cost_at(tf, dt=dt)
-        return env
+
+        return ProblemEnv(problem, dt=dt, tf=tf, **kwargs)
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -341,9 +338,13 @@ class SB3Controller(System):
 class ProblemEnv(Sys2Gym):
     """:class:`Sys2Gym` whose starts and episode ends follow a planning problem."""
 
-    problem = None
-    finite_horizon = False
-    failure_cost = None
+    def __init__(self, problem, *, dt, tf, **kwargs):
+        super().__init__(problem.sys, require_cost(problem), dt=dt, tf=tf, **kwargs)
+
+        # The problem the episodes follow: its horizon and the cost of a failure
+        self.problem = problem
+        self.finite_horizon = problem.horizon_kind() == "finite"
+        self.failure_cost = problem.failure_cost_at(tf, dt=dt)
 
     def reset(self, seed=None, options=None):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
