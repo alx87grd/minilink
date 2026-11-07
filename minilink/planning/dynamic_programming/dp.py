@@ -17,6 +17,7 @@ from minilink.planning.planner import (
     given_numbers,
     planner_at,
     planner_evidence,
+    require_continuous_to_evaluate,
     require_solution,
 )
 from minilink.planning.problems import PlanningProblem, require_cost
@@ -194,12 +195,16 @@ class DynamicProgrammingPlanner(Planner):
         ``max_iterations`` sweeps; its controller is the greedy lookup table and its
         ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also rolls the law out from the problem's start and scores it over the
-        problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
+        problem's draws (a step problem's law is scored by its face,
+        ``problem.compile().run(policy)``). ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
         this one unchanged. ``verbose`` prints the table builds and the sweeps;
         ``record_history`` keeps ``(t, J, pi)`` per sweep in the tables, for
         the animations.
         """
+        if evaluate:
+            require_continuous_to_evaluate(self.problem)
+
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
@@ -256,6 +261,9 @@ class DynamicProgrammingPlanner(Planner):
         record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
         every stage instead. ``verbose`` and ``record_history`` as for :meth:`solve`.
         """
+        if evaluate:
+            require_continuous_to_evaluate(self.problem)
+
         # Exactly n backward sweeps from the terminal cost
         result = self.value_iteration(
             int(n), stop_on_tol=False, verbose=verbose, record_history=record_history
@@ -277,12 +285,12 @@ class DynamicProgrammingPlanner(Planner):
     # Value iteration
 
     def build_kwargs(self) -> dict:
-        """The keywords that rebuild this planner on another problem: the grid's shape, the engine, the stopping rules, the numbers it was given."""
+        """The keywords that rebuild this planner on another problem: the grid's shape and period (none for a step problem, on its own clock), the engine, the stopping rules, the numbers it was given."""
         grid = self.grid
         kwargs = dict(
             x_grid=grid.x_grid_shape,
             u_grid=grid.u_grid_shape,
-            dt=grid.dt,
+            dt=grid.dt if isinstance(self.problem, PlanningProblem) else None,
             solver=grid.solver,
             backend=self.backend,
             tol=self.tol,

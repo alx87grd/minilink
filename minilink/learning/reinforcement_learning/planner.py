@@ -34,7 +34,11 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment, is_continuous
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    planner_evidence,
+    require_continuous_to_evaluate,
+)
 from minilink.planning.results import PlanningSolution
 
 #: The update rule of each name ``method=`` accepts.
@@ -790,15 +794,6 @@ def effective_horizon_text(problem, face, horizon):
         return f"{span}; declare discount_rate on the problem it discretizes"
 
     return f"{span}; declare discount_rate on the problem"
-
-
-def require_continuous_to_evaluate(problem):
-    """Refuse the evaluator's score on a step problem: its score is its face's rollout."""
-    if not is_continuous(problem):
-        raise NotImplementedError(
-            "solve(evaluate=True) scores a continuous problem's closed loop; score the "
-            "learned law on a step problem with its face, problem.compile().run(policy)"
-        )
 
 
 def require_finite_input_box(problem):

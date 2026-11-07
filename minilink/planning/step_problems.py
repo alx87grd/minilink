@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.core.costs import SampledCost, StepCost, box_samples
 from minilink.core.inspect import repr_pretty
+from minilink.core.params import require_complete
 from minilink.planning.problems import (
     PlanningProblem,
     coerce_laws,
@@ -13,7 +14,9 @@ from minilink.planning.problems import (
     finite_box_or,
     law_draws,
     require_cost,
+    require_numbers,
     require_one_run,
+    require_roles,
     stream_of,
     with_law_draws,
 )
@@ -150,9 +153,32 @@ class StepPlanningProblem:
 
         Numbers only, as on :class:`~minilink.planning.problems.PlanningProblem`:
         the laws over them are :attr:`distributions`, and :meth:`realize`
-        draws them into this tree.
+        draws them into this tree. Assigning a complete tree routes each entry
+        to its part, as on a continuous problem.
         """
         return self.parts_view()
+
+    @params.setter
+    def params(self, value):
+        view = self.parts_view()
+        require_roles(value, view)
+        require_numbers(value or {})
+        require_complete(value, view)
+
+        for role, entry in value.items():
+            if role == "plant":
+                self.sys.params = entry
+            elif role == "cost":
+                self.cost.params = entry
+            elif role == "x0":
+                self.parts.x0 = entry
+            elif role == "t0":
+                self.t0 = coerce_tick_offset(entry, self.dt)
+            elif role == "gamma":
+                self.gamma = coerce_gamma(entry)
+            else:
+                # A set's numbers in place, its one home
+                getattr(self, role).params = entry
 
     def parts_view(self) -> dict:
         """The parts' numbers by role: :attr:`params` without the laws."""

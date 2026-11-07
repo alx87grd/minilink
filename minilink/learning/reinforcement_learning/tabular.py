@@ -22,7 +22,7 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
-from minilink.planning.problems import require_cost
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -127,6 +127,7 @@ class TabularLearningPlanner(Planner):
     ):
         super().__init__(problem)
         require_cost(self.problem)
+        require_continuous_problem(problem)
 
         # Discretized state and input spaces
         grid = grid_of(problem, grid, x_grid, u_grid, dt)
@@ -623,6 +624,15 @@ class UCB:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_continuous_problem(problem):
+    """Refuse a step problem: the learner rounds a continuous plant's states to the grid; a step problem's table is value iteration's."""
+    if not isinstance(problem, PlanningProblem):
+        raise NotImplementedError(
+            "TabularLearningPlanner learns on a continuous problem's grid; solve a "
+            "step problem's table with DynamicProgrammingPlanner(problem, x_grid=, u_grid=)"
+        )
 
 
 def require_rounding(rounding):

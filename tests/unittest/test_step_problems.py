@@ -281,6 +281,46 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     assert vi.grid.dt == 1.0 and vi.gamma == 1.0
 
 
+def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_refuses_the_evaluator():
+    import copy
+
+    from minilink.learning import TabularLearningPlanner
+    from minilink.planning import DynamicProgrammingPlanner
+
+    vi = DynamicProgrammingPlanner(
+        grid_world(gamma=0.9), x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
+    )
+    assert vi.build_kwargs()["dt"] is None
+
+    # At a tree: a goal moved and another discount, the planner's problem unchanged
+    tree = copy.deepcopy(vi.params)
+    tree["cost"]["goal"] = np.array([1.0, 1.0])
+    tree["gamma"] = np.asarray(0.5)
+    solution = vi.solve(params=tree)
+    J = solution.record.tables.J.reshape(7, 7)
+    assert J[1, 1] == 0.0 and J[2, 2] == 1.0
+    assert solution.problem.gamma == 0.5 and vi.problem.gamma == 0.9
+    np.testing.assert_array_equal(vi.problem.cost.params["goal"], [5.0, 3.0])
+
+    # The step problem's params take a complete tree, routed to its parts
+    problem = grid_world(gamma=0.9)
+    edited = copy.deepcopy(problem.params)
+    edited["gamma"] = 0.8
+    edited["t0"] = 2
+    problem.params = edited
+    assert (problem.gamma, problem.t0) == (0.8, 2)
+
+    # A step problem's law is scored by its face, refused before any sweep
+    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
+        vi.solve(evaluate=True)
+    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
+        vi.solve_steps(3, evaluate=True)
+
+    # The tabular learner rounds a continuous plant: a step problem goes to value iteration
+    with pytest.raises(NotImplementedError, match="DynamicProgrammingPlanner"):
+        TabularLearningPlanner(grid_world(), x_grid=(7, 7), u_grid=(3, 3))
+
+
 class TimedTerminal(QuadraticCost):
     """``h(x, t) = 1 + t``: a terminal cost that reads the time it is charged at."""
 

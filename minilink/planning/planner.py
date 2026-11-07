@@ -182,6 +182,15 @@ def require_solution(planner) -> PlanningSolution:
     return planner.last_solution
 
 
+def require_continuous_to_evaluate(problem):
+    """Refuse the evaluator's score on a step problem: its score is its face's rollout."""
+    if not isinstance(problem, PlanningProblem):
+        raise NotImplementedError(
+            "solve(evaluate=True) scores a continuous problem's closed loop; score a "
+            "law on a step problem with its face, problem.compile().run(policy)"
+        )
+
+
 def require_cost_to_go(planner, solution):
     """Refuse a solution whose method gives no cost-to-go; return its ``cost_to_go``."""
     if solution.cost_to_go is None:
