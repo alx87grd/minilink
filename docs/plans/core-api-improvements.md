@@ -11,6 +11,15 @@ Each item below records:
 
 ## CA-1. Standard port arguments on `System.__init__` (`input_dim`, `output_dim`, `expose_state`, `y_dependencies`)
 
+**Ruled 2026-11-07:** go, with one change: on a static `System` given an `input_dim`, `y_dependencies`
+defaults to `("u",)` (a static map feeds through by definition; `None`, no feedthrough, would
+silently misorder a diagram); `DynamicSystem` and `StepSystem` keep `None`.
+Ruled the same day, the naming: words in the constructor, textbook symbols as attributes. The
+first argument `n` becomes `state_dim` (beside `input_dim` and `output_dim`, which create the
+ports `"u"` and `"y"`), swept in the same change with no alias; the attributes stay `n`, `m`,
+`p`, the textbook dimensions (`m` and `p` totals over the ports: `input_dim=1` with a `"d"` port
+of 3 gives `m = 4`). RULES §2.7's vocabulary gains `state_dim`.
+
 ### Problem and reproducer
 In the system hierarchy, there are three primary system classes:
 - `System` (`minilink/core/system.py`) — memoryless/static systems ($n = 0$, $y = h(u, t; p)$) and base class of all systems.

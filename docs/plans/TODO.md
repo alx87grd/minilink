@@ -333,8 +333,13 @@ Design: [core-api-improvements.md](core-api-improvements.md), each proposal with
 and diff (from the core tutorials' review). Each is a core API change **[ask — core]**; one
 commit per proposal, its callers and DESIGN in the same change.
 
-- [ ] **Static systems take the port shortcuts** (CA-1): `System(0, input_dim=, output_dim=,
-  y_dependencies=)` as `DynamicSystem` and `StepSystem` do. Done when the reproducer builds.
+- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go): `System(0, input_dim=,
+  output_dim=, y_dependencies=)` as `DynamicSystem` and `StepSystem` do, `y_dependencies`
+  defaulting to `("u",)` on a static system with an input; the first argument `n` renamed
+  `state_dim` in every constructor call (about 128 keyword sites, no alias), the attributes `n`,
+  `m`, `p` unchanged. Done when the reproducer builds without `y_dependencies`, no `n=` keyword
+  is left, `test_vocabulary.py` pins `state_dim`, and DESIGN §4 states the shortcut, its static
+  default and the naming.
 - [ ] **The output map on the compiled evaluators** (CA-2): `evaluator.h(x, u, t, params)` on
   `Evaluator` and `DiscreteEvaluator`. Done when a compiled diagram's `h` equals the system's.
 - [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
