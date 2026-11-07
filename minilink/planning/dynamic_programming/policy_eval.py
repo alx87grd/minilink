@@ -88,12 +88,11 @@ class PolicyEvaluator:
     def solve(self) -> np.ndarray:
         """Iterate the fixed-policy Bellman update to tolerance and return ``J``."""
         grid = self.grid
-        opt = self
-        tf = opt.final_time
-        gamma = opt.gamma
-        method = opt.interpolation
-        tol = opt.tol
-        max_iterations = opt.max_iterations
+        tf = self.final_time
+        gamma = self.gamma
+        method = self.interpolation
+        tol = self.tol
+        max_iterations = self.max_iterations
 
         # Successor and running cost of every node under the policy's action
         x_next, G = self.policy_transition(tf)
@@ -150,7 +149,6 @@ class PolicyEvaluator:
         U = self.problem.U
         tree = grid.face.params
         sys_params = tree["plant"]
-        set_params = None
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
         INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
@@ -175,8 +173,8 @@ class PolicyEvaluator:
             # An admissible action, and a successor in X and on the grid (the
             # table's domain)
             valid = (
-                U.contains(u, x, t, set_params)
-                and X.contains(x_next, t, set_params)
+                U.contains(u, x, t)
+                and X.contains(x_next, t)
                 and grid.X.contains(x_next)
             )
 
