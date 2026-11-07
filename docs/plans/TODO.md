@@ -39,7 +39,6 @@ maintainer would and logged in the run's record.
 | --- | --- | --- | --- |
 | A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
 | A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
-| `refresh()` retired | — | v0.4 | remove it, or keep it internal, §1.11 |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
@@ -84,7 +83,7 @@ breaks nothing goes last and may follow the tag.
 
 0. **The decisions waiting for the maintainer**, in parallel with phases 1 to 4 (the
    agent does not wait on them; CA-1, CA-2, CA-5 and the root exports ruled 2026-11-07): the
-   later round of API proposals and `refresh()` (§1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
+   later round of API proposals (§1.11; `refresh()` ruled removed); the minimal surface's MS-D1 to MS-D6 (§1.12); the
    root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
    Each ruling unblocks its row in phase 3 or 5.
 1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
@@ -362,12 +361,12 @@ commit per proposal, its callers and DESIGN in the same change.
   moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
   `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
   been dropped.
-- [ ] **`refresh()` retired** **[ask — core]**: the base `System.refresh()` is a no-op hook, the
-  diagram's re-stacks the state layout after a block's state size changes, the sampled view and
-  the sampled diagram forward it (14 call sites in the library, examples and tests). Options: (a)
-  remove it, the diagram re-stacking its layout at each read of `n` and `state_index` as it
-  already reads its `x0` and solver hints; (b) keep it, internal only, out of the tutorials (as
-  now). Done when the maintainer picks and the sites follow.
+- [ ] **`refresh()` retired** (ruled 2026-11-07: removed): a block's state size is fixed once
+  built (DESIGN §4, build versus run), the diagram's layout computed when blocks are added;
+  `refresh()` goes from `System`, the diagram and the sampled views; the six test calls go
+  (no-ops: a block's `x0` is a live view, checked on a continuous and a sampled loop), and the
+  two tests that pinned it pin the live views instead. Done when no `refresh` is left and
+  DESIGN's "Three owners of a start" drops its sentence.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5; ruled 2026-11-07, with §1.13's
   root exports): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
   `ScaledCost`, `SampledSystem`, `SampledDiagramSystem` on `minilink.core`; `QuadraticField` and
