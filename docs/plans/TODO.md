@@ -45,7 +45,6 @@ maintainer would and logged in the run's record.
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | Your demo pass, and a tabular Q-learning demo | K4 | v0.4 (the clean-up lane) | now the maintainer's end-of-v0.4 demo rebuild (MS-D1, 2026-11-07) |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
-| The unsupported plants to the experimental tier | K8-3 | v0.4 (the clean-up lane) | per plant, from K1's table |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.5 | the critic before the update (today) or after it |
 | Policy iteration on the grid | S51 | v0.5 | a mode or a sibling of `DynamicProgrammingPlanner` |
@@ -449,10 +448,11 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   notebooks and demos migrated); **K8-1** the root prelude trimmed to the course set (the
   course plants, 16, no cap; all 50 catalog plants today; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
-  both-backends contract test, with a docs entry; **K8-3** the unsupported plants the
-  maintainer names from K1's table moved to `minilink/experimental/catalog/` with their skins
+  both-backends contract test, with a docs entry; **K8-3** the unsupported plants moved to `minilink/experimental/catalog/` with their skins
   and demos (the top-level `experimental/`), their tests and docs entries removed, out of the
-  wheel **[ask — per plant]**; **K8-4** twins merged and the dead helpers deleted
+  wheel (ruled 2026-11-07, by rule after the maintainer's demo rebuild: a plant stays supported
+  if his new demos, a course notebook or the tutorial uses it, the rest move, the list put to
+  him for review; 24 of 50 are used today by their tests alone); **K8-4** twins merged and the dead helpers deleted
   (the Mermaid exporters, `camera.py`, `ProblemEnv` / `to_gymnasium`, the
   `identification/` stub; the pygame renderer stays, the real-time default); **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly the course plants, `minilink.catalog`
