@@ -398,7 +398,12 @@ Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, C
 benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
 **[ask]**; the order is the plan's §4.
 
-- [ ] **The test layers** (MS-D1, MS-D2): the layers, then the moves and deletions, file by file.
+- [ ] **The test layers** (MS-D1 ruled 2026-11-07: restructure now, as the net for v0.4's
+  sweeps; MS-D2): the layers, then the moves and deletions, file by file.
+- [ ] **The maintainer's demo rebuild, then the tests' clean slate** (MS-D1, 2026-11-07), the
+  last steps of v0.4: the maintainer deletes all demos and rebuilds a minimalist set; once the
+  new demos are what he wants, the test infrastructure is rebuilt from scratch around the new
+  library. Done when the new demo set and the new suite replace the old ones.
 - [ ] **The demo set** (MS-D4), with the maintainer's pass (K4, §2).
 - [ ] **The notebooks** (MS-D5) and **the benchmarks** (MS-D6).
 

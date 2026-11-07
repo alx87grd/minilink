@@ -61,7 +61,10 @@ course notebook breaks a student's link unless the PDF changes with it.
   only the cases a coverage diff shows uncovered, then delete the old suite.
 
 *Agent's recommendation:* B, or C if the maintainer wants to read every test that stays.
-**Answer:**
+**Answer (2026-11-07):** B on the short term, the net for v0.4's sweeps. At the end of v0.4 the
+maintainer deletes all demos and rebuilds a minimalist set himself; once the new demos are
+what he wants, the last step is a clean slate (A) for the test infrastructure, rebuilt around
+the new library.
 
 ### MS-D2. The test layers
 
