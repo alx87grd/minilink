@@ -358,8 +358,9 @@ commit per proposal, its callers and DESIGN in the same change.
   one sweep, no alias); workflow keywords on constructors (ruled 2026-11-07: on the verb, every
   planner's `solve`/`solve_steps` takes `verbose`, `callback`, `live_plot`, `record_history`, the
   constructors keep structure, numbers and `options=`, as `Optimizer.solve` and
-  `compute_trajectory`; a planner rebuilt for a sweep inherits no display; one sweep of about 60
-  constructors, no alias; DESIGN §6's four kinds say so when it lands);
+  `compute_trajectory`; a planner rebuilt for a sweep inherits no display; only the orchestrator's verb takes
+  them: the compiled face's `pv.solve(params, z0)` stays pure, fast and free of plots and
+  printing, as today; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
   `problem.compile()` always returning the evaluator, the step face from
   `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the
   evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
