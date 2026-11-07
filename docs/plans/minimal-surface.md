@@ -68,6 +68,11 @@ the new library.
 
 ### MS-D2. The test layers
 
+**Deferred (2026-11-07):** MS-D2a–e are decided at the end-of-v0.4 clean-slate rebuild of the
+tests (MS-D1), around the maintainer's new demos; until then the short-term restructure is
+small: the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
+relief), the files otherwise stay.
+
 **Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder
 per layer; two are essential, the contract and the textbook math. What the other kinds
 become is open below.
@@ -109,6 +114,9 @@ path shortened (the jobs side by side, `pytest -n auto`, the notebooks three at 
 build in the gate).
 
 ### MS-D4. Demos: what the set is
+
+**Deferred (2026-11-07):** the maintainer deletes all demos and rebuilds a minimalist set at
+the end of v0.4 (MS-D1); the set is decided then.
 
 - **A. Clean slate.** Delete `examples/demos/` and `examples/projects/`; write a new set,
   one demo per core feature, against the v0.3 core.
