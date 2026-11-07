@@ -1675,3 +1675,31 @@ def test_rollout_batch_counts_transitions_like_rollout():
     ev = Pendulum().compile(backend="jax")
     xs = ev.rollout_batch(np.zeros((3, 2)), dt=0.01, n_steps=7)
     assert xs.shape == (3, 8, 2)
+
+
+def test_a_static_leaf_samples_its_grid_in_one_jax_call():
+    """On JAX the static grid is one vmapped call, sampling what the NumPy loop samples."""
+    pytest.importorskip("jax")
+    from minilink.blocks.sources import Sine
+
+    blocks = {
+        "gain": lambda: Gain(K=np.array([[2.0, 0.0], [1.0, -1.0]])),
+        "step": lambda: Step(np.array([0.0]), np.array([1.0]), 0.5),
+        "sine": lambda: Sine(amplitude=[1.0, 2.0], omega=[3.0, 5.0]),
+    }
+    for name, make in blocks.items():
+        runs = {}
+        for backend in ("numpy", "jax"):
+            block = make()
+            sim = StaticSimulator(block, tf=1.0, n_steps=101, backend=backend)
+            u = (lambda t: np.array([t, 1.0 - t])) if block.m else None
+            runs[backend] = sim.solve(u=u)
+            if backend == "jax":
+                # The grid's map is compiled once, then reused by every solve
+                assert "outputs_on_grid" in sim.evaluator.compiled_forms
+        numpy_run, jax_run = runs["numpy"], runs["jax"]
+        assert list(jax_run.signals) == list(numpy_run.signals), name
+        for key in numpy_run.signals:
+            np.testing.assert_allclose(
+                jax_run.signals[key], numpy_run.signals[key], atol=1e-12, err_msg=name
+            )

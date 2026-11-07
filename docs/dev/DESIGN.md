@@ -1099,7 +1099,8 @@ systems; a sampled loop caches its run on ``self.traj`` alike.
 Auto-sim fallback calls `compute_trajectory` (MRO picks engine on homogeneous diagrams).
 
 **Two static paths:** a static *leaf* (`Gain`, `Step` source) uses
-`StaticSimulator` — empty state, outputs in `traj.signals`. A static-only
+`StaticSimulator` — empty state, outputs in `traj.signals`, the whole grid one
+`vmap` of the jitted outputs on JAX (a loop on NumPy). A static-only
 *diagram* (`n=0` stacked state) still subclasses `DynamicSystem` and uses
 `Simulator` with the diagram evaluator (signal-flow on a time grid).
 
