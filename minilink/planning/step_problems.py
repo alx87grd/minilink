@@ -130,6 +130,11 @@ class StepPlanningProblem:
         return self.parts.criterion
 
     @property
+    def disturbances(self) -> dict:
+        """The source blocks on the plant's ports: none, a step problem feeds no source."""
+        return {}
+
+    @property
     def is_stochastic(self) -> bool:
         """``True`` when a part is random: a law on the start or on a number of the tree."""
         return self.start_law is not None or bool(self.distributions)
@@ -400,6 +405,15 @@ def require_step_cost(cost):
             f"a step problem's cost is a StepCost (c(x, u, k), h(x, k)), got "
             f"{type(cost).__name__}: a continuous cost goes through "
             "problem.discretize(dt), whose cost is its SampledCost"
+        )
+
+
+def require_no_period_on_ticks(problem, dt):
+    """Refuse a ``dt`` for a step problem: it ticks on its own clock."""
+    if isinstance(problem, StepPlanningProblem) and dt is not None:
+        raise ValueError(
+            "a step problem ticks on its own clock: omit dt (its period, if it has "
+            "one, is the problem's dt)"
         )
 
 

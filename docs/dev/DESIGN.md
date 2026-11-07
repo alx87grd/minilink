@@ -1514,8 +1514,17 @@ and the tabular learners, so one object owns what a training episode means (an e
 scores the learned law by `evaluate`, the law held over each period). The heads draw at a JAX
 key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
 tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes. The discount is
-the problem's `e^{−ρ dt}` unless `gamma=` overrides it, and the record (`gamma`,
-`scored_gamma`) says when the two differ.
+the face's `γ` (the problem's `e^{−ρ dt}`) unless `gamma=` overrides it, and the record (`gamma`,
+`scored_gamma`) says when the two differ. The environment reads the face only: its `N`
+(an episode's ticks on a finite horizon), its `γ` and its cost bound over the episode (the
+failure charge). So a `StepPlanningProblem` trains through its own face, on its own clock
+(no `dt`: a native one's period is one tick, its time the tick `t0 + k`; a discretized one's
+its `dt`), its reward `−c_k`, its start and laws drawn by its `sample_x0` and
+`sample_params`, no source; a discretized problem steps as its origin at that `dt` with
+`reward="stage"`, to the bit. `ReinforcementLearningPlanner` trains on either problem (`dt`
+defaults to 0.05 s on a continuous one, none on a step problem); a step problem's learned
+law is scored by its face, `problem.compile().run(policy)`, and `solve(evaluate=True)`
+refuses it with that pointer.
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the

@@ -225,7 +225,8 @@ the input held, a solver's own objective allowed but the score always the proble
   and the laws through its parts) and `t0` as its tick offset. Done when a grid world with a
   law as its start realizes from its own tree and a step problem started at `t0 = k₀` scores
   as from 0 with the cost shifted.
-- [ ] **The RL environment on a native step problem**: `RolloutEnvironment` refuses a
+- [ ] **The RL environment on a native step problem** (built on `v04-build`, in review: the row
+  leaves at the merge): `RolloutEnvironment` refuses a
   `StepPlanningProblem` by name today (a discretized one names its origin and period); reading
   the face's `n_steps`, `γ` and cost bound instead needs the step problem's sets, laws and sources.
   Done when an RL planner trains on a native grid-world problem through its face.

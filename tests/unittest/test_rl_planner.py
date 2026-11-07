@@ -5,12 +5,14 @@ import warnings
 import numpy as np
 import pytest
 
-from minilink import Pendulum, WhiteNoise
-from minilink.core.costs import CostFunction
+from minilink import Pendulum, StepSystem, WhiteNoise
+from minilink.core.backends import array_module
+from minilink.core.costs import CostFunction, StepCost
 from minilink.core.distributions import Uniform
 from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_problems import StepPlanningProblem
 
 pytest.importorskip("jax")
 import jax  # noqa: E402
@@ -866,3 +868,98 @@ def test_training_again_leaves_an_earlier_solution_as_it_was():
     x = np.array([0.3, 0.0])
     u_first = first.controller.outputs["u"].compute(None, x, 0.0)
     np.testing.assert_allclose(u_first, first.controller.action(x))
+
+
+# --- a native step problem ---
+
+
+class GridWalker(StepSystem):
+    """A walker on a 7 × 7 grid of cells: ``x_{k+1} = x_k + round(u_k)``, a move to a neighbour or none, clipped to the grid."""
+
+    def __init__(self):
+        super().__init__(state_dim=2, input_dim=2, output_dim=2)
+        self.state.lower_bound[:] = [0.0, 0.0]
+        self.state.upper_bound[:] = [6.0, 6.0]
+        self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
+        self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+
+    def step(self, x, u, k=0, params=None):
+        xp = array_module(x)
+
+        x_next = xp.clip(x + xp.round(u), 0.0, 6.0)
+
+        return x_next
+
+
+class MovesLeft(StepCost):
+    """``c = max |x − goal|``: the moves left to the goal, diagonal moves allowed."""
+
+    def __init__(self, goal):
+        self.params = {"goal": np.asarray(goal, dtype=float)}
+
+    def c(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+        xp = array_module(x)
+
+        c = xp.max(xp.abs(x - params["goal"]))
+
+        return c
+
+    def h(self, x, k=0, params=None):
+        return 0.0 * x[0]
+
+
+def grid_world(**fields):
+    walker = GridWalker()
+    return StepPlanningProblem(
+        walker,
+        cost=MovesLeft([5.0, 3.0]),
+        x0=[0.0, 0.0],
+        X=walker.state.box,
+        U=walker.input_box,
+        **fields,
+    )
+
+
+def test_an_rl_planner_trains_on_a_native_grid_world_through_its_face():
+    problem = grid_world(gamma=0.9)
+    planner = ReinforcementLearningPlanner(
+        problem, n_envs=8, n_steps=32, hidden=(32,), episode_length=12, seed=0
+    )
+
+    # The environment reads the face: ticks of 1, its γ, its cost bound over an episode
+    face = problem.compile()
+    env = planner.env
+    assert (planner.dt, env.n_steps_per_episode, env.reward) == (1.0, 12, "stage")
+    assert planner.gamma == face.gamma == 0.9
+    assert env.failure_cost == face.failure_cost_over(12, 0.9)
+
+    # The face scores a law: J = Σ γᵏ c_k over 12 ticks from the start
+    def score(controller):
+        return face.run(lambda x, k: np.asarray(controller.action(x)), n_steps=12)
+
+    untrained = score(planner.actor)
+    solution = planner.solve(n_timesteps=5_000)
+    trained = score(solution.controller)
+
+    assert solution.success and solution.record.reward == "stage"
+    assert solution.record.gamma == solution.record.scored_gamma == 0.9
+    assert solution.cost_to_go is not None
+    assert trained[3] < untrained[3]
+    assert np.max(np.abs(trained[0][-1] - [5.0, 3.0])) < np.max(
+        np.abs(untrained[0][-1] - [5.0, 3.0])
+    )
+
+    # Its score is its face's rollout, not the continuous evaluator's
+    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
+        planner.solve(n_timesteps=256, evaluate=True)
+
+
+def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():
+    with pytest.warns(UserWarning, match="ticks; declare gamma on the step problem"):
+        planner = ReinforcementLearningPlanner(
+            grid_world(), n_envs=2, n_steps=8, hidden=(4,), episode_length=6
+        )
+    assert planner.gamma == 0.99 and planner.env.face.gamma == 1.0
+    with pytest.raises(ValueError, match="own clock"):
+        ReinforcementLearningPlanner(grid_world(gamma=0.9), dt=0.1, hidden=(4,))

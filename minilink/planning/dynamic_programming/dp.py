@@ -21,7 +21,10 @@ from minilink.planning.planner import (
 )
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
-from minilink.planning.step_problems import StepPlanningProblem
+from minilink.planning.step_problems import (
+    StepPlanningProblem,
+    require_no_period_on_ticks,
+)
 
 #: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
 BACKEND_LOOP = "loop"
@@ -962,12 +965,3 @@ def require_tables(result):
     """Refuse a cleanup before any solve has produced the tables."""
     if result is None:
         raise ValueError("No solution has been computed yet")
-
-
-def require_no_period_on_ticks(problem, dt):
-    """Refuse a ``dt`` for a step problem's grid: it ticks on its own clock."""
-    if isinstance(problem, StepPlanningProblem) and dt is not None:
-        raise ValueError(
-            "a step problem ticks on its own clock: omit dt (its period, if it has "
-            "one, is the problem's dt)"
-        )

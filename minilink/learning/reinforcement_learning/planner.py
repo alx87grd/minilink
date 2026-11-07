@@ -80,11 +80,13 @@ class ReinforcementLearningPlanner(Planner):
 
     Parameters
     ----------
-    problem : PlanningProblem
+    problem : PlanningProblem or StepPlanningProblem
         Task with a start (a law, a set, or one point to train from), cost and
-        constraint set.
-    dt : float
-        Control period of the learned law (one RK4 step per period).
+        constraint set; a step problem trains through its step face, on its
+        own clock.
+    dt : float, optional
+        Control period of the learned law on a continuous problem (one RK4
+        step per period; default 0.05 s); a step problem takes none.
     policy : NeuralPolicy, optional
         The law to train; default built from ``features``, ``hidden``,
         ``activation`` and ``normalize`` on the problem's plant.
@@ -100,11 +102,13 @@ class ReinforcementLearningPlanner(Planner):
         Where episodes run (the plant's state box by default); leaving it truncates
         the episode. A training choice, not a constraint: the constraint is ``problem.X``.
     episode_length : float, optional
-        Episode duration for an infinite-horizon problem (default 10 s).
+        Episode duration for an infinite-horizon problem (default 10 s, or 10
+        ticks of a native step problem).
     gamma : float, optional
         Discount per control period, used when the algorithm does not set its
-        own. Default: the problem's ``discount_factor(dt)`` when the problem
-        declares a rate, else 0.99 with a warning that states the effective horizon.
+        own. Default: the step face's ``γ`` (``e^{−ρ dt}`` on a continuous
+        problem, a step problem's own) when it discounts, else 0.99 with a
+        warning that states the effective horizon.
     log_std_init : float
         Initial exploration log-std on the normalized action (Gaussian head).
     reward : {"running", "stage"}
@@ -133,7 +137,7 @@ class ReinforcementLearningPlanner(Planner):
         self,
         problem,
         *,
-        dt=0.05,
+        dt=None,
         policy=None,
         features=None,
         hidden=(64, 64),
@@ -156,7 +160,6 @@ class ReinforcementLearningPlanner(Planner):
         jax = require_jax()
 
         # Training settings
-        self.dt = float(dt)
         self.n_envs = int(n_envs)
         self.seed = int(seed)
 
@@ -252,6 +255,11 @@ class ReinforcementLearningPlanner(Planner):
 
         # The law's rollouts, one jitted scan per number of periods and source draw
         self.rollout_forms = {}
+
+    @property
+    def dt(self):
+        """The control period of the learned law: the environment's (a native step problem's tick is 1)."""
+        return self.env.dt
 
     @property
     def gamma(self):
@@ -466,18 +474,20 @@ class ReinforcementLearningPlanner(Planner):
             return float(gamma)
 
         problem = self.env.problem
+        face = self.env.face
         dt = self.dt
 
-        # The problem's discount rate over one control period
-        if problem.discount_rate > 0:
-            return problem.discount_factor(dt)
+        # The problem's discount over one control period: its step face's γ
+        if face.gamma < 1.0:
+            return face.gamma
 
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
+        hint = undiscounted_hint(problem, face, horizon)
         warnings.warn(
             f"the problem is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
-            f"per control period, an effective horizon of {horizon:.1f} s at "
-            f"dt={dt:g}; declare discount_rate on the problem or pass gamma to choose it",
+            f"per control period, an effective horizon of {hint} or pass gamma to "
+            "choose it",
             stacklevel=3,
         )
 
@@ -584,6 +594,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The nominal rollout, and the Monte Carlo score over the problem's draws
         if evaluate:
+            require_continuous_to_evaluate(self.problem)
             trajectory = self.nominal_trajectory()
             evaluation = planner_evidence(
                 self,
@@ -649,7 +660,7 @@ class ReinforcementLearningPlanner(Planner):
         if self.algorithm.critic_kind != "V":
             return None
 
-        if self.gamma != self.env.problem.discount_factor(self.dt):
+        if self.gamma != self.env.face.gamma:
             return None
 
         jnp = require_jax_numpy()
@@ -764,6 +775,26 @@ class ReinforcementLearningRecord:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def undiscounted_hint(problem, face, horizon):
+    """The effective horizon in the problem's time, and where its discount is declared."""
+    if face.dt is None:
+        return f"{horizon:.1f} ticks; declare gamma on the step problem"
+    span = f"{horizon:.1f} s at dt={face.dt:g}"
+    if not is_continuous(problem):
+        return f"{span}; declare discount_rate on the problem it discretizes"
+
+    return f"{span}; declare discount_rate on the problem"
+
+
+def require_continuous_to_evaluate(problem):
+    """Refuse the evaluator's score on a step problem: its score is its face's rollout."""
+    if not is_continuous(problem):
+        raise NotImplementedError(
+            "solve(evaluate=True) scores a continuous problem's closed loop; score the "
+            "learned law on a step problem with its face, problem.compile().run(policy)"
+        )
 
 
 def require_finite_input_box(problem):

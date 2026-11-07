@@ -383,16 +383,64 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
     assert face.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]
 
 
-def test_the_rollout_environment_refuses_a_step_problem_naming_the_way():
-    from minilink import Pendulum, PlanningProblem, QuadraticCost
+def episode_return(env, law):
+    """One episode of ``env`` under ``u = law(x)``: its discounted return ``Σ γᵏ r_k`` and its length."""
+    x, t = env.reset(0), env.t0
+    total, k = 0.0, 0
+    while True:
+        x, t, r, terminated, truncated = env.step(x, t, law(x), None)
+        total += env.face.gamma**k * float(r)
+        k += 1
+        if terminated or truncated:
+            return total, k
+
+
+def test_the_rollout_environment_steps_a_native_step_problem_on_its_face():
     from minilink.planning.environment import RolloutEnvironment
 
-    with pytest.raises(TypeError, match="step its face"):
-        RolloutEnvironment(grid_world(), backend="numpy")
-    plant = Pendulum()
-    problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
-    with pytest.raises(TypeError, match=r"RolloutEnvironment\(origin, dt=0.1\)"):
-        RolloutEnvironment(problem.discretize(0.1), backend="numpy")
+    # The face's N, γ and cost bound; a native problem ticks, its time the tick k₀ + k
+    late, shifted = late_and_shifted(4)
+    env = RolloutEnvironment(late, backend="numpy")
+    face = late.compile()
+    assert (env.dt, env.t0, env.n_steps_per_episode) == (1.0, 3.0, 4)
+    assert env.finite_horizon and env.reward == "stage"
+    assert env.failure_cost == face.failure_cost_over(4, 0.9) == face.cost_bound
+
+    # One step is the face's transition, rewarded −c_k
+    x_next, t_next, r, terminated, truncated = env.step(
+        np.array([1.0]), 3.0, np.array([1.0]), None
+    )
+    assert (
+        x_next[0] == 2.0
+        and t_next == 4.0
+        and r == -face.transition_at(np.array([1.0]), np.array([1.0]), 3.0)[1]
+    )
+    assert not terminated and not truncated
+
+    # The return is −J of the face's run, and the same from k₀ as from 0 on the shifted cost
+    law = lambda x: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
+    J = face.run(lambda x, t: law(x))[3]
+    assert episode_return(env, law) == (-J, 4)
+    shifted_env = RolloutEnvironment(shifted, backend="numpy")
+    assert episode_return(shifted_env, law) == (-J, 4)
+
+    # A step problem ticks on its own clock: no control period is given
+    with pytest.raises(ValueError, match="own clock"):
+        RolloutEnvironment(late, dt=0.1, backend="numpy")
+
+
+def test_the_rollout_environment_steps_a_discretized_problem_as_its_origin():
+    from minilink.planning.environment import RolloutEnvironment
+
+    problem = swing_problem(horizon=1.0, discount_rate=0.3, X=Pendulum().state.box)
+    origin = RolloutEnvironment(problem, dt=0.1, reward="stage", backend="numpy")
+    sampled = RolloutEnvironment(problem.discretize(0.1), backend="numpy")
+    assert sampled.reward == "stage" and sampled.dt == 0.1
+    assert sampled.n_steps_per_episode == origin.n_steps_per_episode == 10
+    assert sampled.failure_cost == origin.failure_cost
+
+    law = lambda x: np.array([-2.0 * x[0] - x[1]])  # noqa: E731
+    assert episode_return(sampled, law) == episode_return(origin, law)
 
 
 def test_a_problem_compiles_a_controllers_evaluator_only():
