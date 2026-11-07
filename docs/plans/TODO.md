@@ -38,7 +38,6 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
-| A later round of API proposals | — | v0.4 | the planner shortcuts on the solution's names, `n_episodes`/`n_timesteps`, workflow keywords on constructors, `problem.compile()`'s return, helper methods to module functions (§1.11) |
 | The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
@@ -83,7 +82,7 @@ breaks nothing goes last and may follow the tag.
 
 0. **The decisions waiting for the maintainer**, in parallel with phases 1 to 4 (the
    agent does not wait on them; CA-1, CA-2, CA-5 and the root exports ruled 2026-11-07): the
-   later round of API proposals (§1.11; `refresh()` ruled removed); the minimal surface's MS-D1 to MS-D6 (§1.12); the
+   later round of API proposals and `refresh()` ruled 2026-11-07, §1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
    root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
    Each ruling unblocks its row in phase 3 or 5.
 1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
@@ -343,7 +342,7 @@ commit per proposal, its callers and DESIGN in the same change.
   when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
   port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
   pins `sys.h == outputs["y"]` on every block and catalog plant.
-- [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
+- [ ] **A later round of API proposals** (all five ruled 2026-11-07; from the 2026-11-05
   public-surface scan, after its nine rulings landed; each needs its own context and options
   before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
   full mirror and one meaning per word: the **controller** is the block a loop closes on, the
@@ -367,7 +366,10 @@ commit per proposal, its callers and DESIGN in the same change.
   `problem.compile()` always returning the evaluator, the step face from
   `discretize(dt).compile()` (ruled 2026-11-07: one return type per verb, a controller-less
   `problem.compile` refused with that pointer; 14 call sites); about 80 public helper methods on the diagram, the problem, the
-  evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
+  evaluator and the planners moved to module functions (ruled 2026-11-07: the helper-shaped
+  ones, about 17 on `PlanningProblem` and the `Planner` base, become `require_*`/`*_of` module
+  functions; a name an example, notebook or tutorial calls stays a method; a planner's algorithm
+  steps stay methods; built inside the minimal surface). Not recommended by the scan: `%` against
   `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
   a result object for `pv.solve`. Done when the maintainer rules on each.
 - [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
