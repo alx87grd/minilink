@@ -314,13 +314,12 @@ class DynamicProgrammingPlanner(Planner):
         the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
         solution.
         """
-        opt = self
-        tf = opt.final_time
+        tf = self.final_time
         dt = self.grid.dt
-        tol = opt.tol
+        tol = self.tol
 
         # The JAX engine runs these same sweeps, jitted on device
-        if opt.backend == BACKEND_JAX:
+        if self.backend == BACKEND_JAX:
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
             from minilink.planning.dynamic_programming import dp_jax
 
@@ -329,7 +328,7 @@ class DynamicProgrammingPlanner(Planner):
             )
 
         # The backward step: the textbook loop, or the same step over lookup tables
-        if opt.backend == BACKEND_LOOP:
+        if self.backend == BACKEND_LOOP:
             backward_step = self.backward_step_loop
         else:
             backward_step = self.backward_step_table
@@ -853,34 +852,6 @@ def require_grid_on_sets(problem, grid):
         )
 
 
-def grid_numbers_of(grid, gamma, out_of_bound_cost):
-    """``(gamma, out_of_bound_cost, final_time)``: the given numbers, else the face's discount and failure cost; the face's horizon end."""
-    face = grid.face
-
-    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is given
-    if gamma is None:
-        gamma = face.gamma if face.gamma < 1.0 else 1.0
-    gamma = float(gamma)
-
-    # The cost of leaving the grid, unless given: the problem's, else the face's cost bound
-    if out_of_bound_cost is None:
-        out_of_bound_cost = grid_failure_cost(grid, gamma)
-
-    # The horizon's end (t0 + horizon, or a step problem's last tick), 0 without one
-    end = face.horizon_end()
-    final_time = 0.0 if end is None else float(end)
-
-    return gamma, out_of_bound_cost, final_time
-
-
-def require_dp_backend(backend):
-    """Refuse an unknown backward-step engine; return it."""
-    if backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
-        raise ValueError(f"Unknown backend {backend!r}")
-
-    return backend
-
-
 def tool_rate_of(problem, gamma, dt):
     """
     The planner's own discount rate ``ρ = −ln γ / dt`` when ``gamma`` overrides a continuous problem's, else ``None``.
@@ -917,6 +888,34 @@ def grid_on_rate(grid, rate):
     )
 
 
+def require_dp_backend(backend):
+    """Refuse an unknown backward-step engine; return it."""
+    if backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
+        raise ValueError(f"Unknown backend {backend!r}")
+
+    return backend
+
+
+def grid_numbers_of(grid, gamma, out_of_bound_cost):
+    """``(gamma, out_of_bound_cost, final_time)``: the given numbers, else the face's discount and failure cost; the face's horizon end."""
+    face = grid.face
+
+    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is given
+    if gamma is None:
+        gamma = face.gamma if face.gamma < 1.0 else 1.0
+    gamma = float(gamma)
+
+    # The cost of leaving the grid, unless given: the problem's, else the face's cost bound
+    if out_of_bound_cost is None:
+        out_of_bound_cost = grid_failure_cost(grid, gamma)
+
+    # The horizon's end (t0 + horizon, or a step problem's last tick), 0 without one
+    end = face.horizon_end()
+    final_time = 0.0 if end is None else float(end)
+
+    return gamma, out_of_bound_cost, final_time
+
+
 def grid_failure_cost(grid, gamma):
     """
     The cost of an inadmissible pair at the discount ``gamma`` per step: the face's failure cost over the sweeps' horizon.
@@ -937,7 +936,10 @@ STAGE_MEMORY_LIMIT = 2**30
 def require_stage_memory(N, grid):
     """Refuse a finite horizon whose stacks pass :data:`STAGE_MEMORY_LIMIT`: ``N + 1`` cost-to-go tables, ``N`` policies and ``N`` command tables."""
     nodes = grid.nodes_n
-    size = 8 * ((N + 1) * nodes + N * nodes + N * nodes * grid.m)
+    m = grid.m
+
+    # 8 bytes a number: J_0 … J_N, π_0 … π_{N−1}, and the m inputs of every node per stage
+    size = 8 * ((N + 1) * nodes + N * nodes + N * nodes * m)
     if size > STAGE_MEMORY_LIMIT:
         raise ValueError(
             f"a finite horizon of N={N} stages on {nodes:,} nodes keeps "
