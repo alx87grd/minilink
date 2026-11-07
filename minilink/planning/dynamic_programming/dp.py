@@ -839,8 +839,18 @@ def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid
 
     if x_grid is not None or u_grid is not None or dt is not None:
         raise ValueError("pass either grid= or x_grid/u_grid/dt, not both")
+    require_grid_on_sets(problem, grid)
 
     return grid
+
+
+def require_grid_on_sets(problem, grid):
+    """Refuse a grid built on other sets than the problem's: ``X`` and ``U`` have one owner, the problem the grid was built from."""
+    if grid.problem.X is not problem.X or grid.problem.U is not problem.U:
+        raise ValueError(
+            "the grid was built on another problem's X or U: its successor tables "
+            "would test those sets; build StateSpaceGrid(problem, ...) on this problem"
+        )
 
 
 def grid_numbers_of(grid, gamma, out_of_bound_cost):

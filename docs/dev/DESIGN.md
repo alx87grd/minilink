@@ -1702,7 +1702,9 @@ successor table for per-sweep recomputation (memory vs time-varying support); a 
 grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `planner.controller` is a `LookupPolicy` (a static `System`; a variant with another
 `interpolation` is built directly, `LookupPolicy(grid, pi, interpolation="nearest")`, with the
 stage times on a finite horizon, `LookupPolicy(grid, pi_stages, t)`); `PolicyEvaluator`
-gives the cost-to-go of any fixed law. **Function approximation**
+gives the cost-to-go of any fixed law. A grid passed to either is built on the problem's own `X`
+and `U` (the same objects, a `problem.replace(...)` copy included; another problem's sets are
+refused), so the loop and table engines and the evaluator read one owner. **Function approximation**
 (`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
 features — `QuadraticFeatures(x_bar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
 `(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),

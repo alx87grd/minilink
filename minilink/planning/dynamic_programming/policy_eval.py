@@ -6,6 +6,7 @@ from minilink.core.roles import block_roles
 from minilink.planning.dynamic_programming.dp import (
     grid_numbers_of,
     infeasible_penalty,
+    require_grid_on_sets,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
 from minilink.planning.evaluator import controller_of
@@ -61,6 +62,7 @@ class PolicyEvaluator:
         interpolation: str = "linear",
     ) -> None:
         require_problem_cost(problem)
+        require_grid_on_sets(problem, grid)
 
         # The problem and its discretization
         self.problem = problem

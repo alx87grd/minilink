@@ -1160,3 +1160,24 @@ def test_the_lookup_policys_command_never_leaves_the_grids_input_box():
     for x in rng.uniform(plant.state.box.lower, plant.state.box.upper, size=(200, 2)):
         u = policy.action(x)
         assert np.all(u <= 2.0) and np.all(u >= -2.0)
+
+
+def test_the_grid_and_its_planner_read_one_owner_of_the_sets():
+    """A grid built on another problem's X or U is refused; a copy sharing the sets is accepted."""
+    from minilink.core.sets import BoxSet
+
+    problem = make_problem()
+    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    policy = lambda x: np.zeros(1)  # noqa: E731
+
+    # The same sets on a derived problem: one owner still
+    same_sets = problem.replace(discount_rate=0.5)
+    DynamicProgrammingPlanner(same_sets, grid=grid)
+    PolicyEvaluator(same_sets, grid=grid, policy=policy)
+
+    # Other sets: the loop and table engines, and the evaluator, would read two owners
+    other = problem.replace(U=BoxSet([-0.5], [0.5]))
+    with pytest.raises(ValueError, match="another problem's X or U"):
+        DynamicProgrammingPlanner(other, grid=grid)
+    with pytest.raises(ValueError, match="another problem's X or U"):
+        PolicyEvaluator(other, grid=grid, policy=policy)
