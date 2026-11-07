@@ -230,7 +230,7 @@ class SquashedGaussianHead:
         mlp = self.mlp
         lo, hi = self.log_std_bounds
 
-        log_std = jnp.clip(mlp.compute(None, z, params=params["log_std_mlp"]), lo, hi)
+        log_std = jnp.clip(mlp.h(None, z, params=params["log_std_mlp"]), lo, hi)
 
         return log_std
 

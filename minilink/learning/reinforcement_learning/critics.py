@@ -50,7 +50,7 @@ class ValueFunction:
 
         # V_w(x) = MLP(z(x)), on the policy's features z
         z = features(x)
-        V = mlp.compute(None, z, params=w)[0]
+        V = mlp.h(None, z, params=w)[0]
 
         return V
 
@@ -86,7 +86,7 @@ class QFunction(ValueFunction):
 
         # Q_w(x, a) = MLP([z(x), a]), the action appended to the features
         z = jnp.concatenate([features(x), a])
-        Q = mlp.compute(None, z, params=w)[0]
+        Q = mlp.h(None, z, params=w)[0]
 
         return Q
 

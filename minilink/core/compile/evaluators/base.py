@@ -143,6 +143,24 @@ class Evaluator(JacobianMixin):
         """Every boundary output port at ``(x, u, t)``; ``params=None`` reads the compiled ones."""
         raise NotImplementedError
 
+    def h(self, x, u=None, t=0.0, params=None):
+        """
+        The output map ``y = h(x, u, t; p)``: the ``"y"`` port, as ``sys.h``; empty when there is none.
+
+        ``u=None`` holds the nominal input; on a discrete evaluator ``t`` is
+        the tick ``k``. The other ports are :meth:`outputs`'.
+        """
+        xp = self.xp
+        u = self.nominal_input if u is None else u
+
+        # The y port of every output port at (x, u, t)
+        outputs = self.outputs(x, u, t, params)
+        if "y" not in outputs:
+            return xp.zeros(0)
+        y = outputs["y"]
+
+        return y
+
     ###########################################################################
     # Internal machinery
     ###########################################################################

@@ -782,9 +782,10 @@ except ImportError:
 
 
 class TestEvaluatorApi(unittest.TestCase):
-    def test_dynamic_evaluator_has_no_h(self):
+    def test_dynamic_evaluator_h_is_the_y_port(self):
         ev = compile(Integrator())
-        self.assertFalse(hasattr(ev, "h"))
+        x = np.array([0.7])
+        np.testing.assert_allclose(ev.h(x), ev.outputs(x, ev.nominal_input)["y"])
         self.assertFalse(hasattr(ev, "h_p"))
 
     def test_static_evaluator_outputs_y(self):
@@ -816,7 +817,6 @@ class TestEvaluatorApi(unittest.TestCase):
         self.assertTrue(hasattr(ev, "rollout"))
         self.assertFalse(hasattr(ev, "f"))
         self.assertFalse(hasattr(ev, "integrate"))
-        self.assertFalse(hasattr(ev, "h"))
         self.assertFalse(isinstance(ev, ContinuousEvaluator))
 
 

@@ -24,11 +24,9 @@ class Saturation(System):
 
         # Ports
         self.add_input_port("u", dim=self.dim)
-        self.add_output_port(
-            "y", dim=self.dim, function=self.compute, dependencies="all"
-        )
+        self.add_output_port("y", dim=self.dim, function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)
 
@@ -56,5 +54,5 @@ if __name__ == "__main__":
     print("input:     ", grid)
     print(
         "saturation:",
-        np.array([Saturation(-1, 1).compute(None, np.array([v]))[0] for v in grid]),
+        np.array([Saturation(-1, 1).h(None, np.array([v]))[0] for v in grid]),
     )

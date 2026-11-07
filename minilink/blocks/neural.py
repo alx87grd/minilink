@@ -60,11 +60,9 @@ class MLP(System):
 
         # Ports
         self.add_input_port("u", dim=sizes[0])
-        self.add_output_port(
-            "y", dim=sizes[-1], function=self.compute, dependencies="all"
-        )
+        self.add_output_port("y", dim=sizes[-1], function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)
 

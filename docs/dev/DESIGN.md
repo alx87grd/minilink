@@ -975,7 +975,9 @@ so a renamed block (``loop__plant2`` when the name was taken) still gets its par
 **`outputs()` are boundary outputs
 only** (dict keyed by port id, not diagram internals); a diagram's internal signals are
 `signals(x, u, t, params=None)` (the buffer) and `compute_internal_signals_dict` (keyed
-`"block:port"`). Evaluators do not mirror model `h` as a separate evaluator API.
+`"block:port"`). `h(x, u=None, t=0.0, params=None)` is the output map, the `"y"` port as
+`sys.h` (empty when there is none, a `PID`'s output being its command `"u"`): one contract,
+`h` *is* the `"y"` port on every block, plant and evaluator (`test_output_map.py`).
 
 **One body per method, compiled on JAX.** Every evaluator method takes `params=None`
 (`None` reads the parameters compiled in; a dict replaces them, a diagram's block by
@@ -1055,7 +1057,7 @@ system kind, both backends), `compiled.py` (the mark), `stepping.py` (the step m
 formulas and the loop / `lax.scan` that runs them), `jacobian.py` (`jacobian`: central
 differences on NumPy, `jax.jacfwd` on the uncompiled body on JAX).
 
-**Frozen evaluator subset.** The stable evaluator API is the methods above: `f`,
+**Frozen evaluator subset.** The stable evaluator API is the methods above: `f`, `h`,
 `outputs`, `signals`, `step`, `rollout`, `rollout_batch` and `jacobian`, each with
 `params=None`, and `nominal_input`. A diagram evaluator's `rollout(record=names)` returns
 `(x_samples, records)`, the named signals at the start of each period from its first stage.
