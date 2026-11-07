@@ -433,7 +433,9 @@ From the three-layer tutorials' audit (the notebooks work around each today):
   `GridField` join the root; `Field` and the sampled classes go on `minilink.core`, MPC and MPPI
   stay on their bands. Done with CA-5's row.
 - [ ] **A linear model's matrices by name**: `lin.A` is a method, so the tutorials read
-  `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form.
+  `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form. The
+  method stays (the class contract, `A(t, params)`); the two tutorials call `lin.A()`.
+  Built on `v04-build`, in review: the row leaves at the merge.
 - [ ] **`plot_bode` on a sampled loop**: a method on continuous systems only, the function form
   for the sampled loops. Done when both read the same verb.
 
