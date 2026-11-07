@@ -132,6 +132,17 @@ performance) goes to docs/dev/QUESTIONS.md in its format; a detail (a version, a
 an implementation choice) goes in its TODO row as an **[ask]** with its options. The chat names
 it; show the context before the options: the code as it stands, the evidence, and what each option changes. The maintainer dismisses a bare option list; one worked snippet makes the choice answerable.
 
+In the chat, put decisions **one at a time**, each in this order:
+1. **Context:** what the thing is, where it sits in the plan, and why it is a decision now.
+2. **Code, before and after** (when relevant): one short snippet of the call today and under
+   each option.
+3. **Math or numbers** (when relevant): the equation the choice touches, or measured times and
+   values, with how they were measured.
+4. **Options:** each with what it changes and what it costs.
+5. **Recommendation:** the agent's pick and the one-line reason.
+
+Wait for the answer before the next decision; record each ruling where it lands (above).
+
 **Behavior-preserving refactor runs** (readability and textbook passes, restructures):
 
 1. Read the tests first; they are the output contract. Keep every asserted name working (a property can replace an attribute).
