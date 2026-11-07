@@ -306,8 +306,9 @@ v0.3 runs; the RL and RRT faces stay with their v0.5 rows, on the same contract.
 each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
 
 - [ ] **The planners' math and fields** (`PP-1` to `PP-3`; built on the branch
-  `plans-as-policies-1`, in review: the row leaves at the merge): done when `bellman_backup` and
-  `lqr_matrices` open their files and the planners call them, the seeded value-iteration and
+  `plans-as-policies-1`, in review: the row leaves at the merge): done when the Bellman backup is
+  written in each engine's step (ruled 2026-11-07: inline, its helper `bellman_backup` removed)
+  and `lqr_matrices` opens its file and the planner calls it, the seeded value-iteration and
   LQR baselines `cmp` byte-identical (NumPy, loop and JAX engines); `GridField` is in
   `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
   iteration's `cost_to_go` (the failure cost outside the grid), `QuadraticField` LQR's; each

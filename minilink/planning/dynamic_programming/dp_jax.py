@@ -8,7 +8,6 @@ from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
-    bellman_backup,
     stage_schedule,
 )
 from minilink.planning.dynamic_programming.progress import (
@@ -356,15 +355,18 @@ def jitted_step(planner):
     order = 0 if planner.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds, gamma):
-        # The cost-to-go one step ahead read at the successors, zero off the grid
-        def arrival(J):
-            J_arrival = map_coordinates(
-                J.reshape(shape), coords, order=order, mode="constant", cval=0.0
-            )
-            return jnp.where(in_bounds, J_arrival, 0.0).reshape(N, A)
+        # The cost-to-go one step ahead at every pair's successor (zero off the grid)
+        J_arrival = map_coordinates(
+            J_next.reshape(shape), coords, order=order, mode="constant", cval=0.0
+        )
+        J_arrival = jnp.where(in_bounds, J_arrival, 0.0).reshape(N, A)
 
-        # J(x) = min_u [ c(x, u) + γ J_next(x_next) ]
-        J, pi = bellman_backup(J_next, G, arrival, gamma)
+        # Q(x, u) = c(x, u) + γ J_next(x_next)
+        Q = G + gamma * J_arrival
+
+        # J(x) = min_u Q(x, u), π(x) = argmin_u Q(x, u)
+        J = Q.min(axis=1)
+        pi = Q.argmin(axis=1)
 
         return J, pi.astype(jnp.int32)
 

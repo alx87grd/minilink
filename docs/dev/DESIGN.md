@@ -1707,9 +1707,11 @@ stationary law approximated without a second solve) and its `cost_to_go`
 is `J` as a `GridField` on the grid (`J(x, t)` on a finite horizon, the stages read
 linearly in `t`; `grid.field(J)`: read by the planner's interpolation,
 the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
-callable; `planner.cost_to_go` reads it). The backup is one function at the top of `dp.py`,
-`bellman_backup(J_next, G, arrival, gamma)`, `J = min_u [G + γ J_next(x_next)]` with its
-argmin, each engine passing its reading of the grid (`arrival`, zero off the grid); the
+callable; `planner.cost_to_go` reads it). The Bellman backup is written in the body of each
+engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (ruled
+2026-11-07: the backup is the lesson, so no helper hides it), each engine reading the grid its
+own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with the in-bounds
+mask on JAX, zero off the grid); the
 `"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
 `solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
