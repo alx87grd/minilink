@@ -188,7 +188,7 @@ textbook recursion.
 | Stage of `t` | `i = round((t − t0) / dt)` taken down when `t` falls short of `t_i` beyond a tolerance (no `floor` on float ticks); a step problem's tick difference | — |
 | Cost-to-go | `J(x, t)`, the value discounted to `t` (the problem's from `t0` is `γ^i J_i`) | `J(x)` |
 | JAX | one `lax.scan(reverse=True)` over `N` sweeps, stacking the tables | today's `lax.while_loop` |
-| Record | `mode="finite"`, `N`, the stacks in `tables` | `mode="converged"`; `tol` documented as a change per sweep, not an error bound on `J` (with `γ < 1` the bound is `γ·tol/(1 − γ)`; with `γ = 1` none) |
+| Record | `mode="finite"`, `N`, the stacks in `tables` | `mode="infinite"` (ruled 2026-11-07: the mode names the horizon, `converged` the outcome); `tol` documented as a change per sweep, not an error bound on `J` (with `γ < 1` the bound is `γ·tol/(1 − γ)`; with `γ = 1` none) |
 
 Symbols: `i` is the stage counted forward from `t0`; `k` stays the sweep count (steps left),
 `i = N − k`. The stacks are the per-sweep history, reversed: they are the solution's single
@@ -558,7 +558,7 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
 ## 14. What change 2 built (branch `v04-build`)
 
 - `solve()` reads the problem's horizon: `face.n_steps` set, exactly `N` sweeps with every
-  stage kept (`record.mode == "finite"`); unset, today's sweeps to `tol` (`"converged"`,
+  stage kept (`record.mode == "finite"`); unset, today's sweeps to `tol` (`"infinite"`,
   byte-identical: the seeded baseline of change 1, its finite case swapped for the same problem
   on no horizon, `cmp` equal on the NumPy, loop and JAX engines). `solve_steps(n)` is the
   receding law (`"receding"`); `fixed_horizon` is gone from the record.

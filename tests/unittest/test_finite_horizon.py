@@ -59,7 +59,7 @@ def test_the_horizon_picks_the_mode():
     infinite = DynamicProgrammingPlanner(
         reach().replace(horizon=None), max_iterations=30, **GRID
     ).solve()
-    assert infinite.record.mode == "converged"
+    assert infinite.record.mode == "infinite"
     assert infinite.record.tables.schedule is None
     assert "t" not in infinite.controller.params
 

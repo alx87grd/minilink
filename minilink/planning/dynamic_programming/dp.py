@@ -225,7 +225,7 @@ class DynamicProgrammingPlanner(Planner):
                 verbose=verbose,
                 record_history=record_history,
             )
-            mode = "converged"
+            mode = "infinite"
 
         # Finite horizon: exactly N backward sweeps, every stage kept
         else:
@@ -684,7 +684,7 @@ class DynamicProgrammingPlanner(Planner):
             iterations=result.iterations,
             delta=float(result.delta),
             tol=tol,
-            converged=mode != "converged" or result.delta <= tol,
+            converged=mode != "infinite" or result.delta <= tol,
             mode=mode,
             discount_rate=self.discount_rate,
             frozen_at=self.final_time if mode == "finite" and frozen else None,
@@ -779,7 +779,7 @@ class ValueIterationRecord:
     """
     How the sweeps ended, with the tables they ended on.
 
-    ``mode`` is ``"converged"`` (an infinite horizon, swept until the change
+    ``mode`` is ``"infinite"`` (no horizon, swept until the change
     per sweep fell under ``tol``, at most ``max_iterations`` times),
     ``"finite"`` (the problem's ``N`` sweeps, every stage kept) or
     ``"receding"`` (:meth:`~DynamicProgrammingPlanner.solve_steps`' ``n``

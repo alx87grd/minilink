@@ -1665,7 +1665,7 @@ callable `out_of_bound_cost` has no single saturation level, so it leaves the ta
 solved.
 `ValueIterationRecord.success` means the sweeps converged to `tol` (a finite
 horizon, and `solve_steps`, always succeed); the record carries `mode`
-(`"converged"`, `"finite"` or `"receding"`), the sweep count, the last cost-to-go change
+(`"infinite"`, `"finite"` or `"receding"`; whether the sweeps reached `tol` is `converged`), the sweep count, the last cost-to-go change
 and the tables themselves (`record.tables`, the `J` and `pi` the planner's `result`
 and plots read; a finite horizon's stages in `record.tables.schedule`).
 
