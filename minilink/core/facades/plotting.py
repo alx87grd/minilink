@@ -193,44 +193,10 @@ class SystemPlotting:
         )
 
 
-class DynamicPlotting:
+class LinearPlotting:
     """
-    Plotting shortcuts for :class:`~minilink.core.system.DynamicSystem`: the phase plane and the linear-analysis plots.
+    The linear-analysis plots of one SISO channel, in ``s`` on a :class:`~minilink.core.system.DynamicSystem` and in ``z`` on a :class:`~minilink.core.discrete.step_system.StepSystem`.
     """
-
-    def plot_phase_plane(
-        self,
-        traj=None,
-        *,
-        x_axis=0,
-        y_axis=None,
-        backend="matplotlib",
-        show=True,
-        **kwargs,
-    ):
-        """
-        Convenience shortcut to plot a phase-plane vector field.
-
-        If ``traj`` is provided, or if :attr:`traj` contains a previous
-        simulation result, the sampled state path is overlaid on the vector
-        field. Otherwise only the vector field is plotted. See
-        :func:`minilink.graphical.phase_plane.plot_phase_plane`.
-        """
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.phase_plane import plot_phase_plane
-
-        if traj is None:
-            traj = self.traj
-
-        return plot_phase_plane(
-            self,
-            traj,
-            x_axis=x_axis,
-            y_axis=y_axis,
-            backend=backend,
-            show=show,
-            **kwargs,
-        )
 
     def plot_bode(
         self,
@@ -395,9 +361,49 @@ class DynamicPlotting:
         )
 
 
-class StepPlotting:
+class DynamicPlotting(LinearPlotting):
     """
-    Plotting shortcuts for :class:`~minilink.core.discrete.step_system.StepSystem`.
+    Plotting shortcuts for :class:`~minilink.core.system.DynamicSystem`: the phase plane and the linear-analysis plots.
+    """
+
+    def plot_phase_plane(
+        self,
+        traj=None,
+        *,
+        x_axis=0,
+        y_axis=None,
+        backend="matplotlib",
+        show=True,
+        **kwargs,
+    ):
+        """
+        Convenience shortcut to plot a phase-plane vector field.
+
+        If ``traj`` is provided, or if :attr:`traj` contains a previous
+        simulation result, the sampled state path is overlaid on the vector
+        field. Otherwise only the vector field is plotted. See
+        :func:`minilink.graphical.phase_plane.plot_phase_plane`.
+        """
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.phase_plane import plot_phase_plane
+
+        if traj is None:
+            traj = self.traj
+
+        return plot_phase_plane(
+            self,
+            traj,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            backend=backend,
+            show=show,
+            **kwargs,
+        )
+
+
+class StepPlotting(LinearPlotting):
+    """
+    Plotting shortcuts for :class:`~minilink.core.discrete.step_system.StepSystem`: the rollout and the linear-analysis plots.
     """
 
     def plot_rollout(

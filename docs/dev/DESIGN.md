@@ -413,8 +413,9 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `jacobian`; `DynamicAnalysis`: `linearize`, `transfer_function`,
   `find_equilibrium`; `StepAnalysis`: `jacobian` with `k`), `plotting.py`
   (`SystemPlotting`: `plot_trajectory`, `plot_cost`, the maps, `plot_diagram`;
-  `DynamicPlotting`: `plot_phase_plane`, `plot_bode`, `plot_pzmap`,
-  `plot_root_locus`, `plot_step_response`; `StepPlotting`: `plot_rollout`) and
+  `DynamicPlotting`: `plot_phase_plane`; `StepPlotting`: `plot_rollout`; both inherit
+  `LinearPlotting`: `plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`,
+  one channel's plots in `s` or in `z`) and
   `animation.py` (`SystemAnimation`: `render`, `animate`; `DynamicAnimation`:
   `animate_modal`, `game`). `System`, `DynamicSystem` and `StepSystem` list
   their kind's mixins as bases. The

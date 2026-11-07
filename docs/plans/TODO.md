@@ -437,7 +437,10 @@ From the three-layer tutorials' audit (the notebooks work around each today):
   method stays (the class contract, `A(t, params)`); the two tutorials call `lin.A()`.
   Built on `v04-build`, in review: the row leaves at the merge.
 - [ ] **`plot_bode` on a sampled loop**: a method on continuous systems only, the function form
-  for the sampled loops. Done when both read the same verb.
+  for the sampled loops. Done when both read the same verb. The four linear-analysis plots
+  (`plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`) moved to one mixin both
+  the continuous and the step systems inherit; the discrete tutorial calls `loop.plot_bode()`.
+  Built on `v04-build`, in review: the row leaves at the merge.
 
 ---
 
