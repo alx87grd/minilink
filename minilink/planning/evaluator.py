@@ -43,6 +43,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
+from minilink.planning.policies import require_feedback_roles
 from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
 from minilink.planning.step_face import StepFace
 
@@ -885,16 +886,6 @@ def static_law(controller):
         return np.asarray(ev.outputs(x_ctl, u_in, float(t))[roles.command])
 
     return law
-
-
-def require_feedback_roles(controller, roles):
-    """Refuse a block that reads no state or commands no ``u``."""
-    if roles.measurement is None or roles.command is None:
-        raise ValueError(
-            "the policy must read the state on an input named 'x' (or 'y') "
-            f"and command 'u'; {controller.name!r} reads {list(controller.inputs)} "
-            f"and gives {list(controller.outputs)}"
-        )
 
 
 def require_static_law(controller):
