@@ -181,7 +181,8 @@ breaks nothing goes last and may follow the tag.
 - [ ] **The root locus and the step response in `z`**: `linearize`, `bode`, `margins`,
   `nyquist` and `pzmap` read a `StepSystem` or a `SampledSystem` in `z`; `root_locus`
   and `step_response` stay continuous. Done when both give the discrete answer on a
-  `DiscreteLTISystem` and the continuous callers see no change.
+  `DiscreteLTISystem` and the continuous callers see no change. Built on `v04-build`, in review: the row
+  leaves at the merge.
 
 ### 1.3 The draws
 

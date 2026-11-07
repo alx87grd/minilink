@@ -280,22 +280,29 @@ def root_locus(A, B, C, D, gains=None, *, n_gains=400):
 # Time response
 
 
-def step_response(A, B, C, D, t):
+def step_response(A, B, C, D, t, period=None):
     """Unit-step response from rest, exact on a uniform time grid ``t``.
 
     One matrix exponential gives the zero-order-hold pair ``(A_d, B_d)``; the
-    state is then marched exactly.
+    state is then marched exactly. With ``period``, ``(A, B, C, D)`` is a
+    difference equation and ``t`` its tick times ``k Δ``: the state is marched
+    on its own pair, one tick per sample.
     """
     A, B, C, D = as_siso_matrices(A, B, C, D)
     t = np.asarray(t, dtype=float).reshape(-1)
-    dt = uniform_step(t)
 
     n, m = B.shape
 
+    # A difference equation marches on its own pair
+    A_d = A
+    B_d = B
+
     # expm([[A, B], [0, 0]] Δt) = [[A_d, B_d], [0, I]]
-    hold = linalg.expm(np.block([[A, B], [np.zeros((m, n + m))]]) * dt)
-    A_d = hold[:n, :n]
-    B_d = hold[:n, n:]
+    if period is None:
+        dt = uniform_step(t)
+        hold = linalg.expm(np.block([[A, B], [np.zeros((m, n + m))]]) * dt)
+        A_d = hold[:n, :n]
+        B_d = hold[:n, n:]
 
     # y_k = C x_k + D u,   x_{k+1} = A_d x_k + B_d u,   from x_0 = 0 under u = 1
     u = np.ones(m)
@@ -308,10 +315,23 @@ def step_response(A, B, C, D, t):
     return y
 
 
-def settling_horizon(A):
-    """Default step-response horizon: eight times the slowest stable time constant."""
+def settling_horizon(A, period=None):
+    """Default step-response horizon: eight times the slowest stable time constant.
+
+    With ``period``, ``A`` is a difference equation's and its poles are in ``z``.
+    """
+    p = poles(A)
+
     # The decay rates σ = −Re p of the stable poles (σ > 10⁻⁹)
-    decay = -np.real(poles(A))
+    if period is None:
+        decay = -np.real(p)
+
+    # In z, σ = −ln|z| / Δ; a pole at the origin dies in one tick (σ = ∞)
+    else:
+        with np.errstate(divide="ignore"):
+            decay = -np.log(np.abs(p)) / period
+        decay = decay[np.isfinite(decay)]
+
     decay = decay[decay > 1e-9]
 
     # No stable pole: a ten-second horizon
