@@ -369,8 +369,9 @@ v0.3's review and its six release points are done (`0.3.0`). K4 and the hand-loo
   upright `cos θ < −0.95` and `|cart| < 5 m` over the last 2 s): **1 seed of 8** swings up and
   balances (seed 2, `J = 1.23 ± 0.84`, every start upright); the other seven swing up once and
   spin (eval `J` 21 to 1756, median about 32); the training's final episode cost (1.17–1.85)
-  does not tell them apart. The **[ask]**: a larger budget, another reward or exploration
-  setting, or the demo shown as a single seed's result. Also seen: `evaluate` reports every
+  does not tell them apart. The **[ask]** (a larger budget, another reward or exploration
+  setting, or the demo shown as a single seed's result) is **deferred to the maintainer's
+  end-of-v0.4 demo rebuild (ruled 2026-11-07)**; the demo stays as it is until then. Also seen: `evaluate` reports every
   seed feasible and reached at `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`).
 
 ### 1.11 The core API proposals
