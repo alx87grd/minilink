@@ -118,7 +118,7 @@ def collect_discontinuous_solver_notes(
             )
     elif user_solver is None and solver_mode == "euler" and verbose and dt is not None:
         notes.append(
-            f"Auto-selected Euler with dt={dt:g} (discontinuous default scale "
+            f"Auto-selected Euler with dt={dt:g} (the automatic step, "
             f"{AUTO_DT_SCALE:g} × smallest_time_constant)."
         )
 

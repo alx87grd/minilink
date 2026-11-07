@@ -41,8 +41,6 @@ from minilink.planning.trajectory_optimization.transcription import (
     dynamics_function,
 )
 
-_UNSET = object()  # Marks a keyword the caller did not pass
-
 _TRANSCRIPTION_PRESETS = frozenset(
     {"direct_collocation", "multiple_shooting", "single_shooting"}
 )
