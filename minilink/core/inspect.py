@@ -28,7 +28,7 @@ def inspect_inline(obj):
 def inspect_text(obj):
     """One short summary for a textbook object: the core objects' here, any other its own ``str``."""
     # Real cycles: every module below imports inspect_text for its own display
-    from minilink.core.costs import CostFunction
+    from minilink.core.costs import CostFunction, StepCost
     from minilink.core.fields import Field
     from minilink.core.sets import InputSet, Set
     from minilink.core.system import System
@@ -47,7 +47,7 @@ def inspect_text(obj):
     if text is not None:
         return text
 
-    if isinstance(obj, CostFunction):
+    if isinstance(obj, (CostFunction, StepCost)):
         return cost_text(obj)
     if isinstance(obj, Field):
         return field_text(obj)

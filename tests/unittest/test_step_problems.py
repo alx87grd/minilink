@@ -523,3 +523,17 @@ def test_a_discretized_random_plant_steps_at_its_mean():
     )
 
     assert problem.discretize(0.1).compile().params["plant"]["m"] == 2.0
+
+
+def test_a_step_problem_prints_its_horizon_its_discount_and_its_parts():
+    from minilink import Uniform
+
+    text = str(grid_world(gamma=0.9, n_steps=12))
+    assert text.splitlines()[0] == "StepPlanningProblem, Walker, n_steps=12, gamma=0.9"
+    assert "  X0: SingletonSet" in text and "  cost: Moves" in text
+
+    # A law on the start prints the criterion and the law, as a continuous problem does
+    lawful = str(grid_world(x0=Uniform([0.0, 0.0], [1.0, 1.0])))
+    assert "n_steps=None, gamma=1, criterion=expectation" in lawful
+    assert "  x0: Uniform" in lawful
+    assert str(grid_world().cost) == "Moves"

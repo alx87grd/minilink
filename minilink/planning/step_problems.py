@@ -13,10 +13,13 @@ from minilink.planning.problems import (
     fallback_bound,
     finite_box_or,
     law_draws,
+    planning_horizon_text,
+    problem_text,
     require_cost,
     require_numbers,
     require_one_run,
     require_roles,
+    stochastic_problem_text,
     stream_of,
     with_law_draws,
 )
@@ -299,6 +302,15 @@ class StepPlanningProblem:
             return self.cost_bound(n_steps, gamma=gamma, params=params)
 
         return failure_cost
+
+    # Display
+
+    def __str__(self):
+        horizon = f"n_steps={planning_horizon_text(self.n_steps)}, gamma={self.gamma:g}"
+        if self.is_stochastic:
+            return stochastic_problem_text(self, horizon)
+
+        return problem_text(self, horizon)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

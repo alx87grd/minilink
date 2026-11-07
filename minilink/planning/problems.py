@@ -683,10 +683,13 @@ class PlanningProblem:
     # Display
 
     def __str__(self):
+        horizon = (
+            f"horizon={planning_horizon_text(self.horizon)}, rho={self.discount_rate:g}"
+        )
         if self.is_stochastic:
-            return stochastic_problem_text(self)
+            return stochastic_problem_text(self, horizon)
 
-        return problem_text(self)
+        return problem_text(self, horizon)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -1208,15 +1211,15 @@ def require_input_box(U):
     return U
 
 
-def problem_text(problem):
-    """The print text of a deterministic problem: its headline, sets and cost."""
-    headline, body = problem_parts(problem)
+def problem_text(problem, horizon):
+    """The print text of a deterministic problem (continuous or step): its headline, ``horizon`` its horizon and discount as printed, its sets and cost."""
+    headline, body = problem_parts(problem, horizon)
     return format_inspect(headline, body)
 
 
-def stochastic_problem_text(problem):
+def stochastic_problem_text(problem, horizon):
     """The print text of a stochastic problem: the deterministic one with its criterion and laws."""
-    headline, body = problem_parts(problem)
+    headline, body = problem_parts(problem, horizon)
     criterion = problem.criterion
     if isinstance(criterion, tuple):
         criterion_s = f"cvar, alpha={criterion[1]:g}"
@@ -1237,14 +1240,11 @@ def stochastic_problem_text(problem):
     return format_inspect(headline, body)
 
 
-def problem_parts(problem):
-    """``(headline, body)`` shared by both problem texts."""
+def problem_parts(problem, horizon):
+    """``(headline, body)`` shared by both problem texts, ``horizon`` the headline's horizon and discount."""
     sys = problem.sys
     name = getattr(sys, "name", type(sys).__name__)
-    headline = (
-        f"{type(problem).__name__}, {name}, "
-        f"horizon={planning_horizon_text(problem.horizon)}, rho={problem.discount_rate:g}"
-    )
+    headline = f"{type(problem).__name__}, {name}, {horizon}"
     body = []
     for label, item in (
         ("X", problem.X),
