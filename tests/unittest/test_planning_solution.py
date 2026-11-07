@@ -505,7 +505,7 @@ def numpy_only_law(solution):
 
 
 def test_compare_reads_dt_as_evaluate_does():
-    """A sampled controller runs on its own clock, dt omitted; a continuous one needs dt."""
+    """A sampled controller runs on its own clock, dt omitted; a continuous one on dt, else its automatic step."""
     from minilink.control import lqr as lqr_design
     from minilink.planning import compare
 
@@ -518,8 +518,10 @@ def test_compare_reads_dt_as_evaluate_does():
     alone = evaluate(problem, law % 0.1, backend="numpy")
     np.testing.assert_array_equal(on_clock.J, alone.J)
 
-    with pytest.raises(TypeError, match="needs dt"):
-        compare(problem, LQR=law, backend="numpy")
+    continuous = compare(problem, LQR=law, backend="numpy").evaluations["LQR"]
+    np.testing.assert_array_equal(
+        continuous.J, evaluate(problem, law, backend="numpy").J
+    )
     with pytest.raises(ValueError, match="own clock"):
         compare(problem, LQR=law % 0.1, dt=0.05, backend="numpy")
 

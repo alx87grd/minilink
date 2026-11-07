@@ -84,7 +84,9 @@ class ProblemEvaluator:
         Sample period of the run: the free inputs are held over it and the run is
         recorded on its grid. A sampled controller (``pid % 0.01``, a loop on a
         clock) runs on its own base period: ``dt`` omitted reads it, and a ``dt``
-        that differs is refused.
+        that differs is refused. A continuous loop with ``dt`` omitted runs on
+        its automatic step, the continuous simulator's ``Δt = 0.1 τ_min``
+        shortened to divide the run.
     solver : {"rk4", "euler"}
         Integration formula of one step (a sampled loop: its plant's).
     substeps : int, optional
@@ -127,9 +129,12 @@ class ProblemEvaluator:
         self.solver = solver
         self.substeps = 1 if substeps is None else int(substeps)
 
-        # The grid: N periods of dt to the horizon
-        self.dt = float(require_dt(dt))
+        # The grid: N periods of dt to the horizon, a continuous loop that names
+        # no dt on its automatic step
         self.tf = horizon_of(problem, episode_length)
+        if dt is None:
+            dt = automatic_dt_of(self.loop, self.tf)
+        self.dt = float(dt)
         self.n_steps = steps_of(self.tf, self.dt)
 
         # The loop, compiled once on its backend
@@ -663,8 +668,8 @@ def evaluate(
     One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
     see :class:`ProblemEvaluator` for the loop, the run and the score. A sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous controller needs ``dt``, the period its loop is integrated and
-    recorded on.
+    continuous controller runs on ``dt``, the period its loop is integrated and
+    recorded on, and with ``dt`` omitted on its automatic step.
     """
     pe = ProblemEvaluator(
         problem,
@@ -999,13 +1004,22 @@ def plant_stepped(loop, solver, substeps):
     return with_plant_steps(loop, substeps=substeps, solver=solver)
 
 
-def require_dt(dt):
-    """Refuse a continuous loop with no sample period: its run is recorded on the grid of ``dt``."""
-    if dt is None:
-        raise TypeError(
-            "a continuous loop needs dt, the sample period of its run: "
-            "problem.compile(controller, dt=0.01)"
-        )
+def automatic_dt_of(loop, tf):
+    """
+    A continuous loop's period when it names none: its automatic step, shortened to divide the run.
+
+    ``Δt`` is the continuous simulator's automatic step of the loop
+    (:func:`~minilink.core.system.automatic_step_of`, ``0.1 τ_min``), and
+    ``dt = tf / ⌈tf / Δt⌉``, the largest step under it that ends on the horizon.
+    """
+    # A real cycle: the system module imports the compile chain, which loads after this one
+    from minilink.core.system import automatic_step_of
+
+    step = automatic_step_of(loop.solver_info)
+
+    # n = ⌈tf / Δt⌉ periods, a multiple landing on its round despite the division
+    n = max(1, int(np.ceil(tf / step - 1e-9)))
+    dt = tf / n
 
     return dt
 

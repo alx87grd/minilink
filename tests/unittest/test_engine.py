@@ -246,7 +246,9 @@ def test_the_facade_is_compile_then_evaluate():
     assert isinstance(report, Evaluation) and report.n_trials == 4
 
 
-def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_for_dt():
+def test_the_facade_reads_a_sampled_controllers_clock_and_a_continuous_ones_automatic_step():
+    from minilink.core.system import automatic_step_of
+
     problem = upright_problem()
 
     # A sampled controller runs on its own clock
@@ -254,9 +256,15 @@ def test_the_facade_reads_a_sampled_controllers_clock_and_asks_a_continuous_one_
     assert isinstance(on_clock, Evaluation)
     assert on_clock.trajectories is None
 
-    # A continuous controller's loop needs the period it is integrated on
-    with pytest.raises(TypeError, match="needs dt"):
-        evaluate(problem, pid(), backend="numpy")
+    # A continuous controller with no dt runs on the loop's automatic step,
+    # Δt = 0.1 τ_min shortened to divide the run: dt = tf / ⌈tf / Δt⌉
+    pe = problem.compile(pid(), backend="numpy")
+    step = automatic_step_of(pe.loop.solver_info)
+    assert pe.dt <= step and pe.n_steps == int(np.ceil(pe.tf / step - 1e-9))
+    np.testing.assert_allclose(pe.n_steps * pe.dt, pe.tf, rtol=1e-12)
+    automatic = evaluate(problem, pid(), backend="numpy")
+    stated = evaluate(problem, pid(), dt=pe.dt, backend="numpy")
+    np.testing.assert_array_equal(automatic.J, stated.J)
 
 
 # --- the gradient and the program ---

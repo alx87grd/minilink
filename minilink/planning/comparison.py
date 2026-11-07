@@ -45,7 +45,8 @@ def compare(
     an :class:`~minilink.planning.evaluation.Evaluation` already computed.
     ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous one needs ``dt``, the period its loop is integrated on.
+    continuous one runs on ``dt``, the period its loop is integrated on, and
+    with ``dt`` omitted on the evaluator's automatic step.
     """
     problem, named = split_entries(args, entries)
 
