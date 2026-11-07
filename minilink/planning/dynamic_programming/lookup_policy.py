@@ -55,11 +55,12 @@ class LookupPolicy(System):
 
         super().__init__()
 
-        # The grid and the policy's action ids; the rule and the grid's input box
-        # are structure
+        # The grid and the policy's action ids; the rule, the schedule and the grid's
+        # input box are structure
         self.grid = grid
         self.pi = np.asarray(pi, dtype=int)
         self.interpolation = interpolation
+        self.timed = t is not None
         self.u_lb = np.asarray(grid.u_lb, dtype=float)
         self.u_ub = np.asarray(grid.u_ub, dtype=float)
 
@@ -76,7 +77,7 @@ class LookupPolicy(System):
             for i, level in enumerate(grid.x_levels)
         }
         self.params = {"u_table": u_table, "levels": levels}
-        if t is not None:
+        if self.timed:
             self.params["t"] = np.asarray(t, dtype=float).reshape(-1)
 
         # Ports: their bounds mirror the grid's domain (plot sweeps and color limits)
@@ -107,7 +108,7 @@ class LookupPolicy(System):
         x = xp.reshape(xp.asarray(x, dtype=float), (-1,))
 
         # On a schedule, the table of the stage of t
-        if "t" in params:
+        if self.timed:
             u_table = u_table[stage_of(xp.asarray(params["t"]), t, xp)]
 
         # u read on the grid: multilinear in the cell holding x (or its nearest node),
