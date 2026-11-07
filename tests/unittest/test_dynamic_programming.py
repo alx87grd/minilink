@@ -19,6 +19,7 @@ from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingPlanner,
     DynamicProgrammingResult,
 )
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 from minilink.planning.planner import require_solution
 from minilink.planning.problems import PlanningProblem
@@ -212,7 +213,9 @@ class TestControllerAndEvaluation(unittest.TestCase):
         )
         planner.solve()
         self.assertIs(planner.controller, require_solution(planner).controller)
-        nearest = plotting.lookup_controller_of(planner.result, interpolation="nearest")
+        nearest = LookupPolicy(
+            planner.result.grid, planner.result.pi, interpolation="nearest"
+        )
         self.assertIsNot(nearest, planner.controller)
         np.testing.assert_array_equal(nearest.pi, planner.result.pi)
 
@@ -239,7 +242,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
         problem = make_problem()
         planner, result = solve(problem)
         planner.clean_infeasible_set()
-        controller = plotting.lookup_controller_of(result)
+        controller = LookupPolicy(result.grid, result.pi)
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
         diagram = DiagramSystem()
@@ -253,7 +256,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
     def test_policy_evaluator_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
-        controller = plotting.lookup_controller_of(result)
+        controller = LookupPolicy(result.grid, result.pi)
         evaluator = PolicyEvaluator(
             problem,
             grid=result.grid,
@@ -626,9 +629,9 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         self.assertIsNone(plotting.cost_scale_limit(np.inf))
         self.assertEqual(plotting.cost_scale_limit(500), 500.0)
 
-    def test_lookup_controller_of_smoke(self):
+    def test_lookup_policy_smoke(self):
         _, result = solve(make_problem())
-        controller = plotting.lookup_controller_of(result)
+        controller = LookupPolicy(result.grid, result.pi)
         u = controller.action(result.grid.states[0])
         self.assertEqual(u.shape, (1,))
 
@@ -641,7 +644,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         planner.clean_infeasible_set()
         plant = problem.sys
         plant.x0 = np.array([2.0, 0.0])
-        diagram = plotting.lookup_controller_of(result) @ plant
+        diagram = LookupPolicy(result.grid, result.pi) @ plant
         trajectory = diagram.compute_trajectory(tf=8.0, verbose=False)
         _, ax = plotting.plot_control_law(result, trajectory=trajectory, show=False)
         self.assertGreaterEqual(len(ax.lines), 1)
@@ -1138,7 +1141,6 @@ def test_the_lookup_policys_command_never_leaves_the_grids_input_box():
         PlanningProblem,
         QuadraticCost,
     )
-    from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 
     plant = Pendulum()
     plant.inputs["u"].lower_bound = np.array([-2.0])

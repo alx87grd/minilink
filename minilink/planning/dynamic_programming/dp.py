@@ -733,7 +733,8 @@ class DynamicProgrammingResult:
     pi : np.ndarray
         Greedy policy as action ids by node id, shape ``(nodes_n,)`` (stage 0).
     iterations : int
-        Number of backward sweeps performed.
+        Number of backward sweeps performed (a tabular learner's tables: the
+        episodes it learned from).
     delta : float
         Largest cost-to-go change in the final sweep.
     history : list, optional

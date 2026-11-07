@@ -12,6 +12,7 @@ from minilink.planning.dynamic_programming.dp import (
     grid_failure_cost,
     grid_of,
 )
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import progress as report_progress
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
@@ -184,6 +185,8 @@ class TabularLearningPlanner(Planner):
 
         A cell never visited keeps its initial value, zero: the optimistic
         start that makes untried actions worth trying (``visits`` tells which).
+        Its ``iterations`` counts the episodes learned so far (value iteration's
+        counts sweeps), ``delta`` is ``nan``.
         """
         grid = self.grid
         Q = self.Q
@@ -228,7 +231,7 @@ class TabularLearningPlanner(Planner):
 
         # The greedy law of the learned table
         result = self.result
-        controller = plotting.lookup_controller_of(result)
+        controller = LookupPolicy(result.grid, result.pi)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -475,7 +478,7 @@ class TabularLearningPlanner(Planner):
 
 @dataclass(frozen=True)
 class TabularLearningRecord:
-    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from."""
+    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``iterations`` the episodes, ``n_episodes``)."""
 
     algorithm: str
     n_episodes: int

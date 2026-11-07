@@ -27,8 +27,9 @@ class Planner(ABC):
     Base class for planners.
 
     Concrete planners live in family subpackages: ``trajectory_optimization/``,
-    ``search/`` (RRT family), ``dynamic_programming/`` (dynamic programming) and
-    ``reinforcement_learning/``. Every ``solve`` returns a
+    ``search/`` (RRT family) and ``dynamic_programming/`` (dynamic programming)
+    here, and ``minilink.learning``'s ``reinforcement_learning/`` (the neural
+    and the tabular learners). Every ``solve`` returns a
     :class:`~minilink.planning.results.PlanningSolution` and stores it as
     :attr:`last_solution`; the :class:`~minilink.planning.problems.PlanningProblem`
     stays declarative and does not solve itself.

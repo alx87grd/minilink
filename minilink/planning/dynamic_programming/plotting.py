@@ -377,16 +377,6 @@ def cost_scale_limit(failure_cost):
     return float(failure_cost)
 
 
-def lookup_controller_of(result, *, interpolation="linear"):
-    """The greedy lookup-table controller of value-iteration tables ``result``: a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupPolicy` on its grid and ``pi``."""
-    # Lazy import: the lookup law loads on first use, not with the plots
-    from minilink.planning.dynamic_programming.lookup_policy import (
-        LookupPolicy,
-    )
-
-    return LookupPolicy(result.grid, result.pi, interpolation=interpolation)
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
