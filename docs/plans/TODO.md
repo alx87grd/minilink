@@ -406,7 +406,13 @@ benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the main
   new demos are what he wants, the test infrastructure is rebuilt from scratch around the new
   library. Done when the new demo set and the new suite replace the old ones.
 - [ ] **The demo set** (MS-D4): deferred to the maintainer's end-of-v0.4 rebuild (row below).
-- [ ] **The notebooks** (MS-D5) and **the benchmarks** (MS-D6).
+- [ ] **The notebooks** (MS-D5, ruled 2026-11-07): the course notebooks keep their paths, their
+  content the maintainer's; the two topic notebooks that duplicate GRO860's go
+  (`topics/reinforcement_learning/drone_ppo.ipynb`,
+  `topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb`) with their
+  references (the notebook checker, `examples/README.md`, ROADMAP); the five unique topic pages
+  stay until K5. Done when the two are gone and the notebook checks pass.
+- [ ] **The benchmarks** (MS-D6).
 
 ### 1.13 The root exports and the tutorials' quirks
 

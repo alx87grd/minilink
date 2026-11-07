@@ -153,11 +153,13 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 ### MS-D5. Notebooks
 
 - **Course notebooks** (`examples/teaching/courses/`, 20): keep their paths (the PDFs link
-  16); their content is the maintainer's teaching design. **Answer:**
+  16); their content is the maintainer's teaching design. **Answer (2026-11-07):** yes.
 - **Tutorial**: settled. The tutorials were redrafted in three layers (basics, core, advanced)
   and landed on `dev` (2026-11-01).
 - **Topics** (`examples/teaching/topics/`, 7): A. fold into the tutorial or the courses and
-  delete; B. keep. **Answer:**
+  delete; B. keep. **Answer (2026-11-07):** C, the two duplicates of GRO860 notebooks go
+  (`drone_ppo`, identical; `pendulum_value_iteration_vs_lqr_vs_rl`, 97% the same), the five
+  unique pages stay until the repository-structure decision (K5, v0.9).
 
 ### MS-D6. Benchmarks
 
