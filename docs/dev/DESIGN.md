@@ -1782,6 +1782,6 @@ animation keyframes the slide alongside the bodies. One backdrop hint sits
 beside the camera's: `scene_grid=False` hides the viewer's ground grid and axes
 (an underwater or open-sea scene); the flat renderers ignore it.
 
-All performance benchmarking lives in repo-root `benchmarks/` (helpers,
-synthetic fixtures, `run_*` scripts) — outside the shipped package, importing
-minilink like an external user, and not a public contract.
+The regression gate lives in repo-root `benchmarks/` (`run_regression_check.py`, its
+suites, scenarios, synthetic fixtures and committed baselines) — outside the shipped
+package, importing minilink like an external user, and not a public contract.

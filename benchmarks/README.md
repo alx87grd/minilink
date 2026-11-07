@@ -1,66 +1,37 @@
 # Benchmarks
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/benchmarks/ode_solver_benchmark.ipynb)
+The regression gate of minilink: end-to-end accuracy goldens and guarded solve times,
+checked against committed baselines. It is not collected by pytest (pytest guards its
+helpers in `tests/unittest/test_benchmark_helpers.py`) and not shipped in the pip package.
 
-Performance tracking and end-to-end numerical regression for minilink — not
-collected by default pytest (pytest only guards the helpers and runs the public-name
-inventory) and not
-shipped in the pip package. Helpers are grouped by what they measure;
-`common.py` holds shared plumbing, `systems/` holds synthetic fixture systems,
-and `scenarios/` holds canonical integration-check setups.
-
-The modules import minilink exactly like an external user. Nothing inside
-`minilink/` may import from here (the unit tests may: the helper guards in
-`tests/unittest/test_benchmark_helpers.py`, the inventory in `test_public_names.py`, the
-fixture systems in `test_mechanical_robotics.py`).
-
-Benchmark fixtures intentionally differ from unittest planning fixtures: e.g.
-`planning_rrt.holonomic_problem()` uses a dense 18-sphere scene for timing
-studies, while `tests/unittest/planning_helpers.py` keeps a minimal obstacle
-scene for fast RRT contract tests.
+The modules import minilink exactly like an external user. Nothing inside `minilink/` may
+import from here (the unit tests may: the helper guards in `test_benchmark_helpers.py`, the
+fixture systems in `test_mechanical_robotics.py` and `flatten_diagram_helpers.py`, and the
+public-name inventory in `test_public_names.py`).
 
 ## Layout
 
 | Path | Role |
 | --- | --- |
-| [`ode_solver_benchmark.ipynb`](ode_solver_benchmark.ipynb) | **Interactive notebook** — ODE solver × backend sweeps on local or Colab hardware |
-| [`run_regression_check.py`](run_regression_check.py) | Single entry point for all committed baselines |
-| [`run_study.py`](run_study.py) | **Benchmark study** unified machine-exploration presets |
-| [`studies/presets.py`](studies/presets.py) | Preset implementations invoked by `run_study.py` |
-| [`suites/core_perf.py`](suites/core_perf.py) | Fast compile/`f()`/sim final-state regression gate |
-| [`suites/integration_check.py`](suites/integration_check.py) | Trajectory checkpoint goldens + JAX trajopt solve-time gates |
-| [`suites/solve_speed.py`](suites/solve_speed.py) | Standalone NLP + NumPy pendulum trajopt solve wall-time gates |
-| [`suites/dp_speed.py`](suites/dp_speed.py) | Value-iteration backward-sweep wall-time gates + jax/numpy agreement |
-| [`scenarios/`](scenarios/) | Frozen scenario configs (double pendulum, showcase pendulum, cart-pole trajopt, E4/F MPC parity) |
-| [`run_e4_trajopt_parity.py`](run_e4_trajopt_parity.py) | Thin wrapper → `--suite e4` (capture/compare) |
-| [`run_f_mpc_parity.py`](run_f_mpc_parity.py) | Thin wrapper → `--suite f_mpc` (capture/compare) |
-| [`baselines/*.json`](baselines/) | Committed golden metrics |
-| [`step_model_baseline.py`](step_model_baseline.py) | Captures every sampled consumer of the step model to JSON for a behaviour-preserving refactor check (no timings, so two captures are byte-identical); `--compare REF.json --rtol` against a capture (AGENTS' refactor recipe) |
-| [`v03_budget.py`](v03_budget.py) | The v0.3 core's budget, a report and not a gate: the one score (1000 starts × 200 RK4 steps), the sampled loop (100 starts × 3000 ticks), the native MPC's closed loop (60 ticks × 15 iterations × 20 steps), the parametric solve against the frozen one, a parameter family against the plain batch, each against 2× its bar; `OUT.json` keeps the numbers |
-| [`v03_baseline.py`](v03_baseline.py) | Captures the v0.3 core's numbers to JSON for a behaviour-preserving refactor check: the step model's entries plus the sampled loop, the problem evaluator, the draws, the optimizer, RL and the fields, to JSON with no timings; `--compare REF.json [--rtol R]` against [`baselines/v03_core.json`](baselines/v03_core.json) (byte-identical by default) |
-| [`params_binding.py`](params_binding.py) | Frozen step vs `params` as an argument vs bound parameters, on JAX: the evidence of the step model's parameter binding |
-| [`public_names.py`](public_names.py) | The public-name inventory: every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
+| [`run_regression_check.py`](run_regression_check.py) | The one entry point: runs the suites, compares them with their baselines, prints the host context |
+| [`suites/`](suites/) | The gated suites: `core_perf`, `integration_check`, `solve_speed`, `dp_speed` |
+| [`scenarios/`](scenarios/) | Frozen scenario configs: double pendulum, showcase pendulum, cart-pole trajopt, the trajectory-optimization and MPC parity suites (`e4`, `f_mpc`) |
+| `simulation.py`, `f_evaluators.py`, `optimization.py`, `trajopt.py`, `dynamic_programming.py` | The measuring helpers the suites call, by what they measure |
+| `baseline.py`, `common.py`, `host_profiles.py` | The baseline files and their comparison, shared plumbing, the host speed context |
+| [`systems/`](systems/) | Synthetic fixture systems (pendulum twins, many spheres, dense networks) |
+| [`baselines/*.json`](baselines/) | The committed goldens, one file per suite |
+| [`host_profiles/*.json`](host_profiles/) | Recorded timings per machine (context only, not a gate) |
+| [`public_names.py`](public_names.py) | Not part of the gate: the public-name inventory, every facade name and the files using it; `--untested` lists the names no test uses (held empty by `tests/unittest/test_public_names.py`) |
 
 ## Running
 
 From the repo root with the **`minilink`** conda env active (see
-[environment.yml](../environment.yml)), or any environment with the libraries you
-want to measure (JAX for the JAX variants; `cyipopt` for the Ipopt
-variants — both are skipped gracefully when missing). Gate commands (lint, `pytest`,
-the regression CI flags, demo and notebook checks) are in the Agent table of
-[tests/README.md](../tests/README.md#entry-points); this is the benchmark CLI.
+[environment.yml](../environment.yml)), or any environment with the libraries you want to
+measure (JAX for the JAX variants; `cyipopt` for the Ipopt variants — both are skipped
+gracefully when missing). The CI and full-local commands are in the Agent table of
+[tests/README.md](../tests/README.md#entry-points); this is the CLI.
 
 ```bash
-python benchmarks/run_study.py --list                            # every preset, one line each
-python benchmarks/run_study.py --preset f_eval --plant pendulum  # f() call speed; or --plant diagram_dense
-python benchmarks/run_study.py --preset step_eval --plant leaf   # step() call speed; or --plant step_diagram
-python benchmarks/run_study.py --preset sim --mode matrix        # solver x backend; or --mode standard | manual
-python benchmarks/run_study.py --preset trajopt --mode backends  # transcription x backend; or --mode solvers
-python benchmarks/run_study.py --preset optimizer                # NLP solver presets on textbook problems
-python benchmarks/run_study.py --preset dp                       # value-iteration loop/numpy/jax backends
-python benchmarks/run_study.py --preset rrt_nearest              # RRT nearest brute_force vs kd_tree
-python benchmarks/run_study.py --preset pyro_parity -- --fast    # Pyro vs Minilink DP/RRT (external Pyro env)
-
 python benchmarks/run_regression_check.py                      # core_perf baseline (default)
 python benchmarks/run_regression_check.py --suite integration  # trajectory + JAX trajopt gate
 python benchmarks/run_regression_check.py --suite solve_speed  # NLP + NumPy trajopt solve gates
@@ -69,20 +40,11 @@ python benchmarks/run_regression_check.py --suite e4           # E4 trajopt/MPC 
 python benchmarks/run_regression_check.py --suite f_mpc        # F MPC hybrid/hand-loop/dual-rate
 python benchmarks/run_regression_check.py --suite all          # all regression-gate suites
 python benchmarks/run_regression_check.py --suite all --tiny   # CI reduced workload
-python benchmarks/run_nested_flatten_study.py                  # nested PID-loop flatten parity + speed (informational)
-python benchmarks/run_nested_dense_flatten_study.py            # dense / deep-chain nested subnets (informational)
-python benchmarks/run_nested_dense_flatten_study.py --quick    # smaller workload
 
 python benchmarks/run_regression_check.py --update             # refresh committed JSON
-python benchmarks/run_e4_trajopt_parity.py --capture           # same as --suite e4 --update
-python benchmarks/run_f_mpc_parity.py --capture                # same as --suite f_mpc --update
 ```
 
 ## Regression baselines
-
-All gated suites run through [`run_regression_check.py`](run_regression_check.py).
-Pytest only guards benchmark helpers (`test_benchmark_helpers.py`); **GitHub CI** runs
-`--suite all --tiny` with JAX installed (see below).
 
 | Suite | Baseline | What it gates |
 | --- | --- | --- |

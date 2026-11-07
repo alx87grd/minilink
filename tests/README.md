@@ -39,7 +39,7 @@ tests/
 
 benchmarks/
   run_regression_check.py   ← regression gates (+ host speed context)
-  run_study.py              ← benchmark study (backend exploration)
+  public_names.py           ← the public-name inventory (a test tool: test_public_names.py)
   host_profiles/*.json      ← recorded timings per machine (context only)
   baselines/*.json          ← committed regression goldens
 ```
@@ -55,7 +55,6 @@ Demos stay in `examples/demos/` for teaching; **demo-check runners** that execut
 | **After sim/trajopt/MPC/value-iteration work** | [`tests/run/run_regression_gates.py`](run/run_regression_gates.py) |
 | **Demo/catalog sanity** | [`tests/run/run_demo_checks.py`](run/run_demo_checks.py) |
 | **Notebook smoke** | [`tests/run/run_notebook_checks.py`](run/run_notebook_checks.py) |
-| **Backend perf tables** | [`tests/run/run_benchmark_study.py`](run/run_benchmark_study.py) |
 | **Pick one check** | [`tests/run/run_checks.py`](run/run_checks.py) — set `CHECK = "contract_tests"` at top |
 
 Graphics visual checklist (local only): [`tests/demo_checks/run_graphics_visual_check.py`](demo_checks/run_graphics_visual_check.py).
@@ -75,7 +74,6 @@ by its name here.
 | Cross-cutting or handoff | `pytest` |
 | Regression gates, CI flags (compile / `Simulator` / trajopt / MPC / value iteration) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup --speed-slack-s 0.1` |
 | Regression gates, full local (big review pass) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all` (per-suite factors from the baseline JSON) |
-| Backend perf exploration | `python benchmarks/run_study.py --list` |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
 | Notebook change | `MPLBACKEND=Agg python tests/demo_checks/run_notebook_checks.py` |
 | Docs build (when editing `docs/` or docstrings) | `sphinx-build -W --keep-going -b html docs docs/_build/html` |
@@ -121,7 +119,6 @@ in `notebook_overrides.json` too, except those marked `nightly: false`, run only
 | --- | --- | --- | --- | --- |
 | **Contract tests** | API types, shapes, compile/sim/MPC behavior | `run_contract_tests.py` | `pytest` | `test` (Basic tier) + `regression` (w/ JAX); `pythons` + `laptops` on PRs into `main` |
 | **Regression gates** | Accuracy goldens + guarded NLP/trajopt solve time | `run_regression_gates.py` | `benchmarks/run_regression_check.py` | `regression` |
-| **Benchmark study** | Machine/GPU exploration tables | `run_benchmark_study.py` | `benchmarks/run_study.py` | — |
 | **Graphics contract** | Draw-list + headless PNG checks | (in contract tests) | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_demo_checks.py` | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
@@ -132,9 +129,8 @@ in `notebook_overrides.json` too, except those marked `nightly: false`, run only
 
 ### Performance
 
-Regression gates (pass/fail against `benchmarks/baselines/`, run by CI), the benchmark study
-(`run_study.py`, backend tables on your machine) and the recorded host profiles are
-[benchmarks/README.md](../benchmarks/README.md)'s.
+Regression gates (pass/fail against `benchmarks/baselines/`, run by CI) and the recorded
+host profiles are [benchmarks/README.md](../benchmarks/README.md)'s.
 
 ---
 

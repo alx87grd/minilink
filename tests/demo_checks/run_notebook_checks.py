@@ -12,8 +12,7 @@ Defaults: ``timeout=180``, ``requires=[]``. Overrides in
 ``notebook_overrides.json`` (``smoke: false`` drops a long notebook from the
 default suite; ``--all`` keeps it; ``nightly: false`` drops it from ``--all``
 too, so it runs only when named with ``--notebook``). Not run: ``projects/`` and
-``experimental/``. Performance benchmarks live under ``benchmarks/`` (run via
-``benchmarks/run_study.py`` or ``benchmarks/ode_solver_benchmark.ipynb``).
+``experimental/``.
 
 Usage (from repo root)::
 

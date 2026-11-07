@@ -414,7 +414,16 @@ benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the main
   stay until K5. Done when the two are gone and the notebook checks pass.
 - [ ] **The benchmarks** (MS-D6, ruled 2026-11-07): the regression gate stays; the studies, the
   one-off baselines and the pyro parity scripts go, with `tests/README.md`'s study row. Done
-  when `benchmarks/` holds the gate alone and the CI gate passes.
+  when `benchmarks/` holds the gate alone and the CI gate passes. Built on `v04-build`, in
+  review: the row leaves at the merge. What went: the study driver and its presets with their
+  helpers (`step_evaluators.py`, `planning_rrt.py`, `systems/step.py`), its IDE launcher and
+  bridge test; the nested-flatten studies and their scenarios (the flatten-default row's
+  benchmark, in history at `b5b9892`; the two fixtures the flatten tests read moved into
+  `tests/unittest/flatten_diagram_helpers.py`); the one-off captures (`params_baseline.py`,
+  `step_model_baseline.py`, `v03_baseline.py` with `baselines/v03_core.json`, `v03_budget.py`,
+  `compile_once.py`, `params_binding.py`); the pyro parity scripts; the two parity CLI wrappers
+  (`--suite e4|f_mpc --update` does the same); the ODE-solver notebook. `public_names.py` stays
+  beside the gate as a test tool.
 
 ### 1.13 The root exports and the tutorials' quirks
 

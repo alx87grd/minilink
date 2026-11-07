@@ -70,11 +70,6 @@ def run_regression(*, ci_mode: bool) -> int:
     return run_command(cmd)
 
 
-def run_study_script(args: list[str]) -> int:
-    cmd = [sys.executable, str(REPO_ROOT / "benchmarks" / "run_study.py"), *args]
-    return run_command(cmd)
-
-
 def run_demo_check_script(relative_path: str, args: list[str] | None = None) -> int:
     cmd = [sys.executable, str(REPO_ROOT / relative_path), *(args or [])]
     return run_command(cmd)

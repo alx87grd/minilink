@@ -1,7 +1,7 @@
-"""Import guards that benchmark helpers load and return structured results.
+"""Import guards that the regression gate's helpers load and return structured results.
 
-Benchmarks measure performance, not correctness; these tests only guard the
-repo-root ``benchmarks/`` package against import and API drift.
+The gate measures performance and end-to-end numbers, not contracts; these tests only
+guard the repo-root ``benchmarks/`` package against import and API drift.
 """
 
 from __future__ import annotations
@@ -20,25 +20,18 @@ from benchmarks.optimization import (
     benchmark_optimizer_backends,
     print_optimizer_benchmark,
 )
-from benchmarks.planning_rrt import benchmark_nearest_backend, holonomic_problem
 from benchmarks.simulation import (
     TRUTH_SIMULATION_VARIANT,
     SimulationBenchmarkVariant,
     benchmark_simulation_backend,
     benchmark_simulation_matrix,
 )
-from benchmarks.step_evaluators import (
-    StepEvaluatorBenchmarkVariant,
-    benchmark_step_evaluators,
-)
 from benchmarks.trajopt import (
     TrajectoryOptimizationBenchmarkConfig,
     TrajectoryOptimizationBenchmarkVariant,
     benchmark_trajectory_optimization,
 )
-from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem
-from minilink.planning.search.rrt import RRTPlanner
 
 
 class _TinyStable(DynamicSystem):
@@ -52,19 +45,6 @@ class _TinyStable(DynamicSystem):
 
     def h(self, x, u, t=0, params=None):
         return x
-
-
-class _TinyStep(StepSystem):
-    def __init__(self):
-        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.name = "TinyStep"
-        self.x0 = np.array([1.0])
-
-    def step(self, x, u, k=0, params=None):
-        return np.asarray([x[0] + u[0]], dtype=float)
-
-    def h(self, x, u, k=0, params=None):
-        return np.asarray(x, dtype=float)
 
 
 class TestBenchmarkSmoke(unittest.TestCase):
@@ -82,22 +62,6 @@ class TestBenchmarkSmoke(unittest.TestCase):
             variants=(
                 FEvaluatorBenchmarkVariant("native", None),
                 FEvaluatorBenchmarkVariant("numpy", "numpy"),
-            ),
-        )
-        self.assertEqual(len(result.rows), 2)
-        self.assertGreaterEqual(result.rows[1].loop_s, 0.0)
-
-    def test_step_evaluator_benchmark_returns_rows(self):
-        step_sys = _TinyStep()
-        result = benchmark_step_evaluators(
-            step_sys,
-            np.array([1.0]),
-            np.array([0.0]),
-            k=0,
-            n_calls=2,
-            variants=(
-                StepEvaluatorBenchmarkVariant("native", None),
-                StepEvaluatorBenchmarkVariant("numpy", "numpy"),
             ),
         )
         self.assertEqual(len(result.rows), 2)
@@ -189,16 +153,6 @@ class TestBenchmarkSmoke(unittest.TestCase):
         baseline = load_baseline(baseline_path)
         self.assertEqual(baseline.suite, "dp_speed")
         self.assertTrue(recorded <= {metric.id for metric in baseline.metrics})
-
-    def test_planning_rrt_fixture_and_benchmark_row(self):
-        problem, extender, x_goal = holonomic_problem()
-        self.assertEqual(problem.sys.n, 2)
-        self.assertIsNotNone(extender)
-        self.assertEqual(x_goal.shape, (2,))
-        row = benchmark_nearest_backend(RRTPlanner, "brute_force", seed=0)
-        self.assertEqual(row.planner, "rrt")
-        self.assertEqual(row.backend, "brute_force")
-        self.assertGreater(row.elapsed_s, 0.0)
 
 
 class TestBenchmarkRegression(unittest.TestCase):

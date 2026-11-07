@@ -375,8 +375,8 @@ behaviour-preserving, one module per step.
 ### 5.3 v0.3 — shipped
 
 `0.3.0` was tagged on 2026-10-30 (the merge of `dev` into `main`, PR #131) and published on
-PyPI: every workstream's main rows, the acceptance scripts as tests and the budget as
-`benchmarks/v03_budget.py`; the maintainer's review held and its six release points ruled. The
+PyPI: every workstream's main rows, the acceptance scripts as tests and the budget as a
+report script (retired with the benchmark studies in v0.4); the maintainer's review held and its six release points ruled. The
 core's small leftovers and the clean-up lane carry into v0.4 (§5.4).
 
 ### 5.4 v0.4 — the clean surface
