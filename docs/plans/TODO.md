@@ -147,8 +147,14 @@ breaks nothing goes last and may follow the tag.
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.5 row.
 - [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
-  - one warm-start helper on the plan `Trajectory`;
-  - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
+  - one warm-start helper on the plan `Trajectory`: no second caller left. The MPC helpers the
+    scan named are gone; the block warm-starts in `z` under tracing, on its face's `shift`
+    (two faces, two rules: knots linear, MPPI's inputs held), and a planner warm-started from
+    a `Trajectory` goes through `Trajectory.resample`, already the one owner;
+  - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7): the joint and
+    the task impedance read their errors through the spring-damper laws' one helper.
+
+  Built on `v04-build`, in review: the row leaves at the merge.
 
 ### 1.2 The step algebra first-class
 
