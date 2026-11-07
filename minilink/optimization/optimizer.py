@@ -9,7 +9,13 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import (
+    body_line,
+    format_inspect,
+    inspect_inline,
+    inspect_text,
+    repr_pretty,
+)
 from minilink.core.params import require_complete
 from minilink.core.reporting import (
     DISP_RULE_DIV,
@@ -165,7 +171,7 @@ class Optimizer:
         self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
 
     def __str__(self):
-        return inspect_text(self)
+        return optimizer_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -624,6 +630,17 @@ def backend_kwargs_of(preset, method_kwargs, options):
         kwargs["options"] = {**existing, **options}
 
     return kwargs
+
+
+def optimizer_text(opt):
+    headline = f"Optimizer, method={opt.method!r}"
+    body = [
+        body_line("program", inspect_inline(opt.program)),
+        body_line("z0", preview_vector(opt.z0)),
+        body_line("backend", opt.backend),
+    ]
+
+    return format_inspect(headline, body)
 
 
 if __name__ == "__main__":

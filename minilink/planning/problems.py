@@ -12,7 +12,12 @@ import numpy as np
 from minilink.core.backends import is_jax_key, require_jax
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import Distribution, child_seed, split_keys, tiled_mean
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import (
+    body_line,
+    format_inspect,
+    inspect_inline,
+    repr_pretty,
+)
 from minilink.core.params import (
     flatten,
     lookup,
@@ -678,7 +683,10 @@ class PlanningProblem:
     # Display
 
     def __str__(self):
-        return inspect_text(self)
+        if self.is_stochastic:
+            return stochastic_problem_text(self)
+
+        return problem_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -1206,3 +1214,60 @@ def require_input_box(U):
         )
 
     return U
+
+
+def problem_text(problem):
+    headline, body = problem_parts(problem)
+    return format_inspect(headline, body)
+
+
+def stochastic_problem_text(problem):
+    headline, body = problem_parts(problem)
+    criterion = problem.criterion
+    if isinstance(criterion, tuple):
+        criterion_s = f"cvar, alpha={criterion[1]:g}"
+    else:
+        criterion_s = str(criterion)
+    headline = f"{headline}, criterion={criterion_s}"
+
+    if problem.start_law is not None:
+        body.append(body_line("x0", inspect_inline(problem.start_law)))
+    if problem.distributions:
+        paths = [".".join(path) for path, _ in flatten(problem.distributions)]
+        body.append(
+            body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
+        )
+    if problem.disturbances:
+        body.append(body_line("disturbances", ", ".join(sorted(problem.disturbances))))
+
+    return format_inspect(headline, body)
+
+
+def problem_parts(problem):
+    sys = problem.sys
+    name = getattr(sys, "name", type(sys).__name__)
+    headline = (
+        f"{type(problem).__name__}, {name}, "
+        f"horizon={planning_horizon_text(problem.horizon)}, rho={problem.discount_rate:g}"
+    )
+    body = []
+    for label, item in (
+        ("X", problem.X),
+        ("X0", problem.X0),
+        ("Xf", problem.Xf),
+        ("U", problem.U),
+        ("cost", problem.cost),
+    ):
+        if item is not None:
+            body.append(body_line(label, inspect_inline(item)))
+
+    return headline, body
+
+
+def planning_horizon_text(tf):
+    if tf is None:
+        return "None"
+    if not np.isfinite(tf):
+        return "inf"
+
+    return f"{tf:g}"

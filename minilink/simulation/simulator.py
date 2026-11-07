@@ -9,7 +9,7 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.inspect import inspect_text
+from minilink.core.inspect import body_line, format_inspect, inspect_inline
 from minilink.core.params import checked
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
@@ -220,7 +220,7 @@ class Simulator:
             print_setup_panel(self, setup_notes)
 
     def __str__(self):
-        return inspect_text(self)
+        return simulator_text(self)
 
     def solve(self, *, u=None, input_port_id=None, params=None, record=()):
         """
@@ -538,3 +538,10 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         solver_options=sim.solver_backend_options or None,
         notes=notes or None,
     )
+
+
+def simulator_text(sim):
+    headline = f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_pts}"
+    body = [body_line("sys", inspect_inline(sim.sys))]
+
+    return format_inspect(headline, body)

@@ -7,7 +7,7 @@ import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import body_line, format_inspect, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
@@ -189,7 +189,7 @@ class PlanningSolution:
     # Display
 
     def __str__(self) -> str:
-        return inspect_text(self)
+        return solution_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -223,3 +223,34 @@ class PlanningSolution:
             )
 
         return self.trajectory
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def solution_text(solution):
+    law = "u = pi(t), open loop" if solution.open_loop else "u = pi(x), feedback"
+    if solution.trajectory is None:
+        trajectory = "not rolled out (solve with evaluate=True)"
+    else:
+        trajectory = (
+            f"{solution.trajectory.n_samples} samples over "
+            f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
+        )
+    evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
+    success = "yes" if solution.success else "no"
+    headline = f"PlanningSolution, method={solution.method}, success={success}"
+    body = [
+        body_line("controller", f"{solution.controller.name} ({law})"),
+        body_line("trajectory", trajectory),
+        body_line("evaluation", evaluation),
+        body_line(
+            "cost_to_go",
+            "yes" if solution.cost_to_go is not None else "no",
+        ),
+        body_line("record", str(solution.record)),
+    ]
+
+    return format_inspect(headline, body)

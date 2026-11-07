@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.costs import SampledCost, StepCost, box_samples
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import repr_pretty
 from minilink.planning.problems import (
     PlanningProblem,
     coerce_laws,
@@ -273,9 +273,6 @@ class StepPlanningProblem:
             return self.cost_bound(n_steps, gamma=gamma, params=params)
 
         return failure_cost
-
-    def __str__(self):
-        return inspect_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

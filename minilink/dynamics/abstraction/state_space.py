@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.inspect import latex_inspect
 from minilink.core.system import DynamicSystem, fastest_time_constant
 
 ###############################################################################
@@ -192,7 +191,7 @@ class LTISystem(StateSpaceSystem):
         return f"{super().__str__()}\n{matrices_text(self)}"
 
     def _repr_latex_(self):
-        return latex_inspect(self)
+        return lti_latex()
 
 
 class DiscreteLTISystem(StepSystem):
@@ -366,3 +365,12 @@ def matrices_text(sys):
             + np.array2string(values, precision=4, suppress_small=True, prefix=prefix)
         )
     return "\n".join(blocks)
+
+
+def lti_latex():
+    return (
+        r"\begin{align*}"
+        r"\dot{x} &= A x + B u \\"
+        r"y &= C x + D u"
+        r"\end{align*}"
+    )

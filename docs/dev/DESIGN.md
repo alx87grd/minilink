@@ -127,9 +127,6 @@ state-feedback block):
   open-loop plan is a `TrajectorySource` block).
 - **Exception:** `core/closed_loop.py` imports `blocks.routing` (`Error`, `Sum`,
   `Gain`, `Demux`): `@` and `feedback` build those blocks.
-- **Exception:** `core/inspect.py` imports `optimization` and `planning`
-  (`PlanningProblem`, the spatial fields): `print()` dispatches on every core
-  noun, wherever it lives.
 - **Exception:** `analysis/` imports `blocks.TransferFunction`: the transfer
   function and sensitivity tools return one, so `bode` and `margins` apply.
 - **Exception:** `planning/trajectory_optimization/mpc/` imports `planning.spatial.overlays`
@@ -1776,12 +1773,15 @@ script Matplotlib window).
 
 **Inspect (`core/inspect.py`).** One text layout for textbook objects:
 line 1 is `{TypeName}, …` identity tokens; further lines are two-space
-indented `label: value`. `print(obj)` and IPython `_repr_pretty_` call
-`inspect_text`; unknown types fall back to `repr`. Covered types include
-`System`, `Trajectory`, sets, distributions, costs (including sums and
-quadratic weights), fields, `PlanningProblem` (a stochastic one with its
-laws and criterion), `PlanningSolution`, `MathematicalProgram`,
-`Optimizer`, `OptimizationResult`, and `Simulator`.
+indented `label: value`. One rule places each text: `core/inspect.py` writes the core
+objects' (`System`, `Trajectory`, sets, distributions, costs including sums and quadratic
+weights, fields) and the layout helpers, and `inspect_text` reads any other object's own
+`str`; a tool band's object writes its text beside its class with those helpers
+(`PlanningProblem`, a stochastic one with its laws and criterion, `PlanningSolution`,
+`MathematicalProgram`, `Optimizer`, `OptimizationResult`, `Simulator`), so the core printer
+imports no tool band. `print(obj)` and IPython `_repr_pretty_` read the same text; an
+object without one prints its `repr`. The LaTeX summaries follow the same rule
+(`latex_inspect` reads an object's own `_repr_latex_`).
 Subclasses may append a deep block after the hub summary (`LTISystem`
 matrices, `TransferFunction` `G(s)`, `StateObserver` gain and poles).
 

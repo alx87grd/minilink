@@ -372,3 +372,18 @@ def test_simulation_band_loads_no_optimization_module():
         "print(sorted(m for m in sys.modules if m.startswith('minilink.optimization')))"
     )
     assert _run_fresh_python(probe, {}) == "[]"
+
+
+def test_the_core_printer_loads_no_tool_band():
+    """print() on a core object reads core alone: each tool band writes its own objects' text."""
+    probe = (
+        "import sys\n"
+        "import numpy as np\n"
+        "from minilink.blocks.basic import Integrator\n"
+        "from minilink.core.inspect import inspect_text, latex_inspect\n"
+        "from minilink.core.sets import BoxSet\n"
+        "inspect_text(Integrator()); inspect_text(BoxSet([0.0], [1.0])); latex_inspect(1.0)\n"
+        "bands = ('minilink.optimization', 'minilink.planning', 'minilink.simulation')\n"
+        "print(sorted(m for m in sys.modules if m.startswith(bands)))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"

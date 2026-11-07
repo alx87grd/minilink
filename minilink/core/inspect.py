@@ -2,9 +2,6 @@
 
 import numpy as np
 
-from minilink.core.params import flatten
-from minilink.core.reporting import preview_vector
-
 ###############################################################################
 # Public API
 ###############################################################################
@@ -24,20 +21,13 @@ def inspect_inline(obj):
 
 
 def inspect_text(obj):
-    """One short summary for a textbook object; unknown types use ``repr``."""
+    """One short summary for a textbook object: the core objects' here, any other its own ``str``."""
     # Real cycles: every module below imports inspect_text for its own display
     from minilink.core.costs import CostFunction
     from minilink.core.fields import Field
     from minilink.core.sets import InputSet, Set
     from minilink.core.system import System
     from minilink.core.trajectory import Trajectory
-    from minilink.optimization.mathematical_program import (
-        MathematicalProgram,
-        OptimizationResult,
-    )
-    from minilink.optimization.optimizer import Optimizer
-    from minilink.planning.problems import PlanningProblem
-    from minilink.planning.results import PlanningSolution
 
     if isinstance(obj, System):
         return system_text(obj)
@@ -56,46 +46,28 @@ def inspect_text(obj):
         return cost_text(obj)
     if isinstance(obj, Field):
         return field_text(obj)
-    if isinstance(obj, PlanningProblem) and obj.is_stochastic:
-        return stochastic_problem_text(obj)
-    if isinstance(obj, PlanningProblem):
-        return problem_text(obj)
-    if isinstance(obj, PlanningSolution):
-        return solution_text(obj)
-    if isinstance(obj, Optimizer):
-        return optimizer_text(obj)
-    if isinstance(obj, OptimizationResult):
-        return optimization_result_text(obj)
-    if isinstance(obj, MathematicalProgram):
-        return program_text(obj)
-
-    # The simulator: a lazy import from an outer band
-    from minilink.simulation.simulator import Simulator
-
-    if isinstance(obj, Simulator):
-        return simulator_text(obj)
-
     if isinstance(obj, (Set, InputSet)):
         return type(obj).__name__
 
-    return repr(obj)
+    # Any other object prints its own text (a tool band's problem, solution,
+    # program or simulator writes it beside its class), else its repr
+    return str(obj)
 
 
 def latex_inspect(obj):
-    """Notebook LaTeX summary when meaningful; otherwise ``None``."""
-    # A real cycle: costs, state_space and mathematical_program import this module
+    """Notebook LaTeX summary when meaningful (the core objects' here, any other its own ``_repr_latex_``); otherwise ``None``."""
+    # A real cycle: costs imports this module
     from minilink.core.costs import QuadraticCost
-    from minilink.dynamics.abstraction.state_space import LTISystem
-    from minilink.optimization.mathematical_program import MathematicalProgram
 
-    if isinstance(obj, LTISystem):
-        return lti_latex()
     if isinstance(obj, QuadraticCost):
         return quadratic_cost_latex()
-    if isinstance(obj, MathematicalProgram):
-        return program_latex(obj)
 
-    return None
+    # Any other object writes its own summary beside its class, or has none
+    own = getattr(obj, "_repr_latex_", None)
+    if own is None:
+        return None
+
+    return own()
 
 
 def repr_pretty(obj, p, cycle):
@@ -118,15 +90,6 @@ def array_text(values):
 
 def box_interval(lower, upper, var):
     return f"{array_text(lower)} <= {var} <= {array_text(upper)}"
-
-
-def planning_horizon_text(tf):
-    if tf is None:
-        return "None"
-    if not np.isfinite(tf):
-        return "inf"
-
-    return f"{tf:g}"
 
 
 def system_text(sys):
@@ -220,136 +183,6 @@ def distribution_text(obj):
     return None
 
 
-def problem_parts(problem):
-    sys = problem.sys
-    name = getattr(sys, "name", type(sys).__name__)
-    headline = (
-        f"{type(problem).__name__}, {name}, "
-        f"horizon={planning_horizon_text(problem.horizon)}, rho={problem.discount_rate:g}"
-    )
-    body = []
-    for label, item in (
-        ("X", problem.X),
-        ("X0", problem.X0),
-        ("Xf", problem.Xf),
-        ("U", problem.U),
-        ("cost", problem.cost),
-    ):
-        if item is not None:
-            body.append(body_line(label, inspect_inline(item)))
-
-    return headline, body
-
-
-def problem_text(problem):
-    headline, body = problem_parts(problem)
-    return format_inspect(headline, body)
-
-
-def stochastic_problem_text(problem):
-    headline, body = problem_parts(problem)
-    criterion = problem.criterion
-    if isinstance(criterion, tuple):
-        criterion_s = f"cvar, alpha={criterion[1]:g}"
-    else:
-        criterion_s = str(criterion)
-    headline = f"{headline}, criterion={criterion_s}"
-
-    if problem.start_law is not None:
-        body.append(body_line("x0", inspect_inline(problem.start_law)))
-    if problem.distributions:
-        paths = [".".join(path) for path, _ in flatten(problem.distributions)]
-        body.append(
-            body_line("params", f"{len(paths)} laws ({', '.join(sorted(paths))})")
-        )
-    if problem.disturbances:
-        body.append(body_line("disturbances", ", ".join(sorted(problem.disturbances))))
-
-    return format_inspect(headline, body)
-
-
-def solution_text(solution):
-    law = "u = pi(t), open loop" if solution.open_loop else "u = pi(x), feedback"
-    if solution.trajectory is None:
-        trajectory = "not rolled out (solve with evaluate=True)"
-    else:
-        trajectory = (
-            f"{solution.trajectory.n_samples} samples over "
-            f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
-        )
-    evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
-    success = "yes" if solution.success else "no"
-    headline = f"PlanningSolution, method={solution.method}, success={success}"
-    body = [
-        body_line("controller", f"{solution.controller.name} ({law})"),
-        body_line("trajectory", trajectory),
-        body_line("evaluation", evaluation),
-        body_line(
-            "cost_to_go",
-            "yes" if solution.cost_to_go is not None else "no",
-        ),
-        body_line("record", str(solution.record)),
-    ]
-
-    return format_inspect(headline, body)
-
-
-def optimizer_text(opt):
-    headline = f"Optimizer, method={opt.method!r}"
-    body = [
-        body_line("program", inspect_inline(opt.program)),
-        body_line("z0", preview_vector(opt.z0)),
-        body_line("backend", opt.backend),
-    ]
-
-    return format_inspect(headline, body)
-
-
-def optimization_result_text(result):
-    success = "yes" if result.success else "no"
-    headline = f"OptimizationResult, success={success}"
-    body = []
-
-    if result.cost is not None:
-        body.append(body_line("J*", f"{float(result.cost):.6g}"))
-    body.append(body_line("z*", preview_vector(result.z)))
-    if result.message:
-        message = result.message.strip()
-        if len(message) > 72:
-            message = message[:69] + "..."
-        body.append(body_line("message", message))
-    if result.solve_time_s is not None:
-        body.append(body_line("solve_time_s", f"{result.solve_time_s:g}"))
-
-    return format_inspect(headline, body)
-
-
-def program_text(program):
-    # A real cycle: optimizer imports this module
-    from minilink.optimization.optimizer import program_class
-
-    kind = program_class(program)
-    has_h = program.h is not None
-    has_g = program.g is not None
-    headline = f"MathematicalProgram, n_z={program.n_z}"
-    body = [
-        body_line("class", kind),
-        body_line("h", f"{'yes' if has_h else 'no'} (n={constraint_rows(program.h)})"),
-        body_line("g", f"{'yes' if has_g else 'no'} (n={constraint_rows(program.g)})"),
-        body_line("backend", program.backend),
-    ]
-
-    sides = []
-    if program.lower is not None:
-        sides.append("lower")
-    if program.upper is not None:
-        sides.append("upper")
-    if sides:
-        body.append(body_line("bounds", ", ".join(sides)))
-
-    return format_inspect(headline, body)
-
-
 def cost_text(cost):
     # A real cycle: costs imports inspect_text at module level
     from minilink.core.costs import QuadraticCost, ScaledCost, SumCost
@@ -405,24 +238,6 @@ def field_text(field):
     return cls
 
 
-def simulator_text(sim):
-    headline = f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_pts}"
-    body = [body_line("sys", inspect_inline(sim.sys))]
-
-    return format_inspect(headline, body)
-
-
-def constraint_rows(fn):
-    if fn is None:
-        return 0
-
-    n_out = getattr(fn, "n_out", None)
-    if n_out is not None:
-        return int(n_out)
-
-    return "?"
-
-
 def matrix_summary(matrix):
     values = np.asarray(matrix, dtype=float)
     if values.ndim != 2:
@@ -437,15 +252,6 @@ def matrix_summary(matrix):
     return f"({n}, {m})"
 
 
-def lti_latex():
-    return (
-        r"\begin{align*}"
-        r"\dot{x} &= A x + B u \\"
-        r"y &= C x + D u"
-        r"\end{align*}"
-    )
-
-
 def quadratic_cost_latex():
     return (
         r"\begin{align*}"
@@ -453,17 +259,3 @@ def quadratic_cost_latex():
         r"h(x) &= (x-\bar{x})^\top S (x-\bar{x})"
         r"\end{align*}"
     )
-
-
-def program_latex(program):
-    parts = [r"\min_{z} J(z)"]
-    if program.h is not None:
-        parts.append(r"\text{subject to } h(z) = 0")
-    if program.g is not None:
-        parts.append(r"g(z) \geq 0")
-    if program.lower is not None or program.upper is not None:
-        parts.append(r"\text{box bounds on } z")
-
-    body = r" \\ ".join(parts)
-
-    return rf"\begin{{align*}}{body}\end{{align*}}"
