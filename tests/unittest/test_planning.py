@@ -1955,6 +1955,19 @@ def test_polyline_sample_and_tangent_take_a_vector_of_arc_lengths():
         np.testing.assert_allclose(tangents[k], path.tangent(s_k), rtol=0, atol=1e-15)
 
 
+def test_the_paths_import_from_core_geometry_alone():
+    """The path names live on minilink.core.geometry; planning.spatial keeps the scene names."""
+    import minilink.core.geometry as geometry
+    import minilink.planning.spatial as spatial
+
+    paths = {"PolylinePath", "ReferencePath", "circuit_waypoints", "from_waypoints"}
+
+    assert paths <= set(geometry.__all__)
+    assert not paths & set(spatial.__all__)
+    assert not any(hasattr(spatial, name) for name in paths)
+    assert {"ReferenceTrack", "Scene", "mount"} <= set(spatial.__all__)
+
+
 def test_from_waypoints_default_is_polyline():
     path = from_waypoints([[0, 0], [1, 0], [1, 1]])
     assert isinstance(path, PolylinePath)

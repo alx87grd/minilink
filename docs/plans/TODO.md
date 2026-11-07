@@ -854,7 +854,8 @@ pillar names it.
   fields, grid, catalog
   `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
   plots and overlays under `graphical/` with lazy methods on `Scene` / `Track`;
-  `planning.spatial` re-exports then deletes in the same change as the call sites;
+  `planning.spatial` re-exports then deletes in the same change as the call sites (the path
+  names already left it, ruled 2026-11-07);
   the path-tracking laws take a Track once it moves. Done when the two UdeS racecar demos and the RRT forest demo
   use the catalog, `control` imports geometry with no planning import, and the suite is
   green. Glyph rename stays S30.
