@@ -287,7 +287,12 @@ class ReinforcementLearningPlanner(Planner):
         rolls the deterministic law out from the problem's start and scores it
         by Monte Carlo over ``n_trials`` draws of the problem. ``verbose``
         prints the environment's semantics and one line per learning iteration.
+        A step problem's law is scored by its face, ``problem.compile().run(policy)``:
+        ``evaluate=True`` on one is refused before any training.
         """
+        if evaluate:
+            require_continuous_to_evaluate(self.problem)
+
         # Train, then store the learned law as the planner's solution
         self.learn(n_timesteps, verbose=verbose)
         solution = self.solution(evaluate, n_trials)
@@ -594,7 +599,6 @@ class ReinforcementLearningPlanner(Planner):
 
         # The nominal rollout, and the Monte Carlo score over the problem's draws
         if evaluate:
-            require_continuous_to_evaluate(self.problem)
             trajectory = self.nominal_trajectory()
             evaluation = planner_evidence(
                 self,

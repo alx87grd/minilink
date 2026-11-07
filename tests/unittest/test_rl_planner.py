@@ -950,9 +950,12 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_face():
         np.abs(untrained[0][-1] - [5.0, 3.0])
     )
 
-    # Its score is its face's rollout, not the continuous evaluator's
+    # Its score is its face's rollout, not the continuous evaluator's: refused before
+    # any training
+    steps = planner.num_timesteps
     with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
         planner.solve(n_timesteps=256, evaluate=True)
+    assert planner.num_timesteps == steps
 
 
 def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():
