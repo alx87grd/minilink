@@ -135,6 +135,19 @@ concrete formatting, ordered by the cost of being wrong:
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots | `plot_cost_to_go`, `plot_control_law` | `plot_cost2go`, `plot_policy` |
 
+  **A naming pattern, not a hard rule (the maintainer, 2026-11-07): the controller is the block,
+  the policy the function.** Use it where it fits:
+  - a **policy** (or **control law**) is a pure function, `u = π(x, t)`: arrays in, arrays out,
+    no state (`solution.policy(x, t)`, the compiled face's `pv.command(z, x, t)`);
+  - a **controller** is the block, or the diagram of blocks, a loop closes on: it may carry a
+    state and several functions (a PID's integrator, an observer, the MPC box), wired with
+    `controller @ plant` (`solution.controller`, `planner.controller`).
+
+  A controller built on a static policy (a state feedback, a lookup table, a network) is almost
+  the same thing as its policy; the words still keep the two roles apart: the block for the
+  wiring, the policy or control law for the function. Class names may name the law a block
+  implements (`LookupPolicy`, `NeuralPolicy`, `StateFeedback`).
+
 ---
 
 ## 3. Where Does It Live?
