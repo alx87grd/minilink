@@ -96,7 +96,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k Δ`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `step_problems.py` and `step_face.py` (the step problem and the compiled step face), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes; **retires** into `core/geometry/`) |
+| `planning/` | `problems.py`, `step_problems.py` and `step_face.py` (the step problem and the compiled step face), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -1283,7 +1283,7 @@ the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to `(A, B, Q, R, S)` at the cost's `(x_bar, u_bar)`
 (`B` and `R` over the command port), then the algebraic Riccati equation for an
-infinite `tf`, the differential one swept from `S` for a finite `tf`. A discounted problem
+infinite horizon, the differential one swept from `S` over a finite horizon. A discounted problem
 (`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
 `A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
 unusual; the poles stay the plant's, `eig(A − B K)`. Its `RiccatiRecord` holds `K`, `P`, the
@@ -1295,8 +1295,10 @@ finite length is a finite horizon and `h` is charged at `t0 + horizon`; `+inf` o
 infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long to run
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
-The discount rate `rho` is the problem's, `problem.discount_rate`; planners convert it
-with `problem.discount_factor(dt)` (the per-tick `gamma` of DP and RL). `X` and `U` are hard
+The discount rate `rho` is the problem's, `problem.discount_rate`; value iteration and the
+RL planner read its per-tick `gamma` from the problem's step face, `e^{−ρ dt}` (a step
+problem's own `gamma`), and tabular learning from `problem.discount_factor(dt)`, the same
+number. `X` and `U` are hard
 constraints in every tool: a run that leaves them is a failure. **The failure switch**
 `penalize_failure` (a bool, default off: an evaluation reports the plain cost and the
 facts) adds the **failure cost** to a failed or missed run's `J`; `failure_cost` is that cost (a
@@ -1456,9 +1458,9 @@ source keeps the interpolation its planner states. Scoring a law is the problem 
   sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
 
 **The step face (`planning/step_face.py`):** `problem.discretize(dt, solver="rk4",
-substeps=1).compile()` is the problem's `StepFace` (one verb, one return type:
-`problem.compile(controller)` is always the controller's evaluator, and refuses no
-controller with this pointer): `transition(x, u, k, params)
+substeps=1).compile()` is the problem's `StepFace` (`compile` gives each problem its
+evaluated face: `problem.compile(controller)` is the controller's evaluator, and refuses
+no controller with this pointer; a step problem's `compile()` is its step face): `transition(x, u, k, params)
 -> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
 beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
 `N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
@@ -1767,7 +1769,7 @@ best-effort fallback (`return_best_effort`). The two swappable pieces are an inj
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
 `(t,x,u)`; `solve() → PlanningSolution` with a held (`interpolation="previous"`)
-`TrajectorySource` as policy and a `TreeSearchRecord`. `RRTStarPlanner` extends the attach step
+`TrajectorySource` as its controller and a `TreeSearchRecord`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until
