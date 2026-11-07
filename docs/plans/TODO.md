@@ -330,14 +330,14 @@ Design: [core-api-improvements.md](core-api-improvements.md), each proposal with
 and diff (from the core tutorials' review). Each is a core API change **[ask — core]**; one
 commit per proposal, its callers and DESIGN in the same change.
 
-- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go): `System(0, input_dim=,
+- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go; built on `v04-build`, in review: the row leaves at the merge): `System(0, input_dim=,
   output_dim=, y_dependencies=)` as `DynamicSystem` and `StepSystem` do, `y_dependencies`
   defaulting to `("u",)` on a static system with an input; the first argument `n` renamed
   `state_dim` in every constructor call (about 128 keyword sites, no alias), the attributes `n`,
   `m`, `p` unchanged. Done when the reproducer builds without `y_dependencies`, no `n=` keyword
   is left, `test_vocabulary.py` pins `state_dim`, and DESIGN §4 states the shortcut, its static
   default and the naming.
-- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract):
+- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract; built on `v04-build`, in review: the row leaves at the merge; the transfer-function compensator, `Gain` and `MLP` were found with the same defect and fixed with it):
   `evaluator.h(x, u, t, params)` on `Evaluator` and `DiscreteEvaluator`, the `"y"` port, empty
   when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
   port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
@@ -380,14 +380,14 @@ commit per proposal, its callers and DESIGN in the same change.
   moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
   `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
   been dropped.
-- [ ] **`refresh()` retired** (ruled 2026-11-07: removed): a block's state size is fixed once
+- [ ] **`refresh()` retired** (ruled 2026-11-07: removed; built on `v04-build`, in review: the row leaves at the merge): a block's state size is fixed once
   built (DESIGN §4, build versus run), the diagram's layout computed when blocks are added;
   `refresh()` goes from `System`, the diagram and the sampled views; the six test calls go
   (no-ops: a block's `x0` is a live view, checked on a continuous and a sampled loop), and the
   two tests that pinned it pin the live views instead. Done when no `refresh` is left and
   DESIGN's "Three owners of a start" drops its sentence.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5; ruled 2026-11-07, with §1.13's
-  root exports): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+  root exports; built on `v04-build`, in review: the row leaves at the merge): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
   `ScaledCost`, `SampledSystem`, `SampledDiagramSystem` on `minilink.core`; `QuadraticField` and
   `GridField` on the root. Done when they import from there, `test_teaching_surface.py` pins the
   two root names, and the tutorials' deep `minilink.core.fields` import and its allowlist entry

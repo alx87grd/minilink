@@ -279,3 +279,22 @@ Furthermore, `Field` and `QuadraticField` are exported from `minilink.core` but 
 ## CA-7. Target / operating-point naming
 
 Landed (2026-11-04): `x_bar` / `u_bar` / `y_bar` everywhere (RULES 2.7, `test_vocabulary.py`).
+
+---
+
+## Decisions taken during the automatic run (2026-11-07, branch `v04-build`)
+
+Choices the rulings left open, each taken as recommended; the maintainer may overturn any.
+
+- **CA-1, `StateSpaceSystem`:** its own keyword-only `n`, `m`, `p` became `state_dim`,
+  `input_dim`, `output_dim`, so every system constructor reads the same words (the catalog's
+  three mass-spring-damper plants and one test follow). The path-tracking project's vehicles
+  take `state_dim` in their own constructors too.
+- **CA-1, port order:** `System.__init__` creates the standard ports right after its port
+  tables, before the model defaults (`x0`, `params`, hints); `DynamicSystem` and `StepSystem`
+  pass their shortcuts through it instead of adding the ports after it.
+- **CA-2, the same defect elsewhere:** the test over every block found three more blocks whose
+  `h` disagreed with their `"y"` port: `Gain` and `MLP` (their `"y"` by `compute`, renamed `h`;
+  `MLP.compute` callers in the RL critics and policies follow) and the transfer-function
+  compensator (`Lead`, `ports="error"`): it has no `"y"` port, so its command moved to `ctl`
+  and its `h` is empty, as a `PID`'s.
