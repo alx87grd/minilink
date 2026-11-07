@@ -216,11 +216,8 @@ class TestDemoCheckManifests(unittest.TestCase):
             (flagship_runner, ["--demo", "mpc_minimal"], ["mpc_car_minimal"]),
             (
                 notebook_runner,
-                ["--notebook", "teaching_drone_ppo"],
-                [
-                    "teaching_courses_udes_gro860_drone_ppo",
-                    "teaching_topics_reinforcement_learning_drone_ppo",
-                ],
+                ["--notebook", "teaching_drone_pp"],
+                ["teaching_drone_ppo"],
             ),
             (
                 notebook_runner,

@@ -1521,7 +1521,7 @@ through the network, and the step model (`ev.step(x, u, t, params, dt=…)` with
 to the policy weights. Official demos: `examples/demos/rl/` (pendulum swing-up, cart-pole,
 drone, rocket); the tutorial chapter is
 `examples/tutorial/advanced/04_reinforcement_learning.ipynb`; native teaching
-notebooks are `pendulum_value_iteration_vs_lqr_vs_rl` and `drone_ppo`. The
+notebooks are GRO860's `pendulum_value_iteration_vs_lqr_vs_rl` and `drone_ppo`. The
 spatial scene names (`ReferenceTrack`, `from_waypoints`, `Scene`, `mount`,
 `car_outline`, `point_probe`, the shaping helpers, `TrackCorridorOverlay`,
 `plot_track`) are exported on the `minilink.planning` facade so track demos
