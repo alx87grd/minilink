@@ -176,7 +176,7 @@ class RRTStarPlanner(RRTPlanner):
         self.iterations = 0
         self.best_goal_cost = None
         self.history = []
-        report = self.search_report_of(**workflow)
+        report = self.build_search_report(**workflow)
 
         best_goal_node = None
         stale_extensions = 0

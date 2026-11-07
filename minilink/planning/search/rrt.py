@@ -173,7 +173,7 @@ class RRTPlanner(Planner):
         self.reached_goal = False
         self.solution_node = None
         self.iterations = 0
-        report = self.search_report_of(**workflow)
+        report = self.build_search_report(**workflow)
 
         for _ in range(self.max_nodes):
             # Sample a state, and extend the nearest node toward it
@@ -289,7 +289,7 @@ class RRTPlanner(Planner):
 
         return Xf
 
-    def search_report_of(
+    def build_search_report(
         self,
         *,
         callback=None,
