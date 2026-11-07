@@ -11,7 +11,11 @@ from minilink.planning.problems import (
     nominal_plant_params,
     require_cost,
 )
-from minilink.planning.step_problems import StepPlanningProblem, sampled_cost_bound
+from minilink.planning.step_problems import (
+    StepPlanningProblem,
+    require_no_period_on_ticks,
+    sampled_cost_bound,
+)
 
 ###############################################################################
 # Public API
@@ -104,6 +108,14 @@ class StepFace:
             tree["discount_rate"] = problem.discount_rate
 
         return tree
+
+    @property
+    def period(self) -> float:
+        """The length of one tick in the problem's time: ``dt`` (seconds), or ``1`` for a native problem's tick."""
+        if self.dt is None:
+            return 1.0
+
+        return float(self.dt)
 
     @property
     def X(self):
@@ -338,14 +350,24 @@ class StepFace:
         return np.stack(xs), np.stack(us), np.asarray(cs), J
 
 
-###############################################################################
-# Internal machinery
-###############################################################################
+def face_of(problem, dt=None, *, solver="rk4", substeps=1) -> StepFace:
+    """The problem's step face: a continuous problem's at ``dt`` on ``solver``, a step problem's own (it ticks on its own clock: no ``dt``)."""
+    if is_continuous(problem):
+        return StepFace(problem, dt=dt, solver=solver, substeps=substeps)
+
+    require_no_period_on_ticks(problem, dt)
+
+    return problem.compile()
 
 
 def is_continuous(problem) -> bool:
-    """Whether a problem is a continuous one (``PlanningProblem``), compiled at a period."""
+    """Whether a problem is a continuous one (``PlanningProblem``, a running cost ``g``, compiled at a period), not a step problem."""
     return isinstance(problem, PlanningProblem)
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def require_period(dt):

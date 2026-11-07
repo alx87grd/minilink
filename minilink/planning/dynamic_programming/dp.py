@@ -22,8 +22,8 @@ from minilink.planning.planner import (
 )
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_face import is_continuous
 from minilink.planning.step_problems import (
-    StepPlanningProblem,
     require_no_period_on_ticks,
 )
 
@@ -835,8 +835,7 @@ def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid
     if grid is None:
         # A step problem ticks on its own: its grid needs no dt, and takes none
         require_no_period_on_ticks(problem, dt)
-        native = isinstance(problem, StepPlanningProblem) and dt is None
-        if x_grid is None or u_grid is None or (dt is None and not native):
+        if x_grid is None or u_grid is None or (dt is None and is_continuous(problem)):
             raise ValueError(
                 "pass grid=StateSpaceGrid(...) or all of x_grid, u_grid, and dt"
             )
@@ -868,7 +867,7 @@ def tool_rate_of(problem, gamma, dt):
     ``γ = 1`` is ``ρ = 0``; ``γ = 0`` (one step counts) keeps the problem's
     rate, which an Euler step never reads inside its period.
     """
-    if gamma is None or not isinstance(problem, PlanningProblem):
+    if gamma is None or not is_continuous(problem):
         return None
     gamma = float(gamma)
     if gamma <= 0.0:

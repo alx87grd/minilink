@@ -132,6 +132,23 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
         StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]), t0=0.5)
 
 
+def test_one_face_of_every_problem_and_its_period():
+    from minilink.planning.step_face import face_of
+
+    # A continuous problem at dt, its discretization, and a native step problem's ticks
+    problem = swing_problem()
+    assert face_of(problem, 0.05).period == 0.05
+    assert face_of(problem.discretize(0.05)).period == 0.05
+    native = StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]))
+    assert face_of(native).period == 1.0 and face_of(native).dt is None
+
+    # A step problem ticks on its own clock; a continuous one needs its period
+    with pytest.raises(ValueError, match="own clock"):
+        face_of(native, 0.1)
+    with pytest.raises(ValueError, match="needs its period"):
+        face_of(problem)
+
+
 def test_the_state_only_step_is_the_transitions_state_on_both_faces():
     problem = swing_problem(t0=2.0)
     face = StepFace(problem, dt=0.05, solver="rk4", substeps=1)

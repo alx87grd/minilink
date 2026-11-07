@@ -45,7 +45,7 @@ from minilink.planning.evaluation import (
 )
 from minilink.planning.policies import require_feedback_roles
 from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
-from minilink.planning.step_face import StepFace
+from minilink.planning.step_face import face_of
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -702,7 +702,7 @@ def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
     n_steps = steps_of(horizon_of(nominal, tf), float(dt))
 
     # The face's step, the law on the grid, the command's slice of the plant input
-    face = StepFace(nominal, dt=float(dt), solver="rk4", substeps=1)
+    face = face_of(nominal, float(dt))
     t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
     law = held_law(policy, t)
     command = plant.get_input_port_slice(command_port(plant))

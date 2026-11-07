@@ -15,6 +15,7 @@ from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import controller_of, evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_face import is_continuous
 
 ###############################################################################
 # Public API
@@ -188,7 +189,7 @@ def require_solution(planner) -> PlanningSolution:
 
 def require_continuous_to_evaluate(problem):
     """Refuse the evaluator's score on a step problem: its score is its face's rollout."""
-    if not isinstance(problem, PlanningProblem):
+    if not is_continuous(problem):
         raise NotImplementedError(
             "solve(evaluate=True) scores a continuous problem's closed loop; score a "
             "law on a step problem with its face, problem.compile().run(policy)"

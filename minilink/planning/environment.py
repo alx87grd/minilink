@@ -18,9 +18,8 @@ from minilink.core.distributions import child_seed
 from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
 from minilink.core.wiring import WiredDiagramMixin
-from minilink.planning.problems import PlanningProblem, require_cost
-from minilink.planning.step_face import StepFace
-from minilink.planning.step_problems import require_no_period_on_ticks
+from minilink.planning.problems import require_cost
+from minilink.planning.step_face import face_of, is_continuous
 
 ###############################################################################
 # Public API
@@ -115,9 +114,11 @@ class RolloutEnvironment:
         require_step_knobs(solver, substeps)
         self.solver = solver
         self.substeps = int(substeps)
-        self.face = face_of(problem, dt, solver, self.substeps)
+        if dt is None and is_continuous(problem):
+            dt = DEFAULT_PERIOD
+        self.face = face_of(problem, dt, solver=solver, substeps=self.substeps)
         self.face_params = self.face.params
-        self.dt = 1.0 if self.face.dt is None else float(self.face.dt)
+        self.dt = self.face.period
         self.t0 = float(problem.t0)
 
         # Horizon: a finite one ends after the face's N periods, an infinite one runs
@@ -342,22 +343,6 @@ class RolloutEnvironment:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def is_continuous(problem) -> bool:
-    """Whether the problem is a continuous one, with a running cost ``g`` (not a step problem)."""
-    return isinstance(problem, PlanningProblem)
-
-
-def face_of(problem, dt, solver, substeps):
-    """The problem's step face: a continuous problem's at ``dt`` (default :data:`DEFAULT_PERIOD`), a step problem's own (no ``dt``)."""
-    if is_continuous(problem):
-        dt = DEFAULT_PERIOD if dt is None else float(dt)
-        return StepFace(problem, dt=dt, solver=solver, substeps=substeps)
-
-    require_no_period_on_ticks(problem, dt)
-
-    return problem.compile()
 
 
 def episode_time_of(problem, face, dt, episode_length):

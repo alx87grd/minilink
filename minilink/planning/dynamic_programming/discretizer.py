@@ -15,6 +15,7 @@ from minilink.planning.dynamic_programming.progress import (
     progress,
 )
 from minilink.planning.problems import PlanningProblem
+from minilink.planning.step_face import face_of, is_continuous
 
 #: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
@@ -90,8 +91,8 @@ class StateSpaceGrid:
         self.sys = problem.sys
         self.n = int(self.sys.n)
         self.m = int(self.sys.m)
-        self.face = face_of(problem, dt, solver)
-        self.dt = 1.0 if self.face.dt is None else float(self.face.dt)
+        self.face = face_of(problem, dt, solver=solver)
+        self.dt = self.face.period
         self.solver = solver
 
         # Levels per axis, and the box they span
@@ -142,7 +143,7 @@ class StateSpaceGrid:
 
     def rebuilt_on(self, problem) -> "StateSpaceGrid":
         """The same grid on ``problem``: its shapes, its period (none for a step problem, on its own clock), its scheme and its table options."""
-        dt = self.dt if isinstance(problem, PlanningProblem) else None
+        dt = self.dt if is_continuous(problem) else None
 
         return StateSpaceGrid(
             problem,
@@ -625,18 +626,6 @@ class StateSpaceGrid:
     def default_anchor(self):
         """The problem's goal point (``Xf``'s point, else the cost's ``x_bar``, else the start)."""
         return self.problem.goal_point()
-
-
-def face_of(problem, dt, solver):
-    """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
-    # Lazy import: the step problem and the face load with the first grid
-    from minilink.planning.step_face import StepFace
-    from minilink.planning.step_problems import StepPlanningProblem
-
-    if isinstance(problem, StepPlanningProblem):
-        return problem.compile()
-
-    return StepFace(problem, dt=dt, solver=solver, substeps=1)
 
 
 if __name__ == "__main__":

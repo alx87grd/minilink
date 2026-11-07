@@ -22,8 +22,9 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
-from minilink.planning.problems import PlanningProblem, require_cost
+from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_face import is_continuous
 
 ###############################################################################
 # Public API
@@ -628,7 +629,7 @@ class UCB:
 
 def require_continuous_problem(problem):
     """Refuse a step problem: the learner rounds a continuous plant's states to the grid; a step problem's table is value iteration's."""
-    if not isinstance(problem, PlanningProblem):
+    if not is_continuous(problem):
         raise NotImplementedError(
             "TabularLearningPlanner learns on a continuous problem's grid; solve a "
             "step problem's table with DynamicProgrammingPlanner(problem, x_grid=, u_grid=)"

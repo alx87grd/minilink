@@ -33,13 +33,14 @@ from minilink.learning.reinforcement_learning.policy import (
     GaussianHead,
     SquashedGaussianHead,
 )
-from minilink.planning.environment import RolloutEnvironment, is_continuous
+from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import (
     Planner,
     planner_evidence,
     require_continuous_to_evaluate,
 )
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_face import is_continuous
 
 #: The update rule of each name ``method=`` accepts.
 ALGORITHMS = {
