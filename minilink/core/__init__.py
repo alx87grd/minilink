@@ -15,6 +15,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepSystem": ("minilink.core.discrete.step_system", "StepSystem"),
     "DiagramSystem": ("minilink.core.diagram", "DiagramSystem"),
     "StepDiagramSystem": ("minilink.core.discrete.step_diagram", "StepDiagramSystem"),
+    "SampledSystem": ("minilink.core.discrete.sampled_system", "SampledSystem"),
+    "SampledDiagramSystem": (
+        "minilink.core.discrete.sampled_diagram",
+        "SampledDiagramSystem",
+    ),
     # Data
     "Trajectory": ("minilink.core.trajectory", "Trajectory"),
     # Costs
@@ -23,10 +28,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "StepCost": ("minilink.core.costs", "StepCost"),
     "SampledCost": ("minilink.core.costs", "SampledCost"),
     "TimeCost": ("minilink.core.costs", "TimeCost"),
+    "SumCost": ("minilink.core.costs", "SumCost"),
+    "ScaledCost": ("minilink.core.costs", "ScaledCost"),
     # Fields
     "Field": ("minilink.core.fields", "Field"),
     "QuadraticField": ("minilink.core.fields", "QuadraticField"),
     "EllipsoidSet": ("minilink.core.fields", "EllipsoidSet"),
+    "MarginField": ("minilink.core.fields", "MarginField"),
+    "GridField": ("minilink.core.fields", "GridField"),
     # Sets
     "Set": ("minilink.core.sets", "Set"),
     "InputSet": ("minilink.core.sets", "InputSet"),
@@ -34,6 +43,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
     "BallSet": ("minilink.core.sets", "BallSet"),
     "SingletonSet": ("minilink.core.sets", "SingletonSet"),
+    "CallableSet": ("minilink.core.sets", "CallableSet"),
+    "IntersectionSet": ("minilink.core.sets", "IntersectionSet"),
     # Distributions
     "Distribution": ("minilink.core.distributions", "Distribution"),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),

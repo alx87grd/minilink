@@ -31,6 +31,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "QuadraticCost": ("minilink.core.costs", "QuadraticCost"),
     "BoxSet": ("minilink.core.sets", "BoxSet"),
     "BoxInputSet": ("minilink.core.sets", "BoxInputSet"),
+    "QuadraticField": ("minilink.core.fields", "QuadraticField"),
+    "GridField": ("minilink.core.fields", "GridField"),
     # Blocks
     "Integrator": ("minilink.blocks.basic", "Integrator"),
     "Step": ("minilink.blocks.sources", "Step"),

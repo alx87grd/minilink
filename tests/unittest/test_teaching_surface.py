@@ -48,6 +48,8 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Evaluation",
         "Gaussian",
         "Uniform",
+        "QuadraticField",
+        "GridField",
     ),
     "minilink.estimation": ("StateObserver", "kalman", "luenberger"),
     "minilink.core": (
@@ -64,6 +66,14 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "StepDiagramSystem",
         "Gaussian",
         "Uniform",
+        "MarginField",
+        "GridField",
+        "CallableSet",
+        "IntersectionSet",
+        "SumCost",
+        "ScaledCost",
+        "SampledSystem",
+        "SampledDiagramSystem",
     ),
     "minilink.blocks": (
         "Integrator",
