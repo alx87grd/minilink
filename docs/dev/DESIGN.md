@@ -1615,8 +1615,10 @@ knobs and RRT*'s `history_stride`), keywords that change what is shown, never wh
 takes the first three kinds; the workflow is a keyword of the verb, `solve` (and `solve_steps`
 where it exists), as on `Optimizer.solve` and `compute_trajectory`, and travels as arguments
 down to where it is read, never as planner state. A planner rebuilt for a sweep (`planner_at`,
-`build_kwargs`) inherits no display: `solve(params=…)` hands its own workflow keywords to the
-rebuilt planner's `solve`. The compiled face's `pv.solve(params, z0)` takes none: it stays pure,
+`build_kwargs`, `rebuilt_on`) inherits no display: `solve(params=…)` hands its own workflow keywords to the
+rebuilt planner's `solve`. Value iteration rebuilds its grid with the grid's own options
+(`StateSpaceGrid.rebuilt_on`: `precompute`, `precompute_backend` and the grid's build report),
+as `gamma=` does. The compiled face's `pv.solve(params, z0)` takes none: it stays pure,
 silent and free of plots. There is no settings record on a planner. One exception:
 the RL planner's `params` is a report, and its `solve` trains without `params=` (TODO §6).
 

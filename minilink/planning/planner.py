@@ -96,6 +96,10 @@ class Planner(ABC):
         """The keywords that rebuild this planner on another problem: its structure and the numbers it was given, never a display (the workflow is the verb's)."""
         raise NotImplementedError(f"{type(self).__name__} has no build_kwargs")
 
+    def rebuilt_on(self, problem, kwargs) -> "Planner":
+        """A planner of this kind on ``problem`` from ``kwargs`` (:meth:`build_kwargs`, the changed numbers in): what :func:`planner_at` solves with."""
+        return type(self)(problem, **kwargs)
+
     # Solve entries: each family overrides its own
 
     def solve(self, **kwargs):
@@ -317,7 +321,7 @@ def planner_at(planner, params) -> "Planner":
     if seed is not None:
         kwargs["seed"] = seed
 
-    return type(planner)(problem, **kwargs)
+    return planner.rebuilt_on(problem, kwargs)
 
 
 def given_numbers(**numbers) -> dict:

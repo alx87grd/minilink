@@ -290,7 +290,7 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_refuses_the_eval
     vi = DynamicProgrammingPlanner(
         grid_world(gamma=0.9), x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
     )
-    assert vi.build_kwargs()["dt"] is None
+    assert "dt" not in vi.build_kwargs()
 
     # At a tree: a goal moved and another discount, the planner's problem unchanged
     tree = copy.deepcopy(vi.params)

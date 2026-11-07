@@ -121,7 +121,8 @@ class StateSpaceGrid:
         self.nodes_n = self.states.shape[0]
         self.actions_n = self.inputs.shape[0]
 
-        # Table build options
+        # Table build options, as given (a rebuilt grid keeps them)
+        self.precompute = bool(precompute)
         self.precompute_backend = precompute_backend
         self.verbose = bool(verbose)
         self._jax_transition = False
@@ -138,6 +139,21 @@ class StateSpaceGrid:
             self.x_next, self.action_ok, self.x_next_ok = self.build_transition(0.0)
             if precompute_backend == BACKEND_JAX:
                 self._jax_transition = True
+
+    def rebuilt_on(self, problem) -> "StateSpaceGrid":
+        """The same grid on ``problem``: its shapes, its period (none for a step problem, on its own clock), its scheme and its table options."""
+        dt = self.dt if isinstance(problem, PlanningProblem) else None
+
+        return StateSpaceGrid(
+            problem,
+            x_grid_shape=self.x_grid_shape,
+            u_grid_shape=self.u_grid_shape,
+            dt=dt,
+            solver=self.solver,
+            precompute=self.precompute,
+            precompute_backend=self.precompute_backend,
+            verbose=self.verbose,
+        )
 
     @property
     def X(self) -> BoxSet:

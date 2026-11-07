@@ -285,13 +285,8 @@ class DynamicProgrammingPlanner(Planner):
     # Value iteration
 
     def build_kwargs(self) -> dict:
-        """The keywords that rebuild this planner on another problem: the grid's shape and period (none for a step problem, on its own clock), the engine, the stopping rules, the numbers it was given."""
-        grid = self.grid
+        """The keywords that rebuild this planner on another problem, beside its grid (:meth:`rebuilt_on`): the engine, the stopping rules, the numbers it was given."""
         kwargs = dict(
-            x_grid=grid.x_grid_shape,
-            u_grid=grid.u_grid_shape,
-            dt=grid.dt if isinstance(self.problem, PlanningProblem) else None,
-            solver=grid.solver,
             backend=self.backend,
             tol=self.tol,
             max_iterations=self.max_iterations,
@@ -300,6 +295,12 @@ class DynamicProgrammingPlanner(Planner):
         )
 
         return {**kwargs, **self.given}
+
+    def rebuilt_on(self, problem, kwargs) -> DynamicProgrammingPlanner:
+        """This planner on ``problem``: its grid rebuilt there with the same shapes, period, scheme and table options, and ``kwargs``."""
+        grid = self.grid.rebuilt_on(problem)
+
+        return type(self)(problem, grid=grid, **kwargs)
 
     def value_iteration(
         self,
@@ -882,18 +883,12 @@ def tool_rate_of(problem, gamma, dt):
 
 
 def grid_on_rate(grid, rate):
-    """The grid itself, or the same grid on a copy of its problem at the rate ``rate`` (``None``: unchanged)."""
+    """The grid itself, or the same grid (its table options too) on a copy of its problem at the rate ``rate`` (``None``: unchanged)."""
     if rate is None:
         return grid
     problem = grid.problem.replace(discount_rate=rate)
 
-    return StateSpaceGrid(
-        problem,
-        x_grid_shape=grid.x_grid_shape,
-        u_grid_shape=grid.u_grid_shape,
-        dt=grid.dt,
-        solver=grid.solver,
-    )
+    return grid.rebuilt_on(problem)
 
 
 def require_dp_backend(backend):

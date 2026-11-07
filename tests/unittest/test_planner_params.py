@@ -1,5 +1,7 @@
 """Every planner's numbers: one tree, overridden per solve (DESIGN §6, the four kinds of argument)."""
 
+from unittest import mock
+
 import numpy as np
 import pytest
 
@@ -202,3 +204,26 @@ def test_a_verbose_solve_at_a_tree_reports_once_from_the_verb(capsys):
     assert built.call_count == 1
     assert not set(built.call_args.kwargs) & WORKFLOW
     assert capsys.readouterr().out.count("Bellman equation solved!") == 1
+
+
+def test_the_grids_table_options_survive_a_discount_and_a_tree():
+    """A grid built with precompute=False keeps it through gamma= and solve(params=)."""
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    problem = regulation()
+    grid = StateSpaceGrid(
+        problem, x_grid_shape=(9, 9), u_grid_shape=(3,), dt=0.1, precompute=False
+    )
+    planner = DynamicProgrammingPlanner(problem, grid=grid, gamma=0.9, max_iterations=5)
+    assert planner.grid is not grid and not planner.grid.precompute
+
+    with mock.patch.object(
+        DynamicProgrammingPlanner,
+        "__init__",
+        autospec=True,
+        side_effect=DynamicProgrammingPlanner.__init__,
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": {"gamma": 0.8}}))
+    rebuilt = built.call_args.args[0]
+    assert rebuilt.grid.precompute is False and rebuilt.grid.precomputed is False
+    assert rebuilt.gamma == 0.8
