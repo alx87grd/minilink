@@ -13,7 +13,6 @@ from minilink.control.neural import NeuralPolicy
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.roles import command_port
 from minilink.core.sets import BoxSet
-from minilink.core.trajectory import Trajectory
 from minilink.learning.reinforcement_learning.algorithms import (
     PPO,
     REINFORCE,
@@ -27,18 +26,18 @@ from minilink.learning.reinforcement_learning.collect import (
     reset_carry,
     rollout,
 )
-from minilink.learning.reinforcement_learning.critics import QFunction, ValueFunction
+from minilink.learning.reinforcement_learning.critics import (
+    CriticField,
+    QFunction,
+    ValueFunction,
+)
 from minilink.learning.reinforcement_learning.policy import (
     ExplorationPolicy,
     GaussianHead,
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.planner import (
-    Planner,
-    planner_evidence,
-    require_continuous_to_evaluate,
-)
+from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_face import is_continuous
 
@@ -258,9 +257,6 @@ class ReinforcementLearningPlanner(Planner):
             lambda theta, x: self.actor.action(x, {"mlp": theta["mlp"]})
         )
 
-        # The law's rollouts, one jitted scan per number of periods and source draw
-        self.rollout_forms = {}
-
     @property
     def dt(self):
         """The control period of the learned law: the environment's (a native step problem's tick is 1)."""
@@ -289,15 +285,11 @@ class ReinforcementLearningPlanner(Planner):
         Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
 
         The solver record carries the training facts. ``evaluate=True`` also
-        rolls the deterministic law out from the problem's start and scores it
-        by Monte Carlo over ``n_trials`` draws of the problem. ``verbose``
+        scores the deterministic law, as it is handed out, by Monte Carlo over
+        ``n_trials`` draws of the problem (a continuous problem's on the
+        evaluator's automatic step, a step problem's on its face). ``verbose``
         prints the environment's semantics and one line per learning iteration.
-        A step problem's law is scored by its face, ``problem.compile().run(policy)``:
-        ``evaluate=True`` on one is refused before any training.
         """
-        if evaluate:
-            require_continuous_to_evaluate(self.problem)
-
         # Train, then store the learned law as the planner's solution
         self.learn(n_timesteps, verbose=verbose)
         solution = self.solution(evaluate, n_trials)
@@ -384,10 +376,6 @@ class ReinforcementLearningPlanner(Planner):
         u = np.asarray(u)
 
         return u, None
-
-    def nominal_trajectory(self, tf=None) -> Trajectory:
-        """The learned law from the problem's start, with nominal parameters and disturbances."""
-        return self.rollout_law(self.problem.x0, tf)
 
     # Plots
 
@@ -598,37 +586,29 @@ class ReinforcementLearningPlanner(Planner):
         )
 
     def solution(self, evaluate, n_trials) -> PlanningSolution:
-        """The learned law with its training record; rolled out and scored when asked."""
-        trajectory = None
-        evaluation = None
+        """
+        The learned law as a solution: a copy of the law at its weights when solved, its training record, the critic's cost-to-go.
 
-        # The nominal rollout, and the Monte Carlo score over the problem's draws
-        if evaluate:
-            trajectory = self.nominal_trajectory()
-            evaluation = planner_evidence(
-                self,
-                self.actor,
-                dt=self.dt,
-                n_trials=n_trials,
-                tf=self.env.tf,
-                backend="jax",
-            )
-
-        return self.learned_solution(trajectory, evaluation)
-
-    def learned_solution(self, trajectory, evaluation) -> PlanningSolution:
-        """The learned law as a solution: a copy of the law at its weights when solved (training again moves only the planner's own), its training record, the rollout and score given, the critic's cost-to-go."""
+        Training again moves only the planner's own law. With ``evaluate``, the
+        copy handed out is scored, as it is, by Monte Carlo over the problem's draws.
+        """
         record = self.training_record()
         cost_to_go = self.critic_cost_to_go()
         controller = snapshot_of(self.actor)
+
+        # The Monte Carlo score of the law handed out, over the problem's draws
+        evaluation = None
+        if evaluate:
+            evaluation = planner_evidence(
+                self, controller, n_trials=n_trials, tf=self.env.tf, backend="jax"
+            )
 
         return PlanningSolution(
             problem=self.problem,
             controller=controller,
             record=record,
-            trajectory=trajectory,
-            evaluation=evaluation,
             cost_to_go=cost_to_go,
+            evaluation=evaluation,
         )
 
     def training_record(self) -> "ReinforcementLearningRecord":
@@ -664,7 +644,7 @@ class ReinforcementLearningPlanner(Planner):
         )
 
     def critic_cost_to_go(self):
-        """``J(x) = -V_w(x)`` from the critic, only when it estimates the problem's own discount; else ``None``."""
+        """The critic's field ``J(x) = −V_w(x)`` at its current weights, only when it estimates the problem's own discount; else ``None``."""
         # Only a state-value critic trained on the problem's own discount estimates J
         if self.algorithm.critic_kind != "V":
             return None
@@ -672,58 +652,9 @@ class ReinforcementLearningPlanner(Planner):
         if self.gamma != self.env.face.gamma:
             return None
 
-        jnp = require_jax_numpy()
-
-        critic = self.critic
         w = self.algorithm.params(self.train_state)["critic"]
 
-        # J(x) = −V_w(x)
-        def cost_to_go(x):
-            J = -float(critic.value(w, jnp.asarray(x, dtype=float)))
-            return J
-
-        return cost_to_go
-
-    def rollout_law(self, x0, tf=None, key=None) -> Trajectory:
-        """The deterministic law on the training grid, input held per period; disturbances drawn only with a ``key``."""
-        jax = require_jax()
-        jnp = require_jax_numpy()
-
-        env = self.env
-        pi = self.action_jit
-        theta = self.algorithm.params(self.train_state)["policy"]
-
-        # N = t_f / dt control periods, over the episode unless tf is given
-        n_steps = int(round((env.tf if tf is None else float(tf)) / env.dt))
-
-        # The episode's sources: their seeds drawn only with a key, the plant nominal
-        sources = None if key is None else env.source_seeds(key)
-
-        # The N periods from x0 at t0, one jitted scan per (N, sources drawn)
-        x0 = jnp.asarray(x0, dtype=float)
-        t0 = env.t0
-        form = (n_steps, sources is None)
-        if form not in self.rollout_forms:
-
-            def rollout(theta, x0, sources):
-                # Closed loop on the grid: u_k = π(x_k), then one control period of the plant
-                def body(carry, _):
-                    x, t = carry
-                    u = pi(theta, x)
-                    x_next, t_next, _, _, _ = env.step(x, t, u, None, sources)
-                    return (x_next, t_next), (x, u)
-
-                return jax.lax.scan(body, (x0, t0), None, length=n_steps)
-
-            self.rollout_forms[form] = jax.jit(rollout)
-        (x_end, _), (xs, us) = self.rollout_forms[form](theta, x0, sources)
-
-        # N + 1 samples: the final state appended, the last input held at it
-        xs = np.concatenate([np.asarray(xs), np.asarray(x_end)[None]])
-        us = np.concatenate([np.asarray(us), np.asarray(us)[-1:]])
-        t = t0 + env.dt * np.arange(n_steps + 1)
-
-        return Trajectory(t=t, x=xs.T, u=us.T)
+        return CriticField(self.critic, w)
 
 
 @dataclass(frozen=True)

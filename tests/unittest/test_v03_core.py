@@ -606,19 +606,23 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         J_env += face.gamma**k * -float(reward)
     assert bool(terminated)
 
-    # One J, the planner's own score among them (the law held over each period): the
-    # environment's on the face's model to the bit; the judge integrates the plant at
-    # the continuous simulator's step, the face in one RK4 step a period
-    J_planner = float(np.squeeze(solution.evaluation.J))
-    assert J_judge == J_planner
+    # One J of the law held over each period: the environment's on the face's model
+    # to the bit; the judge integrates the plant at the continuous simulator's step,
+    # the face in one RK4 step a period
     np.testing.assert_allclose(J_env, J_face, rtol=1e-14, atol=0.0)
     np.testing.assert_allclose(J_judge, J_face, rtol=1e-3)
     J_stepped = problem.compile(law % dt, substeps=1, backend="numpy").evaluate()
     np.testing.assert_allclose(J_stepped.objective, J_face, rtol=1e-14, atol=0.0)
 
-    # The planner's evidence is the same held loop on the face
-    evidence = vi.nominal_trajectory()
-    np.testing.assert_array_equal(evidence.x.T, face.run(policy)[0])
+    # The held loop on the face's step runs the face's own states
+    held = problem.compile(law % dt, substeps=1, backend="numpy").trajectory()
+    np.testing.assert_array_equal(held.of("plant").x.T, face.run(policy)[0])
+
+    # The planner's own score is the law it hands out, as it is: the continuous
+    # loop on the evaluator's automatic step, a different controller than the held one
+    J_planner = float(np.squeeze(solution.evaluation.J))
+    assert J_planner == float(problem.compile(law).evaluate().objective)
+    np.testing.assert_allclose(J_planner, J_face, rtol=1e-2)
 
 
 # Script 5
@@ -788,7 +792,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     assert J_ended < 0.1 * J_short
 
 
-def test_a_planners_evidence_scores_on_the_faces_own_sum():
+def test_a_held_loops_run_scores_on_the_faces_own_sum():
     from minilink.planning import DynamicProgrammingPlanner
     from minilink.planning.evaluation import evaluate_trajectory
 
@@ -808,8 +812,9 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
-    # The evidence carries the running cost: its score is J = Σ γᵏ c_k + γᴺ h
-    evidence = vi.nominal_trajectory()
+    # The law held over each period on the face's own step: the run carries the
+    # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
+    held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
     J_face = problem.discretize(0.1).compile().run(policy)[3]
-    J = float(np.squeeze(evaluate_trajectory(problem, evidence).cost))
+    J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
     np.testing.assert_allclose(J, J_face, rtol=1e-12)

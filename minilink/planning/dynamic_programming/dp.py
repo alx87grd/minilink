@@ -11,13 +11,11 @@ from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
-from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
     given_numbers,
     planner_at,
     planner_evidence,
-    require_continuous_to_evaluate,
     require_solution,
 )
 from minilink.planning.problems import PlanningProblem, require_cost
@@ -194,17 +192,14 @@ class DynamicProgrammingPlanner(Planner):
         (a change per sweep, not an error bound on ``J``), or after
         ``max_iterations`` sweeps; its controller is the greedy lookup table and its
         ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
-        also rolls the law out from the problem's start and scores it over the
-        problem's draws (a step problem's law is scored by its face,
-        ``problem.compile().run(policy)``). ``params`` (the complete tree of :attr:`params`, a copy
+        also scores the controller, as it is, over the problem's draws (a
+        continuous problem's on the evaluator's automatic step, a step
+        problem's on its face). ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
         this one unchanged. ``verbose`` prints the table builds and the sweeps;
         ``record_history`` keeps ``(t, J, pi)`` per sweep in the tables, for
         the animations.
         """
-        if evaluate:
-            require_continuous_to_evaluate(self.problem)
-
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
@@ -261,9 +256,6 @@ class DynamicProgrammingPlanner(Planner):
         record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
         every stage instead. ``verbose`` and ``record_history`` as for :meth:`solve`.
         """
-        if evaluate:
-            require_continuous_to_evaluate(self.problem)
-
         # Exactly n backward sweeps from the terminal cost
         result = self.value_iteration(
             int(n), stop_on_tol=False, verbose=verbose, record_history=record_history
@@ -579,13 +571,6 @@ class DynamicProgrammingPlanner(Planner):
 
     # Rollout, cleanup and plots
 
-    def nominal_trajectory(self, tf=None, *, solution=None):
-        """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
-        solution = require_solution(self) if solution is None else solution
-        return nominal_trajectory(
-            self.problem, solution.controller, dt=self.grid.dt, tf=tf
-        )
-
     def clean_infeasible_set(
         self, tol: float = 1.0, *, tables=None
     ) -> DynamicProgrammingResult:
@@ -659,10 +644,9 @@ class DynamicProgrammingPlanner(Planner):
 
         Cleans the infeasible cells, builds the greedy lookup law (per stage in
         the ``"finite"`` mode), records how the sweeps ended with the tables
-        themselves, optionally rolls the law out, and stores the solution.
+        themselves, optionally scores the law, and stores the solution.
         """
         tol = float(self.tol)
-        dt = self.grid.dt
 
         # Pin the saturated cells to the penalty, before the law is built from them
         if self.clean_infeasible:
@@ -691,15 +675,14 @@ class DynamicProgrammingPlanner(Planner):
             tables=result,
         )
 
-        # Optionally, roll the law out from the problem's start and score it over
-        # its draws
-        trajectory = None
+        # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
         if evaluate:
-            trajectory = nominal_trajectory(self.problem, policy, dt=dt)
-            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
+            evaluation = planner_evidence(
+                self, policy, n_trials=n_trials, backend="auto"
+            )
 
-        # The solution: the law, the record, the rollout, and the cost-to-go as a field
+        # The solution: the law, the record, the score, and the cost-to-go as a field
         # on the grid, read as the planner's options say, the failure cost past the
         # grid (the price the sweeps give to leaving it)
         outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
@@ -713,7 +696,11 @@ class DynamicProgrammingPlanner(Planner):
                 J_stages, t_stages, method=self.interpolation, outside=outside
             )
         solution = PlanningSolution(
-            self.problem, policy, record, trajectory, evaluation, cost_to_go
+            problem=self.problem,
+            controller=policy,
+            record=record,
+            cost_to_go=cost_to_go,
+            evaluation=evaluation,
         )
 
         return self.store_solution(solution)

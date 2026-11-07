@@ -1,4 +1,4 @@
-"""One result for every planner: the policy reproduces the trajectory, and the evaluation is shared."""
+"""One result for every planner: the controller handed out is the one scored and drawn, and the evaluation is shared."""
 
 import numpy as np
 import pytest
@@ -6,7 +6,6 @@ import pytest
 from minilink import DynamicProgrammingPlanner, Pendulum, PlanningProblem, QuadraticCost
 from minilink.blocks import TrajectorySource
 from minilink.core.sets import SingletonSet
-from minilink.core.trajectory import Trajectory
 from minilink.dynamics.catalog.equations import DoubleIntegrator
 from minilink.learning.reinforcement_learning import TabularLearningPlanner
 from minilink.planning import (
@@ -14,8 +13,6 @@ from minilink.planning import (
     Uniform,
     evaluate,
 )
-from minilink.planning.evaluator import held_law, nominal_trajectory
-from minilink.planning.planner import solution_trajectory_of
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -195,12 +192,15 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
     assert solution.open_loop and solution.controller.interpolation == "previous"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
-    law = held_law(solution.controller, planned.t)
+
+    def law(x, t):
+        return np.asarray(solution.controller.h(np.zeros(0), np.zeros(0), t))
+
     x_hand = held_input_rollout(problem.sys, law, planned.t, planned.x[:, 0])
     np.testing.assert_allclose(x_hand, planned.x, atol=1e-8)
 
 
-# --- feedback planners: the rollout is the held-input closed loop on the grid ---
+# --- feedback planners: the law handed out is the law scored and drawn ---
 
 
 def double_integrator_problem():
@@ -222,7 +222,9 @@ def double_integrator_problem():
 
 
 @pytest.mark.parametrize("make", ["dp", "tabular"])
-def test_grid_policies_roll_out_as_held_input_closed_loops(make):
+def test_grid_laws_are_scored_and_drawn_as_handed_out(make):
+    from minilink.planning.results import drawn_trajectory_of
+
     problem = double_integrator_problem()
     grid = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
     if make == "dp":
@@ -233,20 +235,43 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
             problem, gamma=0.9, solver="euler", seed=0, **grid
         )
         solution = planner.solve(n_episodes=300, evaluate=True)
-    assert not solution.open_loop and solution.evaluation.n_trials == 1
-    planned = solution.trajectory
 
-    def law(x, t):
-        return solution.controller.action(x)
+    # A feedback law: no plan, the controller handed out as it is, a lookup block
+    assert not solution.open_loop and solution.trajectory is None
+    assert solution.controller is planner.controller
+    assert solution.evaluation.n_trials == 1
 
-    x_hand = held_input_rollout(problem.sys, law, planned.t, problem.x0)
-    np.testing.assert_allclose(planned.x, x_hand, atol=1e-10)
-    # the same rollout is what plot_trajectory draws, and the cost-to-go is the planner's table
-    np.testing.assert_array_equal(
-        solution_trajectory_of(planner).x, solution.trajectory.x
-    )
+    # The score is the controller's continuous loop on the evaluator's automatic step
+    alone = evaluate(problem, solution.controller)
+    np.testing.assert_array_equal(solution.evaluation.J, alone.J)
+
+    # The views draw that loop's run from the start, the plant's own run
+    run = problem.compile(solution.controller).trajectory().of("plant")
+    np.testing.assert_array_equal(drawn_trajectory_of(solution).x, np.asarray(run.x))
+    np.testing.assert_array_equal(drawn_trajectory_of(solution).x[:, 0], problem.x0)
     assert solution.cost_to_go(problem.x0) == planner.cost_to_go(problem.x0)
     assert str(solution.evaluation).startswith("J = ")
+
+
+def test_value_iteration_scores_the_law_it_hands_out_continuously():
+    """solve(evaluate=True), evaluate(problem, controller) and compare agree: no hold on dt."""
+    from minilink.planning import compare
+
+    problem = pendulum_problem().replace(Xf=None)
+    vi = DynamicProgrammingPlanner(problem, x_grid=(41, 41), u_grid=(5,), dt=0.1)
+    solution = vi.solve(evaluate=True)
+
+    # The three scores of the law handed out are one number
+    alone = evaluate(problem, solution.controller)
+    raced = compare(problem, VI=solution).evaluations["VI"]
+    np.testing.assert_array_equal(solution.evaluation.J, alone.J)
+    np.testing.assert_array_equal(solution.evaluation.J, raced.J)
+
+    # The continuous law on the automatic step (dt = 2 / 45 s here), not the law
+    # held over each period of the grid, a different controller with its own score
+    held = evaluate(problem, solution.controller % 0.1)
+    np.testing.assert_allclose(solution.evaluation.J, [23.37795258655731], rtol=1e-9)
+    np.testing.assert_allclose(held.J, [23.36262222847119], rtol=1e-9)
 
 
 def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
@@ -264,7 +289,9 @@ def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws
     assert all(np.all(np.isfinite(report.J)) for report in scored)
 
 
-def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
+@pytest.mark.optional
+@pytest.mark.jax
+def test_the_rl_planner_scores_the_law_it_hands_out():
     pytest.importorskip("jax")
     from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
 
@@ -291,9 +318,19 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
         gamma=0.9,
     )
     solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=3)
-    verb = nominal_trajectory(problem, solution.controller, dt=0.1, tf=planner.env.tf)
-    np.testing.assert_allclose(verb.x, solution.trajectory.x, atol=1e-10)
-    assert isinstance(verb, Trajectory) and solution.evaluation.n_trials == 3
+
+    # A feedback law: no plan; its score is the continuous loop of the copy handed out
+    assert solution.trajectory is None and solution.evaluation.n_trials == 3
+    alone = evaluate(
+        problem,
+        solution.controller,
+        n_trials=3,
+        key=0,
+        backend="jax",
+        episode_length=planner.env.tf,
+    )
+    np.testing.assert_array_equal(solution.evaluation.J, alone.J)
+    assert isinstance(solution.plot_trajectory(show=False).figure, object)
 
 
 # --- the solution knows its problem, shows what the planner produced, and compares ---
@@ -367,11 +404,15 @@ def test_solution_verbs_draw_what_the_planner_produced():
         plan.plot_control_law()
     with pytest.raises(ValueError, match="cost_to_go"):
         plan.plot_cost_to_go()
-    unrolled = DynamicProgrammingPlanner(
+    # A feedback law with no score yet: the views run it from the start all the same
+    unscored = DynamicProgrammingPlanner(
         problem, x_grid=(11, 11), u_grid=(3,), dt=0.2, gamma=0.9, tol=1.0
     ).solve()
-    with pytest.raises(ValueError, match="evaluate=True"):
-        unrolled.plot_trajectory()
+    result = unscored.plot_trajectory(show=False)
+    assert result.figure._suptitle.get_text() == "run (value iteration)"
+    assert (
+        plan.plot_trajectory(show=False).figure._suptitle.get_text().startswith("plan")
+    )
 
 
 def test_planner_shortcuts_draw_the_latest_solution():
@@ -557,51 +598,58 @@ def test_compare_scores_a_sampled_loop_as_evaluate_does():
     np.testing.assert_allclose(compared.J, alone.J)
 
 
-# --- the controller is the block, the policy the function ---
+# --- the controller is the block handed out; the function is the compiled face's ---
 
 
-def test_a_feedback_solutions_policy_is_its_controllers_command():
+def test_a_feedback_solution_hands_out_its_controller_block_and_no_function():
     from minilink import LQRPlanner
+    from minilink.planning.policies import policy_from_block
 
     x = np.array([0.4, -0.3])
 
-    # The stationary LQR law, u = −K x about the origin
+    # The stationary LQR law, u = −K x about the origin: the block's command
     stationary = LQRPlanner(move_problem().replace(horizon=np.inf)).solve()
     K = stationary.controller.params["K"]
-    np.testing.assert_allclose(stationary.policy(x), -K @ x, rtol=1e-12)
-    assert stationary.policy(x).shape == (1,)
+    command = policy_from_block(stationary.controller)
+    np.testing.assert_allclose(command(x), -K @ x, rtol=1e-12)
+    assert command(x).shape == (1,)
 
     # The finite-horizon LQR law reads the time: u = −K(t_k) x at a node of its schedule
     finite = LQRPlanner(move_problem()).solve()
     t_k = finite.controller.params["t"]
     K_k = finite.controller.params["K"]
+    command = policy_from_block(finite.controller)
     for k in (0, 30):
-        np.testing.assert_allclose(finite.policy(x, t_k[k]), -K_k[k] @ x, rtol=1e-12)
-    assert not np.allclose(finite.policy(x, 0.0), finite.policy(x, 1.9))
+        np.testing.assert_allclose(command(x, t_k[k]), -K_k[k] @ x, rtol=1e-12)
 
-    # Value iteration's lookup law, read at a state
-    vi = DynamicProgrammingPlanner(
-        move_problem().replace(horizon=np.inf), x_grid=(11, 11), u_grid=(5,), dt=0.2
-    ).solve()
-    np.testing.assert_allclose(vi.policy(x), vi.controller.action(x))
-
-    # A feedback policy reads the state
-    with pytest.raises(ValueError, match="reads the state"):
-        stationary.policy(t=0.0)
+    # The solution and the planner hand out the block, not a function of it
+    for retired in ("policy", "require_state", "require_trajectory"):
+        assert not hasattr(stationary, retired)
+    assert stationary.trajectory is None and stationary.evaluation is None
 
 
-def test_an_open_loop_solutions_policy_reads_the_time_alone():
+def test_an_open_loop_solutions_controller_replays_its_plan():
     solution = trajopt(move_problem(), collocation).solve()
     plan = solution.trajectory
     assert solution.open_loop
 
-    # u = π(t): the plan's input, linear between its samples; the state is not read
+    # u = π(t): the source's output, the plan's input linear between its samples
     t = 0.5 * (plan.t[3] + plan.t[4])
     u_plan = np.interp(t, plan.t, plan.u[0])
-    np.testing.assert_allclose(solution.policy(t=t), [u_plan], rtol=1e-12)
-    np.testing.assert_array_equal(
-        solution.policy(np.array([5.0, 5.0]), t), solution.policy(None, t)
+    u = solution.controller.h(np.zeros(0), np.zeros(0), t)
+    np.testing.assert_allclose(u, [u_plan], rtol=1e-12)
+
+
+def test_a_solution_is_built_by_keyword_with_its_optional_evidence():
+    problem = move_problem()
+    solution = trajopt(problem, shooting).solve()
+    bare = PlanningSolution(
+        problem=problem, controller=solution.controller, record=solution.record
     )
+    assert bare.trajectory is None and bare.cost_to_go is None
+    assert bare.evaluation is None and bare.params is not problem.params
+    with pytest.raises(TypeError):
+        PlanningSolution(problem, solution.controller, solution.record)
 
 
 @pytest.mark.parametrize("make", ["dp", "lqr"])
@@ -626,17 +674,26 @@ def test_the_planner_mirrors_its_latest_solution(make):
     # After it, each reads the latest solution
     solution = planner.solve()
     assert planner.controller is planner.last_solution.controller
-    np.testing.assert_array_equal(planner.policy(x, 0.0), solution.policy(x, 0.0))
     assert planner.cost_to_go(x) == float(solution.cost_to_go(x))
     assert isinstance(planner.cost_to_go(x), float)
     with pytest.raises(AttributeError):
         planner.controller = None
 
-    # The trajectory views carry the solution's words; the retired ones are gone
+    # The views carry the solution's words; the retired ones are gone
     assert callable(planner.plot_trajectory) and callable(planner.animate)
-    for retired in ("plot_solution", "animate_solution", "get_controller", "value_at"):
-        assert not hasattr(planner, retired)
-    planner.plot_trajectory()
+    retired = (
+        "plot_solution",
+        "animate_solution",
+        "get_controller",
+        "value_at",
+        "policy",
+        "nominal_trajectory",
+        "holds_policy",
+    )
+    for name in retired:
+        assert not hasattr(planner, name)
+    planner.plot_trajectory(show=False)
+    planner.plot_cost(show=False)
     plt.close("all")
 
 

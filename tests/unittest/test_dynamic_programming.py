@@ -226,7 +226,6 @@ class TestControllerAndEvaluation(unittest.TestCase):
         verbs = {
             "cost_to_go": lambda: planner.cost_to_go([0.0, 0.0]),
             "controller": lambda: planner.controller,
-            "policy": lambda: planner.policy([0.0, 0.0]),
             "plot_cost_to_go": planner.plot_cost_to_go,
             "plot_control_law": planner.plot_control_law,
             "animate_cost_to_go": planner.animate_cost_to_go,
@@ -861,8 +860,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         self.assertEqual(
             fixed.evaluation.n_trials, 1
         )  # a deterministic problem: one trial
-        np.testing.assert_allclose(fixed.trajectory.x[:, 0], problem.x0)
-        self.assertAlmostEqual(fixed.trajectory.t[1] - fixed.trajectory.t[0], 0.05)
+        self.assertIsNone(fixed.trajectory)  # a feedback law: no plan
 
     def test_final_time_reads_the_problem_horizon(self):
         from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -151,8 +151,8 @@ class MPPIPlanner(Planner):
 
         ``params`` is ``None`` (the problem as it is) or the complete tree of
         :attr:`params`, edited; ``guess`` (a trajectory or
-        a solution) seeds ``U``, else the ports' nominal input. The policy is the
-        held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
+        a solution) seeds ``U``, else the ports' nominal input. The controller is
+        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
         """
         pv = self.compile()
         z0 = pv.initial(params) if guess is None else pv.pack(guess, params)
@@ -164,13 +164,7 @@ class MPPIPlanner(Planner):
             evaluation = planner_evidence(
                 self, solution.controller, dt=self.dt, n_trials=n_trials
             )
-            solution = PlanningSolution(
-                solution.problem,
-                solution.controller,
-                solution.record,
-                solution.trajectory,
-                evaluation,
-            )
+            solution = replace(solution, evaluation=evaluation)
 
         return self.store_solution(solution)
 
@@ -473,11 +467,12 @@ class CompiledMPPIPlanner:
         )
 
         return PlanningSolution(
-            problem_with(self.problem, host_tree(problem_part(self.merged(params)))),
-            controller,
-            record,
-            trajectory,
-            None,
+            problem=problem_with(
+                self.problem, host_tree(problem_part(self.merged(params)))
+            ),
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
         )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:

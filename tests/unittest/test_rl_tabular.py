@@ -157,7 +157,7 @@ def test_sample_average_step_and_the_planner_arguments():
     solution = learner.solve(n_episodes=5, evaluate=True)
     assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
-    assert solution.evaluation.n_trials == 1 and solution.trajectory is not None
+    assert solution.evaluation.n_trials == 1 and solution.trajectory is None
     assert "episodes" in str(solution.record)
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, x_grid=(5, 5))

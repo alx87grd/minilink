@@ -6,6 +6,8 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.costs import SampledCost
+from minilink.core.system import System
+from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import (
     PlanningProblem,
     nominal_plant_params,
@@ -320,11 +322,15 @@ class StepFace:
         """
         The face's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
 
+        ``policy`` is a function or a controller block (its state on its
+        measurement port, its other inputs at their nominal values).
         ``n_steps`` defaults to the face's :attr:`n_steps`. The states ``(n_steps + 1, n)``, the
         inputs and stage costs ``(n_steps,)``-long, on the array module of the
         start: the one sum every tool's score is.
         """
         params = self.params if params is None else params
+        if isinstance(policy, System):
+            policy = policy_from_block(policy)
         x = np.asarray(params["x0"] if x0 is None else x0, dtype=float)
         N = self.n_steps if n_steps is None else int(n_steps)
         require_horizon(N)

@@ -7,14 +7,12 @@ from copy import deepcopy
 import numpy as np
 
 from minilink.blocks.sources import TrajectorySource
-from minilink.core.fields import Field
-from minilink.core.params import checked, merge_known
+from minilink.core.params import checked, flatten, lookup, merge_known, with_leaf
 from minilink.core.roles import command_port
-from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.evaluator import controller_of, evaluate
+from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, episode_ticks_of
 from minilink.planning.step_face import is_continuous
 
 ###############################################################################
@@ -43,20 +41,15 @@ class Planner(ABC):
     -----
     Offline entry is :meth:`solve`, which returns and stores the
     :class:`~minilink.planning.results.PlanningSolution`, and mirrors it:
-    :attr:`controller` is its block, :meth:`policy` its law ``u = pi(x, t)``,
-    :meth:`cost_to_go` its cost-to-go at a state, :meth:`plot_trajectory` and
-    :meth:`animate` its trajectory, :meth:`plot_control_law` and
+    :attr:`controller` is its block, :meth:`cost_to_go` its cost-to-go at a
+    state, :meth:`plot_trajectory`, :meth:`animate` and :meth:`plot_cost` its
+    plan or its controller's run, :meth:`plot_control_law` and
     :meth:`plot_cost_to_go` its law and cost-to-go.
     """
 
     #: Planners that read the uncertainty of a stochastic problem set this;
     #: the others read its start set ``X0`` and its ``x0``, and warn.
     accepts_stochastic = False
-
-    #: Planners whose feedback law runs on the grid of its ``dt`` (value
-    #: iteration, the learners) score it held over each period; a planner whose
-    #: law is continuous (the LQR) clears this and scores the continuous loop.
-    holds_policy = True
 
     #: The constructor keywords that are the method's numbers, ``params["method"]``
     number_names: tuple = ()
@@ -112,50 +105,40 @@ class Planner(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__}.solve is not implemented")
 
-    # The latest solution's law and cost-to-go
+    # The latest solution's controller and cost-to-go
 
     @property
     def controller(self):
         """The latest solution's controller: a feedback block, or the open-loop source of a trajectory planner."""
         return require_solution(self).controller
 
-    def policy(self, x=None, t=0.0):
-        """The latest solution's command ``u = pi(x, t)`` (:meth:`PlanningSolution.policy`)."""
-        return require_solution(self).policy(x, t)
-
     def cost_to_go(self, x, t=None) -> float:
-        """
-        The latest solution's cost-to-go at ``x`` (at ``t`` when given): its ``cost_to_go``, read.
-
-        A :class:`~minilink.core.fields.Field` reads ``t``; a plain callable of
-        ``x`` (the critic of a learned law) is time-invariant and ignores it.
-        """
+        """The latest solution's cost-to-go field read at ``x`` (at ``t`` when given), a ``float``."""
         solution = require_solution(self)
         J = require_cost_to_go(self, solution)
+        x = np.asarray(x, dtype=float)
 
-        # A field reads the time; a callable of x alone does not
-        if isinstance(J, Field) and t is not None:
-            value = J(x, t=t)
-        else:
+        # J(x), or J(x, t) on a field that reads the time
+        if t is None:
             value = J(x)
+        else:
+            value = J(x, t=t)
 
         return float(value)
 
-    def nominal_trajectory(self, tf=None, *, solution=None) -> Trajectory:
-        """``solution``'s controller from the problem's start on the planner's grid (feedback planners); the latest solution when none is given."""
-        raise NotImplementedError(f"{type(self).__name__} has no nominal_trajectory")
-
     # Views of the latest solution
 
-    def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib"):
-        """Plot the latest solution's trajectory with the problem system."""
-        return self.problem.sys.plot_trajectory(
-            solution_trajectory_of(self), signals=signals, backend=backend
-        )
+    def plot_trajectory(self, **kwargs):
+        """The latest solution's plan, else its controller's run (:meth:`PlanningSolution.plot_trajectory`)."""
+        return require_solution(self).plot_trajectory(**kwargs)
 
     def animate(self, **kwargs):
-        """Animate the latest solution's trajectory with the problem system."""
-        return self.problem.sys.animate(solution_trajectory_of(self), **kwargs)
+        """The latest solution's plan, else its controller's run, animated (:meth:`PlanningSolution.animate`)."""
+        return require_solution(self).animate(**kwargs)
+
+    def plot_cost(self, **kwargs):
+        """The running cost along the latest solution's plan, else its controller's run (:meth:`PlanningSolution.plot_cost`)."""
+        return require_solution(self).plot_cost(**kwargs)
 
     def plot_control_law(self, **kwargs):
         """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
@@ -188,32 +171,15 @@ def require_solution(planner) -> PlanningSolution:
     return planner.last_solution
 
 
-def require_continuous_to_evaluate(problem):
-    """Refuse the evaluator's score on a step problem: its score is its face's rollout."""
-    if not is_continuous(problem):
-        raise NotImplementedError(
-            "solve(evaluate=True) scores a continuous problem's closed loop; score a "
-            "law on a step problem with its face, problem.compile().run(policy)"
+def require_cost_to_go(planner, solution):
+    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``."""
+    if solution.cost_to_go is None:
+        raise ValueError(
+            f"{type(planner).__name__}'s solution carries no cost-to-go field "
+            "(its cost_to_go is None)"
         )
 
-
-def require_cost_to_go(planner, solution):
-    """Refuse a solution whose method gives no cost-to-go; return its ``cost_to_go``."""
-    if solution.cost_to_go is None:
-        raise ValueError(f"{type(planner).__name__} gives no cost-to-go")
-
     return solution.cost_to_go
-
-
-def solution_trajectory_of(planner) -> Trajectory:
-    """The latest solution's trajectory, rolled out on demand for a feedback law."""
-    solution = require_solution(planner)
-
-    # The planned trajectory, else the feedback law rolled out from the start
-    if solution.trajectory is not None:
-        return solution.trajectory
-
-    return planner.nominal_trajectory(solution=solution)
 
 
 def open_loop_controller_of(
@@ -237,21 +203,18 @@ def open_loop_controller_of(
 
 
 def planner_evidence(
-    planner, controller, *, dt, n_trials=50, tf=None, backend="numpy", problem=None
+    planner, controller, *, dt=None, n_trials=50, tf=None, backend="numpy", problem=None
 ) -> Evaluation | None:
     """
-    The evidence a planner's ``solve(evaluate=True)`` records: its law scored on the real plant.
+    The evidence a planner's ``solve(evaluate=True)`` records: its controller, as it is, scored on the real plant.
 
     The :func:`~minilink.planning.evaluator.evaluate` of ``controller`` on the
     planner's problem (or ``problem``): one run when nothing is random,
     ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
-    no cost (a search without one). A feedback law with no clock of its own
-    is held over each period of ``dt`` (``controller % dt``), the loop its planner
-    designs for, and the plant is integrated at the automatic step; an
-    open-loop source keeps the interpolation its planner states. The public
-    way to score a law is the problem's evaluator,
-    ``problem.compile(ctl % dt).evaluate()``, with ``substeps=`` for the
-    planner's own physics.
+    no cost (a search without one). A continuous controller runs on ``dt`` (an
+    open-loop plan on its own grid), else on the evaluator's automatic step; a
+    clocked one on its own clock; ``tf`` is the run of an infinite horizon. On
+    a step problem, the face's rollouts (:func:`step_evaluation`).
     """
     problem = planner.problem if problem is None else problem
 
@@ -262,13 +225,13 @@ def planner_evidence(
     # One run when nothing is random, n_trials draws otherwise
     trials = int(n_trials) if problem.is_stochastic else None
 
-    # The law the run holds: a feedback law on the clock of dt, when the
-    # planner designs it on that grid
-    law = held_feedback(controller, dt) if planner.holds_policy else controller
+    # A step problem is scored on its face
+    if not is_continuous(problem):
+        return step_evaluation(problem, controller, trials, episode_length=tf)
 
     return evaluate(
         problem,
-        law,
+        controller,
         dt=dt,
         n_trials=trials,
         key=0,
@@ -277,18 +240,80 @@ def planner_evidence(
     )
 
 
-def held_feedback(controller, dt):
-    """A feedback controller with no clock of its own on the clock of ``dt`` (``controller % dt``); a source, a tick law or a clocked law as given."""
-    # Lazy import: the step system loads with the compile chain
-    from minilink.core.discrete.step_system import StepSystem
+def step_evaluation(
+    problem, controller, n_trials=None, *, key=0, episode_length=None
+) -> Evaluation:
+    """
+    The :class:`~minilink.planning.evaluation.Evaluation` of a controller on a step problem: its face's rollouts, scored.
 
-    controller = controller_of(controller)
-    reads_input = int(controller.m) > 0
-    tick_or_clocked = isinstance(controller, StepSystem)
-    if reads_input and not tick_or_clocked:
-        return controller % float(dt)
+    One run on a deterministic problem, ``n_trials`` draws of
+    ``problem.realize(key, n_trials)`` otherwise, each the face's
+    ``J = Σ γᵏ c_k + γᴺ h`` over its horizon (an infinite one over an episode
+    of ``episode_length`` ticks, 10 by default), with the judge's facts: the
+    least margin of ``x_k`` to ``X`` and of ``u_k`` to ``U``, the margin of
+    ``x_N`` to ``Xf``, and with ``penalize_failure`` the face's failure cost
+    (a run not finite: the face's cost bound and it).
+    """
+    face = problem.compile()
+    N = episode_ticks_of(face, episode_length)
+    n = 1 if n_trials is None else int(n_trials)
+    draws = problem.realize(key if problem.is_stochastic else None, n)
+    drawn = [("x0",), *(path for path, _ in flatten(problem.distributions))]
+    failure_cost = face.failure_cost
+    bound = face.cost_bound
 
-    return controller
+    rows = []
+    for i in range(n):
+        params = trial_of(draws, drawn, i)
+
+        # The face's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h
+        xs, us, _, cost = face.run(controller, params=params, n_steps=N)
+        t = [face.time_of(k, params) for k in range(N + 1)]
+
+        # The judge's facts: finite, the least margin to X and U, the margin to Xf
+        finite = bool(np.all(np.isfinite(xs)) and np.all(np.isfinite(us)))
+        margin_X = min(float(np.min(problem.X.margin(x, t_k))) for x, t_k in zip(xs, t))
+        margin_U = min(
+            float(np.min(problem.U.margin(u, x, t_k))) for u, x, t_k in zip(us, xs, t)
+        )
+        feasibility_margin = min(margin_X, margin_U)
+        failed = not finite or feasibility_margin < 0.0
+        reachability_margin = np.inf
+        if problem.Xf is not None:
+            reachability_margin = float(np.min(problem.Xf.margin(xs[-1], t[-1])))
+        reached = reachability_margin >= 0.0
+
+        # J = cost, or with the failure charged cost + failure_cost · (failed or not
+        # reached), and the cost bound + failure_cost for a run not finite
+        cost = float(cost) if finite else np.inf
+        J = cost
+        if problem.penalize_failure:
+            charged = failure_cost if failed or not reached else 0.0
+            J = (cost if finite else bound) + charged
+
+        rows.append(
+            (cost, J, feasibility_margin, failed, reachability_margin, reached, xs[0])
+        )
+
+    return Evaluation(
+        cost=np.array([row[0] for row in rows]),
+        J=np.array([row[1] for row in rows]),
+        feasibility_margin=np.array([row[2] for row in rows]),
+        failed=np.array([row[3] for row in rows]),
+        reachability_margin=np.array([row[4] for row in rows]),
+        reached=np.array([row[5] for row in rows]),
+        x0=np.stack([row[6] for row in rows]),
+        criterion=problem.criterion,
+    )
+
+
+def trial_of(draws, drawn, i):
+    """Trial ``i`` of a step problem's realization: each drawn leaf (``drawn``, its paths) indexed, the shared ones as they are."""
+    params = draws
+    for path in drawn:
+        params = with_leaf(params, path, lookup(draws, path)[i])
+
+    return params
 
 
 def planner_at(planner, params) -> "Planner":

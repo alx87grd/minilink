@@ -298,7 +298,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     assert vi.grid.dt == 1.0 and vi.gamma == 1.0
 
 
-def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_refuses_the_evaluator():
+def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_face():
     import copy
 
     from minilink.learning import TabularLearningPlanner
@@ -327,11 +327,39 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_refuses_the_eval
     problem.params = edited
     assert (problem.gamma, problem.t0) == (0.8, 2)
 
-    # A step problem's law is scored by its face, refused before any sweep
-    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
-        vi.solve(evaluate=True)
-    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
-        vi.solve_steps(3, evaluate=True)
+    # A step problem's law is scored by its face, the controller block run as it is:
+    # an infinite horizon over an episode of 10 ticks
+    from minilink.planning.results import drawn_trajectory_of
+
+    face = vi.problem.compile()
+    solution = vi.solve(evaluate=True)
+    assert solution.evaluation.n_trials == 1 and solution.trajectory is None
+    J = face.run(solution.controller, n_steps=10)[3]
+    assert float(solution.evaluation.J[0]) == J == sum(0.9**k for k in range(5))
+    assert bool(solution.evaluation.reached[0]) and not solution.evaluation.failed[0]
+    run = drawn_trajectory_of(solution)
+    np.testing.assert_array_equal(run.x[:, -1], [5.0, 3.0])
+    np.testing.assert_array_equal(run.t, np.arange(11.0))
+    receding = vi.solve_steps(3, evaluate=True)
+    assert np.isfinite(receding.evaluation.J[0])
+
+    # A finite horizon over its own ticks; a start law over its draws
+    finite = DynamicProgrammingPlanner(
+        grid_world(gamma=0.9, n_steps=8), x_grid=(7, 7), u_grid=(3, 3)
+    ).solve(evaluate=True)
+    assert (
+        float(finite.evaluation.J[0])
+        == finite.problem.compile().run(finite.controller)[3]
+    )
+    from minilink import Uniform
+
+    spread = DynamicProgrammingPlanner(
+        grid_world(gamma=0.9, n_steps=8, x0=Uniform([0.0, 0.0], [2.0, 2.0])),
+        x_grid=(7, 7),
+        u_grid=(3, 3),
+    ).solve(evaluate=True, n_trials=3)
+    assert spread.evaluation.n_trials == 3
+    assert len({tuple(x) for x in spread.evaluation.x0}) == 3
 
     # The tabular learner rounds a continuous plant: a step problem goes to value iteration
     with pytest.raises(NotImplementedError, match="DynamicProgrammingPlanner"):

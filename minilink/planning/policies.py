@@ -1,4 +1,4 @@
-"""A controller block read as its policy: the pure function ``u = π(x, t)``."""
+"""A feedback controller block read as its law, the function ``u = π(x, t)`` the step tools call."""
 
 import numpy as np
 
@@ -36,28 +36,6 @@ def policy_from_block(block):
     return policy
 
 
-def policy_from_source(block):
-    """Adapt an open-loop controller, a source with no input port, into its policy ``u = policy(x=None, t=0.0)``.
-
-    The command is the source's output ``y = h(x_c, t)`` at its own initial
-    state ``x0``, the signal ``block >> plant`` feeds the plant; the state
-    ``x`` is not read.
-    """
-    require_source(block)
-
-    u_none = block.get_u_from_input_ports().astype(float)
-    x_ctrl = np.asarray(block.x0, dtype=float)
-
-    # The command of the source at t, whatever the state
-    def policy(x=None, t=0.0):
-        command = np.asarray(block.h(x_ctrl, u_none, t), dtype=float)
-        command = command.reshape(-1)
-
-        return command
-
-    return policy
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
@@ -71,14 +49,4 @@ def require_feedback_roles(block, roles):
             "reads the state on an input named 'x' (or 'y') and commands 'u'; "
             f"{type(block).__name__} reads {list(block.inputs)} and gives "
             f"{list(block.outputs)}"
-        )
-
-
-def require_source(block):
-    """Refuse a block with an input port: an open-loop policy reads the time alone."""
-    if int(block.m) > 0:
-        raise ValueError(
-            "an open-loop policy u = pi(t) is a source with no input port; "
-            f"{type(block).__name__} reads {list(block.inputs)}: "
-            "policy_from_block adapts a feedback controller"
         )

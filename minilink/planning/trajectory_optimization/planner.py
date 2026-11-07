@@ -530,7 +530,13 @@ class TrajectoryOptimizationPlanner(Planner):
                 problem=problem,
             )
 
-        return PlanningSolution(problem, controller, record, trajectory, evaluation)
+        return PlanningSolution(
+            problem=problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            evaluation=evaluation,
+        )
 
     def print_solve_report(
         self,

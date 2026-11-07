@@ -15,7 +15,6 @@ from minilink.planning.dynamic_programming.dp import (
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import progress as report_progress
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
     given_numbers,
@@ -212,8 +211,9 @@ class TabularLearningPlanner(Planner):
         """
         Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
-        ``evaluate=True`` also rolls the law out from the problem's start and
-        scores it over the problem's draws.
+        ``evaluate=True`` also scores the law, as it is, over the problem's
+        draws (on the evaluator's automatic step, over an episode on an
+        infinite horizon).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         ``verbose`` prints the episodes' progress and, at the end, the record.
@@ -233,26 +233,25 @@ class TabularLearningPlanner(Planner):
         result = self.result
         controller = LookupPolicy(result.grid, result.pi)
 
-        # Optionally, roll the law out from the problem's start and score it over
-        # its draws
-        trajectory = None
+        # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
         if evaluate:
-            dt = self.grid.dt
-            tf = self.env.tf
-            trajectory = nominal_trajectory(self.problem, controller, dt=dt, tf=tf)
             evaluation = planner_evidence(
-                self, controller, dt=dt, n_trials=n_trials, tf=tf
+                self, controller, n_trials=n_trials, tf=self.env.tf, backend="auto"
             )
 
-        # The solution: the law, the record, the rollout, and the cost-to-go as a field
+        # The solution: the law, the record, the score, and the cost-to-go as a field
         # on the grid, the failure cost past it (the price of leaving the grid)
         record = self.learning_record(result)
         cost_to_go = result.grid.field(
             result.J, method="linear", outside=self.env.failure_cost
         )
         solution = PlanningSolution(
-            self.problem, controller, record, trajectory, evaluation, cost_to_go
+            problem=self.problem,
+            controller=controller,
+            record=record,
+            cost_to_go=cost_to_go,
+            evaluation=evaluation,
         )
         if verbose:
             print(record)
@@ -375,17 +374,7 @@ class TabularLearningPlanner(Planner):
             tables=tables,
         )
 
-    # Rollout and plots
-
-    def nominal_trajectory(self, tf=None, *, solution=None):
-        """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
-        solution = require_solution(self) if solution is None else solution
-        return nominal_trajectory(
-            self.problem,
-            solution.controller,
-            dt=self.grid.dt,
-            tf=self.env.tf if tf is None else tf,
-        )
+    # Plots
 
     def plot_cost_to_go(self, **kwargs):
         """The latest solution's cost-to-go table on the grid itself, as value iteration draws it."""

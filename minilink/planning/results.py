@@ -1,33 +1,39 @@
-"""The planning solution: the controller, its policy, its cost-to-go, and the evidence for them."""
+"""The planning solution: the controller, the plan it predicts, and the evidence for them."""
 
 from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Callable
 from dataclasses import dataclass
 
+import numpy as np
+
+from minilink.core.fields import Field
 from minilink.core.inspect import body_line, format_inspect, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.policies import policy_from_block, policy_from_source
+from minilink.planning.evaluator import EPISODE_LENGTH
 from minilink.planning.problems import PlanningProblem, require_cost
+from minilink.planning.step_face import is_continuous
 
 ###############################################################################
 # Public API
 ###############################################################################
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class PlanningSolution:
     """
-    What every planner returns: the controller, its cost-to-go and the evidence for them.
+    What every planner returns: the controller, the plan it predicts, and the evidence for them.
 
-    Everything here is the solver's own claim under its own model — the table
-    on its grid, the Riccati form on the linear model, the critic's fit. A
-    measurement of the law comes from the evaluators (:func:`~minilink.planning.evaluator.evaluate`,
-    ``PolicyEvaluator``) as its own object and is never written back here.
+    One rule: the controller handed out is the block scored in ``evaluation``
+    and drawn by the views, as it is. Everything else here is the solver's
+    own claim under its own model — the plan, the table on its grid, the
+    Riccati form on the linear model, the critic's fit. A measurement of the
+    controller comes from the evaluators
+    (:func:`~minilink.planning.evaluator.evaluate`, ``PolicyEvaluator``) as its
+    own object.
 
     Parameters
     ----------
@@ -35,38 +41,35 @@ class PlanningSolution:
         What was solved: the system, its sets, the cost and the horizon. A
         frozen record; its ``sys`` is a live reference, not a snapshot.
     controller : System
-        The block a loop closes on. A feedback controller reads the state,
-        ``controller @ plant`` closes the loop; an open-loop controller is a
-        source such as a :class:`~minilink.blocks.sources.TrajectorySource`,
-        ``controller >> plant`` drives the plant. Its policy, the law
-        ``u = pi(x, t)`` as a function, is :meth:`policy`; a finite-horizon
-        design is feedback in time.
+        The block you run, as it is. A feedback law (LQR, value iteration,
+        tabular and deep learning) reads the state: ``controller @ plant``
+        closes the loop, continuous. An open-loop plan (trajectory
+        optimization, MPPI, RRT) is a source such as a
+        :class:`~minilink.blocks.sources.TrajectorySource`: ``controller >>
+        plant`` drives the plant. On a step problem, the law ticks with the plant.
     record : record
         The planner's account of the solve, one dataclass per planner
         (``TrajectoryOptimizationRecord``, ``TreeSearchRecord``,
         ``ValueIterationRecord``, ``TabularLearningRecord``,
-        ``ReinforcementLearningRecord``, ``RiccatiRecord``), each with a
-        ``success`` flag and a one-line ``str``.
-    trajectory : Trajectory or None
-        What the controller produces from the problem's start on the planner's
-        grid with nominal parameters: the schedule of an open-loop planner,
-        the rollout of a feedback law when the solve was asked to evaluate.
-        It is the planner's evidence, not a closed-loop simulation: close the
-        loop in the script, ``controller @ plant``, and simulate that.
-    evaluation : Evaluation or None
-        The cost over the problem's draws under the one scoring contract
-        (one trial on a deterministic problem), when the solve was asked to
-        evaluate; ``None`` otherwise, or when the problem declares no cost.
-    cost_to_go : Field, callable or None
+        ``ReinforcementLearningRecord``, ``RiccatiRecord``, ``MPPIRecord``),
+        each with a ``success`` flag and a one-line ``str``.
+    trajectory : Trajectory, optional
+        The plan an open-loop planner computed, on its own grid and model;
+        ``None`` for a feedback law (its views run the controller).
+    cost_to_go : Field, optional
         ``J(x)``, the method's own estimate under its own model, where the
         method produces one: a :class:`~minilink.core.fields.GridField` for
         dynamic programming and tabular learning (the failure cost past its
         grid), a :class:`~minilink.core.fields.QuadraticField` for a
-        linear-quadratic design (``J(x, t=t)`` on a finite horizon); the critic
-        of a learned law (when it estimates the problem's own discount) is a
-        plain callable of ``x``. On a
-        stochastic problem it is the expected cost-to-go when the method
-        takes the distributions.
+        linear-quadratic design (``J(x, t=t)`` on a finite horizon), the
+        critic's field for a learned law (when it estimates the problem's own
+        discount). On a stochastic problem it is the expected cost-to-go when
+        the method takes the distributions.
+    evaluation : Evaluation, optional
+        The score of ``controller``, as it is, over the problem's draws under
+        the one scoring contract (one trial on a deterministic problem), when
+        the solve was asked to evaluate (``solve(evaluate=True)``); ``None``
+        otherwise, or when the problem declares no cost.
     params : dict, optional
         The numbers the solve ran on: the problem's tree as it was when the
         solution was made, a copy. ``None`` (the default) takes it from
@@ -77,9 +80,9 @@ class PlanningSolution:
     problem: PlanningProblem
     controller: System
     record: object
-    trajectory: Trajectory | None
-    evaluation: Evaluation | None
-    cost_to_go: Callable | None = None
+    trajectory: Trajectory | None = None
+    cost_to_go: Field | None = None
+    evaluation: Evaluation | None = None
     params: dict | None = None
 
     def __post_init__(self) -> None:
@@ -105,28 +108,36 @@ class PlanningSolution:
 
         return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
 
-    def policy(self, x=None, t=0.0):
+    # Views, run on demand: the plan, else the controller run from the problem's start
+
+    def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib", show=True):
         """
-        The command ``u = pi(x, t)`` of the controller, a 1-D array: its policy as a function.
+        Draw the plan, else the controller's run from the problem's start, on the problem's system.
 
-        A feedback controller reads ``x`` on its measurement port, its other
-        inputs (a reference) at their nominal values and its own state at its
-        ``x0``; an open-loop controller reads the time ``t`` alone and
-        ignores ``x``.
+        The run is the loop the score runs, ``problem.compile(controller)``
+        (a continuous law on the evaluator's automatic step, a clocked one on
+        its own clock; a step problem's face), once from the start with
+        nominal parameters. The figure is titled plan or run.
         """
-        # The law of the block: the time alone for a source, the state and the time
-        # for a feedback controller
-        if self.open_loop:
-            pi = policy_from_source(self.controller)
-        else:
-            self.require_state(x)
-            pi = policy_from_block(self.controller)
+        # A real cycle: comparison imports PlanningSolution from this module
+        from minilink.planning.comparison import plot_solution_trajectory
 
-        u = pi(x, t)
+        return plot_solution_trajectory(
+            self, drawn_trajectory_of(self), signals=signals, backend=backend, show=show
+        )
 
-        return u
+    def animate(self, **kwargs):
+        """Animate the plan, else the controller's run from the problem's start (:meth:`plot_trajectory`), on the problem's system."""
+        return self.problem.sys.animate(drawn_trajectory_of(self), **kwargs)
 
-    # Views of what the planner produced — never a closed-loop simulation
+    def plot_cost(self, *, backend="matplotlib", show=True):
+        """Draw the running cost and ``J(t)`` along the plan, else the controller's run (:meth:`plot_trajectory`)."""
+        return self.problem.sys.plot_cost(
+            require_cost(self.problem),
+            traj=drawn_trajectory_of(self),
+            backend=backend,
+            show=show,
+        )
 
     def plot_control_law(self, **kwargs):
         """
@@ -158,29 +169,6 @@ class PlanningSolution:
 
         return plot_cost_to_go(self, **kwargs)
 
-    def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib", show=True):
-        """
-        Draw ``trajectory`` on the problem's system: the plan, or the nominal rollout.
-
-        The figure says which. A closed-loop simulation is not this: wire
-        ``controller @ plant`` and plot that diagram's trajectory.
-        """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_solution_trajectory
-
-        return plot_solution_trajectory(
-            self, signals=signals, backend=backend, show=show
-        )
-
-    def plot_cost(self, *, backend="matplotlib", show=True):
-        """Draw the running cost and ``J(t)`` along ``trajectory`` under the problem's cost."""
-        return self.problem.sys.plot_cost(
-            require_cost(self.problem),
-            traj=self.require_trajectory(),
-            backend=backend,
-            show=show,
-        )
-
     # Display
 
     def __str__(self) -> str:
@@ -193,31 +181,13 @@ class PlanningSolution:
     # Internal machinery
     ###########################################################################
 
-    def require_state(self, x) -> None:
-        """Refuse a feedback policy read without a state."""
-        if x is None:
-            raise ValueError(
-                "a feedback controller's policy u = pi(x, t) reads the state: "
-                "pass x, policy(x, t)"
-            )
-
     def require_feedback_law(self) -> None:
         """Refuse to draw the control law of an open-loop controller ``u = pi(t)``."""
         if self.open_loop:
             raise ValueError(
-                "an open-loop policy u = pi(t) has no control law to draw; "
+                "an open-loop controller u = pi(t) has no control law to draw; "
                 "plot_trajectory draws the plan"
             )
-
-    def require_trajectory(self) -> Trajectory:
-        """Refuse a solution that carries no trajectory, naming ``solve(evaluate=True)``; return it."""
-        if self.trajectory is None:
-            raise ValueError(
-                f"this {self.method} solution carries no trajectory; "
-                "solve(evaluate=True) rolls the law out from the problem's start"
-            )
-
-        return self.trajectory
 
 
 ###############################################################################
@@ -225,14 +195,69 @@ class PlanningSolution:
 ###############################################################################
 
 
+def drawn_trajectory_of(solution) -> Trajectory:
+    """
+    What a solution's views draw: its plan, else its controller run once from the problem's start.
+
+    The run is the loop the score runs, ``problem.compile(controller)``, with
+    nominal parameters (a stochastic problem at its mean start), the plant's
+    own run read back (``traj.of("plant")``); on a step problem, its face's
+    rollout (:func:`step_run_of`).
+    """
+    if solution.trajectory is not None:
+        return solution.trajectory
+
+    problem = solution.problem
+    if not is_continuous(problem):
+        return step_run_of(problem, solution.controller)
+
+    run = problem.compile(solution.controller).trajectory().of("plant")
+    plant_run = Trajectory(
+        t=np.asarray(run.t), x=np.asarray(run.x), u=np.asarray(run.u)
+    )
+
+    return plant_run
+
+
+def step_run_of(problem, controller, params=None, *, episode_length=None) -> Trajectory:
+    """
+    A step problem's rollout under ``controller`` from its start: the face's run as a trajectory.
+
+    ``N`` ticks of its face, ``problem.compile().run(controller)``: its own
+    horizon, else an episode of ``episode_length`` (10 by default) in its
+    time. ``params`` is the face's tree (``None``: its own). The last input is
+    held at the final state, so ``x`` and ``u`` share the ``N + 1`` times.
+    """
+    face = problem.compile()
+    params = face.params if params is None else params
+    N = episode_ticks_of(face, episode_length)
+
+    # x_0 … x_N and u_0 … u_{N−1} on the ticks t0 + k, the last input held
+    xs, us, _, _ = face.run(controller, params=params, n_steps=N)
+    t = np.array([face.time_of(k, params) for k in range(N + 1)], dtype=float)
+    u = np.concatenate([us, us[-1:]], axis=0)
+
+    return Trajectory(t=t, x=xs.T, u=u.T)
+
+
+def episode_ticks_of(face, episode_length=None) -> int:
+    """The ticks of a face's rollout: its horizon ``N``, else an episode of ``episode_length`` (10 by default) in its time."""
+    if face.n_steps is not None:
+        return int(face.n_steps)
+
+    length = EPISODE_LENGTH if episode_length is None else float(episode_length)
+
+    return max(1, int(round(length / face.period)))
+
+
 def solution_text(solution):
-    """The print text of a solution: its method, law, trajectory, evaluation and record."""
+    """The print text of a solution: its method, law, plan, evaluation and record."""
     law = "u = pi(t), open loop" if solution.open_loop else "u = pi(x), feedback"
     if solution.trajectory is None:
-        trajectory = "not rolled out (solve with evaluate=True)"
+        trajectory = "none (a feedback law: the views run the controller)"
     else:
         trajectory = (
-            f"{solution.trajectory.n_samples} samples over "
+            f"plan of {solution.trajectory.n_samples} samples over "
             f"{solution.trajectory.tf - solution.trajectory.t0:.3g} s"
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)

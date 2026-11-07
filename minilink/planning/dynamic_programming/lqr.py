@@ -18,13 +18,11 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.fields import QuadraticField
 from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
-from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
     given_numbers,
     planner_at,
     planner_evidence,
-    require_solution,
 )
 from minilink.planning.problems import (
     PlanningProblem,
@@ -94,8 +92,9 @@ class LQRPlanner(Planner):
     x_bar, u_bar : array-like, optional
         Operating point of the linearization; default the cost's target.
     dt : float, optional
-        Sampling period of the nominal rollout and the Monte Carlo score
-        (``solve(evaluate=True)``); a reporting choice, the law is continuous.
+        Sampling period of the score's continuous loop (``solve(evaluate=True)``),
+        the grid it is integrated and recorded on; a reporting choice, the law
+        is continuous.
     n_steps : int, optional
         Samples of the finite-horizon gain schedule ``K(t)``.
     t : float, optional
@@ -105,9 +104,6 @@ class LQRPlanner(Planner):
     eps : float, optional
         Central-difference step.
     """
-
-    # The law is continuous: its score closes it as a continuous loop
-    holds_policy = False
 
     number_names = ("x_bar", "u_bar", "t")
 
@@ -147,9 +143,9 @@ class LQRPlanner(Planner):
         Solve the Riccati equation of the linearized problem.
 
         The solution's controller is the state-feedback block, its ``cost_to_go``
-        the quadratic form of the linear model. ``evaluate=True`` also rolls
-        the law out from the problem's start on the nonlinear plant and scores
-        it over the problem's draws.
+        the quadratic form of the linear model. ``evaluate=True`` also scores
+        the law, as it is, on the nonlinear plant over the problem's draws (the
+        continuous loop on the grid of ``dt``).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
@@ -233,17 +229,18 @@ class LQRPlanner(Planner):
             )
             cost_to_go = QuadraticField(x_bar, P)
 
-        # Optionally, roll the law out from the problem's start and score it over
-        # its draws
-        trajectory = None
+        # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
         if evaluate:
-            trajectory = nominal_trajectory(problem, controller, dt=dt)
             evaluation = planner_evidence(self, controller, dt=dt, n_trials=n_trials)
 
-        # The solution: the law, the record, the rollout, the quadratic cost-to-go
+        # The solution: the law, the record, the quadratic cost-to-go, the score
         solution = PlanningSolution(
-            problem, controller, record, trajectory, evaluation, cost_to_go
+            problem=problem,
+            controller=controller,
+            record=record,
+            cost_to_go=cost_to_go,
+            evaluation=evaluation,
         )
 
         return self.store_solution(solution)
@@ -255,11 +252,6 @@ class LQRPlanner(Planner):
         )
 
         return {**kwargs, **self.given}
-
-    def nominal_trajectory(self, tf=None, *, solution=None):
-        """``solution``'s law (the latest when none is given) from the problem's start on the nonlinear plant, sampled every ``dt``."""
-        solution = require_solution(self) if solution is None else solution
-        return nominal_trajectory(self.problem, solution.controller, dt=self.dt, tf=tf)
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""

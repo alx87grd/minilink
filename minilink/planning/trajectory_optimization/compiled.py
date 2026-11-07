@@ -320,7 +320,9 @@ class CompiledTrajectoryPlanner:
         )
         controller = open_loop_controller_of(trajectory, self.planner.problem.sys)
 
-        return PlanningSolution(problem, controller, record, trajectory, None)
+        return PlanningSolution(
+            problem=problem, controller=controller, record=record, trajectory=trajectory
+        )
 
     def pack(self, guess, params=None):
         """A guess in ``z`` form: a :class:`~minilink.core.trajectory.Trajectory` or a :class:`~minilink.planning.results.PlanningSolution` resampled on the knots."""

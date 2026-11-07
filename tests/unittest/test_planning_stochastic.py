@@ -866,9 +866,8 @@ def test_a_user_set_with_numbers_is_moved_on_a_deep_copy():
     assert moved.margin(np.zeros(2)) == 4.0
 
 
-def test_a_source_policy_is_held_from_the_problems_start_time():
+def test_a_source_controller_runs_from_the_problems_start_time():
     from minilink.blocks.sources import TrajectorySource
-    from minilink.planning.evaluator import nominal_trajectory
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
@@ -882,7 +881,8 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     )
     t_grid = 1.5 + 0.1 * np.arange(21)
     source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
-    traj = nominal_trajectory(problem, source, dt=0.1)
+    traj = problem.compile(source, dt=0.1, backend="numpy").trajectory().of("plant")
+    np.testing.assert_allclose(traj.t[0], 1.5)
     np.testing.assert_allclose(traj.u[:, 0], [np.sin(1.5)])
 
 

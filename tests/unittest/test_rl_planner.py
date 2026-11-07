@@ -9,6 +9,7 @@ from minilink import Pendulum, StepSystem, WhiteNoise
 from minilink.core.backends import array_module
 from minilink.core.costs import CostFunction, QuadraticCost, StepCost
 from minilink.core.distributions import Uniform
+from minilink.core.fields import Field
 from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
@@ -280,18 +281,22 @@ def test_the_discount_has_one_owner_and_an_announced_default():
         build(undiscounted, method=PPO(gamma=0.9, batch_size=32), gamma=0.95)
 
 
-def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
+def test_the_solutions_run_is_the_undisturbed_loop_from_the_start():
+    from minilink.planning.results import drawn_trajectory_of
+
     small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32)
 
     # no disturbance port: the law from the start, no draw consumed
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(prob, **small)
+    solution = planner.solve(n_timesteps=32)
     key = np.asarray(planner.key)
-    nominal = planner.nominal_trajectory(tf=0.5)
+    run = drawn_trajectory_of(solution)
     np.testing.assert_array_equal(np.asarray(planner.key), key)
-    np.testing.assert_allclose(nominal.x[:, 0], prob.x0)
+    np.testing.assert_allclose(run.x[:, 0], prob.x0)
+    assert solution.trajectory is None
 
-    # a disturbance source: the nominal rollout reads it at its mean
+    # a disturbance source: the run reads it at its mean
     noisy = PlanningProblem(
         bounded_pendulum(NoisyPendulum()),
         cost=HangCost(),
@@ -300,14 +305,12 @@ def test_nominal_trajectory_is_the_undisturbed_rollout_from_the_start():
         disturbances={"d": WhiteNoise(1, psd=0.1, sample_period=0.1)},
     )
     planner = ReinforcementLearningPlanner(noisy, **small)
-    first, second = (
-        planner.nominal_trajectory(tf=0.5),
-        planner.nominal_trajectory(tf=0.5),
-    )
+    solution = planner.solve(n_timesteps=32)
+    first, second = drawn_trajectory_of(solution), drawn_trajectory_of(solution)
     np.testing.assert_array_equal(first.x, second.x)
 
 
-def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
+def test_solve_with_evaluate_scores_the_law_it_hands_out():
     planner = ReinforcementLearningPlanner(
         problem(horizon=np.inf),
         dt=0.1,
@@ -320,7 +323,16 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
     solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=4)
     assert solution.evaluation.J.shape == (4,)
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
-    np.testing.assert_array_equal(solution.trajectory.x, planner.nominal_trajectory().x)
+    assert solution.trajectory is None
+    alone = evaluate(
+        planner.problem,
+        solution.controller,
+        n_trials=4,
+        key=0,
+        backend="jax",
+        episode_length=planner.env.tf,
+    )
+    np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     assert np.isfinite(solution.record.cost) and "plant steps" in str(solution.record)
     assert solution.record.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
     assert "feedback" in str(solution)
@@ -750,11 +762,17 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     solution = planner.solve(n_timesteps=64)
     x = np.array([0.2, 0.0])
     w = planner.algorithm.params(planner.train_state)["critic"]
-    np.testing.assert_allclose(
-        solution.cost_to_go(x), -float(planner.critic.value(w, jnp.asarray(x)))
-    )
 
-    # The critic is a callable of x alone: the planner reads it at any time
+    # The critic is a field of the state, J(x) = −V_w(x), its weights its numbers
+    J = solution.cost_to_go
+    assert isinstance(J, Field) and J.params is w
+    np.testing.assert_allclose(J(x), -float(planner.critic.value(w, jnp.asarray(x))))
+    assert J.value(np.stack([x, -x])).shape == (2,)
+    grads = jax.grad(lambda p: J.value(jnp.asarray(x), params=p))(J.params)
+    leaves = jax.tree_util.tree_leaves(grads)
+    assert leaves and all(bool(jnp.all(jnp.isfinite(g))) for g in leaves)
+
+    # It reads x alone: the planner reads it at any time
     assert planner.cost_to_go(x, t=3.0) == planner.cost_to_go(x)
 
     # the same problem trained at another discount estimates something else
@@ -769,7 +787,8 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     )
     assert other.solve(n_timesteps=64).cost_to_go is None
     with pytest.raises(
-        ValueError, match="ReinforcementLearningPlanner gives no cost-to-go"
+        ValueError,
+        match="ReinforcementLearningPlanner's solution carries no cost-to-go",
     ):
         other.cost_to_go(x)
 
@@ -976,12 +995,14 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_face():
         np.abs(untrained[0][-1] - [5.0, 3.0])
     )
 
-    # Its score is its face's rollout, not the continuous evaluator's: refused before
-    # any training
-    steps = planner.num_timesteps
-    with pytest.raises(NotImplementedError, match="compile\\(\\).run"):
-        planner.solve(n_timesteps=256, evaluate=True)
-    assert planner.num_timesteps == steps
+    # Its score is its face's rollout over the episode, the controller handed out
+    # read by the face as a block
+    scored = planner.solve(n_timesteps=256, evaluate=True)
+    assert scored.evaluation.n_trials == 1 and scored.trajectory is None
+    assert float(scored.evaluation.J[0]) == score(scored.controller)[3]
+    assert (
+        float(face.run(scored.controller, n_steps=12)[3]) == score(scored.controller)[3]
+    )
 
 
 def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():

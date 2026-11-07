@@ -129,11 +129,13 @@ def test_lqr_needs_a_quadratic_cost():
         LQRPlanner(problem)
 
 
-def test_evaluate_rolls_out_and_scores_and_the_loop_balances_the_pendulum():
+def test_evaluate_scores_the_law_and_the_loop_balances_the_pendulum():
+    from minilink.planning.results import drawn_trajectory_of
+
     problem = pendulum_problem()
     solution = LQRPlanner(problem, dt=0.02).solve(evaluate=True)
-    assert solution.trajectory is not None and solution.evaluation.n_trials == 1
-    np.testing.assert_allclose(solution.trajectory.x[:, 0], problem.x0)
+    assert solution.trajectory is None and solution.evaluation.n_trials == 1
+    np.testing.assert_allclose(drawn_trajectory_of(solution).x[:, 0], problem.x0)
     assert solution.evaluation.mean == pytest.approx(
         solution.cost_to_go(problem.x0), rel=0.5
     )

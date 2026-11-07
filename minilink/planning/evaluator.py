@@ -43,9 +43,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.policies import require_feedback_roles
 from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
-from minilink.planning.step_face import face_of
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -684,60 +682,6 @@ def evaluate(
     return pe.evaluate(key=key, n_trials=n_trials, record=record)
 
 
-def nominal_trajectory(problem, controller, *, dt, tf=None) -> Trajectory:
-    """
-    The planner's evidence: ``controller``'s law held over each period of ``dt`` from the problem's start.
-
-    ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
-    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
-    parameters, on NumPy, from ``t0``: the sampled loop a feedback planner
-    designs for (its grid, its model), reported beside its controller; the
-    planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
-    length for an infinite horizon. ``u`` is the plant's command port. The run
-    carries the face's running cost, ``C_{k+1} = C_k + γᵏ c_k``, and the plant
-    role, so :func:`~minilink.planning.evaluation.evaluate_trajectory` scores
-    it on the face's own sum, ``J = Σ γᵏ c_k + γᴺ h``, not by the trapezoid.
-    """
-    # Lazy import: the loop roles load with the first rollout
-    from minilink.core.roles import command_port
-
-    nominal = problem.nominal() if problem.is_stochastic else problem
-    controller = controller_of(controller)
-    plant = nominal.sys
-    n_steps = steps_of(horizon_of(nominal, tf), float(dt))
-
-    # The face's step, the law on the grid, the command's slice of the plant input
-    face = face_of(nominal, float(dt))
-    t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
-    law = held_law(controller, t)
-    command = plant.get_input_port_slice(command_port(plant))
-    u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
-
-    face_params = face.params
-    gamma = float(face.gamma_at(face_params))
-
-    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1} with its stage cost
-    # c_k; C_{k+1} = C_k + γᵏ c_k; the last sample takes its input only
-    xs = np.zeros((plant.n, n_steps + 1))
-    us = np.zeros((command.stop - command.start, n_steps + 1))
-    running = np.zeros(n_steps + 1)
-    xs[:, 0] = nominal.x0
-    for k in range(n_steps + 1):
-        us[:, k] = law(xs[:, k], t[k])
-        if k == n_steps:
-            break
-        u_full[command] = us[:, k]
-        x_next, c = face.transition_at(xs[:, k], u_full, t[k], face_params)
-        xs[:, k + 1] = x_next
-        running[k + 1] = running[k] + gamma**k * float(c)
-
-    # The plant role and its running cost: the run scores on the face's own sum
-    roles = {"plant": {"x": (0, int(plant.n)), "u": PLANT_INPUT}}
-    signals = {PLANT_INPUT: us, RUNNING_COST: running.reshape(1, -1)}
-
-    return Trajectory(t=t, x=xs, u=us, signals=signals, roles=roles)
-
-
 def controller_of(controller):
     """The block itself, or the controller of a :class:`~minilink.planning.results.PlanningSolution`."""
     # A real cycle: results imports Evaluation from this module
@@ -836,70 +780,6 @@ def integrate_adaptive(f, x0, u, ts, options):
     )
 
     return solution.y.T
-
-
-def held_law(controller, t):
-    """``u = π(x, t)`` of a controller on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
-    if int(controller.m) == 0:
-        return time_law(controller, t)
-
-    return static_law(controller)
-
-
-def time_law(source, t):
-    """``u = π(t)`` of a source block, sampled on the grid ``t`` and held over each period."""
-    empty = np.zeros(0)
-
-    # u_k = π(t_k): the source's output at each sample of the grid
-    table = np.stack([np.asarray(source.h(empty, empty, float(t_k))) for t_k in t])
-    t_0 = float(t[0])
-    dt = float(t[1] - t[0])
-
-    # u(t) = u_k at the nearest sample, k = round((t − t_0) / dt)
-    return lambda x, t: table[int(round((t - t_0) / dt))]
-
-
-def static_law(controller):
-    """
-    ``u = π(x, t)`` of a static feedback block on NumPy: the state on its measurement port.
-
-    Every other input of the block holds its nominal value (an unconnected
-    reference its set point); the time reaches the block, so a time-varying
-    gain ``K(t)`` is read at each instant.
-    """
-    # Lazy import: the loop roles load with the first law
-    from minilink.core.roles import block_roles
-
-    roles = block_roles(controller)
-    require_feedback_roles(controller, roles)
-    require_static_law(controller)
-    ev = controller.compile(backend=BACKEND_NUMPY, verbose=False)
-
-    # The measurement's slice of the block's stacked input vector
-    start = 0
-    for port_id, port in controller.inputs.items():
-        if port_id == roles.measurement:
-            measurement = slice(start, start + port.dim)
-        start += port.dim
-    u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
-    x_ctl = np.zeros(0)
-
-    # u = π(x, t): the state on the measurement port, every other input at nominal
-    def law(x, t=0.0):
-        u_in = u_nominal.copy()
-        u_in[measurement] = x
-        return np.asarray(ev.outputs(x_ctl, u_in, float(t))[roles.command])
-
-    return law
-
-
-def require_static_law(controller):
-    """Refuse a policy with internal state for the held rollout: a sample holds none."""
-    if int(controller.n) > 0:
-        raise ValueError(
-            "the planner's rollout holds a static law u = pi(x, t); a controller "
-            "with internal state is scored by evaluate(problem, controller, dt=)"
-        )
 
 
 def compile_loop(loop, backend):

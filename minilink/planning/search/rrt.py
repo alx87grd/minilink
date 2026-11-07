@@ -471,7 +471,11 @@ class RRTPlanner(Planner):
             )
 
         solution = PlanningSolution(
-            self.problem, controller, self.search_record(), trajectory, evaluation
+            problem=self.problem,
+            controller=controller,
+            record=self.search_record(),
+            trajectory=trajectory,
+            evaluation=evaluation,
         )
 
         return self.store_solution(solution)
