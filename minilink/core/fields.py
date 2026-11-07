@@ -573,7 +573,7 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = xp.asarray(self.table_at(t, params))
+        table = xp.asarray(self.table_at(t, params))  # On x's module, x traced or not
         X = xp.asarray(x, dtype=float)
 
         # x held inside the grid on each axis: the edge's value past it
@@ -601,7 +601,7 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = xp.asarray(self.table_at(t, params))
+        table = xp.asarray(self.table_at(t, params))  # On x's module, x traced or not
         X = xp.asarray(x, dtype=float)
 
         # Zero along an axis where x is held, and everywhere outside with a number
@@ -786,9 +786,10 @@ def require_grid_shapes(levels, values, t):
             )
     shape = tuple(level.size for level in levels)
     expected = shape if t is None else (t.size, *shape)
+    axes = "the levels' sizes" if t is None else "the levels' sizes, the times first"
     if values.shape != expected:
         raise ValueError(
-            f"values must have shape {expected} (the levels' sizes{', the times first' if t is not None else ''}), got {values.shape}"
+            f"values must have shape {expected} ({axes}), got {values.shape}"
         )
     if t is not None and (t.size < 2 or np.any(np.diff(t) <= 0.0)):
         raise ValueError("the times t must be at least two increasing values")
