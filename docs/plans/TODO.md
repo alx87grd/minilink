@@ -63,7 +63,7 @@ maintainer would and logged in the run's record.
 | Behavior cloning | — | after v1.0 | the game mode and the fitting planner |
 | A plant that owns its noise ports | — | later | the example, then the two noisy plants revisited |
 | Simon's curve speed scaler | — | later | into the path-tracking project, or the cap `v ≤ √(a_y,max / κ)` |
-| `DynamicBicycle`'s base | S32 | v0.4 (the clean-up lane) | rename `M` → `H` now, the base with K8 |
+| The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | the maintainer's review: which class is the child of which, the cars' base, the mass matrix's one name |
 | The compile-time flatten default | — | standing | after one benchmark: off, on, or always |
 | Which pyro demos the courses need | C1 | v0.5 | your pick |
 | Reward scaling by default | — | later | `reward_scale="auto"` the default or opt-in |
@@ -515,6 +515,15 @@ workboard; the former wave G rows are §4 rows.
   Still open: `DynamicBicycle`'s base. Its named ports and its subclasses' extra states do not
   fit `[q; v]`; the recommendation (and the reviewers') is to rename `M` to `H` only now and
   move the base when K8 reworks the cars.
+  Postponed again (2026-11-07), the `M` → `H` rename included: the maintainer reviews the
+  mechanical hierarchy first (which class is the child of which, `MechanicalSystem` and
+  `GeneralizedMechanicalSystem`, the manipulators, the body-frame vehicles) and the car models'
+  base, at the end-of-v0.4 demo cleanup or later (the row below).
+- [ ] **The mechanical hierarchy and the car models' base, reviewed** **[maintainer]**
+  (2026-11-07): which mechanical class is the child of which, where the car family
+  (`DynamicBicycle` and its children, the racecar, `BicycleDynRate`) sits, and the one
+  mass-matrix name; with the end-of-v0.4 demo cleanup or later. Done when the maintainer rules
+  and the mechanical family's row above is rebuilt on it.
 
 ---
 
