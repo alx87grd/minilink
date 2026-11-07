@@ -38,7 +38,6 @@ maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | A demo: an MPC's hyperparameter tuned by minilink's native methods | — | v0.4 | the planner, the plant and the hyperparameter to tune, §1.7 |
-| The minimal surface's decisions | MS-D1–MS-D6 | v0.4 | each decision's option, §1.12 ([minimal-surface.md](minimal-surface.md)) |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
@@ -412,7 +411,9 @@ benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the main
   `topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb`) with their
   references (the notebook checker, `examples/README.md`, ROADMAP); the five unique topic pages
   stay until K5. Done when the two are gone and the notebook checks pass.
-- [ ] **The benchmarks** (MS-D6).
+- [ ] **The benchmarks** (MS-D6, ruled 2026-11-07): the regression gate stays; the studies, the
+  one-off baselines and the pyro parity scripts go, with `tests/README.md`'s study row. Done
+  when `benchmarks/` holds the gate alone and the CI gate passes.
 
 ### 1.13 The root exports and the tutorials' quirks
 

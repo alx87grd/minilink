@@ -169,7 +169,11 @@ A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or
 - **B.** Delete `benchmarks/` entirely; speed is watched by the acceptance layer's budget.
 - **C.** Keep as is.
 
-*Agent's recommendation:* A. **Answer:**
+*Agent's recommendation:* A. **Answer (2026-11-07):** A: the regression gate stays
+(`run_regression_check.py`, its suites, the trajectory and MPC parity scenarios, the pinned
+baselines); the studies, the one-off baselines (`params_baseline.py`, `step_model_baseline.py`,
+`v03_baseline.py`, `v03_budget.py`) and the pyro parity scripts go, with `tests/README.md`'s
+study row.
 
 ### MS-D7. The release numbering
 
