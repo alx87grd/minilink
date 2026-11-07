@@ -248,7 +248,7 @@ def declare_impedance_ports(
 
 
 def tracking_errors(u, n, ref_dim):
-    """``(e, ė)`` from the flat input ``[r; q; dq]``: ``q_d − q`` and ``dq_d − dq``, ``dq_d = 0`` unless ``r`` carries it."""
+    """``(e, ė)`` from the flat input ``[r; q; dq]``, as :func:`reference_errors`."""
     r = u[:ref_dim]
     q = u[ref_dim : ref_dim + n]
     dq = u[ref_dim + n : ref_dim + 2 * n]
@@ -259,7 +259,7 @@ def tracking_errors(u, n, ref_dim):
 
 
 def reference_errors(r, q, dq):
-    """``(e, ė)`` of a measured ``(q, dq)``, joint or task coordinates, against ``r``: ``q_d − q`` and ``dq_d − dq``, ``dq_d = 0`` unless ``r`` carries it."""
+    """``(e, ė) = (q_d − q, dq_d − dq)`` of a measured ``(q, dq)``, joint or task coordinates; ``r`` is ``q_d`` (``dq_d = 0``) or ``[q_d; dq_d]``."""
     n = q.shape[0]
 
     # The reference [q_d; dq_d], or q_d alone with dq_d = 0 (regulation)

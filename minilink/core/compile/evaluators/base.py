@@ -153,7 +153,7 @@ class Evaluator(JacobianMixin):
         xp = self.xp
         u = self.nominal_input if u is None else u
 
-        # The y port of every output port at (x, u, t)
+        # Every output port at (x, u, t), then the y port among them
         outputs = self.outputs(x, u, t, params)
         if "y" not in outputs:
             return xp.zeros(0)

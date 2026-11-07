@@ -109,7 +109,6 @@ def compile_auto(system, verbose=False):
 
     Returns ``(backend, evaluator)``; the policy is :func:`build_on_auto`'s.
     """
-
     return build_on_auto(
         lambda backend: compile(system, backend=backend, verbose=verbose)
     )
@@ -123,13 +122,12 @@ def build_on_auto(build):
     JAX build surfaces. Every automatic backend (``compile_auto``, the
     simulators' ``backend="auto"``) reads this one rule.
     """
-
+    # JAX first; NumPy when JAX is on disk but does not import (blocked, a broken
+    # install) or a block does not trace
     if jax_installed():
         try:
             return BACKEND_JAX, build(BACKEND_JAX)
-        except ImportError:
-            pass  # present on disk but not importable (e.g. blocked, broken install)
-        except NotTraceableError:
+        except (ImportError, NotTraceableError):
             pass
 
     return BACKEND_NUMPY, build(BACKEND_NUMPY)
