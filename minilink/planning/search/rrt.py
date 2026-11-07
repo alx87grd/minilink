@@ -55,7 +55,7 @@ class RRTPlanner(Planner):
     The search's settings are keywords, read back as attributes: ``max_nodes``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
     ``max_sample_attempts``, ``return_best_effort``, ``nearest_backend``.
-    The workflow, ``callback`` and the live plot, are keywords of :meth:`solve`.
+    The workflow, ``callback`` (the live figure one of its hooks), is a keyword of :meth:`solve`.
 
     Provisional tool: maintainer review before assigning for coursework.
 
@@ -118,12 +118,7 @@ class RRTPlanner(Planner):
         params=None,
         evaluate=False,
         n_trials=50,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        live_plot_every: int = 5,
-        live_plot_pause: float = 0.001,
-        live_plot_after_goal_only: bool = False,
-        live_plot_ax: object | None = None,
+        callback: Callable | list[Callable] | None = None,
     ) -> PlanningSolution:
         """
         Grow the tree until the goal region is reached or the budget is spent.
@@ -134,27 +129,17 @@ class RRTPlanner(Planner):
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
 
-        The workflow: ``callback(step)`` sees an
-        :class:`~minilink.planning.search.live_plot.RRSearchIteration` and
-        ``live_plot`` redraws the tree (on ``live_plot_ax``, or a new figure,
-        pausing ``live_plot_pause`` seconds), both every ``live_plot_every``
-        extensions, and only once the goal is reached with
-        ``live_plot_after_goal_only``.
+        The workflow: ``callback`` (a callable or a list of callables) sees
+        every successful extension as an
+        :class:`~minilink.planning.search.live_plot.RRSearchIteration`; each
+        hook filters for itself. The live figure is one such hook,
+        ``callback=LiveSearchPlot(every=10)``
+        (:class:`~minilink.planning.search.live_plot.LiveSearchPlot`).
         """
-        # The display: each extension's report, or a rebuilt planner's solve
-        workflow = dict(
-            callback=callback,
-            live_plot=live_plot,
-            live_plot_every=live_plot_every,
-            live_plot_pause=live_plot_pause,
-            live_plot_after_goal_only=live_plot_after_goal_only,
-            live_plot_ax=live_plot_ax,
-        )
-
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials, **workflow
+                evaluate=evaluate, n_trials=n_trials, callback=callback
             )
             return self.store_solution(solution)
 
@@ -173,7 +158,7 @@ class RRTPlanner(Planner):
         self.reached_goal = False
         self.solution_node = None
         self.iterations = 0
-        report = self.build_search_report(**workflow)
+        report = self.build_search_report(callback)
 
         for _ in range(self.max_nodes):
             # Sample a state, and extend the nearest node toward it
@@ -255,11 +240,11 @@ class RRTPlanner(Planner):
         return animate_search(self, **kwargs)
 
     def show_live_search(self, **kwargs):
-        """Build a :class:`~minilink.planning.search.live_plot.LiveSearchPlotCallback`."""
+        """A :class:`~minilink.planning.search.live_plot.LiveSearchPlot` for ``solve(callback=...)``."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import LiveSearchPlotCallback
+        from minilink.planning.search.live_plot import LiveSearchPlot
 
-        return LiveSearchPlotCallback(self, **kwargs)
+        return LiveSearchPlot(**kwargs)
 
     ###########################################################################
     # Internal machinery
@@ -289,47 +274,22 @@ class RRTPlanner(Planner):
 
         return Xf
 
-    def build_search_report(
-        self,
-        *,
-        callback=None,
-        live_plot=False,
-        live_plot_every=5,
-        live_plot_pause=0.001,
-        live_plot_after_goal_only=False,
-        live_plot_ax=None,
-    ):
+    def build_search_report(self, callback=None):
         """
-        The solve's report of one extension, ``report(phase)``: the live plot, then the callback, every ``live_plot_every`` extensions.
+        The solve's report of one extension, ``report(phase)``: the search as it stands, handed to every hook.
 
-        Silent before the goal is reached with ``live_plot_after_goal_only``,
-        and a no-op when the solve asks for neither.
+        ``callback`` is a callable or a list of callables; each filters for
+        itself. A no-op when the solve asks for none.
         """
-        hooks = []
-
-        # The live figure, beside the user's callback when there is one
-        if live_plot:
-            # Lazy import: the graphics load on first use, not with the core
-            from minilink.planning.search.live_plot import LiveSearchPlotCallback
-
-            hooks.append(
-                LiveSearchPlotCallback(
-                    self,
-                    ax=live_plot_ax,
-                    every=live_plot_every,
-                    pause=live_plot_pause,
-                    after_goal_only=live_plot_after_goal_only,
-                )
-            )
-        if callback is not None:
-            hooks.append(callback)
+        if callback is None:
+            hooks = []
+        elif isinstance(callback, (list, tuple)):
+            hooks = list(callback)
+        else:
+            hooks = [callback]
 
         def report(phase):
             if not hooks:
-                return
-            if live_plot_after_goal_only and not self.reached_goal:
-                return
-            if self.iterations % max(1, live_plot_every) != 0:
                 return
             step = self.search_step(phase)
             for hook in hooks:

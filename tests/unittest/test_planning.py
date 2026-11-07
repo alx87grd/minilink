@@ -1315,7 +1315,8 @@ def test_rrt_star_requires_rewire_eta_for_unknown_extender():
         planner.max_connection()
 
 
-def test_search_callback_invoked_on_rrt():
+def test_search_callback_sees_every_extension():
+    """The user's callback sees every successful extension, none filtered."""
     calls = []
 
     class RecordingCallback:
@@ -1329,18 +1330,28 @@ def test_search_callback_invoked_on_rrt():
         seed=0,
         max_nodes=200,
     )
-    planner.solve(callback=RecordingCallback(), live_plot_every=1)
-    assert calls
-    assert all((step.iteration > 0 for step in calls))
+    planner.solve(callback=RecordingCallback())
+    assert [step.iteration for step in calls] == list(range(1, planner.iterations + 1))
     assert calls[-1].phase == "explore"
 
 
-def test_live_plot_after_goal_only_skips_explore_phase():
-    calls = []
+def test_the_live_plot_filters_for_itself():
+    """LiveSearchPlot(after_goal_only=True) draws nothing before the goal; a callback beside it sees every extension."""
+    import matplotlib
 
-    class RecordingCallback:
-        def __call__(self, step):
-            calls.append(step.phase)
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from minilink.planning import LiveSearchPlot
+
+    _, ax = plt.subplots()
+    seen = []
+    lines_before_goal = []
+
+    def record(step):
+        seen.append(step.phase)
+        if not step.reached_goal:
+            lines_before_goal.append(len(ax.lines))
 
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
@@ -1351,20 +1362,24 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         optimize_after_goal=True,
         convergence_patience=100,
     )
-    planner.solve(
-        callback=RecordingCallback(), live_plot_every=1, live_plot_after_goal_only=True
-    )
+    live = LiveSearchPlot(every=25, pause=0.0, after_goal_only=True, ax=ax)
+    planner.solve(callback=[live, record])
     assert planner.reached_goal
-    assert calls
-    assert all((phase == "optimize" for phase in calls))
+    assert len(seen) == planner.iterations
+    assert "explore" in seen and "optimize" in seen
+    assert lines_before_goal and not any(lines_before_goal)
+    assert ax.lines
+    plt.close(ax.figure)
 
 
 def test_live_plot_runs_beside_the_callback():
-    """A solve with callback= and live_plot=True hands every step to both."""
+    """A solve with callback=[record, LiveSearchPlot(...)] hands every step to both."""
     import matplotlib
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
+    from minilink.planning import LiveSearchPlot
 
     calls = []
     problem, _ = make_holonomic_obstacle_problem()
@@ -1372,13 +1387,7 @@ def test_live_plot_runs_beside_the_callback():
         problem, extender=make_steering_extender(), seed=0, max_nodes=10
     )
     _, ax = plt.subplots()
-    planner.solve(
-        callback=calls.append,
-        live_plot=True,
-        live_plot_every=1,
-        live_plot_pause=0.0,
-        live_plot_ax=ax,
-    )
+    planner.solve(callback=[calls.append, LiveSearchPlot(pause=0.0, ax=ax)])
     assert calls
     assert ax.lines
     plt.close(ax.figure)

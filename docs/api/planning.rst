@@ -86,6 +86,9 @@ Search
 .. automodule:: minilink.planning.search.tree
    :members:
 
+.. automodule:: minilink.planning.search.live_plot
+   :members:
+
 Dynamic programming
 -------------------
 

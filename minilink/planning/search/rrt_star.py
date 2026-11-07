@@ -113,12 +113,7 @@ class RRTStarPlanner(RRTPlanner):
         params=None,
         evaluate=False,
         n_trials=50,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        live_plot_every: int = 5,
-        live_plot_pause: float = 0.001,
-        live_plot_after_goal_only: bool = False,
-        live_plot_ax: object | None = None,
+        callback: Callable | list[Callable] | None = None,
         record_history: bool = False,
         history_stride: int = 1,
     ) -> PlanningSolution:
@@ -131,16 +126,6 @@ class RRTStarPlanner(RRTPlanner):
         :class:`RRTStarSnapshot` in :attr:`history` on the first and every
         ``history_stride``-th extension, and on the last.
         """
-        # The display: each extension's report, or a rebuilt planner's solve
-        workflow = dict(
-            callback=callback,
-            live_plot=live_plot,
-            live_plot_every=live_plot_every,
-            live_plot_pause=live_plot_pause,
-            live_plot_after_goal_only=live_plot_after_goal_only,
-            live_plot_ax=live_plot_ax,
-        )
-
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
@@ -148,7 +133,7 @@ class RRTStarPlanner(RRTPlanner):
                 n_trials=n_trials,
                 record_history=record_history,
                 history_stride=history_stride,
-                **workflow,
+                callback=callback,
             )
             return self.store_solution(solution)
 
@@ -176,7 +161,7 @@ class RRTStarPlanner(RRTPlanner):
         self.iterations = 0
         self.best_goal_cost = None
         self.history = []
-        report = self.build_search_report(**workflow)
+        report = self.build_search_report(callback)
 
         best_goal_node = None
         stale_extensions = 0

@@ -1627,8 +1627,8 @@ the `seed`), given as flat keywords and held in `planner.params` (`params["metho
 taken per call by `solve(params=…)`, the complete tree edited (a method number the tree
 leaves at its value is derived again on the solve's problem, one it changes is given); **an external solver's knobs** (SciPy `maxiter`,
 `ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
-**workflow** (`verbose`, `callback`, `live_plot`, `record_history`, RRT's `live_plot_*` display
-knobs and RRT*'s `history_stride`), keywords that change what is shown, never what is computed. The constructor
+**workflow** (`verbose`, `callback`, trajectory optimization's `live_plot`, `record_history`
+and RRT*'s `history_stride`), keywords that change what is shown, never what is computed. The constructor
 takes the first three kinds; the workflow is a keyword of the verb, `solve` (and `solve_steps`
 where it exists), as on `Optimizer.solve` and `compute_trajectory`, and travels as arguments
 down to where it is read, never as planner state. A planner rebuilt for a sweep (`planner_at`,
@@ -1790,8 +1790,11 @@ with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `optimize_after_goal`, the search continues after the first goal connection until
 the best goal cost stops improving for `convergence_patience` extensions;
 `solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
-`solve(callback=…, live_plot=True)` hands each step to both, the tree redrawn beside the
-callback; the `nearest_backend` setting
+`solve(callback=…)` takes a callable or a list of callables and hands every successful
+extension to each (an `RRSearchIteration`), each hook filtering for itself; the live figure is
+one such hook, `LiveSearchPlot(every=1, pause=…, after_goal_only=False, ax=None)` (ruled
+2026-11-07: an object in place of the five `live_plot*` keywords), exported on
+`minilink.planning`; the `nearest_backend` setting
 selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 ## 7. Graphics And Benchmarks

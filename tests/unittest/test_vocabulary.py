@@ -94,6 +94,11 @@ RETIRED = {
     ),
     "plot_solution": ("plot_trajectory", None),
     "animate_solution": ("animate", None),
+    "live_plot": ("callback=LiveSearchPlot()", ("RRTPlanner", "RRTStarPlanner")),
+    "live_plot_every": ("LiveSearchPlot(every=)", None),
+    "live_plot_pause": ("LiveSearchPlot(pause=)", None),
+    "live_plot_after_goal_only": ("LiveSearchPlot(after_goal_only=)", None),
+    "live_plot_ax": ("LiveSearchPlot(ax=)", None),
 }
 
 
@@ -202,20 +207,9 @@ WORKFLOW = {
     "callback",
     "live_plot",
     "record_history",
-    "live_plot_every",
-    "live_plot_pause",
-    "live_plot_after_goal_only",
-    "live_plot_ax",
     "history_stride",
 }
-SEARCH_DISPLAY = {
-    "callback",
-    "live_plot",
-    "live_plot_every",
-    "live_plot_pause",
-    "live_plot_after_goal_only",
-    "live_plot_ax",
-}
+SEARCH_DISPLAY = {"callback"}
 VERB_WORKFLOW = {
     "DynamicProgrammingPlanner": {"verbose", "record_history"},
     "TrajectoryOptimizationPlanner": {

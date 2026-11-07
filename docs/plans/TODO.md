@@ -412,9 +412,10 @@ commit per proposal, its callers and DESIGN in the same change.
   constructors keep structure, numbers and `options=`, as `Optimizer.solve` and
   `compute_trajectory`; a planner rebuilt for a sweep inherits no display; only the orchestrator's verb takes
   them: the compiled face's `pv.solve(params, z0)` stays pure, fast and free of plots and
-  printing, as today; with it, RRT's display knobs (`live_plot_every`, `live_plot_pause`,
-  `live_plot_after_goal_only`, `live_plot_ax`) move to `solve`, RRT runs `callback` and
-  `live_plot` together (today the live plot is silently dropped beside a callback), and tabular
+  printing, as today; with it, RRT's live plot is an object, `LiveSearchPlot(every=1, pause=…,
+  after_goal_only=False, ax=None)`, a hook of `solve(callback=…)`, which takes a callable or a
+  list of callables, each hook filtering for itself (ruled 2026-11-07: the five `live_plot*`
+  keywords leave both RRT planners' `solve`; the user's callback sees every extension), and tabular
   RL gains `solve(verbose=)`; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
   `problem.compile()` always returning the evaluator, the step face from
   `discretize(dt).compile()` (ruled 2026-11-07: one return type per verb, a controller-less
