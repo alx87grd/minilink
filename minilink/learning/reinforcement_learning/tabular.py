@@ -182,21 +182,21 @@ class TabularLearningPlanner(Planner):
         """
         grid = self.grid
         Q = self.Q
-        episodes = len(self.history)
+        n_episodes = len(self.history)
 
         # J(x) = min_u Q(x, u) and π(x) = argmin_u Q(x, u)
         J = Q.min(axis=1)
         pi = Q.argmin(axis=1)
 
         return DynamicProgrammingResult(
-            grid=grid, J=J, pi=pi, iterations=episodes, delta=float("nan")
+            grid=grid, J=J, pi=pi, iterations=n_episodes, delta=float("nan")
         )
 
     def solve(
-        self, episodes=1000, *, params=None, evaluate=False, n_trials=50
+        self, n_episodes=1000, *, params=None, evaluate=False, n_trials=50
     ) -> PlanningSolution:
         """
-        Learn for ``episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
+        Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
         ``evaluate=True`` also rolls the law out from the problem's start and
         scores it over the problem's draws.
@@ -207,12 +207,12 @@ class TabularLearningPlanner(Planner):
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                episodes, evaluate=evaluate, n_trials=n_trials
+                n_episodes, evaluate=evaluate, n_trials=n_trials
             )
             return self.store_solution(solution)
 
         # Episodes of interaction, learning as they go
-        self.learn(episodes)
+        self.learn(n_episodes)
 
         # The greedy law of the learned table
         result = self.result
@@ -258,8 +258,8 @@ class TabularLearningPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def learn(self, episodes):
-        """Run ``episodes`` episodes of interaction, learning as they go; returns ``self``."""
+    def learn(self, n_episodes):
+        """Run ``n_episodes`` episodes of interaction, learning as they go; returns ``self``."""
         grid = self.grid
         env = self.env
         Q = self.Q
@@ -270,10 +270,10 @@ class TabularLearningPlanner(Planner):
         gamma = self.gamma
         rng = self.rng
 
-        for episode in range(episodes):
+        for episode in range(n_episodes):
             # The episode's exploration schedule, parameter draw, start node and
             # first action
-            progress = episode / max(episodes - 1, 1)
+            progress = episode / max(n_episodes - 1, 1)
             params = env.sample_params(rng)
             s = self.node(self.start())
             t = env.t0
@@ -341,7 +341,7 @@ class TabularLearningPlanner(Planner):
 
         return TabularLearningRecord(
             algorithm=algorithm,
-            episodes=len(history),
+            n_episodes=len(history),
             visited_fraction=visited_fraction,
             cost=cost,
             table_finite=table_finite,
@@ -457,7 +457,7 @@ class TabularLearningRecord:
     """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from."""
 
     algorithm: str
-    episodes: int
+    n_episodes: int
     visited_fraction: float
     cost: float
     table_finite: bool
@@ -475,7 +475,7 @@ class TabularLearningRecord:
 
     def __str__(self) -> str:
         return (
-            f"{self.algorithm}: {self.episodes} episodes, {100 * self.visited_fraction:.0f}% of "
+            f"{self.algorithm}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
             f"the grid visited, mean episode cost {self.cost:.2f} at the end"
         )
 

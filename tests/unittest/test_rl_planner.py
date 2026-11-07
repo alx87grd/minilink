@@ -143,9 +143,9 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     )
     assert isinstance(planner.algorithm, PPO)
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
-    solution = planner.solve(timesteps=256)
+    solution = planner.solve(n_timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert solution.record.timesteps == 256 and solution.record.algorithm == "PPO"
+    assert solution.record.n_timesteps == 256 and solution.record.algorithm == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.num_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller
@@ -193,7 +193,7 @@ def test_learn_and_solve_verbose_override_the_constructor(capsys):
     planner.learn(32, verbose=True)
     logged = capsys.readouterr().out
     assert "steps" in logged and planner.verbose is False
-    planner.solve(timesteps=32, verbose=False)
+    planner.solve(n_timesteps=32, verbose=False)
     assert capsys.readouterr().out == ""
 
 
@@ -297,7 +297,7 @@ def test_solve_with_evaluate_carries_the_rollout_and_the_full_evaluation():
         episode_length=0.5,  # episodes end inside a collection: the record's cost is a number
         verbose=0,
     )
-    solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
+    solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=4)
     assert solution.evaluation.J.shape == (4,)
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     np.testing.assert_array_equal(solution.trajectory.x, planner.nominal_trajectory().x)
@@ -489,7 +489,7 @@ def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
     )
-    solution = planner.solve(timesteps=64, evaluate=True, n_trials=4)
+    solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=4)
     assert np.isfinite(solution.evaluation.mean) and solution.success
     assert 0.0 <= solution.evaluation.feasibility_rate <= 1.0
     assert "truncates" in planner.env.describe()
@@ -640,7 +640,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     planner.learn(2 * planner.n_steps * planner.n_envs)
     assert len(planner.history) == 2
     assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
-    solution = planner.solve(timesteps=planner.n_steps * planner.n_envs)
+    solution = planner.solve(n_timesteps=planner.n_steps * planner.n_envs)
     assert (
         solution.success
         and solution.record.algorithm == type(planner.algorithm).__name__
@@ -731,7 +731,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     planner = ReinforcementLearningPlanner(
         prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32, verbose=0
     )
-    solution = planner.solve(timesteps=64)
+    solution = planner.solve(n_timesteps=64)
     x = np.array([0.2, 0.0])
     w = planner.algorithm.params(planner.train_state)["critic"]
     np.testing.assert_allclose(
@@ -748,7 +748,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
         gamma=0.5,
         verbose=0,
     )
-    assert other.solve(timesteps=64).cost_to_go is None
+    assert other.solve(n_timesteps=64).cost_to_go is None
 
 
 def test_the_planner_trains_on_a_substepped_step_model():
@@ -763,7 +763,7 @@ def test_the_planner_trains_on_a_substepped_step_model():
         batch_size=32,
         verbose=False,
     )
-    solution = planner.solve(timesteps=32)
+    solution = planner.solve(n_timesteps=32)
     env = planner.env
     x, u = np.array([0.3, 0.0]), np.array([0.5])
     expected = env.sys.compile(verbose=False).step(x, u, 0.0, dt=0.1, substeps=2)
@@ -823,7 +823,7 @@ def test_the_collector_draws_each_episode_at_its_own_policy_seed():
     )
     seeds = np.asarray(planner.carry[4])
     assert seeds.shape == (4,) and len(set(seeds.tolist())) == 4
-    planner.solve(timesteps=32)
+    planner.solve(n_timesteps=32)
     assert not np.array_equal(np.asarray(planner.carry[4]), seeds)
 
 
@@ -831,12 +831,12 @@ def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
     """The problem's discount by default; an override is a training choice the record names."""
     kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16, verbose=0)
     prob = problem(horizon=np.inf, discount_rate=0.5)
-    derived = ReinforcementLearningPlanner(prob, **kwargs).solve(timesteps=16).record
+    derived = ReinforcementLearningPlanner(prob, **kwargs).solve(n_timesteps=16).record
     assert derived.gamma == derived.scored_gamma == np.exp(-prob.discount_rate * 0.1)
     assert not derived.discount_differs and "scored at" not in str(derived)
 
     override = ReinforcementLearningPlanner(prob, gamma=0.9, **kwargs)
-    record = override.solve(timesteps=16).record
+    record = override.solve(n_timesteps=16).record
     assert record.gamma == 0.9 and record.discount_differs
     assert "trained at gamma=0.9" in str(record)
 
@@ -864,9 +864,9 @@ def test_training_again_leaves_an_earlier_solution_as_it_was():
         batch_size=32,
         verbose=0,
     )
-    first = planner.solve(timesteps=128)
+    first = planner.solve(n_timesteps=128)
     W0 = np.array(first.controller.params["mlp"]["W0"])
-    second = planner.solve(timesteps=128)
+    second = planner.solve(n_timesteps=128)
 
     assert first.controller is not second.controller
     np.testing.assert_array_equal(first.controller.params["mlp"]["W0"], W0)

@@ -230,7 +230,7 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
         planner = TabularLearningPlanner(
             problem, gamma=0.9, solver="euler", seed=0, **grid
         )
-        solution = planner.solve(episodes=300, evaluate=True)
+        solution = planner.solve(n_episodes=300, evaluate=True)
     assert not solution.open_loop and solution.evaluation.n_trials == 1
     planned = solution.trajectory
 
@@ -289,7 +289,7 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
         gamma=0.9,
         verbose=0,
     )
-    solution = planner.solve(timesteps=64, evaluate=True, n_trials=3)
+    solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=3)
     verb = nominal_trajectory(problem, solution.controller, dt=0.1, tf=planner.env.tf)
     np.testing.assert_allclose(verb.x, solution.trajectory.x, atol=1e-10)
     assert isinstance(verb, Trajectory) and solution.evaluation.n_trials == 3

@@ -66,7 +66,7 @@ planner = ReinforcementLearningPlanner(
     batch_size=512,
     gamma=0.99,
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 

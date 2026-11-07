@@ -74,7 +74,7 @@ planner = ReinforcementLearningPlanner(
     gamma=0.995,
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 

@@ -1479,7 +1479,7 @@ are those of value iteration on the latest solution's tables (RULES 2.4), and th
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
-learns a neural law in pure JAX: `solve(timesteps=)` → `PlanningSolution`
+learns a neural law in pure JAX: `solve(n_timesteps=)` → `PlanningSolution`
 (a copy of the trained block as `controller`, a `ReinforcementLearningRecord`, the critic as
 `cost_to_go` when the discounts match), `planner.controller` →
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,

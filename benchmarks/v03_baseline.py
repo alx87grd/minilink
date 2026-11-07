@@ -358,7 +358,7 @@ def rl_entries(out):
         gamma=0.97,
         verbose=False,
     )
-    planner.solve(timesteps=256, verbose=False)
+    planner.solve(n_timesteps=256, verbose=False)
     law = planner.controller
     states = np.array([[0.0, 0.0], [1.0, -0.5], [3.0, 1.0]])
     out["rl.ppo.u"] = [law.ctl(None, x) for x in states]

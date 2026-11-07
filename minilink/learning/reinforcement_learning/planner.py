@@ -125,7 +125,7 @@ class ReinforcementLearningPlanner(Planner):
     critic : ValueFunction or QFunction or None
         The critic of the algorithm's family.
     history : list of dict
-        One record per iteration (timesteps, mean episode return, losses, fps).
+        One record per iteration (n_timesteps, mean episode return, losses, fps).
     env : RolloutEnvironment
         The compiled environment (its ``describe()`` states the semantics).
     """
@@ -277,10 +277,10 @@ class ReinforcementLearningPlanner(Planner):
         return {"method": self.algorithm.method_params, "seed": self.seed}
 
     def solve(
-        self, timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
+        self, n_timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
     ) -> PlanningSolution:
         """
-        Train for ``timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
+        Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
 
         The solver record carries the training facts. ``evaluate=True`` also
         rolls the deterministic law out from the problem's start and scores it
@@ -288,16 +288,16 @@ class ReinforcementLearningPlanner(Planner):
         overrides :attr:`verbose` for this call only.
         """
         # Train, then store the learned law as the planner's solution
-        self.learn(timesteps, verbose=verbose)
+        self.learn(n_timesteps, verbose=verbose)
         solution = self.solution(evaluate, n_trials)
 
         return self.store_solution(solution)
 
     # Training
 
-    def learn(self, timesteps, *, verbose=None):
+    def learn(self, n_timesteps, *, verbose=None):
         """
-        Train for ``timesteps`` plant steps (rounded up to whole collections); returns ``self``.
+        Train for ``n_timesteps`` plant steps (rounded up to whole collections); returns ``self``.
 
         ``verbose`` overrides :attr:`verbose` for this call only.
         """
@@ -305,7 +305,7 @@ class ReinforcementLearningPlanner(Planner):
 
         log = self.verbose if verbose is None else bool(verbose)
         steps_per_iteration = self.n_steps * self.n_envs
-        n_iterations = math.ceil(timesteps / steps_per_iteration)
+        n_iterations = math.ceil(n_timesteps / steps_per_iteration)
 
         for _ in range(n_iterations):
             # Fresh keys for this iteration's collection and update
@@ -384,7 +384,7 @@ class ReinforcementLearningPlanner(Planner):
             _, ax = plt.subplots(figsize=(8, 3))
 
         # Mean episode return against plant steps, one point per iteration
-        steps = [h["timesteps"] for h in self.history]
+        steps = [h["n_timesteps"] for h in self.history]
         returns = [h["ep_return_mean"] for h in self.history]
         ax.plot(steps, returns)
         ax.set_xlabel("timesteps")
@@ -560,7 +560,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The record: steps, mean return, episodes, speed, time, the algorithm's losses
         record = {
-            "timesteps": self.num_timesteps,
+            "n_timesteps": self.num_timesteps,
             "ep_return_mean": self.last_ep_return_mean,
             "n_episodes": int(ep_returns.size),
             "fps": self.n_steps * self.n_envs / max(time.time() - t0, 1e-9),
@@ -575,7 +575,7 @@ class ReinforcementLearningPlanner(Planner):
         """One progress line: timesteps, mean episode return, the algorithm's losses, speed."""
         shown = " | ".join(f"{k} {float(v):8.4g}" for k, v in stats.items())
         print(
-            f"steps {record['timesteps']:>8d} | "
+            f"steps {record['n_timesteps']:>8d} | "
             f"ep_return {record['ep_return_mean']:9.1f} | "
             f"{shown} | fps {record['fps']:7.0f} | {record['elapsed']:.0f}s"
         )
@@ -636,7 +636,7 @@ class ReinforcementLearningPlanner(Planner):
 
         return ReinforcementLearningRecord(
             algorithm=type(self.algorithm).__name__,
-            timesteps=self.num_timesteps,
+            n_timesteps=self.num_timesteps,
             train_time_s=self.train_time,
             cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
@@ -716,7 +716,7 @@ class ReinforcementLearningRecord:
 
     ``cost`` is the mean episode cost ``J`` of the last collection, positive
     and falling. ``history`` holds one dict per learning iteration
-    (``timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
+    (``n_timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
     training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
     ``reward`` is what the training rewarded: ``"running"`` (``−g dt``) or
@@ -724,7 +724,7 @@ class ReinforcementLearningRecord:
     """
 
     algorithm: str
-    timesteps: int
+    n_timesteps: int
     train_time_s: float
     cost: float
     weights_finite: bool
@@ -751,7 +751,7 @@ class ReinforcementLearningRecord:
     def __str__(self) -> str:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
-            f"{self.algorithm}: {self.timesteps} plant steps in "
+            f"{self.algorithm}: {self.n_timesteps} plant steps in "
             f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
         )

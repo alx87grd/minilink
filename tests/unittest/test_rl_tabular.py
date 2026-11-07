@@ -62,11 +62,11 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     learner = TabularLearningPlanner(
         problem, gamma=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
-    solution = learner.solve(episodes=2000)
+    solution = learner.solve(n_episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
     assert isinstance(solution.controller, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
-    assert solution.record.episodes == 2000 and len(learner.history) == 2000
+    assert solution.record.n_episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
@@ -153,7 +153,7 @@ def test_exploration_policies_choose_valid_actions():
 def test_sample_average_step_and_the_planner_arguments():
     problem = double_integrator_problem()
     learner = TabularLearningPlanner(problem, eta=None, **GRID)
-    solution = learner.solve(episodes=5, evaluate=True)
+    solution = learner.solve(n_episodes=5, evaluate=True)
     assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
     assert solution.evaluation.n_trials == 1 and solution.trajectory is not None

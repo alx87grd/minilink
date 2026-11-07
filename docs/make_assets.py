@@ -469,7 +469,7 @@ def gif_rocket() -> None:
         log_std_init=-1.0,
         seed=0,
     )
-    planner.solve(timesteps=TRAINING_TIMESTEPS)
+    planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
     cl_sys = planner.controller @ plant
