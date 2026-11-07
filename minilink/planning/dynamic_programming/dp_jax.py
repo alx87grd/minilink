@@ -47,13 +47,9 @@ def value_iteration(
     """
     jax = ensure_jax_x64()
 
-    opt = planner
-
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner, verbose)
-    J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time, verbose))
-    gamma = float(planner.gamma)
-    tol = float(planner.tol)
+    J0 = jax.numpy.asarray(terminal_cost(planner, planner.final_time, verbose))
 
     # Reported or recorded: one jitted step at a time, driven from Python
     if verbose or record_history:
@@ -75,6 +71,8 @@ def value_iteration(
         return finite_sweeps(planner, J0, G, coords, in_bounds, max_sweeps)
 
     # All the backward sweeps in one compiled call, the numbers its arguments
+    gamma = float(planner.gamma)
+    tol = float(planner.tol)
     run = compiled_loop(planner, stop_on_tol, max_sweeps)
     J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
@@ -311,12 +309,11 @@ def sweep_by_sweep(
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
-    opt = planner
-    tf = opt.final_time
+    tf = planner.final_time
     dt = planner.grid.dt
     N = planner.grid.nodes_n
-    tol = float(opt.tol)
-    gamma = float(opt.gamma)
+    tol = float(planner.tol)
+    gamma = float(planner.gamma)
     step = jitted_step(planner)
 
     log = SweepLog(
@@ -439,7 +436,7 @@ def jitted_step(planner):
             )
             return jnp.where(in_bounds, J_arrival, 0.0).reshape(N, A)
 
-        # J(x) = min_u [ g(x, u) dt + γ J_next(x_next) ]
+        # J(x) = min_u [ c(x, u) + γ J_next(x_next) ]
         J, pi = bellman_backup(J_next, G, arrival, gamma)
 
         return J, pi.astype(jnp.int32)

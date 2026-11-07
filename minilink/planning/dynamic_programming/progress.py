@@ -54,8 +54,9 @@ class SweepLog:
     Bookkeeping of the backward sweeps: the pyro-style report and the ``(t, J, pi)`` history.
 
     Verbose solves print a banner, one line per sweep (a progress line for a
-    finite or receding horizon's fixed number of sweeps) and a closing line. ``history`` is the recorded list, or
-    ``None`` when the solve does not ask for it.
+    finite or receding horizon's fixed number of sweeps) and a closing line.
+    ``history`` is the recorded list, or ``None`` when the solve does not ask
+    for it.
     """
 
     def __init__(
