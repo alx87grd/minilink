@@ -345,8 +345,14 @@ commit per proposal, its callers and DESIGN in the same change.
   pins `sys.h == outputs["y"]` on every block and catalog plant.
 - [ ] **A later round of API proposals** **[ask — public names]** (from the 2026-11-05
   public-surface scan, after its nine rulings landed; each needs its own context and options
-  before a ruling): the planner's shortcuts taking the solution's names (`plot_solution` →
-  `plot_trajectory`; `get_controller` and `value_at`; student-facing); training budgets
+  before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
+  full mirror and one meaning per word: the **controller** is the block a loop closes on, the
+  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, a new
+  `sol.policy(x, t)` evaluates it, the planner mirrors the solution: `planner.controller` for
+  `get_controller()`, `planner.policy(x, t)`, `planner.cost_to_go(x)` for `value_at(x)`,
+  `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
+  `animate_solution()`; the `*Policy` class names stay, naming the law a block implements; one
+  sweep, no alias, CONSTITUTION's line amended); training budgets
   `n_episodes` and `n_timesteps` (RULES 2.7); workflow keywords on constructors;
   `problem.compile()` always returning the evaluator, the step face from
   `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the

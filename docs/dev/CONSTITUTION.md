@@ -73,7 +73,8 @@ one of these quantities takes or returns the object, never its arrays:
 - `PlanningProblem` — a system, its sets, a cost and a horizon, stochastic by its parts: a law
   where a number goes (the start, a parameter), and a disturbance a noise source block wired
   onto a port.
-- `PlanningSolution` — a policy, itself a `System`, and the evidence for it.
+- `PlanningSolution` — a controller, itself a `System` (the block a loop closes on), its policy
+  `u = π(x, t)` (the law as a function), and the evidence for them.
 - `MathematicalProgram` — the one NLP shape every transcription lowers to; its parametric
   form, with the problem's parameters as an input, is the same shape.
 
