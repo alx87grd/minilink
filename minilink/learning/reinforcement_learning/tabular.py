@@ -240,10 +240,14 @@ class TabularLearningPlanner(Planner):
                 self, controller, dt=dt, n_trials=n_trials, tf=tf
             )
 
-        # The solution: the law, the record, the rollout, the interpolated cost-to-go
+        # The solution: the law, the record, the rollout, and the cost-to-go as a field
+        # on the grid, the failure cost past it (the price of leaving the grid)
         record = self.learning_record(result)
+        cost_to_go = result.grid.field(
+            result.J, method="linear", outside=self.env.failure_cost
+        )
         solution = PlanningSolution(
-            self.problem, controller, record, trajectory, evaluation, result.value_at
+            self.problem, controller, record, trajectory, evaluation, cost_to_go
         )
         if verbose:
             print(record)

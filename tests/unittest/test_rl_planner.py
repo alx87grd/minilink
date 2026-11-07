@@ -735,6 +735,10 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
     np.testing.assert_allclose(
         solution.cost_to_go(x), -float(planner.critic.value(w, jnp.asarray(x)))
     )
+
+    # The critic is a callable of x alone: the planner reads it at any time
+    assert planner.cost_to_go(x, t=3.0) == planner.cost_to_go(x)
+
     # the same problem trained at another discount estimates something else
     other = ReinforcementLearningPlanner(
         prob,
@@ -746,6 +750,10 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
         gamma=0.5,
     )
     assert other.solve(n_timesteps=64).cost_to_go is None
+    with pytest.raises(
+        ValueError, match="ReinforcementLearningPlanner gives no cost-to-go"
+    ):
+        other.cost_to_go(x)
 
 
 def test_the_planner_trains_on_a_substepped_step_model():

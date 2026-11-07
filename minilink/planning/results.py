@@ -60,11 +60,11 @@ class PlanningSolution:
     cost_to_go : Field, callable or None
         ``J(x)``, the method's own estimate under its own model, where the
         method produces one: a :class:`~minilink.core.fields.GridField` for
-        dynamic programming (the failure cost past its grid), a
-        :class:`~minilink.core.fields.QuadraticField` for a linear-quadratic
-        design (``J(x, t=t)`` on a finite horizon); the interpolated table of
-        tabular learning and the critic of a learned law (when it estimates
-        the problem's own discount) are plain callables of ``x``. On a
+        dynamic programming and tabular learning (the failure cost past its
+        grid), a :class:`~minilink.core.fields.QuadraticField` for a
+        linear-quadratic design (``J(x, t=t)`` on a finite horizon); the critic
+        of a learned law (when it estimates the problem's own discount) is a
+        plain callable of ``x``. On a
         stochastic problem it is the expected cost-to-go when the method
         takes the distributions.
     params : dict, optional

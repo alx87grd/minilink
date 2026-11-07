@@ -68,6 +68,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     assert isinstance(learner.result, DynamicProgrammingResult)
     assert solution.record.n_episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
+    assert learner.cost_to_go(np.zeros(2), t=1.0) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
     J_vi = vi.result.J
@@ -192,3 +193,17 @@ def test_a_verbose_solve_reports_the_episodes_and_the_record(capsys):
     printed = capsys.readouterr().out
     assert "Learning Q(x,u)" in printed and "(5 episodes)" in printed
     assert str(solution.record) in printed
+
+
+def test_the_learned_cost_to_go_is_a_grid_field_priced_at_the_failure_cost_past_the_grid():
+    from minilink.core.fields import GridField
+
+    learner = TabularLearningPlanner(double_integrator_problem(), seed=0, **GRID)
+    solution = learner.solve(n_episodes=50)
+
+    # The table read on the grid, the failure cost of leaving it past its edge
+    J = solution.cost_to_go
+    assert isinstance(J, GridField)
+    node = learner.grid.states[17]
+    assert J(node) == pytest.approx(solution.record.tables.J[17])
+    assert J(np.array([3.0, 0.0])) == learner.env.failure_cost == 20.0

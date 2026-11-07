@@ -7,6 +7,7 @@ from copy import deepcopy
 import numpy as np
 
 from minilink.blocks.sources import TrajectorySource
+from minilink.core.fields import Field
 from minilink.core.params import checked, merge_known
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
@@ -117,9 +118,20 @@ class Planner(ABC):
         return require_solution(self).policy(x, t)
 
     def cost_to_go(self, x, t=None) -> float:
-        """The latest solution's cost-to-go at ``x`` (at ``t`` when given): its ``cost_to_go`` field, read."""
-        J = require_solution(self).cost_to_go
-        value = J(x) if t is None else J(x, t=t)
+        """
+        The latest solution's cost-to-go at ``x`` (at ``t`` when given): its ``cost_to_go``, read.
+
+        A :class:`~minilink.core.fields.Field` reads ``t``; a plain callable of
+        ``x`` (the critic of a learned law) is time-invariant and ignores it.
+        """
+        solution = require_solution(self)
+        J = require_cost_to_go(self, solution)
+
+        # A field reads the time; a callable of x alone does not
+        if isinstance(J, Field) and t is not None:
+            value = J(x, t=t)
+        else:
+            value = J(x)
 
         return float(value)
 
@@ -168,6 +180,14 @@ def require_solution(planner) -> PlanningSolution:
         raise ValueError("No solution has been computed yet")
 
     return planner.last_solution
+
+
+def require_cost_to_go(planner, solution):
+    """Refuse a solution whose method gives no cost-to-go; return its ``cost_to_go``."""
+    if solution.cost_to_go is None:
+        raise ValueError(f"{type(planner).__name__} gives no cost-to-go")
+
+    return solution.cost_to_go
 
 
 def solution_trajectory_of(planner) -> Trajectory:

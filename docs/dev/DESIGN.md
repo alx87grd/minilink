@@ -1251,9 +1251,10 @@ bounds the command, since the Riccati law never reads `U` (LQR never
 warns)), the
 `trajectory` (native for open-loop planners; for a feedback law its nominal
 rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
-`cost_to_go` where the method produces one (a `GridField` for value iteration,
-a `QuadraticField` for `LQRPlanner`, read `J(x)` or `J(x, t=t)`; the tabular table and
-the RL critic, when the training discount equals the problem's, plain callables of `x`). Everything on the solution is the solver's own claim under its
+`cost_to_go` where the method produces one (a `GridField` for value iteration and
+tabular learning, the failure cost past the grid, a `QuadraticField` for `LQRPlanner`,
+read `J(x)` or `J(x, t=t)`; the RL critic, when the training discount equals the
+problem's, a plain callable of `x`, which `planner.cost_to_go(x, t)` reads at any `t`). Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
