@@ -640,8 +640,8 @@ class PlanningProblem:
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
         clock: ``dt`` omitted reads its base period. On a sampled loop
         ``substeps`` is the plant's steps per base period, ``None`` the
-        automatic step (``problem.compile(mpc % 0.2, substeps=20)``). One verb,
-        one return type: the problem's step face is its discretization's,
+        automatic step (``problem.compile(mpc % 0.2, substeps=20)``). The
+        problem's step face is its discretization's,
         ``problem.discretize(dt).compile()``.
         """
         require_controller_to_compile(controller)
