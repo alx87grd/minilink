@@ -18,6 +18,7 @@ from minilink.core.distributions import child_seed
 from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
 from minilink.core.wiring import WiredDiagramMixin
+from minilink.planning.step_face import StepFace
 
 ###############################################################################
 # Public API
@@ -112,7 +113,7 @@ class RolloutEnvironment:
         require_step_knobs(solver, substeps)
         self.solver = solver
         self.substeps = int(substeps)
-        self.face = problem.compile(dt=self.dt, solver=solver, substeps=self.substeps)
+        self.face = StepFace(problem, dt=self.dt, solver=solver, substeps=self.substeps)
         self.face_params = self.face.params
 
         # The training reward: −g dt on a continuous problem unless the stage cost is
@@ -343,7 +344,7 @@ def require_continuous_problem(problem) -> None:
         f"build it on the continuous problem it samples: RolloutEnvironment(origin, "
         f"dt={origin_dt(problem)})"
         if origin is not None
-        else "step its face (problem.compile().transition) directly"
+        else "step its face (step_problem.compile().transition) directly"
     )
     raise TypeError(
         f"{type(problem).__name__} is a step problem: the "

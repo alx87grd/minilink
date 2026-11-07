@@ -520,7 +520,7 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
 - **Two words for two times.** `dt` is the step of a computation and names it at every
-  call (`discretize(sys, dt)`, `sys % dt`, `problem.compile(dt=)`, the evaluator's `step(…, dt=)`);
+  call (`discretize(sys, dt)`, `sys % dt`, `problem.discretize(dt)`, the evaluator's `step(…, dt=)`);
   `sample_period` is the clock a block holds and names it on every such block (the sampled
   system, the noise sources, the seeded policy). `discretize(plant, dt, substeps=4)` shows the
   two: the period above, the integration step `dt / 4` underneath. A noise block's period is
@@ -1433,17 +1433,20 @@ source keeps the interpolation its planner states. Scoring a law is the problem 
   the margins are the numbers a course reports, not an NLP objective (a smooth bound, the
   sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
 
-**The step face (`planning/step_face.py`):** `problem.compile(dt=, solver="rk4",
-substeps=1)` with no controller is the problem's `StepFace`: `transition(x, u, k, params)
+**The step face (`planning/step_face.py`):** `problem.discretize(dt, solver="rk4",
+substeps=1).compile()` is the problem's `StepFace` (one verb, one return type:
+`problem.compile(controller)` is always the controller's evaluator, and refuses no
+controller with this pointer): `transition(x, u, k, params)
 -> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
 beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
 `N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
-(`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, the
-cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
+(`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, a
+discretized problem's at its origin's, the cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
 (`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
-face `problem.compile()` with no `dt`; `problem.discretize(dt)` is the explicit step problem
-of a continuous one, its cost a `SampledCost`, compiling to the same face to the bit.
+face `problem.compile()`; `problem.discretize(dt)` is the explicit step problem of a
+continuous one, its cost a `SampledCost`, compiling to the face the library builds inside
+(`StepFace(problem, dt=)`) to the bit.
 Value iteration, the RL environment and a planner's evidence read only this face.
 
 The pipeline (its map: [docs/pipelines.md](../pipelines.md)). Every object carries its own

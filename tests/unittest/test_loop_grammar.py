@@ -138,7 +138,7 @@ def test_the_models_for_the_discrete_tools():
     exact = discretize(linearize(plant), 0.1, solver="exact")
     assert isinstance(exact, SampledSystem) and exact.kind == "model"
     problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
-    face = problem.compile(dt=0.1)
+    face = problem.discretize(0.1).compile()
     step_problem = problem.discretize(0.1)
     x, u = np.array([0.2, 0.0]), np.zeros(1)
     np.testing.assert_array_equal(

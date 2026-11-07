@@ -21,7 +21,7 @@ class StepFace:
     ``transition(x, u, k, params) -> (x_next, c_k)`` advances the plant one
     tick from ``x`` under ``u`` and returns the stage cost of the tick:
 
-    - for a continuous problem compiled at ``dt`` (``problem.compile(dt=)``),
+    - for a continuous problem at ``dt`` (``problem.discretize(dt).compile()``),
       the plant's step model over one period, the input held, with
       ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside the state by the same
       scheme and substeps (under one Euler step ``g dt`` to the last bit);
@@ -85,7 +85,11 @@ class StepFace:
         """The numbers every call reads: ``plant`` (a random plant at its mean), ``cost``, ``x0``, ``t0``, and the discount."""
         problem = self.problem
         continuous = is_continuous(problem)
-        plant = nominal_plant_params(problem) if continuous else None
+
+        # The design point, a random plant at its mean: a continuous problem's, or the
+        # one a discretized problem samples (a native step problem's own numbers)
+        source = problem if continuous else problem.origin
+        plant = None if source is None else nominal_plant_params(source)
         tree = {
             "plant": problem.sys.params if plant is None else plant,
             "cost": None if problem.cost is None else problem.cost.params,
@@ -344,7 +348,7 @@ def require_period(dt):
     """Refuse a continuous problem's face without its period."""
     if dt is None:
         raise ValueError(
-            "a continuous problem's step face needs its period: problem.compile(dt=...)"
+            "a continuous problem's step face needs its period: problem.discretize(dt).compile()"
         )
 
 

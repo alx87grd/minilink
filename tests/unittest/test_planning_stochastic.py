@@ -895,7 +895,7 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
         plant, cost=cost, horizon=2.0, X=plant.state.box, U=plant.input_box
     )
     dt = 0.1
-    face = problem.compile(dt=dt)
+    face = problem.discretize(dt).compile()
     env = RolloutEnvironment(problem, dt=dt, backend="numpy")
     vi = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=dt)
 
@@ -909,5 +909,5 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
 
     # A failure cost given: every tool charges it
     fixed = problem.replace(penalize_failure=True, failure_cost=7.0)
-    assert fixed.compile(dt=dt).failure_cost == 7.0
+    assert fixed.discretize(dt).compile().failure_cost == 7.0
     assert RolloutEnvironment(fixed, dt=dt, backend="numpy").failure_cost == 7.0

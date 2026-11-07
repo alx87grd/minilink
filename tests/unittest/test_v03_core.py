@@ -589,7 +589,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
     # The step tool's sum on the face value iteration backs up: Σ γᵏ c_k + γᴺ h
-    face = problem.compile(dt=dt, solver="rk4")
+    face = problem.discretize(dt, solver="rk4").compile()
     J_face = face.run(policy)[3]
 
     # The judge, the lookup law sampled at dt on the continuous plant
@@ -807,6 +807,6 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
 
     # The evidence carries the running cost: its score is J = Σ γᵏ c_k + γᴺ h
     evidence = vi.nominal_trajectory()
-    J_face = problem.compile(dt=0.1).run(policy)[3]
+    J_face = problem.discretize(0.1).compile().run(policy)[3]
     J = float(np.squeeze(evaluate_trajectory(problem, evidence).cost))
     np.testing.assert_allclose(J, J_face, rtol=1e-12)

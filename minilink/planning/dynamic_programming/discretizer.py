@@ -613,13 +613,14 @@ class StateSpaceGrid:
 
 def face_of(problem, dt, solver):
     """The problem's step face: a continuous problem at ``dt`` on ``solver``, a step problem's own (``dt`` its tick)."""
-    # Lazy import: the step problem loads with the first grid on one
+    # Lazy import: the step problem and the face load with the first grid
+    from minilink.planning.step_face import StepFace
     from minilink.planning.step_problems import StepPlanningProblem
 
     if isinstance(problem, StepPlanningProblem):
         return problem.compile()
 
-    return problem.compile(dt=dt, solver=solver)
+    return StepFace(problem, dt=dt, solver=solver, substeps=1)
 
 
 if __name__ == "__main__":

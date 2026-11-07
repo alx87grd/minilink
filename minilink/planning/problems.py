@@ -663,27 +663,19 @@ class PlanningProblem:
         episode_length=None,
     ):
         """
-        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem, or its step face.
+        The :class:`~minilink.planning.evaluator.ProblemEvaluator` of a controller on this problem.
 
         The controller closed on the plant (or a built loop with a ``plant`` block),
         compiled once: ``pe.evaluate()`` scores it, ``pe.params`` holds every
         parameter of the run, ``pe.program(wrt)`` exports the tuning program.
         A sampled controller (``pid % 0.01``) runs the sampled loop on its own
-        clock: ``dt`` omitted reads its base period. With no controller,
-        ``problem.compile(dt=)`` is the step face
-        (:class:`~minilink.planning.step_face.StepFace`):
-        ``transition(x, u, k, params) -> (x_next, c_k)`` on the plant's
-        ``solver`` and ``substeps`` (1 by default). On a sampled loop
+        clock: ``dt`` omitted reads its base period. On a sampled loop
         ``substeps`` is the plant's steps per base period, ``None`` the
-        automatic step (``problem.compile(mpc % 0.2, substeps=20)``).
+        automatic step (``problem.compile(mpc % 0.2, substeps=20)``). One verb,
+        one return type: the problem's step face is its discretization's,
+        ``problem.discretize(dt).compile()``.
         """
-        # No controller: the step face, the problem at its period
-        if controller is None:
-            # Lazy import: the face loads with its first compile
-            from minilink.planning.step_face import StepFace
-
-            substeps = 1 if substeps is None else substeps
-            return StepFace(self, dt=dt, solver=solver, substeps=substeps)
+        require_controller_to_compile(controller)
 
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator
@@ -703,8 +695,8 @@ class PlanningProblem:
         The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem`.
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
-        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; its face equals
-        ``self.compile(dt=dt, solver=solver, substeps=substeps)``'s.
+        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; ``compile()`` gives its step
+        face, ``transition(x, u, k, params) -> (x_next, c_k)``.
         """
         # Lazy import: the step problem imports this module
         from minilink.planning.step_problems import discretize_problem
@@ -850,6 +842,15 @@ class PlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_controller_to_compile(controller):
+    """Refuse a compile with no controller: a problem compiles a controller's evaluator, its step face is its discretization's."""
+    if controller is None:
+        raise ValueError(
+            "problem.compile(controller) builds the controller's evaluator; the "
+            "problem's step face is problem.discretize(dt).compile()"
+        )
 
 
 class SetStart(Distribution):

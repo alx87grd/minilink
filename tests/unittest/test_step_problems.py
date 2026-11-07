@@ -7,6 +7,7 @@ from minilink import Pendulum, PlanningProblem, QuadraticCost
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.costs import SampledCost, StepCost
 from minilink.core.discrete.sampled_system import SampledSystem
+from minilink.planning.step_face import StepFace
 from minilink.planning.step_problems import StepPlanningProblem
 
 
@@ -22,7 +23,7 @@ def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
     solver, substeps
 ):
     problem = swing_problem(discount_rate=0.4, t0=1.5)
-    face = problem.compile(dt=0.05, solver=solver, substeps=substeps)
+    face = problem.discretize(0.05, solver=solver, substeps=substeps).compile()
     plant = problem.sys
     rng = np.random.default_rng(3)
     for k in range(20):
@@ -46,7 +47,7 @@ def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
 @pytest.mark.parametrize("solver", ["euler", "rk4"])
 def test_the_discretized_problem_compiles_to_the_same_face(solver):
     problem = swing_problem(discount_rate=0.2)
-    face = problem.compile(dt=0.05, solver=solver)
+    face = StepFace(problem, dt=0.05, solver=solver, substeps=1)
     sampled = problem.discretize(0.05, solver=solver)
     assert isinstance(sampled, StepPlanningProblem)
     assert isinstance(sampled.sys, SampledSystem) and isinstance(
@@ -78,7 +79,7 @@ def test_the_stationary_stage_cost_is_the_discounted_integral():
 
     problem = swing_problem(discount_rate=0.7)
     problem.cost = Unit.from_system(problem.sys)
-    face = problem.compile(dt=0.1, solver="rk4", substeps=4)
+    face = problem.discretize(0.1, solver="rk4", substeps=4).compile()
     _, c = face.transition(np.array([0.1, 0.0]), np.zeros(1), 3)
     assert c == pytest.approx((1.0 - np.exp(-0.7 * 0.1)) / 0.7, rel=1e-10)
 
@@ -131,7 +132,7 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
 
 def test_the_state_only_step_is_the_transitions_state_on_both_faces():
     problem = swing_problem(t0=2.0)
-    face = problem.compile(dt=0.05, solver="rk4")
+    face = StepFace(problem, dt=0.05, solver="rk4", substeps=1)
     sampled = problem.discretize(0.05, solver="rk4").compile()
     x, u = np.array([0.4, -0.3]), np.array([1.0])
     for t in (2.0, 2.35):
@@ -142,7 +143,9 @@ def test_the_state_only_step_is_the_transitions_state_on_both_faces():
 
     # A problem without a cost still steps: a grid needs only its successors
     free = PlanningProblem(problem.sys, x0=[0.0, 0.0])
-    assert free.compile(dt=0.1).step_at(x, u, 0.0).shape == (2,)
+    assert StepFace(free, dt=0.1, solver="rk4", substeps=1).step_at(
+        x, u, 0.0
+    ).shape == (2,)
 
 
 def grid_world():
@@ -204,7 +207,7 @@ def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
         horizon=2.0,
         t0=0.5,
     )
-    face = problem.compile(dt=0.05)
+    face = StepFace(problem, dt=0.05, solver="rk4", substeps=1)
     sampled = problem.discretize(0.05).compile()
     x = np.array([0.1, 0.2])
     assert face.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
@@ -286,7 +289,7 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
         distributions={"plant": {"m": Uniform(1.5, 2.5)}},
     )
     assert problem.sample_params(None)["plant"]["m"] == 2.0
-    face = problem.compile(dt=0.1)
+    face = problem.discretize(0.1).compile()
     assert face.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]
 
 
@@ -300,3 +303,28 @@ def test_the_rollout_environment_refuses_a_step_problem_naming_the_way():
     problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
     with pytest.raises(TypeError, match=r"RolloutEnvironment\(origin, dt=0.1\)"):
         RolloutEnvironment(problem.discretize(0.1), backend="numpy")
+
+
+def test_a_problem_compiles_a_controllers_evaluator_only():
+    # One verb, one return type: the step face is the discretization's
+    problem = swing_problem()
+
+    with pytest.raises(ValueError, match="discretize"):
+        problem.compile()
+    with pytest.raises(ValueError, match="discretize"):
+        problem.compile(dt=0.05)
+
+
+def test_a_discretized_random_plant_steps_at_its_mean():
+    from minilink import Uniform
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        x0=[0.3, 0.0],
+        horizon=1.0,
+        distributions={"plant": {"m": Uniform(1.5, 2.5)}},
+    )
+
+    assert problem.discretize(0.1).compile().params["plant"]["m"] == 2.0

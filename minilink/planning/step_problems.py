@@ -247,7 +247,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     the cost a :class:`~minilink.core.costs.SampledCost` (the one-period
     integral of ``e^{−ρτ} g``), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
     ``(dt, t0)`` in seconds; the start, the sets and the laws as
-    they are. Its face equals ``problem.compile(dt=dt, solver=, substeps=)``'s
+    they are. Its face equals ``StepFace(problem, dt=dt, solver=, substeps=)``'s
     to the bit, its cost bound the continuous problem's on the same sum. A problem
     with disturbance sources is refused: the step problem feeds no source.
     """
