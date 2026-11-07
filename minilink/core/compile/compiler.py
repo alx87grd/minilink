@@ -196,7 +196,7 @@ def compile_diagram(
         if verbose:
             t0 = time.perf_counter()
             n_before = len(diagram.subsystems)
-            print("[compile] Step 0: Flattening nested diagrams...", end="", flush=True)
+            print("[compile] Flattening nested diagrams...", end="", flush=True)
         diagram, _flatten_report = flatten_diagram(diagram)
         if verbose:
             print(
@@ -204,10 +204,10 @@ def compile_diagram(
                 f"{time.perf_counter() - t0:.3f}s)"
             )
 
-    # Step 1: Algebraic loop detection
+    # Algebraic loop detection
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+        print("[compile] Checking for algebraic loops...", end="", flush=True)
 
     for sys_id, subsystem in diagram.subsystems.items():
         validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
@@ -217,7 +217,7 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # Step 2: Build execution plan
+    # The execution plan
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
@@ -225,7 +225,7 @@ def compile_diagram(
             1 for s in diagram.subsystems.values() if isinstance(s, DynamicSystem)
         )
         print(
-            f"[compile] Step 2: Building execution plan "
+            f"[compile] Building execution plan "
             f"({n_ports} ports, {n_states} states)...",
             end="",
             flush=True,
@@ -236,7 +236,7 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # Create evaluator (steps 0, 3, 4 handled inside for JAX)
+    # The evaluator (its JAX trace check inside)
     key = normalize_backend(backend)
     if key != BACKEND_NUMPY:
         require_jax_numpy()
@@ -284,7 +284,7 @@ def compile_step_diagram(
 
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+        print("[compile] Checking for algebraic loops...", end="", flush=True)
 
     port_execution_order = evaluation_order_of(diagram)
 
@@ -298,7 +298,7 @@ def compile_step_diagram(
             1 for s in diagram.subsystems.values() if isinstance(s, StepSystem)
         )
         print(
-            f"[compile] Step 2: Building step execution plan "
+            f"[compile] Building step execution plan "
             f"({n_ports} ports, {n_states} step states)...",
             end="",
             flush=True,

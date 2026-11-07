@@ -1607,3 +1607,31 @@ def test_one_automatic_backend_rule_falls_back_on_a_block_that_does_not_trace():
 
     with pytest.raises(ValueError, match="a wrong shape"):
         build_on_auto(broken)
+
+
+def test_verbose_compile_reads_its_steps_in_order_on_every_path(capsys):
+    """compile(verbose=True) names its steps in the order it runs them, and closes with Done on every backend."""
+    from minilink.core.compile.compiler import compile
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+    backends = ("numpy", "jax")
+    loop = P(2.0) @ Pendulum()
+    for backend in backends:
+        if backend == "jax":
+            pytest.importorskip("jax")
+        compile(Pendulum(), backend=backend, verbose=True)
+        leaf = capsys.readouterr().out.splitlines()
+        assert leaf[-1].startswith("[compile] Done.")
+
+        compile(loop, backend=backend, verbose=True, flatten=True)
+        lines = capsys.readouterr().out.splitlines()
+        steps = [line.split("...")[0] for line in lines]
+        expected = [
+            "[compile] Flattening nested diagrams",
+            "[compile] Checking for algebraic loops",
+            "[compile] Building execution plan (6 ports, 1 states)",
+        ]
+        if backend == "jax":
+            expected.append("[compile] Checking JAX compatibility of 4 blocks")
+        assert steps[:-1] == expected
+        assert lines[-1].startswith("[compile] Done.")
