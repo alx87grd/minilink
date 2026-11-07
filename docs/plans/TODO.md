@@ -362,7 +362,8 @@ commit per proposal, its callers and DESIGN in the same change.
   them: the compiled face's `pv.solve(params, z0)` stays pure, fast and free of plots and
   printing, as today; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
   `problem.compile()` always returning the evaluator, the step face from
-  `discretize(dt).compile()`; about 80 public helper methods on the diagram, the problem, the
+  `discretize(dt).compile()` (ruled 2026-11-07: one return type per verb, a controller-less
+  `problem.compile` refused with that pointer; 14 call sites); about 80 public helper methods on the diagram, the problem, the
   evaluator and the planners moved to module functions. Not recommended by the scan: `%` against
   `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
   a result object for `pv.solve`. Done when the maintainer rules on each.
