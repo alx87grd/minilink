@@ -153,3 +153,72 @@ def retired_on(qualname, owners):
     if owners is None:
         return True
     return qualname.rsplit(".", 1)[-1] in owners
+
+
+# The workflow a planner's verb takes (DESIGN §6, the four kinds of argument): what is shown,
+# never what is computed, a keyword of solve and never of the constructor
+WORKFLOW = {
+    "verbose",
+    "callback",
+    "live_plot",
+    "record_history",
+    "live_plot_every",
+    "live_plot_pause",
+    "live_plot_after_goal_only",
+    "live_plot_ax",
+    "history_stride",
+}
+SEARCH_DISPLAY = {
+    "callback",
+    "live_plot",
+    "live_plot_every",
+    "live_plot_pause",
+    "live_plot_after_goal_only",
+    "live_plot_ax",
+}
+VERB_WORKFLOW = {
+    "DynamicProgrammingPlanner": {"verbose", "record_history"},
+    "TrajectoryOptimizationPlanner": {
+        "verbose",
+        "callback",
+        "live_plot",
+        "record_history",
+    },
+    "RRTPlanner": SEARCH_DISPLAY,
+    "RRTStarPlanner": SEARCH_DISPLAY | {"record_history", "history_stride"},
+    "ReinforcementLearningPlanner": {"verbose"},
+    "TabularLearningPlanner": {"verbose"},
+}
+
+
+def planner_classes():
+    """Every planner class of the library: the subclasses of Planner, at any depth."""
+    import minilink.learning  # noqa: F401  (the learners register as subclasses)
+    from minilink.planning.planner import Planner
+
+    found = []
+    pending = list(Planner.__subclasses__())
+    while pending:
+        cls = pending.pop()
+        if cls.__module__.startswith("minilink.") and cls not in found:
+            found.append(cls)
+        pending += cls.__subclasses__()
+    return found
+
+
+def test_the_workflow_is_on_the_verb_never_on_the_constructor():
+    classes = {cls.__name__: cls for cls in planner_classes()}
+    assert set(VERB_WORKFLOW) <= set(classes)
+
+    for name, cls in classes.items():
+        constructor = set(inspect.signature(cls.__init__).parameters)
+        assert not constructor & WORKFLOW, (
+            f"{name}.__init__ takes {constructor & WORKFLOW}"
+        )
+
+    for name, words in VERB_WORKFLOW.items():
+        cls = classes[name]
+        verbs = [cls.solve] + ([cls.solve_steps] if hasattr(cls, "solve_steps") else [])
+        for verb in verbs:
+            missing = words - set(inspect.signature(verb).parameters)
+            assert not missing, f"{name}.{verb.__name__} lacks {missing}"

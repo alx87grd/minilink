@@ -287,7 +287,6 @@ def test_nominal_trajectory_verb_matches_the_rl_planner_rollout():
         n_steps=16,
         batch_size=32,
         gamma=0.9,
-        verbose=0,
     )
     solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=3)
     verb = nominal_trajectory(problem, solution.controller, dt=0.1, tf=planner.env.tf)

@@ -30,9 +30,8 @@ planner = DynamicProgrammingPlanner(
     tol=1e-3,
     max_iterations=800,
     out_of_bound_cost=INF,
-    verbose=True,
 )
-planner.solve()
+planner.solve(verbose=True)
 
 planner.plot_cost_to_go(jmax=INF, show_3d=True)
 planner.plot_control_law()

@@ -385,11 +385,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
             backend="numpy",
             options={"maxiter": 100, "ftol": 1e-09},
-            verbose=True,
         )
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            planner.solve()
+            planner.solve(verbose=True)
         report = stdout.getvalue()
         self.assertIn("Trajectory Optimization Program", report)
         self.assertIn("transcription: DirectCollocationTranscription", report)
@@ -407,10 +406,11 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=transcription,
             backend="direct",
             options={"maxiter": 100, "ftol": 1e-09},
-            record_history=True,
         )
-        traj = planner.solve().trajectory
-        warm_started = planner.solve(guess=planner.last_solution).trajectory
+        traj = planner.solve(record_history=True).trajectory
+        warm_started = planner.solve(
+            guess=planner.last_solution, record_history=True
+        ).trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.last_solution.record.history), 0)
@@ -1327,10 +1327,8 @@ def test_search_callback_invoked_on_rrt():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=200,
-        callback=RecordingCallback(),
-        live_plot_every=1,
     )
-    planner.solve()
+    planner.solve(callback=RecordingCallback(), live_plot_every=1)
     assert calls
     assert all((step.iteration > 0 for step in calls))
     assert calls[-1].phase == "explore"
@@ -1351,30 +1349,38 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         max_nodes=2500,
         optimize_after_goal=True,
         convergence_patience=100,
-        callback=RecordingCallback(),
-        live_plot_every=1,
-        live_plot_after_goal_only=True,
     )
-    planner.solve()
+    planner.solve(
+        callback=RecordingCallback(), live_plot_every=1, live_plot_after_goal_only=True
+    )
     assert planner.reached_goal
     assert calls
     assert all((phase == "optimize" for phase in calls))
 
 
-def test_live_plot_option_builds_callback():
+def test_live_plot_runs_beside_the_callback():
+    """A solve with callback= and live_plot=True hands every step to both."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    calls = []
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
-        problem,
-        extender=make_steering_extender(),
-        seed=0,
-        max_nodes=10,
+        problem, extender=make_steering_extender(), seed=0, max_nodes=10
+    )
+    _, ax = plt.subplots()
+    planner.solve(
+        callback=calls.append,
         live_plot=True,
         live_plot_every=1,
+        live_plot_pause=0.0,
+        live_plot_ax=ax,
     )
-    callback = planner.resolve_search_callback()
-    from minilink.planning.search.live_plot import LiveSearchPlotCallback
-
-    assert isinstance(callback, LiveSearchPlotCallback)
+    assert calls
+    assert ax.lines
+    plt.close(ax.figure)
 
 
 def test_optimize_after_goal_runs_longer_and_refines_cost():
@@ -1427,10 +1433,8 @@ def test_record_history_for_animation():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=800,
-        record_history=True,
-        history_stride=25,
     )
-    planner.solve()
+    planner.solve(record_history=True, history_stride=25)
     assert len(planner.history) >= 2
     assert planner.history[0].iteration == 1
     assert all((frame.tree_edges for frame in planner.history[1:]))
@@ -2125,13 +2129,13 @@ class TestTextbookOptions(unittest.TestCase):
             U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
-            problem, n_steps=5, transcription="direct_collocation", live_plot=True
+            problem, n_steps=5, transcription="direct_collocation"
         )
-        self.assertTrue(planner.live_plot)
         self.assertIsNotNone(
-            planner.build_callback(None, planner.problem, "numpy", [], None)
+            planner.build_callback(
+                None, planner.problem, "numpy", [], None, live_plot=True
+            )
         )
-        planner.live_plot = False
         self.assertIsNone(
             planner.build_callback(None, planner.problem, "numpy", [], None)
         )
@@ -2154,11 +2158,7 @@ class TestTextbookOptions(unittest.TestCase):
         )
         seen = []
         planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=5,
-            transcription="direct_collocation",
-            live_plot=True,
-            callback=seen.append,
+            problem, n_steps=5, transcription="direct_collocation"
         )
         live = mock.MagicMock()
         with mock.patch(
@@ -2167,7 +2167,13 @@ class TestTextbookOptions(unittest.TestCase):
             return_value=live,
         ):
             progress = planner.build_callback(
-                mock.MagicMock(), planner.problem, "numpy", [], None
+                mock.MagicMock(),
+                planner.problem,
+                "numpy",
+                [],
+                None,
+                callback=seen.append,
+                live_plot=True,
             )
             planner.iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)
@@ -2491,9 +2497,7 @@ def test_every_planner_has_one_tree_shape():
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
         MPPIPlanner(problem, dt=0.1, n_rollouts=16),
-        ReinforcementLearningPlanner(
-            problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,), verbose=False
-        ),
+        ReinforcementLearningPlanner(problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,)),
     ]
     for planner in planners:
         tree = planner.params

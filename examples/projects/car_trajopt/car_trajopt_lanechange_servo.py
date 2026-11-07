@@ -76,7 +76,6 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    verbose=PRINT_SOLVE_REPORT,
     options={
         "disp": SCIPY_DISP,
         "maxiter": 500,
@@ -84,7 +83,7 @@ planner = TrajectoryOptimizationPlanner(
     },
 )
 
-traj = planner.solve().trajectory
+traj = planner.solve(verbose=PRINT_SOLVE_REPORT).trajectory
 planner.plot_trajectory(signals=("x", "u"))
 sys.traj = traj
 sys.animate()

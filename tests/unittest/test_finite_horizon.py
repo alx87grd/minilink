@@ -19,8 +19,8 @@ from tests.unittest.test_planner_params import GRID, reach
 N = 50
 
 
-def finite(**kwargs):
-    return DynamicProgrammingPlanner(reach(), **GRID, **kwargs).solve()
+def finite(verbose=False, **kwargs):
+    return DynamicProgrammingPlanner(reach(), **GRID, **kwargs).solve(verbose=verbose)
 
 
 def double_integrator(horizon=1.0, S=np.eye(2)):

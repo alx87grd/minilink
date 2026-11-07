@@ -111,9 +111,6 @@ class ReinforcementLearningPlanner(Planner):
         The training reward: ``−g dt`` (default) or ``−c_k``.
     seed : int
         Seed of the weights, exploration and starts.
-    verbose : bool
-        Print the environment's semantics and one line per learning iteration
-        (default ``False``: training is silent unless asked).
 
     Attributes
     ----------
@@ -153,7 +150,6 @@ class ReinforcementLearningPlanner(Planner):
         training_zone=None,
         reward="running",
         seed=0,
-        verbose=False,
         **algorithm_kwargs,
     ):
         super().__init__(problem)
@@ -163,7 +159,6 @@ class ReinforcementLearningPlanner(Planner):
         self.dt = float(dt)
         self.n_envs = int(n_envs)
         self.seed = int(seed)
-        self.verbose = bool(verbose)
 
         # Training progress: plant steps, wall-clock time, the latest mean episode
         # return, and one record per learning iteration
@@ -183,8 +178,6 @@ class ReinforcementLearningPlanner(Planner):
             reward=reward,
         )
         self.require_expectation_criterion()
-        if self.verbose:
-            print(f"ReinforcementLearningPlanner: {self.env.describe()}")
 
         # The update rule, and its collection length: one whole episode for an
         # episodic method
@@ -277,7 +270,7 @@ class ReinforcementLearningPlanner(Planner):
         return {"method": self.algorithm.method_params, "seed": self.seed}
 
     def solve(
-        self, n_timesteps=100_000, *, evaluate=False, n_trials=50, verbose=None
+        self, n_timesteps=100_000, *, evaluate=False, n_trials=50, verbose=False
     ) -> PlanningSolution:
         """
         Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
@@ -285,7 +278,7 @@ class ReinforcementLearningPlanner(Planner):
         The solver record carries the training facts. ``evaluate=True`` also
         rolls the deterministic law out from the problem's start and scores it
         by Monte Carlo over ``n_trials`` draws of the problem. ``verbose``
-        overrides :attr:`verbose` for this call only.
+        prints the environment's semantics and one line per learning iteration.
         """
         # Train, then store the learned law as the planner's solution
         self.learn(n_timesteps, verbose=verbose)
@@ -295,17 +288,21 @@ class ReinforcementLearningPlanner(Planner):
 
     # Training
 
-    def learn(self, n_timesteps, *, verbose=None):
+    def learn(self, n_timesteps, *, verbose=False):
         """
         Train for ``n_timesteps`` plant steps (rounded up to whole collections); returns ``self``.
 
-        ``verbose`` overrides :attr:`verbose` for this call only.
+        ``verbose`` prints the environment's semantics, then one line per
+        learning iteration.
         """
         jax = require_jax()
 
-        log = self.verbose if verbose is None else bool(verbose)
         steps_per_iteration = self.n_steps * self.n_envs
         n_iterations = math.ceil(n_timesteps / steps_per_iteration)
+
+        # What the training reads, when asked to report
+        if verbose:
+            print(f"ReinforcementLearningPlanner: {self.env.describe()}")
 
         for _ in range(n_iterations):
             # Fresh keys for this iteration's collection and update
@@ -323,7 +320,7 @@ class ReinforcementLearningPlanner(Planner):
 
             # The iteration's record, and its progress line
             record = self.record_iteration(batch, stats, t0)
-            if log:
+            if verbose:
                 self.print_iteration(record, stats)
 
         return self

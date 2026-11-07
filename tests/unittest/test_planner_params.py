@@ -174,3 +174,31 @@ def test_every_planner_takes_params_by_keyword_only():
     for planner in planners:
         parameter = inspect.signature(planner.solve).parameters["params"]
         assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+WORKFLOW = {"verbose", "callback", "live_plot", "record_history", "history_stride"}
+
+
+@pytest.mark.parametrize("name", list(PLANNERS))
+def test_a_rebuilt_planner_inherits_no_display(name):
+    build, _ = PLANNERS[name]
+    kwargs = build().build_kwargs()
+
+    assert not {key for key in kwargs if key in WORKFLOW or key.startswith("live_plot")}
+
+
+def test_a_verbose_solve_at_a_tree_reports_once_from_the_verb(capsys):
+    """``solve(params=, verbose=True)``: the rebuilt planner gets no display keyword, its solve prints once."""
+    from unittest import mock
+
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    constructor = DynamicProgrammingPlanner.__init__
+    with mock.patch.object(
+        DynamicProgrammingPlanner, "__init__", autospec=True, side_effect=constructor
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+
+    assert built.call_count == 1
+    assert not set(built.call_args.kwargs) & WORKFLOW
+    assert capsys.readouterr().out.count("Bellman equation solved!") == 1

@@ -199,7 +199,6 @@ def run_minilink_pendulum_dp(
         tol=tol,
         max_iterations=n_steps,
         out_of_bound_cost=INF_PENDULUM,
-        verbose=False,
     )
     t_build = time.perf_counter()
     with _quiet():
@@ -264,7 +263,6 @@ def run_minilink_double_pendulum_dp(
         gamma=1.0,
         max_iterations=n_steps,
         out_of_bound_cost=INF_DOUBLE,
-        verbose=False,
     )
     t_build = time.perf_counter()
     with _quiet():

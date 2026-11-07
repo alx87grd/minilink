@@ -83,10 +83,9 @@ planner = DynamicProgrammingPlanner(
     gamma=1.0,
     max_iterations=n_steps,
     out_of_bound_cost=INF,
-    verbose=True,
 )
 t_xnext = time.perf_counter()
-planner.solve_steps(n_steps)
+planner.solve_steps(n_steps, verbose=True)
 t_done = time.perf_counter()
 
 print("\ntiming summary:")

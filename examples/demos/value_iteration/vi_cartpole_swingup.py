@@ -63,9 +63,8 @@ planner = DynamicProgrammingPlanner(
     backend="jax",
     gamma=1.0,
     out_of_bound_cost=INF,
-    verbose=True,
 )
-solution = planner.solve_steps(N_STEPS)
+solution = planner.solve_steps(N_STEPS, verbose=True)
 print(solution.record)
 
 # planner.plot_cost_to_go(jmax=INF, axes=(1, 3), anchor=UPRIGHT)

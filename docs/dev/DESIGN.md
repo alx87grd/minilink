@@ -1533,8 +1533,8 @@ means *the returned plan satisfies the program constraints to
 is not a failure, a solver that reports convergence on an infeasible plan is,
 and the solver's own flag stays in `message` / `stats`. The worst equality
 residual / inequality margin / bound violation are recorded on the record, with the
-solve's whole account (`optimization_result`, the per-iteration `history` when
-`record_history=True`, `solve_time_s`, `step_time_s`); the planner keeps only the
+solve's whole account (`optimization_result`, the per-iteration `history` of a
+`solve(record_history=True)`, `solve_time_s`, `step_time_s`); the planner keeps only the
 diagnostics `last_program` and `last_optimizer` (RULES 2.4). A user's verb (`Optimizer.solve`,
 `planner.solve`) always times the backend solve it wraps and fills `solve_time_s`; the
 machine-side solves (the compiled face's `pv.solve`, the fixed-iteration pure solve) are traced,
@@ -1572,8 +1572,14 @@ the `seed`), given as flat keywords and held in `planner.params` (`params["metho
 taken per call by `solve(params=…)`, the complete tree edited (a method number the tree
 leaves at its value is derived again on the solve's problem, one it changes is given); **an external solver's knobs** (SciPy `maxiter`,
 `ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
-**workflow** (`verbose`, `callback`, `live_plot`, `record_history`), keywords that change what
-is shown, never what is computed. There is no settings record on a planner. One exception:
+**workflow** (`verbose`, `callback`, `live_plot`, `record_history`, RRT's `live_plot_*` display
+knobs and RRT*'s `history_stride`), keywords that change what is shown, never what is computed. The constructor
+takes the first three kinds; the workflow is a keyword of the verb, `solve` (and `solve_steps`
+where it exists), as on `Optimizer.solve` and `compute_trajectory`, and travels as arguments
+down to where it is read, never as planner state. A planner rebuilt for a sweep (`planner_at`,
+`build_kwargs`) inherits no display: `solve(params=…)` hands its own workflow keywords to the
+rebuilt planner's `solve`. The compiled face's `pv.solve(params, z0)` takes none: it stays pure,
+silent and free of plots. There is no settings record on a planner. One exception:
 the RL planner's `params` is a report, and its `solve` trains without `params=` (TODO §6).
 
 **The compiled face**:
@@ -1722,8 +1728,9 @@ with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
 `optimize_after_goal`, the search continues after the first goal connection until
 the best goal cost stops improving for `convergence_patience` extensions;
-`record_history` + `animate_convergence` replay tree growth and path refinement.
-``live_plot`` / ``callback`` redraw the tree during ``solve``; the `nearest_backend` setting
+`solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
+`solve(callback=…, live_plot=True)` hands each step to both, the tree redrawn beside the
+callback; the `nearest_backend` setting
 selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 ## 7. Graphics And Benchmarks

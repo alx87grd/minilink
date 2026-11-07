@@ -404,7 +404,7 @@ goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(plant, U=plant.input_box,
     cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal))
 grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(3,), dt=0.05)
-DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20, verbose=False).solve()
+DynamicProgrammingPlanner(problem, grid=grid, max_iterations=20).solve()
 print("BASIC-TIER-OK", traj.n_samples)
 """
 

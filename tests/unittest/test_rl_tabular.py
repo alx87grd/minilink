@@ -181,3 +181,14 @@ def test_numpy_environment_steps_like_the_problem():
         np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
     )
     assert bool(terminated) and not bool(truncated) and float(r) < -19.0
+
+
+def test_a_verbose_solve_reports_the_episodes_and_the_record(capsys):
+    planner = TabularLearningPlanner(double_integrator_problem(), seed=0, **GRID)
+    planner.solve(5)
+    assert capsys.readouterr().out == ""
+
+    solution = planner.solve(5, verbose=True)
+    printed = capsys.readouterr().out
+    assert "Learning Q(x,u)" in printed and "(5 episodes)" in printed
+    assert str(solution.record) in printed

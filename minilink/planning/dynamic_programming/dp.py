@@ -107,15 +107,15 @@ class DynamicProgrammingPlanner(Planner):
         After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
         and their policy to the nominal action (:meth:`clean_infeasible_set`);
         a callable ``out_of_bound_cost`` leaves the tables as solved.
-    record_history, verbose : bool
-        Workflow: keep ``(t, J, pi)`` per sweep for animation; print build and
-        sweep progress (the grid's own progress follows
-        :attr:`StateSpaceGrid.verbose`).
 
     Notes
     -----
     The sweeps' terminal time, :attr:`final_time`, is the problem's horizon
     end (``t0 + horizon``, or a step problem's last tick); ``0`` without one.
+    The workflow, ``verbose`` and ``record_history``, are keywords of
+    :meth:`solve` and :meth:`solve_steps`. A grid built here keeps its build
+    silent; a grid passed as ``grid=`` reports its own build
+    (:attr:`StateSpaceGrid.verbose`).
     """
 
     number_names = ("gamma", "out_of_bound_cost")
@@ -136,8 +136,6 @@ class DynamicProgrammingPlanner(Planner):
         interpolation: str = "linear",
         out_of_bound_cost=None,
         clean_infeasible: bool = True,
-        record_history: bool = False,
-        verbose: bool = False,
     ) -> None:
         super().__init__(problem)
         self.require_cost()
@@ -161,10 +159,6 @@ class DynamicProgrammingPlanner(Planner):
         )
         self.given = given_numbers(gamma=gamma, out_of_bound_cost=out_of_bound_cost)
 
-        # Workflow
-        self.record_history = bool(record_history)
-        self.verbose = bool(verbose)
-
         # The JAX engine's compiled step and loops, by structure (their numbers are
         # arguments)
         self.compiled = {}
@@ -173,7 +167,15 @@ class DynamicProgrammingPlanner(Planner):
         if self.backend == BACKEND_JAX:
             self.grid.ensure_jax_transition(self.final_time)
 
-    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(
+        self,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose: bool = False,
+        record_history: bool = False,
+    ) -> PlanningSolution:
         """
         Solve on the problem's horizon: a law per stage on a finite one, the converged law on an infinite one.
 
@@ -190,12 +192,17 @@ class DynamicProgrammingPlanner(Planner):
         also rolls the law out from the problem's start and scores it over the
         problem's draws. ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
-        this one unchanged.
+        this one unchanged. ``verbose`` prints the table builds and the sweeps;
+        ``record_history`` keeps ``(t, J, pi)`` per sweep in the tables, for
+        the animations.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials
+                evaluate=evaluate,
+                n_trials=n_trials,
+                verbose=verbose,
+                record_history=record_history,
             )
             return self.store_solution(solution)
 
@@ -203,13 +210,24 @@ class DynamicProgrammingPlanner(Planner):
 
         # Infinite horizon: backward sweeps until the cost-to-go stops changing
         if N is None:
-            result = self.value_iteration(self.max_iterations, stop_on_tol=True)
+            result = self.value_iteration(
+                self.max_iterations,
+                stop_on_tol=True,
+                verbose=verbose,
+                record_history=record_history,
+            )
             mode = "converged"
 
         # Finite horizon: exactly N backward sweeps, every stage kept
         else:
             require_stage_memory(N, self.grid)
-            result = self.value_iteration(N, stop_on_tol=False, keep_stages=True)
+            result = self.value_iteration(
+                N,
+                stop_on_tol=False,
+                keep_stages=True,
+                verbose=verbose,
+                record_history=record_history,
+            )
             mode = "finite"
 
         # The cost-to-go and policy tables as a planning solution
@@ -217,17 +235,27 @@ class DynamicProgrammingPlanner(Planner):
             result, mode=mode, evaluate=evaluate, n_trials=n_trials
         )
 
-    def solve_steps(self, n: int, *, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve_steps(
+        self,
+        n: int,
+        *,
+        evaluate=False,
+        n_trials=50,
+        verbose: bool = False,
+        record_history: bool = False,
+    ) -> PlanningSolution:
         """
         The receding ``n``-step law: ``n`` backward sweeps from the terminal cost, the last table used at every time.
 
         Bertsekas' receding horizon: the stage-0 law of an ``n``-step problem
         applied as a stationary law, whatever the problem's own horizon. Its
         record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
-        every stage instead.
+        every stage instead. ``verbose`` and ``record_history`` as for :meth:`solve`.
         """
         # Exactly n backward sweeps from the terminal cost
-        result = self.value_iteration(int(n), stop_on_tol=False)
+        result = self.value_iteration(
+            int(n), stop_on_tol=False, verbose=verbose, record_history=record_history
+        )
 
         # The cost-to-go and policy tables as a planning solution
         return self.dp_result_to_planning_solution(
@@ -245,7 +273,7 @@ class DynamicProgrammingPlanner(Planner):
     # Value iteration
 
     def build_kwargs(self) -> dict:
-        """The keywords that rebuild this planner on another problem: the grid's shape, the engine, the stopping rules, the workflow, the numbers it was given."""
+        """The keywords that rebuild this planner on another problem: the grid's shape, the engine, the stopping rules, the numbers it was given."""
         grid = self.grid
         kwargs = dict(
             x_grid=grid.x_grid_shape,
@@ -257,14 +285,18 @@ class DynamicProgrammingPlanner(Planner):
             max_iterations=self.max_iterations,
             interpolation=self.interpolation,
             clean_infeasible=self.clean_infeasible,
-            record_history=self.record_history,
-            verbose=self.verbose,
         )
 
         return {**kwargs, **self.given}
 
     def value_iteration(
-        self, max_sweeps: int, *, stop_on_tol: bool = True, keep_stages: bool = False
+        self,
+        max_sweeps: int,
+        *,
+        stop_on_tol: bool = True,
+        keep_stages: bool = False,
+        verbose: bool = False,
+        record_history: bool = False,
     ) -> DynamicProgrammingResult:
         """
         Sweep the Bellman equation backward from the terminal cost.
@@ -273,8 +305,10 @@ class DynamicProgrammingPlanner(Planner):
         the best one-step backup. Stops after ``max_sweeps`` or, with
         ``stop_on_tol``, once the largest change falls under ``tol``.
         ``keep_stages`` keeps every sweep's tables as the result's
-        ``schedule``, forward in time. Returns the raw tables; :meth:`solve`
-        and :meth:`solve_steps` wrap them in a solution.
+        ``schedule``, forward in time; ``verbose`` reports the builds and the
+        sweeps, ``record_history`` keeps every sweep's ``(t, J, pi)``. Returns
+        the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
+        solution.
         """
         opt = self
         tf = opt.final_time
@@ -286,7 +320,9 @@ class DynamicProgrammingPlanner(Planner):
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
             from minilink.planning.dynamic_programming import dp_jax
 
-            return dp_jax.value_iteration(self, max_sweeps, stop_on_tol, keep_stages)
+            return dp_jax.value_iteration(
+                self, max_sweeps, stop_on_tol, keep_stages, verbose, record_history
+            )
 
         # The backward step: the textbook loop, or the same step over lookup tables
         if opt.backend == BACKEND_LOOP:
@@ -294,14 +330,18 @@ class DynamicProgrammingPlanner(Planner):
         else:
             backward_step = self.backward_step_table
 
-        log = SweepLog(opt, max_sweeps, stop_on_tol)
+        log = SweepLog(
+            max_sweeps, stop_on_tol, tol, verbose=verbose, record_history=record_history
+        )
 
         # The running-cost table of this solve, once on a precomputed grid (its
         # transitions do not depend on time); per sweep otherwise
-        G = self.running_cost_table(tf) if self.grid.precomputed else None
+        G = None
+        if self.grid.precomputed:
+            G = self.running_cost_table(tf, verbose=verbose)
 
         # Cost-to-go at the final time
-        J = self.terminal_cost(tf)
+        J = self.terminal_cost(tf, verbose=verbose)
         pi = np.zeros(self.grid.nodes_n, dtype=int)
         log.start(tf, J, pi)
 
@@ -323,7 +363,7 @@ class DynamicProgrammingPlanner(Planner):
             # Bellman backup from the cost-to-go one step ahead:
             # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and step
             J_next = J
-            J, pi = backward_step(J_next, t, G)
+            J, pi = backward_step(J_next, t, G, verbose=verbose)
 
             # Largest change of the cost-to-go: the convergence measure
             delta = float(np.max(np.abs(J - J_next)))
@@ -350,9 +390,9 @@ class DynamicProgrammingPlanner(Planner):
             schedule=schedule,
         )
 
-    def backward_step_loop(self, J_next, t, G=None):
+    def backward_step_loop(self, J_next, t, G=None, *, verbose=False):
         """
-        One backward Bellman step as an explicit loop over nodes and actions (``G`` unused: each pair prices its own step).
+        One backward Bellman step as an explicit loop over nodes and actions (``G`` and ``verbose`` unused: each pair prices its own step).
 
         The readable reference (pyro's ``DynamicProgramming``): for every
         state node and every control action, take a forward-Euler step, look
@@ -411,8 +451,8 @@ class DynamicProgrammingPlanner(Planner):
 
         return J, pi
 
-    def backward_step_table(self, J_next, t, G=None):
-        """The same backward step, vectorized over the successor and running-cost tables (``G`` the solve's table, else built at ``t``)."""
+    def backward_step_table(self, J_next, t, G=None, *, verbose=False):
+        """The same backward step, vectorized over the successor and running-cost tables (``G`` the solve's table, else built at ``t``, its progress reported when ``verbose``)."""
         grid = self.grid
         gamma = self.gamma
         method = self.interpolation
@@ -427,7 +467,7 @@ class DynamicProgrammingPlanner(Planner):
 
         # Running-cost table, with the out-of-bound cost on inadmissible pairs
         if G is None:
-            G = self.running_cost_table(t, admissible, x_next)
+            G = self.running_cost_table(t, admissible, x_next, verbose=verbose)
 
         # The cost-to-go one step ahead read at the successors (zero off the grid):
         # the (N, A, n) successors flattened to N*A states, then back to (N, A)
@@ -439,14 +479,14 @@ class DynamicProgrammingPlanner(Planner):
 
         return J, pi
 
-    def terminal_cost(self, t) -> np.ndarray:
-        """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
+    def terminal_cost(self, t, *, verbose: bool = False) -> np.ndarray:
+        """The terminal cost ``h`` at time ``t`` of every grid node, by node id (``verbose``: the build's progress)."""
         grid = self.grid
         face = grid.face
         N = grid.nodes_n
 
         J = np.empty(N, dtype=float)
-        nodes = progress(range(N), "Computing h(x,t) terminal cost", self.verbose)
+        nodes = progress(range(N), "Computing h(x,t) terminal cost", verbose)
 
         # For all state nodes
         for s in nodes:
@@ -457,7 +497,9 @@ class DynamicProgrammingPlanner(Planner):
 
         return J
 
-    def running_cost_table(self, t, admissible=None, x_next=None) -> np.ndarray:
+    def running_cost_table(
+        self, t, admissible=None, x_next=None, *, verbose: bool = False
+    ) -> np.ndarray:
         """
         Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step face's ``c`` (``g dt`` under Euler).
 
@@ -465,7 +507,7 @@ class DynamicProgrammingPlanner(Planner):
         successor outside the state set or the grid) cost ``out_of_bound_cost``:
         the scalar, or ``out_of_bound_cost(x_next, t)`` at the pair's successor.
         The mask and the successors are read from the grid's transition tables
-        when not given.
+        when not given; ``verbose`` reports the build's progress.
 
         Warning: on a precomputed grid a solve builds the table once, at the
         final time, and reuses it for every sweep. A running cost ``g``, or a
@@ -489,7 +531,7 @@ class DynamicProgrammingPlanner(Planner):
         nodes = progress(
             range(N),
             "Computing g(x,u,t) look-up table",
-            self.verbose,
+            verbose,
             unit="pairs",
             per_item=A,
         )

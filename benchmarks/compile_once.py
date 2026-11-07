@@ -132,7 +132,6 @@ def pipelines():
         backend="jax",
         tol=1.0,
         max_iterations=200,
-        verbose=False,
     )
 
     return {

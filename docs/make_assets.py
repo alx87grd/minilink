@@ -207,7 +207,6 @@ def gif_cartpole() -> None:
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
     camera = camera_matrix(

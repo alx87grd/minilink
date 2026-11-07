@@ -12,6 +12,7 @@ from minilink.planning.dynamic_programming.dp import (
     grid_failure_cost,
     grid_of,
 )
+from minilink.planning.dynamic_programming.progress import progress as report_progress
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
@@ -193,7 +194,13 @@ class TabularLearningPlanner(Planner):
         )
 
     def solve(
-        self, n_episodes=1000, *, params=None, evaluate=False, n_trials=50
+        self,
+        n_episodes=1000,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose: bool = False,
     ) -> PlanningSolution:
         """
         Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
@@ -202,17 +209,18 @@ class TabularLearningPlanner(Planner):
         scores it over the problem's draws.
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
+        ``verbose`` prints the episodes' progress and, at the end, the record.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                n_episodes, evaluate=evaluate, n_trials=n_trials
+                n_episodes, evaluate=evaluate, n_trials=n_trials, verbose=verbose
             )
             return self.store_solution(solution)
 
         # Episodes of interaction, learning as they go
-        self.learn(n_episodes)
+        self.learn(n_episodes, verbose=verbose)
 
         # The greedy law of the learned table
         result = self.result
@@ -233,6 +241,8 @@ class TabularLearningPlanner(Planner):
         solution = PlanningSolution(
             self.problem, policy, record, trajectory, evaluation, result.value_at
         )
+        if verbose:
+            print(record)
 
         return self.store_solution(solution)
 
@@ -258,8 +268,8 @@ class TabularLearningPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def learn(self, n_episodes):
-        """Run ``n_episodes`` episodes of interaction, learning as they go; returns ``self``."""
+    def learn(self, n_episodes, *, verbose=False):
+        """Run ``n_episodes`` episodes of interaction, learning as they go; returns ``self`` (``verbose``: the episodes' progress)."""
         grid = self.grid
         env = self.env
         Q = self.Q
@@ -269,8 +279,11 @@ class TabularLearningPlanner(Planner):
         eta = self.eta
         gamma = self.gamma
         rng = self.rng
+        episodes = report_progress(
+            range(n_episodes), "Learning Q(x,u)", verbose, unit="episodes"
+        )
 
-        for episode in range(n_episodes):
+        for episode in episodes:
             # The episode's exploration schedule, parameter draw, start node and
             # first action
             progress = episode / max(n_episodes - 1, 1)

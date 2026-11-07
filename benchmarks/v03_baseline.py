@@ -191,7 +191,6 @@ def mpc_entries(out):
         transcription="direct_collocation",
         backend="numpy",
         options={"maxiter": 80, "ftol": 1e-6},
-        verbose=False,
     )
     mpc = ModelPredictiveController(planner, delay=True)
     loop = (mpc % 0.2) @ plant
@@ -356,7 +355,6 @@ def rl_entries(out):
         n_steps=16,
         batch_size=32,
         gamma=0.97,
-        verbose=False,
     )
     planner.solve(n_timesteps=256, verbose=False)
     law = planner.controller

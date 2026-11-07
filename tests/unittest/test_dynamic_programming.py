@@ -53,13 +53,13 @@ def make_pendulum_problem():
     return PlanningProblem(sys, cost=QuadraticCost.from_system(sys), U=sys.input_box)
 
 
-def solve(problem, *, precompute=True, **opt_kwargs):
+def solve(problem, *, precompute=True, record_history=False, **opt_kwargs):
     grid = StateSpaceGrid(
         problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
     )
     options = dict(gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
-    planner.solve()
+    planner.solve(record_history=record_history)
     return (planner, planner.result)
 
 
@@ -472,7 +472,7 @@ class TestBackends(unittest.TestCase):
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
 
-        def jax_solve(**options):
+        def jax_solve(**workflow):
             grid = StateSpaceGrid(
                 problem,
                 x_grid_shape=(21, 21),
@@ -481,11 +481,11 @@ class TestBackends(unittest.TestCase):
                 precompute=False,
             )
             planner = DynamicProgrammingPlanner(
-                problem, grid=grid, backend="jax", gamma=0.95, tol=0.01, **options
+                problem, grid=grid, backend="jax", gamma=0.95, tol=0.01
             )
             stdout = io.StringIO()
             with contextlib.redirect_stdout(stdout):
-                planner.solve()
+                planner.solve(**workflow)
             return planner.result, stdout.getvalue()
 
         device, _ = jax_solve()
@@ -910,7 +910,6 @@ class TestCleanInfeasible(unittest.TestCase):
             dt=0.05,
             max_iterations=5,
             clean_infeasible=False,
-            verbose=False,
         )
         self.assertFalse(planner.clean_infeasible)
         from unittest import mock

@@ -23,7 +23,12 @@ from minilink.planning.dynamic_programming.progress import (
 
 
 def value_iteration(
-    planner, max_sweeps, stop_on_tol=True, keep_stages=False
+    planner,
+    max_sweeps,
+    stop_on_tol=True,
+    keep_stages=False,
+    verbose=False,
+    record_history=False,
 ) -> DynamicProgrammingResult:
     """
     The planner's value iteration, run on device.
@@ -45,15 +50,24 @@ def value_iteration(
     opt = planner
 
     # Device tables and the cost-to-go at the final time, built for this solve
-    G, coords, in_bounds = device_tables(planner)
-    J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time))
+    G, coords, in_bounds = device_tables(planner, verbose)
+    J0 = jax.numpy.asarray(terminal_cost(planner, opt.final_time, verbose))
     gamma = float(planner.gamma)
     tol = float(planner.tol)
 
     # Reported or recorded: one jitted step at a time, driven from Python
-    if opt.verbose or opt.record_history:
+    if verbose or record_history:
         return sweep_by_sweep(
-            planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol, keep_stages
+            planner,
+            J0,
+            G,
+            coords,
+            in_bounds,
+            max_sweeps,
+            stop_on_tol,
+            keep_stages,
+            verbose=verbose,
+            record_history=record_history,
         )
 
     # A finite horizon: its N sweeps in one compiled scan, every stage kept
@@ -75,15 +89,14 @@ def value_iteration(
     )
 
 
-def terminal_cost(planner, t) -> np.ndarray:
-    """Terminal cost at every grid node (JAX vmap over N nodes)."""
+def terminal_cost(planner, t, verbose=False) -> np.ndarray:
+    """Terminal cost at every grid node (JAX vmap over N nodes; ``verbose``: the build's progress)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
     grid = planner.grid
     face = grid.face
     N = grid.nodes_n
-    verbose = planner.verbose
 
     states = jnp.asarray(grid.states)
 
@@ -112,8 +125,8 @@ def terminal_cost(planner, t) -> np.ndarray:
     return J
 
 
-def running_cost_table(planner, t) -> np.ndarray:
-    """Running cost of every (node, action) pair over one step, with the out-of-bound penalty (JAX vmap)."""
+def running_cost_table(planner, t, verbose=False) -> np.ndarray:
+    """Running cost of every (node, action) pair over one step, with the out-of-bound penalty (JAX vmap; ``verbose``: the build's progress)."""
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
@@ -122,7 +135,6 @@ def running_cost_table(planner, t) -> np.ndarray:
     params = face.params
     N = grid.nodes_n
     A = grid.actions_n
-    verbose = planner.verbose
     failure_cost = planner.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
@@ -189,7 +201,7 @@ def running_cost_table(planner, t) -> np.ndarray:
 ###############################################################################
 
 
-def device_tables(planner):
+def device_tables(planner, verbose=False):
     """Device copies of the running-cost table and of the successors as fractional grid indices, at the final time."""
     jnp = ensure_jax_x64().numpy
 
@@ -202,7 +214,7 @@ def device_tables(planner):
 
     # Successors of every pair, and the running-cost table on device
     x_next, _, _ = grid.transition(tf)
-    G = jnp.asarray(running_cost_table(planner, tf))
+    G = jnp.asarray(running_cost_table(planner, tf, verbose))
 
     # Successors as fractional grid indices, (x_next − x_lb) / Δx, shape (n, N*A)
     x_lb = jnp.asarray(grid.x_lb)
@@ -283,7 +295,17 @@ def compiled_scan(planner, N):
 
 
 def sweep_by_sweep(
-    planner, J0, G, coords, in_bounds, max_sweeps, stop_on_tol, keep_stages=False
+    planner,
+    J0,
+    G,
+    coords,
+    in_bounds,
+    max_sweeps,
+    stop_on_tol,
+    keep_stages=False,
+    *,
+    verbose=False,
+    record_history=False,
 ):
     """The backward sweeps one jitted step at a time, so each can be reported or recorded."""
     jax = ensure_jax_x64()
@@ -297,7 +319,9 @@ def sweep_by_sweep(
     gamma = float(opt.gamma)
     step = jitted_step(planner)
 
-    log = SweepLog(opt, max_sweeps, stop_on_tol)
+    log = SweepLog(
+        max_sweeps, stop_on_tol, tol, verbose=verbose, record_history=record_history
+    )
 
     # Cost-to-go at the final time
     J = J0

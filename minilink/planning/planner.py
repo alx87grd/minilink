@@ -94,7 +94,7 @@ class Planner(ABC):
         return {**self.problem.parts_view(), "method": method, "seed": self.seed}
 
     def build_kwargs(self) -> dict:
-        """The keywords that rebuild this planner on another problem: its structure, its workflow, the numbers it was given."""
+        """The keywords that rebuild this planner on another problem: its structure and the numbers it was given, never a display (the workflow is the verb's)."""
         raise NotImplementedError(f"{type(self).__name__} has no build_kwargs")
 
     # Solve entries: each family overrides its own
@@ -273,6 +273,8 @@ def planner_at(planner, params) -> "Planner":
     A new planner, built from the planner's keywords (the numbers it was
     given, never the defaults it derived, so a changed problem derives its
     own) on a copy of its problem holding the tree; the planner is unchanged.
+    It inherits no display: the caller's ``solve`` hands its own workflow
+    keywords (``verbose``, ``callback``, ...) to the rebuilt planner's.
     A method number the tree leaves at the planner's value is not given: it
     is derived again on the new problem (the discount factor follows a new
     rate); a number the tree changes is given. The host planners solve

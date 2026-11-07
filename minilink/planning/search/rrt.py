@@ -49,9 +49,8 @@ class RRTPlanner(Planner):
     -----
     The search's settings are keywords, read back as attributes: ``max_nodes``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
-    ``max_sample_attempts``, ``return_best_effort``, ``callback``,
-    ``live_plot``, ``live_plot_every``, ``live_plot_pause``,
-    ``live_plot_after_goal_only``, ``live_plot_ax``, ``nearest_backend``.
+    ``max_sample_attempts``, ``return_best_effort``, ``nearest_backend``.
+    The workflow, ``callback`` and the live plot, are keywords of :meth:`solve`.
 
     Provisional tool: maintainer review before assigning for coursework.
 
@@ -77,12 +76,6 @@ class RRTPlanner(Planner):
         edge_resolution: float | None = None,
         max_sample_attempts: int = 100,
         return_best_effort: bool = True,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        live_plot_every: int = 5,
-        live_plot_pause: float = 0.001,
-        live_plot_after_goal_only: bool = False,
-        live_plot_ax: object | None = None,
         nearest_backend: str = "brute_force",
     ) -> None:
         super().__init__(problem)
@@ -94,7 +87,7 @@ class RRTPlanner(Planner):
         self.extender = extender
         self.metric = metric
 
-        # The search's structure and numbers, and its workflow
+        # The search's structure and numbers
         self.max_nodes = int(max_nodes)
         self.goal_bias = float(goal_bias)
         self.seed = int(seed)
@@ -102,26 +95,31 @@ class RRTPlanner(Planner):
         self.max_sample_attempts = int(max_sample_attempts)
         self.return_best_effort = bool(return_best_effort)
         self.nearest_backend = nearest_backend
-        self.callback = callback
-        self.live_plot = bool(live_plot)
-        self.live_plot_every = int(live_plot_every)
-        self.live_plot_pause = float(live_plot_pause)
-        self.live_plot_after_goal_only = bool(live_plot_after_goal_only)
-        self.live_plot_ax = live_plot_ax
 
         # The search, refreshed by every solve
         self.tree: Tree | None = None
         self.reached_goal: bool = False
         self.solution_node: Node | None = None
         self.iterations: int = 0
-        self.search_callback = None  # The solve's step callback, when it has one
 
         # The box free states are drawn from by rejection: the box of X, or the
         # state bounds when X has no finite one
         box = problem.X.bounding_box()
         self.sample_box = problem.sys.state.box if not is_finite_box(box) else box
 
-    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(
+        self,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        live_plot_every: int = 5,
+        live_plot_pause: float = 0.001,
+        live_plot_after_goal_only: bool = False,
+        live_plot_ax: object | None = None,
+    ) -> PlanningSolution:
         """
         Grow the tree until the goal region is reached or the budget is spent.
 
@@ -130,12 +128,28 @@ class RRTPlanner(Planner):
         draws when the problem declares a cost.
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
+
+        The workflow: ``callback(step)`` sees an
+        :class:`~minilink.planning.search.live_plot.RRSearchIteration` and
+        ``live_plot`` redraws the tree (on ``live_plot_ax``, or a new figure,
+        pausing ``live_plot_pause`` seconds), both every ``live_plot_every``
+        extensions, and only once the goal is reached with
+        ``live_plot_after_goal_only``.
         """
+        # The display: each extension's report, or a rebuilt planner's solve
+        workflow = dict(
+            callback=callback,
+            live_plot=live_plot,
+            live_plot_every=live_plot_every,
+            live_plot_pause=live_plot_pause,
+            live_plot_after_goal_only=live_plot_after_goal_only,
+            live_plot_ax=live_plot_ax,
+        )
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials
+                evaluate=evaluate, n_trials=n_trials, **workflow
             )
             return self.store_solution(solution)
 
@@ -154,7 +168,7 @@ class RRTPlanner(Planner):
         self.reached_goal = False
         self.solution_node = None
         self.iterations = 0
-        self.search_callback = self.resolve_search_callback()
+        report = self.search_report_of(**workflow)
 
         for _ in range(self.max_nodes):
             # Sample a state, and extend the nearest node toward it
@@ -173,12 +187,12 @@ class RRTPlanner(Planner):
             if goal_region.contains(node.x):
                 self.reached_goal = True
                 self.solution_node = node
-                self.on_search_step(phase="explore")
+                report("explore")
                 return self.finish_trajectory(
                     self.tree.extract_trajectory(node), evaluate, n_trials
                 )
 
-            self.on_search_step(phase="explore")
+            report("explore")
 
         # The budget is spent: the node closest to the goal, when best effort is allowed
         goal_point = self.goal_point(goal_region)
@@ -200,12 +214,6 @@ class RRTPlanner(Planner):
         kwargs["edge_resolution"] = self.edge_resolution
         kwargs["max_sample_attempts"] = self.max_sample_attempts
         kwargs["return_best_effort"] = self.return_best_effort
-        kwargs["callback"] = self.callback
-        kwargs["live_plot"] = self.live_plot
-        kwargs["live_plot_every"] = self.live_plot_every
-        kwargs["live_plot_pause"] = self.live_plot_pause
-        kwargs["live_plot_after_goal_only"] = self.live_plot_after_goal_only
-        kwargs["live_plot_ax"] = self.live_plot_ax
         kwargs["nearest_backend"] = self.nearest_backend
 
         return kwargs
@@ -276,23 +284,53 @@ class RRTPlanner(Planner):
 
         return Xf
 
-    def resolve_search_callback(self):
-        """The solve's step callback: the option's, a live plot, or ``None``."""
-        if self.callback is not None:
-            return self.callback
-        if not self.live_plot:
-            return None
+    def search_report_of(
+        self,
+        *,
+        callback=None,
+        live_plot=False,
+        live_plot_every=5,
+        live_plot_pause=0.001,
+        live_plot_after_goal_only=False,
+        live_plot_ax=None,
+    ):
+        """
+        The solve's report of one extension, ``report(phase)``: the live plot, then the callback, every ``live_plot_every`` extensions.
 
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import LiveSearchPlotCallback
+        Silent before the goal is reached with ``live_plot_after_goal_only``,
+        and a no-op when the solve asks for neither.
+        """
+        hooks = []
 
-        return LiveSearchPlotCallback(
-            self,
-            ax=self.live_plot_ax,
-            every=self.live_plot_every,
-            pause=self.live_plot_pause,
-            after_goal_only=self.live_plot_after_goal_only,
-        )
+        # The live figure, beside the user's callback when there is one
+        if live_plot:
+            # Lazy import: the graphics load on first use, not with the core
+            from minilink.planning.search.live_plot import LiveSearchPlotCallback
+
+            hooks.append(
+                LiveSearchPlotCallback(
+                    self,
+                    ax=live_plot_ax,
+                    every=live_plot_every,
+                    pause=live_plot_pause,
+                    after_goal_only=live_plot_after_goal_only,
+                )
+            )
+        if callback is not None:
+            hooks.append(callback)
+
+        def report(phase):
+            if not hooks:
+                return
+            if live_plot_after_goal_only and not self.reached_goal:
+                return
+            if self.iterations % max(1, live_plot_every) != 0:
+                return
+            step = self.search_step(phase)
+            for hook in hooks:
+                hook(step)
+
+        return report
 
     def sample_state(self, rng):
         """The goal region's point with probability ``goal_bias``, otherwise a free state."""
@@ -393,16 +431,8 @@ class RRTPlanner(Planner):
 
         return np.asarray(dense)
 
-    def on_search_step(self, *, phase: str) -> None:
-        """Hand the step to the solve's callback, every ``live_plot_every`` extensions."""
-        callback = self.search_callback
-        if callback is None:
-            return
-        if self.live_plot_after_goal_only and not self.reached_goal:
-            return
-        if self.iterations % max(1, self.live_plot_every) != 0:
-            return
-
+    def search_step(self, phase: str):
+        """The search as it stands, one :class:`~minilink.planning.search.live_plot.RRSearchIteration` for the solve's hooks."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import RRSearchIteration
 
@@ -410,15 +440,13 @@ class RRTPlanner(Planner):
         if self.reached_goal and self.solution_node is not None:
             best_cost = float(self.solution_node.cost)
 
-        callback(
-            RRSearchIteration(
-                iteration=self.iterations,
-                phase=phase,
-                reached_goal=self.reached_goal,
-                best_cost=best_cost,
-                tree_nodes=len(self.tree.nodes),
-                planner=self,
-            )
+        return RRSearchIteration(
+            iteration=self.iterations,
+            phase=phase,
+            reached_goal=self.reached_goal,
+            best_cost=best_cost,
+            tree_nodes=len(self.tree.nodes),
+            planner=self,
         )
 
     def finish_trajectory(

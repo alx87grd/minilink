@@ -163,7 +163,7 @@ def dp_entries(out):
         plant, cost=QuadraticCost.from_system(plant), U=plant.input_box
     )
     planner = DynamicProgrammingPlanner(
-        problem, x_grid=(21, 21), u_grid=(5,), dt=DT, max_iterations=30, verbose=False
+        problem, x_grid=(21, 21), u_grid=(5,), dt=DT, max_iterations=30
     )
     solution = planner.solve()
     grid_points = (
@@ -195,7 +195,7 @@ def trajopt_entries(out):
 
             transcription = ShootingTranscription(ShootingOptions(n_steps=10))
         planner = TrajectoryOptimizationPlanner(
-            problem, n_steps=10, transcription=transcription, verbose=False
+            problem, n_steps=10, transcription=transcription
         )
         transcription = getattr(transcription, "name", None) or "shooting"
         solution = planner.solve()

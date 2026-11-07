@@ -85,13 +85,6 @@ planner = RRTStarPlanner(
     optimize_after_goal=True,
     cost_tol=COST_TOL,
     convergence_patience=CONVERGENCE_PATIENCE,
-    record_history=REPLAY_HISTORY,
-    history_stride=HISTORY_STRIDE,
-    live_plot=LIVE_PLOT,
-    live_plot_ax=live_ax,
-    live_plot_every=LIVE_PLOT_EVERY,
-    live_plot_pause=LIVE_PLOT_PAUSE,
-    live_plot_after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
 )
 
 print("RRT* post-goal convergence demo")
@@ -106,7 +99,15 @@ if LIVE_PLOT:
     )
 
 t0 = time.perf_counter()
-traj = planner.solve().trajectory
+traj = planner.solve(
+    record_history=REPLAY_HISTORY,
+    history_stride=HISTORY_STRIDE,
+    live_plot=LIVE_PLOT,
+    live_plot_ax=live_ax,
+    live_plot_every=LIVE_PLOT_EVERY,
+    live_plot_pause=LIVE_PLOT_PAUSE,
+    live_plot_after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
+).trajectory
 elapsed = time.perf_counter() - t0
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))

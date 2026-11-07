@@ -90,14 +90,13 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=N_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    verbose=True,
     options={
         "maxiter": 500,
         "ftol": 1e-1,
     },
 )
 
-traj = planner.solve().trajectory
+traj = planner.solve(verbose=True).trajectory
 planner.plot_trajectory(signals=("x", "u"))
 sys.traj = traj
 sys.animate(traj, overlays=[scene.as_visualizer(color="tab:red", opacity=0.45)])
