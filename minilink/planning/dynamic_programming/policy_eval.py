@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from minilink.core.roles import block_roles
 from minilink.planning.dynamic_programming.dp import (
     grid_numbers_of,
     infeasible_penalty,
@@ -10,6 +9,7 @@ from minilink.planning.dynamic_programming.dp import (
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
 from minilink.planning.evaluator import controller_of
+from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -211,76 +211,6 @@ def require_problem_cost(problem):
     """Refuse a problem without a cost: there is no cost-to-go to evaluate."""
     if problem.cost is None:
         raise ValueError("PolicyEvaluator requires problem.cost")
-
-
-def policy_from_block(block):
-    """Adapt a feedback controller block into its policy, a ``u = policy(x, t=0.0)`` callable.
-
-    The block is evaluated through its control-port compute at its own
-    initial state ``x0``, with ``x`` on the measurement port, every other
-    input (a reference) pinned at its port nominal, and the time ``t``.
-    """
-    roles = block_roles(block)
-    require_feedback_roles(block, roles)
-
-    output = block.outputs[roles.command]
-    measurement = block.get_input_port_slice(roles.measurement)
-    u_base = block.get_u_from_input_ports().astype(float)
-    x_ctrl = np.asarray(block.x0, dtype=float)
-
-    # The command of the block at t, the state on its measurement port
-    def policy(x, t=0.0):
-        u = u_base.copy()
-        u[measurement] = np.asarray(x, dtype=float).reshape(-1)
-        command = np.asarray(output.compute(x_ctrl, u, t, None), dtype=float)
-        command = command.reshape(-1)
-
-        return command
-
-    return policy
-
-
-def policy_from_source(block):
-    """Adapt an open-loop controller, a source with no input port, into its policy ``u = policy(x=None, t=0.0)``.
-
-    The command is the source's output ``y = h(x_c, t)`` at its own initial
-    state ``x0``, the signal ``block >> plant`` feeds the plant; the state
-    ``x`` is not read.
-    """
-    require_source(block)
-
-    u_none = block.get_u_from_input_ports().astype(float)
-    x_ctrl = np.asarray(block.x0, dtype=float)
-
-    # The command of the source at t, whatever the state
-    def policy(x=None, t=0.0):
-        command = np.asarray(block.h(x_ctrl, u_none, t), dtype=float)
-        command = command.reshape(-1)
-
-        return command
-
-    return policy
-
-
-def require_feedback_roles(block, roles):
-    """Refuse a block that does not read the state on ``x`` (or ``y``) and command ``u``."""
-    if roles.measurement is None or roles.command is None:
-        raise ValueError(
-            "policy must be a callable u = policy(x) or a controller block that "
-            "reads the state on an input named 'x' (or 'y') and commands 'u'; "
-            f"{type(block).__name__} reads {list(block.inputs)} and gives "
-            f"{list(block.outputs)}"
-        )
-
-
-def require_source(block):
-    """Refuse a block with an input port: an open-loop policy reads the time alone."""
-    if int(block.m) > 0:
-        raise ValueError(
-            "an open-loop policy u = pi(t) is a source with no input port; "
-            f"{type(block).__name__} reads {list(block.inputs)}: "
-            "policy_from_block adapts a feedback controller"
-        )
 
 
 def require_solved(J, verb):

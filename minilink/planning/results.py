@@ -11,6 +11,7 @@ from minilink.core.inspect import body_line, format_inspect, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
+from minilink.planning.policies import policy_from_block, policy_from_source
 from minilink.planning.problems import PlanningProblem, require_cost
 
 ###############################################################################
@@ -113,12 +114,6 @@ class PlanningSolution:
         ``x0``; an open-loop controller reads the time ``t`` alone and
         ignores ``x``.
         """
-        # A real cycle: the policy adapters import the planners, which import this module
-        from minilink.planning.dynamic_programming.policy_eval import (
-            policy_from_block,
-            policy_from_source,
-        )
-
         # The law of the block: the time alone for a source, the state and the time
         # for a feedback controller
         if self.open_loop:
