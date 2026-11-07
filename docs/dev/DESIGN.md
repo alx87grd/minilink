@@ -957,7 +957,11 @@ dimension than the compiled value is swept); the research facade for
 parameter-family experiments.
 
 Leaf `compile` accepts `numpy` or `jax` only (`auto` / `direct` are simulator /
-transcription concepts — see :mod:`minilink.core.backends`).
+transcription concepts — see :mod:`minilink.core.backends`). Every automatic backend
+(`compile_auto`, a simulator's `backend="auto"`) reads one rule, `build_on_auto` in
+`compiler.py`: JAX, else NumPy when JAX does not import or a block does not trace (the
+trace check raises `NotTraceableError`, a `RuntimeError`); any other error of the JAX
+build surfaces.
 
 Diagrams → `ExecutionPlan` → diagram evaluator. Optional **compile-time flatten**
 (`compile_diagram(..., flatten=False)` by default): before the plan is built,

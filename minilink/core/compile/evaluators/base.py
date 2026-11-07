@@ -502,14 +502,16 @@ def require_jax_evaluator(evaluator, verb):
         raise TypeError(f"{verb} needs a JAX evaluator: compile(backend='jax')")
 
 
-def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
-    """Refuse a block function that does not trace (``jax.make_jaxpr``)."""
-    from jax.errors import ConcretizationTypeError
+class NotTraceableError(RuntimeError):
+    """A block function that JAX cannot trace: the verdict on which an automatic backend falls back to NumPy."""
 
+
+def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
+    """Refuse a block function that does not trace (``jax.make_jaxpr``), with a :class:`NotTraceableError`."""
     try:
         jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(dummy_x, dummy_u, dummy_t)
-    except (ConcretizationTypeError, TypeError, Exception) as e:
-        raise RuntimeError(
+    except Exception as e:
+        raise NotTraceableError(
             f"\n\nBlock '{label}' is not JAX-traceable.\n"
             f"Its f()/compute() likely performs in-place array mutation "
             f"(e.g., x[0] = ...)\n"

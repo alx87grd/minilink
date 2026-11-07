@@ -1572,3 +1572,38 @@ def test_compile_probes_a_custom_port_function_for_an_undeclared_input():
     ):
         compile(Doubler(dependencies=()))
     compile(Doubler(dependencies=("u",)))
+
+
+def test_one_automatic_backend_rule_falls_back_on_a_block_that_does_not_trace():
+    """compile_auto and the simulators' backend="auto" read one rule: NumPy on a NotTraceableError only."""
+    pytest.importorskip("jax")
+    from minilink.core.compile.compiler import build_on_auto, compile, compile_auto
+    from minilink.core.compile.evaluators.base import NotTraceableError
+    from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+    from minilink.simulation.simulator import Simulator
+    from minilink.simulation.static_simulator import StaticSimulator
+
+    class Untraceable(Pendulum):
+        def f(self, x, u, t=0, params=None):
+            return np.asarray(super().f(np.asarray(x), np.asarray(u), t, params))
+
+    # The verdict is typed: a NotTraceableError, a RuntimeError
+    with pytest.raises(NotTraceableError, match="is not JAX-traceable"):
+        compile(Untraceable(), backend="jax")
+    assert issubclass(NotTraceableError, RuntimeError)
+
+    # Every automatic backend takes NumPy for it, JAX for a block that traces
+    assert compile_auto(Untraceable())[0] == "numpy"
+    assert compile_auto(Pendulum())[0] == "jax"
+    assert Simulator(Untraceable(), tf=0.1, backend="auto").backend == "numpy"
+    assert Simulator(Pendulum(), tf=0.1, backend="auto").backend == "jax"
+    assert StaticSimulator(P(2.0), tf=0.1, backend="auto").backend == "jax"
+
+    # Any other error of the JAX build surfaces instead of falling back
+    def broken(backend):
+        if backend == "jax":
+            raise ValueError("a wrong shape")
+        return "numpy evaluator"
+
+    with pytest.raises(ValueError, match="a wrong shape"):
+        build_on_auto(broken)

@@ -15,6 +15,7 @@ from minilink.core.backends import (
     normalize_backend,
     require_jax_numpy,
 )
+from minilink.core.compile.evaluators.base import NotTraceableError
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.evaluators.discrete import (
     SampledDiagramEvaluator,
@@ -106,20 +107,32 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
 def compile_auto(system, verbose=False):
     """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
 
-    Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
-    JAX cannot be imported, or the system is "not JAX-traceable"; any other
-    error from the JAX compile surfaces.
+    Returns ``(backend, evaluator)``; the policy is :func:`build_on_auto`'s.
+    """
+
+    return build_on_auto(
+        lambda backend: compile(system, backend=backend, verbose=verbose)
+    )
+
+
+def build_on_auto(build):
+    """``(backend, build(backend))``: JAX when it imports and the build traces, else NumPy.
+
+    Only two verdicts fall back to NumPy: JAX cannot be imported, or a block is
+    not JAX-traceable (:class:`NotTraceableError`); any other error from the
+    JAX build surfaces. Every automatic backend (``compile_auto``, the
+    simulators' ``backend="auto"``) reads this one rule.
     """
 
     if jax_installed():
         try:
-            return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
+            return BACKEND_JAX, build(BACKEND_JAX)
         except ImportError:
             pass  # present on disk but not importable (e.g. blocked, broken install)
-        except RuntimeError as exc:
-            if "JAX-traceable" not in str(exc):
-                raise
-    return BACKEND_NUMPY, compile(system, backend=BACKEND_NUMPY, verbose=verbose)
+        except NotTraceableError:
+            pass
+
+    return BACKEND_NUMPY, build(BACKEND_NUMPY)
 
 
 def compile_diagram(
