@@ -15,6 +15,7 @@ from minilink.planning import (
     evaluate,
 )
 from minilink.planning.evaluator import held_law, nominal_trajectory
+from minilink.planning.planner import solution_trajectory_of
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
@@ -241,7 +242,7 @@ def test_grid_policies_roll_out_as_held_input_closed_loops(make):
     np.testing.assert_allclose(planned.x, x_hand, atol=1e-10)
     # the same rollout is what plot_trajectory draws, and the cost-to-go is the planner's table
     np.testing.assert_array_equal(
-        planner.solution_trajectory().x, solution.trajectory.x
+        solution_trajectory_of(planner).x, solution.trajectory.x
     )
     assert solution.cost_to_go(problem.x0) == planner.cost_to_go(problem.x0)
     assert str(solution.evaluation).startswith("J = ")

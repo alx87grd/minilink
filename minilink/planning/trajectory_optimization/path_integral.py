@@ -15,10 +15,15 @@ from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import (
     Planner,
     host_tree,
+    open_loop_controller_of,
     planner_evidence,
     problem_with,
 )
-from minilink.planning.problems import nominal_plant_params
+from minilink.planning.problems import (
+    nominal_plant_params,
+    require_cost,
+    require_finite_horizon,
+)
 from minilink.planning.results import PlanningSolution
 
 # A solve between two knots folds its offset in, in this many parts of dt
@@ -89,7 +94,7 @@ class MPPIPlanner(Planner):
     ):
         require_jax()
         super().__init__(problem)
-        tf = problem.require_finite_horizon()
+        tf = require_finite_horizon(problem)
 
         # The structure: the grid, the sample count, the passes, the scheme
         self.dt = float(dt)
@@ -123,7 +128,7 @@ class MPPIPlanner(Planner):
             "plant": copy.deepcopy(
                 (problem.sys.params if plant is None else plant) or {}
             ),
-            "cost": copy.deepcopy(problem.require_cost().params),
+            "cost": copy.deepcopy(require_cost(problem).params),
             "discount_rate": float(problem.discount_rate),
         }
         if problem.X.params:
@@ -463,7 +468,9 @@ class CompiledMPPIPlanner:
             iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
-        policy = self.planner.open_loop_controller(trajectory, interpolation="previous")
+        policy = open_loop_controller_of(
+            trajectory, self.planner.problem.sys, interpolation="previous"
+        )
 
         return PlanningSolution(
             problem_with(self.problem, host_tree(problem_part(self.merged(params)))),

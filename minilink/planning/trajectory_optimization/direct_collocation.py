@@ -14,7 +14,11 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+)
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
     FixedGridOptions,
@@ -65,7 +69,7 @@ class DirectCollocationTranscription(Transcription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
         if dynamics is None:
             dynamics = dynamics_function(problem, backend)
 
@@ -289,7 +293,7 @@ class DirectCollocationTranscription(Transcription):
             "x0": np.asarray(problem.x0, dtype=float),
             "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
-            "cost": problem.require_cost().params,
+            "cost": require_cost(problem).params,
             "discount_rate": float(problem.discount_rate),
         }
         for role in constrained_roles(problem):
@@ -307,7 +311,7 @@ class DirectCollocationTranscription(Transcription):
         """
         jnp = jax.numpy
 
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         grid = self.knot_offsets(problem, jnp)
         dt = jnp.asarray(self.options.dt(problem))
         unpack_jax = self.jax_unpacker(problem)
@@ -539,7 +543,7 @@ class DirectCollocationTranscription(Transcription):
 
     def objective(self, z: np.ndarray, problem: PlanningProblem):
         """Bolza objective ``J(z)`` of the packed knots."""
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         x, u = self.unpack(z, problem)
         t = self.options.t(problem)
         dt = self.options.dt(problem)

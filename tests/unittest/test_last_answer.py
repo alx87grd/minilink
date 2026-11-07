@@ -10,7 +10,7 @@ PACKAGE = Path(__file__).resolve().parents[2] / "minilink"
 # returned; a new reader here is a tool leaning on hidden state.
 SHORTCUTS = {
     "last_solution": {
-        "planning/planner.py": {"Planner.require_solution"},
+        "planning/planner.py": {"require_solution"},
         "planning/dynamic_programming/dp.py": {"DynamicProgrammingPlanner.result"},
         "planning/search/plotting.py": {"plot_tree", "animate_search.update"},
     },

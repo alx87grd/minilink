@@ -18,6 +18,7 @@ from minilink.core.distributions import child_seed
 from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
 from minilink.core.wiring import WiredDiagramMixin
+from minilink.planning.problems import require_cost
 from minilink.planning.step_face import StepFace
 
 ###############################################################################
@@ -91,7 +92,7 @@ class RolloutEnvironment:
         require_continuous_problem(problem)
         self.problem = problem
         self.sys = problem.sys
-        self.cost = problem.require_cost()
+        self.cost = require_cost(problem)
         self.dt = float(dt)
         self.backend = backend
         self.n = int(self.sys.n)

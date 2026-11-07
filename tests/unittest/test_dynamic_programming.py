@@ -19,6 +19,7 @@ from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
 )
 from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
+from minilink.planning.planner import require_solution
 from minilink.planning.problems import PlanningProblem
 
 
@@ -209,7 +210,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.1, max_iterations=20
         )
         planner.solve()
-        self.assertIs(planner.controller, planner.require_solution().controller)
+        self.assertIs(planner.controller, require_solution(planner).controller)
         nearest = plotting.lookup_controller_of(planner.result, interpolation="nearest")
         self.assertIsNot(nearest, planner.controller)
         np.testing.assert_array_equal(nearest.pi, planner.result.pi)

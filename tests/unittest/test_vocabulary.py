@@ -37,7 +37,7 @@ RETIRED = {
     ),
     "optimizer_options": ("options", None),
     "tf": ("horizon", ("PlanningProblem",)),
-    "require_finite_tf": ("require_finite_horizon", None),
+    "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
     "ybar": ("y_bar", None),
@@ -153,6 +153,46 @@ def retired_on(qualname, owners):
     if owners is None:
         return True
     return qualname.rsplit(".", 1)[-1] in owners
+
+
+# The helpers that are module functions, never methods of the problems or the planner base
+# (RULES 5.25): the refusals and readers a planner reads a problem and its latest solution through
+MODULE_HELPERS = {
+    "PlanningProblem": {
+        "require_cost",
+        "require_goal",
+        "require_finite_horizon",
+        "default_x0",
+        "move_start",
+        "sources_by_id",
+        "part_trees",
+    },
+    "StepPlanningProblem": {"require_cost"},
+    "Planner": {
+        "require_solution",
+        "require_cost",
+        "require_goal",
+        "solution_trajectory",
+        "open_loop_controller",
+    },
+}
+
+
+def test_the_helpers_are_module_functions_not_methods():
+    from minilink.planning.planner import Planner
+    from minilink.planning.problems import PlanningProblem
+    from minilink.planning.step_problems import StepPlanningProblem
+
+    owners = {
+        cls.__name__: cls for cls in (PlanningProblem, StepPlanningProblem, Planner)
+    }
+    hits = sorted(
+        f"{owner}.{name}"
+        for owner, names in MODULE_HELPERS.items()
+        for name in names
+        if hasattr(owners[owner], name)
+    )
+    assert not hits, f"module functions, not methods: {hits}"
 
 
 # The workflow a planner's verb takes (DESIGN §6, the four kinds of argument): what is shown,

@@ -12,7 +12,7 @@ from minilink.core.params import checked
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import host_tree, problem_with
+from minilink.planning.planner import host_tree, open_loop_controller_of, problem_with
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
@@ -318,7 +318,7 @@ class CompiledTrajectoryPlanner:
             stats=dict(result.stats),
             optimization_result=result,
         )
-        policy = self.planner.open_loop_controller(trajectory)
+        policy = open_loop_controller_of(trajectory, self.planner.problem.sys)
 
         return PlanningSolution(problem, policy, record, trajectory, None)
 

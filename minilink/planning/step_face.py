@@ -6,7 +6,11 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.costs import SampledCost
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+)
 from minilink.planning.step_problems import StepPlanningProblem, sampled_cost_bound
 
 ###############################################################################
@@ -140,7 +144,7 @@ class StepFace:
     def transition_at(self, x, u, t, params=None):
         """``(x_next, c)`` of the tick that starts at time ``t`` (a native problem's tick index)."""
         params = self.params if params is None else params
-        self.problem.require_cost()
+        require_cost(self.problem)
 
         # A continuous plant: the plant and its stage cost in one step
         if self.stage is not None:
@@ -196,7 +200,7 @@ class StepFace:
     def stage_cost_at(self, x, u, t, params=None):
         """``c`` alone of the tick that starts at ``t``: :meth:`transition_at`'s cost, the plant not stepped where the scheme allows."""
         params = self.params if params is None else params
-        self.problem.require_cost()
+        require_cost(self.problem)
 
         if self.stage is not None:
             rho = params.get("discount_rate")
@@ -209,7 +213,7 @@ class StepFace:
     def stage_cost_law(self, t, params=None):
         """``c(x, u)``: :meth:`stage_cost_at` of the tick that starts at ``t`` as a function of the pair, its laws built once (a table's cost)."""
         params = self.params if params is None else params
-        cost = self.problem.require_cost()
+        cost = require_cost(self.problem)
 
         if self.stage is not None:
             rho = params.get("discount_rate")

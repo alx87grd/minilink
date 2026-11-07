@@ -9,7 +9,12 @@ import numpy as np
 
 from minilink.core.sets import SingletonSet, is_finite_box
 from minilink.core.trajectory import Trajectory
-from minilink.planning.planner import Planner, planner_at, planner_evidence
+from minilink.planning.planner import (
+    Planner,
+    open_loop_controller_of,
+    planner_at,
+    planner_evidence,
+)
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender
@@ -453,7 +458,9 @@ class RRTPlanner(Planner):
         self, trajectory: Trajectory, evaluate, n_trials
     ) -> PlanningSolution:
         """The path as a solution: its input held by a source block, the search's record, scored when asked."""
-        policy = self.open_loop_controller(trajectory, interpolation="previous")
+        policy = open_loop_controller_of(
+            trajectory, self.problem.sys, interpolation="previous"
+        )
 
         # Scored over the problem's draws, on the path's median time step
         evaluation = None

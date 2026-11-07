@@ -239,7 +239,7 @@ class PlanningProblem:
 
         # The evaluation start: the point given, else the law's mean, else X0's
         x0 = self.coerce_state(
-            self.default_x0(),
+            default_x0_of(self),
             label="x0",
             required=True,
         )
@@ -300,7 +300,7 @@ class PlanningProblem:
         ``problem.params = {"plant": {...}}`` sets the plant's parameters.
         """
         tree = self.held_params
-        parts = self.part_trees()
+        parts = part_trees_of(self)
         own = {key: tree.get(key) for key in OWN_LEAVES}
 
         # The parts' trees, refreshed when a part was replaced, in the roles' order
@@ -327,13 +327,13 @@ class PlanningProblem:
             elif role == "cost":
                 self.cost.params = entry
             elif role == "x0":
-                self.move_start(entry)
+                self.x0 = entry
             elif role == "t0":
                 self.t0 = coerce_start_time(entry)
             elif role == "discount_rate":
                 self.discount_rate = coerce_rate(entry)
-            elif role in self.sources_by_id():
-                self.sources_by_id()[role].params = entry
+            elif role in sources_of(self):
+                sources_of(self)[role].params = entry
             else:
                 # A set's numbers in place, its one home
                 getattr(self, role).params = entry
@@ -358,16 +358,12 @@ class PlanningProblem:
 
     @property
     def x0(self) -> np.ndarray:
-        """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it (:meth:`move_start`)."""
+        """The evaluation start's point (a law's mean): the one leaf ``params["x0"]``; assigning it moves a singleton ``X0`` with it, any other ``X0`` must hold it."""
         return self.held_params.get("x0")
 
     @x0.setter
     def x0(self, value):
-        self.move_start(value)
-
-    def move_start(self, x0):
-        """Set ``x0``: a singleton ``X0`` moves with it, any other ``X0`` must hold it."""
-        start = self.coerce_state(x0, label="x0", required=True)
+        start = self.coerce_state(value, label="x0", required=True)
         self.check_state_shape("x0", start, int(self.sys.n))
         if isinstance(self.X0, SingletonSet):
             self.X0 = SingletonSet(start)
@@ -440,7 +436,7 @@ class PlanningProblem:
 
         # Each random source's seeds, n times, named by its block id and the trial;
         # without a key, every seed None (the mean signal)
-        for sys_id, block in self.sources_by_id().items():
+        for sys_id, block in sources_of(self).items():
             if block.is_random:
                 if key is None:
                     seeds = seeds_of(block, block.realize(None))
@@ -454,7 +450,7 @@ class PlanningProblem:
         """The paths of the leaves :meth:`realize` draws with a trial axis."""
         paths = [("x0",)]
         paths.extend(path for path, _ in flatten(self.distributions))
-        for sys_id, block in self.sources_by_id().items():
+        for sys_id, block in sources_of(self).items():
             if block.is_random:
                 seeds = seeds_of(block, block.realize(0))
                 paths.extend((sys_id, *path) for path, _ in flatten(seeds))
@@ -505,7 +501,7 @@ class PlanningProblem:
             nominal.params = merge_tree(nominal.parts_view(), means)
 
         # Each random source at its mean signal: its seed None
-        for block in nominal.sources_by_id().values():
+        for block in sources_of(nominal).values():
             if block.is_random:
                 block.params = block.realize(None)
 
@@ -551,28 +547,9 @@ class PlanningProblem:
 
         return self.start_law is not None or bool(self.distributions) or random_source
 
-    def sources_by_id(self) -> dict:
-        """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
-        return {source_id(port): block for port, block in self.disturbances.items()}
-
     def parts_view(self) -> dict:
         """:attr:`params` copied at its top level: the parts' own trees by role and the problem's own numbers, for a caller that sets entries."""
         return dict(self.params)
-
-    def part_trees(self) -> dict:
-        """Each part's own tree by role, in the roles' order: the start's singleton left out (its point is ``x0``, one home)."""
-        trees = {"plant": self.sys.params}
-        if self.cost is not None:
-            trees["cost"] = self.cost.params
-        for role in ("X", "U", "X0", "Xf"):
-            set_ = getattr(self, role)
-            if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
-                continue
-            trees[role] = getattr(set_, "params", None)
-        for port, block in getattr(self, "disturbances", {}).items():
-            trees[source_id(port)] = block.params
-
-        return trees
 
     def discount_factor(self, dt) -> float:
         """The per-step factor ``γ = e^{−ρ dt}`` of a planner stepping ``dt``."""
@@ -598,7 +575,7 @@ class PlanningProblem:
         a warning naming ``failure_cost``. ``params`` are the cost's numbers to
         bound (an evaluation's overridden weights); ``None`` reads its own.
         """
-        cost = self.require_cost()
+        cost = require_cost(self)
         rho = self.discount_rate if discount_rate is None else float(discount_rate)
         T = (
             (self.horizon if self.horizon_kind() == "finite" else np.inf)
@@ -711,34 +688,6 @@ class PlanningProblem:
             else "finite"
         )
 
-    def require_cost(self) -> CostFunction:
-        """Refuse a problem without a cost; return the cost."""
-        if self.cost is None:
-            raise ValueError("This planner requires problem.cost")
-
-        return self.cost
-
-    def require_goal(self) -> Set:
-        """Refuse a problem without a terminal set; return it."""
-        if self.Xf is None:
-            raise ValueError(
-                "This planner requires a terminal set: give the problem Xf"
-            )
-
-        return self.Xf
-
-    def require_finite_horizon(self) -> float:
-        """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
-        if self.horizon is None:
-            raise ValueError("This planner requires a finite problem.horizon")
-        if not np.isfinite(self.horizon):
-            raise ValueError(
-                "This planner requires a finite problem.horizon "
-                "(got +inf for infinite-horizon)"
-            )
-
-        return float(self.horizon)
-
     # Display
 
     def __str__(self):
@@ -768,36 +717,6 @@ class PlanningProblem:
             )
 
         return value
-
-    def default_x0(self):
-        """
-        The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
-
-        With no ``X0`` the start is ``sys.x0``; a region holding neither its
-        centre nor ``sys.x0`` is refused.
-        """
-        if self.held_params.get("x0") is not None:
-            return self.held_params["x0"]
-        if self.start_law is not None:
-            return self.start_law.mean
-        X0 = self.X0
-        if X0 is None:
-            return self.sys.x0
-        if isinstance(X0, SingletonSet):
-            return X0.point
-
-        # A region: the centre of its bounding box, else the plant's own start
-        centre = region_centre(X0)
-        if centre is not None and bool(X0.contains(centre)):
-            return centre
-        x0 = np.asarray(self.sys.x0, dtype=float).reshape(-1)
-        if x0.size == int(self.sys.n) and bool(X0.contains(x0)):
-            return x0
-
-        raise ValueError(
-            f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
-            "sys.x0: give x0, a point of X0 or a law over it"
-        )
 
     @staticmethod
     def coerce_state(
@@ -842,6 +761,87 @@ class PlanningProblem:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def default_x0_of(problem):
+    """
+    The start given, else its law's mean, else ``X0``'s: a singleton's point, a region's bounding-box centre when finite and inside, else ``sys.x0``.
+
+    With no ``X0`` the start is ``sys.x0``; a region holding neither its
+    centre nor ``sys.x0`` is refused.
+    """
+    if problem.held_params.get("x0") is not None:
+        return problem.held_params["x0"]
+    if problem.start_law is not None:
+        return problem.start_law.mean
+    X0 = problem.X0
+    if X0 is None:
+        return problem.sys.x0
+    if isinstance(X0, SingletonSet):
+        return X0.point
+
+    # A region: the centre of its bounding box, else the plant's own start
+    centre = region_centre(X0)
+    if centre is not None and bool(X0.contains(centre)):
+        return centre
+    x0 = np.asarray(problem.sys.x0, dtype=float).reshape(-1)
+    if x0.size == int(problem.sys.n) and bool(X0.contains(x0)):
+        return x0
+
+    raise ValueError(
+        f"X0 ({type(X0).__name__}) holds neither its bounding box's centre nor "
+        "sys.x0: give x0, a point of X0 or a law over it"
+    )
+
+
+def part_trees_of(problem) -> dict:
+    """Each part's own tree by role, in the roles' order: the start's singleton left out (its point is ``x0``, one home)."""
+    trees = {"plant": problem.sys.params}
+    if problem.cost is not None:
+        trees["cost"] = problem.cost.params
+    for role in ("X", "U", "X0", "Xf"):
+        set_ = getattr(problem, role)
+        if set_ is None or (role == "X0" and isinstance(set_, SingletonSet)):
+            continue
+        trees[role] = getattr(set_, "params", None)
+    for port, block in getattr(problem, "disturbances", {}).items():
+        trees[source_id(port)] = block.params
+
+    return trees
+
+
+def sources_of(problem) -> dict:
+    """The disturbance sources by the id of their block in the evaluated loop (``d`` → ``disturbance``, ``n`` → ``noise``)."""
+    return {source_id(port): block for port, block in problem.disturbances.items()}
+
+
+def require_cost(problem) -> CostFunction:
+    """Refuse a problem, continuous or step, without a cost; return the cost."""
+    if problem.cost is None:
+        raise ValueError("This planner requires problem.cost")
+
+    return problem.cost
+
+
+def require_goal(problem) -> Set:
+    """Refuse a problem without a terminal set; return it."""
+    if problem.Xf is None:
+        raise ValueError("This planner requires a terminal set: give the problem Xf")
+
+    return problem.Xf
+
+
+def require_finite_horizon(problem) -> float:
+    """Refuse an unset or infinite horizon; return ``horizon`` as a float."""
+    if problem.horizon is None:
+        raise ValueError("This planner requires a finite problem.horizon")
+    if not np.isfinite(problem.horizon):
+        raise ValueError(
+            "This planner requires a finite problem.horizon "
+            "(got +inf for infinite-horizon)"
+        )
+
+    return float(problem.horizon)
 
 
 def require_controller_to_compile(controller):

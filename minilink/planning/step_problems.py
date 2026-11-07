@@ -10,6 +10,7 @@ from minilink.planning.problems import (
     PlanningProblem,
     fallback_bound,
     finite_box_or,
+    require_cost,
 )
 
 ###############################################################################
@@ -164,13 +165,6 @@ class StepPlanningProblem:
 
         return StepFace(self)
 
-    def require_cost(self) -> StepCost:
-        """Refuse a problem without a cost; return the cost."""
-        if self.cost is None:
-            raise ValueError("This planner requires problem.cost")
-
-        return self.cost
-
     def horizon_kind(self) -> str:
         """``"finite"`` with a horizon ``N`` (``h`` is charged there), ``"infinite"`` without."""
         return "infinite" if self.n_steps is None else "finite"
@@ -188,7 +182,7 @@ class StepPlanningProblem:
         problem's on its own sum at ``dt`` (the face's one number):
         ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
         """
-        cost = self.require_cost()
+        cost = require_cost(self)
         gamma = self.gamma if gamma is None else float(gamma)
         N = self.n_steps if n_steps is None else n_steps
 
@@ -257,7 +251,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     from minilink.core.discrete.sampled_system import SampledSystem
     from minilink.planning.evaluator import steps_of
 
-    cost = problem.require_cost()
+    cost = require_cost(problem)
     dt = float(dt)
     rho = problem.discount_rate
     N = steps_of(problem.horizon, dt) if problem.horizon_kind() == "finite" else None

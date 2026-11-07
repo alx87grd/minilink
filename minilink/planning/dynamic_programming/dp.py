@@ -17,8 +17,9 @@ from minilink.planning.planner import (
     given_numbers,
     planner_at,
     planner_evidence,
+    require_solution,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_problems import StepPlanningProblem
 
@@ -138,7 +139,7 @@ class DynamicProgrammingPlanner(Planner):
         clean_infeasible: bool = True,
     ) -> None:
         super().__init__(problem)
-        self.require_cost()
+        require_cost(self.problem)
 
         # Discretized state and input spaces, on the planner's own discount when
         # gamma overrides the problem's: one rate inside and between the periods
@@ -564,7 +565,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
-        solution = self.require_solution() if solution is None else solution
+        solution = require_solution(self) if solution is None else solution
         return nominal_trajectory(
             self.problem, solution.controller, dt=self.grid.dt, tf=tf
         )
@@ -612,22 +613,22 @@ class DynamicProgrammingPlanner(Planner):
 
     def plot_cost_to_go(self, **kwargs):
         """The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...)."""
-        self.require_solution()
+        require_solution(self)
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
     def plot_control_law(self, **kwargs):
         """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``axes``, ...)."""
-        self.require_solution()
+        require_solution(self)
         return plotting.plot_control_law(self.result, **kwargs)
 
     def animate_cost_to_go(self, **kwargs):
-        self.require_solution()
+        require_solution(self)
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
         return plotting.animate_cost_to_go(self.result, **kwargs)
 
     def animate_policy(self, **kwargs):
-        self.require_solution()
+        require_solution(self)
         return plotting.animate_policy(self.result, **kwargs)
 
     ###########################################################################

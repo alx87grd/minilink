@@ -21,6 +21,7 @@ from gymnasium import spaces
 
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.system import System
+from minilink.planning.problems import require_cost
 
 # Public API
 
@@ -160,7 +161,7 @@ class Sys2Gym(gym.Env):
         tf = float(problem.horizon) if finite else float(episode_length or 10.0)
 
         kwargs.setdefault("t0", float(problem.t0))
-        env = ProblemEnv(problem.sys, problem.require_cost(), dt=dt, tf=tf, **kwargs)
+        env = ProblemEnv(problem.sys, require_cost(problem), dt=dt, tf=tf, **kwargs)
         env.problem = problem
         env.finite_horizon = finite
         env.failure_cost = problem.failure_cost_at(tf, dt=dt)
@@ -366,7 +367,7 @@ class ProblemEnv(Sys2Gym):
         if failed:
             r -= float(self.failure_cost)
         if ended:
-            r -= float(problem.require_cost().h(x, t))
+            r -= float(require_cost(problem).h(x, t))
         if failed or ended:
             terminated, truncated = True, False
 

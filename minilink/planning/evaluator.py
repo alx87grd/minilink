@@ -43,7 +43,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.problems import seeds_of, source_id, stack_leaves
+from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
 from minilink.planning.step_face import StepFace
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
@@ -542,7 +542,7 @@ class ProblemEvaluator:
 
     def cost_rate(self, params):
         """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
-        g = self.problem.require_cost().g
+        g = require_cost(self.problem).g
         cost_params = params["cost"]
         rho = params["discount_rate"]
         t0 = params["t0"]

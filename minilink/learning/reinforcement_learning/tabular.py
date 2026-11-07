@@ -20,7 +20,9 @@ from minilink.planning.planner import (
     given_numbers,
     planner_at,
     planner_evidence,
+    require_solution,
 )
+from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -124,7 +126,7 @@ class TabularLearningPlanner(Planner):
         seed=0,
     ):
         super().__init__(problem)
-        self.require_cost()
+        require_cost(self.problem)
 
         # Discretized state and input spaces
         grid = grid_of(problem, grid, x_grid, u_grid, dt)
@@ -366,7 +368,7 @@ class TabularLearningPlanner(Planner):
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
-        solution = self.require_solution() if solution is None else solution
+        solution = require_solution(self) if solution is None else solution
         return nominal_trajectory(
             self.problem,
             solution.controller,
@@ -377,13 +379,11 @@ class TabularLearningPlanner(Planner):
     def plot_cost_to_go(self, **kwargs):
         """The latest solution's cost-to-go table on the grid itself, as value iteration draws it."""
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
-        return plotting.plot_cost_to_go(self.require_solution().record.tables, **kwargs)
+        return plotting.plot_cost_to_go(require_solution(self).record.tables, **kwargs)
 
     def plot_control_law(self, **kwargs):
         """The latest solution's greedy policy table on the grid itself, as value iteration draws it."""
-        return plotting.plot_control_law(
-            self.require_solution().record.tables, **kwargs
-        )
+        return plotting.plot_control_law(require_solution(self).record.tables, **kwargs)
 
     def plot_learning_curve(self, ax=None, window=20):
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""

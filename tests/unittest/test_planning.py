@@ -16,7 +16,7 @@ from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import require_finite_horizon, PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -36,6 +36,7 @@ from minilink.planning.trajectory_optimization.shooting import (
     ShootingOptions,
     ShootingTranscription,
 )
+from minilink.planning.planner import require_solution
 
 
 class TestPlanningArchitecture(unittest.TestCase):
@@ -141,7 +142,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         self.assertTrue(np.isposinf(infinite.horizon))
         with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
-            infinite.require_finite_horizon()
+            require_finite_horizon(infinite)
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
@@ -298,7 +299,7 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         with self.assertRaises(ValueError):
-            planner.require_solution()
+            require_solution(planner)
         with self.assertRaises(ValueError):
             planner.controller
 

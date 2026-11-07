@@ -11,7 +11,7 @@ from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, require_cost
 
 ###############################################################################
 # Public API
@@ -180,7 +180,7 @@ class PlanningSolution:
     def plot_cost(self, *, backend="matplotlib", show=True):
         """Draw the running cost and ``J(t)`` along ``trajectory`` under the problem's cost."""
         return self.problem.sys.plot_cost(
-            self.problem.require_cost(),
+            require_cost(self.problem),
             traj=self.require_trajectory(),
             backend=backend,
             show=show,

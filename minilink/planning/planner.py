@@ -7,10 +7,8 @@ from copy import deepcopy
 import numpy as np
 
 from minilink.blocks.sources import TrajectorySource
-from minilink.core.costs import CostFunction
 from minilink.core.params import checked, merge_known
 from minilink.core.roles import command_port
-from minilink.core.sets import Set
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import controller_of, evaluate
@@ -107,27 +105,20 @@ class Planner(ABC):
         """
         raise NotImplementedError(f"{type(self).__name__}.solve is not implemented")
 
-    # The latest solution, and the parts of the problem a solver needs
-
-    def require_solution(self) -> PlanningSolution:
-        """Refuse a planner with no solution yet; return the latest one."""
-        if self.last_solution is None:
-            raise ValueError("No solution has been computed yet")
-
-        return self.last_solution
+    # The latest solution's law and cost-to-go
 
     @property
     def controller(self):
         """The latest solution's controller: a feedback block, or the open-loop source of a trajectory planner."""
-        return self.require_solution().controller
+        return require_solution(self).controller
 
     def policy(self, x=None, t=0.0):
         """The latest solution's command ``u = pi(x, t)`` (:meth:`PlanningSolution.policy`)."""
-        return self.require_solution().policy(x, t)
+        return require_solution(self).policy(x, t)
 
     def cost_to_go(self, x, t=None) -> float:
         """The latest solution's cost-to-go at ``x`` (at ``t`` when given): its ``cost_to_go`` field, read."""
-        J = self.require_solution().cost_to_go
+        J = require_solution(self).cost_to_go
         value = J(x) if t is None else J(x, t=t)
 
         return float(value)
@@ -136,69 +127,29 @@ class Planner(ABC):
         """``solution``'s controller from the problem's start on the planner's grid (feedback planners); the latest solution when none is given."""
         raise NotImplementedError(f"{type(self).__name__} has no nominal_trajectory")
 
-    def require_cost(self) -> CostFunction:
-        """Refuse a problem without a cost; return ``problem.cost``."""
-        return self.problem.require_cost()
-
-    def require_goal(self) -> Set:
-        """Refuse a problem without a goal set; return ``problem.Xf``."""
-        return self.problem.require_goal()
-
     # Views of the latest solution
 
     def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib"):
         """Plot the latest solution's trajectory with the problem system."""
         return self.problem.sys.plot_trajectory(
-            self.solution_trajectory(), signals=signals, backend=backend
+            solution_trajectory_of(self), signals=signals, backend=backend
         )
 
     def animate(self, **kwargs):
         """Animate the latest solution's trajectory with the problem system."""
-        return self.problem.sys.animate(self.solution_trajectory(), **kwargs)
+        return self.problem.sys.animate(solution_trajectory_of(self), **kwargs)
 
     def plot_control_law(self, **kwargs):
         """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
-        return self.require_solution().plot_control_law(**kwargs)
+        return require_solution(self).plot_control_law(**kwargs)
 
     def plot_cost_to_go(self, **kwargs):
         """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`)."""
-        return self.require_solution().plot_cost_to_go(**kwargs)
+        return require_solution(self).plot_cost_to_go(**kwargs)
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
-
-    def solution_trajectory(self) -> Trajectory:
-        """The latest solution's trajectory, rolled out on demand for a feedback law."""
-        solution = self.require_solution()
-
-        # The planned trajectory, else the feedback law rolled out from the start
-        if solution.trajectory is not None:
-            return solution.trajectory
-
-        return self.nominal_trajectory(solution=solution)
-
-    # What a family's solve builds its solution from
-
-    def open_loop_controller(
-        self, trajectory, *, interpolation="linear"
-    ) -> TrajectorySource:
-        """
-        The trajectory's input as a source block ``u = pi(t)``: ``controller >> plant``.
-
-        The source carries the plant's action port (``u``, or its single
-        input) so that series wiring and the evaluator feed it as the plant
-        expects; a plant with several named ports and no ``u`` gets the
-        stacked input vector, to wire by hand.
-        """
-        sys = self.problem.sys
-        u = trajectory.u
-
-        # The command port's values, when the plant has a u port or a single input
-        if "u" in sys.inputs or len(sys.inputs) == 1:
-            u = sys.get_port_values_from_u(u, command_port(sys))
-
-        return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
     def store_solution(self, solution: PlanningSolution) -> PlanningSolution:
         """Keep ``solution`` as :attr:`last_solution`, and return it."""
@@ -209,6 +160,45 @@ class Planner(ABC):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_solution(planner) -> PlanningSolution:
+    """Refuse a planner with no solution yet; return the latest one."""
+    if planner.last_solution is None:
+        raise ValueError("No solution has been computed yet")
+
+    return planner.last_solution
+
+
+def solution_trajectory_of(planner) -> Trajectory:
+    """The latest solution's trajectory, rolled out on demand for a feedback law."""
+    solution = require_solution(planner)
+
+    # The planned trajectory, else the feedback law rolled out from the start
+    if solution.trajectory is not None:
+        return solution.trajectory
+
+    return planner.nominal_trajectory(solution=solution)
+
+
+def open_loop_controller_of(
+    trajectory, sys, *, interpolation="linear"
+) -> TrajectorySource:
+    """
+    The trajectory's input as a source block ``u = pi(t)`` for the plant ``sys``: ``controller >> sys``.
+
+    The source carries the plant's action port (``u``, or its single
+    input) so that series wiring and the evaluator feed it as the plant
+    expects; a plant with several named ports and no ``u`` gets the
+    stacked input vector, to wire by hand.
+    """
+    u = trajectory.u
+
+    # The command port's values, when the plant has a u port or a single input
+    if "u" in sys.inputs or len(sys.inputs) == 1:
+        u = sys.get_port_values_from_u(u, command_port(sys))
+
+    return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
 
 def planner_evidence(

@@ -19,7 +19,11 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_finite_horizon,
+)
 
 ConstraintFunction = Callable[[np.ndarray], np.ndarray]
 
@@ -88,17 +92,17 @@ class FixedGridOptions:
 
     def t(self, problem: PlanningProblem) -> np.ndarray:
         """The time grid on the horizon ``[t0, t0 + tf]``: ``t0`` plus ``linspace(0, tf, n_steps)``."""
-        t = problem.t0 + fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
+        t = problem.t0 + fixed_grid_t(require_finite_horizon(problem), self.n_steps)
 
         return t
 
     def offsets(self, problem: PlanningProblem) -> np.ndarray:
         """The knots' offsets from the horizon's start, ``linspace(0, tf, n_steps)``: ``t_k = t0 + offset_k``."""
-        return fixed_grid_t(problem.require_finite_horizon(), self.n_steps)
+        return fixed_grid_t(require_finite_horizon(problem), self.n_steps)
 
     def dt(self, problem: PlanningProblem) -> float:
         """Step size from finite ``problem.horizon`` and ``n_steps``."""
-        return fixed_grid_dt(problem.require_finite_horizon(), self.n_steps)
+        return fixed_grid_dt(require_finite_horizon(problem), self.n_steps)
 
 
 # Shared transcription math: the textbook pieces every fixed-grid transcription

@@ -27,8 +27,14 @@ from minilink.optimization.reporting import (
     preview_vector,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import Planner, host_tree, planner_evidence, problem_with
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.planner import (
+    Planner,
+    host_tree,
+    open_loop_controller_of,
+    planner_evidence,
+    problem_with,
+)
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
@@ -105,7 +111,7 @@ class TrajectoryOptimizationPlanner(Planner):
             ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``.
         """
         super().__init__(problem)
-        self.require_cost()
+        require_cost(self.problem)
 
         # Discretization: a transcription instance, or a preset on n_steps knots
         self.transcription = resolve_transcription(transcription, n_steps)
@@ -512,7 +518,7 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
         problem = self.problem if problem is None else problem
-        policy = self.open_loop_controller(trajectory)
+        policy = open_loop_controller_of(trajectory, self.problem.sys)
 
         evaluation = None
         if evaluate:

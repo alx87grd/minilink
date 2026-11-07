@@ -24,8 +24,14 @@ from minilink.planning.planner import (
     given_numbers,
     planner_at,
     planner_evidence,
+    require_solution,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+    require_finite_horizon,
+)
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -119,7 +125,7 @@ class LQRPlanner(Planner):
         super().__init__(problem)
 
         # The quadratic cost: its weights and its target
-        cost = self.require_cost()
+        cost = require_cost(self.problem)
         require_quadratic_cost(cost)
         self.cost = cost
 
@@ -175,7 +181,7 @@ class LQRPlanner(Planner):
         u_bar = command_block(sys, self.u_bar)
 
         if problem.horizon_kind() == "finite":
-            tf = problem.require_finite_horizon()
+            tf = require_finite_horizon(problem)
 
             # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t), on the problem's clock t0 … t0 + t_f
@@ -252,7 +258,7 @@ class LQRPlanner(Planner):
 
     def nominal_trajectory(self, tf=None, *, solution=None):
         """``solution``'s law (the latest when none is given) from the problem's start on the nonlinear plant, sampled every ``dt``."""
-        solution = self.require_solution() if solution is None else solution
+        solution = require_solution(self) if solution is None else solution
         return nominal_trajectory(self.problem, solution.controller, dt=self.dt, tf=tf)
 
     def linear_model(self):
