@@ -230,8 +230,9 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
 
     # The response, hovered sample by sample, and its peak; in z, the samples y_k
     hover = tuple(f"t = {tk:.3g} s<br>y = {yk:.3g}" for tk, yk in zip(time, y))
-    response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
-    if period is not None:
+    if period is None:
+        response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
+    else:
         response = Trace(
             time,
             y,

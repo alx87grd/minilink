@@ -293,16 +293,17 @@ def step_response(A, B, C, D, t, period=None):
 
     n, m = B.shape
 
-    # A difference equation marches on its own pair
-    A_d = A
-    B_d = B
-
     # expm([[A, B], [0, 0]] Δt) = [[A_d, B_d], [0, I]]
     if period is None:
         dt = uniform_step(t)
         hold = linalg.expm(np.block([[A, B], [np.zeros((m, n + m))]]) * dt)
         A_d = hold[:n, :n]
         B_d = hold[:n, n:]
+
+    # A difference equation marches on its own pair
+    else:
+        A_d = A
+        B_d = B
 
     # y_k = C x_k + D u,   x_{k+1} = A_d x_k + B_d u,   from x_0 = 0 under u = 1
     u = np.ones(m)
