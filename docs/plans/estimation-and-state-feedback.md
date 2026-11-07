@@ -127,7 +127,7 @@ statistics over the problem's draws (the dual of `J`), and `covariance` as the d
 past data). The evaluator's dual scores estimation error, consistency (NEES) and innovation
 whiteness. Where the pieces come from today: `Planner` base (`planning/planner.py`),
 `PlanningSolution` (`planning/results.py`), `evaluate` on the compiled problem (`planning/evaluator.py`;
-`MonteCarloEvaluator` folded into it in v0.3), `nominal_trajectory`.
+`MonteCarloEvaluator` folded into it in v0.3).
 
 ## 6. Stress test: the slots the later estimators take
 

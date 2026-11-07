@@ -214,7 +214,7 @@ The identical problem definition is handed to completely different solver paradi
 - **Trajectory Optimization (TrajOpt):** Direct collocation and multiple shooting NLP.
 - **Reinforcement Learning (RL):** PPO / SAC neural policy optimization.
 
-Every planner returns a `PlanningSolution` whose controller is itself a `System` that closes the loop via `controller @ plant`, and whose policy `solution.policy(x, t)` is the command `u = π(x, t)`:
+Every planner returns a `PlanningSolution` whose controller is itself a `System`: a feedback law closes the loop via `controller @ plant`, an open-loop plan drives it via `controller >> plant`, and the solution's score and plots are of that controller as it is:
 
 ```python
 import numpy as np

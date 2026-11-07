@@ -598,3 +598,26 @@ Choices the plan left open, each taken as recommended; the maintainer may overtu
   stabilizing algebraic solution holds `K(tf)` past the horizon instead of failing.
 - **The examples:** none shows the finite law on purpose, so all three migrate to the converged
   law; the finite mode is shown by its tests.
+
+**PlanningSolution shape (ruled 2026-11-07).** A planner returns one keyword-only record,
+`PlanningSolution(problem, controller, record, trajectory=None, cost_to_go=None,
+evaluation=None, params=None)`, under one rule: what is handed out (`controller`) is exactly
+what is scored (`evaluation`) and drawn, with no hidden `% dt`. The controller is the block as
+it is: a feedback law (value iteration in every mode, LQR, tabular and deep learning) closes as
+`controller @ plant`, continuous; an open-loop plan source (trajectory optimization, the
+compiled face's `pv.solution`, MPPI, RRT) drives as `controller >> plant`; on a step problem the
+law ticks with the plant. `trajectory` has one meaning, the plan an open-loop planner computed,
+`None` for a feedback law even with `evaluate=True`; `cost_to_go` is a `Field` or `None` (the
+deep RL critic a `CriticField`, its weights its `params`). The policy as a function on the
+solution (`solution.policy(x, t)`, `planner.policy(x, t)`, ruled earlier the same day) is
+reversed: the function is the compiled face's `pv.command(z, x, t)`. Gone with it: every
+planner's `nominal_trajectory`, `holds_policy`, the held rollout and its adapters, RL's
+`rollout_law`. A planner's evidence is one `evaluate(problem, controller)` of the controller as
+it is (a continuous law on the evaluator's automatic step, which a continuous loop with no `dt`
+now runs on; a clocked one on its clock; a step problem's on its face, whose `run` takes a
+controller block). So value iteration, tabular and deep learning are scored continuously, no
+longer held on their `dt`, and `solve(evaluate=True)`, `evaluate(problem, sol.controller)` and
+`compare` agree; a law held on its grid is the other controller `law % dt`. The views
+(`plot_trajectory`, `animate`, `plot_cost`) draw the plan, else the controller run once from the
+start through the problem's evaluator, nothing stored; the planner mirrors the solution
+(`controller`, `cost_to_go`, the views).

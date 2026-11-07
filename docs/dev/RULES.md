@@ -140,7 +140,7 @@ concrete formatting, ordered by the cost of being wrong:
   **A naming pattern, not a hard rule (the maintainer, 2026-11-07): the controller is the block,
   the policy the function.** Use it where it fits:
   - a **policy** (or **control law**) is a pure function, `u = π(x, t)`: arrays in, arrays out,
-    no state (`solution.policy(x, t)`, the compiled face's `pv.command(z, x, t)`);
+    no state (the compiled face's `pv.command(z, x, t)`);
   - a **controller** is the block, or the diagram of blocks, a loop closes on: it may carry a
     state and several functions (a PID's integrator, an observer, the MPC box), wired with
     `controller @ plant` (`solution.controller`, `planner.controller`).

@@ -1241,37 +1241,45 @@ cost's `x_bar`, else the start) is what a heuristic aims at (an initial guess's 
 bias, a plot's anchor); it never constrains a plan. The planners pin the start from `x0`.
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
-`Planner.solve()` → `PlanningSolution`, one result for every planner: the
-`problem` it solved (a reference), the
-`controller`, the block a loop closes on (a feedback block `u = pi(x)`, a `TrajectorySource` `u = pi(t)`
-for the trajectory family — `solution.open_loop` — or a time-varying feedback
-`u = pi(x, t)` for a finite-horizon LQR), the `record` (one
+`Planner.solve()` → `PlanningSolution`, one result for every planner, a frozen
+keyword-only record (ruled 2026-11-07): the `problem` it solved (a reference); the
+`controller`, the block you run, always as it is — a feedback law (LQR, value
+iteration in every mode, tabular and deep learning) is continuous, `controller @
+plant`, and a finite-horizon law reads the time (`u = pi(x, t)`); an open-loop plan
+source (trajectory optimization, MPPI, RRT) is a `TrajectorySource` `u = pi(t)`,
+`controller >> plant` (`solution.open_loop`); on a step problem the law ticks with the
+plant; the `record` (one
 frozen dataclass per planner with `success` and a one-line `str`; `method`
 names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
 bounds the command, since the Riccati law never reads `U` (LQR never
-warns)), the
-`trajectory` (native for open-loop planners; for a feedback law its nominal
-rollout on the planner's grid, filled by `solve(evaluate=True)`, else `None`), the `evaluation`, and
-`cost_to_go` where the method produces one (a `GridField` for value iteration and
+warns)); the
+`trajectory`, one meaning: the plan an open-loop planner computed, `None` for a
+feedback law, even with `evaluate=True`; the
+`cost_to_go`, always a `Field` or `None` (a `GridField` for value iteration and
 tabular learning, the failure cost past the grid, a `QuadraticField` for `LQRPlanner`,
-read `J(x)` or `J(x, t=t)`; the RL critic, when the training discount equals the
-problem's, a plain callable of `x`, which `planner.cost_to_go(x, t)` reads at any `t`). Everything on the solution is the solver's own claim under its
+read `J(x)` or `J(x, t=t)`; the RL critic's `CriticField`, `J(x) = −V_w(x)` its
+weights its `params`, when the training discount equals the problem's); the
+`evaluation`, the score of `controller` as it is over the problem's draws with
+`solve(evaluate=True)`; and `params`, the numbers solved on, a copy. One rule: what is
+handed out (`controller`) is exactly what is scored (`evaluation`) and drawn — no hidden
+`% dt`. Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
 measurement comes back from the evaluators as its own object. A planner
 computes only what its solve computes natively; `solve(evaluate=True,
-n_trials=)` fills the rest through the evaluator. `solution.policy(x, t)` is the
-controller's policy as a function, the command `u = π(x, t)` (a feedback controller reads `x`
-on its measurement port, its other inputs at their nominal values and its state at its `x0`;
-an open-loop one reads `t` alone). The planner mirrors its latest solution:
-`planner.controller` (a read-only property), `planner.policy(x, t)`,
-`planner.cost_to_go(x, t=None)` (the field read, a `float`), `planner.plot_trajectory` and
-`planner.animate`. **The planner's output is a controller or a trajectory, and the
-script closes the loop itself** (`solution.controller @ plant`): the solution's
-verbs draw what the planner produced — `plot_control_law` (the law over the
-problem's box, one colour scale from its inputs), `plot_cost_to_go` (the
-field over the box, anchored at the goal), `plot_trajectory` (the plan or the
-nominal rollout, titled as such), `plot_cost` — never a closed-loop
-simulation; the planner keeps one-line shortcuts to its latest solution.
+n_trials=)` fills the score through the evaluator. The law as a function is the
+compiled face's, `pv.command(z, x, t)`; the solution hands out the block. The planner
+mirrors its latest solution: `planner.controller` (a read-only property),
+`planner.cost_to_go(x, t=None)` (the field read, a `float`), `planner.plot_trajectory`,
+`planner.animate`, `planner.plot_cost`, `planner.plot_control_law` and
+`planner.plot_cost_to_go`. **The planner's output is a controller, and an open-loop
+planner's its plan; the script closes the loop itself** (`solution.controller @ plant`):
+the solution's views run on demand, nothing stored — `plot_control_law` (the law over
+the problem's box, one colour scale from its inputs), `plot_cost_to_go` (the field over
+the box, anchored at the goal), and `plot_trajectory`, `animate` and `plot_cost`: the
+plan when there is one, else the controller run once from the problem's start through
+the problem's evaluator (`problem.compile(controller)`, the loop the score runs: a
+continuous law on the evaluator's automatic step, nominal parameters; a step problem's
+face), titled plan or run.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
@@ -1399,7 +1407,7 @@ from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
 loop is taken when its block `plant` is the problem's system) and compiles it once. The
 controller's kind decides the loop: a continuous law runs the continuous diagram on the
-grid of `dt`; a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
+grid of `dt` (omitted: the loop's automatic step, below); a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`
 refused, naming the period, `solver` and `substeps` its plant's integration per base period (`None`, the
 automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
@@ -1425,22 +1433,26 @@ params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted
 JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and the
 reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
 `z`. `evaluate(problem, controller, dt=None, ...)` is the facade: a sampled controller runs on
-its clock with `dt` omitted, a continuous one needs `dt`. No backend clips the law:
+its clock with `dt` omitted, a continuous one on `dt`, and with `dt` omitted on the
+loop's automatic step, the continuous simulator's `Δt = 0.1 τ_min` (§5) shortened to
+divide the run, `dt = tf / ⌈tf / Δt⌉`. No backend clips the law:
 port bounds are information, and saturation lives inside the law or in a `Saturation`
 block. A stochastic problem needs `n_trials`; its draws are `problem.realize(key, n)`, one
 tree (above), one key per call, and each trial realizes the loop's random blocks under that
 key (trial `i` is `loop.realize(child_seed(key, "trial i"))`), the same noise on both
 backends for an integer key, while a deterministic problem runs each block's own seed. The program reads the same `J` as the report: with the failure charged, its cost is a step
-with no gradient, and a non-finite objective at `z0` warns once. The feedback planners'
-reported `trajectory` is their own held-input rollout on their
-grid (`nominal_trajectory`, the problem's step face from `t0`), the planner's evidence;
-a planner's evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
-`planning/planner.py`, an internal helper the seven planners' `solve()` call) runs on
-the real plant: a feedback law with no clock of its own held over each period, `policy % dt`, the plant integrated at the automatic step (§5), the planner's own `J` in its
-record beside it, so the evidence does not repeat the planner's own belief; an open-loop
-source keeps the interpolation its planner states. Scoring a law is the problem evaluator's:
-`problem.compile(ctl % dt).evaluate()`, `substeps=` for the planner's own physics.
-`problem.compile(law)` called directly closes a continuous law as a continuous loop.
+with no gradient, and a non-finite objective at `z0` warns once. A planner's
+evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
+`planning/planner.py`, an internal helper the planners' `solve()` call) is one
+`evaluate(problem, controller, ...)` of the controller as it is handed out, on the real
+plant: a continuous law on the evaluator's automatic step (the LQR on its reporting grid
+`dt`, an open-loop plan on its own grid, the interpolation its planner states), a clocked
+controller on its own clock, a step problem's law on its face (each run the face's
+`J = Σ γᵏ c_k + γᴺ h` with the judge's margins and failure charge, an infinite horizon over
+an episode of 10 ticks of its time); the planner's own `J` stays in its record beside it,
+so the evidence does not repeat the planner's own belief. A law held over each period
+of its grid is another controller, `law % dt`, scored as such:
+`problem.compile(law % dt).evaluate()`, `substeps=` for the planner's own physics.
 
 **What the gradient path is not.** Three limits of the differentiable evaluation:
 - **Single shooting is not collocation.** `pe.program(wrt)` differentiates one forward run
@@ -1464,7 +1476,8 @@ no controller with this pointer; a step problem's `compile()` is its step face):
 -> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
 beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
 `N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
-(`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, a
+(`J = Σ γᵏ c_k + γᴺ h`; `policy` a function `u = π(x, t)` or a controller block, read on its
+measurement port); `params` is the tree its calls read (the plant at its mean, a
 discretized problem's at its origin's, the cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
 (`c(x, u, k)`, `h(x, k)`), its start and sets a `PlanningProblem`'s by composition, its
@@ -1514,10 +1527,10 @@ are those of value iteration on the latest solution's tables (RULES 2.4), and th
 `ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
 learns a neural law in pure JAX: `solve(n_timesteps=)` → `PlanningSolution`
 (a copy of the trained block as `controller`, a `ReinforcementLearningRecord`, the critic as
-`cost_to_go` when the discounts match), `planner.controller` →
+`cost_to_go`, a `CriticField`, when the discounts match), `planner.controller` →
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
-map); the learned law's rollout with draws is
+map); the learned law's runs with draws are
 `evaluate(problem, solution.controller, record=True)`. The block being trained, updated in
 place every learning iteration, is `planner.actor`.
 What the algorithm trains is a `ExplorationPolicy` (`planner.exploration_policy`): the actor's mean action
@@ -1534,7 +1547,7 @@ step functions on either backend — the step face's `transition` with the train
 the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
 the first failure, a training device) and the horizon — shared by the JAX collectors
 and the tabular learners, so one object owns what a training episode means (an evaluation
-scores the learned law by `evaluate`, the law held over each period). The heads draw at a JAX
+scores the learned law by `evaluate`, the law as it is handed out). The heads draw at a JAX
 key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
 tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes. The discount is
 the face's `γ` (the problem's `e^{−ρ dt}`) unless `gamma=` overrides it, and the record (`gamma`,
@@ -1546,8 +1559,8 @@ its `dt`), its reward `−c_k`, its start and laws drawn by its `sample_x0` and
 `sample_params`, no source; a discretized problem steps as its origin at that `dt` with
 `reward="stage"`, to the bit. `ReinforcementLearningPlanner` trains on either problem (`dt`
 defaults to 0.05 s on a continuous one, none on a step problem); a step problem's learned
-law is scored by its face, `problem.compile().run(policy)`, and `solve(evaluate=True)`
-refuses it with that pointer.
+law is scored by its face, `problem.compile().run(controller)`, the block read as its law,
+which `solve(evaluate=True)` reports.
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
 is the same map as a helper for scripts. The action port is `u` when the
@@ -1644,7 +1657,7 @@ planner keyword, forwarded to its `Optimizer`) on a box-bounded JAX program (sin
 with an input box) makes `pv.solve` pure: `jit`, `vmap` over starts, `grad`. The face keeps no
 last solution; `planner.solve()` stays the offline verb (callbacks, history, live plot, the
 report) and keeps `last_solution` for its shortcuts only (`plot_trajectory`,
-`animate`, `controller`, `policy`, `cost_to_go`, RULES 2.4); no solve and no tool reads it. Single backend-native
+`animate`, `plot_cost`, `controller`, `cost_to_go`, RULES 2.4); no solve and no tool reads it. Single backend-native
 transcription classes; no parallel JAX transcription types. NumPy transcriptions
 build constraints via `dynamics_function` (the compiled evaluator's `f`).
 **JAX transcriptions** embed `problem.sys.f` directly in the NLP (not the

@@ -394,12 +394,16 @@ commit per proposal, its callers and DESIGN in the same change.
   public-surface scan, after its nine rulings landed; each needs its own context and options
   before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
   full mirror and one meaning per word: the **controller** is the block a loop closes on, the
-  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, a new
-  `sol.policy(x, t)` evaluates it, the planner mirrors the solution: `planner.controller` for
-  `get_controller()`, `planner.policy(x, t)`, `planner.cost_to_go(x)` for `value_at(x)`,
-  `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
+  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, the planner
+  mirrors the solution: `planner.controller` for `get_controller()`, `planner.cost_to_go(x)` for
+  `value_at(x)`, `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
   `animate_solution()`; the `*Policy` class names stay, naming the law a block implements; one
-  sweep, no alias, CONSTITUTION's line amended); training budgets
+  sweep, no alias, CONSTITUTION's line amended; the policy as a function on the solution,
+  `sol.policy(x, t)` and `planner.policy(x, t)`, reversed 2026-11-07: the solution hands out
+  the block and the function is the compiled face's `pv.command(z, x, t)`; the solution's shape
+  ruled the same day, `(problem, controller, record, trajectory, cost_to_go, evaluation,
+  params)`, keyword-only, `trajectory` the plan only, `cost_to_go` a `Field` or `None`, the
+  controller as handed out scored and drawn, plans-as-policies.md §15); training budgets
   `n_episodes` and `n_timesteps` (RULES 2.7; ruled 2026-11-07: the keyword and the record's
   fields, `solve(n_episodes=)`, `solve(n_timesteps=)`, `record.n_episodes`, `record.n_timesteps`,
   one sweep, no alias); workflow keywords on constructors (ruled 2026-11-07: on the verb, every

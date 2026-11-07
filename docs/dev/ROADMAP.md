@@ -104,7 +104,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `hess_J` / `jac_h` / `jac_g`; `record_solve_time` gone, the solve time always recorded at a
   user's verb; `solve_trajectory_from`, `step`, `compile_parametric_program` and the parametric
   transcription gone for `planner.solve(params=)` and `planner.compile()`, the RL planner's
-  rollout verb gone for `evaluate(problem, solution.policy, record=True)`,
+  rollout verb gone for `evaluate(problem, solution.controller, record=True)`,
   `PlanningProblem.start_point` gone for `x0`; `diagram.trajectory_of` → `traj.of("plant")` on
   every diagram run (`record=("plant:u",)` for the input), `diagram.of("plant")`;
   `compute_forced` / `solve_forced` → `compute_trajectory(u=)` / `solve(u=)`, one input rule on
@@ -119,13 +119,22 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   signal pass per saved sample after the run (about 0.13 s on 10 001 samples); a fixed-step run
   records from its own first stage at no measurable cost.
 - 2026-11-07 (on the branch `v04-build`, for `0.4.0`; every notebook migrated in the same
-  commit, no alias): the controller is the block, the policy the function.
-  `PlanningSolution.policy` (the block) → `solution.controller`, and `solution.policy(x, t)` is
-  the command `u = π(x, t)`; on every planner `get_controller()` → the property `controller`
+  commit, no alias): the controller is the block. `PlanningSolution.policy` (the block) →
+  `solution.controller`; on every planner `get_controller()` → the property `controller`
   (its `interpolation=` variant built directly, `LookupPolicy(grid, pi, interpolation=)`),
   `value_at(x)` → `cost_to_go(x, t=None)`, `plot_solution` / `animate_solution` →
-  `plot_trajectory` / `animate`, and the new `planner.policy(x, t)`; the deep RL planner's
-  trained block is `planner.actor` and its exploration law `planner.exploration_policy`.
+  `plot_trajectory` / `animate`; the deep RL planner's trained block is `planner.actor` and its
+  exploration law `planner.exploration_policy`. The solution's shape, ruled the same day: a
+  keyword-only record `(problem, controller, record, trajectory, cost_to_go, evaluation,
+  params)`; no function on it (`solution.policy(x, t)` and `planner.policy(x, t)` gone, the law
+  as a function the compiled face's `pv.command(z, x, t)`); `trajectory` the plan of an
+  open-loop planner only, `None` for a feedback law; `cost_to_go` a `Field` or `None` (the RL
+  critic a `CriticField`); `evaluation` the controller as it is handed out, a feedback law
+  scored continuously on the evaluator's automatic step (value iteration, tabular and deep RL
+  no longer held on their `dt`), so `solve(evaluate=True)`, `evaluate(problem,
+  sol.controller)` and `compare` agree; the views run the controller through the problem's
+  evaluator; every planner's `nominal_trajectory` and `holds_policy` gone; a step problem's
+  `run` takes a controller block, and its planners' `evaluate=True` scores on its face.
 
 ## 3. Maturity (TRL)
 
