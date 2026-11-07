@@ -1,4 +1,3 @@
 # The textbook-rule backlog: check, module::where, count.
 # Shrinks only. Regenerate: python tests/unittest/textbook_style.py --write
-bare-jax	minilink/simulation/compile_backend.py::import jax	1
 unnamed-matrix	minilink/dynamics/catalog/pendulum/pendulum.py::Pendulum.H	1
