@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.params import flatten
+from minilink.core.reporting import preview_vector
 
 ###############################################################################
 # Public API
@@ -294,9 +295,6 @@ def solution_text(solution):
 
 
 def optimizer_text(opt):
-    # Tools import core (DESIGN §3): the optimization band loads on first use
-    from minilink.optimization.reporting import preview_vector
-
     headline = f"Optimizer, method={opt.method!r}"
     body = [
         body_line("program", inspect_inline(opt.program)),
@@ -308,9 +306,6 @@ def optimizer_text(opt):
 
 
 def optimization_result_text(result):
-    # Tools import core (DESIGN §3): the optimization band loads on first use
-    from minilink.optimization.reporting import preview_vector
-
     success = "yes" if result.success else "no"
     headline = f"OptimizationResult, success={success}"
     body = []

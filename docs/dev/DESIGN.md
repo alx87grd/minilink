@@ -1780,7 +1780,7 @@ when Graphviz is available; `_repr_svg_` remains for SVG-only consumers.
 are not doubled. Optional `_repr_latex_` on `LTISystem`, `QuadraticCost`,
 and `MathematicalProgram` renders the textbook equation shape (not the
 callable bodies). Optimizer `verbose=True` frames the same inspect lines
-inside the solve panel (`optimization/reporting.py` rules).
+inside the solve panel (`core/reporting.py` rules).
 
 Plotly under the `full` extra.
 

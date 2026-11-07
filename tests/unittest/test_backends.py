@@ -360,3 +360,15 @@ def test_an_explicit_precision_choice_survives_the_next_jax_evaluator(monkeypatc
         assert jax.config.read("jax_enable_x64") is False
     finally:
         configure_jax(enable_x64=True)
+
+
+def test_simulation_band_loads_no_optimization_module():
+    """A verbose simulation reads its panel frame from core: the optimization band stays unloaded."""
+    probe = (
+        "import sys\n"
+        "from minilink.dynamics.catalog.pendulum.pendulum import Pendulum\n"
+        "from minilink.simulation.simulator import Simulator\n"
+        "Simulator(Pendulum(), tf=0.1, verbose=True).solve()\n"
+        "print(sorted(m for m in sys.modules if m.startswith('minilink.optimization')))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"

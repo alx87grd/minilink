@@ -1,9 +1,9 @@
-"""Solve panels: the frame and the vector preview of the human-readable reports."""
+"""Report panels: the frame and the vector preview of the human-readable reports."""
 
 import numpy as np
 
-# One frame width and one preview style for every solve panel: the
-# Optimizer's and the TrajectoryOptimizationPlanner's
+# One frame width and one preview style for every panel: the simulator's,
+# the Optimizer's and the TrajectoryOptimizationPlanner's
 DISP_LINE_WIDTH = 60
 DISP_RULE_MAIN = "=" * DISP_LINE_WIDTH
 DISP_RULE_DIV = "-" * DISP_LINE_WIDTH

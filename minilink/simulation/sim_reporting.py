@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from minilink.optimization.reporting import (
+from minilink.core.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
     preview_vector,

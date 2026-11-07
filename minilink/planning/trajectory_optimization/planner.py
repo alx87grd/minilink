@@ -10,6 +10,11 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.params import checked
+from minilink.core.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    preview_vector,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -20,11 +25,6 @@ from minilink.optimization.optimizer import (
     OptimizationProgressCallback,
     Optimizer,
     method_params_of,
-)
-from minilink.optimization.reporting import (
-    DISP_RULE_DIV,
-    DISP_RULE_MAIN,
-    preview_vector,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import (

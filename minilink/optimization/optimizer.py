@@ -11,6 +11,11 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.core.params import require_complete
+from minilink.core.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    preview_vector,
+)
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.evaluators.program_evaluator import require_declared_params
 from minilink.optimization.mathematical_program import (
@@ -20,11 +25,6 @@ from minilink.optimization.mathematical_program import (
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
-)
-from minilink.optimization.reporting import (
-    DISP_RULE_DIV,
-    DISP_RULE_MAIN,
-    preview_vector,
 )
 
 # User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
