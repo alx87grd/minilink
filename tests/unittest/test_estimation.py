@@ -70,7 +70,6 @@ def test_the_estimate_converges_on_the_plant():
     loop.add_subsystem(obs, "observer")
     loop.connect("plant", "y", "observer", "y")  # both read the nominal u = 0
     plant.x0 = np.array([1.0, 0.5])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=6.0)
     x_plant = traj.x[slice(*loop.state_index["plant"]), -1]
     x_hat = traj.x[slice(*loop.state_index["observer"]), -1]
@@ -100,7 +99,6 @@ def test_a_box_with_a_gain_is_a_controller_and_the_roles_see_the_observer():
     who = roles(loop)
     assert who.plant is plant and who.controller is box and who.observer is obs
     plant.x0 = np.array([1.0, 0.0])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=12.0)
     np.testing.assert_allclose(traj.x[:, -1], 0.0, atol=1e-3)
     # the separation principle: the loop's poles are the gain's and the observer's
@@ -286,7 +284,6 @@ def test_lqg_holds_the_cart_pole_upright_from_a_disturbed_start():
     ]
     loop = box @ plant
     plant.x0 = np.array([-0.5, np.pi + 0.2, 0.0, 0.0])
-    loop.refresh()
     traj = loop.compute_trajectory(tf=8.0)
     plant_state = traj.x[slice(*loop.state_index["plant"]), -1]
     np.testing.assert_allclose(plant_state, x_up, atol=1e-2)

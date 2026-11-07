@@ -1129,8 +1129,8 @@ a block that computes its own (change its `params`, or pass `dt=`).
 **Three owners of a start.** A block owns its `x0`; a diagram's `x0` is a view
 stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
 through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
-`SampledSystem`'s `x0` is its source's. `refresh()` only rebuilds the stacked layout after a
-structural change inside a block. The problem owns the plant's start (`x0`), and the
+`SampledSystem`'s `x0` is its source's. A block's state size is fixed once built, and a
+diagram's layout is computed as blocks are added. The problem owns the plant's start (`x0`), and the
 evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
 `observer.x0`), read from the block at compile.
 

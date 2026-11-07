@@ -355,25 +355,23 @@ def test_a_static_box_joins_a_sampled_loop():
     np.testing.assert_allclose(ev.outputs(x, np.zeros(0), 0)["y"], [3.0])
 
 
-def test_a_loop_keeps_its_own_x0_held_outputs_included_on_refresh():
+def test_a_loop_keeps_its_own_x0_held_outputs_included():
     loop = multi_rate_computer_on_an_integrator()
     loop.x0 = np.array([0.5, 1.0, 0.0])
-    loop.refresh()
     np.testing.assert_array_equal(loop.x0, [0.5, 1.0, 0.0])
 
 
-def test_a_sampled_plant_reads_its_source_x0_again_on_refresh():
+def test_a_sampled_plant_reads_its_source_x0_live():
+    # The loop's x0 is a view of its blocks', the sampled plant's of its source's
     plant = Pendulum()
     loop = (PID() % 0.01) @ plant
     plant.x0 = np.array([0.3, 0.0])
-    loop.refresh()
     a, b = loop.state_index["plant"]
     np.testing.assert_array_equal(loop.x0[a:b], plant.x0)
 
     # An x0 set on the view itself stays
     view = discretize(Pendulum(), 0.01)
     view.x0 = np.array([1.0, 0.0])
-    view.refresh()
     np.testing.assert_array_equal(view.x0, [1.0, 0.0])
 
 

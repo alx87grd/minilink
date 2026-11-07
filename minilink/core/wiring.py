@@ -333,18 +333,7 @@ class WiredDiagramMixin:
 
         return f"{sys_id}:{port_id}"
 
-    # Refresh, random draws and topology
-
-    def refresh(self):
-        """Refresh all subsystems and rebuild the stacked state layout.
-
-        A structural change inside a block (its state size) needs it; the
-        diagram's ``x0`` and solver hints are views of its blocks and need none.
-        Compiled evaluators are snapshots: recompile after structural changes.
-        """
-        for subsystem in self.subsystems.values():
-            subsystem.refresh()
-        self.n, self.state_index, self.state = state_layout(self.subsystems)
+    # Random draws and topology
 
     def realize(self, key):
         """Nested params with every random block realized under its own stream, named by its id."""

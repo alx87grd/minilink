@@ -137,16 +137,6 @@ class SampledSystem(StepSystem):
         # The System shell's defaults: the view's hints are its source's
         return
 
-    def refresh(self):
-        """Refresh the source, then read again the structure the view took from it: its size, state and ports."""
-        source = self.source
-        source.refresh()
-
-        self.n = source.n
-        self.state = source.state
-        self.inputs = source.inputs
-        self.outputs = source.outputs
-
     @property
     def counts(self) -> bool:
         """Whether the block counts its own ticks: a tick source, which reads ``k``, never seconds."""
@@ -366,10 +356,6 @@ class NativeSampledSystem(SampledSystem):
     @solver_info.setter
     def solver_info(self, value: dict):
         self.__dict__["own_solver_info"] = value
-
-    def refresh(self):
-        """Nothing derived to refresh: the law owns its structure."""
-        return
 
     @property
     def counts(self) -> bool:

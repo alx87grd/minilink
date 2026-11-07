@@ -197,14 +197,6 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         """Output helper returning the state vector directly (``y = x``)."""
         return x
 
-    def refresh(self):
-        """
-        Recompute derived internals from current parameters/topology.
-
-        Base implementation is a no-op and can be overridden by subclasses.
-        """
-        return
-
     def realize(self, key):
         """
         The params of one realization of the block's randomness under ``key``.
