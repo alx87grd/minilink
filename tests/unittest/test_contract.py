@@ -64,6 +64,7 @@ SYSTEM_FACTORIES = {
     "MLP": lambda: minilink.MLP(2, 1, hidden=(4,)),
     "LookupPolicy": lambda: lookup_policy(),
     "NeuralPolicy": lambda: minilink.NeuralPolicy(minilink.Pendulum(), hidden=(4,)),
+    "SampledSystem": lambda: core.SampledSystem(minilink.Pendulum(), 0.1),
 }
 SYSTEM_EXCEPTIONS = {
     # The abstract shells and the diagrams: their params are their blocks' (walked as blocks)
@@ -72,6 +73,7 @@ SYSTEM_EXCEPTIONS = {
     "StepSystem",
     "DiagramSystem",
     "StepDiagramSystem",
+    "SampledDiagramSystem",
 }
 
 

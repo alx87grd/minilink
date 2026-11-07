@@ -5,6 +5,7 @@ import pytest
 from scipy.interpolate import RegularGridInterpolator
 
 from minilink import DynamicProgrammingPlanner, LQRPlanner
+from minilink.core import BoxSet, MarginField
 from minilink.core.backends import require_jax, require_jax_numpy
 from minilink.core.fields import GridField, QuadraticField
 from tests.unittest.test_planner_params import GRID, reach, regulation
@@ -186,3 +187,12 @@ def test_value_iterations_law_closes_a_jax_loop_as_on_numpy():
     on_jax = loop.compute_trajectory(tf=2.0, solver="rk4_fixedsteps", backend="jax")
 
     np.testing.assert_allclose(np.asarray(on_jax.x), on_numpy.x, rtol=1e-9, atol=1e-12)
+
+
+def test_a_sets_margin_field_is_its_least_margin():
+    box = BoxSet(np.array([-1.0, -2.0]), np.array([1.0, 2.0]))
+    V = MarginField(box)
+
+    assert V(np.array([0.5, 0.0])) == pytest.approx(0.5)
+    assert V(np.array([0.0, 2.5])) == pytest.approx(-0.5)
+    assert V.params is box.params
