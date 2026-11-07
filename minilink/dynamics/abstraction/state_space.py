@@ -368,6 +368,7 @@ def matrices_text(sys):
 
 
 def lti_latex():
+    """The state-space equations in LaTeX."""
     return (
         r"\begin{align*}"
         r"\dot{x} &= A x + B u \\"

@@ -215,6 +215,7 @@ def require_ordered_bounds(lower, upper):
 
 
 def program_text(program):
+    """The print text of a program: its class, constraint rows, backend and bounds."""
     # A real cycle: optimizer imports this module
     from minilink.optimization.optimizer import program_class
 
@@ -241,6 +242,7 @@ def program_text(program):
 
 
 def constraint_rows(fn):
+    """The number of rows of a constraint function (``?`` when it does not say)."""
     if fn is None:
         return 0
 
@@ -252,6 +254,7 @@ def constraint_rows(fn):
 
 
 def optimization_result_text(result):
+    """The print text of a result: success, ``J*``, ``z*``, the message and the time."""
     success = "yes" if result.success else "no"
     headline = f"OptimizationResult, success={success}"
     body = []
@@ -271,6 +274,7 @@ def optimization_result_text(result):
 
 
 def program_latex(program):
+    """The program's LaTeX summary: ``min J(z)`` and the kinds of constraint it holds."""
     parts = [r"\min_{z} J(z)"]
     if program.h is not None:
         parts.append(r"\text{subject to } h(z) = 0")

@@ -1217,11 +1217,13 @@ def require_input_box(U):
 
 
 def problem_text(problem):
+    """The print text of a deterministic problem: its headline, sets and cost."""
     headline, body = problem_parts(problem)
     return format_inspect(headline, body)
 
 
 def stochastic_problem_text(problem):
+    """The print text of a stochastic problem: the deterministic one with its criterion and laws."""
     headline, body = problem_parts(problem)
     criterion = problem.criterion
     if isinstance(criterion, tuple):
@@ -1244,6 +1246,7 @@ def stochastic_problem_text(problem):
 
 
 def problem_parts(problem):
+    """``(headline, body)`` shared by both problem texts."""
     sys = problem.sys
     name = getattr(sys, "name", type(sys).__name__)
     headline = (
@@ -1265,6 +1268,7 @@ def problem_parts(problem):
 
 
 def planning_horizon_text(tf):
+    """The horizon as printed: ``None``, ``inf`` or its number."""
     if tf is None:
         return "None"
     if not np.isfinite(tf):

@@ -633,6 +633,7 @@ def backend_kwargs_of(preset, method_kwargs, options):
 
 
 def optimizer_text(opt):
+    """The print text of an optimizer: its method, program, start and backend."""
     headline = f"Optimizer, method={opt.method!r}"
     body = [
         body_line("program", inspect_inline(opt.program)),

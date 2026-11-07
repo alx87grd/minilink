@@ -541,6 +541,7 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
 
 
 def simulator_text(sim):
+    """The print text of a simulator: its solver, step and grid, and the system."""
     headline = f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_pts}"
     body = [body_line("sys", inspect_inline(sim.sys))]
 

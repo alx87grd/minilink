@@ -231,6 +231,7 @@ class PlanningSolution:
 
 
 def solution_text(solution):
+    """The print text of a solution: its method, law, trajectory, evaluation and record."""
     law = "u = pi(t), open loop" if solution.open_loop else "u = pi(x), feedback"
     if solution.trajectory is None:
         trajectory = "not rolled out (solve with evaluate=True)"
