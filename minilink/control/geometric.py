@@ -72,7 +72,6 @@ class PurePursuit(System):
         require_positive("lookahead", lookahead)
 
         super().__init__()
-        self.name = "Pure pursuit"
 
         # The path the law reads: its shape is structure, its numbers a part of params
         self.path = path
@@ -393,7 +392,6 @@ class LineOfSight(System):
         require_positive("lookahead", lookahead)
 
         super().__init__()
-        self.name = "Line of sight"
 
         # The path the law reads: its shape is structure, its numbers a part of params
         self.path = path
@@ -530,7 +528,6 @@ class HeadingController(System):
         require_positive("softening", softening)
 
         super().__init__()
-        self.name = "Heading controller"
 
         # Parameters
         self.params = {
