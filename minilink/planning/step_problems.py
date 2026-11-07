@@ -8,9 +8,14 @@ from minilink.core.costs import SampledCost, StepCost, box_samples
 from minilink.core.inspect import inspect_text, repr_pretty
 from minilink.planning.problems import (
     PlanningProblem,
+    coerce_laws,
     fallback_bound,
     finite_box_or,
+    law_draws,
     require_cost,
+    require_one_run,
+    stream_of,
+    with_law_draws,
 )
 
 ###############################################################################
@@ -25,10 +30,13 @@ class StepPlanningProblem:
     The objective is ``J = Σ_{k<N} γᵏ c(x_k, u_k, k) + γᴺ h(x_N, N)``, ``c`` and
     ``h`` a :class:`~minilink.core.costs.StepCost`, with ``N`` the ``n_steps``
     ticks. ``n_steps=None`` is the infinite
-    horizon (no ``h``). The start, the sets and the laws are a
+    horizon (no ``h``). The start and the sets are a
     :class:`~minilink.planning.problems.PlanningProblem`'s, shared by
-    composition (:attr:`parts`). ``t0`` is the tick offset, an integer,
-    for a native step problem; a discretized problem
+    composition (:attr:`parts`); the laws (``x0=`` a law, ``distributions=``)
+    are over the problem's own tree (:attr:`params`), which :meth:`realize`
+    draws. ``t0`` is the tick offset, an integer, for a native step problem:
+    tick ``k`` of a run is ``t0 + k``, its stage cost ``c(x_k, u_k, t0 + k)``
+    discounted by ``γᵏ``; a discretized problem
     (:meth:`PlanningProblem.discretize`) keeps ``(dt, t0)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
     and its cost a :class:`~minilink.core.costs.SampledCost`. ``compile()``
     gives the step face (:class:`~minilink.planning.step_face.StepFace`), the
@@ -67,7 +75,7 @@ class StepPlanningProblem:
         # The continuous problem it samples, for a discretized one (problem.discretize)
         self.origin = None
 
-        # The start, the sets and the laws, shared with the continuous problem
+        # The start and the sets, shared with the continuous problem
         self.parts = PlanningProblem(
             sys,
             x0=x0,
@@ -77,9 +85,11 @@ class StepPlanningProblem:
             Xf=Xf,
             penalize_failure=penalize_failure,
             failure_cost=failure_cost,
-            distributions=distributions,
             criterion=criterion,
         )
+
+        # The laws over the problem's own tree, the cost's numbers among them
+        self.distributions = coerce_laws(distributions, self.parts_view())
 
     # The shared parts
 
@@ -108,10 +118,6 @@ class StepPlanningProblem:
         return self.parts.Xf
 
     @property
-    def distributions(self):
-        return self.parts.distributions
-
-    @property
     def penalize_failure(self):
         return self.parts.penalize_failure
 
@@ -125,7 +131,8 @@ class StepPlanningProblem:
 
     @property
     def is_stochastic(self) -> bool:
-        return self.parts.is_stochastic
+        """``True`` when a part is random: a law on the start or on a number of the tree."""
+        return self.start_law is not None or bool(self.distributions)
 
     def sample_x0(self, key, n=None):
         """Draw starts from the start's law (the shared parts')."""
@@ -137,7 +144,8 @@ class StepPlanningProblem:
         The live view of the problem's numbers, by role: ``plant``, ``cost``, the sets', ``x0``, ``t0``, ``gamma``.
 
         Numbers only, as on :class:`~minilink.planning.problems.PlanningProblem`:
-        the laws over them are :attr:`distributions`.
+        the laws over them are :attr:`distributions`, and :meth:`realize`
+        draws them into this tree.
         """
         return self.parts_view()
 
@@ -155,6 +163,39 @@ class StepPlanningProblem:
         view["gamma"] = self.gamma
 
         return view
+
+    def realize(self, key=None, n=1):
+        """
+        ``n`` realizations of the problem's draws from one key: its own tree.
+
+        The problem's numbers (:attr:`params`, its tick offset ``t0`` and its
+        ``gamma`` among them), with ``"x0"`` of shape ``(n, nx)`` and each
+        law's leaf drawn ``n`` times in its number's shape, each from the
+        stream named by its path, as
+        :meth:`PlanningProblem.realize <minilink.planning.problems.PlanningProblem.realize>`
+        draws them; the other leaves are shared. A deterministic problem has
+        one realization, its own start; ``key=None`` draws every law at its mean.
+        """
+        n = int(n)
+        tree = self.parts_view()
+
+        # A deterministic problem: its one start, the shared numbers
+        if not self.is_stochastic:
+            require_one_run(n)
+            tree["x0"] = self.sample_x0(None, n)
+            return tree
+
+        # x(0) ~ the start's law, n times, from the stream named "x0"
+        tree["x0"] = self.sample_x0(stream_of(key, "x0"), n)
+
+        # Each law's leaf n times, in its number's shape, from the stream named by its path
+        tree = with_law_draws(tree, self.distributions, key, n)
+
+        return tree
+
+    def sample_params(self, key):
+        """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
+        return law_draws(self.distributions, self.parts_view(), key)
 
     def compile(self, controller=None):
         """The step face (:class:`~minilink.planning.step_face.StepFace`): ``transition(x, u, k, params) -> (x_next, c_k)``."""
@@ -175,8 +216,8 @@ class StepPlanningProblem:
 
         ``c_max`` and ``h_max`` are the stage and terminal costs' largest values
         on a quasi-random sample of the boxes of ``X`` and ``U`` (the declared
-        sets', else the plant's ranges); the infinite horizon is
-        ``c_max / (1 − γ)``. With ``γ = 1`` on an infinite horizon, or boxes
+        sets', else the plant's ranges), read at the tick offset ``t0``; the
+        infinite horizon is ``c_max / (1 − γ)``. With ``γ = 1`` on an infinite horizon, or boxes
         with no finite bound, it falls back to ``1e6`` with a warning naming
         ``failure_cost``. A discretized problem's bound is the continuous
         problem's on its own sum at ``dt`` (the face's one number):
@@ -198,10 +239,12 @@ class StepPlanningProblem:
         if N is None and gamma >= 1.0:
             return fallback_bound("an infinite undiscounted horizon has no cost bound")
 
-        # c_max and h_max: the largest stage and terminal cost on the sampled boxes
+        # c_max and h_max: the largest stage and terminal cost on the sampled boxes,
+        # read at the tick offset k₀ (a problem started at k₀ bounds as from 0)
+        k0 = self.t0
         xs, us = box_samples(X_box, U_box)
-        c_max = max(float(cost.c(x, u, 0, params)) for x, u in zip(xs, us))
-        h_max = max(float(cost.h(x, 0, params)) for x in xs) if N is not None else 0.0
+        c_max = max(float(cost.c(x, u, k0, params)) for x, u in zip(xs, us))
+        h_max = max(float(cost.h(x, k0, params)) for x in xs) if N is not None else 0.0
 
         # Σ_{k<N} γᵏ = (1 − γᴺ) / (1 − γ), or N when γ = 1; 1 / (1 − γ) when N = ∞
         if N is None:

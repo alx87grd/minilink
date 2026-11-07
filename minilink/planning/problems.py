@@ -429,10 +429,7 @@ class PlanningProblem:
 
         # Each law's leaf n times, in its number's shape, from the stream named by
         # its path (the tree copied along the path: the parts' dicts stay untouched)
-        for path, law in flatten(self.distributions):
-            nominal = np.shape(lookup(tree, path))
-            values = law.sample(stream_of(key, ".".join(path)), n)
-            tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+        tree = with_law_draws(tree, self.distributions, key, n)
 
         # Each random source's seeds, n times, named by its block id and the trial;
         # without a key, every seed None (the mean signal)
@@ -467,17 +464,7 @@ class PlanningProblem:
 
     def sample_params(self, key):
         """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
-        paths = [path for path, _ in flatten(self.distributions)]
-        keys = split_keys(key, len(paths))
-        view = self.parts_view()
-
-        draws = {}
-        for path, k in zip(paths, keys):
-            # One draw, in the nominal entry's shape, at its path
-            value = lookup(self.distributions, path).sample(k)
-            set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
-
-        return draws
+        return law_draws(self.distributions, self.parts_view(), key)
 
     def nominal(self) -> PlanningProblem:
         """
@@ -993,6 +980,30 @@ def stream_of(key, name):
     require_integer_key(key)
 
     return child_seed(int(key), name)
+
+
+def with_law_draws(tree, laws, key, n):
+    """The tree with each law's leaf drawn ``n`` times in its number's shape, from the stream named by its path (copied along the path)."""
+    for path, law in flatten(laws):
+        nominal = np.shape(lookup(tree, path))
+        values = law.sample(stream_of(key, ".".join(path)), n)
+        tree = with_leaf(tree, path, values.reshape((n, *nominal)))
+
+    return tree
+
+
+def law_draws(laws, view, key):
+    """One draw of each law, at its path, in the shape of its number in the tree ``view`` (empty when nothing is drawn)."""
+    paths = [path for path, _ in flatten(laws)]
+    keys = split_keys(key, len(paths))
+
+    draws = {}
+    for path, k in zip(paths, keys):
+        # One draw, in the nominal entry's shape, at its path
+        value = lookup(laws, path).sample(k)
+        set_leaf(draws, path, value.reshape(np.shape(lookup(view, path))))
+
+    return draws
 
 
 def source_seeds(block, key, sys_id, n):

@@ -1444,8 +1444,14 @@ beside the state by the same scheme (`g·dt` to the last bit under one Euler ste
 (`J = Σ γᵏ c_k + γᴺ h`); `params` is the tree its calls read (the plant at its mean, a
 discretized problem's at its origin's, the cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
 ...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
-(`c(x, u, k)`, `h(x, k)`), its start, sets and laws a `PlanningProblem`'s by composition, its
-face `problem.compile()`; `problem.discretize(dt)` is the explicit step problem of a
+(`c(x, u, k)`, `h(x, k)`), its start and sets a `PlanningProblem`'s by composition, its
+face `problem.compile()`. Its laws are over its own tree, `params = {"plant", "cost", the
+sets', "x0", "t0", "gamma"}` (the cost's numbers among them), and `realize(key, n)` draws
+them into that tree as a continuous problem's does (the start from the stream `"x0"`, each
+law from its path's; `sample_params(key)` one draw); the face's plant is at its laws' mean.
+A native `t0 = k₀` is a whole tick offset: tick `k` charges `c(x_k, u_k, k₀ + k)` discounted
+by `γᵏ` and `h` at `k₀ + N`, and the cost bound reads `c` and `h` at `k₀`, so a problem
+started at `k₀` scores as from 0 on the cost shifted by `k₀`. `problem.discretize(dt)` is the explicit step problem of a
 continuous one, its cost a `SampledCost`, compiling to the face the library builds inside
 (`StepFace(problem, dt=)`) to the bit.
 Value iteration, the RL environment and a planner's evidence read only this face.

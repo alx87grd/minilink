@@ -90,10 +90,10 @@ class StepFace:
         problem = self.problem
         continuous = is_continuous(problem)
 
-        # The design point, a random plant at its mean: a continuous problem's, or the
-        # one a discretized problem samples (a native step problem's own numbers)
-        source = problem if continuous else problem.origin
-        plant = None if source is None else nominal_plant_params(source)
+        # The design point, a random plant at its mean: a continuous problem's, the one
+        # a discretized problem samples, or a native step problem's own
+        source = problem if continuous or problem.origin is None else problem.origin
+        plant = nominal_plant_params(source)
         tree = {
             "plant": problem.sys.params if plant is None else plant,
             "cost": None if problem.cost is None else problem.cost.params,

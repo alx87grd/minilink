@@ -218,7 +218,8 @@ Contract: DESIGN §6 (the problem evaluator, the step face). Ruled, besides it, 
 points: the sampled check accepted, the run priced to the horizon with
 the input held, a solver's own objective allowed but the score always the problem's cost.
 
-- [ ] **A step problem's own tree** (the rest of the step face and the compiled face; `StepPlanningProblem`, the
+- [ ] **A step problem's own tree** (built on `v04-build`, in review: the row leaves at the
+  merge; the rest of the step face and the compiled face; `StepPlanningProblem`, the
   compiled face, the judge, value iteration and the RL environment on `transition` and the derived
   RL discount landed in the v0.3 run): `realize` on the step problem's own tree (today the start
   and the laws through its parts) and `t0` as its tick offset. Done when a grid world with a

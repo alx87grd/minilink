@@ -7,6 +7,7 @@ from minilink import Pendulum, PlanningProblem, QuadraticCost
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.costs import SampledCost, StepCost
 from minilink.core.discrete.sampled_system import SampledSystem
+from minilink.core.discrete.step_system import StepSystem
 from minilink.planning.step_face import StepFace
 from minilink.planning.step_problems import StepPlanningProblem
 
@@ -98,20 +99,21 @@ class Moves(StepCost):
         return 0.0
 
 
+class Walk(StepSystem):
+    """A walker on the cells 0 to 5 of a line: ``x_{k+1} = x_k + u_k``, clipped to the line."""
+
+    def __init__(self):
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
+        self.state.lower_bound[:] = [0.0]
+        self.state.upper_bound[:] = [5.0]
+        self.inputs["u"].lower_bound[:] = [-1.0]
+        self.inputs["u"].upper_bound[:] = [1.0]
+
+    def step(self, x, u, k=0, params=None):
+        return np.clip(x + u, 0.0, 5.0)
+
+
 def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
-    from minilink.core.discrete.step_system import StepSystem
-
-    class Walk(StepSystem):
-        def __init__(self):
-            super().__init__(state_dim=1, input_dim=1, output_dim=1)
-            self.state.lower_bound[:] = [0.0]
-            self.state.upper_bound[:] = [5.0]
-            self.inputs["u"].lower_bound[:] = [-1.0]
-            self.inputs["u"].upper_bound[:] = [1.0]
-
-        def step(self, x, u, k=0, params=None):
-            return np.clip(x + u, 0.0, 5.0)
-
     problem = StepPlanningProblem(
         Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x0=[1.0], t0=2
     )
@@ -148,9 +150,8 @@ def test_the_state_only_step_is_the_transitions_state_on_both_faces():
     ).shape == (2,)
 
 
-def grid_world():
+def grid_world(**fields):
     """A walker on a 7 × 7 grid of cells, a step to any of its 8 neighbours or none, one unit a move off the goal."""
-    from minilink.core.discrete.step_system import StepSystem
 
     class Walker(StepSystem):
         def __init__(self):
@@ -164,15 +165,104 @@ def grid_world():
             return np.clip(x + u, 0.0, 6.0)
 
     walker = Walker()
+    fields.setdefault("x0", [0.0, 0.0])
     return StepPlanningProblem(
         walker,
         cost=Moves([5.0, 3.0]),
-        x0=[0.0, 0.0],
         X=walker.state.box,
         U=walker.input_box,
         penalize_failure=True,
         failure_cost=100.0,
+        **fields,
     )
+
+
+def test_a_grid_world_with_a_law_as_its_start_realizes_from_its_own_tree():
+    from minilink import Uniform
+    from minilink.planning.problems import stream_of
+
+    start = Uniform([0.0, 0.0], [2.0, 2.0])
+    goal = Uniform([4.0, 2.0], [6.0, 4.0])
+    problem = grid_world(x0=start, distributions={"cost": {"goal": goal}}, t0=4)
+    assert problem.is_stochastic
+
+    # The tree holds the law's numbers: the start's support is the law's own box
+    assert problem.params["X0"] is start.params
+    roles = {"plant", "cost", "X", "U", "X0", "x0", "t0", "gamma"}
+    assert set(problem.params) == roles
+
+    # realize(key, n) draws the start and the goal into the problem's own tree
+    tree = problem.realize(7, n=5)
+    assert set(tree) == roles
+    np.testing.assert_array_equal(tree["x0"], start.sample(stream_of(7, "x0"), 5))
+    goals = tree["cost"]["goal"]
+    assert goals.shape == (5, 2)
+    assert np.all((goals >= [4.0, 2.0]) & (goals <= [6.0, 4.0]))
+    assert tree["t0"] == 4 and tree["gamma"] == 1.0
+    np.testing.assert_array_equal(problem.realize(7, n=5)["x0"], tree["x0"])
+
+    # The start is drawn from the numbers the tree holds: an edit of its box moves it
+    problem.params["X0"]["lower"][:] = [5.0, 5.0]
+    problem.params["X0"]["upper"][:] = [6.0, 6.0]
+    assert np.all(problem.realize(7, n=5)["x0"] >= 5.0)
+
+    # No key: every law at its mean; one draw of the laws at its path
+    nominal = problem.realize(None, n=2)
+    np.testing.assert_array_equal(nominal["x0"], [[5.5, 5.5], [5.5, 5.5]])
+    np.testing.assert_array_equal(nominal["cost"]["goal"], [[5.0, 3.0], [5.0, 3.0]])
+    assert problem.sample_params(3)["cost"]["goal"].shape == (2,)
+
+    # A deterministic grid world has one realization, its own start
+    np.testing.assert_array_equal(grid_world().realize()["x0"], [[0.0, 0.0]])
+    with pytest.raises(ValueError, match="one realization"):
+        grid_world().realize(0, n=2)
+    with pytest.raises(ValueError, match="names no leaf"):
+        grid_world(distributions={"cost": {"target": goal}})
+
+
+class Late(StepCost):
+    """``c = |x − 4| (1 + k + s) + u²``, ``h = 10 |x − 4| (1 + k + s)``: a cost that reads the tick, shifted by ``s`` ticks."""
+
+    def __init__(self, shift=0):
+        self.params = {"goal": 4.0}
+        self.shift = shift
+
+    def c(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+        return abs(x[0] - params["goal"]) * (1 + k + self.shift) + u[0] ** 2
+
+    def h(self, x, k=0, params=None):
+        params = self.params if params is None else params
+        return 10.0 * abs(x[0] - params["goal"]) * (1 + k + self.shift)
+
+
+def late_and_shifted(n_steps):
+    """The walk started at ``k₀ = 3`` on :class:`Late`, and from 0 on the cost shifted by 3 ticks."""
+    walk = Walk()
+    fields = dict(
+        n_steps=n_steps, gamma=0.9, x0=[1.0], X=walk.state.box, U=walk.input_box
+    )
+    late = StepPlanningProblem(walk, cost=Late(), t0=3, **fields)
+    shifted = StepPlanningProblem(walk, cost=Late(shift=3), t0=0, **fields)
+
+    return late, shifted
+
+
+@pytest.mark.parametrize("n_steps", [4, None])
+def test_a_step_problem_started_at_k0_scores_as_from_0_with_the_cost_shifted(n_steps):
+    late, shifted = late_and_shifted(n_steps)
+    assert late.params["t0"] == 3 and late.realize()["t0"] == 3
+
+    # J = Σ γᵏ c(x_k, u_k, k₀ + k) + γᴺ h(x_N, k₀ + N), the discount counted from the start
+    law = lambda x, t: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
+    xs, us, cs, J = late.compile().run(law, n_steps=4)
+    xs_0, us_0, cs_0, J_0 = shifted.compile().run(law, n_steps=4)
+    np.testing.assert_array_equal(xs, xs_0)
+    np.testing.assert_array_equal(cs, cs_0)
+    assert J == J_0 == 13.0 + 0.9 * 11.0 + 0.81 * 7.0
+
+    # The same cost bound: the stage and terminal costs read at the tick offset
+    assert late.compile().cost_bound == shifted.compile().cost_bound
 
 
 def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
