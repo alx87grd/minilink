@@ -326,39 +326,38 @@ class DynamicProgrammingPlanner(Planner):
         tf = self.final_time
         dt = self.grid.dt
         tol = self.tol
+        backend = self.backend
 
-        # The JAX engine runs these same sweeps, jitted on device
-        if self.backend == BACKEND_JAX:
+        # The JAX engine: every sweep compiled on device, unless each one is reported
+        # or recorded; then its jitted step, bound to its device tables, from here
+        device_step = None
+        if backend == BACKEND_JAX:
             # A real cycle: dp_jax imports DynamicProgrammingResult from this module
             from minilink.planning.dynamic_programming import dp_jax
 
-            return dp_jax.value_iteration(
-                self, max_sweeps, stop_on_tol, keep_stages, verbose, record_history
-            )
-
-        # The backward step: the textbook loop, or the same step over lookup tables
-        if self.backend == BACKEND_LOOP:
-            backward_step = self.backward_step_loop
-        else:
-            backward_step = self.backward_step_table
+            if not (verbose or record_history):
+                return dp_jax.value_iteration(
+                    self, max_sweeps, stop_on_tol, keep_stages
+                )
+            device_step, J, pi = dp_jax.device_step(self, verbose)
 
         log = SweepLog(
             max_sweeps, stop_on_tol, tol, verbose=verbose, record_history=record_history
         )
 
-        # The running-cost table of this solve, once on a precomputed grid (its
-        # transitions do not depend on time); per sweep otherwise
+        # On the host: the running-cost table of this solve, once on a precomputed
+        # grid (its transitions do not depend on time), per sweep otherwise; and the
+        # cost-to-go at the final time
         G = None
-        if self.grid.precomputed:
-            G = self.running_cost_table(tf, verbose=verbose)
-
-        # Cost-to-go at the final time
-        J = self.terminal_cost(tf, verbose=verbose)
-        pi = np.zeros(self.grid.nodes_n, dtype=int)
+        if backend != BACKEND_JAX:
+            if self.grid.precomputed:
+                G = self.running_cost_table(tf, verbose=verbose)
+            J = self.terminal_cost(tf, verbose=verbose)
+            pi = np.zeros(self.grid.nodes_n, dtype=int)
         log.start(tf, J, pi)
 
         # The tables of every stage, from the final one back (a finite horizon's)
-        J_stages = [J] if keep_stages else None
+        J_stages = [np.asarray(J)] if keep_stages else None
         pi_stages = [] if keep_stages else None
 
         # Backward sweeps: at most max_sweeps of them, and with stop_on_tol
@@ -373,17 +372,23 @@ class DynamicProgrammingPlanner(Planner):
             t = tf - k * dt
 
             # Bellman backup from the cost-to-go one step ahead:
-            # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and step
+            # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and
+            # step: the textbook loop, the same step over lookup tables, or on device
             J_next = J
-            J, pi = backward_step(J_next, t, G, verbose=verbose)
+            if backend == BACKEND_LOOP:
+                J, pi = self.backward_step_loop(J_next, t)
+            elif backend == BACKEND_NUMPY:
+                J, pi = self.backward_step_table(J_next, t, G, verbose=verbose)
+            else:
+                J, pi = device_step(J_next)
 
             # Largest change of the cost-to-go: the convergence measure
             delta = float(np.max(np.abs(J - J_next)))
 
             log.sweep(k, t, J, J_next, pi)
             if keep_stages:
-                J_stages.append(J)
-                pi_stages.append(pi)
+                J_stages.append(np.asarray(J))
+                pi_stages.append(np.asarray(pi, dtype=int))
 
         log.done(k, delta)
 
@@ -402,9 +407,9 @@ class DynamicProgrammingPlanner(Planner):
             schedule=schedule,
         )
 
-    def backward_step_loop(self, J_next, t, G=None, *, verbose=False):
+    def backward_step_loop(self, J_next, t):
         """
-        One backward Bellman step as an explicit loop over nodes and actions (``G`` and ``verbose`` unused: each pair prices its own step).
+        One backward Bellman step as an explicit loop over nodes and actions, each pair pricing its own step.
 
         The readable reference (pyro's ``DynamicProgramming``): for every
         state node and every control action, take a forward-Euler step, look

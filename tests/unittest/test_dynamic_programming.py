@@ -465,7 +465,7 @@ class TestBackends(unittest.TestCase):
         self.assertLess(rel_gap, 1e-2)
         self.assertGreater(np.mean(results["jax"].pi == results["numpy"].pi), 0.98)
 
-    def test_jax_sweep_by_sweep_matches_the_device_loop(self):
+    def test_jax_one_sweep_at_a_time_matches_the_device_loop(self):
         """verbose or record_history run the JAX sweeps one at a time, to the same result."""
         import contextlib
         import io
