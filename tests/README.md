@@ -71,7 +71,8 @@ by its name here.
 | Always before push | `ruff check . && ruff format --check .` (the pre-commit hooks run the same two); fix with `ruff check --fix . && ruff format .` |
 | Docs/markdown only | skip pytest |
 | Narrow module change | `pytest tests/unittest/test_<domain>.py` |
-| Cross-cutting or handoff | `pytest` |
+| Cross-cutting or handoff | `pytest` (the tests marked `slow` are deselected) |
+| Slow tests | `pytest --runslow -m slow`; every test: `pytest --runslow` |
 | Regression gates, CI flags (compile / `Simulator` / trajopt / MPC / value iteration) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all --tiny --factor 10 --speed-gate-suffixes solve_s,nlp_s,speedup --speed-slack-s 0.1` |
 | Regression gates, full local (big review pass) | `PYTHONPATH=. python benchmarks/run_regression_check.py --suite all` (per-suite factors from the baseline JSON) |
 | Demo-check change | `python tests/demo_checks/run_catalog_checks.py --fast` and/or `run_flagship_demos.py` |
@@ -94,8 +95,8 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 
 | Job | Steps |
 | --- | --- |
-| **`test`** | py 3.12, the Basic tier: ruff, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata), `pytest -n auto` with a coverage report (no gate; JAX tests and demos skip), then the demo-check bridge on its own |
-| **`regression`** | py 3.12 with the full optional stack: `pytest -n auto` (the JAX tests included; the experimental tier's tests are nightly only), the demo-check bridge (the **flagship demos**, JAX ones included), the regression gates (CI flags above) |
+| **`test`** | py 3.12, the Basic tier: ruff, the `nbstripout` hook over every notebook (committed notebooks carry no outputs and no volatile metadata), `pytest -n auto` with a coverage report (no gate; JAX tests and demos skip; the slow tests deselected), then the demo-check bridge on its own (catalog and graphics; the flagship demos are slow) |
+| **`regression`** | py 3.12 with the full optional stack: `pytest -n auto` (the JAX tests included; the slow tests and the experimental tier's tests are nightly only), the demo-check bridge with `--runslow` (the **flagship demos**, JAX ones included), the regression gates (CI flags above) |
 | **`notebooks`** | **notebook smoke** with the full stack, three notebooks at once (`run_notebook_checks.py --jobs 3`) |
 | **`docs`** | the Sphinx build, warnings as errors (`docs.yml` deploys it from `main`) |
 | **`packaging`** | `python -m build` + wheel/sdist check (no `experimental/`) + `twine check` + install the wheel and `import minilink` |
@@ -105,9 +106,9 @@ pull requests to the branches its `on:` block lists (`main` and `dev` among them
 The jobs run side by side, and a newer push to a branch cancels the run it replaces.
 
 Not merge gates: `publish.yml` runs on a `0.*` tag, and its **`check`** job (ruff +
-`pytest`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
+`pytest --runslow`) and **`build`** job (sdist and wheel, checked) must pass before **`publish`**
 uploads to PyPI; `nightly.yml` installs the full optional stack (every extra, Ipopt,
-Stable-Baselines3) and runs `pytest` (the Ipopt tests included), the other Pythons and the laptops, the experimental tier's
+Stable-Baselines3) and runs `pytest --runslow` (the Ipopt and slow tests included), the other Pythons and the laptops, the experimental tier's
 tests (`pytest tests/experimental`: the symbolic mechanics and the contact engines), every demo
 script, and every notebook (`run_notebook_checks.py --all`: those marked `smoke: false`
 in `notebook_overrides.json` too, except those marked `nightly: false`, run only by name);
@@ -214,6 +215,10 @@ cloud agent sessions.
 - `plotting`: tests requiring `plotly`
 - `ipopt`: tests requiring `cyipopt`
 - `rl`: tests requiring `gymnasium`
+- `slow`: a test over ~15 s on a 4-worker run; `tests/unittest/conftest.py` deselects it
+  unless `--runslow` is given, so the per-change runs (`pytest`, CI's `test` and
+  `regression` jobs) skip it and the nightly run, the release check (`publish.yml`) and the
+  `regression` job's demo-check bridge run it
 
 When adding optional behavior, put the import inside a guarded block and add the
 appropriate marker(s). This keeps `pytest -m "not optional"` a dependable

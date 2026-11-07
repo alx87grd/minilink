@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+import pytest
 
 from minilink.core.costs import QuadraticCost, TimeCost
 from minilink.core.diagram import DiagramSystem
@@ -359,6 +360,7 @@ class TestJaxPrecompute(unittest.TestCase):
 
 
 class TestBackends(unittest.TestCase):
+    @pytest.mark.slow
     def test_loop_matches_numpy(self):
         problem = make_problem()
         _, loop = solve(problem, backend="loop")
@@ -1005,6 +1007,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 np.testing.assert_array_equal(constant.result.J, scalar.result.J)
                 np.testing.assert_array_equal(constant.result.pi, scalar.result.pi)
 
+    @pytest.mark.slow
     def test_loop_numpy_and_policy_evaluation_agree_on_the_failure_cost(self):
         table = self.planner(exit_failure_cost)
         loop = self.planner(exit_failure_cost, "loop")

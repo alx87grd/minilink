@@ -171,6 +171,7 @@ def test_script_01_objects_an_lqg_loop_scores_its_covariance_prediction():
 
 @pytest.mark.optional
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_02_loop_a_digital_pid_has_a_gradient():
     jax = pytest.importorskip("jax")
     problem, pid = digital_pid_problem()
@@ -457,6 +458,7 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
 
 
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
     planner = bicycle_planner()
     pv = planner.compile()
@@ -651,6 +653,7 @@ def native_mpc_problem():
 
 @pytest.mark.optional
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradient():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp

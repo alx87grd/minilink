@@ -54,6 +54,7 @@ jobs:
 
     # Coverage is reported, not gated. The demo-check bridge runs its demos as
     # subprocesses with time limits, so it runs on its own, after the parallel run.
+    # The tests marked slow are deselected (nightly.yml runs them with --runslow).
     - name: Test with pytest (parallel, coverage report)
       run: pytest -n auto --ignore=tests/unittest/test_demo_check_runners.py --cov=minilink --cov-report=term --cov-report=markdown-append:"$GITHUB_STEP_SUMMARY"
 
@@ -194,14 +195,15 @@ jobs:
 
     # The whole suite with the full stack: the JAX tests skip in the ``test`` job (no
     # extra), and a JAX test without its marker still runs here. The experimental
-    # tier's tests are nightly only (ROADMAP §2).
+    # tier's tests and the tests marked slow are nightly only (ROADMAP §2; tests/README.md, Marker policy).
     - name: Test with pytest (incl. JAX, parallel)
       run: pytest -n auto --ignore=tests/unittest/test_demo_check_runners.py
 
-    # The flagship demos, the JAX ones included (interactive viewer demos skip)
+    # The flagship demos, the JAX ones included (interactive viewer demos skip): the
+    # one slow test the per-change run keeps, here only (the ``test`` job deselects it)
     - name: Demo-check bridge (incl. JAX flagships)
       if: ${{ !cancelled() }}
-      run: pytest tests/unittest/test_demo_check_runners.py
+      run: pytest --runslow tests/unittest/test_demo_check_runners.py
 
     - name: Regression gates
       if: ${{ !cancelled() }}

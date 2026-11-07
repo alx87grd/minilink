@@ -157,6 +157,7 @@ def test_collocation_policy_reproduces_its_trajectory_to_its_own_discretization(
     assert gaps[1] < 0.1 * gaps[0]  # the trapezoidal defect vanishes with the grid
 
 
+@pytest.mark.slow
 def test_trajopt_evaluation_is_one_trial_deterministic_and_n_trials_stochastic():
     solution = trajopt(move_problem(), collocation, 128).solve(evaluate=True)
     assert solution.evaluation.n_trials == 1 and not solution.evaluation.failed[0]

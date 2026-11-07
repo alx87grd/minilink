@@ -136,6 +136,7 @@ def test_the_mpc_runs_mppi_in_every_form(form, blocks):
     assert np.all(np.isfinite(run.x)) and run.has_signal("plant:u")
 
 
+@pytest.mark.slow
 def test_the_zero_delay_mppi_swings_the_pendulum_up():
     planner = swing_up_planner(n_rollouts=1024)
     mpc = ModelPredictiveController(planner, delay=False)

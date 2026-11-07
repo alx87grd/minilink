@@ -48,7 +48,7 @@ jobs:
         run: ruff format --check .
 
       - name: Test with pytest
-        run: pytest
+        run: pytest --runslow
 
   build:
     runs-on: ubuntu-latest

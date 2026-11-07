@@ -29,6 +29,8 @@ from collections import Counter
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 from tests.demo_checks import run_flagship_demos as flagship_runner
 from tests.demo_checks import run_notebook_checks as notebook_runner
 from tests.run import _common as launcher
@@ -89,6 +91,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
 
+    @pytest.mark.slow
     def test_flagship_demos_exit_zero(self):
         proc = self._run("tests/demo_checks/run_flagship_demos.py")
         if proc.returncode != 0:

@@ -1384,6 +1384,7 @@ def test_live_plot_runs_beside_the_callback():
     plt.close(ax.figure)
 
 
+@pytest.mark.slow
 def test_optimize_after_goal_runs_longer_and_refines_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
