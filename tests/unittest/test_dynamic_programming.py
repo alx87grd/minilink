@@ -802,6 +802,21 @@ class TestCostToGoInterpolation(unittest.TestCase):
             evaluator.value_at(x[0]), float(result.grid.interpolate(J, x, "nearest")[0])
         )
 
+    def test_spline_is_refused_naming_cubic(self):
+        """The cubic spline has one name, "cubic": "spline" is refused with it."""
+        planner = DynamicProgrammingPlanner(
+            make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1, interpolation="spline"
+        )
+        J = np.zeros(planner.grid.nodes_n)
+        x = np.zeros((1, 2))
+        with self.assertRaisesRegex(ValueError, '"cubic"'):
+            planner.solve()
+        with self.assertRaisesRegex(ValueError, '"cubic"'):
+            planner.grid.field(J, method="spline")
+        with self.assertRaisesRegex(ValueError, '"cubic"'):
+            planner.grid.interpolate(J, x, "spline")
+        np.testing.assert_array_equal(planner.grid.interpolate(J, x, "cubic"), [0.0])
+
 
 class TestDpOneObjectSetup(unittest.TestCase):
     """DynamicProgrammingPlanner builds its grid from x_grid / u_grid / dt."""

@@ -7,7 +7,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
 from minilink.core.compile.evaluators.stepping import require_step_knobs
-from minilink.core.fields import GridField
+from minilink.core.fields import GridField, require_grid_method
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
 from minilink.planning.dynamic_programming.progress import (
     maybe_print_build_progress,
@@ -337,12 +337,12 @@ class StateSpaceGrid:
         """
         Return a regular-grid interpolator callable for a node-indexed field.
 
-        ``method`` is one of ``{"linear", "nearest", "cubic", "quintic"}``;
-        ``"spline"`` is accepted as an alias for ``"cubic"``. Out-of-bounds
-        queries return 0. Spline methods are smoother but ring across the
-        infeasibility penalty, so they suit fields without large cliffs.
+        ``method`` is one of ``{"linear", "nearest", "cubic", "quintic"}``
+        (``"cubic"`` the cubic spline). Out-of-bounds queries return 0. Spline
+        methods are smoother but ring across the infeasibility penalty, so they
+        suit fields without large cliffs.
         """
-        method = "cubic" if method == "spline" else method
+        require_grid_method(method, GridField.METHODS)
         grid = values.reshape(self.x_grid_shape)
 
         return RegularGridInterpolator(
@@ -364,10 +364,11 @@ class StateSpaceGrid:
         A node-indexed table ``(nodes_n,)`` as a :class:`~minilink.core.fields.GridField` on this grid's levels.
 
         With times ``t`` ``(T,)``, ``values`` is ``(T, nodes_n)``, one table per
-        time. ``method`` is the reading rule (``"spline"`` the ``"cubic"`` one);
-        ``outside`` the value past the grid (the edge held for ``None``).
+        time. ``method`` is the reading rule, one of
+        :attr:`~minilink.core.fields.GridField.METHODS`; ``outside`` the value
+        past the grid (the edge held for ``None``).
         """
-        method = "cubic" if method == "spline" else method
+        require_grid_method(method, GridField.METHODS)
         values = np.asarray(values, dtype=float)
         shape = tuple(self.x_grid_shape) if t is None else (-1, *self.x_grid_shape)
 

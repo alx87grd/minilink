@@ -74,8 +74,8 @@ class DynamicProgrammingPlanner(Planner):
         on the backward sweeps.
     interpolation : {"linear", "nearest", "cubic", "quintic"}
         Cost-to-go interpolation. ``"linear"`` (default) and ``"nearest"`` are
-        robust; spline methods (``"cubic"``, the ``"spline"`` alias, ``"quintic"``)
-        are smoother but can ring across the infeasibility penalty.
+        robust; the spline methods (``"cubic"``, ``"quintic"``) are smoother
+        but can ring across the infeasibility penalty.
     out_of_bound_cost : float or callable, optional
         Finite penalty charged to inadmissible inputs or out-of-domain
         successors, a number of :attr:`params`: a scalar, or

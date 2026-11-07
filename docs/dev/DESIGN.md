@@ -843,7 +843,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   equation has no stabilizing solution).
   `GridField(levels, values, t=None, *, method="linear", outside=None)` is a table on a
   regular grid read as a field: multilinear in the cell holding `x` (`"nearest"` its closest
-  node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only; a leading time
+  node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only (the cubic spline
+has that one name: `"spline"` is refused naming `"cubic"`, on the field, on the value-iteration
+grid's `field` and interpolator and so on the planner's `interpolation`; ruled 2026-11-07); a leading time
   axis on `t` read linearly and held past its ends, the `QuadraticField` rule. Outside the grid
   the edge holds (`x` clamped on each axis), or `V = outside` when a number is given. Its
   `params` are `{"levels", "values"}` and, as given, `t` and `outside`; its gradient is the

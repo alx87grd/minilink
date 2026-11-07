@@ -807,9 +807,10 @@ def require_grid_shapes(levels, values, t):
 
 
 def require_grid_method(method, supported):
-    """Refuse a reading rule the grid field does not have."""
+    """Refuse a reading rule the grid field does not have, ``"spline"`` with its name, ``"cubic"``."""
     if method not in supported:
-        raise ValueError(f"method must be one of {supported}, got {method!r}")
+        hint = ': the cubic spline is "cubic"' if method == "spline" else ""
+        raise ValueError(f"method must be one of {supported}, got {method!r}{hint}")
 
 
 def require_a_bound(lower, upper):
