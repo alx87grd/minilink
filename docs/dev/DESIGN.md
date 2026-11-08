@@ -309,7 +309,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   orchestrator. Per frame it polls a `RealtimeInput` (`u`, `should_stop`; the nominal `u`
   when none), advances the plant by ZOH integration, draws live through the `Animator`
   and publishes to an optional `RealtimeOutput` (a `LiveSignalPlotOutput` beside it when
-  `plot=True` or `plot=(signals)`, on `plot_backend`). Two clocks: `frame_dt` (wall period per
+  `plot=True` or `plot=(signals)`, drawn by `plot_renderer`). Two clocks: `frame_dt` (wall period per
   frame) and `sim_dt` (the integration step, auto-calibrated at `run` unless given);
   `sync="locked"` advances `frame_dt` of sim time per frame, `sync="realtime"` the measured
   wall time. The run returns a `Trajectory` (one sample per frame), cached on `self.traj`
@@ -513,8 +513,10 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
-  optimizer's algorithm on `Optimizer` and on every planner that optimizes); the
-  optimizer's solver adapter, which a method binds, is `Optimizer.adapter`.
+  optimizer's algorithm on `Optimizer` and on every planner that optimizes, value
+  iteration's `method="loop"`, RRT's `nearest_method=`); the optimizer's solver adapter,
+  which a method binds, is `Optimizer.adapter`; `renderer=` is the drawing library on every
+  drawing verb (`plot_renderer=` on `game` and the realtime simulator).
 - **One word for a run's origin:** `t0`, on every runner (`compute_trajectory`,
   `Simulator`, the evaluator's `rollout`, the host clock runner, the realtime
   run, the gym bridge). A trajectory's first sample is its `t0` property.
@@ -754,8 +756,8 @@ The port names drive three tools:
   block with no law to draw (a plant, a filter, `plot_space = None`) refuses,
   and `plot_input_output_map()` sweeps any input of any block. Engine in `graphical/port_map.py` (module
   twin for third-party blocks).
-- **`PolicyEvaluator(policy=block)`** adapts a block that reads the state on
-  `x` (or `y`) and commands `u` into `u = policy(x)` (grid state on the
+- **`DynamicProgrammingPlanner.evaluate_policy(block)`** adapts a block that reads the
+  state on `x` (or `y`) and commands `u` into `u = policy(x)` (grid state on the
   measurement port, reference pinned).
 
 A block with other port names still simulates, compiles, and wires by hand —
@@ -1119,15 +1121,16 @@ Simulink "ground" semantics), never an error or a warning; `plot_diagram()`
 shows it as unconnected. Time-varying sources belong in the diagram; forcing
 via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
 
-**What `n_steps` counts.** One rule, by the kind of verb: on a horizon `[t0, tf]` it counts the
-grid's points, endpoints included (`Simulator`, a continuous or static `compute_trajectory`,
-a transcription's knots, the LQR gain schedule: `N` points, `N − 1` intervals); on a run of
-periods it counts the transitions (`rollout`, `rollout_batch`, `compute_rollout`, a step
-problem: `N` periods, `N + 1` samples `x_0 … x_N`). `n_steps=100` on `[0, 1]` is thus a
-step of `1/99` on the first and `100` steps of `dt` on the second
-(`test_simulation.py` pins each verb).
+**What `n_steps` and `n_samples` count.** `n_steps` counts transitions, the textbook `N`
+(`rollout`, `rollout_batch`, `compute_rollout`, a step problem, `solve_steps`: `N` periods,
+`N + 1` samples `x_0 … x_N`; a transcription's intervals, `N + 1` knots). A count of time
+samples on a horizon `[t0, tf]`, endpoints included, is `n_samples` (`Simulator`, a
+continuous or static `compute_trajectory`, `step_response`, `bode`, `nyquist`,
+`frequency_response`, the LQR gain schedule, `animate_modal`, `Source.plot_signal`: `N`
+samples, `N − 1` intervals). `n_samples=100` on `[0, 1]` is thus a step of `1/99`, and
+`n_steps=100` is `100` steps of `dt` (`test_simulation.py` pins each verb).
 
-**Automatic grid.** With neither `n_steps` nor `dt`, the solver is chosen first
+**Automatic grid.** With neither `n_samples` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `rk4_fixedsteps` when a block
 holds a signal over a `sample_period`, else `scipy`) and the grid
 is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
@@ -1283,7 +1286,7 @@ plan when there is one, else the controller run once from the problem's start th
 the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
 continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
 step, and the planner's mirrors pass the planner's own `dt`; nominal parameters; a step
-problem's `run`), titled plan or run.
+problem's `rollout`), titled plan or run.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
@@ -1296,7 +1299,9 @@ the paired `J_a − J_b`. `LQRPlanner
 first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
 the cost's `(x_bar, u_bar)` (`B` and `R` over the command port; the planner's
 `design_matrices()` at its own operating point), then the algebraic Riccati equation for an
-infinite horizon, the differential one swept from `S` over a finite horizon. A discounted problem
+infinite horizon, the differential one swept from `S` over a finite horizon (the Riccati
+design functions `lqr_gain_schedule`, `lqr_finite_horizon` and `trajectory_lqr` take the
+cost's `S` as `S_f`, the boundary condition `S(T) = S_f`). A discounted problem
 (`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
 `A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
 unusual; the poles stay the plant's, `eig(A − B K)`. Its `RiccatiRecord` holds `K`, `P`, the
@@ -1455,7 +1460,7 @@ iteration and tabular learning on their grid's `dt`, deep learning on its enviro
 the LQR on its reporting grid `dt`, an open-loop plan on its own grid, the interpolation
 its planner states), so `sol.evaluation` equals `evaluate(problem, sol.controller, dt=)`
 on that step; a clocked
-controller on its own clock, a step problem's law on its own `run` (each run the step problem's
+controller on its own clock, a step problem's law on its own `rollout` (each run the step problem's
 `J = Σ γᵏ c_k + γᴺ h` with the judge's margins and failure charge, an infinite horizon over
 an episode of 10 ticks of its time); the planner's own `J` stays in its record beside it,
 so the evidence does not repeat the planner's own belief. A law held over each period
@@ -1484,12 +1489,13 @@ control problem, a `StepPlanningProblem`: `x_{k+1} = F(x_k, u_k)`, `c_k`,
 `transition(x, u, k, params=None) -> (x_next, c_k)`, one period of the plant stepped with
 the input held and `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated beside the state by the same scheme
 (`g·dt` to the last bit under one Euler step); `terminal(x)`, `h` at the horizon's end;
-`run(controller)` (`J = Σ γᵏ c_k + γᴺ h`; a controller block read on its measurement port,
+`rollout(controller)` (a `Trajectory` on the ticks, its running cost the signal `"cost"`,
+whose last value is `J = Σ γᵏ c_k + γᴺ h`; a controller block read on its measurement port,
 or a function `u = π(x, t)`), with `n_steps` (`N = T/dt`, `T` the horizon), `gamma` (`e^{−ρ dt}`), `dt`,
 the sets, `cost_bound()` and `failure_cost_at()`. `params=None` reads the problem's numbers
 (the plant at its mean, a discretized problem's at its origin's, the cost, `x0`, `t0`, the
 discount). `compile` is the controller's verb only: `problem.compile(controller, dt=None)`
-takes the controller as a required argument, and a step problem has no `compile` (`run`
+takes the controller as a required argument, and a step problem has no `compile` (`rollout`
 scores a controller). A `StepPlanningProblem(sys, *, n_steps, cost, gamma, ...)` is the
 native form on a `StepSystem` with a `StepCost` (`c(x, u, k)`, `h(x, k)`), its start and
 sets a `PlanningProblem`'s by composition, the same methods. Its laws are over its own tree,
@@ -1544,7 +1550,7 @@ learns a neural law in pure JAX: `solve(n_timesteps=)` → `PlanningSolution`
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's runs with draws are
-`evaluate(problem, solution.controller, record=True)`. The block being trained, updated in
+`evaluate(problem, solution.controller, trajectories=True)`. The block being trained, updated in
 place every learning iteration, is `planner.actor`; the plant steps trained so far,
 `planner.n_timesteps`.
 What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy`): the actor's
@@ -1574,7 +1580,7 @@ its `dt`), its reward `−c_k`, its start and laws drawn by its `sample_x0` and
 `sample_params`, no source; a discretized problem steps as its origin at that `dt` with
 `reward="stage"`, to the bit. `ReinforcementLearningPlanner` trains on either problem (`dt`
 defaults to 0.05 s on a continuous one, none on a step problem); a step problem's learned
-law is scored by its own `problem.run(controller)`, the block read as its law,
+law is scored by its own `problem.rollout(controller)`, the block read as its law,
 which `solve(evaluate=True)` reports.
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
@@ -1626,10 +1632,10 @@ reserved key ``scene`` raises ``NotImplementedError`` until the geometry plan bi
 tree stays under 2× the compile, the solve and an evaluator call of the same program with it
 frozen (the bicycle MPC is the check). Every transcription's objective is the
 problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
-`w_k = e^{−ρ(t_k − t0)}`. Knot count
-`n_steps` is a planner flat kwarg (or lives on a custom transcription's
+`w_k = e^{−ρ(t_k − t0)}`. The interval count
+`n_steps` (`N`, `N + 1` knots) is a planner flat kwarg (or lives on a custom transcription's
 options); the time grid is
-`t0 + linspace(0, problem.horizon, n_steps)` for a finite `horizon`.
+`t0 + linspace(0, problem.horizon, n_steps + 1)` for a finite `horizon`.
 
 **A planner's four kinds of argument** (every planner alike):
 **structure**, what a change of rebuilds (the grid, the transcription, `n_steps`, `dt`,
@@ -1725,14 +1731,14 @@ callable; `planner.cost_to_go` reads it). The Bellman backup is written in the b
 engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (the backup is the lesson, so no helper hides it), each engine reading the grid its
 own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with the in-bounds
 mask on JAX, zero off the grid); the
-`"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
+`method="loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
 `solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable
-backward-step backends share this workflow: `loop` (per-node Python, pyro's reference),
-`numpy` (vectorized over the precomputed lookup table, the default),
-and `jax` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, a finite
+backward steps share this workflow: `method="loop"` (per-node Python, pyro's reference),
+and the table method (`method="table"`, the default) on `backend="numpy"` (vectorized over
+the precomputed lookup table, the default) or `backend="jax"` (the same backup as one jitted `lax.while_loop` with `map_coordinates`, a finite
 horizon's `N` sweeps one `lax.scan` stacking the stages, on tables
 built with `vmap`, so the plant and cost must be JAX-traceable; linear/nearest only). The JAX
 engine lives in `dp_jax.py` and the progress reports in `progress.py`, so `dp.py` reads as the
@@ -1740,10 +1746,12 @@ textbook algorithm. `precompute` trades the `(N,A,n)`
 successor table for per-sweep recomputation (memory vs time-varying support); a precomputed
 grid also freezes the running-cost table, so a time-varying `f` or `g` needs `precompute=False`. `planner.controller` is a `LookupPolicy` (a static `System`; a variant with another
 `interpolation` is built directly, `LookupPolicy(grid, pi, interpolation="nearest")`, with the
-stage times on a finite horizon, `LookupPolicy(grid, pi_stages, t)`); `PolicyEvaluator`
-gives the cost-to-go of any fixed law. A grid passed to either is built on the problem's own `X`
+stage times on a finite horizon, `LookupPolicy(grid, pi_stages, t)`);
+`planner.evaluate_policy(controller)` gives the cost-to-go `J^π` of any fixed law, a
+`GridField` on the planner's grid and numbers (`J_pi(x)` reads it,
+`planner.plot_cost_to_go(field=J_pi)` draws it). A grid passed to the planner is built on the problem's own `X`
 and `U` (the same objects, a `problem.replace(...)` copy included; another problem's sets are
-refused), so the loop and table engines and the evaluator read one owner. **Function approximation**
+refused), so the loop and table engines and the policy evaluation read one owner. **Function approximation**
 (`dynamic_programming/approximation.py`): linear-in-the-weights fits `f_hat(x | w) = wᵀφ(x)` with fixed
 features — `QuadraticFeatures(x_bar)` (a quadratic form, the LQR shape; `quadratic_form(w)` reads
 `(c, b, S)` back) and `RadialBasisFeatures` (Gaussian bumps, `on_grid` for a mesh of centres),
@@ -1805,9 +1813,9 @@ with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 the best goal cost stops improving for `convergence_patience` extensions;
 `solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
 `solve(callback=…)` takes a callable or a list of callables and hands every successful
-extension to each (an `RRSearchIteration`), each hook filtering for itself; the live figure is
+extension to each (a `TreeSearchIteration`), each hook filtering for itself; the live figure is
 one such hook, `LiveSearchPlot(every=1, pause=…, after_goal_only=False, ax=None)`, exported on
-`minilink.planning`; the `nearest_backend` setting
+`minilink.planning`; the `nearest_method` setting
 selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
 ## 7. Graphics And Benchmarks

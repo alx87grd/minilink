@@ -74,8 +74,8 @@ concrete formatting, ordered by the cost of being wrong:
   `Evaluation`). An object stores no other run state, with one exception: an object whose
   convenience verbs need a default (plot, animate, `controller`) keeps the last result it
   returned, once, as the same object, never a copy. That is `sys.traj` on a `System`,
-  `last_solution` on a `Planner` (value iteration's `result` reads through it), `last_J` on a
-  `PolicyEvaluator`; a new one is named `last_<what the run returns>`. Only those verbs read
+  `last_solution` on a `Planner` (value iteration's `result` reads through it); a new one is
+  named `last_<what the run returns>`. Only those verbs read
   it, as a default; library code never does. A tool takes the result it needs, or uses the one
   its run returned (`tests/unittest/test_last_answer.py` lists every reader). An engine that
   tools call (`Optimizer`, `ProblemEvaluator`, `Simulator`) keeps none. Two other kinds of
@@ -104,7 +104,9 @@ concrete formatting, ordered by the cost of being wrong:
 - **2.7 One keyword per kind of choice.** `method=` is the verb's own numerical method (the
   derivative, the optimizer's algorithm, the interpolation, the certificate family); `solver=`
   is the time integration on every tool that integrates (`Simulator`, `compute_trajectory`,
-  `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade.
+  `evaluate`, `discretize`, the RL planners); `backend=` is the array module, on every tool and facade;
+  `renderer=` is the drawing library, on every drawing verb (`plot_renderer=` on `game` and the
+  realtime simulator).
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
   The whole vocabulary, one word per idea and one idea per word
   (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):
@@ -117,7 +119,8 @@ concrete formatting, ordered by the cost of being wrong:
   | A system's dimensions, in its constructor (words), and as its attributes (textbook symbols) | `state_dim`, `input_dim`, `output_dim`; `n`, `m`, `p` | `n=` as the constructor's keyword |
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
-  | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
+  | Number of time steps, the transitions (a transcription's intervals: `N + 1` knots) | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
+  | Number of time samples on a horizon, endpoints included (`Simulator`, `compute_trajectory`, the frequency and step responses, the LQR gain schedule) | `n_samples` | `n_steps`, `n`, `n_pts` |
   | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
   | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
@@ -128,8 +131,18 @@ concrete formatting, ordered by the cost of being wrong:
   | Discount factor γ per tick | `gamma` | `alpha` (the CVaR level `alpha` stays) |
   | A per-call draw | `key` | |
   | A seed stored at construction (`0` by default where a run draws; `None` is a random block's mean, never fresh entropy) | `seed` | `rng` (internal only) |
-  | The verb's algorithm | `method` | `algorithm` |
+  | The verb's algorithm (value iteration's `method="loop"`, RRT's `nearest_method`) | `method` | `algorithm`, `backend="loop"`, `nearest_backend` |
+  | The drawing library of a plot or an animation | `renderer` (`plot_renderer` on `game`) | `backend`, `plot_backend` |
+  | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |
   | A planner's record | `solution.record` | `solution.solver` |
+  | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
+  | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
+  | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
+  | A block's channel count (sources, white noise, routing, saturation, delay, the PID family) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
+  | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
+  | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
+  | Playback rate of an animation (simulated seconds per wall second) | `speed` | `time_factor_video` |
+  | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |
   | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native law's numbers |
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
   | Print text / draw a figure | `verbose` (default `False`) / `show` | |

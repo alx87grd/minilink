@@ -37,7 +37,7 @@ the maintainer would and logged in the run's record.
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
-| `Source.show_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
+| `Source.plot_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
@@ -219,7 +219,8 @@ iteration's finite horizon and the law past the horizon for both planners (contr
 No open row: `Field`, `QuadraticField` and the four conversions landed in the v0.3 run,
 `GridField` and the cost-to-go of LQR and value iteration as fields in v0.4 (contract: DESIGN
 §4, "Fields"). The rest of the field object (`CallableField`, `LinearApproximator`, tabular
-RL's `Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4.
+RL's `Q`) is a row of §4; value iteration's policy evaluation returns a `GridField` (the API
+naming sweep, §1.11).
 
 ### 1.10 Hardening and the release
 
@@ -233,8 +234,9 @@ RL's `Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4.
 ### 1.11 The core API proposals
 
 - [ ] **The API naming sweep's rulings** (ruled 2026-11-08 on an independent reviewer's sweep of
-  the public API; being built on the branch `api-naming`, stacked on the docs sweep #137, one
-  agent per area for the library, then the callers). No alias; every caller in the same change:
+  the public API; built on the branch `api-naming`, stacked on the docs sweep #137, in review:
+  the library, the tests and every caller, examples, notebooks, docs and benchmarks, on the
+  new names; the renames listed in ROADMAP §2's breaking changes). No alias; every caller in the same change:
   1. `n_steps` counts transitions (the textbook N); a count of time samples is `n_samples`
      (`compute_trajectory`, `Simulator`, `step_response`/`bode`/`nyquist`/`frequency_response`,
      `lqr_finite_horizon`/`lqr_gain_schedule`, `LQRPlanner`, `animate_modal`,
@@ -416,7 +418,7 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
 
 - [ ] **Naming, the rest** (A4) (any time, agent; the naming quick wins landed:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
-  documented): one colour keyword, `jmax`, across DP, tabular RL, `PolicyEvaluator` and
+  documented): one colour keyword, `jmax`, across DP, tabular RL, the policy evaluation and
   `Comparison`, with S54's clipping (scan: planning#3, examples#5); the operators' named forms
   exported together (scan: core#9).
 
@@ -521,7 +523,7 @@ maintainer's rebuild keeps (§1.12); the notebooks' are unchanged.
 the 2026-09-05 consolidation inventory, in git history (nothing removed without the maintainer's
 pick):
 
-- [ ] `Source.show_signal` (80 lines of bespoke matplotlib; the same picture is
+- [ ] `Source.plot_signal` (`show_signal` before the API naming sweep; 80 lines of bespoke matplotlib; the same picture is
   `source.plot_trajectory(tf=…)`), with the sources demo and `__main__` that exist only for
   it (scan: graphics#14) **[ask — user-callable]**.
 - [ ] Dead modules `planning/spatial/overlays.py` (retires with A3) and
@@ -625,8 +627,8 @@ pillar names it.
   tabular RL's `cost_to_go` on it; `CallableField` (RL critics); `LinearApproximator`
   as a field; `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the
   field (its `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon`
-  handing out `QuadraticField(x̄, S, t)` beside its controller; `PolicyEvaluator` takes the
-  evaluators' verb and returns a field-shaped result (scan: planning#4). Done when the DP
+  handing out `QuadraticField(x̄, S, t)` beside its controller (scan: planning#4; the policy
+  evaluation's `GridField` landed with the API naming sweep, §1.11). Done when the DP
   baselines `cmp` and `test_planning_solution.py`, `test_rl_tabular.py` and
   `test_rl_planner.py` pass.
 
