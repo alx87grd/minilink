@@ -286,8 +286,8 @@ class ReinforcementLearningPlanner(Planner):
 
         The solver record carries the training facts. ``evaluate=True`` also
         scores the deterministic law, as it is handed out, by Monte Carlo over
-        ``n_trials`` draws of the problem (a continuous problem's on the
-        evaluator's automatic step, a step problem's on its model). ``verbose``
+        ``n_trials`` draws of the problem (a continuous problem's integrated on
+        the planner's ``dt``, a step problem's on its model). ``verbose``
         prints the environment's semantics and one line per learning iteration.
         """
         # Train, then store the learned law as the planner's solution
