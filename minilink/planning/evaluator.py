@@ -228,15 +228,16 @@ class ProblemEvaluator:
 
         return self.run(params, x0)
 
-    def evaluate(self, params=None, key=0, n_trials=None, *, record=False):
+    def evaluate(self, params=None, key=0, n_trials=None, *, trajectories=False):
         """
         The :class:`Evaluation` of the loop on the problem: one run, or ``n_trials`` draws.
 
         A deterministic problem is one run (``n_trials`` 1 or unset); a stochastic
         problem draws ``n_trials`` starts and parameter overrides from ``key``. On
         JAX the whole evaluation traces, so ``jax.grad`` of ``.objective`` gives
-        the gradient with respect to every leaf of ``params``. ``record=True``
-        keeps the runs' trajectories (outside a trace).
+        the gradient with respect to every leaf of ``params``.
+        ``trajectories=True`` keeps the runs' trajectories in
+        :attr:`Evaluation.trajectories` (outside a trace).
         """
         params = self.merged(params)
         n_trials = trials_of(self.draws, n_trials)
@@ -245,14 +246,14 @@ class ProblemEvaluator:
         # then the runs and their scores, batched on JAX
         x0s, trial_params = self.realize(params, key, n_trials)
         failure_cost, bound = self.failure_cost_and_bound(params)
-        rows, trajectories = self.run_trials(
-            trial_params, x0s, record, failure_cost, bound
+        rows, runs = self.run_trials(
+            trial_params, x0s, trajectories, failure_cost, bound
         )
 
         return Evaluation(
             **rows,
             x0=x0s,
-            trajectories=trajectories,
+            trajectories=runs,
             criterion=criterion_of(self.problem),
         )
 
@@ -588,8 +589,8 @@ class ProblemEvaluator:
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
 
-    def score(self, params, x0, record, failure_cost, bound):
-        """One trial's row of the record (and its trajectory when ``record``)."""
+    def score(self, params, x0, trajectories, failure_cost, bound):
+        """One trial's row of the record (and its trajectory when ``trajectories``)."""
         traj = self.run(params, x0)
         plant_run = traj.of("plant")
 
@@ -603,16 +604,16 @@ class ProblemEvaluator:
             running_cost=traj.signals[RUNNING_COST][0],
         )
 
-        return row, (traj if record else None)
+        return row, (traj if trajectories else None)
 
-    def run_trials(self, params, x0s, record, failure_cost, bound):
+    def run_trials(self, params, x0s, trajectories, failure_cost, bound):
         """The rows of every trial: a ``vmap`` on JAX, a loop on NumPy."""
         if self.backend == BACKEND_JAX:
-            return self.run_trials_jax(params, x0s, record, failure_cost, bound)
+            return self.run_trials_jax(params, x0s, trajectories, failure_cost, bound)
 
-        return self.run_trials_numpy(params, x0s, record, failure_cost, bound)
+        return self.run_trials_numpy(params, x0s, trajectories, failure_cost, bound)
 
-    def run_trials_jax(self, params, x0s, record, failure_cost, bound):
+    def run_trials_jax(self, params, x0s, trajectories, failure_cost, bound):
         """The trials as one ``vmap`` of the run, jitted once per batch layout."""
         jax = ensure_jax_x64()
         register_evaluation_pytree()
@@ -620,31 +621,31 @@ class ProblemEvaluator:
         # The batched axes: a drawn leaf carries the trial axis, the others are shared;
         # one jitted form per layout, a structure
         tree, axes = batch_axes(params)
-        layout = (record, tree_signature(axes))
+        layout = (trajectories, tree_signature(axes))
         if layout not in self.trials_fn:
             batched = jax.vmap(
-                lambda p, x0, c, b: self.score(p, x0, record, c, b),
+                lambda p, x0, c, b: self.score(p, x0, trajectories, c, b),
                 in_axes=(axes, 0, None, None),
             )
             self.trials_fn[layout] = jax.jit(batched)
 
         rows, trajs = self.trials_fn[layout](tree, x0s, failure_cost, bound)
 
-        return rows, unbatch(trajs, x0s.shape[0]) if record else None
+        return rows, unbatch(trajs, x0s.shape[0]) if trajectories else None
 
-    def run_trials_numpy(self, params, x0s, record, failure_cost, bound):
+    def run_trials_numpy(self, params, x0s, trajectories, failure_cost, bound):
         """The trials one at a time, stacked into the record's arrays."""
         rows, trajs = [], []
         for i, x0 in enumerate(x0s):
             row, traj = self.score(
-                take_trial(params, i), x0, record, failure_cost, bound
+                take_trial(params, i), x0, trajectories, failure_cost, bound
             )
             rows.append(row)
             trajs.append(traj)
 
         stacked = {name: np.stack([row[name] for row in rows]) for name in rows[0]}
 
-        return stacked, (trajs if record else None)
+        return stacked, (trajs if trajectories else None)
 
 
 def evaluate(
@@ -656,7 +657,7 @@ def evaluate(
     substeps=None,
     n_trials=None,
     key=0,
-    record=False,
+    trajectories=False,
     backend="auto",
     episode_length=None,
 ) -> Evaluation:
@@ -668,6 +669,7 @@ def evaluate(
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
     continuous controller runs on ``dt``, the period its loop is integrated and
     recorded on, and with ``dt`` omitted on its automatic step.
+    ``trajectories=True`` keeps the runs in :attr:`Evaluation.trajectories`.
     """
     pe = ProblemEvaluator(
         problem,
@@ -679,7 +681,7 @@ def evaluate(
         episode_length=episode_length,
     )
 
-    return pe.evaluate(key=key, n_trials=n_trials, record=record)
+    return pe.evaluate(key=key, n_trials=n_trials, trajectories=trajectories)
 
 
 def controller_of(controller):

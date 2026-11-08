@@ -104,6 +104,7 @@ RETIRED = {
     "max_eq": ("max_equality_violation", None),
     "min_ineq": ("min_inequality_margin", None),
     "tree_nodes": ("n_nodes", None),
+    "record": ("trajectories", ("ProblemEvaluator", "evaluate")),
     "nodes": ("n_nodes", ("TreeSearchRecord", "TreeSearchIteration")),
     "alpha": (
         "gamma",
