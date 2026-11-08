@@ -20,10 +20,11 @@ def plot_cost_to_go(
     J=None,
     *,
     jmax=None,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     vmin=0.0,
-    show_3d=False,
+    is_3d=False,
     trajectory=None,
     overlay_labels=("closed loop", "start", "end"),
     cmap="YlOrRd",
@@ -36,32 +37,33 @@ def plot_cost_to_go(
 
     Grid form: ``plot_cost_to_go(grid, J, ...)`` for a node-indexed table (a
     policy's ``J^π``). Result form: ``plot_cost_to_go(result, ...)`` from
-    value iteration. ``axes`` may be ``(i, j)`` for one slice or a list of
-    pairs for several.
+    value iteration. ``x_axis`` and ``y_axis`` are the two state axes of the
+    slice, integers, or two lists of one length for several slices.
     """
     grid, J = (grid_or_result, J) if J is not None else table_of(grid_or_result)
-    require_single_slice(trajectory, axes)
+    require_single_slice(trajectory, x_axis, y_axis)
 
     # Several slices: one heatmap per pair, without the overlay
-    if is_batch_axes(axes):
+    if is_batch(x_axis, y_axis):
         return [
             plot_cost_to_go(
                 grid,
                 J,
                 jmax=jmax,
-                axes=pair,
+                x_axis=x_k,
+                y_axis=y_k,
                 anchor=anchor,
                 vmin=vmin,
-                show_3d=show_3d,
+                is_3d=is_3d,
                 trajectory=None,
                 cmap=cmap,
                 title=title,
                 show=show,
             )
-            for pair in axes
+            for x_k, y_k in slices_of(x_axis, y_axis)
         ]
 
-    require_flat_overlay(show_3d, trajectory)
+    require_flat_overlay(is_3d, trajectory)
 
     defer_show = trajectory is not None
 
@@ -69,23 +71,25 @@ def plot_cost_to_go(
     fig, ax = plot_value(
         grid,
         J,
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         vmin=vmin,
         vmax=jmax,
         cmap=cmap,
         ax=ax,
         title=title,
-        show=show and not show_3d and not defer_show,
+        show=show and not is_3d and not defer_show,
     )
 
     # The 3-D surface of J, clipped to 0 ≤ J (≤ jmax when given)
-    if show_3d:
+    if is_3d:
         J_plot = J if jmax is None else np.clip(J, 0.0, jmax)
         plot_value_3d(
             grid,
             np.clip(J_plot, 0.0, np.inf),
-            axes=axes,
+            x_axis=x_axis,
+            y_axis=y_axis,
             anchor=anchor,
             cmap=cmap,
             title=title,
@@ -94,8 +98,8 @@ def plot_cost_to_go(
 
     # The closed-loop trajectory over the heatmap, then the deferred show
     if trajectory is not None:
-        overlay_trajectory(ax, trajectory, axes, overlay_labels)
-        if show and not show_3d:
+        overlay_trajectory(ax, trajectory, x_axis, y_axis, overlay_labels)
+        if show and not is_3d:
             import matplotlib.pyplot as plt
 
             maybe_show(plt, show)
@@ -108,7 +112,8 @@ def plot_control_law(
     pi=None,
     *,
     axis=0,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     trajectory=None,
     overlay_labels=("closed loop", "start", "end"),
@@ -122,8 +127,9 @@ def plot_control_law(
     Grid form: ``plot_control_law(grid, pi, ...)`` for a raw policy table.
     Result form: ``plot_control_law(result, ...)`` from value iteration.
 
-    ``axes`` may be ``(i, j)`` or a list of pairs; ``axis`` may be an int or a
-    list aligned with batch ``axes``.
+    ``x_axis`` and ``y_axis`` are the two state axes of the slice, integers,
+    or two lists of one length for several slices; ``axis`` (the input
+    component) may be an int or a list aligned with them.
     """
     # Grid form: the raw table on its grid
     if pi is not None:
@@ -131,7 +137,8 @@ def plot_control_law(
             grid_or_result,
             pi,
             axis=axis,
-            axes=axes,
+            x_axis=x_axis,
+            y_axis=y_axis,
             anchor=anchor,
             cmap=cmap,
             ax=ax,
@@ -140,22 +147,24 @@ def plot_control_law(
 
     # Result form
     result = grid_or_result
-    require_single_slice(trajectory, axes)
+    require_single_slice(trajectory, x_axis, y_axis)
 
     # Several slices: one heatmap per pair, each with its own input axis
-    if is_batch_axes(axes):
-        axis_list = axis_list_of(axis, axes)
+    if is_batch(x_axis, y_axis):
+        slices = slices_of(x_axis, y_axis)
+        axis_list = axis_list_of(axis, slices)
         return [
             plot_control_law(
                 result,
                 axis=axis_k,
-                axes=axes_k,
+                x_axis=x_k,
+                y_axis=y_k,
                 anchor=anchor,
                 trajectory=None,
                 cmap=cmap,
                 show=show,
             )
-            for axes_k, axis_k in zip(axes, axis_list)
+            for (x_k, y_k), axis_k in zip(slices, axis_list)
         ]
 
     # The heatmap, shown now unless the overlay comes after it
@@ -163,7 +172,8 @@ def plot_control_law(
         result.grid,
         result.pi,
         axis=axis,
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         cmap=cmap,
         ax=ax,
@@ -172,7 +182,7 @@ def plot_control_law(
 
     # The closed-loop trajectory over the heatmap, then the deferred show
     if trajectory is not None:
-        overlay_trajectory(ax, trajectory, axes, overlay_labels)
+        overlay_trajectory(ax, trajectory, x_axis, y_axis, overlay_labels)
         if show:
             import matplotlib.pyplot as plt
 
@@ -184,7 +194,8 @@ def plot_control_law(
 def animate_cost_to_go(
     result,
     *,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     jmax=None,
     anchor=None,
     interval=60,
@@ -203,7 +214,8 @@ def animate_cost_to_go(
         result.grid,
         result.history,
         kind="value",
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         vmax=jmax,
         interval=interval,
@@ -216,7 +228,8 @@ def animate_control_law(
     result,
     *,
     axis=0,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     interval=60,
     save_path=None,
@@ -230,7 +243,8 @@ def animate_control_law(
         result.history,
         kind="policy",
         axis=axis,
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         interval=interval,
         show=show,
@@ -242,7 +256,8 @@ def plot_value(
     grid,
     J,
     *,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     vmin=0.0,
     vmax=None,
@@ -255,7 +270,8 @@ def plot_value(
     return plot_field(
         grid,
         J,
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         vmin=vmin,
         vmax=vmax,
@@ -267,15 +283,23 @@ def plot_value(
 
 
 def plot_value_3d(
-    grid, J, *, axes=(0, 1), anchor=None, cmap="YlOrRd", title="Cost-to-go", show=True
+    grid,
+    J,
+    *,
+    x_axis=0,
+    y_axis=1,
+    anchor=None,
+    cmap="YlOrRd",
+    title="Cost-to-go",
+    show=True,
 ):
     """Draw a 3-D surface of a node-indexed value field ``J``."""
     import matplotlib.pyplot as plt
 
     # The 2-D slice of the field, over the mesh of its two state levels
-    Z = grid.slice_2d(grid.grid_from_array(J), axes[0], axes[1], anchor=anchor)
-    x_level = grid.x_levels[axes[0]]
-    y_level = grid.x_levels[axes[1]]
+    Z = grid.slice_2d(grid.grid_from_array(J), x_axis, y_axis, anchor=anchor)
+    x_level = grid.x_levels[x_axis]
+    y_level = grid.x_levels[y_axis]
     mesh_x, mesh_y = np.meshgrid(x_level, y_level)
 
     fig = plt.figure()
@@ -283,7 +307,7 @@ def plot_value_3d(
     surf = ax.plot_surface(
         mesh_x, mesh_y, Z.T, cmap=cmap, linewidth=0, antialiased=False
     )
-    label_axes(ax, grid, axes)
+    label_axes(ax, grid, x_axis, y_axis)
     ax.set_zlabel("J")
     ax.set_title(title)
     fig.colorbar(surf, ax=ax, shrink=0.6)
@@ -299,7 +323,8 @@ def animate(
     *,
     kind="value",
     axis=0,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     vmax=None,
     interval=60,
@@ -325,12 +350,12 @@ def animate(
 
     # The first sweep's slice, drawn once
     fig, ax = plt.subplots()
-    x_level = grid.x_levels[axes[0]]
-    y_level = grid.x_levels[axes[1]]
+    x_level = grid.x_levels[x_axis]
+    y_level = grid.x_levels[y_axis]
     Z = grid.slice_2d(
         grid.grid_from_array(frame_field(history[0])),
-        axes[0],
-        axes[1],
+        x_axis,
+        y_axis,
         anchor=anchor,
     )
     cmap = "bwr" if kind == "policy" else "YlOrRd"
@@ -339,17 +364,19 @@ def animate(
     # A value's colours span [0, vmax], the last sweep's largest value by default,
     # so every frame shares one scale
     if kind == "value":
-        mesh.set_clim(vmin=0.0, vmax=last_sweep_max(grid, history, axes, anchor, vmax))
+        mesh.set_clim(
+            vmin=0.0, vmax=last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax)
+        )
 
-    label_axes(ax, grid, axes)
+    label_axes(ax, grid, x_axis, y_axis)
     fig.colorbar(mesh, ax=ax)
 
     # Each frame swaps sweep i's slice into the same mesh
     def update(i):
         Z = grid.slice_2d(
             grid.grid_from_array(frame_field(history[i])),
-            axes[0],
-            axes[1],
+            x_axis,
+            y_axis,
             anchor=anchor,
         )
         mesh.set_array(Z.T.ravel())
@@ -391,40 +418,51 @@ def table_of(result):
     return result.grid, result.J
 
 
-def require_single_slice(trajectory, axes):
+def require_single_slice(trajectory, x_axis, y_axis):
     """Refuse a trajectory overlay on a batch of slices."""
-    if trajectory is not None and is_batch_axes(axes):
-        raise ValueError("trajectory overlay requires a single-slice axes=(i, j) call")
+    if trajectory is not None and is_batch(x_axis, y_axis):
+        raise ValueError(
+            "trajectory overlay requires one slice: x_axis and y_axis as integers"
+        )
 
 
-def is_batch_axes(axes):
-    """``axes`` lists several ``(i, j)`` pairs rather than being one."""
-    return len(axes) > 0 and isinstance(axes[0], (tuple, list))
+def is_batch(x_axis, y_axis):
+    """``x_axis`` and ``y_axis`` list several slices rather than naming one."""
+    return isinstance(x_axis, (tuple, list)) or isinstance(y_axis, (tuple, list))
 
 
-def require_flat_overlay(show_3d, trajectory):
+def slices_of(x_axis, y_axis):
+    """The ``(x_axis, y_axis)`` pairs of a batch: the two lists side by side, of one length."""
+    if len(x_axis) != len(y_axis):
+        raise ValueError("x_axis and y_axis lists must have the same length")
+
+    return list(zip(x_axis, y_axis))
+
+
+def require_flat_overlay(is_3d, trajectory):
     """Refuse a trajectory overlay together with the 3-D surface."""
-    if show_3d and trajectory is not None:
-        raise ValueError("show_3d and trajectory cannot be used together")
+    if is_3d and trajectory is not None:
+        raise ValueError("is_3d and trajectory cannot be used together")
 
 
-def overlay_trajectory(ax, trajectory, axes, labels):
-    """Draw a trajectory's path, start and end on the ``axes`` slice."""
+def overlay_trajectory(ax, trajectory, x_axis, y_axis, labels):
+    """Draw a trajectory's path, start and end on the ``(x_axis, y_axis)`` slice."""
     x = trajectory.x
-    ax.plot(x[axes[0]], x[axes[1]], "k-", linewidth=2, label=labels[0])
-    ax.plot(x[axes[0], 0], x[axes[1], 0], "go", label=labels[1])
-    ax.plot(x[axes[0], -1], x[axes[1], -1], "r*", markersize=12, label=labels[2])
+    ax.plot(x[x_axis], x[y_axis], "k-", linewidth=2, label=labels[0])
+    ax.plot(x[x_axis, 0], x[y_axis, 0], "go", label=labels[1])
+    ax.plot(x[x_axis, -1], x[y_axis, -1], "r*", markersize=12, label=labels[2])
     ax.legend(loc="upper right", fontsize=8)
 
 
-def plot_policy_field(grid, pi, *, axis, axes, anchor, cmap, ax, show):
+def plot_policy_field(grid, pi, *, axis, x_axis, y_axis, anchor, cmap, ax, show):
     """Heatmap of input ``axis`` of a policy table, scaled to that input's bounds."""
     u_axis = grid.input_from_policy(pi)[:, axis]
 
     return plot_field(
         grid,
         u_axis,
-        axes=axes,
+        x_axis=x_axis,
+        y_axis=y_axis,
         anchor=anchor,
         vmin=grid.u_lb[axis],
         vmax=grid.u_ub[axis],
@@ -435,23 +473,23 @@ def plot_policy_field(grid, pi, *, axis, axes, anchor, cmap, ax, show):
     )
 
 
-def axis_list_of(axis, axes):
+def axis_list_of(axis, slices):
     """One input axis per slice: the list given, or ``axis`` repeated."""
     if isinstance(axis, (list, tuple)):
-        if len(axis) != len(axes):
-            raise ValueError("axis list must match axes list length")
+        if len(axis) != len(slices):
+            raise ValueError("axis list must match the x_axis and y_axis lists' length")
         return axis
 
-    return [axis] * len(axes)
+    return [axis] * len(slices)
 
 
-def last_sweep_max(grid, history, axes, anchor, vmax):
+def last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax):
     """The colour limit ``vmax`` as given, else the largest value of the last sweep's slice."""
     if vmax is not None:
         return vmax
 
     _, J_last, _ = history[-1]
-    Z = grid.slice_2d(grid.grid_from_array(J_last), axes[0], axes[1], anchor=anchor)
+    Z = grid.slice_2d(grid.grid_from_array(J_last), x_axis, y_axis, anchor=anchor)
 
     return float(np.max(Z))
 
@@ -464,14 +502,16 @@ def require_history(result):
         )
 
 
-def plot_field(grid, values, *, axes, anchor, vmin, vmax, cmap, ax, title, show):
+def plot_field(
+    grid, values, *, x_axis, y_axis, anchor, vmin, vmax, cmap, ax, title, show
+):
     """Heatmap of a node-indexed field on a 2-D slice of the grid."""
     import matplotlib.pyplot as plt
 
     # The 2-D slice of the field, over its two state levels
-    Z = grid.slice_2d(grid.grid_from_array(values), axes[0], axes[1], anchor=anchor)
-    x_level = grid.x_levels[axes[0]]
-    y_level = grid.x_levels[axes[1]]
+    Z = grid.slice_2d(grid.grid_from_array(values), x_axis, y_axis, anchor=anchor)
+    x_level = grid.x_levels[x_axis]
+    y_level = grid.x_levels[y_axis]
 
     # A new figure, or the one that holds the given axes
     if ax is None:
@@ -482,7 +522,7 @@ def plot_field(grid, values, *, axes, anchor, vmin, vmax, cmap, ax, title, show)
     mesh = ax.pcolormesh(x_level, y_level, Z.T, shading="gouraud", cmap=cmap)
     mesh.set_clim(vmin=vmin, vmax=vmax)
     fig.colorbar(mesh, ax=ax)
-    label_axes(ax, grid, axes)
+    label_axes(ax, grid, x_axis, y_axis)
     ax.set_title(title)
     ax.grid(True, alpha=0.3)
 
@@ -491,7 +531,7 @@ def plot_field(grid, values, *, axes, anchor, vmin, vmax, cmap, ax, title, show)
     return fig, ax
 
 
-def label_axes(ax, grid, axes):
+def label_axes(ax, grid, x_axis, y_axis):
     """Name the two sliced state axes by their labels and units, ``x[i]`` without labels."""
     labels = getattr(grid.sys.state, "labels", None)
     units = getattr(grid.sys.state, "units", None)
@@ -501,5 +541,5 @@ def label_axes(ax, grid, axes):
         unit = f" [{units[i]}]" if units and units[i] else ""
         return base + unit
 
-    ax.set_xlabel(name(axes[0]))
-    ax.set_ylabel(name(axes[1]))
+    ax.set_xlabel(name(x_axis))
+    ax.set_ylabel(name(y_axis))

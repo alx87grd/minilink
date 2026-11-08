@@ -239,13 +239,6 @@ class RRTPlanner(Planner):
 
         return animate_search(self, **kwargs)
 
-    def show_live_search(self, **kwargs):
-        """A :class:`~minilink.planning.search.live_plot.LiveSearchPlot` for ``solve(callback=...)``."""
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import LiveSearchPlot
-
-        return LiveSearchPlot(**kwargs)
-
     ###########################################################################
     # Internal machinery
     ###########################################################################

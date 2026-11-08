@@ -614,7 +614,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         _, result = solve(make_problem())
         plt.close("all")
         plotting.plot_cost_to_go(
-            result, axes=[(0, 1), (1, 0)], show_3d=True, show=False
+            result, x_axis=[0, 1], y_axis=[1, 0], is_3d=True, show=False
         )
         surfaces = [
             ax
@@ -752,7 +752,7 @@ class TestPolicyEvaluationField(unittest.TestCase):
         fig, _ = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(fig)
         J = J_pi.params["values"].reshape(-1)
-        fig, _ = result.grid.plot_value(J, show_3d=True, show=False)
+        fig, _ = result.grid.plot_value(J, is_3d=True, show=False)
         self.assertIsNotNone(fig)
 
 

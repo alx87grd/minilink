@@ -717,7 +717,7 @@ class DynamicProgrammingPlanner(Planner):
 
     def plot_cost_to_go(self, field=None, **kwargs):
         """
-        The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...).
+        The cost-to-go table ``J`` on the grid itself (``jmax``, ``x_axis``, ``y_axis``, ``is_3d``, ``title``, ...).
 
         ``field`` draws another table of this grid instead: a policy's
         ``J^π`` from :meth:`evaluate_policy`.
@@ -731,7 +731,7 @@ class DynamicProgrammingPlanner(Planner):
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
     def plot_control_law(self, **kwargs):
-        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``axes``, ...)."""
+        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``x_axis``, ``y_axis``, ...)."""
         require_solution(self)
         return plotting.plot_control_law(self.result, **kwargs)
 

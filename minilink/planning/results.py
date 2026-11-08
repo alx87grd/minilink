@@ -172,7 +172,7 @@ class PlanningSolution:
         Draw the method's cost-to-go over two state axes, the others pinned at the goal.
 
         A heatmap of ``cost_to_go`` sampled on the problem's state box; see
-        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``axes``,
+        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``x_axis``, ``y_axis``,
         ``anchor``, ``bounds``, ``jmax``, ``ax`` and ``show``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
