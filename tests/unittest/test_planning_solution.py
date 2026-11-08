@@ -182,7 +182,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
                 np.array(c, dtype=float) for c in ((1, 0), (0, 1), (-1, 0), (0, -1))
             ],
             horizon=0.6,
-            n_substeps=6,
+            n_steps=6,
         ),
         seed=0,
         max_nodes=4000,

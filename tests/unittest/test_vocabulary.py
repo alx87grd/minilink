@@ -104,6 +104,9 @@ RETIRED = {
     "max_eq": ("max_equality_violation", None),
     "min_ineq": ("min_inequality_margin", None),
     "tree_nodes": ("n_nodes", None),
+    "x_grid_shape": ("x_grid", ("StateSpaceGrid",)),
+    "u_grid_shape": ("u_grid", ("StateSpaceGrid",)),
+    "n_substeps": ("n_steps, dt = horizon / n_steps", ("KinodynamicExtender",)),
     "record": ("trajectories", ("ProblemEvaluator", "evaluate")),
     "nodes": ("n_nodes", ("TreeSearchRecord", "TreeSearchIteration")),
     "alpha": (

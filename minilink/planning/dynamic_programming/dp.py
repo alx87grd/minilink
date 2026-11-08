@@ -938,7 +938,7 @@ def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid
             )
 
         return StateSpaceGrid(
-            problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt, solver=solver
+            problem, x_grid=x_grid, u_grid=u_grid, dt=dt, solver=solver
         )
 
     if x_grid is not None or u_grid is not None or dt is not None:

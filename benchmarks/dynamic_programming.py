@@ -72,8 +72,8 @@ def benchmark_backend(
     t0 = time.perf_counter()
     grid = StateSpaceGrid(
         problem,
-        x_grid_shape=x_grid_shape,
-        u_grid_shape=u_grid_shape,
+        x_grid=x_grid_shape,
+        u_grid=u_grid_shape,
         dt=dt,
         precompute=(backend != "loop"),
     )

@@ -735,7 +735,7 @@ class TestRrtFlatConstructor(unittest.TestCase):
     def test_flat_matches_options(self):
         problem, _ = make_holonomic_obstacle_problem()
         extender = KinodynamicExtender(
-            controls=[np.array([1.0, 0.0])], horizon=0.5, n_substeps=4
+            controls=[np.array([1.0, 0.0])], horizon=0.5, n_steps=4
         )
         nested = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
         flat = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
@@ -805,7 +805,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=4000,
         nearest_method="kd_tree",
@@ -848,7 +848,7 @@ def test_unknown_nearest_method_raises():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         nearest_method="invalid",
     )
@@ -860,7 +860,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=4000,
     )
@@ -878,7 +878,7 @@ def test_kinodynamic_random_controls_reaches_goal():
     problem = problem.replace(Xf=BallSet(problem.goal_point(), 0.6))
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=12, horizon=0.6, n_steps=6),
         seed=1,
         max_nodes=6000,
     )
@@ -894,9 +894,7 @@ def test_seeded_run_is_deterministic():
         return (
             RRTPlanner(
                 problem,
-                extender=KinodynamicExtender(
-                    controls=COMPASS, horizon=0.6, n_substeps=6
-                ),
+                extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
                 seed=7,
                 max_nodes=4000,
             )
@@ -1032,7 +1030,7 @@ def test_reached_goal_false_on_budget_exhaustion():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=10,
         goal_bias=0.0,
@@ -1046,7 +1044,7 @@ def test_return_best_effort_false_raises():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=5,
         goal_bias=0.0,
@@ -2537,7 +2535,7 @@ def test_every_planner_has_one_tree_shape():
 def test_an_unseeded_search_is_reproducible():
     """RRT's seed defaults to 0, as every other planner's: two runs grow one tree."""
     problem, _ = make_holonomic_obstacle_problem()
-    extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6)
+    extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6)
     trees = []
     for _ in range(2):
         planner = RRTPlanner(problem, extender=extender, max_nodes=200)

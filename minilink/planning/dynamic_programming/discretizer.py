@@ -35,10 +35,12 @@ class StateSpaceGrid:
     problem : PlanningProblem
         Source of the system, the state set ``X`` (grid extent and state
         validity), and the input set ``U`` (grid extent and input validity).
-    x_grid_shape : sequence of int
-        Number of levels per state axis, length ``n``.
-    u_grid_shape : sequence of int
-        Number of levels per input axis, length ``m``.
+    x_grid : sequence of int
+        Number of levels per state axis, length ``n`` (kept as
+        :attr:`x_grid_shape`).
+    u_grid : sequence of int
+        Number of levels per input axis, length ``m`` (kept as
+        :attr:`u_grid_shape`).
     dt : float
         Sample period of the successor map, the input held over it.
     solver : {"euler", "rk4"}, optional
@@ -76,8 +78,8 @@ class StateSpaceGrid:
         self,
         problem: PlanningProblem,
         *,
-        x_grid_shape,
-        u_grid_shape,
+        x_grid,
+        u_grid,
         dt: float,
         solver: str = "euler",
         precompute: bool = True,
@@ -96,8 +98,8 @@ class StateSpaceGrid:
         self.solver = solver
 
         # Levels per axis, and the box they span
-        self.x_grid_shape = self.coerce_shape(x_grid_shape, self.n, "x_grid_shape")
-        self.u_grid_shape = self.coerce_shape(u_grid_shape, self.m, "u_grid_shape")
+        self.x_grid_shape = self.coerce_shape(x_grid, self.n, "x_grid")
+        self.u_grid_shape = self.coerce_shape(u_grid, self.m, "u_grid")
 
         x_lb, x_ub = self.state_bounds(problem)
         u_lb, u_ub = self.input_bounds(problem)
@@ -147,8 +149,8 @@ class StateSpaceGrid:
 
         return StateSpaceGrid(
             problem,
-            x_grid_shape=self.x_grid_shape,
-            u_grid_shape=self.u_grid_shape,
+            x_grid=self.x_grid_shape,
+            u_grid=self.u_grid_shape,
             dt=dt,
             solver=self.solver,
             precompute=self.precompute,
@@ -645,6 +647,6 @@ if __name__ == "__main__":
 
     plant = DoubleIntegrator()
     problem = PlanningProblem(plant, U=plant.input_box)
-    grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)

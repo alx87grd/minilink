@@ -65,7 +65,7 @@ ENGINES = {
 
 def solve(problem, *, precompute=True, record_history=False, **opt_kwargs):
     grid = StateSpaceGrid(
-        problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
+        problem, x_grid=(31, 31), u_grid=(7,), dt=0.1, precompute=precompute
     )
     options = dict(gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
@@ -80,7 +80,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
         grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+            problem, x_grid=(11, 11), u_grid=(5,), dt=0.1, precompute=False
         )
         self.assertFalse(grid.precomputed)
         DynamicProgrammingPlanner(
@@ -108,13 +108,11 @@ class TestStateSpaceGrid(unittest.TestCase):
             cost=QuadraticCost.from_system(sys),
             U=sys.input_box,
         )
-        grid_np = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
-        )
+        grid_np = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
         grid_jax = StateSpaceGrid(
             problem,
-            x_grid_shape=(11, 11),
-            u_grid_shape=(5,),
+            x_grid=(11, 11),
+            u_grid=(5,),
             dt=0.1,
             precompute_backend="jax",
         )
@@ -123,9 +121,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         self.assertTrue(np.array_equal(grid_np.x_next_ok, grid_jax.x_next_ok))
 
     def test_dimensions_and_meshgrid_order(self):
-        grid = StateSpaceGrid(
-            make_problem(), x_grid_shape=(5, 4), u_grid_shape=(3,), dt=0.1
-        )
+        grid = StateSpaceGrid(make_problem(), x_grid=(5, 4), u_grid=(3,), dt=0.1)
         self.assertEqual(grid.nodes_n, 20)
         self.assertEqual(grid.actions_n, 3)
         self.assertEqual(grid.states.shape, (20, 2))
@@ -133,9 +129,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         self.assertTrue(np.array_equal(grid.grid_from_array(values).ravel(), values))
 
     def test_nearest_lookups(self):
-        grid = StateSpaceGrid(
-            make_problem(), x_grid_shape=(7, 7), u_grid_shape=(5,), dt=0.1
-        )
+        grid = StateSpaceGrid(make_problem(), x_grid=(7, 7), u_grid=(5,), dt=0.1)
         node = grid.nearest_node([0.0, 0.0])
         self.assertTrue(np.allclose(grid.states[node], [0.0, 0.0]))
         action = grid.nearest_action([1.0])
@@ -146,7 +140,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         sys.state.upper_bound = np.array([np.inf, 3.0])
         problem = PlanningProblem(sys, U=sys.input_box)
         with self.assertRaises(ValueError):
-            StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+            StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
 
 
 class TestValueIteration(unittest.TestCase):
@@ -178,7 +172,7 @@ class TestValueIteration(unittest.TestCase):
 
     def test_solve_steps_runs_fixed_count(self):
         problem = make_problem()
-        grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(5,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
         planner = DynamicProgrammingPlanner(problem, grid=grid)
         planner.solve_steps(5)
         result = planner.result
@@ -282,9 +276,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem = PlanningProblem(
                 sys, cost=cost, horizon=tf, X=sys.state.box, U=sys.input_box
             )
-            grid = StateSpaceGrid(
-                problem, x_grid_shape=(3, 3), u_grid_shape=(3,), dt=0.1
-            )
+            grid = StateSpaceGrid(problem, x_grid=(3, 3), u_grid=(3,), dt=0.1)
             failure_cost = grid_failure_cost(grid, 0.9)
             self.assertGreaterEqual(
                 failure_cost, g_max * 0.1 * (1.0 - 0.9**N) / (1.0 - 0.9) * (1 - 1e-12)
@@ -308,7 +300,7 @@ class TestJaxPrecompute(unittest.TestCase):
 
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
-        grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
         return (problem, grid)
 
     def test_jax_g_table_matches_numpy(self):
@@ -344,7 +336,7 @@ class TestJaxPrecompute(unittest.TestCase):
             U=sys.input_box,
         )
         grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+            problem, x_grid=(11, 11), u_grid=(5,), dt=0.1, precompute=False
         )
         DynamicProgrammingPlanner(
             problem,
@@ -402,9 +394,7 @@ class TestBackends(unittest.TestCase):
         problem = make_pendulum_problem()
 
         def planner_of(backend):
-            grid = StateSpaceGrid(
-                problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
-            )
+            grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
             return DynamicProgrammingPlanner(
                 problem, grid=grid, backend=backend, gamma=0.95
             )
@@ -435,8 +425,8 @@ class TestBackends(unittest.TestCase):
         for backend in backends:
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(11, 11),
-                u_grid_shape=(5,),
+                x_grid=(11, 11),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
@@ -463,8 +453,8 @@ class TestBackends(unittest.TestCase):
         for backend in ("numpy", "jax"):
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(31, 31),
-                u_grid_shape=(7,),
+                x_grid=(31, 31),
+                u_grid=(7,),
                 dt=0.1,
                 precompute=False,
             )
@@ -492,8 +482,8 @@ class TestBackends(unittest.TestCase):
         def jax_solve(**workflow):
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(21, 21),
-                u_grid_shape=(5,),
+                x_grid=(21, 21),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
@@ -533,8 +523,8 @@ class TestBackends(unittest.TestCase):
             )
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(15, 15),
-                u_grid_shape=(5,),
+                x_grid=(15, 15),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
@@ -884,9 +874,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = self._problem()
-        grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.05
-        )
+        grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(3,), dt=0.05)
         with self.assertRaises(ValueError):
             DynamicProgrammingPlanner(problem, grid=grid, dt=0.05)
         with self.assertRaises(ValueError):
@@ -1055,7 +1043,7 @@ class TestDpFlatConstructor(unittest.TestCase):
             cost=QuadraticCost.from_system(sys),
             U=sys.input_box,
         )
-        grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         nested = DynamicProgrammingPlanner(
             problem,
             grid=grid,
@@ -1087,7 +1075,7 @@ def test_grid_exposes_the_boxes_it_spans():
 
     plant = DoubleIntegrator()
     problem = PlanningProblem(plant, U=plant.input_box)
-    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
     np.testing.assert_allclose(grid.X.lower, [-2.0, -3.0])
     np.testing.assert_allclose(grid.X.upper, [2.0, 3.0])
     np.testing.assert_allclose(grid.U.box.lower, [-1.0])
@@ -1109,8 +1097,8 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
     for solver in ("euler", "rk4"):
         grid = StateSpaceGrid(
             problem,
-            x_grid_shape=(5, 5),
-            u_grid_shape=(3,),
+            x_grid=(5, 5),
+            u_grid=(3,),
             dt=0.1,
             solver=solver,
             precompute=False,
@@ -1118,7 +1106,7 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
         expected = discretize(plant, 0.1, solver=solver).step(x, u)
         np.testing.assert_allclose(grid.successor(x, u, 0.0), expected, rtol=1e-14)
     euler = StateSpaceGrid(
-        problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1, precompute=False
+        problem, x_grid=(5, 5), u_grid=(3,), dt=0.1, precompute=False
     )
     np.testing.assert_allclose(euler.successor(x, u, 0.0), x + 0.1 * plant.f(x, u))
 
@@ -1159,7 +1147,7 @@ def test_the_grid_and_its_planner_read_one_owner_of_the_sets():
     from minilink.core.sets import BoxSet
 
     problem = make_problem()
-    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
 
     # The same sets on a derived problem: one owner still
     same_sets = problem.replace(discount_rate=0.5)

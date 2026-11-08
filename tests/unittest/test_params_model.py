@@ -451,7 +451,7 @@ def test_the_kinodynamic_extender_reads_an_edit_of_the_plant():
 
     plant = Pendulum()
     problem = PlanningProblem(plant, x0=np.zeros(2), U=plant.input_box)
-    extender = KinodynamicExtender(horizon=0.2, n_substeps=4)
+    extender = KinodynamicExtender(horizon=0.2, n_steps=4)
     start = np.array([0.3, 0.0])
 
     light = extender.propose(start, start, problem, np.random.default_rng(0))
