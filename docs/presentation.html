@@ -861,8 +861,8 @@ vi_sol  = <span class="token-cls">DynamicProgrammingPlanner</span>(problem).<spa
 opt_sol = <span class="token-cls">TrajectoryOptimizationPlanner</span>(problem).<span class="token-fn">solve</span>()
 rl_sol  = <span class="token-cls">ReinforcementLearningPlanner</span>(problem).<span class="token-fn">solve</span>()  <span class="token-com"># NeuralPolicy</span>
 
-<span class="token-com"># Every solution policy closes the loop: policy @ plant</span>
-loop = rl_sol.policy <span class="token-op">@</span> plant
+<span class="token-com"># Every solution's controller closes the loop: controller @ plant</span>
+loop = rl_sol.controller <span class="token-op">@</span> plant
 
 <span class="token-com"># Evaluate side-by-side on the identical task</span>
 print(<span class="token-fn">compare</span>(problem, DP=vi_sol, TrajOpt=opt_sol, RL=rl_sol))</div>
