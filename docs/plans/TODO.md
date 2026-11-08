@@ -122,7 +122,6 @@ What is left:
   - `UnionSet` via `|`, when reachability or multi-goal work needs it;
   - vector bounds on `Saturation`;
   - `PlanningProblem.hamiltonian()`, only if the course teaches Pontryagin;
-  - the RL critic as a `Field` once training is over;
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
     (scan: examples#10).
 - [ ] **Sets as costs, the lowerings, the metrics as constraints** (the path to the cost's last
@@ -315,8 +314,8 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   wheel (ruled 2026-11-07, by rule after the maintainer's demo rebuild: a plant stays supported
   if his new demos, a course notebook or the tutorial uses it, the rest move, the list put to
   him for review; 24 of 50 are used today by their tests alone); **K8-4** twins merged and the dead helpers deleted
-  (the Mermaid exporters, `camera.py`, `ProblemEnv` / `to_gymnasium`, the
-  `identification/` stub; the pygame renderer stays, the real-time default); **K8-6** the README's catalog line by domain and the API
+  (`camera.py`, `ProblemEnv` / `to_gymnasium`; the pygame renderer stays, the real-time
+  default); **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly the course plants, `minilink.catalog`
   lists only tested plants, no two supported plants differ by parameters alone, and
   `test_teaching_surface.py` pins both lists.
@@ -824,7 +823,7 @@ terms; the v1.0 rows after two cohorts.
   examples from Dorf & Bishop, Ogata, Franklin–Powell asserted numerically (margins, step
   specifications, root locus, LQR and Kalman gains), each citing its example number; GRO501
   gate 3 is the seed. Done when the README links it as the correctness evidence.
-- [ ] **Course-neutral labs** (V9) **[maintainer]**: `examples/teaching/topics/` grows from 7
+- [ ] **Course-neutral labs** (V9) **[maintainer]**: `examples/teaching/topics/` grows from 5
   to 10–15 labs (objectives, prerequisites, time, starter and solution), classical control
   and robotics first; a "For instructors" page (pin a version, Colab, adapt a lab, report a
   bug).
