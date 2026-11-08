@@ -136,7 +136,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
 
-  **A naming pattern, not a hard rule (the maintainer, 2026-11-07): the controller is the block,
+  **A naming pattern, not a hard rule: the controller is the block,
   the policy the function.** Use it where it fits:
   - a **policy** (or **control law**) is a pure function, `u = π(x, t)`: arrays in, arrays out,
     no state (the compiled face's `pv.command(z, x, t)`);
