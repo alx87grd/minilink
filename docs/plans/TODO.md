@@ -33,7 +33,6 @@ the maintainer would and logged in the run's record.
 | --- | --- | --- | --- |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name |
-| A parameter family's batch price | S53 | v0.4 | the 2× bar: a closed-form small-`H` solve, a plant hook for its parameter-only block, or the bar dropped |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
@@ -131,19 +130,6 @@ What is left:
 
 ### 1.2 The step algebra first-class
 
-- [ ] **A parameter family's batch price** (S53) **[ask]**: `rollout_batch` with a `params`
-  family should run within 2× of the plain batch. Landed in v0.4: the gate (`core_perf`'s
-  `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last gated in CI) and
-  the static leaf's time grid batched (one `vmap` on JAX). Measured warm on a cloud CPU (JAX,
-  median of 7; the pendulum, 1000 × 1000 RK4 steps): the plain batch 118 ms, the family 693 ms
-  (5.9×). The cost is `MechanicalSystem.forward_dynamics`'s `solve(H, …)`: with `l` per member,
-  `H` differs per member and each RK4 stage runs `B` one-by-one LAPACK solves where the plain
-  batch runs one. Carrying the parameters in the scan's carry measured 696 ms (no gain); a hoist
-  out of the scan has no generic hook (XLA does not move the batched solve out of the loop). A
-  closed-form `v̇ = rhs / H` for one joint runs the family in 38 ms, but moves the pendulum's
-  numbers at 5·10⁻¹⁵ and changes the textbook line. The ask: a closed-form small-`H` solve, a
-  plant hook for its parameter-only block, or the bar dropped. Done when the family is within
-  2× of the plain batch, or the bar is dropped.
 - [ ] **One owner per rule, its two public items** (S65; the rest landed in v0.4) **[ask]**,
   each a public change:
   - one set of Monte Carlo defaults for `evaluate` and the planners' evidence: `evaluate` takes
