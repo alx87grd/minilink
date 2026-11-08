@@ -613,7 +613,7 @@ f = <span class="token-fn">Function</span>(<span class="token-str">'f'</span>, [
 
 <span class="token-kw">class</span> <span class="token-cls">MassSpringDamper</span>(<span class="token-cls">DynamicSystem</span>):
     <span class="token-kw">def</span> <span class="token-fn">__init__</span>(self):
-        super().<span class="token-fn">__init__</span>(n=<span class="token-num">2</span>, input_dim=<span class="token-num">1</span>, output_dim=<span class="token-num">1</span>)
+        super().<span class="token-fn">__init__</span>(state_dim=<span class="token-num">2</span>, input_dim=<span class="token-num">1</span>, output_dim=<span class="token-num">1</span>)
 
     <span class="token-kw">def</span> <span class="token-fn">f</span>(self, x, u, t=<span class="token-num">0</span>, params=<span class="token-cls">None</span>):
         m, k, b = <span class="token-num">1.0</span>, <span class="token-num">4.0</span>, <span class="token-num">0.3</span>
@@ -667,10 +667,11 @@ plant.<span class="token-fn">plot_trajectory</span>()</div>
             <span>closed_loop_wiring.py</span>
             <span>Shortcuts &amp; Explicit Connections</span>
           </div>
-          <div class="code-body" style="padding: 9px 13px; font-size: 0.76rem; line-height: 1.42;"><span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">DiagramSystem</span>, <span class="token-cls">PID</span>, <span class="token-cls">MassSpringDamper</span>
+          <div class="code-body" style="padding: 9px 13px; font-size: 0.76rem; line-height: 1.42;"><span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">DiagramSystem</span>, <span class="token-cls">PID</span>
 
+<span class="token-com"># The plant: the class of the previous slide</span>
 plant = <span class="token-cls">MassSpringDamper</span>()
-ctrl = <span class="token-cls">PID</span>(kp=<span class="token-num">10.0</span>, ki=<span class="token-num">1.0</span>, kd=<span class="token-num">2.0</span>)
+ctrl = <span class="token-cls">PID</span>(Kp=<span class="token-num">10.0</span>, Ki=<span class="token-num">1.0</span>, Kd=<span class="token-num">2.0</span>)
 
 <span class="token-com"># Option A: Expressive algebraic shortcut ('@' feedback)</span>
 loop = ctrl <span class="token-op">@</span> plant
@@ -678,9 +679,10 @@ loop = ctrl <span class="token-op">@</span> plant
 <span class="token-com"># Option B: Explicit 1-line wiring (replaces Simulink GUI)</span>
 diag = <span class="token-cls">DiagramSystem</span>()
 diag.<span class="token-fn">add_subsystem</span>(plant, <span class="token-str">"plant"</span>)
-diag.<span class="token-fn">add_subsystem</span>(ctrl, <span class="token-str">"controller"</span>)
+pid = <span class="token-cls">PID</span>(Kp=<span class="token-num">10.0</span>, Ki=<span class="token-num">1.0</span>, Kd=<span class="token-num">2.0</span>, ports=<span class="token-str">"reference"</span>)
+diag.<span class="token-fn">add_subsystem</span>(pid, <span class="token-str">"controller"</span>)
 diag.<span class="token-fn">connect</span>(<span class="token-str">"controller"</span>, <span class="token-str">"u"</span>, <span class="token-str">"plant"</span>, <span class="token-str">"u"</span>)
-diag.<span class="token-fn">connect</span>(<span class="token-str">"plant"</span>, <span class="token-str">"y"</span>, <span class="token-str">"controller"</span>, <span class="token-str">"e"</span>)
+diag.<span class="token-fn">connect</span>(<span class="token-str">"plant"</span>, <span class="token-str">"y"</span>, <span class="token-str">"controller"</span>, <span class="token-str">"y"</span>)
 
 <span class="token-com"># Auto-generate read-only diagram for visual audit</span>
 loop.<span class="token-fn">plot_diagram</span>()</div>
@@ -811,15 +813,16 @@ best = <span class="token-cls">Optimizer</span>(pe.<span class="token-fn">progra
           <div class="code-body"><span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">Optimizer</span>
 
 <span class="token-com"># Any problem lowers to a MathematicalProgram</span>
-program = problem_evaluator.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"plant.m"</span>])
+pe = problem.<span class="token-fn">compile</span>(ctrl)
+program = pe.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"controller.Kd"</span>])
 
 <span class="token-com"># Switch solvers with a single keyword:</span>
-<span class="token-com"># method="auto", "adam", "l-bfgs", "slsqp", or "ipopt"</span>
+<span class="token-com"># "auto", "adam", "l-bfgs", "scipy_slsqp", "ipopt"</span>
 opt = <span class="token-cls">Optimizer</span>(program, method=<span class="token-str">"auto"</span>)
 result = opt.<span class="token-fn">solve</span>()
 
-<span class="token-com"># Optimal decision vector and convergence summary</span>
-print(result.success, result.x, result.fun)</div>
+<span class="token-com"># The optimal gains and the closed loop's cost</span>
+print(result.success, result.z, result.cost)</div>
         </div>
       </div>
     </div>
@@ -842,7 +845,7 @@ print(result.success, result.x, result.fun)</div>
           <div style="margin-top: 10px;">
             <ul class="bullet-list" style="gap: 5px; font-size: 0.83rem; line-height: 1.38;">
               <li><strong>Unified Formulation:</strong> DP, Trajectory Optimization, RRT, and Deep RL solve the exact same mathematical problem.</li>
-              <li><strong>Neural Policies as Systems:</strong> A trained neural network policy (<code>NeuralPolicy</code> / MLP) is a standard <code>System</code>: <code>loop = policy @ plant</code>.</li>
+              <li><strong>Neural Policies as Systems:</strong> A trained neural network policy (<code>NeuralPolicy</code> / MLP) is a standard <code>System</code>: <code>loop = controller @ plant</code>.</li>
               <li><strong>Objective Benchmarking:</strong> Single <code>compare()</code> function evaluates open-loop trajectories, state-feedback, and neural policies on the identical task.</li>
             </ul>
           </div>
@@ -856,10 +859,14 @@ print(result.success, result.x, result.fun)</div>
           <div class="code-body"><span class="token-com"># One problem definition</span>
 problem = <span class="token-cls">PlanningProblem</span>(sys=plant, x0=x0, Xf=Xf, cost=cost)
 
-<span class="token-com"># Solved by value iteration, collocation, or RL</span>
-vi_sol  = <span class="token-cls">DynamicProgrammingPlanner</span>(problem).<span class="token-fn">solve</span>()
-opt_sol = <span class="token-cls">TrajectoryOptimizationPlanner</span>(problem).<span class="token-fn">solve</span>()
-rl_sol  = <span class="token-cls">ReinforcementLearningPlanner</span>(problem).<span class="token-fn">solve</span>()  <span class="token-com"># NeuralPolicy</span>
+<span class="token-com"># Solved by value iteration, collocation, or RL (a NeuralPolicy)</span>
+dp = <span class="token-cls">DynamicProgrammingPlanner</span>(
+    problem, x_grid=(<span class="token-num">101</span>, <span class="token-num">101</span>), u_grid=(<span class="token-num">11</span>,), dt=<span class="token-num">0.05</span>
+)
+vi_sol = dp.<span class="token-fn">solve</span>()
+opt = <span class="token-cls">TrajectoryOptimizationPlanner</span>(problem, n_steps=<span class="token-num">40</span>)
+opt_sol = opt.<span class="token-fn">solve</span>()
+rl_sol = <span class="token-cls">ReinforcementLearningPlanner</span>(problem).<span class="token-fn">solve</span>()
 
 <span class="token-com"># Every solution's controller closes the loop: controller @ plant</span>
 loop = rl_sol.controller <span class="token-op">@</span> plant
@@ -1022,24 +1029,29 @@ print(<span class="token-fn">compare</span>(problem, DP=vi_sol, TrajOpt=opt_sol,
             <span>Frontier Neural Policy in Minilink</span>
           </div>
           <div class="code-body" style="padding: 9px 13px; font-size: 0.76rem; line-height: 1.42;"><span class="token-kw">import</span> jax
-<span class="token-kw">import</span> jax.numpy <span class="token-kw">as</span> jnp
-<span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">DynamicSystem</span>
+<span class="token-kw">from</span> minilink <span class="token-kw">import</span> <span class="token-cls">System</span>
 
-<span class="token-kw">class</span> <span class="token-cls">FrontierTransformerPolicy</span>(<span class="token-cls">DynamicSystem</span>):
-    <span class="token-str">"""Massive neural policy wrapped as a standard Minilink block."""</span>
-    <span class="token-kw">def</span> <span class="token-fn">f</span>(self, x, u, t=<span class="token-num">0</span>, params=<span class="token-cls">None</span>):
+<span class="token-kw">class</span> <span class="token-cls">FrontierTransformerPolicy</span>(<span class="token-cls">System</span>):
+    <span class="token-str">"""A large neural policy, a standard block: u = π(x)."""</span>
+    <span class="token-kw">def</span> <span class="token-fn">__init__</span>(self, weights):
+        super().<span class="token-fn">__init__</span>()
+        self.params = {<span class="token-str">"weights"</span>: weights}
+        self.<span class="token-fn">add_input_port</span>(<span class="token-str">"x"</span>, dim=n)
+        self.<span class="token-fn">add_output_port</span>(
+            <span class="token-str">"u"</span>, dim=m, function=self.ctl, dependencies=(<span class="token-str">"x"</span>,)
+        )
+
+    <span class="token-kw">def</span> <span class="token-fn">ctl</span>(self, x, u, t=<span class="token-num">0</span>, params=<span class="token-cls">None</span>):
+        params = self.params <span class="token-kw">if</span> params <span class="token-kw">is</span> <span class="token-cls">None</span> <span class="token-kw">else</span> params
         <span class="token-com"># Pure forward pass over sharded multi-billion parameter weights</span>
-        weights = params[<span class="token-str">"weights"</span>]
-        <span class="token-kw">return</span> <span class="token-fn">transformer_forward</span>(x, weights)
+        <span class="token-kw">return</span> <span class="token-fn">transformer_forward</span>(u, params[<span class="token-str">"weights"</span>])
 
-<span class="token-com"># Standard feedback composition: loop = policy @ plant</span>
-loop = <span class="token-cls">FrontierTransformerPolicy</span>() <span class="token-op">@</span> plant_cluster
+<span class="token-com"># Standard feedback composition: loop = controller @ plant</span>
+loop = <span class="token-cls">FrontierTransformerPolicy</span>(weights) <span class="token-op">@</span> plant_cluster
 
 <span class="token-com"># XLA compilation with automated TPU/GPU sharding across data center pods</span>
-sharded_sim = jax.<span class="token-fn">jit</span>(
-    loop.<span class="token-fn">compile</span>(backend=<span class="token-str">"jax"</span>),
-    in_shardings=(mesh, <span class="token-cls">None</span>)
-)</div>
+ev = loop.<span class="token-fn">compile</span>(backend=<span class="token-str">"jax"</span>)
+sharded_f = jax.<span class="token-fn">jit</span>(ev.f, in_shardings=(state_sharding, <span class="token-cls">None</span>))</div>
         </div>
       </div>
     </div>
