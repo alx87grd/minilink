@@ -150,7 +150,6 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "StateSpaceGrid",
         "DynamicProgrammingPlanner",
         "LookupPolicy",
-        "PolicyEvaluator",
         "QuadraticFeatures",
         "RadialBasisFeatures",
         "LinearApproximator",

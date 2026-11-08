@@ -421,9 +421,8 @@ def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize()
         noisy.discretize(0.1)
 
 
-def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
+def test_policy_evaluation_scores_value_iterations_policy_on_the_face():
     from minilink.planning import DynamicProgrammingPlanner
-    from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 
     problem = swing_problem(horizon=np.inf, discount_rate=0.5)
     vi = DynamicProgrammingPlanner(
@@ -436,16 +435,10 @@ def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
         clean_infeasible=False,
     )
     vi.solve()
-    pe = PolicyEvaluator(
-        problem,
-        grid=vi.grid,
-        policy=vi.controller,
-        **vi.params["method"],
-        tol=vi.tol,
-        max_iterations=vi.max_iterations,
-        interpolation=vi.interpolation,
+    J_pi = vi.evaluate_policy(vi.controller)
+    np.testing.assert_allclose(
+        J_pi.params["values"].reshape(-1), vi.result.J, atol=1e-6
     )
-    np.testing.assert_allclose(pe.solve(), vi.result.J, atol=1e-6)
 
 
 def test_the_design_point_of_a_random_plant_parameter_is_its_mean():

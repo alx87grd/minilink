@@ -52,10 +52,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.lookup_policy",
         "LookupPolicy",
     ),
-    "PolicyEvaluator": (
-        "minilink.planning.dynamic_programming.policy_eval",
-        "PolicyEvaluator",
-    ),
     # Function approximation (cost-to-go fits, approximate dynamic programming)
     "QuadraticFeatures": (
         "minilink.planning.dynamic_programming.approximation",

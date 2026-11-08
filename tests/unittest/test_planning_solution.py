@@ -455,7 +455,7 @@ def test_value_iteration_plots_its_own_tables_under_the_solution_names():
 
 
 def test_compare_reads_the_solutions_side_by_side():
-    from minilink.planning import PolicyEvaluator, compare
+    from minilink.planning import compare
 
     problem, vi, lqr = solved_pendulum()
     race = compare(VI=vi, LQR=lqr)
@@ -486,12 +486,8 @@ def test_compare_reads_the_solutions_side_by_side():
     # a bare controller and an evaluation already computed take part too
     mixed = compare(problem, LQR=lqr.controller, VI=scored.evaluations["VI"], dt=0.1)
     assert list(mixed) == ["LQR"] and "given" in str(mixed)
-    grid_eval = PolicyEvaluator(
-        problem, grid=DynamicProgrammingPlanner(
-            problem, x_grid=(11, 11), u_grid=(3,), dt=0.2
-        ).grid, policy=lqr,
-    )  # fmt: skip
-    assert np.all(np.isfinite(grid_eval.solve()))
+    on_grid = DynamicProgrammingPlanner(problem, x_grid=(11, 11), u_grid=(3,), dt=0.2)
+    assert np.all(np.isfinite(on_grid.evaluate_policy(lqr).params["values"]))
 
     with pytest.raises(TypeError):
         compare(VI=vi.controller)

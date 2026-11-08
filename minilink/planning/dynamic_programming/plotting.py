@@ -16,7 +16,8 @@ from minilink.planning.plotting import maybe_show
 
 
 def plot_cost_to_go(
-    result,
+    grid_or_result,
+    J=None,
     *,
     jmax=None,
     axes=(0, 1),
@@ -31,17 +32,22 @@ def plot_cost_to_go(
     show=True,
 ):
     """
-    Draw cost-to-go heatmap(s) from a :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingResult`.
+    Draw cost-to-go heatmap(s) on the state grid.
 
-    ``axes`` may be ``(i, j)`` for one slice or a list of pairs for several.
+    Grid form: ``plot_cost_to_go(grid, J, ...)`` for a node-indexed table (a
+    policy's ``J^π``). Result form: ``plot_cost_to_go(result, ...)`` from
+    value iteration. ``axes`` may be ``(i, j)`` for one slice or a list of
+    pairs for several.
     """
+    grid, J = (grid_or_result, J) if J is not None else table_of(grid_or_result)
     require_single_slice(trajectory, axes)
 
     # Several slices: one heatmap per pair, without the overlay
     if is_batch_axes(axes):
         return [
             plot_cost_to_go(
-                result,
+                grid,
+                J,
                 jmax=jmax,
                 axes=pair,
                 anchor=anchor,
@@ -57,8 +63,6 @@ def plot_cost_to_go(
 
     require_flat_overlay(show_3d, trajectory)
 
-    grid = result.grid
-    J = result.J
     defer_show = trajectory is not None
 
     # The heatmap, shown now unless the surface or the overlay comes after it
@@ -380,6 +384,11 @@ def cost_scale_limit(failure_cost):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def table_of(result):
+    """``(grid, J)``: a value-iteration result's grid and cost-to-go table."""
+    return result.grid, result.J
 
 
 def require_single_slice(trajectory, axes):

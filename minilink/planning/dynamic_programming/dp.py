@@ -7,10 +7,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.fields import GridField
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
+from minilink.planning.evaluator import controller_of
 from minilink.planning.planner import (
     Planner,
     given_numbers,
@@ -18,6 +20,7 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
+from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_model import is_continuous
@@ -254,6 +257,62 @@ class DynamicProgrammingPlanner(Planner):
             result, mode="receding", evaluate=evaluate, n_trials=n_trials
         )
 
+    def evaluate_policy(self, controller) -> GridField:
+        """
+        The cost-to-go ``J^π`` of a fixed law on the planner's grid, a field read as the planner's own.
+
+        Solves the Bellman *expectation* equation, the sweep of :meth:`solve`
+        with the action fixed by the law instead of minimized:
+        ``J(x) = c(x, π(x)) + γ J(x_next)``, from the terminal cost at the
+        sweeps' terminal time until the largest change falls under ``tol``
+        (at most ``max_iterations`` sweeps). ``controller`` is a law
+        ``u = π(x)``, a solution (its controller), or a controller block that
+        reads the state on an input named ``x`` (or ``y``) and commands ``u``
+        (:func:`minilink.core.roles.block_roles`). The planner's grid,
+        discount, failure cost and interpolation, its stopping rules: the
+        returned :class:`~minilink.core.fields.GridField` holds ``J^π`` in
+        ``params["values"]``, its failure cost past the grid; draw it with
+        ``plot_cost_to_go(field=...)``.
+        """
+        grid = self.grid
+        tf = self.final_time
+        gamma = self.gamma
+        method = self.interpolation
+        tol = self.tol
+        max_iterations = self.max_iterations
+
+        # The fixed law u = π(x): a callable, a solution's controller, or a controller block
+        policy = controller_of(controller)
+        policy = policy if callable(policy) else policy_from_block(policy)
+
+        # Successor and running cost of every node under the policy's action
+        x_next, G = self.policy_transition(policy, tf)
+
+        # Cost-to-go at the final time
+        J = self.terminal_cost(tf)
+
+        # Sweeps until the cost-to-go stops changing, at most max_iterations of them
+        delta = np.inf
+        k = 0
+
+        while k < max_iterations and delta > tol:
+            k = k + 1
+
+            # Bellman expectation backup, the action fixed by the policy:
+            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the model's stage cost and step
+            J_next = J
+            J_arrival = grid.interpolate(J_next, x_next, method)
+            J = G + gamma * J_arrival
+
+            # Largest change of the cost-to-go: the convergence measure
+            delta = float(np.max(np.abs(J - J_next)))
+
+        # J^π as a field on the grid, read as the planner's cost-to-go
+        outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
+        J_pi = grid.field(J, method=method, outside=outside)
+
+        return J_pi
+
     @property
     def dt(self) -> float | None:
         """The grid's step: the period the sweeps back up over, and the integration step of the evidence and the views' run."""
@@ -487,6 +546,51 @@ class DynamicProgrammingPlanner(Planner):
 
         return J, pi
 
+    def policy_transition(self, policy, t):
+        """Per-node successor ``(nodes_n, n)`` and running cost ``(nodes_n,)`` under the fixed law ``u = policy(x)``."""
+        grid = self.grid
+        X = self.problem.X
+        U = self.problem.U
+        tree = grid.model.params
+        sys_params = tree["plant"]
+        N = grid.nodes_n  # Number of nodes
+        n = grid.n  # State dimension
+        INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
+
+        successors = np.empty((N, n), dtype=float)
+        G = np.empty(N, dtype=float)
+
+        # The stage cost of the period at t, its laws built once for every node
+        stage_cost = grid.stage_cost_law(t, tree)
+
+        # For all state nodes
+        for s in range(N):
+            x = grid.states[s]
+
+            # The policy's action at this node
+            u = np.asarray(policy(x), dtype=float).reshape(-1)
+
+            # x_{k+1} = Φ(x_k, π(x_k), t), the grid's step model under the policy
+            x_next = grid.successor(x, u, t, sys_params)
+            successors[s] = x_next
+
+            # An admissible action, and a successor in X and on the grid (the
+            # table's domain)
+            valid = (
+                U.contains(u, x, t)
+                and X.contains(x_next, t)
+                and grid.X.contains(x_next)
+            )
+
+            if valid:
+                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the model
+                G[s] = float(stage_cost(x, u))
+            else:
+                # The step leaves the admissible set: the penalty
+                G[s] = infeasible_penalty(INF, x_next, t)
+
+        return successors, G
+
     def terminal_cost(self, t, *, verbose: bool = False) -> np.ndarray:
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id (``verbose``: the build's progress)."""
         grid = self.grid
@@ -611,10 +715,19 @@ class DynamicProgrammingPlanner(Planner):
 
         return result
 
-    def plot_cost_to_go(self, **kwargs):
-        """The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...)."""
-        require_solution(self)
+    def plot_cost_to_go(self, field=None, **kwargs):
+        """
+        The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...).
+
+        ``field`` draws another table of this grid instead: a policy's
+        ``J^π`` from :meth:`evaluate_policy`.
+        """
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
+        if field is not None:
+            J = np.asarray(field.params["values"], dtype=float).reshape(-1)
+            return plotting.plot_cost_to_go(self.grid, J, **kwargs)
+
+        require_solution(self)
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
     def plot_control_law(self, **kwargs):
@@ -739,12 +852,6 @@ class DynamicProgrammingResult:
     delta: float
     history: list | None = None
     schedule: tuple | None = None
-
-    def value_at(self, x, method="linear") -> float:
-        """Interpolate the cost-to-go at an arbitrary state ``x`` (``method``: the grid's interpolation)."""
-        J = self.grid.interpolate(self.J, np.atleast_2d(x), method)
-
-        return float(J[0])
 
     def save(self, path: str) -> None:
         """Save ``J`` and ``pi`` to ``path`` (single ``.npz``)."""

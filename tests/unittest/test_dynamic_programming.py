@@ -20,7 +20,6 @@ from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
 )
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
-from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 from minilink.planning.planner import require_solution
 from minilink.planning.problems import PlanningProblem
 
@@ -260,20 +259,11 @@ class TestControllerAndEvaluation(unittest.TestCase):
         traj = diagram.compute_trajectory(tf=8.0, verbose=False)
         self.assertLess(np.linalg.norm(traj.x[:, -1]), 0.3)
 
-    def test_policy_evaluator_matches_optimal_value(self):
+    def test_policy_evaluation_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
         controller = LookupPolicy(result.grid, result.pi)
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller.action,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        J_pi = evaluator.solve()
+        J_pi = planner.evaluate_policy(controller.action).params["values"].reshape(-1)
         failure_cost = planner.out_of_bound_cost
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
@@ -688,37 +678,22 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         res = controller.plot_control_law(grid_shape=(9, 9), show=False)
         self.assertIsNotNone(res.figure)
 
-    def test_policy_evaluator_accepts_declared_block(self):
+    def test_policy_evaluation_accepts_a_law_a_block_and_a_solution(self):
         problem = make_problem()
-        planner, result = solve(problem)
+        planner, _ = solve(problem)
         controller = planner.controller
-        J_callable = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller.action,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        ).solve()
-        J_block = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        ).solve()
+        J_callable = planner.evaluate_policy(controller.action).params["values"]
+        J_block = planner.evaluate_policy(controller).params["values"]
+        J_solution = planner.evaluate_policy(planner.last_solution).params["values"]
         np.testing.assert_allclose(J_block, J_callable)
+        np.testing.assert_array_equal(J_solution, J_block)
 
-    def test_policy_evaluator_rejects_undeclared_block(self):
+    def test_policy_evaluation_rejects_undeclared_block(self):
         from minilink.blocks.basic import Integrator
 
-        problem = make_problem()
-        _, result = solve(problem)
+        planner, _ = solve(make_problem())
         with self.assertRaisesRegex(ValueError, "reads the state"):
-            PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
+            planner.evaluate_policy(Integrator())
 
 
 class TestFunctionApproximation(unittest.TestCase):
@@ -765,32 +740,29 @@ class TestFunctionApproximation(unittest.TestCase):
         np.testing.assert_allclose(online.w, target, atol=1e-3)
 
 
-class TestPolicyEvaluatorPlots(unittest.TestCase):
-    def test_value_at_and_plots_after_solve(self):
+class TestPolicyEvaluationField(unittest.TestCase):
+    def test_the_policys_cost_to_go_is_a_grid_field_drawn_by_the_planner(self):
         import matplotlib
 
         matplotlib.use("Agg")
+        from minilink.core.fields import GridField
+
         problem = make_problem()
         planner, result = solve(problem)
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=planner.controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        with self.assertRaisesRegex(ValueError, "solve"):
-            evaluator.value_at(np.zeros(2))
-        evaluator.solve()
+        J_pi = planner.evaluate_policy(planner.controller)
+        self.assertIsInstance(J_pi, GridField)
+        self.assertEqual(J_pi.method, planner.interpolation)
+        x = np.zeros(2)
         self.assertAlmostEqual(
-            evaluator.value_at(np.zeros(2)),
-            float(result.grid.interpolate(evaluator.last_J, np.zeros((1, 2)))[0]),
+            float(J_pi(x)),
+            float(result.grid.interpolate(J_pi.params["values"].reshape(-1), [x])[0]),
         )
-        fig, _ = evaluator.plot_cost_to_go(vmax=10.0, show=False)
+        # Past the grid, the failure cost, as on the solution's cost-to-go
+        self.assertEqual(float(J_pi(np.array([1e3, 0.0]))), planner.out_of_bound_cost)
+        fig, _ = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(fig)
-        fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
+        J = J_pi.params["values"].reshape(-1)
+        fig, _ = result.grid.plot_value(J, show_3d=True, show=False)
         self.assertIsNotNone(fig)
 
 
@@ -806,22 +778,13 @@ class TestCostToGoInterpolation(unittest.TestCase):
         self.assertNotEqual(nearest, linear)
         self.assertEqual(planner.cost_to_go(x[0]), nearest)
         self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
-        self.assertEqual(result.value_at(x[0]), linear)
-        self.assertEqual(result.value_at(x[0], "nearest"), nearest)
+        self.assertEqual(result.grid.field(result.J)(x[0]), linear)
 
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=planner.controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        evaluator.solve()
-        J = evaluator.last_J
+        J_pi = planner.evaluate_policy(planner.controller)
+        J = J_pi.params["values"].reshape(-1)
+        self.assertEqual(J_pi.method, "nearest")
         self.assertEqual(
-            evaluator.value_at(x[0]), float(result.grid.interpolate(J, x, "nearest")[0])
+            float(J_pi(x[0])), float(result.grid.interpolate(J, x, "nearest")[0])
         )
 
     def test_spline_is_refused_naming_cubic(self):
@@ -1055,16 +1018,8 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         # the charged exits, not the 1e6 default, bound the cost-to-go
         self.assertLess(np.max(table.result.J), 1.0e3)
 
-        evaluator = PolicyEvaluator(
-            table.problem,
-            grid=table.grid,
-            policy=table.controller.action,
-            **table.params["method"],
-            tol=table.tol,
-            max_iterations=table.max_iterations,
-            interpolation=table.interpolation,
-        )
-        J_pi = evaluator.solve()
+        J_pi = table.evaluate_policy(table.controller.action).params["values"]
+        J_pi = J_pi.reshape(-1)
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
 
     def test_jax_table_charges_the_failure_cost(self):
@@ -1205,16 +1160,13 @@ def test_the_grid_and_its_planner_read_one_owner_of_the_sets():
 
     problem = make_problem()
     grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
-    policy = lambda x: np.zeros(1)  # noqa: E731
 
     # The same sets on a derived problem: one owner still
     same_sets = problem.replace(discount_rate=0.5)
     DynamicProgrammingPlanner(same_sets, grid=grid)
-    PolicyEvaluator(same_sets, grid=grid, policy=policy)
 
-    # Other sets: the loop and table engines, and the evaluator, would read two owners
+    # Other sets: the loop and table engines, and the policy evaluation, would
+    # read two owners
     other = problem.replace(U=BoxSet([-0.5], [0.5]))
     with pytest.raises(ValueError, match="another problem's X or U"):
         DynamicProgrammingPlanner(other, grid=grid)
-    with pytest.raises(ValueError, match="another problem's X or U"):
-        PolicyEvaluator(other, grid=grid, policy=policy)
