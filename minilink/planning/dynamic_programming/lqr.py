@@ -183,7 +183,7 @@ class LQRPlanner(Planner):
 
             # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(T) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t), on the problem's clock t0 … t0 + T
-            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, T, n_steps=n_samples)
+            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, T, n_samples=n_samples)
             t = problem.t0 + s
 
             # Past the horizon, the stationary law at the operating point: K∞ of

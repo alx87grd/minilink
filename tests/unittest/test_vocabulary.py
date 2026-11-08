@@ -140,6 +140,17 @@ RETIRED = {
     "lqr_matrices": ("design_matrices", ("LQRPlanner",)),
     "compile": ("transition, terminal or rollout", ("StepPlanningProblem",)),
     "run": ("rollout, a Trajectory", ("StepPlanningProblem",)),
+    "n_pts": ("n_samples", None),
+    "n_steps": (
+        "n_samples (n_steps counts transitions only)",
+        (
+            "Simulator",
+            "StaticSimulator",
+            "lqr_gain_schedule",
+            "lqr_finite_horizon",
+            "animate_modal",
+        ),
+    ),
 }
 
 

@@ -344,7 +344,7 @@ class TestLQR(unittest.TestCase):
         diagram.connect("plant", "x", "controller", "x")
         diagram.connect("controller", "u", "plant", "u")
         plant.x0 = np.array([0.2, 0.0])
-        traj = diagram.compute_trajectory(tf=10.0, n_steps=1001, verbose=False)
+        traj = diagram.compute_trajectory(tf=10.0, n_samples=1001, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.01)
 
 
@@ -388,7 +388,7 @@ class TestTrajectoryLQR(unittest.TestCase):
         ctl = trajectory_lqr(plant, reference, self.Q, self.R)
         plant.x0 = reference.x[:, 0] + np.array([0.5, 0.5])
         loop = ctl @ plant
-        traj = loop.compute_trajectory(tf=8.0, n_steps=801, verbose=False)
+        traj = loop.compute_trajectory(tf=8.0, n_samples=801, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], atol=0.02)
 
     def test_stiff_weights_on_a_coarse_reference_stay_exact(self):
@@ -457,7 +457,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_schedule_matches_the_riccati_equation(self):
         t, _, S = lqr_gain_schedule(
-            self.A, self.B, self.Q, self.R, np.diag([1.0, 2.0]), tf=3.0, n_steps=3001
+            self.A, self.B, self.Q, self.R, np.diag([1.0, 2.0]), tf=3.0, n_samples=3001
         )
         R_inv = np.linalg.inv(self.R)
         A, B, Q = self.A, self.B, self.Q
@@ -472,9 +472,9 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         # a fast pole at -1000 rad/s: ‖H‖ Δt ≫ 1 on every grid below
         A = np.array([[0.0, 1.0], [-1.0, -1000.0]])
         B, Q, R, S_f, tf = self.B, self.Q, self.R, np.zeros((2, 2)), 5.0
-        _, _, S_fine = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=10001)
+        _, _, S_fine = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=10001)
         for n_steps in (2, 11, 101):
-            _, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+            _, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=n_steps)
             stride = 10000 // (n_steps - 1)
             self.assertTrue(np.all(np.isfinite(K)))
             np.testing.assert_allclose(S, S_fine[::stride], rtol=1e-8, atol=1e-12)
@@ -532,7 +532,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
         plant = DoubleIntegrator()
         plant.x0 = np.array([1.0, 0.0])
         loop = ctl @ plant
-        traj = loop.compute_trajectory(tf=5.0, n_steps=501, verbose=False)
+        traj = loop.compute_trajectory(tf=5.0, n_samples=501, verbose=False)
         np.testing.assert_allclose(traj.x[:, -1], [0.0, 0.0], atol=0.02)
 
 
@@ -599,7 +599,7 @@ class TestImpedanceIntegralController(unittest.TestCase):
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "x", "pid", "y")
         diagram.connect("pid", "u", "plant", "u")
-        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
+        traj = diagram.compute_trajectory(tf=40.0, n_samples=4001, verbose=False)
         position = traj.x[1, -1]
         speed = traj.x[2, -1]
         self.assertAlmostEqual(position, setpoint, places=2)
@@ -647,7 +647,7 @@ class TestPID(unittest.TestCase):
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "y", "pid", "y")
         diagram.connect("pid", "u", "plant", "u")
-        traj = diagram.compute_trajectory(tf=40.0, n_steps=4001, verbose=False)
+        traj = diagram.compute_trajectory(tf=40.0, n_samples=4001, verbose=False)
         position = traj.x[2, -1]
         speed = traj.x[3, -1]
         self.assertAlmostEqual(position, setpoint, places=2)

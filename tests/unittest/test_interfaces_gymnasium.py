@@ -330,7 +330,7 @@ class TestSB3Controller(unittest.TestCase):
         self.assertEqual(diagram.connections["controller"]["x"], ("plant", "x"))
         self.assertEqual(diagram.connections["plant"]["u"], ("controller", "u"))
 
-        traj = diagram.compute_trajectory(tf=0.5, n_steps=51, verbose=False)
+        traj = diagram.compute_trajectory(tf=0.5, n_samples=51, verbose=False)
         self.assertEqual(traj.x.shape[0], 2)
         np.testing.assert_allclose(ctl.action(np.zeros(2)), [0.2])
 

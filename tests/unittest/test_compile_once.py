@@ -38,7 +38,7 @@ jax.monitoring.register_event_duration_secs_listener(
     )
 )
 
-SIM = dict(tf=2.0, n_steps=201, solver="rk4_fixedsteps", verbose=False, backend="jax")
+SIM = dict(tf=2.0, n_samples=201, solver="rk4_fixedsteps", verbose=False, backend="jax")
 X0 = np.array([0.1, 0.2, 0.0, 0.0])
 
 
@@ -71,7 +71,7 @@ def test_a_held_simulation_compiles_nothing_on_a_repeat():
     plant = cartpole()
     loop = lqr(plant, np.eye(4), np.eye(1)) @ plant
     sampled = (P(2.0) % 0.05) @ Integrator()
-    options = dict(tf=2.0, n_steps=201, solver="rk4_fixedsteps", backend="jax")
+    options = dict(tf=2.0, n_samples=201, solver="rk4_fixedsteps", backend="jax")
     held = [
         Simulator(plant, **options),
         Simulator(plant, tf=2.0, solver="scipy", backend="jax"),
@@ -233,7 +233,7 @@ class Decay(DynamicSystem):
 
 def test_a_float_for_an_integer_default_is_never_truncated():
     plant = Decay()
-    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=11, solver="rk4_fixedsteps", verbose=False)
     plant.compute_trajectory(**run, backend="jax")
     plant.params["a"] = 2.5
     jax_x = plant.compute_trajectory(**run, backend="jax").x[0, -1]
@@ -303,7 +303,7 @@ class Leak(DynamicSystem):
 
 
 def final(sys, backend):
-    run = dict(SIM, backend=backend, tf=1.0, n_steps=101)
+    run = dict(SIM, backend=backend, tf=1.0, n_samples=101)
     return float(np.asarray(sys.compute_trajectory(**run).x)[0, -1])
 
 
@@ -346,7 +346,7 @@ def test_an_embedded_models_numbers_are_seen_by_the_next_call():
     plant.x0 = np.array([0.5, 0.0])
     law = ComputedTorque(plant, tracking_ref=False)
     loop = law @ plant
-    run = dict(tf=1.0, n_steps=101, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=101, solver="rk4_fixedsteps", verbose=False)
     loop.compute_trajectory(**run, backend="jax")
     law.params["model"]["m"] = 3.0 * np.asarray(law.params["model"]["m"])
     np.testing.assert_allclose(
@@ -373,7 +373,7 @@ def test_a_parameter_edit_runs_on_a_diagram_holding_a_sink():
     diagram.add_subsystem(plant, "plant")
     diagram.add_subsystem(Sink(), "sink")
     diagram.connect("plant", "y", "sink", "u")
-    run = dict(tf=1.0, n_steps=11, solver="rk4_fixedsteps", verbose=False)
+    run = dict(tf=1.0, n_samples=11, solver="rk4_fixedsteps", verbose=False)
     diagram.compute_trajectory(**run, backend="jax")
     plant.params["k"] = 2.0
     np.testing.assert_allclose(

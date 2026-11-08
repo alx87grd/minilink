@@ -82,7 +82,7 @@ def test_finite_horizon_is_the_riccati_differential_equation():
     planner = LQRPlanner(pendulum_problem(tf=tf, S=S_f), n_samples=201)
     solution = planner.solve()
     A, B = planner.linear_model()
-    t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=201)
+    t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=201)
 
     assert isinstance(solution.controller, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop

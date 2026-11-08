@@ -237,5 +237,5 @@ def initial_state_of(preset, n):
 
 if __name__ == "__main__":
     sys = ThreeBodyProblem()
-    sys.compute_trajectory(tf=6.3, n_steps=630, show=False, verbose=False)
+    sys.compute_trajectory(tf=6.3, n_samples=630, show=False, verbose=False)
     sys.animate(show=False)

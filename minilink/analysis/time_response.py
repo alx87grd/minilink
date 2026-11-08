@@ -51,7 +51,7 @@ def step_response(
     of=None,
     wrt=None,
     tf=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -60,10 +60,10 @@ def step_response(
     The response of the linear model, in deviation variables: ``sys`` as is
     when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
     channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
-    defaults to eight times the slowest stable time constant, and ``n``
+    defaults to eight times the slowest stable time constant, and ``n_samples``
     samples span ``[0, tf]``. A step or sampled system's response is its
     difference equation's, ``y_k`` at the ticks ``t_k = k Δ`` within
-    ``[0, tf]`` (``Δ = 1`` for a tick law), and ``n`` is not read. The step of
+    ``[0, tf]`` (``Δ = 1`` for a tick law), and ``n_samples`` is not read. The step of
     the nonlinear loop itself is a
     simulation, ``closed_loop(C, plant, reference=Step(...))`` then
     ``compute_trajectory``, and :func:`step_info` reads its sampled output the
@@ -78,9 +78,9 @@ def step_response(
     if tf is None:
         tf = linear.settling_horizon(A, period)
 
-    # n samples over [0, tf]; a difference equation's ticks t_k = k Δ within it
+    # n_samples samples over [0, tf]; a difference equation's ticks t_k = k Δ within it
     if period is None:
-        time = np.linspace(0.0, float(tf), int(n))
+        time = np.linspace(0.0, float(tf), int(n_samples))
     else:
         time = period * np.arange(np.floor(float(tf) / period + 1e-9) + 1)
 
@@ -167,7 +167,7 @@ def plot_step_response(
     of=None,
     wrt=None,
     tf=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
     backend="matplotlib",
@@ -181,7 +181,17 @@ def plot_step_response(
     response is drawn as its samples ``y_k``.
     """
     time, y = step_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, tf=tf, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        tf=tf,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
     info = step_info(time, y)
 

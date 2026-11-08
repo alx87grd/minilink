@@ -425,8 +425,8 @@ class TestLoopInputs(unittest.TestCase):
         outside.add_subsystem(closed_loop(C, self.H), "loop")
         outside.connect("reference", "y", "loop", "r")
         np.testing.assert_allclose(
-            inside.compute_trajectory(tf=4.0, n_steps=201).x,
-            outside.compute_trajectory(tf=4.0, n_steps=201).x,
+            inside.compute_trajectory(tf=4.0, n_samples=201).x,
+            outside.compute_trajectory(tf=4.0, n_samples=201).x,
             atol=1e-9,
         )
 

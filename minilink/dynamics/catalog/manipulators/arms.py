@@ -1043,6 +1043,6 @@ if __name__ == "__main__":
     sys.compute_trajectory(
         u=lambda t: np.array([0.1 * np.sin(t), 0.1 * np.cos(t)]),
         tf=4.0,
-        n_steps=160,
+        n_samples=160,
     )
     sys.animate()

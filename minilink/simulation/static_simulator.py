@@ -36,7 +36,7 @@ class StaticSimulator:
         *,
         x0=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         verbose=False,
@@ -54,11 +54,11 @@ class StaticSimulator:
         self.sys = sys
 
         # Outputs are sampled, not integrated: no dt policy, so the automatic
-        # grid is the DEFAULT_N_STEPS reporting grid
-        self.t, self.dt, self.n_pts = build_time_grid(
+        # grid is the DEFAULT_N_SAMPLES reporting grid
+        self.t, self.dt, self.n_samples = build_time_grid(
             t0,
             tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             verbose=verbose,
         )
@@ -86,11 +86,11 @@ class StaticSimulator:
         return build_on_auto(lambda backend: sys.compile(backend=backend), backend)
 
     def nominal_u_traj(self):
-        """The nominal input held over the grid, ``(m, n_pts)``."""
+        """The nominal input held over the grid, ``(m, n_samples)``."""
         m = self.sys.m
-        n_pts = self.n_pts
+        n_samples = self.n_samples
 
-        u_traj = np.zeros((m, n_pts))
+        u_traj = np.zeros((m, n_samples))
         if m > 0:
             u_bar = self.evaluator._u_nominal
             u_traj[:, :] = np.asarray(u_bar).reshape(m, 1)
@@ -100,7 +100,7 @@ class StaticSimulator:
     def build_trajectory(self, u_traj):
         """Evaluate the boundary outputs at every sample and record them in ``signals``."""
         times = self.t
-        n_pts = self.n_pts
+        n_samples = self.n_samples
 
         # y = h(u, t) at every sample, one channel a row
         outputs = outputs_on_grid(self.evaluator, self.sys, u_traj, times)
@@ -111,7 +111,9 @@ class StaticSimulator:
             key: values for key, values in outputs.items() if key not in {"x", "u"}
         }
 
-        return Trajectory(t=times, x=np.zeros((0, n_pts)), u=u_traj, signals=signals)
+        return Trajectory(
+            t=times, x=np.zeros((0, n_samples)), u=u_traj, signals=signals
+        )
 
 
 ###############################################################################
@@ -131,9 +133,9 @@ def require_static_system(sys):
 
 
 def outputs_on_grid(evaluator, sys, u_traj, times):
-    """``{port: (dim, n_pts)}``, the outputs at every sample: one ``vmap`` of the jitted body on JAX, a loop on NumPy."""
+    """``{port: (dim, n_samples)}``, the outputs at every sample: one ``vmap`` of the jitted body on JAX, a loop on NumPy."""
     m = sys.m
-    n_pts = times.shape[0]
+    n_samples = times.shape[0]
     empty_x = np.array([])
 
     # NumPy: y = h(u_k, t_k) sample by sample
@@ -144,7 +146,7 @@ def outputs_on_grid(evaluator, sys, u_traj, times):
             for key, value in evaluator.outputs(empty_x, u_i, float(ti)).items():
                 arr = np.asarray(value, dtype=float).reshape(-1)
                 if key not in columns:
-                    columns[key] = np.zeros((arr.size, n_pts))
+                    columns[key] = np.zeros((arr.size, n_samples))
                 columns[key][:, i] = arr
         return columns
 
@@ -160,6 +162,6 @@ def outputs_on_grid(evaluator, sys, u_traj, times):
 
     # The ports in their declared order, one channel a row
     return {
-        key: np.asarray(grid[key], dtype=float).reshape(n_pts, -1).T
+        key: np.asarray(grid[key], dtype=float).reshape(n_samples, -1).T
         for key in sys.outputs
     }

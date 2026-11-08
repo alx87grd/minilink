@@ -202,9 +202,9 @@ class TestChannelTools(unittest.TestCase):
         self.assertAlmostEqual(k, 0.5)
         gains, roots = root_locus(plant, x_bar)
         self.assertEqual(roots.shape[1], 2)
-        w_n, G_n = nyquist(plant, x_bar, n=50)
+        w_n, G_n = nyquist(plant, x_bar, n_samples=50)
         self.assertEqual(G_n.shape, (50,))
-        time, y = step_response(plant, x_bar, n=200)
+        time, y = step_response(plant, x_bar, n_samples=200)
         self.assertEqual(time.shape, y.shape)
         self.assertIsInstance(margins(plant, x_bar), linear.Margins)
         G_tf = transfer_function(plant, x_bar)
@@ -218,7 +218,7 @@ class TestChannelTools(unittest.TestCase):
         from minilink.analysis.frequency import margins_text
 
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        coarse, fine = margins(L, n=60), margins(L, n=4000)
+        coarse, fine = margins(L, n_samples=60), margins(L, n_samples=4000)
         # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
         self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
         self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
@@ -314,7 +314,7 @@ class TestInZ(unittest.TestCase):
         # The zero-order hold is exact under a step: the two agree at the ticks
         G = TransferFunction([1.0], [1.0, 3.0, 2.0])
         time, y = step_response(discretize(G, 0.1, solver="exact"), tf=2.0)
-        time_c, y_c = step_response(G, tf=2.0, n=21)
+        time_c, y_c = step_response(G, tf=2.0, n_samples=21)
         np.testing.assert_allclose(time, time_c)
         np.testing.assert_allclose(y, y_c, atol=1e-12)
 

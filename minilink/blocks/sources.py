@@ -48,7 +48,7 @@ class Source(System):
 
         return value
 
-    def show_signal(self, t0=None, tf=None, n_pts=1000, ax=None):
+    def show_signal(self, t0=None, tf=None, n_samples=1000, ax=None):
         """
         Plot the source output signal over a time range.
 
@@ -58,7 +58,7 @@ class Source(System):
             Start time (default 0.0).
         tf : float, optional
             End time (default 10.0).
-        n_pts : int, optional
+        n_samples : int, optional
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
             Existing axis to draw on. If None, a new figure is created and shown
@@ -85,11 +85,11 @@ class Source(System):
             t0 = 0.0
         if tf is None:
             tf = 10.0
-        require_plot_points(n_pts)
+        require_plot_points(n_samples)
 
         # The signal sampled on the time grid, one row per channel
         p = self.dim
-        t = np.linspace(t0, tf, int(n_pts))
+        t = np.linspace(t0, tf, int(n_samples))
         y = np.zeros((p, t.size), dtype=float)
         empty_x = np.array([])
         empty_u = np.array([])
@@ -436,10 +436,10 @@ class TrajectorySource(Source):
 ###############################################################################
 
 
-def require_plot_points(n_pts):
+def require_plot_points(n_samples):
     """Refuse a time grid of fewer than two points."""
-    if n_pts < 2:
-        raise ValueError("n_pts must be >= 2")
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
 
 
 def require_matching_levels(initial_value, final_value):

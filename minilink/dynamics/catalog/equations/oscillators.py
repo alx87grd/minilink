@@ -96,5 +96,5 @@ class Lorenz(DynamicSystem):
 if __name__ == "__main__":
     sys = VanderPol()
     sys.x0 = np.array([0.0, 1.0])
-    sys.compute_trajectory(tf=20.0, n_steps=400, show=True, verbose=False)
+    sys.compute_trajectory(tf=20.0, n_samples=400, show=True, verbose=False)
     sys.plot_phase_plane(traj=sys.traj)
