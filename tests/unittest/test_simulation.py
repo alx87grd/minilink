@@ -1703,3 +1703,17 @@ def test_a_static_leaf_samples_its_grid_in_one_jax_call():
             np.testing.assert_allclose(
                 jax_run.signals[key], numpy_run.signals[key], atol=1e-12, err_msg=name
             )
+
+
+def test_a_simulators_solver_options_are_its_own_copy_of_the_preset():
+    from minilink import Pendulum
+    from minilink.simulation.simulator import Simulator
+
+    edited = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+    edited.solver_backend_options.update(rtol=1e-10, atol=1e-10)
+    fresh = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+
+    assert (
+        fresh.solver_backend_options["rtol"],
+        fresh.solver_backend_options["atol"],
+    ) == (1e-4, 1e-7)

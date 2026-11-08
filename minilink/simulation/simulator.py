@@ -397,10 +397,12 @@ class Simulator:
         return sys.compile(backend=backend)
 
     def parse_solver(self, solver):
-        """``(backend key, options)`` of a solver label."""
+        """``(backend key, options)`` of a solver label, the options a copy of the preset's."""
         if solver not in _USER_SOLVER_MODES:
             raise ValueError(f"Unknown solver '{solver}'")
-        return _USER_SOLVER_MODES[solver]
+        key, options = _USER_SOLVER_MODES[solver]
+
+        return key, dict(options)
 
     def select_backend(self, solver_backend_key):
         """A fresh solver backend for its key."""
