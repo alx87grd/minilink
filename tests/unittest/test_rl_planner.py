@@ -158,6 +158,42 @@ def test_neural_policy_controller_normalizes_and_composes():
 # --- planner ---
 
 
+def test_solve_at_another_tree_trains_the_planner_rebuilt_there_from_its_seed():
+    import copy
+
+    prob = problem(horizon=np.inf, discount_rate=0.5)
+    settings = dict(dt=0.1, hidden=(8,), n_envs=2, n_steps=16, batch_size=16)
+    planner = ReinforcementLearningPlanner(prob, n_epochs=2, **settings)
+    tree = copy.deepcopy(planner.params)
+    assert set(tree) == {"method", "seed"}
+    tree["method"]["clip_range"] = 0.1
+    tree["method"]["optimizer"]["learning_rate"] = 1e-3
+    tree["seed"] = 3
+
+    # The tree's planner: built from the keywords, its numbers set, trained from its seed
+    solution = planner.solve(64, params=tree)
+    fresh = ReinforcementLearningPlanner(
+        prob, n_epochs=2, clip_range=0.1, learning_rate=1e-3, seed=3, **settings
+    )
+    expected = fresh.solve(64)
+    for name, W in expected.controller.params["mlp"].items():
+        np.testing.assert_array_equal(solution.controller.params["mlp"][name], W)
+    assert solution.record.n_timesteps == 64
+
+    # This planner as it was: no step taken, its numbers its own, the solution kept
+    assert planner.n_timesteps == 0 and planner.last_solution is solution
+    assert planner.params["method"]["clip_range"] == 0.2
+    assert planner.params["seed"] == 0
+
+    # Its own tree solves as the planner itself does; a number it lacks is refused
+    same = planner.solve(64, params=copy.deepcopy(planner.params))
+    own = ReinforcementLearningPlanner(prob, n_epochs=2, **settings).solve(64)
+    for name, W in own.controller.params["mlp"].items():
+        np.testing.assert_array_equal(same.controller.params["mlp"][name], W)
+    with pytest.raises(ValueError, match="no number"):
+        planner.solve(64, params={**planner.params, "method": {"tau": 0.1}})
+
+
 def test_planner_learns_returns_a_policy_plan_and_a_controller():
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(

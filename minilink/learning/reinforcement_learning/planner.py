@@ -37,7 +37,7 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, planner_at, planner_evidence
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_model import is_continuous
 
@@ -163,6 +163,29 @@ class ReinforcementLearningPlanner(Planner):
         super().__init__(problem)
         jax = require_jax()
 
+        # The keywords as given, the law and the update rule as they were before any
+        # learning: what rebuilds this planner on another tree (build_kwargs)
+        self.keywords = dict(
+            dt=dt,
+            policy=copy.deepcopy(policy),
+            features=features,
+            hidden=hidden,
+            activation=activation,
+            normalize=normalize,
+            method=copy.deepcopy(method),
+            n_envs=n_envs,
+            n_steps=n_steps,
+            episode_length=episode_length,
+            gamma=gamma,
+            log_std_init=log_std_init,
+            solver=solver,
+            substeps=substeps,
+            training_zone=training_zone,
+            reward=reward,
+            seed=seed,
+            **method_numbers,
+        )
+
         # Training settings
         self.n_envs = int(n_envs)
         self.seed = int(seed)
@@ -273,13 +296,26 @@ class ReinforcementLearningPlanner(Planner):
         The planner's tree: ``"method"``, the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
 
         The numbers are read when the update is first traced: set them on the
-        algorithm before learning. The problem's own leaves are the problem's
-        (the score is always the problem's).
+        algorithm before learning, or solve at another tree
+        (``solve(params=)``). The problem's own leaves are the problem's (the
+        score is always the problem's). The network's weights are learned,
+        never a number of the tree.
         """
         return {"method": self.algorithm.method_params, "seed": self.seed}
 
+    @property
+    def number_names(self) -> tuple:
+        """The names under :attr:`params` ``["method"]``: the update rule's numbers, its optimizer's under ``"optimizer"``."""
+        return tuple(self.algorithm.method_params)
+
     def solve(
-        self, n_timesteps=100_000, *, evaluate=False, n_trials=50, verbose=False
+        self,
+        n_timesteps=100_000,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose=False,
     ) -> PlanningSolution:
         """
         Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
@@ -289,7 +325,18 @@ class ReinforcementLearningPlanner(Planner):
         ``n_trials`` draws of the problem (a continuous problem's integrated on
         the planner's ``dt``, a step problem's on its model). ``verbose``
         prints the environment's semantics and one line per learning iteration.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) trains
+        a planner rebuilt there (:func:`~minilink.planning.planner.planner_at`)
+        from its seed, its weights learned from their initial draw; this
+        planner is unchanged.
         """
+        # At another tree: the planner there, trained from its seed, its solution kept here
+        if params is not None:
+            solution = planner_at(self, params).solve(
+                n_timesteps, evaluate=evaluate, n_trials=n_trials, verbose=verbose
+            )
+            return self.store_solution(solution)
+
         # Train, then store the learned law as the planner's solution
         self.learn(n_timesteps, verbose=verbose)
         solution = self.solution(evaluate, n_trials)
@@ -334,6 +381,41 @@ class ReinforcementLearningPlanner(Planner):
                 self.print_iteration(record, stats)
 
         return self
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another tree: those it was given, its law and update rule as they were before learning."""
+        kwargs = {
+            name: copy.deepcopy(value) if name in ("policy", "method") else value
+            for name, value in self.keywords.items()
+        }
+
+        return kwargs
+
+    def rebuilt_on(self, problem, kwargs) -> "ReinforcementLearningPlanner":
+        """
+        This planner on ``problem`` from ``kwargs``: the method's numbers set on the new update rule before it learns.
+
+        The discount ``gamma`` is a keyword (it sets the environment's rate); the
+        update rule's other numbers, and its optimizer's under ``"optimizer"``,
+        are written on the rebuilt algorithm, read at its first update.
+        """
+        numbers = set(self.number_names) - {"gamma"}
+        keywords = {
+            name: value for name, value in kwargs.items() if name not in numbers
+        }
+        planner = type(self)(problem, **keywords)
+
+        # The method's numbers the tree sets, on the new algorithm and its optimizer
+        algorithm = planner.algorithm
+        for name in numbers & set(kwargs):
+            value = kwargs[name]
+            if name == "optimizer":
+                for key, number in value.items():
+                    setattr(algorithm.optimizer, key, float(number))
+            else:
+                setattr(algorithm, name, float(value))
+
+        return planner
 
     def sync_actor(self):
         """Copy the current policy network weights into the actor block."""
