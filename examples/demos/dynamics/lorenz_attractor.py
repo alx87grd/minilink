@@ -6,12 +6,12 @@ import numpy as np
 from minilink import Lorenz
 
 TF = 40.0
-N_STEPS = 4000
+N_SAMPLES = 4000
 
 sys = Lorenz()
 sys.x0 = np.array([1.0, 1.0, 1.0])
 
-traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS, verbose=False)
+traj = sys.compute_trajectory(tf=TF, n_samples=N_SAMPLES, verbose=False)
 sys.plot_trajectory(traj)
 
 x, y, z = traj.x[0], traj.x[1], traj.x[2]

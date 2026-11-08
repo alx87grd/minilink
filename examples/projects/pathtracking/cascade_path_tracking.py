@@ -426,7 +426,7 @@ diagram.connect("yaw_rate_loop", "delta", "vehicle", "delta")
 
 diagram.plot_diagram()
 diagram.compute_trajectory(tf=20.0, dt=0.02, show=False, verbose=False)
-diagram.plot_trajectory(signals=("x", "u"), backend="matplotlib")
+diagram.plot_trajectory(signals=("x", "u"), renderer="matplotlib")
 
 xv = diagram.traj.of("vehicle").x
 px, py = xv[0, :], xv[1, :]

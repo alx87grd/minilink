@@ -54,7 +54,7 @@ diagram.plot_trajectory()
 diagram.name = "Pendulum with Measurement Noise "
 diagram.subsystems["process_noise"].params["psd"] = 0.0
 diagram.subsystems["measurement_noise"].params["psd"] = 0.01
-# diagram.subsystems["measurement_noise"].show_signal()
+# diagram.subsystems["measurement_noise"].plot_signal()
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()
 
@@ -62,6 +62,6 @@ diagram.name = "Pendulum with Process Noise "
 diagram.subsystems["process_noise"].params["psd"] = 20.0
 diagram.subsystems["process_noise"].params["sample_period"] = 0.2
 diagram.subsystems["measurement_noise"].params["psd"] = 0.0
-# diagram.subsystems["process_noise"].show_signal()
+# diagram.subsystems["process_noise"].plot_signal()
 diagram.compute_trajectory(tf=20)
 diagram.plot_trajectory()

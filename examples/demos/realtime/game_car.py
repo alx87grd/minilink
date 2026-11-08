@@ -8,6 +8,6 @@ sys.game(
     renderer="meshcat",
     is_3d=True,
     plot=("slip", "grip"),
-    plot_backend="plotly",
+    plot_renderer="plotly",
     joystick_axes=[(1, 1.0), (0, -1.0)],
 )

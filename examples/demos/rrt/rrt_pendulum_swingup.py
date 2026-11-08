@@ -24,7 +24,7 @@ problem = PlanningProblem(
 torques = [np.array([tau]) for tau in (-5.0, -2.0, 0.0, 2.0, 5.0)]
 planner = RRTPlanner(
     problem,
-    extender=KinodynamicExtender(controls=torques, horizon=0.3, n_substeps=6),
+    extender=KinodynamicExtender(controls=torques, horizon=0.3, n_steps=6),
     seed=0,
     goal_bias=0.05,
     max_nodes=20000,

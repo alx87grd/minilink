@@ -53,8 +53,8 @@ def pendulum_problem():
 
 def benchmark_backend(
     backend: str,
-    x_grid_shape,
-    u_grid_shape,
+    x_grid,
+    u_grid,
     *,
     n_steps: int = 300,
     dt: float = 0.05,
@@ -72,8 +72,8 @@ def benchmark_backend(
     t0 = time.perf_counter()
     grid = StateSpaceGrid(
         problem,
-        x_grid=x_grid_shape,
-        u_grid=u_grid_shape,
+        x_grid=x_grid,
+        u_grid=u_grid,
         dt=dt,
         precompute=(backend != "loop"),
     )
@@ -98,7 +98,7 @@ def benchmark_backend(
 
     return DPBenchmarkRow(
         backend=backend,
-        grid=f"{tuple(x_grid_shape)}x{tuple(u_grid_shape)}",
+        grid=f"{tuple(x_grid)}x{tuple(u_grid)}",
         build_s=build_s,
         cold_solve_s=cold_solve_s,
         best_solve_s=best_solve_s,

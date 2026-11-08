@@ -3,13 +3,13 @@
 from minilink import ThreeBodyProblem
 
 TF = 30.0
-N_STEPS = 30000
+N_SAMPLES = 30000
 
 sys = ThreeBodyProblem(preset="figure_eight")
 
 sys.x0[0] = 0.9
 
-traj = sys.compute_trajectory(tf=TF, n_steps=N_STEPS)
+traj = sys.compute_trajectory(tf=TF, n_samples=N_SAMPLES)
 
 # sys.plot_trajectory()
 sys.animate(renderer="meshcat")

@@ -7,7 +7,6 @@ from minilink import (
     LQRPlanner,
     Pendulum,
     PlanningProblem,
-    PolicyEvaluator,
     QuadraticCost,
     compare,
 )
@@ -33,7 +32,6 @@ problem = PlanningProblem(plant, x0=X0, cost=cost, U=plant.input_box)
 planner = DynamicProgrammingPlanner(
     problem, x_grid=(101, 101), u_grid=(11,), dt=0.05, tol=0.1, max_iterations=2000
 )
-grid = planner.grid  # shared with the LQR policy evaluation below
 sol_vi = planner.solve()
 sol_lqr = LQRPlanner(problem).solve()
 
@@ -42,19 +40,11 @@ race = compare(VI=sol_vi, LQR=sol_lqr)
 print(race)
 race.plot_control_law()
 race.plot_cost_to_go(jmax=INF)
-planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.plot_cost_to_go(jmax=INF, is_3d=True)
 
 # The LQR law measured on the nonlinear plant: the Bellman expectation equation on VI's grid
-J_lqr = PolicyEvaluator(
-    problem,
-    grid=grid,
-    policy=sol_lqr,
-    **planner.params["method"],
-    tol=planner.tol,
-    max_iterations=planner.max_iterations,
-    interpolation=planner.interpolation,
-).solve()
-grid.plot_value(J_lqr, vmax=INF, title="LQR cost-to-go, measured")
+J_lqr = planner.evaluate_policy(sol_lqr)
+planner.plot_cost_to_go(field=J_lqr, jmax=INF, title="LQR cost-to-go, measured")
 
 # Close the loops, explicitly, and simulate each from the same start
 plant.x0 = X0
@@ -70,6 +60,6 @@ vi_diagram.plot_trajectory(vi_traj)
 lqr_diagram.plot_trajectory(lqr_traj)
 
 # print("VI  cost-to-go at x0:", round(planner.cost_to_go(X0), 2))
-# print("LQR cost-to-go at x0:", round(float(grid.interpolate(J_lqr, X0.reshape(1, -1))[0]), 2))
+# print("LQR cost-to-go at x0:", round(float(J_lqr(X0)), 2))
 # print("VI  | final angle error:", round(abs(vi_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
 # print("LQR | final angle error:", round(abs(lqr_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")

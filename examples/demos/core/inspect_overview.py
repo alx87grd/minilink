@@ -32,7 +32,7 @@ diagram.connect("step", "y", "plant", "u")
 diagram.name = "step_to_integrator"
 print(diagram)
 
-sim = Simulator(plant, tf=1.0, n_steps=11)
+sim = Simulator(plant, tf=1.0, n_samples=11)
 traj = sim.solve()
 print(traj)
 print(sim)
