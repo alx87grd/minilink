@@ -203,7 +203,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Area | Lane | TRL | State | Next |
 | --- | --- | --- | --- | --- |
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`, and so does an `h`-computed output that moves with an input it does not declare (a port function is not probed, KNOWN_ISSUES); `connect` refuses a rewire (`disconnect` first; the v0.3 run, step 7); the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`); three owners of a start (the block, the problem, the evaluator's tree), a block's state size fixed once built; `System(state_dim, *, input_dim=, output_dim=)` on every system kind, a static one feeding its input through; `h` the `"y"` port on every block and evaluator. | Automation by convention, the rest (P10: plots and animation by role). |
-| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX; the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 0.12–0.16 s on a cloud CPU); `rollout_batch` takes a `params` family; float64 on JAX by default. Step evaluators that trace and batch, one signal pass per tick, the sampled plan; the step problem answers its own equations (`transition`, `terminal`, `run`), on the internal `StepModel` (`planning/step_model.py`). One automatic-backend rule (`build_on_auto`, falling back on a missing JAX or a `NotTraceableError` only); the batch claim gated in CI, a parameter family's price (about 4–6× the plain batch) accepted. | Diffrax (S27, v0.9). |
+| Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX; the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 0.12–0.16 s on a cloud CPU); `rollout_batch` takes a `params` family; float64 on JAX by default. Step evaluators that trace and batch, one signal pass per tick, the sampled plan; the step problem answers its own equations (`transition`, `terminal`, `run`), on the internal `StepModel` (`planning/step_model.py`). One automatic-backend rule (`build_on_auto`, falling back on a missing JAX or a `NotTraceableError` only); the batch claim gated in CI, a parameter family's price measured (about 4–6× the plain batch). | A parameter family within 2× of the plain batch, or the bar dropped (S53, waiting for the maintainer); Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified; one automatic step from the blocks' physics (the linear blocks' eigenvalues, the catalog's `fastest_mode()`), a held block read at each RK4 stage like any block (first order at its switches); `scipy_stiff` at `scipy`'s tolerances with the Jacobian on both backends. | Two points of one owner per rule waiting for the maintainer's go (S65); the rest of the catalog declaring its `τ` (TODO §2). |
 | Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none. | The catalog clean-up (K8, v0.4, after the demo rebuild); one mechanical family (S32; postponed until the maintainer reviews the mechanical hierarchy, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.5. |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions; the joint and task impedance laws on the same error rule), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; the geometric path-tracking laws `PurePursuit`, `Stanley` and `LineOfSight` on a `core/geometry` path, with the heading loop `HeadingController` (forward driving; unit-tested and JAX-traced, three racecar demos and their comparison, not yet in a course); a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.5); the path-tracking laws on a `Track` (A3). |
@@ -464,8 +464,8 @@ PRs #135 and #136 on 2026-11-08. Their contracts are DESIGN's; every name they c
   environment on a native step problem; the root locus and the step response in `z`; the
   linear-analysis plots on step and sampled systems; one error rule for the impedance laws;
   one owner per rule (the automatic backend, `scipy_stiff`, the report panels, the print
-  text); the batch-rollout claim gated (a parameter family's price accepted as it is, the
-  catalog's readability first); the first cut of the minimal surface (two topic notebooks
+  text); the batch-rollout claim gated (a parameter family's 2× bar not reached; the ask waits
+  for the maintainer, S53); the first cut of the minimal surface (two topic notebooks
   that duplicated GRO860's deleted, the benchmarks reduced to the regression gate, the slow
   tests behind `--runslow`).
 - *The maintainer's rulings of 2026-11-07 and 2026-11-08, built with them:* the step problem
@@ -474,7 +474,7 @@ PRs #135 and #136 on 2026-11-08. Their contracts are DESIGN's; every name they c
   as a hook; the path names from `minilink.core.geometry`.
 
 **Left**, in order (TODO §1, "Next, in order"):
-- **Phase 5, the surface redrafted on the settled names** (TODO §1.12, §1.13 and §2): the
+- **Phase 5, the surface redrafted on the settled names** (TODO §1.12 and §2): the
   maintainer's demo rebuild, a minimal set in place of every demo, then the tests rebuilt from
   a clean slate around it; the course notebooks, their content the maintainer's; the
   clean-up lane below. The cart-pole RL demo's budget waits for the rebuild.
@@ -490,7 +490,7 @@ PRs #135 and #136 on 2026-11-08. Their contracts are DESIGN's; every name they c
 | § | Workstream | Left (TODO §1.N) |
 | --- | --- | --- |
 | 1 | Every object pure, every number a parameter (invariant) | A5's later nouns, each with its first consumer; the sets-as-costs demos (was V1 step 8) |
-| 2 | The step algebra first-class (invariant) | two points of one owner per rule (S65) waiting for the maintainer's go: the Monte Carlo defaults, the empty-cache rule |
+| 2 | The step algebra first-class (invariant) | waiting for the maintainer's go: a parameter family's batch price (S53), and two points of one owner per rule (S65), the Monte Carlo defaults and the empty-cache rule |
 | 3 | The draws | nothing (the contract is DESIGN §4 and §6) |
 | 4 | The seeded stochastic policy | nothing |
 | 5 | The sampled loop: a step diagram, two runners | nothing (the realtime runner on the pure blocks is v0.5) |
