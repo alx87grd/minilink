@@ -83,8 +83,7 @@ concrete formatting, ordered by the cost of being wrong:
   the tabular `Q`, the RRT tree), and diagnostics of the machinery that no tool reads
   (`last_program` and `last_optimizer` on trajectory optimization, `Simulator.last_debug`). The
   Simulator's `last_traj` and `last_solve_time_s` predate the rule (TODO, D1.4). A new
-  exception needs a reason of `sys.traj`'s weight. `StepSystem.rollout` goes with the sampled
-  loop (TODO §1.5).
+  exception needs a reason of `sys.traj`'s weight.
 - **2.5 Prefer arrays and existing core objects.** New APIs take and return arrays or types
   students already know (`System`, `Trajectory`, `PlanningProblem`, sets, costs). Do not add
   request/response dataclasses, option bags, or adapter layers that only wrap those. A new
@@ -204,7 +203,7 @@ concrete formatting, ordered by the cost of being wrong:
 - **4.3 Preconditions met by named adapters.** Never ask the user to write a separate model for
   different tools. A tool requiring a linear model accepts any `System` via `linearize()`; a tool
   requiring discrete stepping accepts a continuous system via a discretization adapter; a tool
-  requiring a stochastic problem accepts a deterministic one via `as_stochastic()`. Convert once
+  requiring a deterministic problem accepts a stochastic one via `problem.nominal()`. Convert once
   at the boundary, then use the richer object directly: never probe it with `hasattr` or
   `getattr` defaults inside the math. A tool that needs a box asks the set
   (`X.bounding_box()`); it does not `isinstance` the set. A planner or policy builder that
@@ -478,7 +477,7 @@ concrete formatting, ordered by the cost of being wrong:
   contract as a textbook would. They never name the design process (step ids, audits, dates,
   "decided", "landed", "for now", "currently", "until pipeline B", a ROADMAP or TODO
   section), the course or its exercises, or what another library refuses; that history
-  lives in `docs/plans/` and the git log. The same holds for test
+  lives in the git history. The same holds for test
   docstrings and comments, and for refusal and warning messages: a refusal says what is
   supported and what to pass instead.
 - **5.25 One verb family per role:** A helper's name says its role.
