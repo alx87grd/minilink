@@ -11,6 +11,15 @@ Each item below records:
 
 ## CA-1. Standard port arguments on `System.__init__` (`input_dim`, `output_dim`, `expose_state`, `y_dependencies`)
 
+**Ruled 2026-11-07:** go, with one change: on a static `System` given an `input_dim`, `y_dependencies`
+defaults to `("u",)` (a static map feeds through by definition; `None`, no feedthrough, would
+silently misorder a diagram); `DynamicSystem` and `StepSystem` keep `None`.
+Ruled the same day, the naming: words in the constructor, textbook symbols as attributes. The
+first argument `n` becomes `state_dim` (beside `input_dim` and `output_dim`, which create the
+ports `"u"` and `"y"`), swept in the same change with no alias; the attributes stay `n`, `m`,
+`p`, the textbook dimensions (`m` and `p` totals over the ports: `input_dim=1` with a `"d"` port
+of 3 gives `m = 4`). RULES §2.7's vocabulary gains `state_dim`.
+
 ### Problem and reproducer
 In the system hierarchy, there are three primary system classes:
 - `System` (`minilink/core/system.py`) — memoryless/static systems ($n = 0$, $y = h(u, t; p)$) and base class of all systems.
@@ -109,6 +118,13 @@ Instead, a user authoring a static `System` must write explicit `add_input_port`
 
 ## CA-2. Add `.h(x, u=None, t=0.0, params=None)` on compiled evaluators (`Evaluator` and `DiscreteEvaluator`)
 
+**Ruled 2026-11-07: one contract, enforced.** `h` *is* the `"y"` port everywhere, empty when a
+block has none (a `PID`, whose output is the command `"u"`): `ev.h(x, u=None, t=0.0, params=None)`
+returns the `"y"` port or an empty array, exactly as `sys.h` (no fallback to a lone port, which
+would make `ev.h` on a PID its command while `pid.h` is empty). A defect found in the review is
+fixed with it: `Mux`, `Saturation` and `Sum` compute their `"y"` port by another function and
+`sys.h` returns zeros; a test pins `sys.h == outputs["y"]` on every block and catalog plant.
+
 ### Problem and reproducer
 On any `System`, the two primary textbook equations (`CONSTITUTION.md` §2) are:
 - `sys.f(x, u, t=0.0, params=None) -> ndarray (n,)`
@@ -202,6 +218,14 @@ history before this change.
 ---
 
 ## CA-5. Export core mathematical types on `minilink.core` (and optional root prelude `minilink`)
+
+**Ruled 2026-11-07, with the root exports row (TODO §1.13):** `minilink.core` exports the core
+objects' family, `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+`ScaledCost`, `SampledSystem` and `SampledDiagramSystem`, so none needs a deep import; the root
+prelude gains only the concrete fields users build, `QuadraticField` and `GridField` (its rule:
+the concrete objects you build); `Field` stays on `minilink.core` beside `Set` and
+`Distribution`; `ModelPredictiveController` and `MPPIPlanner` stay on `minilink.control` and
+`minilink.planning`, where every example imports them.
 
 ### Problem and reproducer
 Several core classes used in the core tutorials are missing from `minilink/core/__init__.py`:

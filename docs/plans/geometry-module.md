@@ -1,11 +1,11 @@
 # Workspace geometry module
 
-**Status:** core contract — design agreed 2026-09-21, not started.  
+**Status:** core contract — design agreed 2026-09-21. Landed 2026-11-06: the `core/geometry/` package with the shapes and the paths (step 1, the paths of step 2, step 5); the rest not started.  
 **Lane:** core (`minilink.core.geometry`), then a teaching catalog of courses.  
 **Rung:** v0.5, step A3 of [TODO.md](TODO.md) §4, a feature on the core; the `Field` it needs is a v0.3 core pillar ([TODO.md](TODO.md) §1.9).  
 **Depends on:** the `Field` ABC (`core/fields.py`, DESIGN §4) (landed in v0.3, `StateField` renamed `Field`).
 
-Workspace math is split today: SDF solids in [`core/geometry.py`](../../minilink/core/geometry.py), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2), so [`PurePursuit`](../../minilink/control/geometric.py) takes a raw waypoint array. Demos rebuild the same oval and cones by hand.
+Workspace math is split today: SDF solids and paths in [`core/geometry/`](../../minilink/core/geometry/), everything else under [`planning/spatial/`](../../minilink/planning/spatial/). That home is an accident of first consumer (trajopt). Control cannot import planning ([RULES.md](../dev/RULES.md) 3.2); the path-tracking laws of [`control/geometric.py`](../../minilink/control/geometric.py) read a path from core. Demos rebuild the same oval and cones by hand.
 
 **Placement test:** if you would still import it to score a controller with no `PlanningProblem`, it is not `planning/`.
 
@@ -23,10 +23,10 @@ Graphics stay a second vocabulary on purpose (the 2026-09-05 architecture review
 
 | Object | Before | After |
 | --- | --- | --- |
-| `Shape`, `Sphere`, `Box`, `Union`, `Inflated` | [`core/geometry.py`](../../minilink/core/geometry.py) | `core/geometry/shapes.py` (package, same names) |
+| `Shape`, `Sphere`, `Box`, `Union`, `Inflated` | `core/geometry.py` | [`core/geometry/shapes.py`](../../minilink/core/geometry/shapes.py) (landed, same names) |
 | `SE2`, `SE3`, `Rx/Ry/Rz`, `translation`, `inv`, `apply` | [`core/kinematics.py`](../../minilink/core/kinematics.py) | **unchanged** — pose algebra, sibling of geometry |
-| `ReferencePath`, `PolylinePath`, `from_waypoints`, `circuit_waypoints` | [`planning/spatial/paths.py`](../../minilink/planning/spatial/paths.py) | `core/geometry/paths.py` |
-| `is_closed` | [`control/geometric.py`](../../minilink/control/geometric.py) | `core/geometry/paths.py` |
+| `ReferencePath`, `PolylinePath`, `from_waypoints`, `circuit_waypoints` | `planning/spatial/paths.py` | [`core/geometry/paths.py`](../../minilink/core/geometry/paths.py) (landed; a polyline takes `closed=`) |
+| `is_closed` | `control/geometric.py` | `core/geometry/paths.py` (landed) |
 | `ReferenceTrack` | [`planning/spatial/track.py`](../../minilink/planning/spatial/track.py) | `core/geometry/track.py` |
 | `Scene` | [`planning/spatial/scene.py`](../../minilink/planning/spatial/scene.py) | `core/geometry/scene.py` |
 | `WorkspaceField`, `GaussianField` | [`planning/spatial/workspace_fields.py`](../../minilink/planning/spatial/workspace_fields.py) | `core/geometry/` beside Scene |
@@ -47,7 +47,7 @@ Student import after the move: `from minilink.core.geometry import Scene, mount,
 
 | Object | Home | Why |
 | --- | --- | --- |
-| `PurePursuit` | `control/geometric.py` | a law; it *reads* a Path/Track |
+| `PurePursuit`, `Stanley`, `LineOfSight`, `HeadingController` | `control/geometric.py` | laws; the first three *read* a Path |
 | `CBFSafetyFilter` (planned) | `control/` | a block; it *reads* a clearance `Field` |
 | `DubinsSteering`, RRT extenders | `planning/search/` | connectors; they *read* a curve |
 | `PlanningProblem`, trajopt, RRT, RL | `planning/` | verbs |
@@ -58,7 +58,7 @@ Student import after the move: `from minilink.core.geometry import Scene, mount,
 
 `Shape` is `sdf(p)` (occupied workspace). `Field` is `value(x)` (state-domain scalar). Do not fold them. A Dubins *path* (the curve) can later be a `Path` kind in geometry; `DubinsSteering` stays search.
 
-PurePursuit’s lookahead stays **closest waypoint, then along the polyline** — not `PolylinePath.project`. Sharing the path *object* is the win; the law stays in control.
+Every path-tracking law projects a body point on the path (`project`) and reads a point or a tangent at an arc length (`sample`, `tangent`); pure pursuit aims at the point one lookahead along the path, not at a waypoint (ruled 2026-11-06). Sharing the path *object* is the win; each law stays in control.
 
 ## Catalog
 
@@ -107,11 +107,11 @@ minilink/graphical/          # drawing only
 
 ## Implementation (later)
 
-1. `geometry.py` → `core/geometry/shapes.py`.
-2. Move Path, Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
+1. `geometry.py` → `core/geometry/shapes.py` (landed).
+2. Move Path (landed), Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
 4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
-5. PurePursuit accepts a `Path` / `Track`.
+5. The path-tracking laws accept a `Path` (landed; a `Track`, once it moves).
 6. The minimal `Field` (landed in v0.3): spatial subclasses already live in geometry when `Field` lands.
 
 ## Out of scope

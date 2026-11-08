@@ -59,9 +59,6 @@ Spatial
 .. automodule:: minilink.planning.spatial.track
    :members:
 
-.. automodule:: minilink.planning.spatial.paths
-   :members:
-
 .. automodule:: minilink.planning.spatial.workspace_fields
    :members:
 

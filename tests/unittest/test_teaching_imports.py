@@ -23,6 +23,7 @@ TEACHING_MODULES = {
     "minilink",
     "minilink.catalog",
     "minilink.core",
+    "minilink.core.geometry",
     "minilink.blocks",
     "minilink.graphical.catalog",
     "minilink.control",

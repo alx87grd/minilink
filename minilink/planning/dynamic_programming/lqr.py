@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -14,9 +15,9 @@ from minilink.control.state import (
     TimeVaryingFeedback,
 )
 from minilink.core.costs import QuadraticCost
+from minilink.core.fields import QuadraticField
 from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
-from minilink.core.trajectory import interpolate_schedule
 from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
@@ -30,6 +31,31 @@ from minilink.planning.results import PlanningSolution
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+def lqr_matrices(
+    sys, x_bar, u_bar, Q, R, S, *, t=0.0, params=None, method="auto", eps=1e-6
+):
+    """
+    ``(A, B, Q, R, S)``: a quadratic problem lowered to the textbook LQR matrices at ``(x̄, ū, t)``.
+
+    The plant linearized at the operating point, ``B`` over its command port
+    alone (a disturbance ``d`` or a noise ``n`` is never decided), and the
+    weights over that port: ``R[c, c]`` of a weight that spans every input.
+    ``params`` are the plant's numbers to linearize with (its own for
+    ``None``); ``method`` and ``eps`` the differentiation of
+    :func:`~minilink.analysis.derivatives.jacobian`. The Riccati solvers of
+    :mod:`minilink.control.design` take the result.
+    """
+    # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
+    model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    A = model.A()
+    B = model.B()
+
+    # The input weight over the command port: R[c, c]
+    R = command_block(sys, R)
+
+    return A, B, Q, R, S
 
 
 class LQRPlanner(Planner):
@@ -131,23 +157,28 @@ class LQRPlanner(Planner):
         sys = problem.sys
         n_steps = self.n_steps
         dt = self.dt
+        rho = problem.discount_rate
 
-        # The plant linearized at the operating point: A = ∂f/∂x, B = ∂f/∂u
-        A, B = self.linear_model()
+        # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
+        # weights over the command port
+        A, B, Q, R, S_f = self.lqr_matrices()
 
-        # The weights and the operating point over the command port: R[c, c], ū[c]
-        Q = self.cost.Q
-        R = command_block(sys, self.cost.R)
-        S_f = self.cost.S
+        # An e^{−ρt}-discounted cost is the undiscounted one on A_ρ = A − (ρ/2) I (in
+        # x̃ = e^{−ρt/2} x, ũ = e^{−ρt/2} u, the same law); A_ρ = A undiscounted
+        if rho > 0.0:
+            warn_discounted_lqr(rho)
+        A_rho = A - 0.5 * rho * np.eye(A.shape[0])
+
+        # The operating point, ū over the command port: ū[c]
         x_bar = self.x_bar
         u_bar = command_block(sys, self.u_bar)
 
         if problem.horizon_kind() == "finite":
             tf = problem.require_finite_horizon()
 
-            # −Ṡ = Aᵀ S + S A − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
+            # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t)
-            t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=n_steps)
+            t, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, tf, n_steps=n_steps)
 
             # The law u = ū − K(t) (x − x̄)
             policy = TimeVaryingFeedback(t, K, x_bar=x_bar, u_bar=u_bar)
@@ -164,10 +195,10 @@ class LQRPlanner(Planner):
                 schedule=(t, K, S),
                 U_ignored=is_bounded(problem.U.bounding_box()),
             )
-            cost_to_go = quadratic_cost_to_go(x_bar, S, t)
+            cost_to_go = QuadraticField(x_bar, S, t)
         else:
-            # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
-            P = care(A, B, Q, R)
+            # A_ρᵀ P + P A_ρ − P B R⁻¹ Bᵀ P + Q = 0
+            P = care(A_rho, B, Q, R)
 
             # K = R⁻¹ Bᵀ P
             K = np.linalg.solve(R, B.T @ P)
@@ -186,7 +217,7 @@ class LQRPlanner(Planner):
                 horizon=np.inf,
                 U_ignored=is_bounded(problem.U.bounding_box()),
             )
-            cost_to_go = quadratic_cost_to_go(x_bar, P)
+            cost_to_go = QuadraticField(x_bar, P)
 
         # Optionally, roll the law out from the problem's start and score it over
         # its draws
@@ -218,20 +249,27 @@ class LQRPlanner(Planner):
 
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
-        sys = self.problem.sys
-        x_bar = self.x_bar
-        u_bar = self.u_bar
-        t = self.t
-        params = nominal_plant_params(self.problem)
-        method = self.method
-        eps = self.eps
-
-        # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
-        model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
-        A = model.A()
-        B = model.B()
+        A, B, _, _, _ = self.lqr_matrices()
 
         return A, B
+
+    def lqr_matrices(self):
+        """``(A, B, Q, R, S)`` of :func:`lqr_matrices` at this planner's operating point, the plant at its design numbers."""
+        cost = self.cost
+        params = nominal_plant_params(self.problem)
+
+        return lqr_matrices(
+            self.problem.sys,
+            self.x_bar,
+            self.u_bar,
+            cost.Q,
+            cost.R,
+            cost.S,
+            t=self.t,
+            params=params,
+            method=self.method,
+            eps=self.eps,
+        )
 
 
 @dataclass(frozen=True)
@@ -276,39 +314,6 @@ class RiccatiRecord:
         return f"K = {K}, closed-loop poles {poles}{ignored}"
 
 
-def quadratic_cost_to_go(x_bar, P, t_samples=None):
-    """``J(x) = (x − x̄)ᵀ P (x − x̄)``; with a schedule ``P = S(t)`` on ``t_samples``, ``J(x, t)``."""
-    x_bar = np.asarray(x_bar, dtype=float)
-
-    if t_samples is None:
-
-        def J(x, t=0.0):
-            dx = np.asarray(x, dtype=float) - x_bar
-
-            # J = dxᵀ P dx
-            value = float(dx @ P @ dx)
-
-            return value
-
-    else:
-
-        def J(x, t=0.0):
-            dx = np.asarray(x, dtype=float) - x_bar
-            S = interpolate_schedule(np, t_samples, P, float(t))
-
-            # J(x, t) = dxᵀ S(t) dx
-            value = float(dx @ S @ dx)
-
-            return value
-
-    return J
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
 def require_quadratic_cost(cost):
     """Refuse a cost that is not a ``QuadraticCost``, the only one the Riccati equation solves."""
     if not isinstance(cost, QuadraticCost):
@@ -317,6 +322,16 @@ def require_quadratic_cost(cost):
             "g = (x - x_bar)ᵀ Q (x - x_bar) + (u - u_bar)ᵀ R (u - u_bar); "
             f"got {type(cost).__name__}"
         )
+
+
+def warn_discounted_lqr(rho):
+    """Warn that the problem is discounted, unusual for LQR, and how it is solved."""
+    warnings.warn(
+        f"LQRPlanner on a discounted problem (discount_rate={rho:g}): solved as the "
+        "undiscounted problem on A − (ρ/2) I, the textbook equivalent; the closed-loop "
+        "poles are the plant's, eig(A − B K)",
+        stacklevel=3,
+    )
 
 
 def command_block(sys, value):

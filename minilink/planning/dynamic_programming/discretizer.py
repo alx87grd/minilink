@@ -7,6 +7,7 @@ from scipy.interpolate import RegularGridInterpolator
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY, ensure_jax_x64
 from minilink.core.compile.evaluators.stepping import require_step_knobs
+from minilink.core.fields import GridField
 from minilink.core.sets import BoxInputSet, BoxSet, is_finite_box
 from minilink.planning.dynamic_programming.progress import (
     maybe_print_build_progress,
@@ -193,9 +194,12 @@ class StateSpaceGrid:
         if self.verbose and not self.precomputed:
             self.print_mesh_summary()
 
-        # The tables traced on device; a plant JAX cannot trace is refused
+        # The tables traced on device; a plant JAX cannot trace is refused (JAX missing
+        # says so itself)
         try:
             self.x_next, self.action_ok, self.x_next_ok = self.compute_transition_jax(t)
+        except ImportError:
+            raise
         except Exception as exc:
             raise ValueError(
                 "JAX grid precompute requires a JAX-traceable plant f and BoxSet X"
@@ -337,6 +341,22 @@ class StateSpaceGrid:
         interp = self.build_interpolator(values, method)
 
         return interp(np.asarray(queries, dtype=float))
+
+    def field(self, values, t=None, *, method="linear", outside=None) -> GridField:
+        """
+        A node-indexed table ``(nodes_n,)`` as a :class:`~minilink.core.fields.GridField` on this grid's levels.
+
+        With times ``t`` ``(T,)``, ``values`` is ``(T, nodes_n)``, one table per
+        time. ``method`` is the reading rule (``"spline"`` the ``"cubic"`` one);
+        ``outside`` the value past the grid (the edge held for ``None``).
+        """
+        method = "cubic" if method == "spline" else method
+        values = np.asarray(values, dtype=float)
+        shape = tuple(self.x_grid_shape) if t is None else (-1, *self.x_grid_shape)
+
+        return GridField(
+            self.x_levels, values.reshape(shape), t, method=method, outside=outside
+        )
 
     def grid_from_array(self, values) -> np.ndarray:
         """Reshape a node-indexed array ``(nodes_n,)`` into the state grid shape."""

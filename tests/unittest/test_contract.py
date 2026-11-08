@@ -14,6 +14,7 @@ import pytest
 import minilink
 import minilink.core as core
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.geometry import from_waypoints
 from minilink.core.params import flatten, with_leaf
 from minilink.core.system import DynamicSystem, System
 
@@ -49,9 +50,9 @@ SYSTEM_FACTORIES = {
         minilink.KinematicManipulator(3, 2)
     ),
     "KinematicManipulator": lambda: minilink.KinematicManipulator(2, 2),
-    "PurePursuit": lambda: minilink.PurePursuit(
-        np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 1.0]])
-    ),
+    "PurePursuit": lambda: minilink.PurePursuit(contract_path()),
+    "Stanley": lambda: minilink.Stanley(contract_path()),
+    "LineOfSight": lambda: minilink.LineOfSight(contract_path()),
     "TrajectoryFeedback": lambda: minilink.TrajectoryFeedback(
         minilink.Trajectory(
             t=np.array([0.0, 1.0]),
@@ -72,6 +73,11 @@ SYSTEM_EXCEPTIONS = {
     "DiagramSystem",
     "StepDiagramSystem",
 }
+
+
+def contract_path():
+    """A short open path for the path-tracking laws."""
+    return from_waypoints(np.array([[0.0, 0.0], [1.0, 0.0], [2.0, 1.0]]))
 
 
 def lookup_policy():

@@ -80,7 +80,7 @@ planner = DynamicProgrammingPlanner(
     problem,
     grid=grid,
     backend="jax",
-    alpha=1.0,
+    gamma=1.0,
     max_iterations=n_steps,
     out_of_bound_cost=INF,
     verbose=True,

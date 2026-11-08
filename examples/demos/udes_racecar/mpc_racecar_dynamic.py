@@ -147,23 +147,25 @@ car.params["mu"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 
-lap = (mpc % MPC_DT) @ car
-# lap.plot_diagram()
-result = lap.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
-# lap.plot_trajectory()
+closed_loop = (mpc % MPC_DT) @ car
+# closed_loop.plot_diagram()
+result = closed_loop.compute_trajectory(tf=TF_SIM, dt=SIM_DT)
+# closed_loop.plot_trajectory()
 
 
 # car.skin = racecar_skin_2d
-# lap.animate(
+# closed_loop.animate(
 #     result.resample(n_samples=N_FRAMES),
-#     overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
+#     overlays=mpc_animation_overlays(result, mpc, loop=closed_loop, scene=scene, track=track),
 # )
 
 
 car.skin = racecar_skin_3d
-lap.animate(
+closed_loop.animate(
     result.resample(n_samples=N_FRAMES),
-    overlays=mpc_animation_overlays(result, mpc, loop=lap, scene=scene, track=track),
+    overlays=mpc_animation_overlays(
+        result, mpc, loop=closed_loop, scene=scene, track=track
+    ),
     renderer="meshcat",
     native=False,
 )

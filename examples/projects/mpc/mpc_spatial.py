@@ -20,6 +20,7 @@ from minilink import BicycleDynRate
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.geometry import Sphere
+from minilink.core.geometry.paths import from_waypoints
 from minilink.core.shaping import (
     inverse_barrier,
     quadratic_excess,
@@ -28,7 +29,6 @@ from minilink.core.shaping import (
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount, point_probe
 from minilink.planning.spatial.grid import pad_bounds, sample_field_costs
-from minilink.planning.spatial.paths import from_waypoints
 from minilink.planning.spatial.plotting import plot_cost_field_exports
 from minilink.planning.spatial.scene import Scene
 from minilink.planning.spatial.track import ReferenceTrack
