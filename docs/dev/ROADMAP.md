@@ -94,9 +94,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   solver's dict; every planner's `params` tree and `solve(params=)`; trajectory
   optimization's `last_optimization_result`, `iteration_history`, `last_solve_time_s` and
   `last_step_time_s` gone for `solution.record` (RULES 2.4).
-- 2026-11-05 (on the branch `api-surface-rulings-review`, for `0.4.0`; every notebook migrated in
-  the same commits, no alias): `mean_at`, `mean_draw` and `Gaussian.full_cov` → `sample(None,
-  params=)` and `cov`; `BoxSet.from_system_state`, `BoxInputSet.from_system_inputs` and
+- 2026-11-05 (on `dev`, for `0.4.0`; every notebook migrated in the same commits, no alias):
+  `mean_at`, `mean_draw` and `Gaussian.full_cov` → `sample(None, params=)` and `cov`; `BoxSet.from_system_state`, `BoxInputSet.from_system_inputs` and
   `from_bounds` → `sys.state.box`, `sys.input_box`, `BoxSet(lower, upper)` (`U=` takes a box);
   `traj.sample` / `t2x` / `t2u` / `with_signal` / `time_duration` / `copy` → `traj.at(t, name)`,
   `with_signals`, `tf - t0`; `ev.jacobian(of, wrt)` returns the array at a point (no callable);
@@ -111,30 +110,75 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   every solver (a sampled input held, a function read where the solver evaluates `f`),
   `compute_rollout`'s input sequence `(m, n_steps)`; an intersection's, a union's and a scene's
   members keyed by class name; the `input_interp` solver option gone.
-- 2026-11-06 (on the branch `signals-from-the-run`, for `0.4.0`): a diagram run records the
-  plant's whole input by default, `record="plant"`, on every solver and on the sampled loop
+- 2026-11-06 (on `dev`, for `0.4.0`): a diagram run records the plant's whole input by default, `record="plant"`, on every solver and on the sampled loop
   (`record=None` records nothing, a tuple names signals, nested paths included, `"all"` every
   output port), so `traj.of("plant")` is complete on every default run; `record=None` turns off
   the sampled loop's forced record of `"plant:u"`; a default adaptive run of a diagram takes one
   signal pass per saved sample after the run (about 0.13 s on 10 001 samples); a fixed-step run
   records from its own first stage at no measurable cost.
-- 2026-11-07 (on the branch `v04-build`, for `0.4.0`; every notebook migrated in the same
-  commit, no alias): the controller is the block. `PlanningSolution.policy` (the block) →
-  `solution.controller`; on every planner `get_controller()` → the property `controller`
-  (its `interpolation=` variant built directly, `LookupPolicy(grid, pi, interpolation=)`),
-  `value_at(x)` → `cost_to_go(x, t=None)`, `plot_solution` / `animate_solution` →
-  `plot_trajectory` / `animate`; the deep RL planner's trained block is `planner.actor` and its
-  exploration law `planner.exploration_policy`. The solution's shape, ruled the same day: a
-  keyword-only record `(problem, controller, record, trajectory, cost_to_go, evaluation,
-  params)`; no function on it (`solution.policy(x, t)` and `planner.policy(x, t)` gone, the law
-  as a function the compiled face's `pv.command(z, x, t)`); `trajectory` the plan of an
-  open-loop planner only, `None` for a feedback law; `cost_to_go` a `Field` or `None` (the RL
-  critic a `CriticField`); `evaluation` the controller as it is handed out, a feedback law
-  scored continuously, integrated on the planner's own `dt` (ruled 2026-11-08; value
-  iteration, tabular and deep RL no longer held on it), so `solve(evaluate=True)`,
-  `evaluate(problem, sol.controller, dt=)` and `compare(..., dt=)` agree; the views run the controller through the problem's
-  evaluator; every planner's `nominal_trajectory` and `holds_policy` gone; a step problem's
-  `run` takes a controller block, and its planners' `evaluate=True` scores on its `run`.
+- 2026-11-07 and 2026-11-08 (on `dev`, merged by PRs #135 and #136, for `0.4.0`; every
+  notebook migrated in the same commits, no alias):
+  - *The controller is the block, the policy the function.* `PlanningSolution.policy` →
+    `solution.controller`; on every planner `get_controller()` → the property `controller`
+    (its `interpolation=` variant built directly, `LookupPolicy(grid, pi, interpolation=)`),
+    `value_at(x)` → `cost_to_go(x, t=None)`, `plot_solution` / `animate_solution` →
+    `plot_trajectory` / `animate`; value iteration's `animate_policy()` →
+    `animate_control_law()`; the deep RL planner's trained block is `planner.actor`, its
+    exploration law `planner.exploration_policy`, and `ExplorationPolicy.controller` → `actor`.
+  - *The solution's shape.* `PlanningSolution` is a keyword-only record `(problem, controller,
+    record, trajectory, cost_to_go, evaluation, params)` with no function on it (the law as a
+    function is the compiled face's `pv.command(z, x, t)`); `trajectory` is an open-loop
+    planner's plan only, `None` for a feedback law; `cost_to_go` is a `Field` or `None`, read
+    `J(x)` or `J(x, t=t)` (value iteration's and tabular learning's a `GridField`, LQR's a
+    `QuadraticField`, the RL critic a `CriticField`); every planner's `nominal_trajectory` and
+    `holds_policy` are gone.
+  - *The evidence scores the controller as it is handed out* (scores moved once): a feedback law
+    (value iteration, tabular and deep RL) is continuous, no longer held on its grid's `dt`, and
+    is integrated on the planner's own `dt`, so `solve(evaluate=True)`, `evaluate(problem,
+    sol.controller, dt=)` and `compare(..., dt=)` agree; `evaluate` on a continuous controller
+    with no `dt` runs on the loop's automatic step. A step problem's planners score on its `run`.
+  - *The planners' math.* Value iteration on a finite horizon runs exactly `N` sweeps, a law per
+    stage and `J(x, t)` (it ran to convergence before; a script that means the stationary law
+    solves `problem.replace(horizon=None)`); its record's `fixed_horizon` → `mode` (`"infinite"`,
+    `"finite"`, `"receding"`) beside `converged`; `solve_steps(n_steps)` names its count;
+    `bellman_backup` is gone (the backup is written in each engine); the interpolation
+    `"spline"` → `"cubic"`. LQR solves a discounted problem as discounted (with a warning), its
+    finite-horizon law applies the stationary gain past the horizon, and `LQRPlanner.lqr_matrices()`
+    → `design_matrices()` (the module function `lqr_matrices` stays).
+  - *The workflow on the verb.* `verbose`, `callback`, `live_plot`, `record_history` and RRT*'s
+    `history_stride` leave every planner's constructor for `solve` (and `solve_steps`); RRT's
+    `live_plot`, `live_plot_every`, `live_plot_pause`, `live_plot_after_goal_only` and
+    `live_plot_ax` → the hook `LiveSearchPlot(every=, pause=, after_goal_only=, ax=)` given to
+    `solve(callback=)`, which takes a callable or a list (`LiveSearchPlotCallback` →
+    `LiveSearchPlot`); the training budgets `solve(episodes=)` → `n_episodes`,
+    `solve(timesteps=)` → `n_timesteps`, the records' fields alike, and the RL planner's
+    `num_timesteps` → `n_timesteps`.
+  - *The problem.* `problem.compile(controller, dt=None, ...)` always takes the controller (the
+    controller-less `problem.compile(dt=)` is gone); `problem.discretize(dt)` answers its own
+    equations, `transition`, `terminal`, `run(controller)`, `cost_bound()` and
+    `failure_cost_at()` (`StepPlanningProblem.compile` and `StepFace` are gone); the problem's
+    and the planner base's helper methods are module functions (`require_cost(problem)`,
+    `require_finite_horizon(problem)`, `default_x0_of`, `part_trees_of`, `sources_of`,
+    `require_solution(planner)`; `require_goal` is gone).
+  - *The systems.* `refresh()` is gone (a block's state size is fixed once built); the
+    constructor's `n` → `state_dim` on `System`, `DynamicSystem`, `StepSystem` and their
+    subclasses, `StateSpaceSystem`'s `n`, `m`, `p` → `state_dim`, `input_dim`, `output_dim` (the
+    attributes `n`, `m`, `p` unchanged); a static `System` takes the port shortcuts and feeds its
+    input through by default (`y_dependencies=("u",)`); `h` is the `"y"` port on every block and
+    on the evaluators (`ev.h`), so `Sum`, `Gain`, `Mux`, `Saturation` and `MLP`, whose `h`
+    returned zeros, return their output.
+  - *Imports.* The path names (`PolylinePath`, `ReferencePath`, `circuit_waypoints`,
+    `from_waypoints`) import from `minilink.core.geometry`, no longer from
+    `minilink.planning.spatial` (the `minilink.planning` facade keeps them);
+    `minilink.optimization.reporting` → `minilink.core.reporting`;
+    `minilink.simulation.compile_backend` is gone (`build_on_auto` and `NotTraceableError` in
+    `minilink.core.compile.compiler`). Added: the core's mathematical types on `minilink.core`,
+    `QuadraticField` and `GridField` on the root, `LiveSearchPlot` on `minilink.planning`.
+  - *Numbers and names that moved once.* `scipy_stiff` runs at `scipy`'s tolerances (`rtol=1e-4`,
+    `atol=1e-7`) with the Jacobian on both backends; `PurePursuit`, `LineOfSight` and
+    `HeadingController` are named by their class.
+  - *Gone from the examples:* the topic notebooks `topics/reinforcement_learning/drone_ppo` and
+    `pendulum_value_iteration_vs_lqr_vs_rl` (GRO860's own copies stay).
 
 ## 3. Maturity (TRL)
 
