@@ -123,7 +123,7 @@ in `notebook_overrides.json` too, except those marked `nightly: false`, run only
 | **Graphics contract** | Draw-list + headless PNG checks | (in contract tests) | `test_flagship_graphics_contract.py` (in `pytest`) | `test` |
 | **Graphics visual** | You confirm Meshcat/MPL/Plotly locally | `tests/demo_checks/run_graphics_visual_check.py` | local | — |
 | **Demo checks** | Catalog + flagship demos must not throw | `run_demo_checks.py` | `run_catalog_checks.py`, `run_flagship_demos.py` | `test` (pytest bridge) + `regression` (full flagships w/ JAX) |
-| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `laptops` (Basic tier) + `regression`; nightly with `--all` |
+| **Notebook smoke** | Teaching notebooks' code cells must not throw | `run_notebook_checks.py` | `tests/demo_checks/run_notebook_checks.py` | `notebooks` (full stack) + `laptops` (Basic tier); nightly with `--all` |
 | **Repo contract** | Doc links resolve, public prose names no other tool, no pseudo-private methods | (in contract tests) | `test_repo_contract.py` (in `pytest`) | `test` |
 | **Pre-push** | Lint and format, then the contract tests | `run_pre_push.py` | ruff + `pytest` | `test` |
 | **Packaging** | Wheel/sdist ship the library (teaching surface and provisional bands), not `experimental/` | — | `python -m build` + `tests/demo_checks/check_wheel.py` | `packaging` |
@@ -160,9 +160,9 @@ regression CI vs local commands and [benchmarks/README.md](../benchmarks/README.
 there). A thin pytest bridge ([`test_demo_check_runners.py`](unittest/test_demo_check_runners.py))
 invokes those runners so the CI ``test`` job covers catalog / non-JAX flagships /
 graphics without re-implementing checks as pytest cases. The CI ``regression``
-job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated,
-and runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not throw; the
-``laptops`` job runs the same smoke on the Basic tier under Windows and macOS.
+job (JAX installed) re-runs ``run_flagship_demos.py`` so JAX flagships are gated; the
+``notebooks`` job runs ``run_notebook_checks.py`` so teaching notebooks' code cells do not
+throw, and the ``laptops`` job runs the same smoke on the Basic tier under Windows and macOS.
 
 Demos and teaching notebooks must **not** branch on smoke/CI env vars — the runner
 only sets headless display knobs. A contract test scans ``examples/tutorial/``, ``examples/teaching/``,

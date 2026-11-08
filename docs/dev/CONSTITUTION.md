@@ -65,7 +65,7 @@ one of these quantities takes or returns the object, never its arrays:
   goal ball, free space, a level set.
 - `Distribution` — a probability law over a vector, `sample(key)` and `mean`. Sets are
   support, distributions are probability; never one for the other.
-- `Field` (planned) — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
+- `Field` — a scalar function on the model's `(x, u, t)`, the signature of `f` and `g`: a
   Lyapunov function `V(x)`, a cost-to-go `J(x, t)`, a Q-function `Q(x, u)`, a barrier `h(x)`,
   a clearance `d(x)`. Its sublevel and superlevel sets are `Set`s over `x`, or `InputSet`s
   over `u` at a given `x`; its shaping is a `CostFunction`.

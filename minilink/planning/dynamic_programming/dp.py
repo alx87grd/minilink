@@ -170,7 +170,7 @@ class DynamicProgrammingPlanner(Planner):
         ``max_iterations`` sweeps; its controller is the greedy lookup table and its
         ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also scores the controller, as it is, over the problem's draws (a
-        continuous problem's on the evaluator's automatic step, a step
+        continuous problem's integrated on the grid's ``dt``, a step
         problem's on its model). ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
         this one unchanged. ``verbose`` prints the table builds and the sweeps;

@@ -130,7 +130,7 @@ Because a composite diagram is itself a `DynamicSystem`, **every analysis verb w
 - **Real-Time Wall-Clock Play:** `plant.game()` drives plants with keyboard or gamepad (via Pygame).
 - **Decoupled Geometry:** Body poses $T = \mathrm{tf}(x, u, t; p)$ describe kinematics without cluttering the differential equations with rendering code.
 - **Hardware-Accelerated 3D WebGL:** `plant.animate(traj, renderer="meshcat")` opens an interactive 3D browser viewer with orbit, pan, and playback controls.
-- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), quadrotors (`Drone2D`, `Drone3D`), and aerospace vehicles (`Rocket`).
+- **Multi-DoF Robotics Catalog:** Built-in kinematic and dynamic models for robot arms (`UR5Manipulator`), ground vehicles (`KinematicBicycle`, `UdeSRacecar`), drones (`Drone2D`), and aerospace vehicles (`Rocket`).
 
 ```python
 from minilink import UR5Manipulator
@@ -232,7 +232,7 @@ problem = PlanningProblem(
     X=plant.state.box, U=plant.input_box,
 )
 
-# The converged law: on the 4 s horizon itself, the best plan is to stay down
+# The infinite-horizon law: on the 4 s horizon itself, the best plan is to stay down
 vi = DynamicProgrammingPlanner(problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05)
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")

@@ -1,81 +1,48 @@
-# The minimal surface: demos, notebooks, tests and CI redrafted on the v0.3 core
+# The minimal surface: the inputs of the end-of-v0.4 rebuild
 
-**Status:** draft for the maintainer's review; each choice below lists its options, the
-agent's recommendation, and an **Answer** line for the maintainer. Its decision ids carry the
-`MS-` prefix (docs/plans/README.md). **Release:** v0.4, the clean surface (ROADMAP §5.4, ruled
-2026-11-04); its rows are TODO §1.12.
+**Status:** the plan's decisions are ruled (MS-D1 to MS-D7); what landed in v0.4 is the CI
+shape (MS-D3), the short-term test restructure (the `slow` marker and `--runslow`), the
+notebooks (MS-D5) and the benchmarks reduced to the regression gate (MS-D6). Left: the
+maintainer's demo rebuild, then the tests' clean slate (MS-D1), the last steps of v0.4. This
+doc keeps what those two need: the constraint, the test layers and their open options, and a
+starting list for the demo set. Its decision ids carry the `MS-` prefix
+(docs/plans/README.md). The row and its "done when": [TODO.md](TODO.md) §1.12.
 
-## 1. Why
-
-v0.3 settled the core. What surrounds it grew around older APIs:
-
-| | Today (`main`, 0.3.0) |
-| --- | --- |
-| Library (`minilink/`) | 76k lines |
-| Unit tests (`tests/unittest/`) | 67 files, 33k lines, 1 775 test functions (2 161 cases), 18 min locally with the full stack |
-| Test tooling (`tests/run/`, `tests/demo_checks/`, fixtures) | two layers of runner scripts, ~1 500 lines, 4 fixture sets |
-| Benchmarks (`benchmarks/`) | 46 files, 30k lines (gates, studies, pyro parity) |
-| Demos (`examples/demos/`) | 86 scripts in 17 folders |
-| Projects (`examples/projects/`) | 29 scripts, 2 notebooks (car trajopt, MPC, path tracking) |
-| Notebooks | 15 tutorial, 7 topics, 20 course (GRO501 6, GRO860 14) |
-| CI per run (`test.yml`) | 45–60 min; 2–3 runs per change (push and pull-request events) |
+## 1. The goal and the rulings
 
 **The goal:** a surface designed from the core outward, small enough that the maintainer
 knows every demo and every test layer, and a CI that answers in minutes.
 
-## 2. What the audit found
+- **MS-D1, tests (2026-11-07):** restructure on the short term, the net for v0.4's sweeps
+  (landed); at the end of v0.4 the maintainer deletes all demos and rebuilds a minimalist set
+  himself; once the new demos are what he wants, the test infrastructure is rebuilt from
+  scratch around the new library.
+- **MS-D4, the demo set (2026-11-07):** the maintainer's, decided in that rebuild (§4 is a
+  starting list).
+- **MS-D5, notebooks (2026-11-07):** the course notebooks keep their paths, their content the
+  maintainer's; the five unique topic pages stay until the repository-structure decision (K5,
+  v0.9).
 
-**CI** (`.github/workflows/test.yml`):
-- Four Python versions plus macOS and Windows run pytest without JAX (10–15 min); about 450
-  tests skip there, the compiled and differentiable core among them.
-- A `regression` job runs after them: pytest again with JAX, the regression gates, the
-  flagship demos, the notebooks (30–45 min). The core is only tested here.
-- A push to a branch with an open pull request runs CI twice; a fix that crosses
-  `fix → dev → main` runs it three times.
-- The slowest test (`test_flagship_demos_exit_zero`, 167 s) runs the flagship demos the
-  `regression` job runs again. About 40 tests make half of the suite's time.
+**The constraint:** the course PDFs link course notebooks by path (`Notes_OptiRL.pdf` 12,
+`Notes_SystemesAsservis.pdf` 4, checked 2026-10-30). A deleted or renamed course notebook
+breaks a student's link unless the PDF changes with it.
 
-**Tests:** six files check the repository, not the library: `test_textbook_style`,
-`test_repo_contract`, `test_public_names`, `test_teaching_imports`, `test_packaging`,
-`test_demo_check_runners`.
+## 2. What the audit found (2026-10-31)
 
-**Demos:** pyro ports (six robotics, two control), one-concept step toys (six), duplicates
-(six value-iteration demos, five racecar MPCs, two hybrid sliding modes, the closed loop
-wired three times), and few demos written for the v0.3 core.
+Kept for the clean slate:
+- six test files check the repository, not the library: `test_textbook_style`,
+  `test_repo_contract`, `test_public_names`, `test_teaching_imports`, `test_packaging`,
+  `test_demo_check_runners`;
+- the demos held pyro ports (six robotics, two control), one-concept step toys (six),
+  duplicates (six value-iteration demos, five racecar MPCs, two hybrid sliding modes, the
+  closed loop wired three times), and few demos written for the v0.3 core;
+- about 40 tests made half of the suite's time.
 
-**Constraint:** the course PDFs link course notebooks by path: `Notes_OptiRL.pdf` 12,
-`Notes_SystemesAsservis.pdf` 4 (checked 2026-10-30, all run on 0.3.0). A deleted or renamed
-course notebook breaks a student's link unless the PDF changes with it.
+## 3. The test layers (MS-D2), for the clean slate
 
-## 3. The decisions
-
-### MS-D1. Tests: rewrite from scratch, or restructure
-
-- **A. Clean slate.** Delete `tests/`, write a new minimal suite from the core's contracts.
-  Simplest result; loses the executable record of every behaviour v0.3 settled while the
-  demos are also being rebuilt, so a regression has no net for the length of the rewrite.
-- **B. Restructure.** Keep the cases; sort every file into the layers of MS-D2; delete the
-  tests of what is deleted (demos, pyro ports, benchmark studies); merge duplicates; move
-  the slow tests out of the per-change layer.
-- **C. Hybrid.** Write the new layers from scratch (checks, unit, acceptance), port into them
-  only the cases a coverage diff shows uncovered, then delete the old suite.
-
-*Agent's recommendation:* B, or C if the maintainer wants to read every test that stays.
-**Answer (2026-11-07):** B on the short term, the net for v0.4's sweeps. At the end of v0.4 the
-maintainer deletes all demos and rebuilds a minimalist set himself; once the new demos are
-what he wants, the last step is a clean slate (A) for the test infrastructure, rebuilt around
-the new library.
-
-### MS-D2. The test layers
-
-**Deferred (2026-11-07):** MS-D2a–e are decided at the end-of-v0.4 clean-slate rebuild of the
-tests (MS-D1), around the maintainer's new demos; until then the short-term restructure is
-small: the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
-relief), the files otherwise stay.
-
-**Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder
-per layer; two are essential, the contract and the textbook math. What the other kinds
-become is open below.
+**Taken (the maintainer, 2026-10-31):** the layers are cut by what they prove, one folder per
+layer; two are essential, the contract and the textbook math. The rest is decided at the
+clean slate (deferred 2026-11-07).
 
 | Layer | The question it answers | Status |
 | --- | --- | --- |
@@ -88,115 +55,54 @@ become is open below.
 
 - **MS-D2a. Backend parity.** A. one clause of the contract (each object also runs on JAX, its
   outputs equal to NumPy's on one input); B. its own layer; C. none beyond what the math
-  layer runs on both backends. *Agent:* A. **Answer:**
+  layer runs on both backends. *Agent:* A.
 - **MS-D2b. Composition.** A. the core's end-to-end scripts only (`test_v03_core.py`, a dozen
   cases) as a third layer; B. inside the contract (a composition is a public object);
-  C. none, the demos show it. *Agent:* A. **Answer:**
+  C. none, the demos show it. *Agent:* A.
 - **MS-D2c. Examples.** A. a runner, outside pytest, nightly and before a release; B. inside
-  pytest; C. none in CI, the maintainer runs them. *Agent:* A. **Answer:**
+  pytest; C. none in CI, the maintainer runs them. *Agent:* A.
 - **MS-D2d. Repo rules.** A. a pre-commit and CI check outside pytest (seconds); B. a test
   layer; C. drop the ones nobody acts on. *Agent:* A, with C for any rule the maintainer
-  does not want enforced. **Answer:**
+  does not want enforced.
 - **MS-D2e. When each runs.** *Agent's proposal:* contract and repo rules on every change, math
-  and composition on every pull request, examples nightly and before a release. **Answer:**
+  and composition on every pull request, examples nightly and before a release.
 
-### MS-D3. CI shape
+Once the layers are answered, each file of `tests/unittest/` is sorted case by case into
+contract, math, the open layers, or deletion. The obvious ones: **repo rules**
+`test_textbook_style`, `test_repo_contract`, `test_public_names`, `test_public_imports`,
+`test_teaching_imports`, `test_teaching_surface`, `test_packaging`; **composition**
+`test_v03_core`, `test_loop_grammar`, `test_sampled_loop`; **contract** `test_contract`,
+`test_catalog_backends`, `test_blocks`; **deleted with their subject** `test_demo_check_runners`
+(MS-D2c), the pyro-port cases inside `test_mechanical_robotics` and `test_dynamics_catalog`.
+The slowest cases (`pytest --durations=40`) are flagged in the sort.
 
-- **A.** One Linux job (Python 3.12, full stack) runs Checks, Unit and Acceptance on each
-  pull request; pushes to a branch with a pull request do not run again; a newer push
-  cancels the older run (`concurrency: cancel-in-progress`); the rest is nightly.
-- **B.** As A, plus macOS and Windows on pull requests into `main` only.
-- **C.** Keep the matrix on every run; only remove the duplicates.
+## 4. A starting list for the demo set (MS-D4)
 
-*Agent's recommendation:* B. **Answer (2026-11-04):** B, with the other Pythons (3.10, 3.11,
-3.13) beside macOS and Windows on pull requests into `main` and nightly; first the critical
-path shortened (the jobs side by side, `pytest -n auto`, the notebooks three at once, the docs
-build in the gate).
-
-### MS-D4. Demos: what the set is
-
-**Deferred (2026-11-07):** the maintainer deletes all demos and rebuilds a minimalist set at
-the end of v0.4 (MS-D1); the set is decided then.
-
-- **A. Clean slate.** Delete `examples/demos/` and `examples/projects/`; write a new set,
-  one demo per core feature, against the v0.3 core.
-- **B. Curate.** Keep the demos that already show one core feature well, delete the rest.
-- **C. Clean slate for demos, keep projects** as the maintainer's research code, outside
-  the demo checks.
-
-A starting list for A or B (one demo per feature, 20; ✚ new, ✓ kept as is or redrafted):
+One demo per core feature, 19 rows, each an existing script (a clean slate or a curated set
+are both open; the maintainer decides in the rebuild):
 
 | Feature | Demo |
 | --- | --- |
-| A system and its simulation | ✓ `core/diagram_closed_loop.py` (redrafted: a plant, a law, `@`) |
-| Composition | ✓ `core/diagram_nested_loop.py` (cascade) |
-| Analysis | ✓ `analysis/analysis_linearize.py`, ✓ `analysis/analysis_frequency.py` |
-| Classical control | ✓ `control/classical_family.py` |
-| State feedback and estimation | ✓ `control/lqg_cartpole.py` |
-| Robotics | ✓ `robotic/task_impedance_two_link.py` |
-| Sampled loop | ✓ `compile/multi_rate_computer.py` |
-| Noise and Monte Carlo | ✓ `compile/lqg_monte_carlo.py` |
-| Value iteration | ✓ `value_iteration/vi_pendulum_lqr.py` |
-| Trajectory optimization | ✓ `trajopt/trajopt_cartpole_collocation_jax.py` |
-| RRT | ✓ `rrt/rrt_pendulum_swingup.py` |
-| MPC | ✓ `mpc/mpc_car_minimal.py` |
-| MPPI | ✓ `mpc/mppi_pendulum.py` |
-| Reinforcement learning | ✓ `rl/pendulum_swing_up_rl.py` |
-| Gradients through a loop | ✓ `compile/digital_pid_tuning.py` |
-| The core in one script | ✓ `compile/differentiable_double_loop.py` |
-| Optimization | ✓ `optimization/optim_basic.py` |
-| Animation | ✓ `graphical/animation_renderers.py` |
-| Real-time | ✓ `realtime/game_cartpole.py` |
+| A system and its simulation | `core/diagram_closed_loop.py` (a plant, a law, `@`) |
+| Composition | `core/diagram_nested_loop.py` (cascade) |
+| Analysis | `analysis/analysis_linearize.py`, `analysis/analysis_frequency.py` |
+| Classical control | `control/classical_family.py` |
+| State feedback and estimation | `control/lqg_cartpole.py` |
+| Robotics | `robotic/task_impedance_two_link.py` |
+| Sampled loop | `compile/multi_rate_computer.py` |
+| Noise and Monte Carlo | `compile/lqg_monte_carlo.py` |
+| Value iteration | `value_iteration/vi_pendulum_lqr.py` |
+| Trajectory optimization | `trajopt/trajopt_cartpole_collocation_jax.py` |
+| RRT | `rrt/rrt_pendulum_swingup.py` |
+| MPC | `mpc/mpc_car_minimal.py` |
+| MPPI | `mpc/mppi_pendulum.py` |
+| Reinforcement learning | `rl/pendulum_swing_up_rl.py` |
+| Gradients through a loop | `compile/digital_pid_tuning.py` |
+| The core in one script | `compile/differentiable_double_loop.py` |
+| Optimization | `optimization/optim_basic.py` |
+| Animation | `graphical/animation_renderers.py` |
+| Real-time | `realtime/game_cartpole.py` |
 
-**Answer:** (the option, and edits to the list)
-
-### MS-D5. Notebooks
-
-- **Course notebooks** (`examples/teaching/courses/`, 20): keep their paths (the PDFs link
-  16); their content is the maintainer's teaching design. **Answer (2026-11-07):** yes.
-- **Tutorial**: settled. The tutorials were redrafted in three layers (basics, core, advanced)
-  and landed on `dev` (2026-11-01).
-- **Topics** (`examples/teaching/topics/`, 7): A. fold into the tutorial or the courses and
-  delete; B. keep. **Answer (2026-11-07):** C, the two duplicates of GRO860 notebooks go
-  (`drone_ppo`, identical; `pendulum_value_iteration_vs_lqr_vs_rl`, 97% the same), the five
-  unique pages stay until the repository-structure decision (K5, v0.9).
-
-### MS-D6. Benchmarks
-
-- **A.** Keep the regression gates the nightly layer runs (`run_regression_check.py`, its
-  suites and baselines); delete the studies, the pyro parity and the one-off baselines
-  (`step_model_baseline.py`, `v03_baseline.py`, `v03_budget.py`).
-- **B.** Delete `benchmarks/` entirely; speed is watched by the acceptance layer's budget.
-- **C.** Keep as is.
-
-*Agent's recommendation:* A. **Answer (2026-11-07):** A: the regression gate stays
-(`run_regression_check.py`, its suites, the trajectory and MPC parity scenarios, the pinned
-baselines); the studies, the one-off baselines (`params_baseline.py`, `step_model_baseline.py`,
-`v03_baseline.py`, `v03_budget.py`) and the pyro parity scripts go, with `tests/README.md`'s
-study row.
-
-### MS-D7. The release numbering
-
-**Answer (2026-11-04):** the new v0.4 is this plan, with the core API proposals and the v0.3
-core's leftovers (ROADMAP §5.4); the former v0.4 features are v0.5; v0.9 and v1.0 unchanged.
-
-## 4. Order, once the decisions are taken
-
-1. CI first (MS-D3): the fastest relief, independent of the rest.
-2. Tests (MS-D1, MS-D2): the layers, then the moves and deletions, file by file.
-3. Demos and projects (MS-D4), then their checks.
-4. Notebooks (MS-D5), the course ones last and only with the maintainer.
-5. Benchmarks (MS-D6), docs (README, `examples/README.md`, `tests/README.md`, DESIGN's package
-   map), the release.
-
-## 5. The test files, by layer
-
-To be written once MS-D1 and MS-D2a–MS-D2e are answered: each of the 67 files of `tests/unittest/`
-sorted case by case into contract, math, the open layers, or deletion. The obvious ones:
-**repo rules** `test_textbook_style`, `test_repo_contract`, `test_public_names`,
-`test_public_imports`, `test_teaching_imports`, `test_teaching_surface`, `test_packaging`;
-**composition** `test_v03_core`, `test_loop_grammar`, `test_sampled_loop`; **contract**
-`test_contract`, `test_catalog_backends`, `test_blocks`; **deleted with their subject**
-`test_benchmark_helpers` (MS-D6), `test_demo_check_runners` (MS-D2c), the pyro-port cases inside
-`test_mechanical_robotics` and `test_dynamics_catalog`. The ~40 slowest cases (over 4 s,
-`pytest --durations=40`) are flagged in the sort.
+Decided with the set (TODO §1.12): a tabular Q-learning demo beside value iteration, the MPC
+hyperparameter-tuning demo, the cart-pole RL demo's budget; and, drawn from it, the supported
+plants (K8-3) and GMC714's pinned names (G3).

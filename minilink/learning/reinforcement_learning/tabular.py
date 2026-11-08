@@ -217,7 +217,7 @@ class TabularLearningPlanner(Planner):
         Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
         ``evaluate=True`` also scores the law, as it is, over the problem's
-        draws (on the evaluator's automatic step, over an episode on an
+        draws (integrated on the grid's ``dt``, over an episode on an
         infinite horizon).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.

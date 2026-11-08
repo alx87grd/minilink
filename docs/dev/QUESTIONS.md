@@ -8,15 +8,8 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 
 A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
-file. The v0.3 core's rulings are the architecture of record. `§N` names the workstream of
-[ROADMAP §5.4](ROADMAP.md#54-v04--the-clean-surface), the same N as TODO §1.N.
-
-## The core
-
-The v0.3 core's architecture is of record. The questions the independent
-review of the two runs raised were ruled on 2026-10-29; they landed on
-`dev-v0.3` the same day. Its run's decisions taken without you, and those of the three runs before it, are sorted
-for one sitting in the merge-review triage. Nothing else is open here.
+file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
+2026-11-04 to 2026-11-08 live in DESIGN and RULES. Nothing on the core is open here.
 
 ## Toward v1.0
 
