@@ -25,8 +25,8 @@ class P(ErrorDriven, System):
     ----------
     Kp : float or vector
         Per-axis gain (a scalar broadcasts to all axes).
-    dof : int
-        Number of independent scalar loops (default 1).
+    dim : int
+        Number of independent scalar loops, the channels (default 1).
     ports : {"error", "reference"}
         Input layout, see above.
     u_min, u_max : float or vector
@@ -37,22 +37,22 @@ class P(ErrorDriven, System):
         self,
         Kp: float = 1.0,
         *,
-        dof: int = 1,
+        dim: int = 1,
         ports: str = "error",
         u_min: float = -np.inf,
         u_max: float = np.inf,
     ):
-        n = int(dof)
-        require_positive_dof(n)
+        n = int(dim)
+        require_positive_dim(n)
 
         super().__init__()
-        self.dof = n
+        self.dim = n
 
         # Parameters
         self.params = {
-            "Kp": as_dof_vector(Kp, n),
-            "u_min": as_dof_vector(u_min, n),
-            "u_max": as_dof_vector(u_max, n),
+            "Kp": as_axis_vector(Kp, n),
+            "u_min": as_axis_vector(u_min, n),
+            "u_max": as_axis_vector(u_max, n),
         }
 
         # Ports: the error (or the reference and the measurement) in, the command out
@@ -95,7 +95,7 @@ class PID(ErrorDriven, DynamicSystem):
     ``-1/tau``); the rate-measured members of the same family are in
     :mod:`minilink.control.impedance`.
 
-    The block carries the states its terms need — ``2 dof`` here. Setting
+    The block carries the states its terms need — ``2 dim`` here. Setting
     ``Ki=0`` does **not** remove the integrator: the gain is tunable, so the
     state dimension cannot depend on it, and the dead integrator then shows
     up as an unobservable pole at the origin in every linearization. Use
@@ -108,8 +108,8 @@ class PID(ErrorDriven, DynamicSystem):
         Per-axis gains (a scalar broadcasts to all axes).
     tau : float or vector
         Derivative filter time constant per axis [s]; must be positive.
-    dof : int
-        Number of independent scalar loops (default 1).
+    dim : int
+        Number of independent scalar loops, the channels (default 1).
     ports : {"error", "reference"}
         Input layout, see above.
     y_filt0 : float or vector
@@ -129,7 +129,7 @@ class PID(ErrorDriven, DynamicSystem):
         Kd: float = 0.0,
         tau: float = 0.1,
         *,
-        dof: int = 1,
+        dim: int = 1,
         ports: str = "error",
         y_filt0=0.0,
         u_min: float = -np.inf,
@@ -137,8 +137,8 @@ class PID(ErrorDriven, DynamicSystem):
         e_int_min: float = -np.inf,
         e_int_max: float = np.inf,
     ):
-        n = int(dof)
-        require_positive_dof(n)
+        n = int(dim)
+        require_positive_dim(n)
         if self.has_filter:
             require_positive_tau(tau, n)
 
@@ -146,26 +146,26 @@ class PID(ErrorDriven, DynamicSystem):
         self.n_int = n if self.has_integrator else 0
         self.n_filt = n if self.has_filter else 0
         super().__init__(state_dim=self.n_int + self.n_filt)
-        self.dof = n
+        self.dim = n
         self.name = type(self).__name__
 
         # Parameters, with the label and the initial value of each carried state
-        self.params = {"Kp": as_dof_vector(Kp, n)}
+        self.params = {"Kp": as_axis_vector(Kp, n)}
         labels = []
         x0 = []
         if self.has_integrator:
-            self.params["Ki"] = as_dof_vector(Ki, n)
-            self.params["e_int_min"] = as_dof_vector(e_int_min, n)
-            self.params["e_int_max"] = as_dof_vector(e_int_max, n)
+            self.params["Ki"] = as_axis_vector(Ki, n)
+            self.params["e_int_min"] = as_axis_vector(e_int_min, n)
+            self.params["e_int_max"] = as_axis_vector(e_int_max, n)
             labels += [f"e_int{i}" for i in range(n)]
             x0.append(np.zeros(n))
         if self.has_filter:
-            self.params["Kd"] = as_dof_vector(Kd, n)
-            self.params["tau"] = as_dof_vector(tau, n)
+            self.params["Kd"] = as_axis_vector(Kd, n)
+            self.params["tau"] = as_axis_vector(tau, n)
             labels += [f"d_filt{i}" for i in range(n)]
-            x0.append(as_dof_vector(y_filt0, n))
-        self.params["u_min"] = as_dof_vector(u_min, n)
-        self.params["u_max"] = as_dof_vector(u_max, n)
+            x0.append(as_axis_vector(y_filt0, n))
+        self.params["u_min"] = as_axis_vector(u_min, n)
+        self.params["u_max"] = as_axis_vector(u_max, n)
 
         # Signal labels and initial state
         self.state.labels = labels
@@ -280,7 +280,7 @@ class PID(ErrorDriven, DynamicSystem):
         """The signal the filtered derivative acts on: ``y`` (reference form) or ``-e``."""
         if self.port_layout == "error":
             return -self.error(u)
-        return u[self.dof :]
+        return u[self.dim :]
 
 
 class PI(PID):
@@ -298,7 +298,7 @@ class PI(PID):
         Kp: float = 1.0,
         Ki: float = 0.0,
         *,
-        dof: int = 1,
+        dim: int = 1,
         ports: str = "error",
         u_min: float = -np.inf,
         u_max: float = np.inf,
@@ -308,7 +308,7 @@ class PI(PID):
         super().__init__(
             Kp=Kp,
             Ki=Ki,
-            dof=dof,
+            dim=dim,
             ports=ports,
             u_min=u_min,
             u_max=u_max,
@@ -338,7 +338,7 @@ class PD(PID):
         Kd: float = 0.0,
         tau: float = 0.1,
         *,
-        dof: int = 1,
+        dim: int = 1,
         ports: str = "error",
         y_filt0=0.0,
         u_min: float = -np.inf,
@@ -348,7 +348,7 @@ class PD(PID):
             Kp=Kp,
             Kd=Kd,
             tau=tau,
-            dof=dof,
+            dim=dim,
             ports=ports,
             y_filt0=y_filt0,
             u_min=u_min,
@@ -411,27 +411,27 @@ def clipped(u_cmd, params, xp):
 # The refusals and the per-axis shapes of the family's parameters
 
 
-def require_positive_dof(n):
-    """Refuse a block without at least one axis."""
+def require_positive_dim(n, name="dim"):
+    """Refuse a block without at least one axis; ``name`` is the keyword that counts them."""
     if n <= 0:
-        raise ValueError("dof must be positive")
+        raise ValueError(f"{name} must be positive")
 
 
 def require_positive_tau(tau, n):
     """Refuse a derivative filter whose time constant is not positive on every axis."""
-    if np.any(as_dof_vector(tau, n) <= 0.0):
+    if np.any(as_axis_vector(tau, n) <= 0.0):
         raise ValueError("tau must be positive (it divides the filter rate)")
 
 
-def as_dof_vector(value, dof: int):
-    """A scalar broadcast to ``dof`` axes, or a length-``dof`` vector as given."""
+def as_axis_vector(value, n: int):
+    """A scalar broadcast to ``n`` axes, or a length-``n`` vector as given."""
     given = np.asarray(value, dtype=float)
     arr = given.reshape(-1)
     if arr.size == 1:
-        return np.full(dof, float(arr[0]))
-    if arr.size != dof:
+        return np.full(n, float(arr[0]))
+    if arr.size != n:
         raise ValueError(
-            f"expected scalar or length-{dof} vector, got shape {given.shape}"
+            f"expected scalar or length-{n} vector, got shape {given.shape}"
         )
     return arr
 
@@ -440,7 +440,7 @@ def as_gain_matrix(value, n: int):
     """A scalar or a per-axis vector as the diagonal ``(n, n)`` gain, or an ``(n, n)`` matrix as given."""
     arr = np.asarray(value, dtype=float)
     if arr.ndim <= 1:
-        return np.diag(as_dof_vector(arr, n))
+        return np.diag(as_axis_vector(arr, n))
     if arr.shape != (n, n):
         raise ValueError(
             f"expected a scalar, a length-{n} vector or an ({n}, {n}) matrix, got shape {arr.shape}"

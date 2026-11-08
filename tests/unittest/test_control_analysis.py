@@ -538,7 +538,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
 class TestP(unittest.TestCase):
     def test_decoupled_law_per_axis(self):
-        ctl = P([2.0, 3.0], dof=2, ports="reference")
+        ctl = P([2.0, 3.0], dim=2, ports="reference")
         u = ctl.ctl(np.zeros(0), np.array([1.0, 1.0, 0.0, 0.0]))
         np.testing.assert_allclose(u, [2.0, 3.0])
         self.assertEqual(ctl.n, 0)
@@ -549,7 +549,7 @@ class TestP(unittest.TestCase):
 
     def test_a_gain_of_another_size_is_reported_with_its_own_shape(self):
         with self.assertRaisesRegex(ValueError, r"length-2 vector, got shape \(3, 1\)"):
-            P(np.ones((3, 1)), dof=2)
+            P(np.ones((3, 1)), dim=2)
 
     def test_a_coupled_gain_is_a_gain_block_in_the_loop(self):
         from minilink import Gain
@@ -701,7 +701,7 @@ class TestImpedanceController(unittest.TestCase):
 
 class TestPIDMIMO(unittest.TestCase):
     def test_dof_two_diagonal(self):
-        pid = PID(dof=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1, ports="reference")
+        pid = PID(dim=2, Kp=2.0, Ki=1.0, Kd=0.5, tau=0.1, ports="reference")
         np.testing.assert_allclose(
             pid.f(np.zeros(4), np.array([1.0, 2.0, 0.0, 0.0])), [1.0, 2.0, 0.0, 0.0]
         )
@@ -1566,8 +1566,8 @@ class TestCompensatorStateLayout(unittest.TestCase):
         self.assertEqual(PI(Kp=2.0, Ki=1.0).n, 1)
         self.assertEqual(PD(Kp=2.0, Kd=1.0).n, 1)
         self.assertEqual(PID(Kp=2.0, Ki=1.0, Kd=1.0).n, 2)
-        self.assertEqual(PI(Kp=2.0, Ki=1.0, dof=3).n, 3)
-        self.assertEqual(PD(Kp=2.0, Kd=1.0, dof=3).n, 3)
+        self.assertEqual(PI(Kp=2.0, Ki=1.0, dim=3).n, 3)
+        self.assertEqual(PD(Kp=2.0, Kd=1.0, dim=3).n, 3)
 
     def test_loop_gain_pole_and_zero_counts(self):
         plant_poles = 2

@@ -9,7 +9,7 @@ from minilink.control.siso import P
 
 class TestBlocks(unittest.TestCase):
     def test_source(self):
-        s = Source(p=2)
+        s = Source(dim=2)
         s.params["value"] = np.array([3.0, 4.0])
         y = s.h(x=[], u=[], t=0)
         np.testing.assert_array_equal(y, np.array([3.0, 4.0]))

@@ -162,6 +162,8 @@ RETIRED = {
         ),
     ),
     "plot_backend": ("plot_renderer", None),
+    "p": ("dim", ("Source", "WhiteNoise")),
+    "dof": ("dim (dof stays a manipulator's joints)", ("P", "PI", "PD", "PID")),
 }
 
 

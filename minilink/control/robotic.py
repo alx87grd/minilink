@@ -9,7 +9,7 @@ from collections.abc import Callable
 import numpy as np
 
 from minilink.control.impedance import reference_errors, tracking_errors
-from minilink.control.siso import as_dof_vector
+from minilink.control.siso import as_axis_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
 from minilink.dynamics.abstraction.manipulator import Manipulator
@@ -56,8 +56,8 @@ class JointImpedance(System):
 
         # Parameters: the joint stiffness and damping, and the model's numbers
         self.params = {
-            "Kp": as_dof_vector(10.0 if Kp is None else Kp, n),
-            "Kd": as_dof_vector(1.0 if Kd is None else Kd, n),
+            "Kp": as_axis_vector(10.0 if Kp is None else Kp, n),
+            "Kd": as_axis_vector(1.0 if Kd is None else Kd, n),
             "model": copy.deepcopy(plant.params),
         }
 
@@ -159,8 +159,8 @@ class TaskImpedance(System):
         ref_dim = 2 * n if tracking_ref else n
 
         # Parameters: the task stiffness and damping, and the model's numbers
-        Kp = np.full(n, 10.0) if Kp is None else as_dof_vector(Kp, n)
-        Kd = np.full(n, 1.0) if Kd is None else as_dof_vector(Kd, n)
+        Kp = np.full(n, 10.0) if Kp is None else as_axis_vector(Kp, n)
+        Kd = np.full(n, 1.0) if Kd is None else as_axis_vector(Kd, n)
         self.params = {
             "Kp": Kp,
             "Kd": Kd,
@@ -305,7 +305,7 @@ class TaskKinematic(System):
 
         # Parameters: the task gain, and the model's numbers
         self.params = {
-            "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
+            "Kp": as_axis_vector(1.0 if Kp is None else Kp, task_dim),
             "model": copy.deepcopy(plant.params),
         }
 
@@ -368,8 +368,8 @@ class TaskKinematicNullspace(TaskKinematic):
 
         # Parameters: the task gain, the posture gain, and the model's numbers
         self.params = {
-            "Kp": as_dof_vector(1.0 if Kp is None else Kp, task_dim),
-            "K_null": as_dof_vector(1.0 if K_null is None else K_null, dof),
+            "Kp": as_axis_vector(1.0 if Kp is None else Kp, task_dim),
+            "K_null": as_axis_vector(1.0 if K_null is None else K_null, dof),
             "model": copy.deepcopy(plant.params),
         }
 

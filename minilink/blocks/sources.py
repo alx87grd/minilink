@@ -26,15 +26,15 @@ class Source(System):
     ``WhiteNoise(port="d")``), which is how ``autowire`` finds it.
     """
 
-    def __init__(self, p, *, port="y"):
+    def __init__(self, dim, *, port="y"):
         super().__init__()
 
         # Parameters
-        self.params = {"value": np.zeros(p)}
+        self.params = {"value": np.zeros(dim)}
 
         # Ports: the one output, ``y`` by default, or the input it drives (``port="r"``)
         self.port = port
-        self.add_output_port(port, dim=p, function=self.h)
+        self.add_output_port(port, dim=dim, function=self.h)
 
     @property
     def dim(self):
@@ -318,21 +318,21 @@ class WhiteNoise(NoiseSource):
     """
 
     def __init__(
-        self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
+        self, dim=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
     ):
         require_one_of("hold", hold, self.HOLDS)
         require_seed(seed)
         require_positive_period(sample_period)
 
         # The per-sample law is derived in h from the intensity: the shell is Source's
-        Source.__init__(self, p, port=port)
+        Source.__init__(self, dim, port=port)
         self.hold = hold
 
         # Parameters: the realization's seed, the sample period Δ and the intensity W
         self.params = {
             "seed": seed,
             "sample_period": float(sample_period),
-            "psd": as_intensity(psd, p),
+            "psd": as_intensity(psd, dim),
         }
 
     @property
