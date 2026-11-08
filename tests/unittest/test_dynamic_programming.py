@@ -56,6 +56,14 @@ def make_pendulum_problem():
     return PlanningProblem(sys, cost=QuadraticCost.from_system(sys), U=sys.input_box)
 
 
+# The backward step's engines: the loop, the table on NumPy, the table on JAX
+ENGINES = {
+    "loop": dict(method="loop"),
+    "numpy": dict(method="table", backend="numpy"),
+    "jax": dict(method="table", backend="jax"),
+}
+
+
 def solve(problem, *, precompute=True, record_history=False, **opt_kwargs):
     grid = StateSpaceGrid(
         problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
@@ -365,10 +373,20 @@ class TestBackends(unittest.TestCase):
     @pytest.mark.slow
     def test_loop_matches_numpy(self):
         problem = make_problem()
-        _, loop = solve(problem, backend="loop")
+        _, loop = solve(problem, method="loop")
         _, vectorized = solve(problem, backend="numpy")
         self.assertTrue(np.allclose(loop.J, vectorized.J))
         self.assertTrue(np.array_equal(loop.pi, vectorized.pi))
+
+    def test_the_loop_is_a_method_and_runs_on_numpy_only(self):
+        problem = make_problem()
+        grid = dict(x_grid=(5, 5), u_grid=(3,), dt=0.1)
+        planner = DynamicProgrammingPlanner(problem, method="loop", **grid)
+        self.assertEqual((planner.method, planner.backend), ("loop", "numpy"))
+        with self.assertRaisesRegex(ValueError, "method='table' on JAX"):
+            DynamicProgrammingPlanner(problem, method="loop", backend="jax", **grid)
+        with self.assertRaisesRegex(ValueError, "Unknown backend 'loop'"):
+            DynamicProgrammingPlanner(problem, backend="loop", **grid)
 
     def test_jax_matches_numpy(self):
         import pytest
@@ -433,7 +451,11 @@ class TestBackends(unittest.TestCase):
                 precompute=False,
             )
             planner = DynamicProgrammingPlanner(
-                problem, grid=grid, backend=backend, gamma=0.95, clean_infeasible=False
+                problem,
+                grid=grid,
+                gamma=0.95,
+                clean_infeasible=False,
+                **ENGINES[backend],
             )
             tables = planner.value_iteration(4, stop_on_tol=False)
             solution = planner.solve_steps(4)
@@ -526,7 +548,7 @@ class TestBackends(unittest.TestCase):
                 dt=0.1,
                 precompute=False,
             )
-            planner = DynamicProgrammingPlanner(problem, grid=grid, backend=backend)
+            planner = DynamicProgrammingPlanner(problem, grid=grid, **ENGINES[backend])
             planner.solve_steps(6)
             return planner.result
 
@@ -961,10 +983,10 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             x_grid=(11, 11),
             u_grid=(5,),
             dt=0.1,
-            backend=backend,
             gamma=0.95,
             tol=1e-3,
             max_iterations=200,
+            **ENGINES[backend],
             **kwargs,
         )
 

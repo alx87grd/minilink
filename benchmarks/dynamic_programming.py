@@ -79,7 +79,9 @@ def benchmark_backend(
     )
     build_s = time.perf_counter() - t0
 
-    options = dict(backend=backend, gamma=alpha)
+    # The engine the row names: the loop (a method on NumPy), or the table on a backend
+    engine = dict(method="loop") if backend == "loop" else dict(backend=backend)
+    options = dict(**engine, gamma=alpha)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
 
     cold_solve_s = None

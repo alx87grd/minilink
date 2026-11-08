@@ -20,8 +20,8 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
-    NEAREST_BACKENDS,
     NEAREST_KD_TREE,
+    NEAREST_METHODS,
     Node,
     Tree,
 )
@@ -54,7 +54,7 @@ class RRTPlanner(Planner):
     -----
     The search's settings are keywords, read back as attributes: ``max_nodes``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
-    ``max_sample_attempts``, ``return_best_effort``, ``nearest_backend``.
+    ``max_sample_attempts``, ``return_best_effort``, ``nearest_method``.
     The workflow, ``callback`` (the live figure one of its hooks), is a keyword of :meth:`solve`.
 
     Provisional tool: maintainer review before assigning for coursework.
@@ -81,7 +81,7 @@ class RRTPlanner(Planner):
         edge_resolution: float | None = None,
         max_sample_attempts: int = 100,
         return_best_effort: bool = True,
-        nearest_backend: str = "brute_force",
+        nearest_method: str = "brute_force",
     ) -> None:
         super().__init__(problem)
 
@@ -99,7 +99,7 @@ class RRTPlanner(Planner):
         self.edge_resolution = edge_resolution
         self.max_sample_attempts = int(max_sample_attempts)
         self.return_best_effort = bool(return_best_effort)
-        self.nearest_backend = nearest_backend
+        self.nearest_method = nearest_method
 
         # The search, refreshed by every solve
         self.tree: Tree | None = None
@@ -144,7 +144,7 @@ class RRTPlanner(Planner):
             return self.store_solution(solution)
 
         metric = self.metric
-        self.require_nearest_backend()
+        self.require_nearest_method()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -153,7 +153,7 @@ class RRTPlanner(Planner):
         # The tree, rooted at the start
         self.tree = Tree(
             Node(x=x0, parent=None, edge=None, cost=0.0),
-            nearest_backend=self.nearest_backend,
+            nearest_method=self.nearest_method,
         )
         self.reached_goal = False
         self.solution_node = None
@@ -204,7 +204,7 @@ class RRTPlanner(Planner):
         kwargs["edge_resolution"] = self.edge_resolution
         kwargs["max_sample_attempts"] = self.max_sample_attempts
         kwargs["return_best_effort"] = self.return_best_effort
-        kwargs["nearest_backend"] = self.nearest_backend
+        kwargs["nearest_method"] = self.nearest_method
 
         return kwargs
 
@@ -250,17 +250,17 @@ class RRTPlanner(Planner):
     # Internal machinery
     ###########################################################################
 
-    def require_nearest_backend(self) -> None:
-        """Refuse an unknown backend, and the k-d tree under a non-Euclidean metric."""
-        backend = self.nearest_backend
-        if backend not in NEAREST_BACKENDS:
+    def require_nearest_method(self) -> None:
+        """Refuse an unknown nearest-neighbour method, and the k-d tree under a non-Euclidean metric."""
+        method = self.nearest_method
+        if method not in NEAREST_METHODS:
             raise ValueError(
-                f"nearest_backend must be one of {NEAREST_BACKENDS}, got {backend!r}"
+                f"nearest_method must be one of {NEAREST_METHODS}, got {method!r}"
             )
-        if backend == NEAREST_KD_TREE and self.metric is not euclidean:
+        if method == NEAREST_KD_TREE and self.metric is not euclidean:
             raise ValueError(
-                "nearest_backend='kd_tree' requires metric=euclidean "
-                "(Euclidean L2 only; use nearest_backend='brute_force' otherwise)"
+                "nearest_method='kd_tree' requires metric=euclidean "
+                "(Euclidean L2 only; use nearest_method='brute_force' otherwise)"
             )
 
     def goal_region(self):

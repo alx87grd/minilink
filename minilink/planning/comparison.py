@@ -324,7 +324,7 @@ def sample_cost_to_go(
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, traj, *, signals, backend, show):
+def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.signals.time_signals import plot_time_signals
@@ -334,13 +334,13 @@ def plot_solution_trajectory(solution, traj, *, signals, backend, show):
         solution.problem.sys,
         traj,
         signals=signals,
-        backend=backend,
+        backend=renderer,
         show=False,
     )
 
     # The title says which: the plan the planner computed, or the controller's run
     kind = "plan" if solution.trajectory is not None else "run"
-    if backend == "matplotlib":
+    if renderer == "matplotlib":
         import matplotlib.pyplot as plt
 
         result.figure.suptitle(f"{kind} ({solution.method})")

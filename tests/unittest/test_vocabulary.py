@@ -78,6 +78,7 @@ RETIRED = {
     "N": ("n_steps", ("StepPlanningProblem",)),
     "n_samples": ("n_rollouts", ("MPPIPlanner",)),
     "n_steps": ("n_samples, the gain schedule's samples", ("LQRPlanner",)),
+    "nearest_backend": ("nearest_method", None),
     "solver": ("record", ("PlanningSolution",)),
     "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
     "alpha": (
@@ -250,6 +251,22 @@ def planner_classes():
             found.append(cls)
         pending += cls.__subclasses__()
     return found
+
+
+# The drawing library of a planning view is its renderer; backend= is the array module
+PLANNING_VIEWS = ("plot_trajectory", "plot_cost")
+
+
+def test_a_planning_view_takes_the_renderer_not_the_backend():
+    from minilink.planning.results import PlanningSolution
+    from minilink.planning.trajectory_optimization.live_plot import (
+        LiveTrajectoryPlotCallback,
+    )
+
+    views = [getattr(PlanningSolution, name) for name in PLANNING_VIEWS]
+    for view in [*views, LiveTrajectoryPlotCallback.__init__]:
+        words = set(inspect.signature(view).parameters)
+        assert "renderer" in words and "backend" not in words, view.__qualname__
 
 
 def test_the_workflow_is_on_the_verb_never_on_the_constructor():

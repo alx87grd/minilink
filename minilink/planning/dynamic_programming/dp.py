@@ -25,8 +25,10 @@ from minilink.planning.step_problems import (
     require_no_period_on_ticks,
 )
 
-#: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
-BACKEND_LOOP = "loop"
+#: The backward step's methods: the per-node Python reference (pyro's base
+#: ``DynamicProgramming``), and the same step over lookup tables
+METHOD_LOOP = "loop"
+METHOD_TABLE = "table"
 
 
 ###############################################################################
@@ -45,10 +47,11 @@ class DynamicProgrammingPlanner(Planner):
 
         DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
 
-    builds the grid itself; pass ``grid=`` for a custom one. The backend picks
+    builds the grid itself; pass ``grid=`` for a custom one. The method picks
     how the backward step runs: ``"loop"`` is the textbook double loop,
-    ``"numpy"`` (default) the same step over lookup tables, and ``"jax"`` the
-    table step jitted on device (:mod:`~minilink.planning.dynamic_programming.dp_jax`).
+    ``"table"`` (default) the same step over lookup tables; the backend is the
+    array module of the tables, ``"numpy"`` (default) or ``"jax"``, the table
+    step jitted on device (:mod:`~minilink.planning.dynamic_programming.dp_jax`).
 
     Parameters
     ----------
@@ -57,11 +60,14 @@ class DynamicProgrammingPlanner(Planner):
     grid : StateSpaceGrid, optional
         Discretization of ``problem``'s state and input spaces. Give
         ``x_grid``, ``u_grid`` and ``dt`` instead and the planner builds it.
-    backend : {"numpy", "loop", "jax"}
-        Backward-step engine. ``"numpy"`` (default) is the vectorized lookup
-        table, ``"loop"`` the per-node Python reference, ``"jax"`` the jitted
-        device version (linear/nearest interpolation only; traceable cost/sets;
-        its tables are built once, so ``f`` and ``g`` must not depend on time).
+    method : {"table", "loop"}
+        The backward step: ``"table"`` (default) the vectorized lookup table,
+        ``"loop"`` the per-node Python reference.
+    backend : {"numpy", "jax"}
+        The array module of the table step: ``"jax"`` the jitted device
+        version (``method="table"`` only; linear/nearest interpolation only;
+        traceable cost/sets; its tables are built once, so ``f`` and ``g`` must
+        not depend on time).
     gamma : float, optional
         The discount factor per step, a number of :attr:`params`. Unset, the
         problem's ``discount_factor(dt)`` (``1`` on an undiscounted problem).
@@ -109,6 +115,7 @@ class DynamicProgrammingPlanner(Planner):
         u_grid=None,
         dt=None,
         solver="euler",
+        method: str = METHOD_TABLE,
         backend: str = BACKEND_NUMPY,
         gamma: float | None = None,
         tol: float = 0.1,
@@ -126,8 +133,9 @@ class DynamicProgrammingPlanner(Planner):
         self.discount_rate = tool_rate_of(problem, gamma, grid.dt)
         self.grid = grid_on_rate(grid, self.discount_rate)
 
-        # Structure: the engine, the stopping rules, the interpolation
-        self.backend = require_dp_backend(backend)
+        # Structure: the backward step and its array module, the stopping rules, the
+        # interpolation
+        self.method, self.backend = require_dp_engine(method, backend)
         self.tol = float(tol)
         self.max_iterations = int(max_iterations)
         self.interpolation = interpolation
@@ -264,6 +272,7 @@ class DynamicProgrammingPlanner(Planner):
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem, beside its grid (:meth:`rebuilt_on`): the engine, the stopping rules, the numbers it was given."""
         kwargs = dict(
+            method=self.method,
             backend=self.backend,
             tol=self.tol,
             max_iterations=self.max_iterations,
@@ -303,6 +312,7 @@ class DynamicProgrammingPlanner(Planner):
         tf = self.final_time
         dt = self.grid.dt
         tol = self.tol
+        method = self.method
         backend = self.backend
 
         # The JAX engine: every sweep compiled on device, unless each one is reported
@@ -352,7 +362,7 @@ class DynamicProgrammingPlanner(Planner):
             # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the model's stage cost and
             # step: the textbook loop, the same step over lookup tables, or on device
             J_next = J
-            if backend == BACKEND_LOOP:
+            if method == METHOD_LOOP:
                 J, pi = self.backward_step_loop(J_next, t)
             elif backend == BACKEND_NUMPY:
                 J, pi = self.backward_step_table(J_next, t, G, verbose=verbose)
@@ -872,12 +882,18 @@ def grid_on_rate(grid, rate):
     return grid.rebuilt_on(problem)
 
 
-def require_dp_backend(backend):
-    """Refuse an unknown backward-step engine; return it."""
-    if backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
-        raise ValueError(f"Unknown backend {backend!r}")
+def require_dp_engine(method, backend):
+    """Refuse an unknown backward step or array module, and the loop on JAX; return ``(method, backend)``."""
+    if method not in (METHOD_LOOP, METHOD_TABLE):
+        raise ValueError(f"Unknown method {method!r}: use 'table' or 'loop'")
+    if backend not in (BACKEND_NUMPY, BACKEND_JAX):
+        raise ValueError(f"Unknown backend {backend!r}: use 'numpy' or 'jax'")
+    if method == METHOD_LOOP and backend == BACKEND_JAX:
+        raise ValueError(
+            "the loop is the per-node NumPy reference: use method='table' on JAX"
+        )
 
-    return backend
+    return method, backend
 
 
 def grid_numbers_of(grid, gamma, out_of_bound_cost):

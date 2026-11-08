@@ -111,7 +111,7 @@ class PlanningSolution:
     # Views, run on demand: the plan, else the controller run from the problem's start
 
     def plot_trajectory(
-        self, *, dt=None, signals=("x", "u"), backend="matplotlib", show=True
+        self, *, dt=None, signals=("x", "u"), renderer="matplotlib", show=True
     ):
         """
         Draw the plan, else the controller's run from the problem's start, on the problem's system.
@@ -121,7 +121,8 @@ class PlanningSolution:
         automatic step; a clocked one on its own clock; a step problem's
         model), once from the start with nominal parameters. The planner's
         mirror passes its own ``dt``, the step of its evidence. The figure is
-        titled plan or run.
+        titled plan or run. ``renderer`` is the drawing library,
+        ``"matplotlib"`` or ``"plotly"``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_solution_trajectory
@@ -130,7 +131,7 @@ class PlanningSolution:
             self,
             drawn_trajectory_of(self, dt),
             signals=signals,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -138,12 +139,12 @@ class PlanningSolution:
         """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system."""
         return self.problem.sys.animate(drawn_trajectory_of(self, dt), **kwargs)
 
-    def plot_cost(self, *, dt=None, backend="matplotlib", show=True):
-        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`)."""
+    def plot_cost(self, *, dt=None, renderer="matplotlib", show=True):
+        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
-            backend=backend,
+            backend=renderer,
             show=show,
         )
 

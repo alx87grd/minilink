@@ -777,7 +777,7 @@ def test_kdtree_nearest_and_near_match_brute_force():
     rng = np.random.default_rng(0)
     brute = Tree(Node(np.array([0.0, 0.0]), None, None, 0.0))
     kd = Tree(
-        Node(np.array([0.0, 0.0]), None, None, 0.0), nearest_backend=NEAREST_KD_TREE
+        Node(np.array([0.0, 0.0]), None, None, 0.0), nearest_method=NEAREST_KD_TREE
     )
     for _ in range(40):
         x = rng.uniform(-5.0, 5.0, size=2)
@@ -808,7 +808,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
         seed=0,
         max_nodes=4000,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -838,21 +838,21 @@ def test_kdtree_requires_euclidean_metric():
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
         metric=dubins.distance,
         seed=0,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     with pytest.raises(ValueError, match="metric=euclidean"):
         planner.solve()
 
 
-def test_unknown_nearest_backend_raises():
+def test_unknown_nearest_method_raises():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
         seed=0,
-        nearest_backend="invalid",
+        nearest_method="invalid",
     )
-    with pytest.raises(ValueError, match="nearest_backend"):
+    with pytest.raises(ValueError, match="nearest_method"):
         planner.solve()
 
 
@@ -1226,7 +1226,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=4000,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
