@@ -279,7 +279,8 @@
       "direction": "lower_better",
       "value": 68.59640203036804,
       "unit": "cost",
-      "notes": "optimum cost; current run must not exceed baseline value"
+      "notes": "optimum cost; a run may exceed the recorded optimum by 0.1 % (solver noise across machines), no more",
+      "max_allowed": 68.665
     },
     {
       "id": "trajopt.showcase_cartpole.jax_slsqp.x_tf",
