@@ -66,8 +66,8 @@ concrete formatting, ordered by the cost of being wrong:
   §4's list, and `tests/unittest/test_contract.py` walks every other public core object.
   However, the core framework remains forgiving:
   models where a student hard-codes constants directly into equations must simulate without friction.
-  Costs, sets, fields and shapes owe the same signature; the library ones do not read
-  `params` yet. Override rule and gap: DESIGN §4, 'Parameters'.
+  Costs, sets, fields and shapes owe the same signature. Override rule and the remaining
+  gap: DESIGN §4, 'Parameters'.
 - **2.4 One last answer, read only by the shortcuts.** A run returns its result, and the result
   carries its whole account: the answer with its timings, its history and the solver's raw
   output (`Trajectory`, `PlanningSolution` and its `record`, `OptimizationResult`,
