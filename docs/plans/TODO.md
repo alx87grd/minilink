@@ -232,6 +232,54 @@ RL's `Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4.
 
 ### 1.11 The core API proposals
 
+- [ ] **The API naming sweep's rulings** (ruled 2026-11-08 on an independent reviewer's sweep of
+  the public API; being built on the branch `api-naming`, stacked on the docs sweep #137, one
+  agent per area for the library, then the callers). No alias; every caller in the same change:
+  1. `n_steps` counts transitions (the textbook N); a count of time samples is `n_samples`
+     (`compute_trajectory`, `Simulator`, `step_response`/`bode`/`nyquist`/`frequency_response`,
+     `lqr_finite_horizon`/`lqr_gain_schedule`, `LQRPlanner`, `animate_modal`,
+     `Source.plot_signal`). Trajectory optimization's `n_steps` counts intervals: knots =
+     `n_steps` + 1 (callers keep their numbers; their plans gain one knot, an intended change,
+     its regression baselines re-pinned).
+  2. `backend=` is the array module only; `renderer=` names the drawing library on every
+     drawing verb (`plot_renderer=` on `game` and the realtime simulator); value iteration's
+     engine is `method="loop"`; RRT's nearest-neighbour search `nearest_method=`.
+  3. Every DP cost-to-go is a `GridField` (its table in `params["values"]`); `value_at` goes;
+     policy evaluation is `DynamicProgrammingPlanner.evaluate_policy(controller)`, returning a
+     `GridField` on the planner's own grid and numbers; the `PolicyEvaluator` class goes.
+  4. `StepPlanningProblem.rollout(controller)` returns a `Trajectory` with its running cost
+     (`J` its last value); `run` goes.
+  5. Records: `n_iterations` (value iteration, RRT, MPPI, trajectory optimization); `method`
+     for `algorithm`; `**method_numbers` on `Optimizer`, trajectory optimization and the RL
+     planner; `PlanningSolution.family` for the property `method` (MPPI's name fixed); one name
+     per quantity in the trajectory-optimization and RRT records (`n_nodes`,
+     `TreeSearchIteration`).
+  6. `evaluate(..., trajectories=True)` for `record=True`.
+  7. `ReinforcementLearningPlanner.solve(params=)`, as every planner.
+  8. `StateSpaceGrid(x_grid=, u_grid=)`; `KinodynamicExtender(horizon, n_steps)`.
+  9. `S` on `QuadraticCost` and `S_f` (the boundary condition `S(T) = S_f`) in the Riccati
+     design functions: both kept, one line in DESIGN.
+  10. `dim=` on the one-size blocks (sources, white noise, routing, saturation, delay, the
+      PID family).
+  11. `Sys2Gym(episode_length=)` for `tf=`.
+  12. `is_3d`, `file_name`, `x_axis`/`y_axis`, `bounds`; `Source.plot_signal`;
+      `show_live_search` goes; `step_info(t, y)`, `discretize(sys, dt)`; `animate(speed=)`;
+      `region_of_attraction(n_samples=)`.
+  Done when the library, tests, examples, notebooks and docs read the new names, the gates pass,
+  and the PR is merged.
+- [ ] **The API sweep's judgment calls** **[ask]**, to decide one at a time after the rulings
+  above land: `tf` both a final time and the body-pose map; three spellings of bounds
+  (`lower`/`upper`, `lower_bound`/`upper_bound`, `u_min`/`u_max`); `traj` against
+  `trajectory`; `n_trials` against `n_rollouts`; `evaluate=True` beside `evaluate()`; the four
+  roles of `of`; keyword-only rules between sibling verbs and between the two problem classes;
+  trajectory optimization's `live_plot=` beside RRT's callback object; the RL planner's
+  `n_steps` (SB3's periods per collection); `eta` against `learning_rate`; `Evaluation`'s
+  `cost` beside `J`; display keywords in constructors (`NeuralPolicy`, `TaskImpedance`,
+  `game(plot=)`); minor names (`PlanFollower.compute_u`, `ModelPredictiveController` a
+  factory, `nyquist`/`frequency_response` both `(w, G)`, `SlidingMode(nab)`, `PD(y_filt0)`,
+  `StateSpaceGrid.load`, the extender's public `rng`); the catalog's constructor words and
+  abbreviated class names; `MathematicalProgram(h=, g=)` (kept, the textbook NLP).
+
 The proposals and the later round of API sweeps landed in v0.4 as ruled (contracts: DESIGN §4
 to §6, RULES 2.7). Left:
 
