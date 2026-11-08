@@ -24,10 +24,9 @@ shipping features than when the folders were laid out. Two things no longer fit:
 - **The examples tree carries four axes on one tree.** By *form* (`demos/` scripts vs
   notebooks), by *audience* (`tutorial/` API walk, `teaching/topics/` textbook pages,
   `teaching/courses/<id>/` homework pins), by *package* (`demos/<chapter>/` mirrors the
-  library) and by *lane* (`projects/`). One lesson exists three times
-  (the pendulum value-iteration-vs-LQR-vs-RL comparison is a topic notebook, a GRO860
-  notebook and a demo script), and the reader needs the README table to know which copy is
-  "the" one.
+  library) and by *lane* (`projects/`). One lesson exists twice (the pendulum
+  value-iteration-vs-LQR-vs-RL comparison is a GRO860 notebook and a demo script; its topic
+  copy went in v0.4), and the reader needs the README table to know which copy is "the" one.
 - **The course notebooks pin no library version.** Every Colab cell runs
   `git clone https://github.com/alx87grd/minilink` (two add `-b main`), so a push to `main`
   can break a running course the same afternoon. Releases exist on PyPI and as GitHub tags
@@ -54,7 +53,7 @@ DESIGN §3 is the package map.
 | Folder | Content |
 | --- | --- |
 | `tutorial/` | three layers, `basics/` (3), `core/` (8), `advanced/` (5), + 3 showcases |
-| `teaching/topics/<domain>/` | 7 notebooks in four domains |
+| `teaching/topics/<domain>/` | 5 notebooks in three domains (two duplicates of GRO860 notebooks deleted in v0.4) |
 | `teaching/courses/udes_gro860/`, `udes_gro501/` | 14 + 6 notebooks, cited by the course documents |
 | `demos/<chapter>/` | scripts in 17 chapters: the package names plus `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `udes_racecar` |
 | `projects/` | 3 multi-file applications |
