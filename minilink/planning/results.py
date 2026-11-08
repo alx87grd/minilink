@@ -232,23 +232,21 @@ def drawn_trajectory_of(solution, dt=None) -> Trajectory:
 
 def step_run_of(problem, controller, params=None, *, episode_length=None) -> Trajectory:
     """
-    A step problem's rollout under ``controller`` from its start: the model's run as a trajectory.
+    A step problem's rollout under ``controller`` from its start: the model's :meth:`~minilink.planning.step_model.StepModel.rollout`.
 
-    ``N`` ticks of the step problem's ``run(controller)``: its own
-    horizon, else an episode of ``episode_length`` (10 by default) in its
-    time. ``params`` is the model's tree (``None``: its own). The last input is
-    held at the final state, so ``x`` and ``u`` share the ``N + 1`` times.
+    ``N`` ticks: its own horizon, else an episode of ``episode_length`` (10
+    by default) in its time. ``params`` is the model's tree (``None``: its
+    own). The last input is held at the final state, so ``x`` and ``u`` share
+    the ``N + 1`` times.
     """
     model = step_model_of(problem)
     params = model.params if params is None else params
     N = episode_ticks_of(model, episode_length)
 
-    # x_0 … x_N and u_0 … u_{N−1} on the ticks t0 + k, the last input held
-    xs, us, _, _ = model.run(controller, params=params, n_steps=N)
-    t = np.array([model.time_of(k, params) for k in range(N + 1)], dtype=float)
-    u = np.concatenate([us, us[-1:]], axis=0)
+    # x_0 … x_N and u_0 … u_N on the ticks t0 + k, the last input held
+    traj = model.rollout(controller, params=params, n_steps=N)
 
-    return Trajectory(t=t, x=xs.T, u=u.T)
+    return traj
 
 
 def episode_ticks_of(model, episode_length=None) -> int:

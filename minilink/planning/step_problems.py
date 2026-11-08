@@ -7,6 +7,7 @@ import numpy as np
 from minilink.core.costs import SampledCost, StepCost, box_samples
 from minilink.core.inspect import repr_pretty
 from minilink.core.params import require_complete
+from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import (
     PlanningProblem,
     coerce_laws,
@@ -46,7 +47,7 @@ class StepPlanningProblem:
     (:meth:`PlanningProblem.discretize`) keeps ``(dt, t0)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
     and its cost a :class:`~minilink.core.costs.SampledCost`. The problem
     answers its own equations: :meth:`transition` (``x_{k+1}``, ``c_k``),
-    :meth:`terminal` (``h``), :meth:`run` (``J`` under a controller),
+    :meth:`terminal` (``h``), :meth:`rollout` (the trajectory and ``J`` under a controller),
     :meth:`cost_bound` and :meth:`failure_cost_at`.
     """
 
@@ -252,20 +253,23 @@ class StepPlanningProblem:
 
         return model.terminal(x, t, params)
 
-    def run(self, controller, x0=None, params=None, n_steps=None):
+    def rollout(self, controller, x0=None, params=None, n_steps=None) -> Trajectory:
         """
-        The rollout under ``controller``: ``(xs, us, cs, J)``, ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``.
+        The rollout under ``controller``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks, its running cost the signal ``"cost"``.
 
         ``controller`` is a controller block (its state on its measurement
         port, its other inputs at their nominal values) or a law
         ``u = policy(x, t)``. From ``x0`` (``None``: the problem's start) over
-        ``n_steps`` ticks (``None``: :attr:`n_steps`; an infinite horizon needs
-        it). The states ``(n_steps + 1, n)``, the inputs and the stage costs
-        ``(n_steps,)``-long.
+        ``N = n_steps`` ticks (``None``: :attr:`n_steps`; an infinite horizon
+        needs it). The samples sit at ``t0 + k dt`` (``t0 + k`` on a native
+        problem), ``x`` ``(n, N + 1)`` and ``u`` ``(m, N + 1)``, the last
+        input held; ``traj.signals["cost"]`` ``(1, N + 1)`` is
+        ``J_k = Σ_{j<k} γʲ c_j`` with ``γᴺ h(x_N)`` added at the last sample,
+        so ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)`` is its last value.
         """
         model = build_step_model(self)
 
-        return model.run(controller, x0, params, n_steps)
+        return model.rollout(controller, x0, params, n_steps)
 
     def horizon_kind(self) -> str:
         """``"finite"`` with a horizon ``N`` (``h`` is charged there), ``"infinite"`` without."""

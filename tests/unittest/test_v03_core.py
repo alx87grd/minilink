@@ -558,10 +558,10 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
 
     # The greedy walk from the start, rolled out by the problem, pays J(x0)
     law = vi.controller
-    walk = problem.run(
+    walk = problem.rollout(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
     )
-    assert walk[3] == J[0, 0] == 5.0
+    assert walk.signals["cost"][0, -1] == J[0, 0] == 5.0
 
 
 def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_one_j():
@@ -591,7 +591,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
 
     # The step tool's sum on the discretization value iteration backs up: Σ γᵏ c_k + γᴺ h
     step_problem = problem.discretize(dt, solver="rk4")
-    J_step = step_problem.run(policy)[3]
+    J_step = step_problem.rollout(policy).signals["cost"][0, -1]
 
     # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
@@ -615,7 +615,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
 
     # The held loop on the step problem's step runs its own states
     held = problem.compile(law % dt, substeps=1, backend="numpy").trajectory()
-    np.testing.assert_array_equal(held.of("plant").x.T, step_problem.run(policy)[0])
+    np.testing.assert_array_equal(held.of("plant").x, step_problem.rollout(policy).x)
 
     # The planner's own score is the law it hands out, as it is: the continuous
     # loop integrated on the planner's dt, a different controller than the held one
@@ -814,6 +814,6 @@ def test_a_held_loops_run_scores_on_the_step_problems_own_sum():
     # The law held over each period on the step problem's own step: the run carries the
     # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
     held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
-    J_step = problem.discretize(0.1).run(policy)[3]
+    J_step = problem.discretize(0.1).rollout(policy).signals["cost"][0, -1]
     J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
     np.testing.assert_allclose(J, J_step, rtol=1e-12)
