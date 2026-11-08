@@ -1554,7 +1554,8 @@ mean action (its `actor`, the planner's) with an exploration head around it (`Ga
 on the same features. One file per algorithm under `algorithms/` (`REINFORCE`,
 `ActorCritic`, `PPO`, `SAC`), each owning only its update rule and train state; three class
 attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JAX, no
-Flax/Optax dependency. Training prints one line per update; `verbose=False` silences it.
+Flax/Optax dependency. Training is quiet by default; `solve(verbose=True)` prints one line per
+update.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
 step functions on either backend — the step model's `transition` with the training reward `r = −g dt` (`reward="stage"`: `r = −c_k`),
