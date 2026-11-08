@@ -11,7 +11,7 @@ from minilink.core.system import System
 
 
 def discretize(
-    system: System,
+    sys: System,
     dt: float,
     *,
     solver: str = "rk4",
@@ -30,4 +30,4 @@ def discretize(
     and the sample period is ``dt`` alone: the source's ``params`` may not carry
     a ``"dt"`` key. ``sys % dt`` is ``discretize(sys, dt, solver="euler")``.
     """
-    return SampledSystem(system, dt, solver=solver, substeps=substeps)
+    return SampledSystem(sys, dt, solver=solver, substeps=substeps)

@@ -170,7 +170,7 @@ class TestDiagrams(unittest.TestCase):
         render_diagram_graph(graph, show=False, show_inline=False, show_pdf=True)
         self.assertEqual(graph.renders, [])
         render_diagram_graph(
-            graph, show=False, show_inline=False, show_pdf=True, filename="out.gv"
+            graph, show=False, show_inline=False, show_pdf=True, file_name="out.gv"
         )
         self.assertEqual(graph.renders, [("out.gv", False)])
 

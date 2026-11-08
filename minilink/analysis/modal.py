@@ -72,7 +72,7 @@ def animate_modal(
     amplitude=1.0,
     tf=None,
     n_samples=2001,
-    time_factor_video=3.0,
+    speed=3.0,
     renderer="matplotlib",
     is_3d=False,
     show=True,
@@ -131,7 +131,7 @@ def animate_modal(
         title = f"Mode {index}: {pole.real:.1f}{pole.imag:+.1f}j"
         inline = sys.animate(
             traj,
-            time_factor_video=time_factor_video,
+            speed=speed,
             is_3d=is_3d,
             html=html,
             renderer=renderer,

@@ -1844,7 +1844,7 @@ class TestPlotControlLaw(unittest.TestCase):
         res = lqr.plot_control_law(
             bounds=((-1.0, 1.0), (-1.0, 1.0)),
             grid_shape=(5, 5),
-            show_3d=True,
+            is_3d=True,
             show=False,
         )
         self.assertEqual(res.axes.name, "3d")

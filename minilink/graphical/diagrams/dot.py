@@ -67,7 +67,7 @@ class GraphvizTopologyExporter(TopologyExporter):
 
 def plot_diagram(
     sys_or_diagram,
-    filename=None,
+    file_name=None,
     show=True,
     show_inline=None,
     show_pdf=None,
@@ -87,7 +87,7 @@ def plot_diagram(
         show=show,
         show_inline=show_inline,
         show_pdf=show_pdf,
-        filename=filename,
+        file_name=file_name,
     )
 
     # Nothing for the notebook cell to render when the figure could not be drawn
@@ -297,7 +297,7 @@ def escape_port_char(char):
 
 
 def render_diagram_graph(
-    graph, show=True, show_inline=None, show_pdf=None, filename=None
+    graph, show=True, show_inline=None, show_pdf=None, file_name=None
 ):
     """
     Display a Graphviz object.
@@ -305,7 +305,7 @@ def render_diagram_graph(
     ``show_inline=None`` defaults to inline SVG in Jupyter / Colab.
     Outside notebooks, ``show=True`` opens a Matplotlib window with the
     Graphviz PNG (same blocking policy as trajectory plots). Pass
-    ``show_pdf=True`` for the legacy OS PDF viewer; pass ``filename`` to
+    ``show_pdf=True`` for the legacy OS PDF viewer; pass ``file_name`` to
     write Graphviz output to disk. ``show=False`` builds/returns only.
 
     Returns ``False`` when the figure cannot be drawn (no graphviz wrapper, or
@@ -390,19 +390,19 @@ def render_diagram_graph(
             )
 
     # To disk: the requested file, or a temporary one for the PDF viewer when shown
-    need_disk = (show and show_pdf) or filename is not None
+    need_disk = (show and show_pdf) or file_name is not None
     if not need_disk:
         return drawn
 
-    if filename is None:
+    if file_name is None:
         with tempfile.NamedTemporaryFile(
             suffix="_" + graph.name + ".gv",
             delete=False,
         ) as tmp:
-            filename = tmp.name
+            file_name = tmp.name
 
     try:
-        graph.render(filename=filename, view=bool(show and show_pdf))
+        graph.render(filename=file_name, view=bool(show and show_pdf))
     except Exception as exc:
         warnings.warn(
             f"Could not render graph. Is Graphviz installed? Error: {exc}",

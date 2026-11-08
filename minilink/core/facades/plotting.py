@@ -93,7 +93,7 @@ class SystemPlotting:
         Convenience shortcut plotting one output component over swept inputs.
 
         Sweeps components of one input port (line, heatmap, or
-        ``show_3d=True`` surface) with every other input pinned at its
+        ``is_3d=True`` surface) with every other input pinned at its
         nominal value. See
         :func:`minilink.graphical.port_map.plot_input_output_map`.
         """
@@ -155,7 +155,7 @@ class SystemPlotting:
 
     def plot_diagram(
         self,
-        filename=None,
+        file_name=None,
         show=True,
         show_inline=None,
         show_pdf=None,
@@ -175,7 +175,7 @@ class SystemPlotting:
         ``display()``, which would draw the figure twice). Bare scripts
         and IPython REPLs open a Matplotlib window with the Graphviz PNG
         (same blocking policy as trajectory plots). Pass ``show_pdf=True``
-        for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
+        for the legacy OS PDF viewer; pass ``file_name`` to write Graphviz
         output to disk; pass ``show=False`` to build the Digraph only.
         Without the Graphviz binary the figure is skipped with a warning and
         ``None`` is returned, so a notebook cell does not fail.
@@ -188,7 +188,7 @@ class SystemPlotting:
             show=show,
             show_inline=show_inline,
             show_pdf=show_pdf,
-            filename=filename,
+            file_name=file_name,
             expand=expand,
         )
 

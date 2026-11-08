@@ -164,6 +164,13 @@ RETIRED = {
     "plot_backend": ("plot_renderer", None),
     "p": ("dim", ("Source", "WhiteNoise")),
     "dof": ("dim (dof stays a manipulator's joints)", ("P", "PI", "PD", "PID")),
+    "filename": ("file_name", None),
+    "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
+    "show_signal": ("plot_signal", None),
+    "time": ("t", ("step_info",)),
+    "system": ("sys", ("discretize",)),
+    "time_factor_video": ("speed", None),
+    "samples": ("n_samples", ("region_of_attraction",)),
 }
 
 

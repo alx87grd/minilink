@@ -304,4 +304,4 @@ if __name__ == "__main__":
     sys.inputs["u"].nominal_value[0] = 1.0
     # sys.inputs["u"].nominal_value[1] = 1.0
     sys.compute_trajectory(tf=4.0)
-    sys.animate(time_factor_video=1.0)
+    sys.animate(speed=1.0)

@@ -48,7 +48,7 @@ class Source(System):
 
         return value
 
-    def show_signal(self, t0=None, tf=None, n_samples=1000, ax=None):
+    def plot_signal(self, t0=None, tf=None, n_samples=1000, ax=None):
         """
         Plot the source output signal over a time range.
 
@@ -503,11 +503,11 @@ def require_sample_shape(values, t):
 
 if __name__ == "__main__":
     noise = WhiteNoise(1, psd=0.01, sample_period=0.01, seed=1)
-    fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+    fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
     ax.set_title("Baseline")
 
     # The intensity is fixed: a longer period holds smaller samples for longer
     for period in (0.05, 0.2, 1.0):
         noise.params["sample_period"] = period
-        fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+        fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
         ax.set_title(f"sample_period = {period}")
