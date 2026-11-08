@@ -102,12 +102,13 @@ class PlanningSolution:
         return int(self.controller.m) == 0
 
     @property
-    def method(self) -> str:
-        """The planning method, read from the record (``"value iteration"``, ``"riccati"``, ...)."""
-        # The record's class name without its suffix, one lowercase word per capital
+    def family(self) -> str:
+        """The planning family, read from the record (``"value iteration"``, ``"riccati"``, ``"mppi"``, ...)."""
+        # The record's class name without its suffix, one lowercase word per capitalized
+        # word (an acronym stays one word)
         name = type(self.record).__name__.removesuffix("Record")
 
-        return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
+        return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
 
     # Views, run on demand: the plan, else the controller run from the problem's start
 
@@ -271,7 +272,7 @@ def solution_text(solution):
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
     success = "yes" if solution.success else "no"
-    headline = f"PlanningSolution, method={solution.method}, success={success}"
+    headline = f"PlanningSolution, family={solution.family}, success={success}"
     body = [
         body_line("controller", f"{solution.controller.name} ({law})"),
         body_line("trajectory", trajectory),

@@ -135,7 +135,7 @@ class Optimizer:
         pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
         ``grad``. ``None`` (default) runs to the method's tolerance, its
         ``maxiter`` the cap. A size, structural: never a parameter.
-    **method_kwargs
+    **method_numbers
         Extra keyword arguments override the preset's top-level kwargs and are
         forwarded to the backend constructor.
     """
@@ -150,7 +150,7 @@ class Optimizer:
         use_hessian: bool = False,
         options: dict | None = None,
         n_iterations: int | None = None,
-        **method_kwargs,
+        **method_numbers,
     ):
         # The method: the class default for "auto", refused when the class does not admit it
         method = method_for(program, method)
@@ -170,8 +170,8 @@ class Optimizer:
 
         # The solver adapter: the method's preset, the caller's keywords and options
         # over it; a native law's own numbers may come as keywords (learning_rate=)
-        options, method_kwargs = method_options_of(method, options, method_kwargs)
-        self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
+        options, method_numbers = method_options_of(method, options, method_numbers)
+        self.adapter = make_optimizer_backend(method, options=options, **method_numbers)
 
     def __str__(self):
         return optimizer_text(self)
@@ -588,7 +588,7 @@ def require_named_method(method):
         )
 
 
-def method_options_of(method, options, method_kwargs):
+def method_options_of(method, options, method_numbers):
     """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept; refuse such a number given in ``options``."""
     numbers = method_params_of(method) if method in NATIVE_METHODS else {}
     hidden = sorted(key for key in (options or {}) if key in numbers)
@@ -597,8 +597,8 @@ def method_options_of(method, options, method_kwargs):
             f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
             f"(Optimizer(..., {hidden[0]}=...)); options= holds an external solver's knobs"
         )
-    own = {key: value for key, value in method_kwargs.items() if key in numbers}
-    rest = {key: value for key, value in method_kwargs.items() if key not in numbers}
+    own = {key: value for key, value in method_numbers.items() if key in numbers}
+    rest = {key: value for key, value in method_numbers.items() if key not in numbers}
     if not own:
         return options, rest
 
@@ -607,13 +607,13 @@ def method_options_of(method, options, method_kwargs):
     return merged, rest
 
 
-def backend_kwargs_of(preset, method_kwargs, options):
+def backend_kwargs_of(preset, method_numbers, options):
     """The backend's constructor keywords: the preset's, then the caller's keywords, then the merged options."""
     # A copy of each preset dict, so a backend never edits the shared preset
     kwargs = {}
     for key, value in preset.items():
         kwargs[key] = dict(value) if isinstance(value, dict) else value
-    kwargs.update(method_kwargs)
+    kwargs.update(method_numbers)
 
     # The caller's options win over the preset's
     if options is not None:

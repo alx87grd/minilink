@@ -451,10 +451,10 @@ def search_title(step):
     if step.reached_goal and step.best_cost is not None:
         return (
             f"RRT search  phase={step.phase}  iter={step.iteration}  "
-            f"nodes={step.tree_nodes}  best cost={step.best_cost:.2f}"
+            f"nodes={step.n_nodes}  best cost={step.best_cost:.2f}"
         )
 
     return (
         f"RRT search  phase={step.phase}  iter={step.iteration}  "
-        f"nodes={step.tree_nodes}  searching..."
+        f"nodes={step.n_nodes}  searching..."
     )

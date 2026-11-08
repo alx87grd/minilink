@@ -153,7 +153,7 @@ class TestValueIteration(unittest.TestCase):
     def test_converges(self):
         _, result = solve(make_problem())
         self.assertLess(result.delta, 0.001)
-        self.assertGreater(result.iterations, 1)
+        self.assertGreater(result.n_iterations, 1)
 
     def test_value_zero_at_goal_and_grows_with_distance(self):
         _, result = solve(make_problem())
@@ -182,7 +182,7 @@ class TestValueIteration(unittest.TestCase):
         planner = DynamicProgrammingPlanner(problem, grid=grid)
         planner.solve_steps(5)
         result = planner.result
-        self.assertEqual(result.iterations, 5)
+        self.assertEqual(result.n_iterations, 5)
 
     def test_out_of_bound_penalty_and_cleanup(self):
         planner, result = solve(make_problem())
@@ -207,7 +207,7 @@ class TestValueIteration(unittest.TestCase):
 
     def test_record_history(self):
         _, result = solve(make_problem(), record_history=True)
-        self.assertEqual(len(result.history), result.iterations + 1)
+        self.assertEqual(len(result.history), result.n_iterations + 1)
 
 
 class TestControllerAndEvaluation(unittest.TestCase):
@@ -449,7 +449,7 @@ class TestBackends(unittest.TestCase):
             )
             tables = planner.value_iteration(4, stop_on_tol=False)
             solution = planner.solve_steps(4)
-            self.assertEqual(tables.iterations, 4, backend)
+            self.assertEqual(tables.n_iterations, 4, backend)
             np.testing.assert_array_equal(tables.J, planner.result.J, err_msg=backend)
             np.testing.assert_array_equal(tables.pi, planner.result.pi)
             self.assertTrue(solution.success)
@@ -474,7 +474,7 @@ class TestBackends(unittest.TestCase):
             results[backend] = planner.result
 
         numpy_J, jax_J = results["numpy"].J, results["jax"].J
-        self.assertEqual(results["jax"].iterations, 15)
+        self.assertEqual(results["jax"].n_iterations, 15)
         rel_gap = np.max(np.abs(jax_J - numpy_J) / np.maximum(np.abs(numpy_J), 1.0))
         self.assertLess(rel_gap, 1e-2)
         self.assertGreater(np.mean(results["jax"].pi == results["numpy"].pi), 0.98)
@@ -510,10 +510,10 @@ class TestBackends(unittest.TestCase):
         reported, report = jax_solve(verbose=True)
 
         for result in (recorded, reported):
-            self.assertEqual(result.iterations, device.iterations)
+            self.assertEqual(result.n_iterations, device.n_iterations)
             np.testing.assert_allclose(result.J, device.J, rtol=1e-12, atol=1e-9)
             np.testing.assert_array_equal(result.pi, device.pi)
-        self.assertEqual(len(recorded.history), recorded.iterations + 1)
+        self.assertEqual(len(recorded.history), recorded.n_iterations + 1)
         self.assertIn("Bellman equation solved!", report)
 
     def test_time_varying_dynamics_on_a_grid_rebuilt_each_sweep(self):
@@ -836,7 +836,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         ).solve()
         self.assertFalse(capped.success)
         self.assertIn("max_iterations", str(capped.record))
-        self.assertEqual(capped.record.iterations, 2)
+        self.assertEqual(capped.record.n_iterations, 2)
 
         planner = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
@@ -856,7 +856,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
         ).solve_steps(3, evaluate=True)
         self.assertTrue(fixed.success)
-        self.assertEqual(fixed.record.iterations, 3)
+        self.assertEqual(fixed.record.n_iterations, 3)
         self.assertEqual(
             fixed.evaluation.n_trials, 1
         )  # a deterministic problem: one trial
@@ -1013,7 +1013,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         table = self.planner(exit_failure_cost)
         loop = self.planner(exit_failure_cost, "loop")
         table.solve()
-        loop.solve_steps(table.result.iterations)
+        loop.solve_steps(table.result.n_iterations)
         np.testing.assert_allclose(loop.result.J, table.result.J)
         # the charged exits, not the 1e6 default, bound the cost-to-go
         self.assertLess(np.max(table.result.J), 1.0e3)

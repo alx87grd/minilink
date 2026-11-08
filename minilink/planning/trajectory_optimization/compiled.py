@@ -308,7 +308,7 @@ class CompiledTrajectoryPlanner:
             cost=result.cost,
             solver_success=result.success,
             message="",
-            iterations=status.get("iterations"),
+            n_iterations=status.get("iterations"),
             solve_time_s=None,
             feasibility_tol=tol,
             max_equality_violation=float(max_eq),

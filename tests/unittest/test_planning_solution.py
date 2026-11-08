@@ -386,10 +386,10 @@ def solved_pendulum():
 def test_every_solution_carries_its_problem():
     problem = move_problem()
     solution = trajopt(problem, shooting).solve()
-    assert solution.problem is problem and solution.method == "trajectory optimization"
+    assert solution.problem is problem and solution.family == "trajectory optimization"
     problem, vi, lqr = solved_pendulum()
     assert vi.problem is problem and lqr.problem is problem
-    assert vi.method == "value iteration" and lqr.method == "riccati"
+    assert vi.family == "value iteration" and lqr.family == "riccati"
 
 
 def test_solution_verbs_draw_what_the_planner_produced():

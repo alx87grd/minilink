@@ -36,7 +36,7 @@ class DPBenchmarkRow:
     build_s: float
     cold_solve_s: float
     best_solve_s: float
-    iterations: int
+    n_iterations: int
     result: object  # DynamicProgrammingResult, for the cross-backend value check
 
 
@@ -102,7 +102,7 @@ def benchmark_backend(
         build_s=build_s,
         cold_solve_s=cold_solve_s,
         best_solve_s=best_solve_s,
-        iterations=result.iterations,
+        n_iterations=result.n_iterations,
         result=result,
     )
 
@@ -124,7 +124,7 @@ def print_dp_benchmark(rows, *, reference: str = "loop") -> None:
         )
         print(
             f"{r.backend:8} {r.grid:18} {r.build_s:8.2f} {r.cold_solve_s:9.3f} "
-            f"{r.best_solve_s:9.3f} {r.iterations:6d} {speedup:8.1f}x"
+            f"{r.best_solve_s:9.3f} {r.n_iterations:6d} {speedup:8.1f}x"
         )
     print("-" * 73)
     print(

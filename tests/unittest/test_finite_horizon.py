@@ -46,7 +46,7 @@ def test_the_horizon_picks_the_mode():
     record = solution.record
     t, J, pi = record.tables.schedule
 
-    assert record.mode == "finite" and record.iterations == N and record.success
+    assert record.mode == "finite" and record.n_iterations == N and record.success
     assert t.shape == (N + 1,) and J.shape[0] == N + 1 and pi.shape[0] == N
     np.testing.assert_allclose(t, np.linspace(0.0, 5.0, N + 1), atol=1e-12)
     assert (

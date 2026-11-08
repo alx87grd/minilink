@@ -96,9 +96,9 @@ class ReinforcementLearningPlanner(Planner):
         ``activation`` and ``normalize`` on the problem's plant.
     method : str or Algorithm
         ``"reinforce"``, ``"actor_critic"``, ``"ppo"`` (on-policy) or
-        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; keyword
-        arguments not listed here go to the algorithm (``learning_rate``,
-        ``n_epochs``, ``tau``, ...).
+        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; its numbers,
+        ``**method_numbers``, are the keywords not listed here
+        (``learning_rate``, ``n_epochs``, ``tau``, ...).
     n_envs, n_steps : int
         Plants simulated in parallel and control periods per collection (an
         episodic method collects one episode length instead of ``n_steps``).
@@ -158,7 +158,7 @@ class ReinforcementLearningPlanner(Planner):
         training_zone=None,
         reward="running",
         seed=0,
-        **algorithm_kwargs,
+        **method_numbers,
     ):
         super().__init__(problem)
         jax = require_jax()
@@ -188,7 +188,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The update rule, and its collection length: one whole episode for an
         # episodic method
-        self.algorithm = self.build_algorithm(method, algorithm_kwargs)
+        self.algorithm = self.build_algorithm(method, method_numbers)
         self.n_steps = (
             self.env.n_steps_per_episode if self.algorithm.episodic else int(n_steps)
         )
@@ -409,13 +409,13 @@ class ReinforcementLearningPlanner(Planner):
                 f"criterion={criterion!r} is only reported by evaluate"
             )
 
-    def build_algorithm(self, method, algorithm_kwargs):
+    def build_algorithm(self, method, method_numbers):
         """An algorithm instance as given, or the named one built from the keyword arguments."""
         if isinstance(method, Algorithm):
             return method
 
         if method in ALGORITHMS:
-            return ALGORITHMS[method](**algorithm_kwargs)
+            return ALGORITHMS[method](**method_numbers)
 
         raise ValueError(f"method must be one of {sorted(ALGORITHMS)} or an Algorithm")
 
@@ -637,7 +637,7 @@ class ReinforcementLearningPlanner(Planner):
         ]
 
         return ReinforcementLearningRecord(
-            algorithm=type(self.algorithm).__name__,
+            method=type(self.algorithm).__name__,
             n_timesteps=self.n_timesteps,
             train_time_s=self.train_time,
             cost=-self.last_ep_return_mean,
@@ -676,7 +676,7 @@ class ReinforcementLearningRecord:
     ``"stage"`` (``−c_k``); the score is always the problem's cost.
     """
 
-    algorithm: str
+    method: str
     n_timesteps: int
     train_time_s: float
     cost: float
@@ -704,7 +704,7 @@ class ReinforcementLearningRecord:
     def __str__(self) -> str:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
-            f"{self.algorithm}: {self.n_timesteps} plant steps in "
+            f"{self.method}: {self.n_timesteps} plant steps in "
             f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
         )

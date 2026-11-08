@@ -184,7 +184,7 @@ class MPPIRecord:
     S_weighted: float
     effective_samples: float
     exit_rate: float
-    iterations: int
+    n_iterations: int
     success: bool
 
     def __str__(self) -> str:
@@ -459,7 +459,7 @@ class CompiledMPPIPlanner:
             S_weighted=float(status.get("S_weighted", np.nan)),
             effective_samples=float(status.get("effective_samples", np.nan)),
             exit_rate=float(status.get("exit_rate", np.nan)),
-            iterations=int(status.get("iterations", self.n_iterations)),
+            n_iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
         controller = open_loop_controller_of(

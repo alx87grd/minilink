@@ -315,7 +315,7 @@ class TrajectoryOptimizationPlanner(Planner):
             cost=optimization_result.cost,
             solver_success=bool(optimization_result.success),
             message=str(optimization_result.message),
-            iterations=dict(optimization_result.stats).get("nit"),
+            n_iterations=dict(optimization_result.stats).get("nit"),
             solve_time_s=optimization_result.solve_time_s,
             feasibility_tol=float(self.feasibility_tol),
             max_equality_violation=float(max_eq),
@@ -508,8 +508,8 @@ class TrajectoryOptimizationPlanner(Planner):
             z=z.copy(),
             trajectory=trajectory,
             cost=cost,
-            max_eq=max_eq,
-            min_ineq=min_ineq,
+            max_equality_violation=max_eq,
+            min_inequality_margin=min_ineq,
         )
 
     def trajectory_solution(
@@ -597,7 +597,7 @@ class TrajectoryOptimizationRecord:
     cost: float | None
     solver_success: bool
     message: str
-    iterations: int | None
+    n_iterations: int | None
     solve_time_s: float | None
     feasibility_tol: float
     max_equality_violation: float | None
@@ -634,8 +634,8 @@ class TrajectoryOptimizationRecord:
             check += f" (max defect {self.max_equality_violation:.2g})"
 
         solver = f"solver {'ok' if self.solver_success else 'stopped'}: {self.message}"
-        if self.iterations is not None:
-            solver += f", {self.iterations} iterations"
+        if self.n_iterations is not None:
+            solver += f", {self.n_iterations} iterations"
         if self.solve_time_s is not None:
             solver += f", {self.solve_time_s:.3g} s"
 
@@ -650,8 +650,8 @@ class TrajectoryOptimizationIteration:
     z: np.ndarray
     trajectory: Trajectory
     cost: float
-    max_eq: float
-    min_ineq: float | None
+    max_equality_violation: float
+    min_inequality_margin: float | None
 
 
 def warm_bound_form(optimizer) -> None:

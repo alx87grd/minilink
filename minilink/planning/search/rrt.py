@@ -131,7 +131,7 @@ class RRTPlanner(Planner):
 
         The workflow: ``callback`` (a callable or a list of callables) sees
         every successful extension as an
-        :class:`~minilink.planning.search.live_plot.RRSearchIteration`; each
+        :class:`~minilink.planning.search.live_plot.TreeSearchIteration`; each
         hook filters for itself. The live figure is one such hook,
         ``callback=LiveSearchPlot(every=10)``
         (:class:`~minilink.planning.search.live_plot.LiveSearchPlot`).
@@ -214,8 +214,8 @@ class RRTPlanner(Planner):
 
         return TreeSearchRecord(
             reached_goal=bool(self.reached_goal),
-            iterations=int(self.iterations),
-            nodes=len(self.tree.nodes),
+            n_iterations=int(self.iterations),
+            n_nodes=len(self.tree.nodes),
             cost=float("nan") if node is None else float(node.cost),
             converged=False,
             history=[],
@@ -397,20 +397,20 @@ class RRTPlanner(Planner):
         return np.asarray(dense)
 
     def search_step(self, phase: str):
-        """The search as it stands, one :class:`~minilink.planning.search.live_plot.RRSearchIteration` for the solve's hooks."""
+        """The search as it stands, one :class:`~minilink.planning.search.live_plot.TreeSearchIteration` for the solve's hooks."""
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.planning.search.live_plot import RRSearchIteration
+        from minilink.planning.search.live_plot import TreeSearchIteration
 
         best_cost = None
         if self.reached_goal and self.solution_node is not None:
             best_cost = float(self.solution_node.cost)
 
-        return RRSearchIteration(
+        return TreeSearchIteration(
             iteration=self.iterations,
             phase=phase,
             reached_goal=self.reached_goal,
             best_cost=best_cost,
-            tree_nodes=len(self.tree.nodes),
+            n_nodes=len(self.tree.nodes),
             planner=self,
         )
 
@@ -469,8 +469,8 @@ class TreeSearchRecord:
     """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come."""
 
     reached_goal: bool
-    iterations: int
-    nodes: int
+    n_iterations: int
+    n_nodes: int
     cost: float
     converged: bool
     history: list
@@ -485,7 +485,7 @@ class TreeSearchRecord:
     def __str__(self) -> str:
         outcome = "goal reached" if self.reached_goal else "goal not reached"
         text = (
-            f"{outcome} after {self.iterations} extensions ({self.nodes} nodes), "
+            f"{outcome} after {self.n_iterations} extensions ({self.n_nodes} nodes), "
             f"path cost {self.cost:.4g}"
         )
         if self.converged:

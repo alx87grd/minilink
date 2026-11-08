@@ -48,7 +48,7 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     P = solve_continuous_are(A, B, Q, R)
 
     assert isinstance(solution.record, RiccatiRecord) and solution.success
-    assert solution.problem is problem and solution.method == "riccati"
+    assert solution.problem is problem and solution.family == "riccati"
     np.testing.assert_allclose(solution.record.K, lqr_gain(A, B, Q, R))
     np.testing.assert_allclose(solution.record.P, P)
     assert np.all(np.real(solution.record.poles) < 0.0)

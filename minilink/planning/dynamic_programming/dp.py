@@ -447,7 +447,7 @@ class DynamicProgrammingPlanner(Planner):
             grid=self.grid,
             J=np.array(J),
             pi=np.array(pi, dtype=int),
-            iterations=k,
+            n_iterations=k,
             delta=delta,
             history=log.history,
             schedule=schedule,
@@ -777,7 +777,7 @@ class DynamicProgrammingPlanner(Planner):
         # when one table served every sweep
         frozen = self.grid.precomputed or self.backend == BACKEND_JAX
         record = ValueIterationRecord(
-            iterations=result.iterations,
+            n_iterations=result.n_iterations,
             delta=float(result.delta),
             tol=tol,
             converged=mode != "infinite" or result.delta <= tol,
@@ -831,7 +831,7 @@ class DynamicProgrammingResult:
         Cost-to-go by node id, shape ``(nodes_n,)`` (a finite horizon's: stage 0).
     pi : np.ndarray
         Greedy policy as action ids by node id, shape ``(nodes_n,)`` (stage 0).
-    iterations : int
+    n_iterations : int
         Number of backward sweeps performed (a tabular learner's tables: the
         episodes it learned from).
     delta : float
@@ -848,7 +848,7 @@ class DynamicProgrammingResult:
     grid: StateSpaceGrid
     J: np.ndarray
     pi: np.ndarray
-    iterations: int
+    n_iterations: int
     delta: float
     history: list | None = None
     schedule: tuple | None = None
@@ -863,7 +863,7 @@ class DynamicProgrammingResult:
         data = np.load(path)
 
         return cls(
-            grid=grid, J=data["J"], pi=data["pi"], iterations=0, delta=float("nan")
+            grid=grid, J=data["J"], pi=data["pi"], n_iterations=0, delta=float("nan")
         )
 
 
@@ -885,7 +885,7 @@ class ValueIterationRecord:
     one table served every sweep (a precomputed grid, the JAX engine).
     """
 
-    iterations: int
+    n_iterations: int
     delta: float
     tol: float
     converged: bool
@@ -908,18 +908,16 @@ class ValueIterationRecord:
             else f"; planned at rho={self.discount_rate:.4g}/s (gamma), scored at the problem's"
         )
         if self.mode == "finite":
-            return f"{self.iterations} backward sweeps (finite horizon, a law per stage){rate}"
+            return f"{self.n_iterations} backward sweeps (finite horizon, a law per stage){rate}"
 
         if self.mode == "receding":
-            return f"{self.iterations} backward sweeps (receding horizon){rate}"
+            return f"{self.n_iterations} backward sweeps (receding horizon){rate}"
 
         if self.converged:
-            return (
-                f"converged in {self.iterations} sweeps (delta={self.delta:.3g}){rate}"
-            )
+            return f"converged in {self.n_iterations} sweeps (delta={self.delta:.3g}){rate}"
 
         return (
-            f"max_iterations={self.iterations} reached before tol={self.tol:g} "
+            f"max_iterations={self.n_iterations} reached before tol={self.tol:g} "
             f"(delta={self.delta:.3g}){rate}"
         )
 

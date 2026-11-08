@@ -167,7 +167,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
     solution = planner.solve(n_timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert solution.record.n_timesteps == 256 and solution.record.algorithm == "PPO"
+    assert solution.record.n_timesteps == 256 and solution.record.method == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.n_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller
@@ -673,8 +673,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
     solution = planner.solve(n_timesteps=planner.n_steps * planner.n_envs)
     assert (
-        solution.success
-        and solution.record.algorithm == type(planner.algorithm).__name__
+        solution.success and solution.record.method == type(planner.algorithm).__name__
     )
 
 

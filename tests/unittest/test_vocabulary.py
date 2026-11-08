@@ -33,7 +33,16 @@ RETIRED = {
     "t_start": ("t0", None),
     "iterations": (
         "n_iterations",
-        ("Optimizer", "TrajectoryOptimizationPlanner", "MPPIPlanner"),
+        (
+            "Optimizer",
+            "TrajectoryOptimizationPlanner",
+            "MPPIPlanner",
+            "MPPIRecord",
+            "TrajectoryOptimizationRecord",
+            "ValueIterationRecord",
+            "TreeSearchRecord",
+            "DynamicProgrammingResult",
+        ),
     ),
     "optimizer_options": ("options", None),
     "tf": ("horizon", ("PlanningProblem",)),
@@ -80,7 +89,22 @@ RETIRED = {
     "n_steps": ("n_samples, the gain schedule's samples", ("LQRPlanner",)),
     "nearest_backend": ("nearest_method", None),
     "solver": ("record", ("PlanningSolution",)),
-    "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
+    "algorithm": (
+        "method",
+        (
+            "ReinforcementLearningPlanner",
+            "TabularLearningPlanner",
+            "ReinforcementLearningRecord",
+            "TabularLearningRecord",
+        ),
+    ),
+    "algorithm_kwargs": ("method_numbers", None),
+    "method_kwargs": ("method_numbers", None),
+    "method": ("family", ("PlanningSolution",)),
+    "max_eq": ("max_equality_violation", None),
+    "min_ineq": ("min_inequality_margin", None),
+    "tree_nodes": ("n_nodes", None),
+    "nodes": ("n_nodes", ("TreeSearchRecord", "TreeSearchIteration")),
     "alpha": (
         "gamma",
         (

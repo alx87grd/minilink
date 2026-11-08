@@ -517,8 +517,8 @@ class TestPlanningArchitecture(unittest.TestCase):
                 z=np.zeros(1),
                 trajectory=traj0,
                 cost=1.0,
-                max_eq=0.0,
-                min_ineq=None,
+                max_equality_violation=0.0,
+                min_inequality_margin=None,
             )
         )
         fig_id = id(callback.fig)
@@ -529,8 +529,8 @@ class TestPlanningArchitecture(unittest.TestCase):
                 z=np.zeros(1),
                 trajectory=traj1,
                 cost=0.5,
-                max_eq=0.0,
-                min_ineq=None,
+                max_equality_violation=0.0,
+                min_inequality_margin=None,
             )
         )
         self.assertEqual(id(callback.fig), fig_id)
@@ -813,7 +813,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     solution = planner.solve()
     traj = solution.trajectory
     assert planner.reached_goal and solution.success
-    assert solution.record.reached_goal and solution.record.nodes == len(
+    assert solution.record.reached_goal and solution.record.n_nodes == len(
         planner.tree.nodes
     )
     assert (

@@ -59,7 +59,7 @@ def value_iteration(
         grid=planner.grid,
         J=np.array(J),
         pi=np.array(pi, dtype=int),
-        iterations=int(k),
+        n_iterations=int(k),
         delta=float(delta),
         history=None,
     )
@@ -263,7 +263,7 @@ def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingRes
         grid=planner.grid,
         J=np.array(J_swept[-1]),
         pi=np.array(pi_swept[-1], dtype=int),
-        iterations=N,
+        n_iterations=N,
         delta=delta,
         history=None,
         schedule=schedule,

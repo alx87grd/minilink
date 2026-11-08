@@ -282,7 +282,7 @@ def plot_cost_to_go(
     labels = state_labels(solution.problem.sys)
     ax.set_xlabel(labels[axes[0]])
     ax.set_ylabel(labels[axes[1]])
-    ax.set_title(f"cost-to-go ({solution.method})" if title is None else title)
+    ax.set_title(f"cost-to-go ({solution.family})" if title is None else title)
     ax.grid(True, alpha=0.3)
 
     maybe_show(plt, show)
@@ -343,7 +343,7 @@ def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
     if renderer == "matplotlib":
         import matplotlib.pyplot as plt
 
-        result.figure.suptitle(f"{kind} ({solution.method})")
+        result.figure.suptitle(f"{kind} ({solution.family})")
         maybe_show(plt, show)
 
     return result
@@ -514,7 +514,7 @@ def require_cost_to_go(solution):
     """Refuse a solution that carries no cost-to-go field; return the field."""
     field = solution.cost_to_go
     if field is None:
-        raise ValueError(f"this {solution.method} solution carries no cost_to_go")
+        raise ValueError(f"this {solution.family} solution carries no cost_to_go")
 
     return field
 
