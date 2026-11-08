@@ -56,7 +56,10 @@ root prelude plus the band facades, registered in `minilink/__init__.py` and the
 `__init__` files, and checked as a set by `test_teaching_surface.py`. A name reaches the root
 when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` and
 `SampledCost` (`minilink.core`) stay on their bands until one does; `StepSystem` is
-on the root.
+on the root. The core band facade exports the core's mathematical types, the composites
+included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+`ScaledCost`, `SampledSystem`, `SampledDiagramSystem`); of the fields, the concrete
+`QuadraticField` and `GridField` are also on the root.
 
 ## 3. Package Map
 
