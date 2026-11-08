@@ -232,7 +232,7 @@ problem = PlanningProblem(
     X=plant.state.box, U=plant.input_box,
 )
 
-# The converged law: on the 4 s horizon itself, the best plan is to stay down
+# The infinite-horizon law: on the 4 s horizon itself, the best plan is to stay down
 vi = DynamicProgrammingPlanner(problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05)
 rrt = RRTPlanner(problem, seed=0)
 opt = TrajectoryOptimizationPlanner(problem, n_steps=40, transcription="direct_collocation")
