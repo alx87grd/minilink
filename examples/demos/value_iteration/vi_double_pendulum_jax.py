@@ -69,8 +69,8 @@ print(
 t_plan = time.perf_counter()
 grid = StateSpaceGrid(
     problem,
-    x_grid_shape=x_shape,
-    u_grid_shape=u_shape,
+    x_grid=x_shape,
+    u_grid=u_shape,
     dt=0.1,
     precompute=False,
     verbose=True,
@@ -96,10 +96,11 @@ print(f"  total pipeline:   {t_done - t_plan:5.2f} s")
 
 planner.plot_cost_to_go(
     jmax=INF,
-    axes=[(0, 1), (0, 2), (1, 3)],
+    x_axis=[0, 0, 1],
+    y_axis=[1, 2, 3],
     anchor=GOAL,
 )
-planner.plot_control_law(axis=[0, 1], axes=[(0, 1), (0, 1)], anchor=GOAL)
+planner.plot_control_law(axis=[0, 1], x_axis=[0, 0], y_axis=[1, 1], anchor=GOAL)
 
 controller = planner.controller
 diagram = DiagramSystem()
@@ -110,7 +111,7 @@ diagram.connect("controller", "u", "plant", "u")
 
 for x0 in CLOSED_LOOP_X0:
     plant.x0 = x0.copy()
-    trajectory = diagram.compute_trajectory(tf=8.0, n_steps=4001, solver="euler")
+    trajectory = diagram.compute_trajectory(tf=8.0, n_samples=4001, solver="euler")
     diagram.plot_trajectory(trajectory, signals=("x", "u"))
     diagram.plot_phase_plane(trajectory, x_axis=0, y_axis=2, title="(θ1, dθ1)")
     diagram.plot_phase_plane(trajectory, x_axis=1, y_axis=3, title="(θ2, dθ2)")

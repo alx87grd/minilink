@@ -328,8 +328,8 @@ def test_the_role_loop_and_the_box_loop_give_one_trajectory():
         reference=False,
     )
     boxed = closed_loop(lqg(plant, Q, R, Q_n, R_n, x_bar=x_up), plant, reference=False)
-    a = by_role.compute_trajectory(tf=4.0, n_steps=201)
-    b = boxed.compute_trajectory(tf=4.0, n_steps=201)
+    a = by_role.compute_trajectory(tf=4.0, n_samples=201)
+    b = boxed.compute_trajectory(tf=4.0, n_samples=201)
     np.testing.assert_allclose(
         a.x[slice(*by_role.state_index["plant"])],
         b.x[slice(*boxed.state_index["plant"])],

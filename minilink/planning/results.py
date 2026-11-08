@@ -32,7 +32,8 @@ class PlanningSolution:
     own claim under its own model — the plan, the table on its grid, the
     Riccati form on the linear model, the critic's fit. A measurement of the
     controller comes from the evaluators
-    (:func:`~minilink.planning.evaluator.evaluate`, ``PolicyEvaluator``) as its
+    (:func:`~minilink.planning.evaluator.evaluate`, value iteration's
+    ``evaluate_policy``) as its
     own object.
 
     Parameters
@@ -101,17 +102,18 @@ class PlanningSolution:
         return int(self.controller.m) == 0
 
     @property
-    def method(self) -> str:
-        """The planning method, read from the record (``"value iteration"``, ``"riccati"``, ...)."""
-        # The record's class name without its suffix, one lowercase word per capital
+    def family(self) -> str:
+        """The planning family, read from the record (``"value iteration"``, ``"riccati"``, ``"mppi"``, ...)."""
+        # The record's class name without its suffix, one lowercase word per capitalized
+        # word (an acronym stays one word)
         name = type(self.record).__name__.removesuffix("Record")
 
-        return re.sub(r"(?<!^)(?=[A-Z])", " ", name).lower()
+        return re.sub(r"(?<=[a-z])(?=[A-Z])", " ", name).lower()
 
     # Views, run on demand: the plan, else the controller run from the problem's start
 
     def plot_trajectory(
-        self, *, dt=None, signals=("x", "u"), backend="matplotlib", show=True
+        self, *, dt=None, signals=("x", "u"), renderer="matplotlib", show=True
     ):
         """
         Draw the plan, else the controller's run from the problem's start, on the problem's system.
@@ -121,7 +123,8 @@ class PlanningSolution:
         automatic step; a clocked one on its own clock; a step problem's
         model), once from the start with nominal parameters. The planner's
         mirror passes its own ``dt``, the step of its evidence. The figure is
-        titled plan or run.
+        titled plan or run. ``renderer`` is the drawing library,
+        ``"matplotlib"`` or ``"plotly"``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_solution_trajectory
@@ -130,7 +133,7 @@ class PlanningSolution:
             self,
             drawn_trajectory_of(self, dt),
             signals=signals,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -138,12 +141,12 @@ class PlanningSolution:
         """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system."""
         return self.problem.sys.animate(drawn_trajectory_of(self, dt), **kwargs)
 
-    def plot_cost(self, *, dt=None, backend="matplotlib", show=True):
-        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`)."""
+    def plot_cost(self, *, dt=None, renderer="matplotlib", show=True):
+        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`), with the drawing library ``renderer``."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -169,7 +172,7 @@ class PlanningSolution:
         Draw the method's cost-to-go over two state axes, the others pinned at the goal.
 
         A heatmap of ``cost_to_go`` sampled on the problem's state box; see
-        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``axes``,
+        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``x_axis``, ``y_axis``,
         ``anchor``, ``bounds``, ``jmax``, ``ax`` and ``show``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
@@ -230,23 +233,21 @@ def drawn_trajectory_of(solution, dt=None) -> Trajectory:
 
 def step_run_of(problem, controller, params=None, *, episode_length=None) -> Trajectory:
     """
-    A step problem's rollout under ``controller`` from its start: the model's run as a trajectory.
+    A step problem's rollout under ``controller`` from its start: the model's :meth:`~minilink.planning.step_model.StepModel.rollout`.
 
-    ``N`` ticks of the step problem's ``run(controller)``: its own
-    horizon, else an episode of ``episode_length`` (10 by default) in its
-    time. ``params`` is the model's tree (``None``: its own). The last input is
-    held at the final state, so ``x`` and ``u`` share the ``N + 1`` times.
+    ``N`` ticks: its own horizon, else an episode of ``episode_length`` (10
+    by default) in its time. ``params`` is the model's tree (``None``: its
+    own). The last input is held at the final state, so ``x`` and ``u`` share
+    the ``N + 1`` times.
     """
     model = step_model_of(problem)
     params = model.params if params is None else params
     N = episode_ticks_of(model, episode_length)
 
-    # x_0 … x_N and u_0 … u_{N−1} on the ticks t0 + k, the last input held
-    xs, us, _, _ = model.run(controller, params=params, n_steps=N)
-    t = np.array([model.time_of(k, params) for k in range(N + 1)], dtype=float)
-    u = np.concatenate([us, us[-1:]], axis=0)
+    # x_0 … x_N and u_0 … u_N on the ticks t0 + k, the last input held
+    traj = model.rollout(controller, params=params, n_steps=N)
 
-    return Trajectory(t=t, x=xs.T, u=u.T)
+    return traj
 
 
 def episode_ticks_of(model, episode_length=None) -> int:
@@ -271,7 +272,7 @@ def solution_text(solution):
         )
     evaluation = "none" if solution.evaluation is None else str(solution.evaluation)
     success = "yes" if solution.success else "no"
-    headline = f"PlanningSolution, method={solution.method}, success={success}"
+    headline = f"PlanningSolution, family={solution.family}, success={success}"
     body = [
         body_line("controller", f"{solution.controller.name} ({law})"),
         body_line("trajectory", trajectory),

@@ -525,7 +525,7 @@ if __name__ == "__main__":
     sys.x0 = np.array([1.0, 0.25, 0.0, 0.0])
     # sys.inputs["u"].nominal_value = np.array([1.0])
     sys.compute_trajectory(tf=12.0)
-    sys.animate(is_3d=True, time_factor_video=1.0)
+    sys.animate(is_3d=True, speed=1.0)
     # sys.animate()
     # sys.animate(renderer="meshcat")
 

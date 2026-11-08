@@ -207,9 +207,7 @@ def test_the_grids_table_options_survive_a_discount_and_a_tree():
     from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 
     problem = regulation()
-    grid = StateSpaceGrid(
-        problem, x_grid_shape=(9, 9), u_grid_shape=(3,), dt=0.1, precompute=False
-    )
+    grid = StateSpaceGrid(problem, x_grid=(9, 9), u_grid=(3,), dt=0.1, precompute=False)
     planner = DynamicProgrammingPlanner(problem, grid=grid, gamma=0.9, max_iterations=5)
     assert planner.grid is not grid and not planner.grid.precompute
 

@@ -274,8 +274,12 @@ def step_evaluation(
     for i in range(n):
         params = trial_of(draws, drawn, i)
 
-        # The model's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h
-        xs, us, _, cost = model.run(controller, params=params, n_steps=N)
+        # The model's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h, the
+        # running cost's last value
+        traj = model.rollout(controller, params=params, n_steps=N)
+        xs = traj.x.T
+        us = traj.u[:, :N].T
+        cost = traj.signals["cost"][0, -1]
         t = [model.time_of(k, params) for k in range(N + 1)]
 
         # The judge's facts: finite, the least margin to X and U, the margin to Xf

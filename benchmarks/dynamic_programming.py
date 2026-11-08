@@ -36,7 +36,7 @@ class DPBenchmarkRow:
     build_s: float
     cold_solve_s: float
     best_solve_s: float
-    iterations: int
+    n_iterations: int
     result: object  # DynamicProgrammingResult, for the cross-backend value check
 
 
@@ -53,8 +53,8 @@ def pendulum_problem():
 
 def benchmark_backend(
     backend: str,
-    x_grid_shape,
-    u_grid_shape,
+    x_grid,
+    u_grid,
     *,
     n_steps: int = 300,
     dt: float = 0.05,
@@ -72,14 +72,16 @@ def benchmark_backend(
     t0 = time.perf_counter()
     grid = StateSpaceGrid(
         problem,
-        x_grid_shape=x_grid_shape,
-        u_grid_shape=u_grid_shape,
+        x_grid=x_grid,
+        u_grid=u_grid,
         dt=dt,
         precompute=(backend != "loop"),
     )
     build_s = time.perf_counter() - t0
 
-    options = dict(backend=backend, gamma=alpha)
+    # The engine the row names: the loop (a method on NumPy), or the table on a backend
+    engine = dict(method="loop") if backend == "loop" else dict(backend=backend)
+    options = dict(**engine, gamma=alpha)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
 
     cold_solve_s = None
@@ -96,11 +98,11 @@ def benchmark_backend(
 
     return DPBenchmarkRow(
         backend=backend,
-        grid=f"{tuple(x_grid_shape)}x{tuple(u_grid_shape)}",
+        grid=f"{tuple(x_grid)}x{tuple(u_grid)}",
         build_s=build_s,
         cold_solve_s=cold_solve_s,
         best_solve_s=best_solve_s,
-        iterations=result.iterations,
+        n_iterations=result.n_iterations,
         result=result,
     )
 
@@ -122,7 +124,7 @@ def print_dp_benchmark(rows, *, reference: str = "loop") -> None:
         )
         print(
             f"{r.backend:8} {r.grid:18} {r.build_s:8.2f} {r.cold_solve_s:9.3f} "
-            f"{r.best_solve_s:9.3f} {r.iterations:6d} {speedup:8.1f}x"
+            f"{r.best_solve_s:9.3f} {r.n_iterations:6d} {speedup:8.1f}x"
         )
     print("-" * 73)
     print(

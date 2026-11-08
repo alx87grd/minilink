@@ -182,7 +182,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
                 np.array(c, dtype=float) for c in ((1, 0), (0, 1), (-1, 0), (0, -1))
             ],
             horizon=0.6,
-            n_substeps=6,
+            n_steps=6,
         ),
         seed=0,
         max_nodes=4000,
@@ -386,10 +386,10 @@ def solved_pendulum():
 def test_every_solution_carries_its_problem():
     problem = move_problem()
     solution = trajopt(problem, shooting).solve()
-    assert solution.problem is problem and solution.method == "trajectory optimization"
+    assert solution.problem is problem and solution.family == "trajectory optimization"
     problem, vi, lqr = solved_pendulum()
     assert vi.problem is problem and lqr.problem is problem
-    assert vi.method == "value iteration" and lqr.method == "riccati"
+    assert vi.family == "value iteration" and lqr.family == "riccati"
 
 
 def test_solution_verbs_draw_what_the_planner_produced():
@@ -455,7 +455,7 @@ def test_value_iteration_plots_its_own_tables_under_the_solution_names():
 
 
 def test_compare_reads_the_solutions_side_by_side():
-    from minilink.planning import PolicyEvaluator, compare
+    from minilink.planning import compare
 
     problem, vi, lqr = solved_pendulum()
     race = compare(VI=vi, LQR=lqr)
@@ -486,12 +486,8 @@ def test_compare_reads_the_solutions_side_by_side():
     # a bare controller and an evaluation already computed take part too
     mixed = compare(problem, LQR=lqr.controller, VI=scored.evaluations["VI"], dt=0.1)
     assert list(mixed) == ["LQR"] and "given" in str(mixed)
-    grid_eval = PolicyEvaluator(
-        problem, grid=DynamicProgrammingPlanner(
-            problem, x_grid=(11, 11), u_grid=(3,), dt=0.2
-        ).grid, policy=lqr,
-    )  # fmt: skip
-    assert np.all(np.isfinite(grid_eval.solve()))
+    on_grid = DynamicProgrammingPlanner(problem, x_grid=(11, 11), u_grid=(3,), dt=0.2)
+    assert np.all(np.isfinite(on_grid.evaluate_policy(lqr).params["values"]))
 
     with pytest.raises(TypeError):
         compare(VI=vi.controller)

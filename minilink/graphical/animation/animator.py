@@ -78,7 +78,7 @@ class Animator:
     def animate_simulation(
         self,
         traj,
-        time_factor_video=1.0,
+        speed=1.0,
         is_3d=False,
         save=False,
         file_name="Animation",
@@ -146,7 +146,7 @@ class Animator:
         # Every frame of the schedule resolved up front
         backend = make_renderer(renderer, self)
         kinematic = self.sys.get_kinematic_geometry()
-        schedule = trajectory_frame_schedule(traj, time_factor_video)
+        schedule = trajectory_frame_schedule(traj, speed)
         frames = self.build_frames(
             traj,
             schedule,

@@ -242,7 +242,8 @@ class Comparison:
 def plot_cost_to_go(
     solution,
     *,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     anchor=None,
     bounds=None,
     grid_shape=(51, 51),
@@ -254,7 +255,7 @@ def plot_cost_to_go(
     show=True,
 ):
     """
-    Heatmap of a solution's ``cost_to_go`` over two state axes, the others pinned at ``anchor``.
+    Heatmap of a solution's ``cost_to_go`` over the state axes ``x_axis`` and ``y_axis``, the others pinned at ``anchor``.
 
     ``bounds`` (``((xlo, xhi), (ylo, yhi))``) defaults to the problem's
     constraint box, else the plant's state box; ``anchor`` to the goal,
@@ -264,7 +265,13 @@ def plot_cost_to_go(
 
     # The field sampled on a mesh over the two axes
     x_level, y_level, J = sample_cost_to_go(
-        solution, axes=axes, anchor=anchor, bounds=bounds, grid_shape=grid_shape, t=t
+        solution,
+        x_axis=x_axis,
+        y_axis=y_axis,
+        anchor=anchor,
+        bounds=bounds,
+        grid_shape=grid_shape,
+        t=t,
     )
 
     # A new figure, or the one that holds the given axes
@@ -280,9 +287,9 @@ def plot_cost_to_go(
 
     # The state labels and the title
     labels = state_labels(solution.problem.sys)
-    ax.set_xlabel(labels[axes[0]])
-    ax.set_ylabel(labels[axes[1]])
-    ax.set_title(f"cost-to-go ({solution.method})" if title is None else title)
+    ax.set_xlabel(labels[x_axis])
+    ax.set_ylabel(labels[y_axis])
+    ax.set_title(f"cost-to-go ({solution.family})" if title is None else title)
     ax.grid(True, alpha=0.3)
 
     maybe_show(plt, show)
@@ -291,9 +298,16 @@ def plot_cost_to_go(
 
 
 def sample_cost_to_go(
-    solution, *, axes=(0, 1), anchor=None, bounds=None, grid_shape=(51, 51), t=0.0
+    solution,
+    *,
+    x_axis=0,
+    y_axis=1,
+    anchor=None,
+    bounds=None,
+    grid_shape=(51, 51),
+    t=0.0,
 ):
-    """``(x_level, y_level, J)``: the cost-to-go sampled on a mesh over two state axes."""
+    """``(x_level, y_level, J)``: the cost-to-go sampled on a mesh over the state axes ``x_axis`` and ``y_axis``."""
     field = require_cost_to_go(solution)
     problem = solution.problem
     box = state_box(problem)
@@ -301,7 +315,7 @@ def sample_cost_to_go(
     # The sweep's bounds: the state box over the two axes, unless given
     if bounds is None:
         require_bounded_state_box(box)
-        i, j = axes
+        i, j = x_axis, y_axis
         bounds = ((box.lower[i], box.upper[i]), (box.lower[j], box.upper[j]))
 
     # The other axes pinned at the anchor: the goal, else the start
@@ -318,13 +332,13 @@ def sample_cost_to_go(
     x = anchor.copy()
     for i, xi in enumerate(x_level):
         for j, yj in enumerate(y_level):
-            x[axes[0]], x[axes[1]] = xi, yj
+            x[x_axis], x[y_axis] = xi, yj
             J[i, j] = float(field(x) if t == 0.0 else field(x, t=t))
 
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, traj, *, signals, backend, show):
+def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
     """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.signals.time_signals import plot_time_signals
@@ -334,16 +348,16 @@ def plot_solution_trajectory(solution, traj, *, signals, backend, show):
         solution.problem.sys,
         traj,
         signals=signals,
-        backend=backend,
+        renderer=renderer,
         show=False,
     )
 
     # The title says which: the plan the planner computed, or the controller's run
     kind = "plan" if solution.trajectory is not None else "run"
-    if backend == "matplotlib":
+    if renderer == "matplotlib":
         import matplotlib.pyplot as plt
 
-        result.figure.suptitle(f"{kind} ({solution.method})")
+        result.figure.suptitle(f"{kind} ({solution.family})")
         maybe_show(plt, show)
 
     return result
@@ -514,7 +528,7 @@ def require_cost_to_go(solution):
     """Refuse a solution that carries no cost-to-go field; return the field."""
     field = solution.cost_to_go
     if field is None:
-        raise ValueError(f"this {solution.method} solution carries no cost_to_go")
+        raise ValueError(f"this {solution.family} solution carries no cost_to_go")
 
     return field
 

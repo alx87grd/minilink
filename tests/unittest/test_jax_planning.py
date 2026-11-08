@@ -120,7 +120,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
         )
-        self.assertEqual(program.n_z, problem.sys.m * 5)
+        self.assertEqual(program.n_z, problem.sys.m * 6)  # N = 5 intervals, 6 knots
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
         self.assertTrue(program_evaluator.has_jacobian_g)
@@ -147,7 +147,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         program_evaluator = compile_program_evaluator(
             program, backend=program.backend, sample_z=z0
         )
-        self.assertEqual(program.n_z, (problem.sys.n + problem.sys.m) * 5)
+        self.assertEqual(program.n_z, (problem.sys.n + problem.sys.m) * 6)  # 6 knots
         self.assertTrue(program_evaluator.has_gradient)
         self.assertTrue(program_evaluator.has_jacobian_h)
         traj = planner.solve().trajectory

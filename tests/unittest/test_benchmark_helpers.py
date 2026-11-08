@@ -124,7 +124,7 @@ class TestBenchmarkSmoke(unittest.TestCase):
         row = benchmark_backend("loop", (5, 5), (3,), n_steps=2, runs=1)
         self.assertEqual(row.backend, "loop")
         self.assertGreater(row.build_s, 0.0)
-        self.assertEqual(row.iterations, 2)
+        self.assertEqual(row.n_iterations, 2)
 
     def test_dp_speed_suite_metrics_match_the_committed_baseline(self):
         """The gate's metric ids must stay in sync with benchmarks/baselines/dp_speed.json."""

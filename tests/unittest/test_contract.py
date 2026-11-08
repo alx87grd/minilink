@@ -88,7 +88,7 @@ def lookup_policy():
 
     plant = minilink.Pendulum()
     problem = minilink.PlanningProblem(plant, x0=np.zeros(2), U=plant.input_box)
-    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
 
     return minilink.LookupPolicy(grid, np.arange(25) % 3)
 

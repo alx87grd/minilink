@@ -7,10 +7,12 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.core.backends import BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.fields import GridField
 from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.dynamic_programming.progress import SweepLog, progress
+from minilink.planning.evaluator import controller_of
 from minilink.planning.planner import (
     Planner,
     given_numbers,
@@ -18,6 +20,7 @@ from minilink.planning.planner import (
     planner_evidence,
     require_solution,
 )
+from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_model import is_continuous
@@ -25,8 +28,10 @@ from minilink.planning.step_problems import (
     require_no_period_on_ticks,
 )
 
-#: Per-node Python reference engine (pyro's base ``DynamicProgramming``).
-BACKEND_LOOP = "loop"
+#: The backward step's methods: the per-node Python reference (pyro's base
+#: ``DynamicProgramming``), and the same step over lookup tables
+METHOD_LOOP = "loop"
+METHOD_TABLE = "table"
 
 
 ###############################################################################
@@ -45,10 +50,11 @@ class DynamicProgrammingPlanner(Planner):
 
         DynamicProgrammingPlanner(problem, x_grid=(201, 201), u_grid=(21,), dt=0.05)
 
-    builds the grid itself; pass ``grid=`` for a custom one. The backend picks
+    builds the grid itself; pass ``grid=`` for a custom one. The method picks
     how the backward step runs: ``"loop"`` is the textbook double loop,
-    ``"numpy"`` (default) the same step over lookup tables, and ``"jax"`` the
-    table step jitted on device (:mod:`~minilink.planning.dynamic_programming.dp_jax`).
+    ``"table"`` (default) the same step over lookup tables; the backend is the
+    array module of the tables, ``"numpy"`` (default) or ``"jax"``, the table
+    step jitted on device (:mod:`~minilink.planning.dynamic_programming.dp_jax`).
 
     Parameters
     ----------
@@ -57,11 +63,14 @@ class DynamicProgrammingPlanner(Planner):
     grid : StateSpaceGrid, optional
         Discretization of ``problem``'s state and input spaces. Give
         ``x_grid``, ``u_grid`` and ``dt`` instead and the planner builds it.
-    backend : {"numpy", "loop", "jax"}
-        Backward-step engine. ``"numpy"`` (default) is the vectorized lookup
-        table, ``"loop"`` the per-node Python reference, ``"jax"`` the jitted
-        device version (linear/nearest interpolation only; traceable cost/sets;
-        its tables are built once, so ``f`` and ``g`` must not depend on time).
+    method : {"table", "loop"}
+        The backward step: ``"table"`` (default) the vectorized lookup table,
+        ``"loop"`` the per-node Python reference.
+    backend : {"numpy", "jax"}
+        The array module of the table step: ``"jax"`` the jitted device
+        version (``method="table"`` only; linear/nearest interpolation only;
+        traceable cost/sets; its tables are built once, so ``f`` and ``g`` must
+        not depend on time).
     gamma : float, optional
         The discount factor per step, a number of :attr:`params`. Unset, the
         problem's ``discount_factor(dt)`` (``1`` on an undiscounted problem).
@@ -109,6 +118,7 @@ class DynamicProgrammingPlanner(Planner):
         u_grid=None,
         dt=None,
         solver="euler",
+        method: str = METHOD_TABLE,
         backend: str = BACKEND_NUMPY,
         gamma: float | None = None,
         tol: float = 0.1,
@@ -126,8 +136,9 @@ class DynamicProgrammingPlanner(Planner):
         self.discount_rate = tool_rate_of(problem, gamma, grid.dt)
         self.grid = grid_on_rate(grid, self.discount_rate)
 
-        # Structure: the engine, the stopping rules, the interpolation
-        self.backend = require_dp_backend(backend)
+        # Structure: the backward step and its array module, the stopping rules, the
+        # interpolation
+        self.method, self.backend = require_dp_engine(method, backend)
         self.tol = float(tol)
         self.max_iterations = int(max_iterations)
         self.interpolation = interpolation
@@ -246,6 +257,62 @@ class DynamicProgrammingPlanner(Planner):
             result, mode="receding", evaluate=evaluate, n_trials=n_trials
         )
 
+    def evaluate_policy(self, controller) -> GridField:
+        """
+        The cost-to-go ``J^π`` of a fixed law on the planner's grid, a field read as the planner's own.
+
+        Solves the Bellman *expectation* equation, the sweep of :meth:`solve`
+        with the action fixed by the law instead of minimized:
+        ``J(x) = c(x, π(x)) + γ J(x_next)``, from the terminal cost at the
+        sweeps' terminal time until the largest change falls under ``tol``
+        (at most ``max_iterations`` sweeps). ``controller`` is a law
+        ``u = π(x)``, a solution (its controller), or a controller block that
+        reads the state on an input named ``x`` (or ``y``) and commands ``u``
+        (:func:`minilink.core.roles.block_roles`). The planner's grid,
+        discount, failure cost and interpolation, its stopping rules: the
+        returned :class:`~minilink.core.fields.GridField` holds ``J^π`` in
+        ``params["values"]``, its failure cost past the grid; draw it with
+        ``plot_cost_to_go(field=...)``.
+        """
+        grid = self.grid
+        tf = self.final_time
+        gamma = self.gamma
+        method = self.interpolation
+        tol = self.tol
+        max_iterations = self.max_iterations
+
+        # The fixed law u = π(x): a callable, a solution's controller, or a controller block
+        policy = controller_of(controller)
+        policy = policy if callable(policy) else policy_from_block(policy)
+
+        # Successor and running cost of every node under the policy's action
+        x_next, G = self.policy_transition(policy, tf)
+
+        # Cost-to-go at the final time
+        J = self.terminal_cost(tf)
+
+        # Sweeps until the cost-to-go stops changing, at most max_iterations of them
+        delta = np.inf
+        k = 0
+
+        while k < max_iterations and delta > tol:
+            k = k + 1
+
+            # Bellman expectation backup, the action fixed by the policy:
+            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the model's stage cost and step
+            J_next = J
+            J_arrival = grid.interpolate(J_next, x_next, method)
+            J = G + gamma * J_arrival
+
+            # Largest change of the cost-to-go: the convergence measure
+            delta = float(np.max(np.abs(J - J_next)))
+
+        # J^π as a field on the grid, read as the planner's cost-to-go
+        outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
+        J_pi = grid.field(J, method=method, outside=outside)
+
+        return J_pi
+
     @property
     def dt(self) -> float | None:
         """The grid's step: the period the sweeps back up over, and the integration step of the evidence and the views' run."""
@@ -264,6 +331,7 @@ class DynamicProgrammingPlanner(Planner):
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem, beside its grid (:meth:`rebuilt_on`): the engine, the stopping rules, the numbers it was given."""
         kwargs = dict(
+            method=self.method,
             backend=self.backend,
             tol=self.tol,
             max_iterations=self.max_iterations,
@@ -303,6 +371,7 @@ class DynamicProgrammingPlanner(Planner):
         tf = self.final_time
         dt = self.grid.dt
         tol = self.tol
+        method = self.method
         backend = self.backend
 
         # The JAX engine: every sweep compiled on device, unless each one is reported
@@ -352,7 +421,7 @@ class DynamicProgrammingPlanner(Planner):
             # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the model's stage cost and
             # step: the textbook loop, the same step over lookup tables, or on device
             J_next = J
-            if backend == BACKEND_LOOP:
+            if method == METHOD_LOOP:
                 J, pi = self.backward_step_loop(J_next, t)
             elif backend == BACKEND_NUMPY:
                 J, pi = self.backward_step_table(J_next, t, G, verbose=verbose)
@@ -378,7 +447,7 @@ class DynamicProgrammingPlanner(Planner):
             grid=self.grid,
             J=np.array(J),
             pi=np.array(pi, dtype=int),
-            iterations=k,
+            n_iterations=k,
             delta=delta,
             history=log.history,
             schedule=schedule,
@@ -476,6 +545,51 @@ class DynamicProgrammingPlanner(Planner):
         pi = Q.argmin(axis=1)
 
         return J, pi
+
+    def policy_transition(self, policy, t):
+        """Per-node successor ``(nodes_n, n)`` and running cost ``(nodes_n,)`` under the fixed law ``u = policy(x)``."""
+        grid = self.grid
+        X = self.problem.X
+        U = self.problem.U
+        tree = grid.model.params
+        sys_params = tree["plant"]
+        N = grid.nodes_n  # Number of nodes
+        n = grid.n  # State dimension
+        INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
+
+        successors = np.empty((N, n), dtype=float)
+        G = np.empty(N, dtype=float)
+
+        # The stage cost of the period at t, its laws built once for every node
+        stage_cost = grid.stage_cost_law(t, tree)
+
+        # For all state nodes
+        for s in range(N):
+            x = grid.states[s]
+
+            # The policy's action at this node
+            u = np.asarray(policy(x), dtype=float).reshape(-1)
+
+            # x_{k+1} = Φ(x_k, π(x_k), t), the grid's step model under the policy
+            x_next = grid.successor(x, u, t, sys_params)
+            successors[s] = x_next
+
+            # An admissible action, and a successor in X and on the grid (the
+            # table's domain)
+            valid = (
+                U.contains(u, x, t)
+                and X.contains(x_next, t)
+                and grid.X.contains(x_next)
+            )
+
+            if valid:
+                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the model
+                G[s] = float(stage_cost(x, u))
+            else:
+                # The step leaves the admissible set: the penalty
+                G[s] = infeasible_penalty(INF, x_next, t)
+
+        return successors, G
 
     def terminal_cost(self, t, *, verbose: bool = False) -> np.ndarray:
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id (``verbose``: the build's progress)."""
@@ -601,14 +715,23 @@ class DynamicProgrammingPlanner(Planner):
 
         return result
 
-    def plot_cost_to_go(self, **kwargs):
-        """The cost-to-go table ``J`` on the grid itself (``jmax``, ``axes``, ``show_3d``, ``title``, ...)."""
-        require_solution(self)
+    def plot_cost_to_go(self, field=None, **kwargs):
+        """
+        The cost-to-go table ``J`` on the grid itself (``jmax``, ``x_axis``, ``y_axis``, ``is_3d``, ``title``, ...).
+
+        ``field`` draws another table of this grid instead: a policy's
+        ``J^π`` from :meth:`evaluate_policy`.
+        """
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
+        if field is not None:
+            J = np.asarray(field.params["values"], dtype=float).reshape(-1)
+            return plotting.plot_cost_to_go(self.grid, J, **kwargs)
+
+        require_solution(self)
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
     def plot_control_law(self, **kwargs):
-        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``axes``, ...)."""
+        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``x_axis``, ``y_axis``, ...)."""
         require_solution(self)
         return plotting.plot_control_law(self.result, **kwargs)
 
@@ -654,7 +777,7 @@ class DynamicProgrammingPlanner(Planner):
         # when one table served every sweep
         frozen = self.grid.precomputed or self.backend == BACKEND_JAX
         record = ValueIterationRecord(
-            iterations=result.iterations,
+            n_iterations=result.n_iterations,
             delta=float(result.delta),
             tol=tol,
             converged=mode != "infinite" or result.delta <= tol,
@@ -708,7 +831,7 @@ class DynamicProgrammingResult:
         Cost-to-go by node id, shape ``(nodes_n,)`` (a finite horizon's: stage 0).
     pi : np.ndarray
         Greedy policy as action ids by node id, shape ``(nodes_n,)`` (stage 0).
-    iterations : int
+    n_iterations : int
         Number of backward sweeps performed (a tabular learner's tables: the
         episodes it learned from).
     delta : float
@@ -725,16 +848,10 @@ class DynamicProgrammingResult:
     grid: StateSpaceGrid
     J: np.ndarray
     pi: np.ndarray
-    iterations: int
+    n_iterations: int
     delta: float
     history: list | None = None
     schedule: tuple | None = None
-
-    def value_at(self, x, method="linear") -> float:
-        """Interpolate the cost-to-go at an arbitrary state ``x`` (``method``: the grid's interpolation)."""
-        J = self.grid.interpolate(self.J, np.atleast_2d(x), method)
-
-        return float(J[0])
 
     def save(self, path: str) -> None:
         """Save ``J`` and ``pi`` to ``path`` (single ``.npz``)."""
@@ -746,7 +863,7 @@ class DynamicProgrammingResult:
         data = np.load(path)
 
         return cls(
-            grid=grid, J=data["J"], pi=data["pi"], iterations=0, delta=float("nan")
+            grid=grid, J=data["J"], pi=data["pi"], n_iterations=0, delta=float("nan")
         )
 
 
@@ -768,7 +885,7 @@ class ValueIterationRecord:
     one table served every sweep (a precomputed grid, the JAX engine).
     """
 
-    iterations: int
+    n_iterations: int
     delta: float
     tol: float
     converged: bool
@@ -791,18 +908,16 @@ class ValueIterationRecord:
             else f"; planned at rho={self.discount_rate:.4g}/s (gamma), scored at the problem's"
         )
         if self.mode == "finite":
-            return f"{self.iterations} backward sweeps (finite horizon, a law per stage){rate}"
+            return f"{self.n_iterations} backward sweeps (finite horizon, a law per stage){rate}"
 
         if self.mode == "receding":
-            return f"{self.iterations} backward sweeps (receding horizon){rate}"
+            return f"{self.n_iterations} backward sweeps (receding horizon){rate}"
 
         if self.converged:
-            return (
-                f"converged in {self.iterations} sweeps (delta={self.delta:.3g}){rate}"
-            )
+            return f"converged in {self.n_iterations} sweeps (delta={self.delta:.3g}){rate}"
 
         return (
-            f"max_iterations={self.iterations} reached before tol={self.tol:g} "
+            f"max_iterations={self.n_iterations} reached before tol={self.tol:g} "
             f"(delta={self.delta:.3g}){rate}"
         )
 
@@ -823,7 +938,7 @@ def grid_of(problem, grid, x_grid, u_grid, dt, solver="euler") -> StateSpaceGrid
             )
 
         return StateSpaceGrid(
-            problem, x_grid_shape=x_grid, u_grid_shape=u_grid, dt=dt, solver=solver
+            problem, x_grid=x_grid, u_grid=u_grid, dt=dt, solver=solver
         )
 
     if x_grid is not None or u_grid is not None or dt is not None:
@@ -872,12 +987,18 @@ def grid_on_rate(grid, rate):
     return grid.rebuilt_on(problem)
 
 
-def require_dp_backend(backend):
-    """Refuse an unknown backward-step engine; return it."""
-    if backend not in (BACKEND_LOOP, BACKEND_NUMPY, BACKEND_JAX):
-        raise ValueError(f"Unknown backend {backend!r}")
+def require_dp_engine(method, backend):
+    """Refuse an unknown backward step or array module, and the loop on JAX; return ``(method, backend)``."""
+    if method not in (METHOD_LOOP, METHOD_TABLE):
+        raise ValueError(f"Unknown method {method!r}: use 'table' or 'loop'")
+    if backend not in (BACKEND_NUMPY, BACKEND_JAX):
+        raise ValueError(f"Unknown backend {backend!r}: use 'numpy' or 'jax'")
+    if method == METHOD_LOOP and backend == BACKEND_JAX:
+        raise ValueError(
+            "the loop is the per-node NumPy reference: use method='table' on JAX"
+        )
 
-    return backend
+    return method, backend
 
 
 def grid_numbers_of(grid, gamma, out_of_bound_cost):

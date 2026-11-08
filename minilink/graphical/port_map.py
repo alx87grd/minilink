@@ -33,7 +33,7 @@ def plot_input_output_map(
     out_axis=0,
     bounds=None,
     grid_shape=(101, 101),
-    show_3d=False,
+    is_3d=False,
     params=None,
     t=0.0,
     title=None,
@@ -46,7 +46,7 @@ def plot_input_output_map(
     """Plot one output component of ``block`` over swept input components.
 
     Sweeps one component of an input port (a line) or two (a heatmap, or a
-    3-D surface with ``show_3d=True``) through the output port's ordinary
+    3-D surface with ``is_3d=True``) through the output port's ordinary
     ``compute``: no special block API is required.
 
     Parameters
@@ -63,7 +63,7 @@ def plot_input_output_map(
     bounds : optional
         Sweep ranges: ``(lo, hi)`` for a line, ``((xlo, xhi), (ylo, yhi))``
         for a surface. Defaults to the port bounds when finite, else ±10.
-    show_3d : bool, optional
+    is_3d : bool, optional
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set passed through to the port compute.
@@ -114,9 +114,7 @@ def plot_input_output_map(
         vmax=vmax,
     )
 
-    return render_port_map_matplotlib(
-        spec, show_3d=show_3d, cmap=cmap, ax=ax, show=show
-    )
+    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
 
 
 def plot_control_law(
@@ -129,7 +127,7 @@ def plot_control_law(
     space=None,
     bounds=None,
     grid_shape=(101, 101),
-    show_3d=False,
+    is_3d=False,
     params=None,
     t=0.0,
     title=None,
@@ -173,7 +171,7 @@ def plot_control_law(
         block's ``plot_space``.
     bounds : optional
         Sweep ranges, as in :func:`plot_input_output_map`.
-    show_3d : bool, optional
+    is_3d : bool, optional
         ``True`` draws a 3-D surface instead of a heatmap.
     params : dict, optional
         Alternative parameter set (gain sweeps, trained vs. untrained).
@@ -225,9 +223,7 @@ def plot_control_law(
         u_base=u_base,
     )
 
-    return render_port_map_matplotlib(
-        spec, show_3d=show_3d, cmap=cmap, ax=ax, show=show
-    )
+    return render_port_map_matplotlib(spec, is_3d=is_3d, cmap=cmap, ax=ax, show=show)
 
 
 @dataclass(frozen=True)
@@ -270,7 +266,7 @@ class PortMapSpec:
 def render_port_map_matplotlib(
     spec: PortMapSpec,
     *,
-    show_3d: bool = False,
+    is_3d: bool = False,
     cmap: str = "bwr",
     ax=None,
     show: bool = True,
@@ -296,7 +292,7 @@ def render_port_map_matplotlib(
     matplotlib.rcParams["ps.fonttype"] = 42
 
     # A new figure, 3-D for a surface, or the one that holds the given axes
-    surface = spec.y_values is not None and show_3d
+    surface = spec.y_values is not None and is_3d
     owns_figure = ax is None
     if owns_figure:
         fig = plt.figure(
@@ -359,7 +355,7 @@ def render_port_map_matplotlib(
             plt.pause(pause)
 
     return PlotResult(
-        backend="matplotlib",
+        renderer="matplotlib",
         payload=(fig, ax),
         figure=fig,
         axes=ax,

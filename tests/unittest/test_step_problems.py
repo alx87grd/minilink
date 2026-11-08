@@ -72,7 +72,10 @@ def test_the_discretized_problem_answers_as_the_continuous_problems_model(solver
 
     # One rollout, one J: Σ γᵏ c_k + γᴺ h on both
     law = lambda x, t: np.array([-2.0 * x[0] - x[1]])  # noqa: E731
-    assert model.run(law)[3] == sampled.run(law)[3]
+    assert (
+        model.rollout(law).signals["cost"][0, -1]
+        == (sampled.rollout(law).signals["cost"][0, -1])
+    )
 
 
 def test_the_stationary_stage_cost_is_the_discounted_integral():
@@ -120,9 +123,13 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
     problem = StepPlanningProblem(
         Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x0=[1.0], t0=2
     )
-    xs, us, cs, J = problem.run(lambda x, t: np.ones(1))
-    np.testing.assert_array_equal(xs[:, 0], [1, 2, 3, 4, 5, 5, 5])
-    assert J == pytest.approx(1 + 0.9 + 0.81 + 0.0 + 0.9**4 + 0.9**5)
+    traj = problem.rollout(lambda x, t: np.ones(1))
+    np.testing.assert_array_equal(traj.x[0], [1, 2, 3, 4, 5, 5, 5])
+    np.testing.assert_array_equal(traj.t, 2 + np.arange(7))  # the ticks t0 + k
+    assert traj.u.shape == (1, 7)  # the last input held at the final state
+    J = traj.signals["cost"][0]  # J_k = Σ_{j<k} γʲ c_j, γᴺ h added at the end
+    assert J[0] == 0.0 and J[3] == pytest.approx(1 + 0.9 + 0.81)
+    assert J[-1] == pytest.approx(1 + 0.9 + 0.81 + 0.0 + 0.9**4 + 0.9**5)
     assert step_model_of(problem).time_of(3) == 5  # the tick offset, an integer
     assert set(problem.params) >= {"plant", "cost", "x0", "t0", "gamma"}
 
@@ -272,10 +279,11 @@ def test_a_step_problem_started_at_k0_scores_as_from_0_with_the_cost_shifted(n_s
 
     # J = Σ γᵏ c(x_k, u_k, k₀ + k) + γᴺ h(x_N, k₀ + N), the discount counted from the start
     law = lambda x, t: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
-    xs, us, cs, J = late.run(law, n_steps=4)
-    xs_0, us_0, cs_0, J_0 = shifted.run(law, n_steps=4)
-    np.testing.assert_array_equal(xs, xs_0)
-    np.testing.assert_array_equal(cs, cs_0)
+    traj = late.rollout(law, n_steps=4)
+    traj_0 = shifted.rollout(law, n_steps=4)
+    np.testing.assert_array_equal(traj.x, traj_0.x)
+    np.testing.assert_array_equal(traj.signals["cost"], traj_0.signals["cost"])
+    J, J_0 = traj.signals["cost"][0, -1], traj_0.signals["cost"][0, -1]
     assert J == J_0 == 13.0 + 0.9 * 11.0 + 0.81 * 7.0
 
     # The same cost bound: the stage and terminal costs read at the tick offset
@@ -333,7 +341,7 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_ru
 
     solution = vi.solve(evaluate=True)
     assert solution.evaluation.n_trials == 1 and solution.trajectory is None
-    J = vi.problem.run(solution.controller, n_steps=10)[3]
+    J = vi.problem.rollout(solution.controller, n_steps=10).signals["cost"][0, -1]
     assert float(solution.evaluation.J[0]) == J == sum(0.9**k for k in range(5))
     assert bool(solution.evaluation.reached[0]) and not solution.evaluation.failed[0]
     run = drawn_trajectory_of(solution)
@@ -346,7 +354,8 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_ru
     finite = DynamicProgrammingPlanner(
         grid_world(gamma=0.9, n_steps=8), x_grid=(7, 7), u_grid=(3, 3)
     ).solve(evaluate=True)
-    assert float(finite.evaluation.J[0]) == finite.problem.run(finite.controller)[3]
+    J = finite.problem.rollout(finite.controller).signals["cost"][0, -1]
+    assert float(finite.evaluation.J[0]) == J
     from minilink import Uniform
 
     spread = DynamicProgrammingPlanner(
@@ -383,7 +392,10 @@ def test_the_discretized_problem_charges_the_terminal_cost_at_the_horizons_time(
     x = np.array([0.1, 0.2])
     assert model.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
     law = lambda x, t: np.array([-x[0]])  # noqa: E731
-    assert model.run(law)[3] == sampled.run(law)[3]
+    assert (
+        model.rollout(law).signals["cost"][0, -1]
+        == (sampled.rollout(law).signals["cost"][0, -1])
+    )
 
 
 def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
@@ -421,9 +433,8 @@ def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize()
         noisy.discretize(0.1)
 
 
-def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
+def test_policy_evaluation_scores_value_iterations_policy_on_the_face():
     from minilink.planning import DynamicProgrammingPlanner
-    from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 
     problem = swing_problem(horizon=np.inf, discount_rate=0.5)
     vi = DynamicProgrammingPlanner(
@@ -436,16 +447,10 @@ def test_the_policy_evaluator_scores_value_iterations_policy_on_the_face():
         clean_infeasible=False,
     )
     vi.solve()
-    pe = PolicyEvaluator(
-        problem,
-        grid=vi.grid,
-        policy=vi.controller,
-        **vi.params["method"],
-        tol=vi.tol,
-        max_iterations=vi.max_iterations,
-        interpolation=vi.interpolation,
+    J_pi = vi.evaluate_policy(vi.controller)
+    np.testing.assert_allclose(
+        J_pi.params["values"].reshape(-1), vi.result.J, atol=1e-6
     )
-    np.testing.assert_allclose(pe.solve(), vi.result.J, atol=1e-6)
 
 
 def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
@@ -500,7 +505,7 @@ def test_the_rollout_environment_steps_a_native_step_problem_on_its_model():
 
     # The return is −J of the problem's run, and the same from k₀ as from 0 on the shifted cost
     law = lambda x: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
-    J = late.run(lambda x, t: law(x))[3]
+    J = late.rollout(lambda x, t: law(x)).signals["cost"][0, -1]
     assert episode_return(env, law) == (-J, 4)
     shifted_env = RolloutEnvironment(shifted, backend="numpy")
     assert episode_return(shifted_env, law) == (-J, 4)

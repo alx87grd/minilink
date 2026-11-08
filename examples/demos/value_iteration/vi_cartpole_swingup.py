@@ -51,8 +51,8 @@ problem = PlanningProblem(
 
 grid = StateSpaceGrid(
     problem,
-    x_grid_shape=(31, 51, 31, 51),
-    u_grid_shape=(5,),
+    x_grid=(31, 51, 31, 51),
+    u_grid=(5,),
     dt=DT,
     precompute=False,
     verbose=True,

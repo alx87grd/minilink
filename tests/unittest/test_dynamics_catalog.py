@@ -88,7 +88,7 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(dx[0:3], x0[3:6])
         e0 = sys.total_energy(x0)
         self.assertLess(e0, 0.0)
-        traj = sys.compute_trajectory(tf=1.0, n_steps=400, show=False, verbose=False)
+        traj = sys.compute_trajectory(tf=1.0, n_samples=400, show=False, verbose=False)
         e_drift = abs(sys.total_energy(traj.x[:, -1]) - e0) / abs(e0)
         self.assertLess(e_drift, 1e-2)
 

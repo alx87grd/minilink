@@ -76,13 +76,13 @@ def test_rigid_tires_reproduce_the_kinematic_bicycle():
     car.x0[5] = speed * np.tan(delta) / L
 
     u = np.vstack([np.full(n, 8.0), np.full(n, delta)])
-    traj = car.compute_trajectory(u=u, tf=tf, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=tf, n_samples=n, verbose=False)
 
     kinematic = KinematicBicycle()
     kinematic.params = {"a": car.params["a"], "b": car.params["b"], "length": 0.34}
     kinematic.x0 = np.zeros(3)
     kin_traj = kinematic.compute_trajectory(
-        u=np.vstack([traj.x[3], np.full(n, delta)]), tf=tf, n_steps=n, verbose=False
+        u=np.vstack([traj.x[3], np.full(n, delta)]), tf=tf, n_samples=n, verbose=False
     )
 
     # the plant carries its pose at the centre of gravity; the bicycle at the rear axle
@@ -104,7 +104,7 @@ def test_steady_cornering_matches_the_understeer_formula():
     car.x0 = cruise_state(car, speed, delta, power=7.0)
 
     u = np.vstack([np.full(n, 7.0), np.full(n, delta)])
-    traj = car.compute_trajectory(u=u, tf=6.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=6.0, n_samples=n, verbose=False)
 
     vx, yaw_rate = traj.x[3, -1], traj.x[5, -1]
     radius = vx / yaw_rate
@@ -123,7 +123,7 @@ def test_understeer_gradient_is_the_stiffness_difference():
     for delta in (0.03, 0.06):
         car.x0 = cruise_state(car, speed, delta, power=7.0)
         u = np.vstack([np.full(n, 7.0), np.full(n, delta)])
-        traj = car.compute_trajectory(u=u, tf=6.0, n_steps=n, verbose=False)
+        traj = car.compute_trajectory(u=u, tf=6.0, n_samples=n, verbose=False)
         vx, yaw_rate = traj.x[3, -1], traj.x[5, -1]
         extra.append(delta - L * yaw_rate / vx)
         lateral.append(vx * yaw_rate / p["gravity"])
@@ -140,7 +140,7 @@ def test_top_speed_is_set_by_the_power_and_the_drag():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.full(n, p["P_max"]), np.zeros(n)])
-    traj = car.compute_trajectory(u=u, tf=25.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=25.0, n_samples=n, verbose=False)
 
     top_speed = traj.x[3, -1]
     assert 9.0 < top_speed < 12.0
@@ -158,7 +158,7 @@ def test_launch_is_traction_limited_and_spins_the_rear_wheel():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.full(n, p["P_max"]), np.zeros(n)])
-    traj = car.compute_trajectory(u=u, tf=1.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=1.0, n_samples=n, verbose=False)
 
     slips = np.array([car.slips(traj.x[:, k], np.zeros(2)) for k in range(n)])
     imu = np.array([car.imu(traj.x[:, k], np.zeros(2)) for k in range(n)])
@@ -188,7 +188,7 @@ def test_steering_is_rate_limited_and_stops_at_the_end_stop():
     car.x0 = np.zeros(car.n)
 
     u = np.vstack([np.zeros(n), np.full(n, 2.0)])
-    traj = car.compute_trajectory(u=u, tf=1.5, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=1.5, n_samples=n, verbose=False)
 
     rate = np.diff(traj.x[7]) / (traj.t[1] - traj.t[0])
     assert rate.max() <= p["steer_rate_max"] * 1.001
@@ -220,7 +220,7 @@ def test_coasting_never_gains_energy():
     car.x0 = cruise_state(car, 6.0, delta=0.05)
 
     u = np.zeros((2, n))
-    traj = car.compute_trajectory(u=u, tf=8.0, n_steps=n, verbose=False)
+    traj = car.compute_trajectory(u=u, tf=8.0, n_samples=n, verbose=False)
 
     energy = (
         0.5 * p["mass"] * (traj.x[3] ** 2 + traj.x[4] ** 2)

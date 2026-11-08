@@ -7,7 +7,7 @@
 
 
 class LiveTrajectoryPlotCallback:
-    """Live trajectory update callback using the graphical signal backend."""
+    """Live trajectory update callback: each iterate drawn with the drawing library ``renderer``."""
 
     def __init__(
         self,
@@ -15,7 +15,7 @@ class LiveTrajectoryPlotCallback:
         signals=("x", "u"),
         every=1,
         pause=0.001,
-        backend="matplotlib",
+        renderer="matplotlib",
     ):
         # The plant and the signals drawn
         self.sys = sys
@@ -24,19 +24,19 @@ class LiveTrajectoryPlotCallback:
         # The drawing rate: every k-th iterate, with a pause after each draw
         self.every = max(1, int(every))
         self.pause = float(pause)
-        self.backend = backend
+        self.renderer = renderer
 
         # Graphics: the plot handle, opened at the first drawn iterate
         self.handle = None
 
     @property
     def fig(self):
-        """Matplotlib figure when the selected backend exposes one."""
+        """Matplotlib figure when the selected renderer exposes one."""
         return getattr(self.handle, "fig", None)
 
     @property
     def lines(self):
-        """Matplotlib line artists when the selected backend exposes them."""
+        """Matplotlib line artists when the selected renderer exposes them."""
         return getattr(self.handle, "lines", [])
 
     def __call__(self, iteration) -> None:
@@ -55,7 +55,7 @@ class LiveTrajectoryPlotCallback:
                 self.sys,
                 iteration.trajectory,
                 signals=self.signals,
-                backend=self.backend,
+                renderer=self.renderer,
                 show=True,
                 pause=self.pause,
             )
@@ -63,7 +63,7 @@ class LiveTrajectoryPlotCallback:
         self.handle.update(iteration.trajectory, title=title)
 
         # A short pause lets the matplotlib window redraw while the solver runs
-        if self.pause > 0.0 and self.backend == "matplotlib":
+        if self.pause > 0.0 and self.renderer == "matplotlib":
             import matplotlib.pyplot as plt
 
             plt.pause(self.pause)
@@ -76,8 +76,8 @@ class LiveTrajectoryPlotCallback:
     def iteration_title(iteration) -> str:
         """The figure title of one iterate: its index, cost and constraint residuals."""
         title = f"iteration {iteration.iteration}  cost {iteration.cost:.6g}"
-        if iteration.max_eq is not None:
-            title += f"  eq {iteration.max_eq:.2e}"
-        if iteration.min_ineq is not None:
-            title += f"  min ineq {iteration.min_ineq:.2e}"
+        if iteration.max_equality_violation is not None:
+            title += f"  eq {iteration.max_equality_violation:.2e}"
+        if iteration.min_inequality_margin is not None:
+            title += f"  min ineq {iteration.min_inequality_margin:.2e}"
         return title

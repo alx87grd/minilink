@@ -1,4 +1,4 @@
-"""Plot result: the record every plotting backend returns."""
+"""Plot result: the record every renderer returns."""
 
 from dataclasses import dataclass
 from typing import Any
@@ -10,9 +10,9 @@ from typing import Any
 
 @dataclass
 class PlotResult:
-    """Result returned by a plotting backend."""
+    """Result returned by a renderer."""
 
-    backend: str
+    renderer: str
     payload: Any
     figure: Any = None
     axes: Any = None

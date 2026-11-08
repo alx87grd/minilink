@@ -104,8 +104,8 @@ class RealtimeSimulator:
         names the signals to show. Uses
         :class:`~minilink.simulation.realtime.live_plot.LiveSignalPlotOutput`,
         published beside ``output`` when both are given.
-    plot_backend : str
-        Signal plotting backend of the live plot (``"matplotlib"`` or
+    plot_renderer : str
+        Signal plotting renderer of the live plot (``"matplotlib"`` or
         ``"plotly"``), as on every plotting verb.
     backend : str or None
         Evaluator backend. ``None`` or ``"auto"`` (default ``None``): try JAX
@@ -144,7 +144,7 @@ class RealtimeSimulator:
         input=None,
         output=None,
         plot=False,
-        plot_backend="matplotlib",
+        plot_renderer="matplotlib",
         backend=None,
         max_steps=None,
         tf=None,
@@ -175,8 +175,8 @@ class RealtimeSimulator:
         self.input = input
         require_plot_flag(plot)
         self.plot = plot
-        self.plot_backend = plot_backend
-        self.output = realtime_output_of(output, plot, plot_backend=plot_backend)
+        self.plot_renderer = plot_renderer
+        self.output = realtime_output_of(output, plot, plot_renderer=plot_renderer)
         self.max_steps = max_steps
         self.tf = tf
         self.verbose = bool(verbose)
@@ -542,21 +542,21 @@ class CompositeOutput(RealtimeOutput):
 
 
 def require_plot_flag(plot) -> None:
-    """Refuse a backend name as ``plot``: the backend is ``plot_backend``, ``plot`` is ``True`` or the signals."""
+    """Refuse a renderer name as ``plot``: the renderer is ``plot_renderer``, ``plot`` is ``True`` or the signals."""
     if isinstance(plot, str):
         raise ValueError(
             f"plot={plot!r}: pass plot=True or a sequence of signal names, and the "
-            "backend as plot_backend='matplotlib' or 'plotly'"
+            "renderer as plot_renderer='matplotlib' or 'plotly'"
         )
 
 
-def realtime_output_of(output, plot, *, plot_backend: str = "matplotlib"):
+def realtime_output_of(output, plot, *, plot_renderer: str = "matplotlib"):
     """The user's ``RealtimeOutput``, with a ``LiveSignalPlotOutput`` beside it when ``plot`` asks for one."""
     if plot is False or plot is None:
         return output
 
     signals = None if plot is True else tuple(plot)
-    plot_out = LiveSignalPlotOutput(signals=signals, backend=plot_backend)
+    plot_out = LiveSignalPlotOutput(signals=signals, renderer=plot_renderer)
     if output is None:
         return plot_out
     return CompositeOutput((plot_out, output))

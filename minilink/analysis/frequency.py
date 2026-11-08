@@ -46,7 +46,7 @@ def frequency_response(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -75,7 +75,7 @@ def frequency_response(
         widened until it brackets the 0 dB crossing; a step or sampled system's
         (its difference equation, ``G(e^{jωΔ})``) runs three decades up to its
         Nyquist frequency ``π/Δ``, in rad per tick for a tick law.
-    n : int, optional
+    n_samples : int, optional
         Number of frequencies for the automatic grid.
     method : {"auto", "fd", "jax"}, optional
         Differentiation backend, see :func:`~minilink.analysis.derivatives.jacobian`.
@@ -86,7 +86,7 @@ def frequency_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w = frequency_grid(A, B, C, D, w, n, period)
+    w = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # G(jω) on the grid, G(e^{jωΔ}) for a difference equation
     G = linear.frequency_response(A, B, C, D, w, period)
@@ -104,7 +104,7 @@ def bode(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -113,7 +113,17 @@ def bode(
     Same arguments as :func:`frequency_response`; the phase is unwrapped.
     """
     w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
@@ -134,7 +144,7 @@ def margins(
     of=None,
     wrt=None,
     w=None,
-    n: int = _MARGIN_GRID_POINTS,
+    n_samples: int = _MARGIN_GRID_POINTS,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> Margins:
@@ -148,7 +158,7 @@ def margins(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w = frequency_grid(A, B, C, D, w, n, period)
+    w = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # L(jω) on the grid brackets the crossovers; each is then solved on the exact L(jω)
     G = linear.frequency_response(A, B, C, D, w, period)
@@ -167,7 +177,7 @@ def nyquist(
     of=None,
     wrt=None,
     w=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -178,7 +188,17 @@ def nyquist(
     those frequencies (the indented contour is not drawn).
     """
     w, G = frequency_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     return w, G
@@ -316,25 +336,25 @@ def plot_bode(
     of=None,
     wrt=None,
     w=None,
-    n: int = 200,
+    n_samples: int = 200,
     margins: bool = True,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
     title: str | None = None,
 ) -> PlotResult:
     """Bode diagram of the selected channel; ``margins=True`` marks the crossovers.
 
     The crossovers and the printed margins are those of :func:`margins`, read
-    on its grid (or on ``w``), not on the ``n`` plotted frequencies.
+    on its grid (or on ``w``), not on the ``n_samples`` plotted frequencies.
     ``title`` overrides the figure heading (default ``"Bode Diagram"``).
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
     period = discrete_period(sys)
-    w_plot = frequency_grid(A, B, C, D, w, n, period)
+    w_plot = frequency_grid(A, B, C, D, w, n_samples, period)
 
     # |G(jω)| in dB and the unwrapped ∠G(jω) in degrees
     G = linear.frequency_response(A, B, C, D, w_plot, period)
@@ -354,7 +374,7 @@ def plot_bode(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_pzmap(
@@ -370,7 +390,7 @@ def plot_pzmap(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
@@ -394,7 +414,7 @@ def plot_pzmap(
 
     figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_root_locus(
@@ -411,7 +431,7 @@ def plot_root_locus(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Root locus of the selected channel closed with ``u = -K y``.
@@ -435,7 +455,7 @@ def plot_root_locus(
         A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
     )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_nyquist(
@@ -448,20 +468,30 @@ def plot_nyquist(
     of=None,
     wrt=None,
     w=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Nyquist diagram of the selected channel with the critical point ``-1``."""
     w, G = nyquist(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, w=w, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        w=w,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
 
     figure = nyquist_figure(w, G, sys, of, wrt)
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 ###############################################################################
@@ -469,16 +499,16 @@ def plot_nyquist(
 ###############################################################################
 
 
-def frequency_grid(A, B, C, D, w, n, period=None):
+def frequency_grid(A, B, C, D, w, n_samples, period=None):
     """The frequencies to evaluate: the user's, or a log grid from the poles and zeros (to the Nyquist frequency ``π/Δ`` of a difference equation)."""
-    # By default, n frequencies evenly spaced in log ω across the poles and zeros;
+    # By default, n_samples frequencies evenly spaced in log ω across the poles and zeros;
     # a difference equation's three decades below its Nyquist frequency π/Δ
     if w is None and period is not None:
         w_nyquist = np.pi / float(period)
-        w = np.logspace(np.log10(w_nyquist) - 3.0, np.log10(w_nyquist), int(n))
+        w = np.logspace(np.log10(w_nyquist) - 3.0, np.log10(w_nyquist), int(n_samples))
     elif w is None:
         w_min, w_max = linear.frequency_range(A, B, C, D)
-        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n))
+        w = np.logspace(np.log10(w_min), np.log10(w_max), int(n_samples))
 
     w = np.asarray(w, dtype=float).reshape(-1)
     if w.size == 0 or np.any(w <= 0.0):

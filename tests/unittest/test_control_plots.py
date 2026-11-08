@@ -202,9 +202,9 @@ class TestChannelTools(unittest.TestCase):
         self.assertAlmostEqual(k, 0.5)
         gains, roots = root_locus(plant, x_bar)
         self.assertEqual(roots.shape[1], 2)
-        w_n, G_n = nyquist(plant, x_bar, n=50)
+        w_n, G_n = nyquist(plant, x_bar, n_samples=50)
         self.assertEqual(G_n.shape, (50,))
-        time, y = step_response(plant, x_bar, n=200)
+        time, y = step_response(plant, x_bar, n_samples=200)
         self.assertEqual(time.shape, y.shape)
         self.assertIsInstance(margins(plant, x_bar), linear.Margins)
         G_tf = transfer_function(plant, x_bar)
@@ -218,7 +218,7 @@ class TestChannelTools(unittest.TestCase):
         from minilink.analysis.frequency import margins_text
 
         L = TransferFunction([1.0], [1.0, 3.0, 2.0, 0.0])
-        coarse, fine = margins(L, n=60), margins(L, n=4000)
+        coarse, fine = margins(L, n_samples=60), margins(L, n_samples=4000)
         # L(s) = 1 / (s (s + 1)(s + 2)): Gm = 20 log10(6) at sqrt(2) rad/s, exactly
         self.assertAlmostEqual(coarse.gain_margin_db, 20 * np.log10(6.0), places=9)
         self.assertAlmostEqual(coarse.w_phase_crossover, np.sqrt(2.0), places=9)
@@ -314,7 +314,7 @@ class TestInZ(unittest.TestCase):
         # The zero-order hold is exact under a step: the two agree at the ticks
         G = TransferFunction([1.0], [1.0, 3.0, 2.0])
         time, y = step_response(discretize(G, 0.1, solver="exact"), tf=2.0)
-        time_c, y_c = step_response(G, tf=2.0, n=21)
+        time_c, y_c = step_response(G, tf=2.0, n_samples=21)
         np.testing.assert_allclose(time, time_c)
         np.testing.assert_allclose(y, y_c, atol=1e-12)
 
@@ -418,20 +418,20 @@ class TestPlots(unittest.TestCase):
             (plot_nyquist, self.loop, 3),
             (plot_step_response, self.loop, 2),
         ):
-            r = plot(sys, backend="plotly", show=False)
-            self.assertEqual(r.backend, "plotly")
+            r = plot(sys, renderer="plotly", show=False)
+            self.assertEqual(r.renderer, "plotly")
             self.assertEqual(len(r.figure.data), expected, plot.__name__)
-        r = plot_bode(self.plant, backend="plotly", show=False)
+        r = plot_bode(self.plant, renderer="plotly", show=False)
         self.assertEqual(r.figure.layout.xaxis.type, "log")
         self.assertIn("Bode Diagram", r.figure.layout.title.text)
         self.assertIn("From: tau", r.figure.layout.title.text)
         self.assertTrue(r.figure.data[0].hovertext[0].startswith("ω ="))
-        r = plot_root_locus(self.plant, backend="plotly", show=False)
+        r = plot_root_locus(self.plant, renderer="plotly", show=False)
         self.assertIn("K =", r.figure.data[0].hovertext[1])
 
     def test_unknown_backend_is_refused(self):
-        with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
-            plot_bode(self.plant, backend="bokeh", show=False)
+        with self.assertRaisesRegex(ValueError, "Unknown renderer"):
+            plot_bode(self.plant, renderer="bokeh", show=False)
 
     def test_a_short_trace_draws_its_three_arrows_on_both_backends(self):
         from minilink.graphical.control import (
@@ -455,7 +455,7 @@ class TestPlots(unittest.TestCase):
             spec = ControlFigure(title="arrows", panels=(panel,))
             for backend in backends:
                 with self.subTest(n=n, backend=backend):
-                    r = render_control_figure(spec, backend=backend, show=False)
+                    r = render_control_figure(spec, renderer=backend, show=False)
                     if backend == "plotly":
                         arrows = r.figure.layout.annotations
                     else:
@@ -466,12 +466,14 @@ class TestPlots(unittest.TestCase):
         pytest.importorskip("plotly")
         self.plant.x0 = np.array([0.5, 0.0])
         traj = self.plant.compute_trajectory(tf=1.0, verbose=False)
-        r = self.plant.plot_phase_plane(traj, backend="plotly", show=False)
-        self.assertEqual(r.backend, "plotly")
+        r = self.plant.plot_phase_plane(traj, renderer="plotly", show=False)
+        self.assertEqual(r.renderer, "plotly")
         names = [trace.name for trace in r.figure.data]
         self.assertTrue({"trajectory", "start", "end"} <= set(names), names)
-        r = self.plant.plot_phase_plane(backend="plotly", streamplot=True, show=False)
-        self.assertEqual(r.backend, "plotly")  # the cached trajectory is overlaid again
+        r = self.plant.plot_phase_plane(renderer="plotly", streamplot=True, show=False)
+        self.assertEqual(
+            r.renderer, "plotly"
+        )  # the cached trajectory is overlaid again
 
 
 if __name__ == "__main__":

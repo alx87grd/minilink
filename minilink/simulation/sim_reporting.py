@@ -22,7 +22,7 @@ def print_simulation_preamble(
     x0,
     t0: float,
     tf: float,
-    n_pts: int,
+    n_samples: int,
     dt: float,
     solver_mode: str,
     user_solver: str | None,
@@ -44,7 +44,7 @@ def print_simulation_preamble(
     print(f"x0: {preview_vector(x0)}")
     print(f"interval: [{t0:g}, {tf:g}]")
     grid_note = " (auto grid)" if auto_time_grid else ""
-    print(f"n_pts={n_pts}, dt={dt:g}{grid_note}")
+    print(f"n_samples={n_samples}, dt={dt:g}{grid_note}")
 
     # The solver, auto-selected or the user's, and how the model was compiled
     if user_solver is None:

@@ -7,6 +7,7 @@ import numpy as np
 from minilink.core.backends import array_module
 from minilink.core.costs import SampledCost
 from minilink.core.system import System
+from minilink.core.trajectory import Trajectory
 from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import (
     PlanningProblem,
@@ -47,7 +48,7 @@ class StepModel:
     a native problem), :meth:`terminal` the terminal cost, :attr:`X`,
     :attr:`U` and :attr:`Xf` the sets. Value iteration, the RL environment and
     the judge read this model only; the step problem's ``transition``,
-    ``terminal`` and ``run`` delegate to it.
+    ``terminal`` and ``rollout`` delegate to it.
     """
 
     def __init__(self, problem, *, dt=None, solver="rk4", substeps=1):
@@ -319,15 +320,18 @@ class StepModel:
 
         return failure_cost
 
-    def run(self, policy, x0=None, params=None, n_steps=None):
+    def rollout(self, policy, x0=None, params=None, n_steps=None) -> Trajectory:
         """
-        The model's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
+        The model's rollout under a law ``u = policy(x, t)``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks.
 
         ``policy`` is a function or a controller block (its state on its
         measurement port, its other inputs at their nominal values).
-        ``n_steps`` defaults to the model's :attr:`n_steps`. The states ``(n_steps + 1, n)``, the
-        inputs and stage costs ``(n_steps,)``-long, on the array module of the
-        start: the one sum every tool's score is.
+        ``n_steps`` (``N``) defaults to the model's :attr:`n_steps`. The
+        samples sit at the ticks' times ``t_k`` (:meth:`time_of`), ``x``
+        ``(n, N + 1)``, ``u`` ``(m, N + 1)`` with the last input held at the
+        final state; the signal ``"cost"`` ``(1, N + 1)`` is the running sum
+        ``J_k = Σ_{j<k} γʲ c_j``, the terminal ``γᴺ h(x_N)`` added at the last
+        sample, so its last value is ``J``: the one sum every tool's score is.
         """
         params = self.params if params is None else params
         if isinstance(policy, System):
@@ -338,7 +342,7 @@ class StepModel:
         gamma = float(self.gamma_at(params))
         m = self.m
 
-        xs, us, cs = [x], [], []
+        xs, us, Js = [x], [], [0.0]
         J = 0.0
         for k in range(N):
             t_k = self.time_of(k, params)
@@ -349,12 +353,23 @@ class StepModel:
             J = J + gamma**k * float(c)
             xs.append(np.asarray(x, dtype=float))
             us.append(u)
-            cs.append(float(c))
+            Js.append(J)
 
-        # J += γᴺ h(x_N)
+        # J += γᴺ h(x_N), at the last sample
         J = J + gamma**N * float(self.terminal(x, params=params))
+        Js[-1] = J
 
-        return np.stack(xs), np.stack(us), np.asarray(cs), J
+        # The ticks t_0 … t_N, the last input held at the final state
+        t = np.array([self.time_of(k, params) for k in range(N + 1)], dtype=float)
+        u = np.stack([*us, us[-1]], axis=1)
+        traj = Trajectory(
+            t=t,
+            x=np.stack(xs, axis=1),
+            u=u,
+            signals={"cost": np.asarray(Js, dtype=float).reshape(1, -1)},
+        )
+
+        return traj
 
 
 def step_model_of(problem, dt=None, *, solver="rk4", substeps=1) -> StepModel:
@@ -386,6 +401,8 @@ def require_period(dt):
 
 
 def require_horizon(N):
-    """Refuse a rollout with no number of ticks."""
+    """Refuse a rollout with no number of ticks, or with none to roll."""
     if N is None:
         raise ValueError("an infinite horizon needs n_steps= for a rollout")
+    if N < 1:
+        raise ValueError(f"a rollout runs at least one tick, got n_steps={N}")

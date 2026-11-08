@@ -34,7 +34,7 @@ class CorePerfSuiteConfig:
     sim_n_runs: int = 2
     diagram_dense_nodes: int = 50
     diagram_dense_connections: int = 5
-    static_n_steps: int = 200
+    static_n_samples: int = 200
     batch_size: int = 1000
     batch_n_steps: int = 1000
     batch_reps: int = 5
@@ -268,7 +268,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     gain = Gain(K=2.0, dim=1)
     t0 = time.perf_counter()
     gain.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t0=0, tf=1, n_samples=cfg.static_n_samples, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(
@@ -292,7 +292,7 @@ def _static_facade_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     diagram.connect("src", "y", "gain", "u")
     t0 = time.perf_counter()
     diagram.compute_trajectory(
-        t0=0, tf=1, n_steps=cfg.static_n_steps, show=False, verbose=False
+        t0=0, tf=1, n_samples=cfg.static_n_samples, show=False, verbose=False
     )
     metrics.append(
         MetricRecord(

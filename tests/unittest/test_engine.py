@@ -230,7 +230,7 @@ def test_a_stochastic_problem_draws_its_trials(backend):
     with pytest.raises(ValueError, match="n_trials"):
         pe.evaluate()
 
-    report = pe.evaluate(n_trials=8, key=0, record=True)
+    report = pe.evaluate(n_trials=8, key=0, trajectories=True)
     assert report.x0.shape == (8, 2)
     assert len(np.unique(report.x0[:, 0])) == 8
     assert len(report.trajectories) == 8

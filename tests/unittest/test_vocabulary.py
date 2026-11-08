@@ -19,6 +19,7 @@ FACADES = (
     "minilink.optimization",
     "minilink.planning",
     "minilink.learning",
+    "minilink.interfaces",
 )
 PLANT_PACKAGE = "minilink.dynamics"
 
@@ -33,10 +34,19 @@ RETIRED = {
     "t_start": ("t0", None),
     "iterations": (
         "n_iterations",
-        ("Optimizer", "TrajectoryOptimizationPlanner", "MPPIPlanner"),
+        (
+            "Optimizer",
+            "TrajectoryOptimizationPlanner",
+            "MPPIPlanner",
+            "MPPIRecord",
+            "TrajectoryOptimizationRecord",
+            "ValueIterationRecord",
+            "TreeSearchRecord",
+            "DynamicProgrammingResult",
+        ),
     ),
     "optimizer_options": ("options", None),
-    "tf": ("horizon", ("PlanningProblem",)),
+    "tf": ("horizon, or episode_length", ("PlanningProblem", "Sys2Gym")),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
@@ -77,8 +87,32 @@ RETIRED = {
     "solve_policy": ("solve", None),
     "N": ("n_steps", ("StepPlanningProblem",)),
     "n_samples": ("n_rollouts", ("MPPIPlanner",)),
+    "nearest_backend": ("nearest_method", None),
     "solver": ("record", ("PlanningSolution",)),
-    "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
+    "algorithm": (
+        "method",
+        (
+            "ReinforcementLearningPlanner",
+            "TabularLearningPlanner",
+            "ReinforcementLearningRecord",
+            "TabularLearningRecord",
+        ),
+    ),
+    "algorithm_kwargs": ("method_numbers", None),
+    "method_kwargs": ("method_numbers", None),
+    "method": ("family", ("PlanningSolution",)),
+    "max_eq": ("max_equality_violation", None),
+    "min_ineq": ("min_inequality_margin", None),
+    "tree_nodes": ("n_nodes", None),
+    "show_3d": ("is_3d", ("StateSpaceGrid",)),
+    "axis_x": ("x_axis", None),
+    "axis_y": ("y_axis", None),
+    "show_live_search": ("callback=LiveSearchPlot()", ("RRTPlanner", "RRTStarPlanner")),
+    "x_grid_shape": ("x_grid", ("StateSpaceGrid",)),
+    "u_grid_shape": ("u_grid", ("StateSpaceGrid",)),
+    "n_substeps": ("n_steps, dt = horizon / n_steps", ("KinodynamicExtender",)),
+    "record": ("trajectories", ("ProblemEvaluator", "evaluate")),
+    "nodes": ("n_nodes", ("TreeSearchRecord", "TreeSearchIteration")),
     "alpha": (
         "gamma",
         (
@@ -103,7 +137,40 @@ RETIRED = {
     "num_timesteps": ("n_timesteps", ("ReinforcementLearningPlanner",)),
     "controller": ("actor", ("ExplorationPolicy",)),
     "lqr_matrices": ("design_matrices", ("LQRPlanner",)),
-    "compile": ("transition, terminal or run", ("StepPlanningProblem",)),
+    "compile": ("transition, terminal or rollout", ("StepPlanningProblem",)),
+    "run": ("rollout, a Trajectory", ("StepPlanningProblem",)),
+    "n_pts": ("n_samples", None),
+    "n_steps": (
+        "n_samples (n_steps counts transitions only)",
+        (
+            "Simulator",
+            "StaticSimulator",
+            "lqr_gain_schedule",
+            "lqr_finite_horizon",
+            "animate_modal",
+            "LQRPlanner",
+        ),
+    ),
+    "backend": (
+        "renderer (backend is the array module)",
+        (
+            "plot_bode",
+            "plot_pzmap",
+            "plot_root_locus",
+            "plot_nyquist",
+            "plot_step_response",
+        ),
+    ),
+    "plot_backend": ("plot_renderer", None),
+    "p": ("dim", ("Source", "WhiteNoise")),
+    "dof": ("dim (dof stays a manipulator's joints)", ("P", "PI", "PD", "PID")),
+    "filename": ("file_name", None),
+    "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
+    "show_signal": ("plot_signal", None),
+    "time": ("t", ("step_info",)),
+    "system": ("sys", ("discretize",)),
+    "time_factor_video": ("speed", None),
+    "samples": ("n_samples", ("region_of_attraction",)),
 }
 
 
@@ -249,6 +316,22 @@ def planner_classes():
             found.append(cls)
         pending += cls.__subclasses__()
     return found
+
+
+# The drawing library of a planning view is its renderer; backend= is the array module
+PLANNING_VIEWS = ("plot_trajectory", "plot_cost")
+
+
+def test_a_planning_view_takes_the_renderer_not_the_backend():
+    from minilink.planning.results import PlanningSolution
+    from minilink.planning.trajectory_optimization.live_plot import (
+        LiveTrajectoryPlotCallback,
+    )
+
+    views = [getattr(PlanningSolution, name) for name in PLANNING_VIEWS]
+    for view in [*views, LiveTrajectoryPlotCallback.__init__]:
+        words = set(inspect.signature(view).parameters)
+        assert "renderer" in words and "backend" not in words, view.__qualname__
 
 
 def test_the_workflow_is_on_the_verb_never_on_the_constructor():

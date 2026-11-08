@@ -79,9 +79,10 @@ print(solution.record)
 
 # The greedy walk on the same problem: J = Σ c_k, the moves to the goal
 law = vi.controller
-xs, us, cs, J = problem.run(
+walk = problem.rollout(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
+J = walk.signals["cost"][0, -1]
 print(
     f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.cost_to_go(problem.x0):g}"
 )
@@ -90,7 +91,7 @@ print(
 fig, ax = plt.subplots()
 J_grid = vi.result.J.reshape(SIZE, SIZE).T
 image = ax.imshow(J_grid, origin="lower", cmap="viridis")
-ax.plot(xs[:, 0], xs[:, 1], "w.-", label="greedy walk")
+ax.plot(walk.x[0], walk.x[1], "w.-", label="greedy walk")
 ax.plot(*GOAL, "r*", markersize=14, label="goal")
 fig.colorbar(image, label="moves to the goal")
 ax.set_xlabel("cell x")

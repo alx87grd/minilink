@@ -21,7 +21,7 @@ from minilink.core.sets import SingletonSet  # noqa: E402
 
 
 def save_gif(
-    sys_or_diagram, traj, name: str, *, time_factor_video: float = 2.0, camera=None
+    sys_or_diagram, traj, name: str, *, speed: float = 2.0, camera=None
 ) -> None:
     out = STATIC / name
     sys_or_diagram.animate(
@@ -31,7 +31,7 @@ def save_gif(
         show=False,
         save=True,
         file_name=str(out.with_suffix("")),
-        time_factor_video=time_factor_video,
+        speed=speed,
         camera=camera,
     )
     shrink_gif(out)
@@ -212,7 +212,7 @@ def gif_cartpole() -> None:
     camera = camera_matrix(
         target=(-1.0, 0.75, 0.0), scale=3.6
     )  # the cart's run and the pole
-    save_gif(plant, traj, "cartpole_swingup.gif", time_factor_video=1.0, camera=camera)
+    save_gif(plant, traj, "cartpole_swingup.gif", speed=1.0, camera=camera)
 
 
 def ur5_impedance() -> None:
@@ -251,7 +251,7 @@ def ur5_impedance() -> None:
     ctl.task_force_scale = 0.08  # [m/N]
 
     diagram = ref >> ctl @ arm
-    traj = diagram.compute_trajectory(tf=TF, n_steps=int(30 * TF) + 1)
+    traj = diagram.compute_trajectory(tf=TF, n_samples=int(30 * TF) + 1)
     # the eye on the hand's side of the base: the target ball and the force in view
     camera = oblique_camera(
         [-0.33, 0.08, 0.4], azimuth_deg=160.0, elevation_deg=18.0, distance=0.95
@@ -261,7 +261,7 @@ def ur5_impedance() -> None:
         traj,
         "ur5_impedance.html",
         "ur5_meshcat.gif",
-        time_factor_video=1.0,
+        speed=1.0,
         camera=camera,
     )
 
@@ -401,7 +401,7 @@ def racecar_mpc() -> None:
         frames,
         "racecar_mpc.html",
         "racecar_mpc.gif",
-        time_factor_video=PLAYBACK,
+        speed=PLAYBACK,
         overlays=overlays,
     )
 
@@ -476,7 +476,7 @@ def gif_rocket() -> None:
     camera = camera_matrix(
         target=(3.0, 7.0, 0.0), scale=8.0
     )  # the whole descent, still
-    save_gif(cl_sys, traj, "rocket_landing.gif", time_factor_video=1.0, camera=camera)
+    save_gif(cl_sys, traj, "rocket_landing.gif", speed=1.0, camera=camera)
 
 
 def pipeline_map() -> None:

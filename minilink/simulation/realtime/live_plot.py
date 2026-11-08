@@ -33,8 +33,8 @@ class LiveSignalPlotOutput(RealtimeOutput):
         keep the full trajectory from ``t0``.
     every : int
         Redraw every ``every`` frames (default ``3``, ~10 Hz at 30 FPS).
-    backend : str
-        Signal plotting backend (``"matplotlib"`` or ``"plotly"``).
+    renderer : str
+        Signal plotting renderer (``"matplotlib"`` or ``"plotly"``).
     show : bool
         Whether to display the plot window (default ``True``; ``False`` for
         headless testing).
@@ -51,12 +51,12 @@ class LiveSignalPlotOutput(RealtimeOutput):
         signals=None,
         window: float | None = 10.0,
         every: int = 3,
-        backend: str = "matplotlib",
+        renderer: str = "matplotlib",
         show: bool = True,
         close_on_stop: bool = False,
     ):
         # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.signals.time_signals import require_signal_backend
+        from minilink.graphical.signals.time_signals import require_signal_renderer
 
         if window is not None and float(window) <= 0.0:
             raise ValueError(f"window must be positive or None, got {window!r}")
@@ -66,7 +66,7 @@ class LiveSignalPlotOutput(RealtimeOutput):
         self.signals = signals
         self.window = None if window is None else float(window)
         self.every = int(every)
-        self.backend = require_signal_backend(backend)
+        self.renderer = require_signal_renderer(renderer)
         self.show = bool(show)
         self.close_on_stop = bool(close_on_stop)
 
@@ -142,7 +142,7 @@ class LiveSignalPlotOutput(RealtimeOutput):
             sys,
             init_traj,
             signals=self.resolved_signals,
-            backend=self.backend,
+            renderer=self.renderer,
             show=self.show,
             pause=0.001,
         )
@@ -171,7 +171,7 @@ class LiveSignalPlotOutput(RealtimeOutput):
         if self.handle is None:
             return
 
-        if self.close_on_stop or self.backend == "plotly":
+        if self.close_on_stop or self.renderer == "plotly":
             self.handle.close()
 
     def window_trajectory(self) -> Trajectory:

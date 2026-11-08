@@ -3,11 +3,11 @@
 import numpy as np
 
 from minilink.control.siso import (
-    as_dof_vector,
+    as_axis_vector,
     as_gain_matrix,
     clipped,
     held_integral,
-    require_positive_dof,
+    require_positive_dim,
 )
 from minilink.core.backends import array_module
 from minilink.core.system import DynamicSystem, System
@@ -62,7 +62,7 @@ class Impedance(System):
         u_units=None,
     ):
         n = int(dof)
-        require_positive_dof(n)
+        require_positive_dim(n, "dof")
 
         super().__init__()
         self.dof = n
@@ -71,8 +71,8 @@ class Impedance(System):
         self.params = {
             "Kp": as_gain_matrix(Kp, n),
             "Kd": as_gain_matrix(Kd, n),
-            "u_min": as_dof_vector(u_min, n),
-            "u_max": as_dof_vector(u_max, n),
+            "u_min": as_axis_vector(u_min, n),
+            "u_max": as_axis_vector(u_max, n),
         }
 
         # Ports: the reference and the measurement [q; dq] in, the command out
@@ -140,7 +140,7 @@ class IntegralImpedance(DynamicSystem):
         u_units=None,
     ):
         n = int(dof)
-        require_positive_dof(n)
+        require_positive_dim(n, "dof")
 
         super().__init__(state_dim=n)
         self.dof = n
@@ -149,12 +149,12 @@ class IntegralImpedance(DynamicSystem):
         # the limits and the end stops per axis
         self.params = {
             "Kp": as_gain_matrix(Kp, n),
-            "Ki": as_dof_vector(Ki, n),
+            "Ki": as_axis_vector(Ki, n),
             "Kd": as_gain_matrix(Kd, n),
-            "u_min": as_dof_vector(u_min, n),
-            "u_max": as_dof_vector(u_max, n),
-            "e_int_min": as_dof_vector(e_int_min, n),
-            "e_int_max": as_dof_vector(e_int_max, n),
+            "u_min": as_axis_vector(u_min, n),
+            "u_max": as_axis_vector(u_max, n),
+            "e_int_min": as_axis_vector(e_int_min, n),
+            "e_int_max": as_axis_vector(e_int_max, n),
         }
 
         # Signal labels: one integral state per axis

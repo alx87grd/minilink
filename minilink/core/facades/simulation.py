@@ -37,7 +37,7 @@ class SystemSimulation:
         *,
         input_port_id=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         show=False,
@@ -60,7 +60,7 @@ class SystemSimulation:
             input, a constant vector, or a scalar on a one-input system; ``None``
             is the nominal input. With ``input_port_id`` it describes that one
             port, the others at their nominal values.
-        n_steps : int, optional
+        n_samples : int, optional
             Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to the simulator (default ``"numpy"``).
@@ -83,7 +83,7 @@ class SystemSimulation:
             x0=x0,
             t0=t0,
             tf=tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             solver=solver,
             backend=backend,
@@ -148,7 +148,7 @@ class DynamicSimulation:
         *,
         input_port_id=None,
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         show=False,
@@ -177,7 +177,7 @@ class DynamicSimulation:
         input_port_id : str, optional
             The one input port ``u`` describes, the others kept at their nominal
             values.
-        n_steps : int, optional
+        n_samples : int, optional
             Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
@@ -216,7 +216,7 @@ class DynamicSimulation:
             x0=x0,
             t0=t0,
             tf=tf,
-            n_steps=n_steps,
+            n_samples=n_samples,
             dt=dt,
             solver=solver,
             backend=backend,

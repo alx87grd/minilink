@@ -28,7 +28,7 @@ class CompiledTrajectoryPlanner:
     The pure face of a trajectory-optimization planner: its solve as functions of ``(params, z)``.
 
     ``z`` is the planner's solution vector: the transcription's decision vector
-    (the knots, ``(rows, N)`` row after row: collocation's states then inputs,
+    (the knots, ``(rows, N + 1)`` row after row: collocation's states then inputs,
     shooting's inputs) with the origin ``t0`` it was solved from appended,
     ``n_z`` entries. ``params`` is the planner's tree: the program's leaves
     (``x0``, ``t0``, the plant's, the cost's, the discount and the
@@ -308,7 +308,7 @@ class CompiledTrajectoryPlanner:
             cost=result.cost,
             solver_success=result.success,
             message="",
-            iterations=status.get("iterations"),
+            n_iterations=status.get("iterations"),
             solve_time_s=None,
             feasibility_tol=tol,
             max_equality_violation=float(max_eq),
@@ -353,10 +353,10 @@ class CompiledTrajectoryPlanner:
         return self.planner.build_optimizer(program, np.asarray(z_dec, dtype=float))
 
     def rows(self, z):
-        """The knot rows of ``z``'s decision vector, ``(rows, N)``."""
-        n_steps = self.offsets.size
+        """The knot rows of ``z``'s decision vector, ``(rows, N + 1)``."""
+        n_knots = self.offsets.size
 
-        return z[:-1].reshape(-1, n_steps)
+        return z[:-1].reshape(-1, n_knots)
 
     def problem_at(self, params):
         """A copy of the problem holding the compiled tree with ``params`` merged over it (its parts copied): the face's values, never a later edit of the problem's."""

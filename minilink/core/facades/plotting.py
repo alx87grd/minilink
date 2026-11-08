@@ -18,7 +18,7 @@ class SystemPlotting:
         traj=None,
         *,
         signals=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """
@@ -62,11 +62,11 @@ class SystemPlotting:
             self,
             traj,
             signals=signals,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
-    def plot_cost(self, cost, *, of=None, traj=None, backend="matplotlib", show=True):
+    def plot_cost(self, cost, *, of=None, traj=None, renderer="matplotlib", show=True):
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
@@ -85,7 +85,7 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("cost_rate", "cost"), backend=backend, show=show
+            scored, signals=("cost_rate", "cost"), renderer=renderer, show=show
         )
 
     def plot_input_output_map(self, **kwargs):
@@ -93,7 +93,7 @@ class SystemPlotting:
         Convenience shortcut plotting one output component over swept inputs.
 
         Sweeps components of one input port (line, heatmap, or
-        ``show_3d=True`` surface) with every other input pinned at its
+        ``is_3d=True`` surface) with every other input pinned at its
         nominal value. See
         :func:`minilink.graphical.port_map.plot_input_output_map`.
         """
@@ -155,7 +155,7 @@ class SystemPlotting:
 
     def plot_diagram(
         self,
-        filename=None,
+        file_name=None,
         show=True,
         show_inline=None,
         show_pdf=None,
@@ -175,7 +175,7 @@ class SystemPlotting:
         ``display()``, which would draw the figure twice). Bare scripts
         and IPython REPLs open a Matplotlib window with the Graphviz PNG
         (same blocking policy as trajectory plots). Pass ``show_pdf=True``
-        for the legacy OS PDF viewer; pass ``filename`` to write Graphviz
+        for the legacy OS PDF viewer; pass ``file_name`` to write Graphviz
         output to disk; pass ``show=False`` to build the Digraph only.
         Without the Graphviz binary the figure is skipped with a warning and
         ``None`` is returned, so a notebook cell does not fail.
@@ -188,7 +188,7 @@ class SystemPlotting:
             show=show,
             show_inline=show_inline,
             show_pdf=show_pdf,
-            filename=filename,
+            file_name=file_name,
             expand=expand,
         )
 
@@ -208,11 +208,11 @@ class LinearPlotting:
         of=None,
         wrt=None,
         w=None,
-        n=200,
+        n_samples=200,
         margins=True,
         method="auto",
         eps=1e-6,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
         title=None,
     ):
@@ -232,11 +232,11 @@ class LinearPlotting:
             of=of,
             wrt=wrt,
             w=w,
-            n=n,
+            n_samples=n_samples,
             margins=margins,
             method=method,
             eps=eps,
-            backend=backend,
+            renderer=renderer,
             show=show,
             title=title,
         )
@@ -255,7 +255,7 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Root locus of one SISO channel closed with ``u = -K y``.
@@ -278,7 +278,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -295,7 +295,7 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Plot poles and zeros of one SISO channel.
@@ -317,7 +317,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -331,10 +331,10 @@ class LinearPlotting:
         of=None,
         wrt=None,
         tf=None,
-        n=500,
+        n_samples=500,
         method="auto",
         eps=1e-6,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
@@ -353,10 +353,10 @@ class LinearPlotting:
             of=of,
             wrt=wrt,
             tf=tf,
-            n=n,
+            n_samples=n_samples,
             method=method,
             eps=eps,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -372,7 +372,7 @@ class DynamicPlotting(LinearPlotting):
         *,
         x_axis=0,
         y_axis=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
         **kwargs,
     ):
@@ -395,7 +395,7 @@ class DynamicPlotting(LinearPlotting):
             traj,
             x_axis=x_axis,
             y_axis=y_axis,
-            backend=backend,
+            renderer=renderer,
             show=show,
             **kwargs,
         )
@@ -411,7 +411,7 @@ class StepPlotting(LinearPlotting):
         rollout=None,
         *,
         signals=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """
@@ -445,7 +445,7 @@ class StepPlotting(LinearPlotting):
                 if self.sample_period is None
                 else TIME_ABSCISSA_LABEL
             ),
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 

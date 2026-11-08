@@ -151,10 +151,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.planning.dynamic_programming.approximation",
         "LinearApproximator",
     ),
-    "PolicyEvaluator": (
-        "minilink.planning.dynamic_programming.policy_eval",
-        "PolicyEvaluator",
-    ),
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "ReinforcementLearningPlanner": (

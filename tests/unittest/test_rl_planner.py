@@ -158,6 +158,42 @@ def test_neural_policy_controller_normalizes_and_composes():
 # --- planner ---
 
 
+def test_solve_at_another_tree_trains_the_planner_rebuilt_there_from_its_seed():
+    import copy
+
+    prob = problem(horizon=np.inf, discount_rate=0.5)
+    settings = dict(dt=0.1, hidden=(8,), n_envs=2, n_steps=16, batch_size=16)
+    planner = ReinforcementLearningPlanner(prob, n_epochs=2, **settings)
+    tree = copy.deepcopy(planner.params)
+    assert set(tree) == {"method", "seed"}
+    tree["method"]["clip_range"] = 0.1
+    tree["method"]["optimizer"]["learning_rate"] = 1e-3
+    tree["seed"] = 3
+
+    # The tree's planner: built from the keywords, its numbers set, trained from its seed
+    solution = planner.solve(64, params=tree)
+    fresh = ReinforcementLearningPlanner(
+        prob, n_epochs=2, clip_range=0.1, learning_rate=1e-3, seed=3, **settings
+    )
+    expected = fresh.solve(64)
+    for name, W in expected.controller.params["mlp"].items():
+        np.testing.assert_array_equal(solution.controller.params["mlp"][name], W)
+    assert solution.record.n_timesteps == 64
+
+    # This planner as it was: no step taken, its numbers its own, the solution kept
+    assert planner.n_timesteps == 0 and planner.last_solution is solution
+    assert planner.params["method"]["clip_range"] == 0.2
+    assert planner.params["seed"] == 0
+
+    # Its own tree solves as the planner itself does; a number it lacks is refused
+    same = planner.solve(64, params=copy.deepcopy(planner.params))
+    own = ReinforcementLearningPlanner(prob, n_epochs=2, **settings).solve(64)
+    for name, W in own.controller.params["mlp"].items():
+        np.testing.assert_array_equal(same.controller.params["mlp"][name], W)
+    with pytest.raises(ValueError, match="no number"):
+        planner.solve(64, params={**planner.params, "method": {"tau": 0.1}})
+
+
 def test_planner_learns_returns_a_policy_plan_and_a_controller():
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
@@ -167,7 +203,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
     solution = planner.solve(n_timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert solution.record.n_timesteps == 256 and solution.record.algorithm == "PPO"
+    assert solution.record.n_timesteps == 256 and solution.record.method == "PPO"
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.n_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller
@@ -673,8 +709,7 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
     solution = planner.solve(n_timesteps=planner.n_steps * planner.n_envs)
     assert (
-        solution.success
-        and solution.record.algorithm == type(planner.algorithm).__name__
+        solution.success and solution.record.method == type(planner.algorithm).__name__
     )
 
 
@@ -984,7 +1019,8 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
 
     # The problem scores a law: J = Σ γᵏ c_k over 12 ticks from the start
     def score(controller):
-        return problem.run(lambda x, k: np.asarray(controller.action(x)), n_steps=12)
+        law = lambda x, k: np.asarray(controller.action(x))  # noqa: E731
+        return problem.rollout(law, n_steps=12)
 
     untrained = score(planner.actor)
     solution = planner.solve(n_timesteps=5_000)
@@ -993,20 +1029,18 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     assert solution.success and solution.record.reward == "stage"
     assert solution.record.gamma == solution.record.scored_gamma == 0.9
     assert solution.cost_to_go is not None
-    assert trained[3] < untrained[3]
-    assert np.max(np.abs(trained[0][-1] - [5.0, 3.0])) < np.max(
-        np.abs(untrained[0][-1] - [5.0, 3.0])
+    assert trained.signals["cost"][0, -1] < untrained.signals["cost"][0, -1]
+    assert np.max(np.abs(trained.x[:, -1] - [5.0, 3.0])) < np.max(
+        np.abs(untrained.x[:, -1] - [5.0, 3.0])
     )
 
     # Its score is the problem's rollout over the episode, the controller handed out
     # read as a block
     scored = planner.solve(n_timesteps=256, evaluate=True)
     assert scored.evaluation.n_trials == 1 and scored.trajectory is None
-    assert float(scored.evaluation.J[0]) == score(scored.controller)[3]
-    assert (
-        float(problem.run(scored.controller, n_steps=12)[3])
-        == score(scored.controller)[3]
-    )
+    J = score(scored.controller).signals["cost"][0, -1]
+    assert float(scored.evaluation.J[0]) == J
+    assert problem.rollout(scored.controller, n_steps=12).signals["cost"][0, -1] == J
 
 
 def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():

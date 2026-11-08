@@ -9,8 +9,9 @@ from minilink.core.exports import lazy_facade
 #
 # The classical family is ``P``, ``PI``, ``PD``, ``PID`` (one measurement per axis, the
 # derivative filtered) and ``Impedance``, ``IntegralImpedance`` (a
-# measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dof``
-# independent loops, actuator limits that are infinite by default.
+# measured ``[q; dq]``, the rate read), six blocks in one grammar: per-axis gains, ``dim``
+# independent loops (``dof`` joints on the impedances), actuator limits that are infinite
+# by default.
 #
 # The design verbs (``lqr``, ``place``, ``lqg``, ``lqr_finite_horizon``,
 # ``trajectory_lqr``) take a linear model or a plant; their gains (``lqr_gain``,

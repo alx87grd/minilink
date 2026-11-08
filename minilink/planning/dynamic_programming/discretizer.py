@@ -35,10 +35,12 @@ class StateSpaceGrid:
     problem : PlanningProblem
         Source of the system, the state set ``X`` (grid extent and state
         validity), and the input set ``U`` (grid extent and input validity).
-    x_grid_shape : sequence of int
-        Number of levels per state axis, length ``n``.
-    u_grid_shape : sequence of int
-        Number of levels per input axis, length ``m``.
+    x_grid : sequence of int
+        Number of levels per state axis, length ``n`` (kept as
+        :attr:`x_grid_shape`).
+    u_grid : sequence of int
+        Number of levels per input axis, length ``m`` (kept as
+        :attr:`u_grid_shape`).
     dt : float
         Sample period of the successor map, the input held over it.
     solver : {"euler", "rk4"}, optional
@@ -76,8 +78,8 @@ class StateSpaceGrid:
         self,
         problem: PlanningProblem,
         *,
-        x_grid_shape,
-        u_grid_shape,
+        x_grid,
+        u_grid,
         dt: float,
         solver: str = "euler",
         precompute: bool = True,
@@ -96,8 +98,8 @@ class StateSpaceGrid:
         self.solver = solver
 
         # Levels per axis, and the box they span
-        self.x_grid_shape = self.coerce_shape(x_grid_shape, self.n, "x_grid_shape")
-        self.u_grid_shape = self.coerce_shape(u_grid_shape, self.m, "u_grid_shape")
+        self.x_grid_shape = self.coerce_shape(x_grid, self.n, "x_grid")
+        self.u_grid_shape = self.coerce_shape(u_grid, self.m, "u_grid")
 
         x_lb, x_ub = self.state_bounds(problem)
         u_lb, u_ub = self.input_bounds(problem)
@@ -147,8 +149,8 @@ class StateSpaceGrid:
 
         return StateSpaceGrid(
             problem,
-            x_grid_shape=self.x_grid_shape,
-            u_grid_shape=self.u_grid_shape,
+            x_grid=self.x_grid_shape,
+            u_grid=self.u_grid_shape,
             dt=dt,
             solver=self.solver,
             precompute=self.precompute,
@@ -398,9 +400,9 @@ class StateSpaceGrid:
 
         return int(np.ravel_multi_index(index, self.u_grid_shape))
 
-    def slice_2d(self, grid_nd, axis_x: int = 0, axis_y: int = 1, anchor=None):
+    def slice_2d(self, grid_nd, x_axis: int = 0, y_axis: int = 1, anchor=None):
         """
-        Take a 2-D ``(axis_x, axis_y)`` slice of an ``n``-D grid array.
+        Take a 2-D ``(x_axis, y_axis)`` slice of an ``n``-D grid array.
 
         Other axes are pinned to the grid node nearest ``anchor`` (defaulting to
         the problem goal when available, otherwise the grid centre).
@@ -415,26 +417,26 @@ class StateSpaceGrid:
             self.nearest_index(anchor, self.x_lb, self.x_step, self.x_grid_shape)
         )
 
-        # The (axis_x, axis_y) plane through that node
-        nx = self.x_grid_shape[axis_x]
-        ny = self.x_grid_shape[axis_y]
+        # The (x_axis, y_axis) plane through that node
+        nx = self.x_grid_shape[x_axis]
+        ny = self.x_grid_shape[y_axis]
         out = np.empty((nx, ny), dtype=float)
         for i in range(nx):
             for j in range(ny):
-                index[axis_x] = i
-                index[axis_y] = j
+                index[x_axis] = i
+                index[y_axis] = j
                 out[i, j] = grid_nd[tuple(index)]
 
         return out
 
     # Plotting
 
-    def plot_value(self, values, *, show_3d=False, **kwargs):
+    def plot_value(self, values, *, is_3d=False, **kwargs):
         """
-        Draw a node-indexed field on this grid: a heatmap, or a surface with ``show_3d``.
+        Draw a node-indexed field on this grid: a heatmap, or a surface with ``is_3d``.
 
         ``values`` has shape ``(nodes_n,)`` — a cost-to-go, a policy's value, a
-        fitted approximation. Options (``axes``, ``anchor``, ``vmin``, ``vmax``,
+        fitted approximation. Options (``x_axis``, ``y_axis``, ``anchor``, ``vmin``, ``vmax``,
         ``title``, ``show``) are those of
         :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
         """
@@ -444,7 +446,7 @@ class StateSpaceGrid:
         values = np.asarray(values, dtype=float)
 
         # A surface takes no colour limits: the field itself is clipped to [vmin, vmax]
-        if show_3d:
+        if is_3d:
             vmin = kwargs.pop("vmin", None)
             vmax = kwargs.pop("vmax", None)
             if vmin is not None or vmax is not None:
@@ -645,6 +647,6 @@ if __name__ == "__main__":
 
     plant = DoubleIntegrator()
     problem = PlanningProblem(plant, U=plant.input_box)
-    grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(3,), dt=0.1)
     print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
     print("x_next shape:", grid.successors().shape)

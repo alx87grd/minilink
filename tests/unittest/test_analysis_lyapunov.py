@@ -199,8 +199,8 @@ class TestQuadraticCertificate(unittest.TestCase):
         with self.assertRaises(ValueError):
             region_of_attraction(sys, search="sobol")
 
-        grid = region_of_attraction(sys, search="grid", samples=2601)
-        drawn = region_of_attraction(sys, search="random", samples=4000)
+        grid = region_of_attraction(sys, search="grid", n_samples=2601)
+        drawn = region_of_attraction(sys, search="random", n_samples=4000)
         self.assertAlmostEqual(grid.level, drawn.level, delta=0.4 * grid.level)
 
     def test_the_region_draws_inside_the_level_and_repeats_on_a_seed(self):

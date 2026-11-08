@@ -179,6 +179,41 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `HeadingController` are named by their class.
   - *Gone from the examples:* the topic notebooks `topics/reinforcement_learning/drone_ppo` and
     `pendulum_value_iteration_vs_lqr_vs_rl` (GRO860's own copies stay).
+- 2026-11-08 (the API naming sweep, TODO §1.11, built on the branch `api-naming` for `0.4.0`;
+  every notebook migrated in the same commits, no alias):
+  - *Counts.* `n_steps` counts transitions, the textbook `N`; a count of time samples is
+    `n_samples`: `compute_trajectory(n_steps=)` and `Simulator(n_steps=)`, the LQR gain
+    schedule's (`lqr_gain_schedule`, `lqr_finite_horizon`, `LQRPlanner`) and `animate_modal`'s
+    `n_steps=`, and `step_response`, `bode`, `nyquist`, `frequency_response` and their `plot_`
+    twins' `n=` → `n_samples=`; `Source.show_signal(n_pts=)` → `plot_signal(n_samples=)`.
+    Trajectory optimization's `n_steps` counts intervals: a plan has `n_steps + 1` knots, one
+    more than before for the same number (its numbers moved once).
+  - *One keyword per kind of choice.* A plot's or an animation's drawing library is
+    `renderer=` (`backend=` is the array module only), `game(plot_backend=)` and the realtime
+    simulator's → `plot_renderer=`; value iteration's `backend="loop"` → `method="loop"`;
+    RRT's `nearest_backend=` → `nearest_method=`.
+  - *Value iteration's policy evaluation.* The `PolicyEvaluator` class is gone:
+    `planner.evaluate_policy(controller)` returns `J^π` as a `GridField` on the planner's own
+    grid and numbers, read `J_pi(x)` and drawn by `planner.plot_cost_to_go(field=J_pi)`;
+    `DynamicProgrammingResult.value_at` is gone.
+  - *A step problem's run.* `step_problem.run(controller)`, which returned `xs, us, cs, J`, →
+    `step_problem.rollout(controller)`, a `Trajectory` (`x` is `(n, N + 1)`) whose signal
+    `"cost"` is the running cost, `J` its last value (`traj.signals["cost"][0, -1]`).
+  - *Records.* `iterations` → `n_iterations`, the learning records' `algorithm` → `method`,
+    `PlanningSolution.method` → `family`, RRT's `nodes` / `tree_nodes` → `n_nodes` and
+    `RRSearchIteration` → `TreeSearchIteration`, a trajectory-optimization iterate's `max_eq` /
+    `min_ineq` → `max_equality_violation` / `min_inequality_margin`; `**algorithm_kwargs` /
+    `**method_kwargs` → `**method_numbers`.
+  - *Keywords.* `evaluate(..., record=True)` → `trajectories=True`; `StateSpaceGrid(x_grid_shape=,
+    u_grid_shape=)` → `x_grid=`, `u_grid=`; `KinodynamicExtender(n_substeps=)` → `n_steps=`;
+    `Sys2Gym(tf=)` and `env.tf` → `episode_length`; the channel count of the sources, white
+    noise and the PID family, `p=` / `dof=` → `dim=`; `show_3d=` → `is_3d=`; the grid plots'
+    `axes=(i, j)` and `slice_2d(axis_x, axis_y)` → `x_axis=i, y_axis=j`; `plot_diagram(filename=)`
+    → `file_name=`; `LyapunovCertificate.plot(limits=)` → `bounds=`;
+    `animate(time_factor_video=)` → `speed=`; `region_of_attraction(samples=)` → `n_samples=`;
+    `step_info(time, y)` → `step_info(t, y)`; `discretize(system=)` → `sys=`;
+    `RRTPlanner.show_live_search()` is gone for `solve(callback=LiveSearchPlot())`. The RL
+    planner's `solve(params=)` takes the planner's whole tree, as every planner's.
 
 ## 3. Maturity (TRL)
 
@@ -209,7 +244,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions; the joint and task impedance laws on the same error rule), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; the geometric path-tracking laws `PurePursuit`, `Stanley` and `LineOfSight` on a `core/geometry` path, with the heading loop `HeadingController` (forward driving; unit-tested and JAX-traced, three racecar demos and their comparison, not yet in a course); a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.5); the path-tracking laws on a `Track` (A3). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point; a step or sampled system in `z`, the root locus and the step response included, and the four linear plots (`plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`) on continuous, step and sampled systems alike. | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`; `NoiseSource`, sampled noise of any law, `WhiteNoise` its subclass), TF, `MLP`, `UnitDelay`. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.5). |
-| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`loop` / `numpy` / `jax`), lookup controller, `PolicyEvaluator`, `LQRPlanner`; every planner returns a `PlanningSolution` (the controller as handed out, its cost-to-go a `Field`: a `GridField` for value iteration, a `QuadraticField` for LQR); value iteration's two horizons (an infinite one to convergence; a finite one with a law per stage and `J(x, t)`) and the receding `solve_steps`, LQR's finite law past the horizon, discounted LQR; the evidence on the planner's own `dt`; `compare()` reads solutions side by side, and `compare(problem, …, dt=)` scores them on the problem; an inadmissible pair priced by the problem's cost bound; `dp.py` is the textbook reference of the style; the grid reads the problem's step model. | The compiled faces of LQR and value iteration (v0.4's phase 7, [plans-as-policies.md](../plans/plans-as-policies.md)); policy iteration (S51), v0.5. |
+| Planning / policy synthesis (DP) | teaching (GRO860) | 6 | Grid + value iteration (`method="loop"`, or the table on `numpy` / `jax`), lookup controller, policy evaluation (`evaluate_policy`), `LQRPlanner`; every planner returns a `PlanningSolution` (the controller as handed out, its cost-to-go a `Field`: a `GridField` for value iteration, a `QuadraticField` for LQR); value iteration's two horizons (an infinite one to convergence; a finite one with a law per stage and `J(x, t)`) and the receding `solve_steps`, LQR's finite law past the horizon, discounted LQR; the evidence on the planner's own `dt`; `compare()` reads solutions side by side, and `compare(problem, …, dt=)` scores them on the problem; an inadmissible pair priced by the problem's cost bound; `dp.py` is the textbook reference of the style; the grid reads the problem's step model. | The compiled faces of LQR and value iteration (v0.4's phase 7, [plans-as-policies.md](../plans/plans-as-policies.md)); policy iteration (S51), v0.5. |
 | Planning / trajopt | teaching (GRO860) | 5 | Collocation, shooting, multiple shooting; live plot; `success` means defects satisfied to `feasibility_tol`; float64 by default on JAX. | Harden SciPy/Ipopt before TRL 6. |
 | Optimization | teaching (via trajopt) | 5 | `MathematicalProgram` + `Optimizer`, SciPy/Ipopt; the method table (`gd`, `adam`, `l-bfgs`, `method="auto"`) with a first-order backend, `z0` optional (S74); the generic parametric program on the backend table, the stochastic program its case; a native fixed-step solver with `n_iterations=K` as a proof of concept. | Harden SciPy/Ipopt before TRL 6; the friction-aware MPC example from a port (S76's rest, TODO §1.7); native solvers beyond the proof of concept in v0.5 ([native-optimizers.md](../plans/native-optimizers.md)). |
 | Interfaces / RL bridge | research lane (bridge) | 4 | `Sys2Gym` + `SB3Controller`; the env step is one compiled RK4 call. | Keep for external interop; courses solve with the native planner. |

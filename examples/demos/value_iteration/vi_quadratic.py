@@ -33,7 +33,7 @@ planner = DynamicProgrammingPlanner(
     out_of_bound_cost=INF,
 )
 planner.solve(verbose=True)
-planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.plot_cost_to_go(jmax=INF, is_3d=True)
 
 controller = planner.controller
 controller.plot_control_law()  # interpolated law the closed loop actually feels

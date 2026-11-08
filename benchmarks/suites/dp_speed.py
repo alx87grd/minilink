@@ -21,14 +21,14 @@ from benchmarks.baseline import MetricRecord
 from benchmarks.dynamic_programming import benchmark_backend
 
 # Pendulum swing-up on a grid small enough to gate, large enough to be vectorized-bound.
-X_GRID_SHAPE = (101, 101)
-U_GRID_SHAPE = (11,)
+X_GRID = (101, 101)
+U_GRID = (11,)
 N_STEPS = 40
 DT = 0.05
 
 # Tiny workload for the CI smoke run: dispatch-bound, so it gates accuracy, not speedup.
-TINY_X_GRID_SHAPE = (21, 21)
-TINY_U_GRID_SHAPE = (5,)
+TINY_X_GRID = (21, 21)
+TINY_U_GRID = (5,)
 TINY_N_STEPS = 5
 
 # Ceilings for the fast backend against the NumPy reference.
@@ -49,8 +49,8 @@ def run_dp_speed_suite(config: DpSpeedSuiteConfig | None = None) -> list[MetricR
     """Run value-iteration speed and cross-backend gates; return flat metric records."""
     cfg = config or DpSpeedSuiteConfig()
 
-    x_grid_shape = TINY_X_GRID_SHAPE if cfg.tiny else X_GRID_SHAPE
-    u_grid_shape = TINY_U_GRID_SHAPE if cfg.tiny else U_GRID_SHAPE
+    x_grid = TINY_X_GRID if cfg.tiny else X_GRID
+    u_grid = TINY_U_GRID if cfg.tiny else U_GRID
     n_steps = TINY_N_STEPS if cfg.tiny else N_STEPS
 
     # Two runs minimum: the first JAX solve pays compilation, the best one must not
@@ -59,8 +59,8 @@ def run_dp_speed_suite(config: DpSpeedSuiteConfig | None = None) -> list[MetricR
     def timed(backend):
         return benchmark_backend(
             backend,
-            x_grid_shape,
-            u_grid_shape,
+            x_grid,
+            u_grid,
             n_steps=n_steps,
             dt=DT,
             runs=runs,

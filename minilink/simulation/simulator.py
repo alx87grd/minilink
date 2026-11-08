@@ -85,7 +85,7 @@ RK4_AUTO_MIN_TIME_POINTS = 10_000
 
 # Solvers that integrate on the output grid itself (every non-SciPy backend):
 # their automatic dt comes from the plant time constant instead of
-# DEFAULT_N_STEPS.
+# DEFAULT_N_SAMPLES.
 FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
@@ -120,10 +120,10 @@ class Simulator:
         Initial state in :math:`\\mathbb{R}^n`. If ``None``, uses ``sys.x0``.
     t0, tf : float
         Start and end time.
-    n_steps : int, optional
+    n_samples : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
-        Step size when ``n_steps`` is not set. The grid ends at ``tf`` when
+        Step size when ``n_samples`` is not set. The grid ends at ``tf`` when
         ``dt`` divides ``tf - t0``; otherwise its last sample is the first
         step past ``tf``.
     solver : str, optional
@@ -149,7 +149,7 @@ class Simulator:
         *,
         x0=None,  # Initial state; sys.x0 when None
         t0=0,
-        n_steps=None,
+        n_samples=None,
         dt=None,
         solver=None,
         verbose=False,
@@ -163,7 +163,7 @@ class Simulator:
         self.sys = sys
         self.user_solver = solver
         self.user_specified_dt = dt is not None
-        self.auto_time_grid = n_steps is None and dt is None
+        self.auto_time_grid = n_samples is None and dt is None
         self.solver_warnings = solver_warnings
         self.t0 = float(t0)
         self.tf = float(tf)
@@ -184,17 +184,17 @@ class Simulator:
         # first and the grid is sized to it; with an explicit grid the solver
         # may still be chosen from the grid (JAX auto-RK4 on long uniform grids).
         self.t = None
-        self.n_pts = None
+        self.n_samples = None
         self.solver_mode = None
         if self.auto_time_grid:
             self.solver_mode = self.select_solver(sys, solver)
-            self.t, dt, n_steps = self.select_time_vector(
+            self.t, dt, n_samples = self.select_time_vector(
                 t0, tf, None, None, sys, solver_mode=self.solver_mode
             )
-            self.n_pts = len(self.t)
+            self.n_samples = len(self.t)
         else:
-            self.t, dt, n_steps = self.select_time_vector(t0, tf, n_steps, dt, sys)
-            self.n_pts = len(self.t)
+            self.t, dt, n_samples = self.select_time_vector(t0, tf, n_samples, dt, sys)
+            self.n_samples = len(self.t)
             self.solver_mode = self.select_solver(sys, solver)
 
         # The solver backend and its options
@@ -227,7 +227,7 @@ class Simulator:
         Run the simulation over ``self.t``: the nominal input, or ``u`` prescribed.
 
         ``u`` is ``None`` for the constant :math:`\\bar{u}` of the compiled
-        evaluator; else a sampled matrix ``(m, n_pts)``, a function ``u(t)``, a
+        evaluator; else a sampled matrix ``(m, n_samples)``, a function ``u(t)``, a
         constant vector, or a scalar for a one-input system. A sampled input is
         held over each sample period and a function of time is read where the
         solver evaluates ``f``, on every solver; ``input_port_id`` prescribes one
@@ -246,7 +246,7 @@ class Simulator:
         Returns
         -------
         Trajectory
-            State and input time series, ``(n, n_pts)`` and ``(m, n_pts)``.
+            State and input time series, ``(n, n_samples)`` and ``(m, n_samples)``.
         """
         params = self.tree_of(params)
         local, nested = split_record(record)
@@ -269,7 +269,7 @@ class Simulator:
                 **({"record": local} if from_pass else {}),
             )
             m = self.sys.m
-            u_traj = np.zeros((m, self.n_pts))
+            u_traj = np.zeros((m, self.n_samples))
             if m > 0:
                 u_bar = self.evaluator._u_nominal
                 u_traj[:, :] = u_bar.reshape(m, 1)
@@ -329,11 +329,11 @@ class Simulator:
 
     # Solver and time-grid selection
 
-    def select_time_vector(self, t0, tf, n_steps, dt, sys, solver_mode=None):
+    def select_time_vector(self, t0, tf, n_samples, dt, sys, solver_mode=None):
         """
         Build time samples on [t0, tf] and return (time_vector, dt, len).
 
-        Explicit ``n_steps`` or ``dt`` win (``n_steps`` if both are set, with a
+        Explicit ``n_samples`` or ``dt`` win (``n_samples`` if both are set, with a
         logged warning). With neither, the automatic grid depends on the
         solver: fixed-step solvers (:data:`FIXED_STEP_SOLVERS`) integrate on
         the grid, so ``dt`` is :func:`~minilink.core.system.automatic_step_of`:
@@ -341,16 +341,18 @@ class Simulator:
         :data:`~minilink.core.system.AUTO_DT_SCALE`, rounded down to a divisor
         of the sample period when a block holds a signal; adaptive solvers pick
         their own steps, so the grid is only a reporting resolution with
-        :data:`~minilink.simulation.time_grid.DEFAULT_N_STEPS` points.
+        :data:`~minilink.simulation.time_grid.DEFAULT_N_SAMPLES` points.
         """
-        # An adaptive solver picks its own steps: the DEFAULT_N_STEPS reporting grid
+        # An adaptive solver picks its own steps: the DEFAULT_N_SAMPLES reporting grid
         default_dt = None
 
         # A fixed-step solver steps on the grid: Δt = 0.1 τ_min, dividing the hold period
         if solver_mode in FIXED_STEP_SOLVERS:
             default_dt = automatic_step_of(sys.solver_info)
 
-        return build_time_grid(t0, tf, n_steps=n_steps, dt=dt, default_dt=default_dt)
+        return build_time_grid(
+            t0, tf, n_samples=n_samples, dt=dt, default_dt=default_dt
+        )
 
     def select_solver(self, sys, user_solver=None):
         """
@@ -376,7 +378,7 @@ class Simulator:
         if (
             not self.auto_time_grid
             and self.backend == BACKEND_JAX
-            and self.n_pts >= RK4_AUTO_MIN_TIME_POINTS
+            and self.n_samples >= RK4_AUTO_MIN_TIME_POINTS
             and time_grid_is_uniform(self.t)
         ):
             return "rk4_fixedsteps"
@@ -418,7 +420,7 @@ class Simulator:
 
     def recorded_signals(self, x_traj, u_traj, params, local, nested, records):
         """
-        The run's named signals by name, ``(dim, n_pts)`` each, on the run's numbers.
+        The run's named signals by name, ``(dim, n_samples)`` each, on the run's numbers.
 
         ``records`` are the fixed-step run's own, at the start of each step, the
         last sample one more signal pass; without them every saved sample takes
@@ -486,7 +488,7 @@ def split_record(record):
 
 
 def values_at_samples(ev, layout, xs, us, ts, params):
-    """The recorded values at every saved sample, ``(n_pts, r)``: one signal pass each, one ``vmap`` on JAX."""
+    """The recorded values at every saved sample, ``(n_samples, r)``: one signal pass each, one ``vmap`` on JAX."""
     if ev.backend == "jax":
         jax = ev.jax
         at = jax.vmap(
@@ -531,7 +533,7 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         x0=sim.x0,
         t0=sim.t0,
         tf=sim.tf,
-        n_pts=sim.n_pts,
+        n_samples=sim.n_samples,
         dt=sim.dt,
         solver_mode=sim.solver_mode,
         user_solver=sim.user_solver,
@@ -544,7 +546,9 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
 
 def simulator_text(sim):
     """The print text of a simulator: its solver, step and grid, and the system."""
-    headline = f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_pts}"
+    headline = (
+        f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_samples}"
+    )
     body = [body_line("sys", inspect_inline(sim.sys))]
 
     return format_inspect(headline, body)

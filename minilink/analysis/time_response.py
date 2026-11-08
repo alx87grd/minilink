@@ -51,7 +51,7 @@ def step_response(
     of=None,
     wrt=None,
     tf=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -60,10 +60,10 @@ def step_response(
     The response of the linear model, in deviation variables: ``sys`` as is
     when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
     channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
-    defaults to eight times the slowest stable time constant, and ``n``
+    defaults to eight times the slowest stable time constant, and ``n_samples``
     samples span ``[0, tf]``. A step or sampled system's response is its
     difference equation's, ``y_k`` at the ticks ``t_k = k Δ`` within
-    ``[0, tf]`` (``Δ = 1`` for a tick law), and ``n`` is not read. The step of
+    ``[0, tf]`` (``Δ = 1`` for a tick law), and ``n_samples`` is not read. The step of
     the nonlinear loop itself is a
     simulation, ``closed_loop(C, plant, reference=Step(...))`` then
     ``compute_trajectory``, and :func:`step_info` reads its sampled output the
@@ -78,9 +78,9 @@ def step_response(
     if tf is None:
         tf = linear.settling_horizon(A, period)
 
-    # n samples over [0, tf]; a difference equation's ticks t_k = k Δ within it
+    # n_samples samples over [0, tf]; a difference equation's ticks t_k = k Δ within it
     if period is None:
-        time = np.linspace(0.0, float(tf), int(n))
+        time = np.linspace(0.0, float(tf), int(n_samples))
     else:
         time = period * np.arange(np.floor(float(tf) / period + 1e-9) + 1)
 
@@ -90,7 +90,7 @@ def step_response(
     return time, y
 
 
-def step_info(time, y) -> StepInfo:
+def step_info(t, y) -> StepInfo:
     """Rise time, settling time, overshoot, peak and steady state of a sampled step response.
 
     Reads any sampled response: the linear one from :func:`step_response`, or
@@ -99,7 +99,7 @@ def step_info(time, y) -> StepInfo:
     value for a step from rest that neither dips below its start nor overshoots
     by 100 %, and still defined for a response that returns to zero.
     """
-    time = np.asarray(time, dtype=float).reshape(-1)
+    t = np.asarray(t, dtype=float).reshape(-1)
     y = np.asarray(y, dtype=float).reshape(-1)
 
     # Final value y_f: the last sample
@@ -109,7 +109,7 @@ def step_info(time, y) -> StepInfo:
     band = 0.02 * np.max(np.abs(y - y_final))
 
     # Settled when the last fifth of the record stays within the band
-    tail = y[time >= 0.8 * time[-1]]
+    tail = y[t >= 0.8 * t[-1]]
     settled = np.all(np.abs(tail - y_final) <= band)
 
     # Steady state y_ss = y_f, once settled
@@ -118,11 +118,11 @@ def step_info(time, y) -> StepInfo:
     # Peak: the largest |y| and its time
     k_p = int(np.argmax(np.abs(y)))
     y_p = float(y[k_p])
-    t_p = float(time[k_p])
+    t_p = float(t[k_p])
 
     # Settling time t_s: the first sample after the last exit from the band
     outside = np.flatnonzero(np.abs(y - y_final) > band)
-    t_s = first_sample_after(time, outside) if settled else float(np.nan)
+    t_s = first_sample_after(t, outside) if settled else float(np.nan)
 
     # Rise time and overshoot are relative to a final value: none when the response
     # has not settled, or settles at zero (its final value inside the band)
@@ -140,8 +140,8 @@ def step_info(time, y) -> StepInfo:
     progress = np.sign(y_final) * y
 
     # Rise time t_r = t(90 % of y_f) − t(10 % of y_f)
-    t_10 = first_time_reaching(time, progress, 0.1 * abs(y_final))
-    t_90 = first_time_reaching(time, progress, 0.9 * abs(y_final))
+    t_10 = first_time_reaching(t, progress, 0.1 * abs(y_final))
+    t_90 = first_time_reaching(t, progress, 0.9 * abs(y_final))
     t_r = float(t_90 - t_10)
 
     # Overshoot M_p = 100 (max progress − |y_f|) / |y_f| in percent, floored at 0
@@ -167,10 +167,10 @@ def plot_step_response(
     of=None,
     wrt=None,
     tf=None,
-    n: int = 500,
+    n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Step response of the selected channel with rise time, settling time and overshoot.
@@ -181,13 +181,23 @@ def plot_step_response(
     response is drawn as its samples ``y_k``.
     """
     time, y = step_response(
-        sys, x_bar, u_bar, t, params, of=of, wrt=wrt, tf=tf, n=n, method=method, eps=eps
+        sys,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        tf=tf,
+        n_samples=n_samples,
+        method=method,
+        eps=eps,
     )
     info = step_info(time, y)
 
     figure = step_figure(time, y, info, sys, of, wrt, discrete_period(sys))
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 ###############################################################################

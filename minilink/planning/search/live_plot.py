@@ -8,7 +8,7 @@ from dataclasses import dataclass
 
 
 @dataclass
-class RRSearchIteration:
+class TreeSearchIteration:
     """
     One successful tree extension during a search solve.
 
@@ -23,7 +23,7 @@ class RRSearchIteration:
         Whether a goal-region node exists in the tree.
     best_cost : float or None
         Best goal cost-to-come when ``reached_goal``; otherwise ``None``.
-    tree_nodes : int
+    n_nodes : int
         Current tree size.
     planner : RRTPlanner
         Planner whose ``tree`` and ``solution_node`` reflect the live state.
@@ -33,7 +33,7 @@ class RRSearchIteration:
     phase: str
     reached_goal: bool
     best_cost: float | None
-    tree_nodes: int
+    n_nodes: int
     planner: object
 
 
@@ -105,7 +105,7 @@ class LiveSearchPlot:
         """Tree edge line artists from the latest redraw."""
         return list(self._tree_lines)
 
-    def __call__(self, step: RRSearchIteration) -> None:
+    def __call__(self, step: TreeSearchIteration) -> None:
         # One redraw every few extensions, and none before the goal when asked
         if step.iteration % self.every != 0:
             return

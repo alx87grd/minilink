@@ -1,4 +1,4 @@
-"""Time-signal plots: a trajectory's signals, one row per component, on a chosen backend."""
+"""Time-signal plots: a trajectory's signals, one row per component, on a chosen renderer."""
 
 from __future__ import annotations
 
@@ -205,11 +205,11 @@ def plot_time_signals(
     *,
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
     **kwargs,
 ) -> PlotResult:
-    """Plot sampled time signals with the selected backend."""
+    """Plot sampled time signals with the selected renderer."""
     spec = build_signal_plot_spec(
         sys,
         traj,
@@ -217,7 +217,7 @@ def plot_time_signals(
         abscissa_label=abscissa_label,
     )
 
-    key = require_signal_backend(backend)
+    key = require_signal_renderer(renderer)
 
     if key == "matplotlib":
         # A real cycle: matplotlib_backend imports from this module
@@ -241,7 +241,7 @@ def open_time_signal_plot(
     *,
     signals: tuple[str, ...] = ("x", "u"),
     abscissa_label: str = TIME_ABSCISSA_LABEL,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
     **kwargs,
 ) -> LivePlotHandle:
@@ -260,7 +260,7 @@ def open_time_signal_plot(
 
     spec = spec_builder(traj)
 
-    key = require_signal_backend(backend)
+    key = require_signal_renderer(renderer)
 
     if key == "matplotlib":
         # A real cycle: matplotlib_backend imports from this module
@@ -541,15 +541,15 @@ def require_traces(traces):
         raise ValueError("No signal components were selected for plotting.")
 
 
-def require_signal_backend(backend):
-    """Refuse a backend other than ``"matplotlib"`` or ``"plotly"``; return its key."""
-    if not isinstance(backend, str):
-        raise TypeError("Signal plotting backend must be a string.")
+def require_signal_renderer(renderer):
+    """Refuse a renderer other than ``"matplotlib"`` or ``"plotly"``; return its key."""
+    if not isinstance(renderer, str):
+        raise TypeError("Signal plotting renderer must be a string.")
 
-    key = backend.strip().lower()
+    key = renderer.strip().lower()
     if key not in ("matplotlib", "plotly"):
         raise ValueError(
-            f"Unknown signal backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+            f"Unknown signal renderer {renderer!r}. Expected 'matplotlib' or 'plotly'."
         )
 
     return key

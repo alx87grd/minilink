@@ -224,7 +224,7 @@ if __name__ == "__main__":
     sys.compute_trajectory(
         u=lambda t: np.array([1.0, 0.25 * np.sin(t)]),
         tf=5.0,
-        n_steps=160,
+        n_samples=160,
         show=True,
         verbose=False,
     )

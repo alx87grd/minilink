@@ -48,7 +48,7 @@ def test_infinite_horizon_is_the_algebraic_riccati_solution():
     P = solve_continuous_are(A, B, Q, R)
 
     assert isinstance(solution.record, RiccatiRecord) and solution.success
-    assert solution.problem is problem and solution.method == "riccati"
+    assert solution.problem is problem and solution.family == "riccati"
     np.testing.assert_allclose(solution.record.K, lqr_gain(A, B, Q, R))
     np.testing.assert_allclose(solution.record.P, P)
     assert np.all(np.real(solution.record.poles) < 0.0)
@@ -79,10 +79,10 @@ def test_the_record_says_U_ignored_and_nothing_warns(tf):
 
 def test_finite_horizon_is_the_riccati_differential_equation():
     tf, S_f = 2.0, np.diag([5.0, 1.0])
-    planner = LQRPlanner(pendulum_problem(tf=tf, S=S_f), n_steps=201)
+    planner = LQRPlanner(pendulum_problem(tf=tf, S=S_f), n_samples=201)
     solution = planner.solve()
     A, B = planner.linear_model()
-    t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_steps=201)
+    t, K, S = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=201)
 
     assert isinstance(solution.controller, TimeVaryingFeedback)
     assert solution.success and not solution.open_loop
@@ -115,7 +115,7 @@ def test_a_plant_with_noise_ports_is_designed_about_its_command():
         K, lqr(plant, Q_x, R_all[:1, :1], x_bar=x_up).params["K"]
     )
     finite = LQRPlanner(
-        PlanningProblem(plant, cost=cost, horizon=2.0, U=plant.input_box), n_steps=51
+        PlanningProblem(plant, cost=cost, horizon=2.0, U=plant.input_box), n_samples=51
     ).solve()
     assert finite.controller.params["K"].shape == (51, 1, 4)
 

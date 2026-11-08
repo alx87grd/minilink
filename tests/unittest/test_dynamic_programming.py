@@ -20,7 +20,6 @@ from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
 )
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
-from minilink.planning.dynamic_programming.policy_eval import PolicyEvaluator
 from minilink.planning.planner import require_solution
 from minilink.planning.problems import PlanningProblem
 
@@ -56,9 +55,17 @@ def make_pendulum_problem():
     return PlanningProblem(sys, cost=QuadraticCost.from_system(sys), U=sys.input_box)
 
 
+# The backward step's engines: the loop, the table on NumPy, the table on JAX
+ENGINES = {
+    "loop": dict(method="loop"),
+    "numpy": dict(method="table", backend="numpy"),
+    "jax": dict(method="table", backend="jax"),
+}
+
+
 def solve(problem, *, precompute=True, record_history=False, **opt_kwargs):
     grid = StateSpaceGrid(
-        problem, x_grid_shape=(31, 31), u_grid_shape=(7,), dt=0.1, precompute=precompute
+        problem, x_grid=(31, 31), u_grid=(7,), dt=0.1, precompute=precompute
     )
     options = dict(gamma=0.95, tol=0.001, max_iterations=400, **opt_kwargs)
     planner = DynamicProgrammingPlanner(problem, grid=grid, **options)
@@ -73,7 +80,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
         grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+            problem, x_grid=(11, 11), u_grid=(5,), dt=0.1, precompute=False
         )
         self.assertFalse(grid.precomputed)
         DynamicProgrammingPlanner(
@@ -101,13 +108,11 @@ class TestStateSpaceGrid(unittest.TestCase):
             cost=QuadraticCost.from_system(sys),
             U=sys.input_box,
         )
-        grid_np = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
-        )
+        grid_np = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
         grid_jax = StateSpaceGrid(
             problem,
-            x_grid_shape=(11, 11),
-            u_grid_shape=(5,),
+            x_grid=(11, 11),
+            u_grid=(5,),
             dt=0.1,
             precompute_backend="jax",
         )
@@ -116,9 +121,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         self.assertTrue(np.array_equal(grid_np.x_next_ok, grid_jax.x_next_ok))
 
     def test_dimensions_and_meshgrid_order(self):
-        grid = StateSpaceGrid(
-            make_problem(), x_grid_shape=(5, 4), u_grid_shape=(3,), dt=0.1
-        )
+        grid = StateSpaceGrid(make_problem(), x_grid=(5, 4), u_grid=(3,), dt=0.1)
         self.assertEqual(grid.nodes_n, 20)
         self.assertEqual(grid.actions_n, 3)
         self.assertEqual(grid.states.shape, (20, 2))
@@ -126,9 +129,7 @@ class TestStateSpaceGrid(unittest.TestCase):
         self.assertTrue(np.array_equal(grid.grid_from_array(values).ravel(), values))
 
     def test_nearest_lookups(self):
-        grid = StateSpaceGrid(
-            make_problem(), x_grid_shape=(7, 7), u_grid_shape=(5,), dt=0.1
-        )
+        grid = StateSpaceGrid(make_problem(), x_grid=(7, 7), u_grid=(5,), dt=0.1)
         node = grid.nearest_node([0.0, 0.0])
         self.assertTrue(np.allclose(grid.states[node], [0.0, 0.0]))
         action = grid.nearest_action([1.0])
@@ -139,14 +140,14 @@ class TestStateSpaceGrid(unittest.TestCase):
         sys.state.upper_bound = np.array([np.inf, 3.0])
         problem = PlanningProblem(sys, U=sys.input_box)
         with self.assertRaises(ValueError):
-            StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+            StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
 
 
 class TestValueIteration(unittest.TestCase):
     def test_converges(self):
         _, result = solve(make_problem())
         self.assertLess(result.delta, 0.001)
-        self.assertGreater(result.iterations, 1)
+        self.assertGreater(result.n_iterations, 1)
 
     def test_value_zero_at_goal_and_grows_with_distance(self):
         _, result = solve(make_problem())
@@ -171,11 +172,11 @@ class TestValueIteration(unittest.TestCase):
 
     def test_solve_steps_runs_fixed_count(self):
         problem = make_problem()
-        grid = StateSpaceGrid(problem, x_grid_shape=(21, 21), u_grid_shape=(5,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
         planner = DynamicProgrammingPlanner(problem, grid=grid)
         planner.solve_steps(5)
         result = planner.result
-        self.assertEqual(result.iterations, 5)
+        self.assertEqual(result.n_iterations, 5)
 
     def test_out_of_bound_penalty_and_cleanup(self):
         planner, result = solve(make_problem())
@@ -200,7 +201,7 @@ class TestValueIteration(unittest.TestCase):
 
     def test_record_history(self):
         _, result = solve(make_problem(), record_history=True)
-        self.assertEqual(len(result.history), result.iterations + 1)
+        self.assertEqual(len(result.history), result.n_iterations + 1)
 
 
 class TestControllerAndEvaluation(unittest.TestCase):
@@ -252,20 +253,11 @@ class TestControllerAndEvaluation(unittest.TestCase):
         traj = diagram.compute_trajectory(tf=8.0, verbose=False)
         self.assertLess(np.linalg.norm(traj.x[:, -1]), 0.3)
 
-    def test_policy_evaluator_matches_optimal_value(self):
+    def test_policy_evaluation_matches_optimal_value(self):
         problem = make_problem()
         planner, result = solve(problem)
         controller = LookupPolicy(result.grid, result.pi)
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller.action,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        J_pi = evaluator.solve()
+        J_pi = planner.evaluate_policy(controller.action).params["values"].reshape(-1)
         failure_cost = planner.out_of_bound_cost
         feasible = result.J < 0.5 * failure_cost  # The cells clear of the failure_cost
         self.assertLess(np.max(np.abs(J_pi[feasible] - result.J[feasible])), 0.05)
@@ -284,9 +276,7 @@ class TestControllerAndEvaluation(unittest.TestCase):
             problem = PlanningProblem(
                 sys, cost=cost, horizon=tf, X=sys.state.box, U=sys.input_box
             )
-            grid = StateSpaceGrid(
-                problem, x_grid_shape=(3, 3), u_grid_shape=(3,), dt=0.1
-            )
+            grid = StateSpaceGrid(problem, x_grid=(3, 3), u_grid=(3,), dt=0.1)
             failure_cost = grid_failure_cost(grid, 0.9)
             self.assertGreaterEqual(
                 failure_cost, g_max * 0.1 * (1.0 - 0.9**N) / (1.0 - 0.9) * (1 - 1e-12)
@@ -310,7 +300,7 @@ class TestJaxPrecompute(unittest.TestCase):
 
         pytest.importorskip("jax")
         problem = make_pendulum_problem()
-        grid = StateSpaceGrid(problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
         return (problem, grid)
 
     def test_jax_g_table_matches_numpy(self):
@@ -346,7 +336,7 @@ class TestJaxPrecompute(unittest.TestCase):
             U=sys.input_box,
         )
         grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1, precompute=False
+            problem, x_grid=(11, 11), u_grid=(5,), dt=0.1, precompute=False
         )
         DynamicProgrammingPlanner(
             problem,
@@ -365,10 +355,20 @@ class TestBackends(unittest.TestCase):
     @pytest.mark.slow
     def test_loop_matches_numpy(self):
         problem = make_problem()
-        _, loop = solve(problem, backend="loop")
+        _, loop = solve(problem, method="loop")
         _, vectorized = solve(problem, backend="numpy")
         self.assertTrue(np.allclose(loop.J, vectorized.J))
         self.assertTrue(np.array_equal(loop.pi, vectorized.pi))
+
+    def test_the_loop_is_a_method_and_runs_on_numpy_only(self):
+        problem = make_problem()
+        grid = dict(x_grid=(5, 5), u_grid=(3,), dt=0.1)
+        planner = DynamicProgrammingPlanner(problem, method="loop", **grid)
+        self.assertEqual((planner.method, planner.backend), ("loop", "numpy"))
+        with self.assertRaisesRegex(ValueError, "method='table' on JAX"):
+            DynamicProgrammingPlanner(problem, method="loop", backend="jax", **grid)
+        with self.assertRaisesRegex(ValueError, "Unknown backend 'loop'"):
+            DynamicProgrammingPlanner(problem, backend="loop", **grid)
 
     def test_jax_matches_numpy(self):
         import pytest
@@ -394,9 +394,7 @@ class TestBackends(unittest.TestCase):
         problem = make_pendulum_problem()
 
         def planner_of(backend):
-            grid = StateSpaceGrid(
-                problem, x_grid_shape=(11, 11), u_grid_shape=(5,), dt=0.1
-            )
+            grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(5,), dt=0.1)
             return DynamicProgrammingPlanner(
                 problem, grid=grid, backend=backend, gamma=0.95
             )
@@ -427,17 +425,21 @@ class TestBackends(unittest.TestCase):
         for backend in backends:
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(11, 11),
-                u_grid_shape=(5,),
+                x_grid=(11, 11),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
             planner = DynamicProgrammingPlanner(
-                problem, grid=grid, backend=backend, gamma=0.95, clean_infeasible=False
+                problem,
+                grid=grid,
+                gamma=0.95,
+                clean_infeasible=False,
+                **ENGINES[backend],
             )
             tables = planner.value_iteration(4, stop_on_tol=False)
             solution = planner.solve_steps(4)
-            self.assertEqual(tables.iterations, 4, backend)
+            self.assertEqual(tables.n_iterations, 4, backend)
             np.testing.assert_array_equal(tables.J, planner.result.J, err_msg=backend)
             np.testing.assert_array_equal(tables.pi, planner.result.pi)
             self.assertTrue(solution.success)
@@ -451,8 +453,8 @@ class TestBackends(unittest.TestCase):
         for backend in ("numpy", "jax"):
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(31, 31),
-                u_grid_shape=(7,),
+                x_grid=(31, 31),
+                u_grid=(7,),
                 dt=0.1,
                 precompute=False,
             )
@@ -462,7 +464,7 @@ class TestBackends(unittest.TestCase):
             results[backend] = planner.result
 
         numpy_J, jax_J = results["numpy"].J, results["jax"].J
-        self.assertEqual(results["jax"].iterations, 15)
+        self.assertEqual(results["jax"].n_iterations, 15)
         rel_gap = np.max(np.abs(jax_J - numpy_J) / np.maximum(np.abs(numpy_J), 1.0))
         self.assertLess(rel_gap, 1e-2)
         self.assertGreater(np.mean(results["jax"].pi == results["numpy"].pi), 0.98)
@@ -480,8 +482,8 @@ class TestBackends(unittest.TestCase):
         def jax_solve(**workflow):
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(21, 21),
-                u_grid_shape=(5,),
+                x_grid=(21, 21),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
@@ -498,10 +500,10 @@ class TestBackends(unittest.TestCase):
         reported, report = jax_solve(verbose=True)
 
         for result in (recorded, reported):
-            self.assertEqual(result.iterations, device.iterations)
+            self.assertEqual(result.n_iterations, device.n_iterations)
             np.testing.assert_allclose(result.J, device.J, rtol=1e-12, atol=1e-9)
             np.testing.assert_array_equal(result.pi, device.pi)
-        self.assertEqual(len(recorded.history), recorded.iterations + 1)
+        self.assertEqual(len(recorded.history), recorded.n_iterations + 1)
         self.assertIn("Bellman equation solved!", report)
 
     def test_time_varying_dynamics_on_a_grid_rebuilt_each_sweep(self):
@@ -521,12 +523,12 @@ class TestBackends(unittest.TestCase):
             )
             grid = StateSpaceGrid(
                 problem,
-                x_grid_shape=(15, 15),
-                u_grid_shape=(5,),
+                x_grid=(15, 15),
+                u_grid=(5,),
                 dt=0.1,
                 precompute=False,
             )
-            planner = DynamicProgrammingPlanner(problem, grid=grid, backend=backend)
+            planner = DynamicProgrammingPlanner(problem, grid=grid, **ENGINES[backend])
             planner.solve_steps(6)
             return planner.result
 
@@ -612,7 +614,7 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         _, result = solve(make_problem())
         plt.close("all")
         plotting.plot_cost_to_go(
-            result, axes=[(0, 1), (1, 0)], show_3d=True, show=False
+            result, x_axis=[0, 1], y_axis=[1, 0], is_3d=True, show=False
         )
         surfaces = [
             ax
@@ -666,37 +668,22 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         res = controller.plot_control_law(grid_shape=(9, 9), show=False)
         self.assertIsNotNone(res.figure)
 
-    def test_policy_evaluator_accepts_declared_block(self):
+    def test_policy_evaluation_accepts_a_law_a_block_and_a_solution(self):
         problem = make_problem()
-        planner, result = solve(problem)
+        planner, _ = solve(problem)
         controller = planner.controller
-        J_callable = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller.action,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        ).solve()
-        J_block = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        ).solve()
+        J_callable = planner.evaluate_policy(controller.action).params["values"]
+        J_block = planner.evaluate_policy(controller).params["values"]
+        J_solution = planner.evaluate_policy(planner.last_solution).params["values"]
         np.testing.assert_allclose(J_block, J_callable)
+        np.testing.assert_array_equal(J_solution, J_block)
 
-    def test_policy_evaluator_rejects_undeclared_block(self):
+    def test_policy_evaluation_rejects_undeclared_block(self):
         from minilink.blocks.basic import Integrator
 
-        problem = make_problem()
-        _, result = solve(problem)
+        planner, _ = solve(make_problem())
         with self.assertRaisesRegex(ValueError, "reads the state"):
-            PolicyEvaluator(problem, grid=result.grid, policy=Integrator())
+            planner.evaluate_policy(Integrator())
 
 
 class TestFunctionApproximation(unittest.TestCase):
@@ -743,32 +730,29 @@ class TestFunctionApproximation(unittest.TestCase):
         np.testing.assert_allclose(online.w, target, atol=1e-3)
 
 
-class TestPolicyEvaluatorPlots(unittest.TestCase):
-    def test_value_at_and_plots_after_solve(self):
+class TestPolicyEvaluationField(unittest.TestCase):
+    def test_the_policys_cost_to_go_is_a_grid_field_drawn_by_the_planner(self):
         import matplotlib
 
         matplotlib.use("Agg")
+        from minilink.core.fields import GridField
+
         problem = make_problem()
         planner, result = solve(problem)
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=planner.controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        with self.assertRaisesRegex(ValueError, "solve"):
-            evaluator.value_at(np.zeros(2))
-        evaluator.solve()
+        J_pi = planner.evaluate_policy(planner.controller)
+        self.assertIsInstance(J_pi, GridField)
+        self.assertEqual(J_pi.method, planner.interpolation)
+        x = np.zeros(2)
         self.assertAlmostEqual(
-            evaluator.value_at(np.zeros(2)),
-            float(result.grid.interpolate(evaluator.last_J, np.zeros((1, 2)))[0]),
+            float(J_pi(x)),
+            float(result.grid.interpolate(J_pi.params["values"].reshape(-1), [x])[0]),
         )
-        fig, _ = evaluator.plot_cost_to_go(vmax=10.0, show=False)
+        # Past the grid, the failure cost, as on the solution's cost-to-go
+        self.assertEqual(float(J_pi(np.array([1e3, 0.0]))), planner.out_of_bound_cost)
+        fig, _ = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(fig)
-        fig, _ = result.grid.plot_value(evaluator.last_J, show_3d=True, show=False)
+        J = J_pi.params["values"].reshape(-1)
+        fig, _ = result.grid.plot_value(J, is_3d=True, show=False)
         self.assertIsNotNone(fig)
 
 
@@ -784,22 +768,13 @@ class TestCostToGoInterpolation(unittest.TestCase):
         self.assertNotEqual(nearest, linear)
         self.assertEqual(planner.cost_to_go(x[0]), nearest)
         self.assertEqual(planner.last_solution.cost_to_go(x[0]), nearest)
-        self.assertEqual(result.value_at(x[0]), linear)
-        self.assertEqual(result.value_at(x[0], "nearest"), nearest)
+        self.assertEqual(result.grid.field(result.J)(x[0]), linear)
 
-        evaluator = PolicyEvaluator(
-            problem,
-            grid=result.grid,
-            policy=planner.controller,
-            **planner.params["method"],
-            tol=planner.tol,
-            max_iterations=planner.max_iterations,
-            interpolation=planner.interpolation,
-        )
-        evaluator.solve()
-        J = evaluator.last_J
+        J_pi = planner.evaluate_policy(planner.controller)
+        J = J_pi.params["values"].reshape(-1)
+        self.assertEqual(J_pi.method, "nearest")
         self.assertEqual(
-            evaluator.value_at(x[0]), float(result.grid.interpolate(J, x, "nearest")[0])
+            float(J_pi(x[0])), float(result.grid.interpolate(J, x, "nearest")[0])
         )
 
     def test_spline_is_refused_naming_cubic(self):
@@ -851,7 +826,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         ).solve()
         self.assertFalse(capped.success)
         self.assertIn("max_iterations", str(capped.record))
-        self.assertEqual(capped.record.iterations, 2)
+        self.assertEqual(capped.record.n_iterations, 2)
 
         planner = DynamicProgrammingPlanner(
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05, tol=1.0, max_iterations=500
@@ -871,7 +846,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
             problem, x_grid=(11, 11), u_grid=(3,), dt=0.05
         ).solve_steps(3, evaluate=True)
         self.assertTrue(fixed.success)
-        self.assertEqual(fixed.record.iterations, 3)
+        self.assertEqual(fixed.record.n_iterations, 3)
         self.assertEqual(
             fixed.evaluation.n_trials, 1
         )  # a deterministic problem: one trial
@@ -899,9 +874,7 @@ class TestDpOneObjectSetup(unittest.TestCase):
         from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         problem = self._problem()
-        grid = StateSpaceGrid(
-            problem, x_grid_shape=(11, 11), u_grid_shape=(3,), dt=0.05
-        )
+        grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(3,), dt=0.05)
         with self.assertRaises(ValueError):
             DynamicProgrammingPlanner(problem, grid=grid, dt=0.05)
         with self.assertRaises(ValueError):
@@ -961,10 +934,10 @@ class TestInfeasibleCostPrice(unittest.TestCase):
             x_grid=(11, 11),
             u_grid=(5,),
             dt=0.1,
-            backend=backend,
             gamma=0.95,
             tol=1e-3,
             max_iterations=200,
+            **ENGINES[backend],
             **kwargs,
         )
 
@@ -1028,21 +1001,13 @@ class TestInfeasibleCostPrice(unittest.TestCase):
         table = self.planner(exit_failure_cost)
         loop = self.planner(exit_failure_cost, "loop")
         table.solve()
-        loop.solve_steps(table.result.iterations)
+        loop.solve_steps(table.result.n_iterations)
         np.testing.assert_allclose(loop.result.J, table.result.J)
         # the charged exits, not the 1e6 default, bound the cost-to-go
         self.assertLess(np.max(table.result.J), 1.0e3)
 
-        evaluator = PolicyEvaluator(
-            table.problem,
-            grid=table.grid,
-            policy=table.controller.action,
-            **table.params["method"],
-            tol=table.tol,
-            max_iterations=table.max_iterations,
-            interpolation=table.interpolation,
-        )
-        J_pi = evaluator.solve()
+        J_pi = table.evaluate_policy(table.controller.action).params["values"]
+        J_pi = J_pi.reshape(-1)
         self.assertLess(np.max(np.abs(J_pi - table.result.J)), 0.05)
 
     def test_jax_table_charges_the_failure_cost(self):
@@ -1078,7 +1043,7 @@ class TestDpFlatConstructor(unittest.TestCase):
             cost=QuadraticCost.from_system(sys),
             U=sys.input_box,
         )
-        grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+        grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
         nested = DynamicProgrammingPlanner(
             problem,
             grid=grid,
@@ -1110,7 +1075,7 @@ def test_grid_exposes_the_boxes_it_spans():
 
     plant = DoubleIntegrator()
     problem = PlanningProblem(plant, U=plant.input_box)
-    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
+    grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
     np.testing.assert_allclose(grid.X.lower, [-2.0, -3.0])
     np.testing.assert_allclose(grid.X.upper, [2.0, 3.0])
     np.testing.assert_allclose(grid.U.box.lower, [-1.0])
@@ -1132,8 +1097,8 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
     for solver in ("euler", "rk4"):
         grid = StateSpaceGrid(
             problem,
-            x_grid_shape=(5, 5),
-            u_grid_shape=(3,),
+            x_grid=(5, 5),
+            u_grid=(3,),
             dt=0.1,
             solver=solver,
             precompute=False,
@@ -1141,7 +1106,7 @@ def test_the_grid_steps_through_the_step_model_euler_by_default():
         expected = discretize(plant, 0.1, solver=solver).step(x, u)
         np.testing.assert_allclose(grid.successor(x, u, 0.0), expected, rtol=1e-14)
     euler = StateSpaceGrid(
-        problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1, precompute=False
+        problem, x_grid=(5, 5), u_grid=(3,), dt=0.1, precompute=False
     )
     np.testing.assert_allclose(euler.successor(x, u, 0.0), x + 0.1 * plant.f(x, u))
 
@@ -1182,17 +1147,14 @@ def test_the_grid_and_its_planner_read_one_owner_of_the_sets():
     from minilink.core.sets import BoxSet
 
     problem = make_problem()
-    grid = StateSpaceGrid(problem, x_grid_shape=(5, 5), u_grid_shape=(3,), dt=0.1)
-    policy = lambda x: np.zeros(1)  # noqa: E731
+    grid = StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
 
     # The same sets on a derived problem: one owner still
     same_sets = problem.replace(discount_rate=0.5)
     DynamicProgrammingPlanner(same_sets, grid=grid)
-    PolicyEvaluator(same_sets, grid=grid, policy=policy)
 
-    # Other sets: the loop and table engines, and the evaluator, would read two owners
+    # Other sets: the loop and table engines, and the policy evaluation, would
+    # read two owners
     other = problem.replace(U=BoxSet([-0.5], [0.5]))
     with pytest.raises(ValueError, match="another problem's X or U"):
         DynamicProgrammingPlanner(other, grid=grid)
-    with pytest.raises(ValueError, match="another problem's X or U"):
-        PolicyEvaluator(other, grid=grid, policy=policy)

@@ -79,14 +79,12 @@ def make_steering_extender(*, max_distance=1.0, resolution=0.05, speed=1.0):
     )
 
 
-def make_kinodynamic_extender(*, horizon=0.6, n_substeps=6, n_primitives=8):
+def make_kinodynamic_extender(*, horizon=0.6, n_steps=6, n_primitives=8):
     primitives = [
         np.array([np.cos(a), np.sin(a)])
         for a in np.linspace(0.0, 2.0 * np.pi, n_primitives, endpoint=False)
     ]
-    return KinodynamicExtender(
-        controls=primitives, horizon=horizon, n_substeps=n_substeps
-    )
+    return KinodynamicExtender(controls=primitives, horizon=horizon, n_steps=n_steps)
 
 
 def run_scene_intro():
@@ -194,7 +192,7 @@ def run_extender_comparison():
     problem = problem.replace(Xf=BallSet(X_GOAL, EXTENDER_GOAL_TOLERANCE))
     extenders = {
         "steering": make_steering_extender(max_distance=0.6, resolution=0.05),
-        "kinodynamic": make_kinodynamic_extender(horizon=0.6, n_substeps=6),
+        "kinodynamic": make_kinodynamic_extender(horizon=0.6, n_steps=6),
     }
 
     planners = {}

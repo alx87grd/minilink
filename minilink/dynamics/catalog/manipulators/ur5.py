@@ -599,7 +599,7 @@ if __name__ == "__main__":
     sys.compute_trajectory(
         u=lambda t: np.zeros(6),
         tf=3.0,
-        n_steps=120,
+        n_samples=120,
         backend="jax",
     )
     sys.animate(renderer="meshcat", is_3d=True)

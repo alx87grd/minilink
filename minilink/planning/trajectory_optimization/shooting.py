@@ -139,7 +139,7 @@ class ShootingTranscription(Transcription):
 
     def decision_dimension(self, problem: PlanningProblem) -> int:
         """Return the input-only decision-vector dimension."""
-        return int(problem.sys.m * self.options.n_steps)
+        return int(problem.sys.m * self.options.n_knots)
 
     def pack(self, u: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Pack sampled input knots into one decision vector."""
@@ -147,14 +147,14 @@ class ShootingTranscription(Transcription):
 
     def unpack(self, z: np.ndarray, problem: PlanningProblem) -> np.ndarray:
         """Unpack a decision vector into sampled input knots."""
-        return z.reshape(problem.sys.m, self.options.n_steps)
+        return z.reshape(problem.sys.m, self.options.n_knots)
 
     def decision_bounds(
         self, problem: PlanningProblem
     ) -> tuple[np.ndarray, np.ndarray]:
         """Build box bounds for input-knot decision variables."""
         n_z = self.decision_dimension(problem)
-        n_steps = self.options.n_steps
+        n_knots = self.options.n_knots
 
         # Unbounded, unless the input set has a bounding box
         lower = np.full(n_z, -np.inf)
@@ -163,8 +163,8 @@ class ShootingTranscription(Transcription):
         # u_min ≤ u_k ≤ u_max at every knot: each input's bound along its row of z
         U_box = problem.U.bounding_box()
         if U_box is not None:
-            lower[:] = np.repeat(U_box.lower, n_steps)
-            upper[:] = np.repeat(U_box.upper, n_steps)
+            lower[:] = np.repeat(U_box.lower, n_knots)
+            upper[:] = np.repeat(U_box.upper, n_knots)
 
         return lower, upper
 
@@ -208,12 +208,12 @@ class ShootingTranscription(Transcription):
         cost = require_cost(problem)
         grid = jnp.asarray(self.options.offsets(problem))
         dt = jnp.asarray(self.options.dt(problem))
-        n_steps = int(self.options.n_steps)
+        n_knots = int(self.options.n_knots)
         m = int(problem.sys.m)
 
         # The input knots packed in z, one input's row after another
         def unpack_jax(z):
-            return z.reshape(m, n_steps)
+            return z.reshape(m, n_knots)
 
         # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0 = x0, scanned over the intervals
         def rollout(u, params):
@@ -386,14 +386,14 @@ class ShootingTranscription(Transcription):
         xp = array_module(u)
 
         n = int(problem.sys.n)
-        n_steps = self.options.n_steps
+        N = self.options.n_steps
         t = self.options.t(problem)
         dt = self.options.dt(problem)
 
-        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0
+        # x_{k+1} = RK4(x_k, u_k, u_{k+1}) from x_0, k = 0 … N − 1
         x_k = xp.asarray(x0).reshape(n)
         x_samples = [x_k]
-        for k in range(n_steps - 1):
+        for k in range(N):
             x_k = step_body(f, x_k, u[:, k], u[:, k + 1], float(t[k]), dt, "rk4", 1)
             x_samples.append(x_k)
 

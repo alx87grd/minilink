@@ -101,8 +101,5 @@ Dynamic programming
 .. automodule:: minilink.planning.dynamic_programming.lqr
    :members:
 
-.. automodule:: minilink.planning.dynamic_programming.policy_eval
-   :members:
-
 .. automodule:: minilink.planning.dynamic_programming.approximation
    :members:

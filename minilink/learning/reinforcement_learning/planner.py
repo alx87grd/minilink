@@ -37,7 +37,7 @@ from minilink.learning.reinforcement_learning.policy import (
     SquashedGaussianHead,
 )
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.planner import Planner, planner_evidence
+from minilink.planning.planner import Planner, planner_at, planner_evidence
 from minilink.planning.results import PlanningSolution
 from minilink.planning.step_model import is_continuous
 
@@ -96,9 +96,9 @@ class ReinforcementLearningPlanner(Planner):
         ``activation`` and ``normalize`` on the problem's plant.
     method : str or Algorithm
         ``"reinforce"``, ``"actor_critic"``, ``"ppo"`` (on-policy) or
-        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; keyword
-        arguments not listed here go to the algorithm (``learning_rate``,
-        ``n_epochs``, ``tau``, ...).
+        ``"sac"`` (off-policy), or an :class:`Algorithm` instance; its numbers,
+        ``**method_numbers``, are the keywords not listed here
+        (``learning_rate``, ``n_epochs``, ``tau``, ...).
     n_envs, n_steps : int
         Plants simulated in parallel and control periods per collection (an
         episodic method collects one episode length instead of ``n_steps``).
@@ -158,10 +158,33 @@ class ReinforcementLearningPlanner(Planner):
         training_zone=None,
         reward="running",
         seed=0,
-        **algorithm_kwargs,
+        **method_numbers,
     ):
         super().__init__(problem)
         jax = require_jax()
+
+        # The keywords as given, the law and the update rule as they were before any
+        # learning: what rebuilds this planner on another tree (build_kwargs)
+        self.keywords = dict(
+            dt=dt,
+            policy=copy.deepcopy(policy),
+            features=features,
+            hidden=hidden,
+            activation=activation,
+            normalize=normalize,
+            method=copy.deepcopy(method),
+            n_envs=n_envs,
+            n_steps=n_steps,
+            episode_length=episode_length,
+            gamma=gamma,
+            log_std_init=log_std_init,
+            solver=solver,
+            substeps=substeps,
+            training_zone=training_zone,
+            reward=reward,
+            seed=seed,
+            **method_numbers,
+        )
 
         # Training settings
         self.n_envs = int(n_envs)
@@ -188,7 +211,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The update rule, and its collection length: one whole episode for an
         # episodic method
-        self.algorithm = self.build_algorithm(method, algorithm_kwargs)
+        self.algorithm = self.build_algorithm(method, method_numbers)
         self.n_steps = (
             self.env.n_steps_per_episode if self.algorithm.episodic else int(n_steps)
         )
@@ -273,13 +296,26 @@ class ReinforcementLearningPlanner(Planner):
         The planner's tree: ``"method"``, the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
 
         The numbers are read when the update is first traced: set them on the
-        algorithm before learning. The problem's own leaves are the problem's
-        (the score is always the problem's).
+        algorithm before learning, or solve at another tree
+        (``solve(params=)``). The problem's own leaves are the problem's (the
+        score is always the problem's). The network's weights are learned,
+        never a number of the tree.
         """
         return {"method": self.algorithm.method_params, "seed": self.seed}
 
+    @property
+    def number_names(self) -> tuple:
+        """The names under :attr:`params` ``["method"]``: the update rule's numbers, its optimizer's under ``"optimizer"``."""
+        return tuple(self.algorithm.method_params)
+
     def solve(
-        self, n_timesteps=100_000, *, evaluate=False, n_trials=50, verbose=False
+        self,
+        n_timesteps=100_000,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose=False,
     ) -> PlanningSolution:
         """
         Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
@@ -289,7 +325,18 @@ class ReinforcementLearningPlanner(Planner):
         ``n_trials`` draws of the problem (a continuous problem's integrated on
         the planner's ``dt``, a step problem's on its model). ``verbose``
         prints the environment's semantics and one line per learning iteration.
+        ``params`` (the complete tree of :attr:`params`, a copy edited) trains
+        a planner rebuilt there (:func:`~minilink.planning.planner.planner_at`)
+        from its seed, its weights learned from their initial draw; this
+        planner is unchanged.
         """
+        # At another tree: the planner there, trained from its seed, its solution kept here
+        if params is not None:
+            solution = planner_at(self, params).solve(
+                n_timesteps, evaluate=evaluate, n_trials=n_trials, verbose=verbose
+            )
+            return self.store_solution(solution)
+
         # Train, then store the learned law as the planner's solution
         self.learn(n_timesteps, verbose=verbose)
         solution = self.solution(evaluate, n_trials)
@@ -334,6 +381,41 @@ class ReinforcementLearningPlanner(Planner):
                 self.print_iteration(record, stats)
 
         return self
+
+    def build_kwargs(self) -> dict:
+        """The keywords that rebuild this planner on another tree: those it was given, its law and update rule as they were before learning."""
+        kwargs = {
+            name: copy.deepcopy(value) if name in ("policy", "method") else value
+            for name, value in self.keywords.items()
+        }
+
+        return kwargs
+
+    def rebuilt_on(self, problem, kwargs) -> "ReinforcementLearningPlanner":
+        """
+        This planner on ``problem`` from ``kwargs``: the method's numbers set on the new update rule before it learns.
+
+        The discount ``gamma`` is a keyword (it sets the environment's rate); the
+        update rule's other numbers, and its optimizer's under ``"optimizer"``,
+        are written on the rebuilt algorithm, read at its first update.
+        """
+        numbers = set(self.number_names) - {"gamma"}
+        keywords = {
+            name: value for name, value in kwargs.items() if name not in numbers
+        }
+        planner = type(self)(problem, **keywords)
+
+        # The method's numbers the tree sets, on the new algorithm and its optimizer
+        algorithm = planner.algorithm
+        for name in numbers & set(kwargs):
+            value = kwargs[name]
+            if name == "optimizer":
+                for key, number in value.items():
+                    setattr(algorithm.optimizer, key, float(number))
+            else:
+                setattr(algorithm, name, float(value))
+
+        return planner
 
     def sync_actor(self):
         """Copy the current policy network weights into the actor block."""
@@ -409,13 +491,13 @@ class ReinforcementLearningPlanner(Planner):
                 f"criterion={criterion!r} is only reported by evaluate"
             )
 
-    def build_algorithm(self, method, algorithm_kwargs):
+    def build_algorithm(self, method, method_numbers):
         """An algorithm instance as given, or the named one built from the keyword arguments."""
         if isinstance(method, Algorithm):
             return method
 
         if method in ALGORITHMS:
-            return ALGORITHMS[method](**algorithm_kwargs)
+            return ALGORITHMS[method](**method_numbers)
 
         raise ValueError(f"method must be one of {sorted(ALGORITHMS)} or an Algorithm")
 
@@ -637,7 +719,7 @@ class ReinforcementLearningPlanner(Planner):
         ]
 
         return ReinforcementLearningRecord(
-            algorithm=type(self.algorithm).__name__,
+            method=type(self.algorithm).__name__,
             n_timesteps=self.n_timesteps,
             train_time_s=self.train_time,
             cost=-self.last_ep_return_mean,
@@ -676,7 +758,7 @@ class ReinforcementLearningRecord:
     ``"stage"`` (``−c_k``); the score is always the problem's cost.
     """
 
-    algorithm: str
+    method: str
     n_timesteps: int
     train_time_s: float
     cost: float
@@ -704,7 +786,7 @@ class ReinforcementLearningRecord:
     def __str__(self) -> str:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
-            f"{self.algorithm}: {self.n_timesteps} plant steps in "
+            f"{self.method}: {self.n_timesteps} plant steps in "
             f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
         )

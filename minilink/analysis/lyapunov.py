@@ -36,7 +36,7 @@ def region_of_attraction(
     method: str = "quadratic",
     Q=None,
     window=None,
-    samples: int = None,
+    n_samples: int = None,
     search: str = "auto",
 ) -> LyapunovCertificate:
     """
@@ -71,7 +71,7 @@ def region_of_attraction(
         Box the sublevel search covers. The default searches twice, first on
         the natural scale of ``V`` and then on a box sized to that answer, so
         the samples land where the level is decided.
-    samples : int, optional
+    n_samples : int, optional
         Sampling budget per pass (default ``201**2`` in one or two states,
         50 000 above).
     search : {"auto", "grid", "random"}
@@ -120,19 +120,19 @@ def region_of_attraction(
     # above, inside the model's state box
     domain = sys.state.box
     search = ("grid" if n <= 2 else "random") if search == "auto" else search
-    samples = (201**2 if n <= 2 else 50_000) if samples is None else int(samples)
+    n_samples = (201**2 if n <= 2 else 50_000) if n_samples is None else int(n_samples)
 
     # c = the largest sampled level whose sublevel set holds only V̇ < 0. One pass
     # on the natural scale of V, then a second on a box sized to its answer: the
     # level is decided by the samples nearest its own boundary.
     box = natural_window(x_bar, P, domain) if window is None else as_box(window)
     level, limiting, spread = search_level(
-        box, x_bar, P, f_many, domain, samples, search
+        box, x_bar, P, f_many, domain, n_samples, search
     )
     if window is None:
         box = level_window(x_bar, P, level, domain)
         refined, refined_limiting, refined_spread = search_level(
-            box, x_bar, P, f_many, domain, samples, search
+            box, x_bar, P, f_many, domain, n_samples, search
         )
 
         # A finer sweep only ever tightens the claim
@@ -280,7 +280,7 @@ class LyapunovCertificate:
         The sublevel search is only as good as its coverage, and coverage
         thins out fast with the number of states. When this is ``True`` the
         level is an optimistic guess rather than a sharp estimate: raise
-        ``samples``, narrow ``window``, or read it as indicative only.
+        ``n_samples``, narrow ``window``, or read it as indicative only.
         """
         return self.sample_spread > 0.1
 
@@ -348,7 +348,7 @@ class LyapunovCertificate:
         verified: int = 0,
         trajectories=(),
         n: int = 201,
-        limits=None,
+        bounds=None,
         ax=None,
         show: bool = True,
     ):
@@ -362,7 +362,7 @@ class LyapunovCertificate:
             verified=verified,
             trajectories=trajectories,
             n=n,
-            limits=limits,
+            bounds=bounds,
             ax=ax,
             show=show,
         )
@@ -418,7 +418,7 @@ def plot_region_of_attraction(
     verified: int = 0,
     trajectories=(),
     n: int = 201,
-    limits=None,
+    bounds=None,
     ax=None,
     show: bool = True,
 ):
@@ -443,17 +443,17 @@ def plot_region_of_attraction(
     where the draw lies on the plane.
     ``trajectories`` is a sequence of initial states to overlay.
 
-    ``limits`` is an explicit ``((x_min, x_max), (y_min, y_max))`` window;
+    ``bounds`` is an explicit ``((x_min, x_max), (y_min, y_max))`` window;
     the default frames the slices being drawn.
     """
     # Lazy import: matplotlib loads on first use, not with the analysis
     import matplotlib.pyplot as plt
 
     # The default window: two and a half times the slice, not its shadow
-    if limits is None:
+    if bounds is None:
         center = certificate.x_bar[[x_axis, y_axis]]
         half = 2.5 * certificate.slice_extent(x_axis, y_axis)
-        limits = (
+        bounds = (
             (center[0] - half[0], center[0] + half[0]),
             (center[1] - half[1], center[1] + half[1]),
         )
@@ -465,7 +465,7 @@ def plot_region_of_attraction(
         ax,
         x_axis,
         y_axis,
-        limits,
+        bounds,
         basin=basin,
         detail=detail,
         verified=verified,
@@ -561,7 +561,7 @@ EVEN = slice(0, None, 2)
 ODD = slice(1, None, 2)
 
 
-def search_level(window, x_bar, P, f_many, domain, samples, search):
+def search_level(window, x_bar, P, f_many, domain, n_samples, search):
     """
     Largest sampled level ``c`` whose sublevel set only holds decreasing states.
 
@@ -576,7 +576,7 @@ def search_level(window, x_bar, P, f_many, domain, samples, search):
     spread near zero, while in many states the samples thin out and the
     halves disagree (see :attr:`LyapunovCertificate.sample_limited`).
     """
-    states, on_face = sample_box(window, samples, search)
+    states, on_face = sample_box(window, n_samples, search)
     d = states - x_bar
 
     # V = dᵀ P d and V̇ = 2 dᵀ P f(x) at every sample
@@ -608,7 +608,7 @@ def search_level(window, x_bar, P, f_many, domain, samples, search):
     return level, limiting_state, spread
 
 
-def sample_box(window: BoxSet, samples: int, search: str):
+def sample_box(window: BoxSet, n_samples: int, search: str):
     """Return ``(states, on_face)``: points filling the box, flagged on its faces."""
     lower = window.lower
     upper = window.upper
@@ -616,7 +616,7 @@ def sample_box(window: BoxSet, samples: int, search: str):
 
     # A regular grid: its outer layer lies on the faces
     if search == "grid":
-        per_axis = max(3, int(round(samples ** (1.0 / n))))
+        per_axis = max(3, int(round(n_samples ** (1.0 / n))))
         axes = [np.linspace(lower[i], upper[i], per_axis) for i in range(n)]
         mesh = np.meshgrid(*axes, indexing="ij")
         states = np.stack([m.ravel() for m in mesh], axis=1)
@@ -629,11 +629,11 @@ def sample_box(window: BoxSet, samples: int, search: str):
     from scipy.stats import qmc
 
     # A Halton sequence fills the interior, its first point (the lower corner) dropped
-    unit = qmc.Halton(d=n, scramble=False).random(int(samples) + 1)[1:]
+    unit = qmc.Halton(d=n, scramble=False).random(int(n_samples) + 1)[1:]
     interior = lower + unit * (upper - lower)
 
     # A tenth as many points on the faces: snap one coordinate to a bound
-    faces = interior[: max(2 * n, int(samples) // 10)].copy()
+    faces = interior[: max(2 * n, int(n_samples) // 10)].copy()
     which = np.arange(faces.shape[0]) % n
     side = (np.arange(faces.shape[0]) // n) % 2
     faces[np.arange(faces.shape[0]), which] = np.where(
@@ -721,7 +721,7 @@ def draw_region(
     ax,
     x_axis,
     y_axis,
-    limits,
+    bounds,
     *,
     basin,
     detail,
@@ -738,8 +738,8 @@ def draw_region(
     from minilink.simulation.simulator import Simulator
 
     # The slice: the two swept states over the window, the others at the equilibrium
-    grid_x = np.linspace(limits[0][0], limits[0][1], n)
-    grid_y = np.linspace(limits[1][0], limits[1][1], n)
+    grid_x = np.linspace(bounds[0][0], bounds[0][1], n)
+    grid_y = np.linspace(bounds[1][0], bounds[1][1], n)
     GX, GY = np.meshgrid(grid_x, grid_y)
     states = np.tile(cert.x_bar, (GX.size, 1))
     states[:, x_axis] = GX.ravel()

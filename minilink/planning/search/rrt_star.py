@@ -70,7 +70,7 @@ class RRTStarPlanner(RRTPlanner):
         edge_resolution: float | None = None,
         max_sample_attempts: int = 100,
         return_best_effort: bool = True,
-        nearest_backend: str = "brute_force",
+        nearest_method: str = "brute_force",
         radius_constant: float | None = None,
         rewire_eta: float | None = None,
         rewire: bool = True,
@@ -88,7 +88,7 @@ class RRTStarPlanner(RRTPlanner):
             edge_resolution=edge_resolution,
             max_sample_attempts=max_sample_attempts,
             return_best_effort=return_best_effort,
-            nearest_backend=nearest_backend,
+            nearest_method=nearest_method,
         )
 
         # The rewiring: its radius constant and longest connection, and its switch
@@ -138,7 +138,7 @@ class RRTStarPlanner(RRTPlanner):
             return self.store_solution(solution)
 
         metric = self.metric
-        self.require_nearest_backend()
+        self.require_nearest_method()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -153,7 +153,7 @@ class RRTStarPlanner(RRTPlanner):
         # The tree, rooted at the start
         self.tree = Tree(
             Node(x=x0, parent=None, edge=None, cost=0.0),
-            nearest_backend=self.nearest_backend,
+            nearest_method=self.nearest_method,
         )
         self.reached_goal = False
         self.solution_node = None

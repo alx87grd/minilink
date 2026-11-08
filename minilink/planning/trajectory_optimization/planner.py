@@ -92,7 +92,8 @@ class TrajectoryOptimizationPlanner(Planner):
             String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``, ``\"single_shooting\"`` (box-bounded: the native methods solve it).
             Teach demos should pass the string explicitly.
         n_steps : int, optional
-            Knot count when ``transcription`` is omitted or a string preset.
+            The intervals ``N`` of the grid on the horizon (``N + 1`` knots)
+            when ``transcription`` is omitted or a string preset.
             Required in those cases; ignored when a ``Transcription`` instance
             already carries its grid (must not conflict if also passed).
         method, backend, n_iterations, use_hessian, feasibility_tol, guess
@@ -111,7 +112,7 @@ class TrajectoryOptimizationPlanner(Planner):
         super().__init__(problem)
         require_cost(self.problem)
 
-        # Discretization: a transcription instance, or a preset on n_steps knots
+        # Discretization: a transcription instance, or a preset on n_steps intervals
         self.transcription = resolve_transcription(transcription, n_steps)
 
         # Structure
@@ -314,7 +315,7 @@ class TrajectoryOptimizationPlanner(Planner):
             cost=optimization_result.cost,
             solver_success=bool(optimization_result.success),
             message=str(optimization_result.message),
-            iterations=dict(optimization_result.stats).get("nit"),
+            n_iterations=dict(optimization_result.stats).get("nit"),
             solve_time_s=optimization_result.solve_time_s,
             feasibility_tol=float(self.feasibility_tol),
             max_equality_violation=float(max_eq),
@@ -507,8 +508,8 @@ class TrajectoryOptimizationPlanner(Planner):
             z=z.copy(),
             trajectory=trajectory,
             cost=cost,
-            max_eq=max_eq,
-            min_ineq=min_ineq,
+            max_equality_violation=max_eq,
+            min_inequality_margin=min_ineq,
         )
 
     def trajectory_solution(
@@ -596,7 +597,7 @@ class TrajectoryOptimizationRecord:
     cost: float | None
     solver_success: bool
     message: str
-    iterations: int | None
+    n_iterations: int | None
     solve_time_s: float | None
     feasibility_tol: float
     max_equality_violation: float | None
@@ -633,8 +634,8 @@ class TrajectoryOptimizationRecord:
             check += f" (max defect {self.max_equality_violation:.2g})"
 
         solver = f"solver {'ok' if self.solver_success else 'stopped'}: {self.message}"
-        if self.iterations is not None:
-            solver += f", {self.iterations} iterations"
+        if self.n_iterations is not None:
+            solver += f", {self.n_iterations} iterations"
         if self.solve_time_s is not None:
             solver += f", {self.solve_time_s:.3g} s"
 
@@ -649,8 +650,8 @@ class TrajectoryOptimizationIteration:
     z: np.ndarray
     trajectory: Trajectory
     cost: float
-    max_eq: float
-    min_ineq: float | None
+    max_equality_violation: float
+    min_inequality_margin: float | None
 
 
 def warm_bound_form(optimizer) -> None:
@@ -680,7 +681,7 @@ def resolve_transcription(
     transcription: Transcription | str | None,
     n_steps: int | None,
 ) -> Transcription:
-    """The transcription passed in, or a preset (direct collocation by default) on ``n_steps`` knots."""
+    """The transcription passed in, or a preset (direct collocation by default) on ``n_steps`` intervals."""
     if isinstance(transcription, Transcription):
         if n_steps is not None:
             existing = getattr(getattr(transcription, "options", None), "n_steps", None)
@@ -696,8 +697,8 @@ def resolve_transcription(
             "n_steps is required when transcription is omitted or a string preset."
         )
     n_steps = int(n_steps)
-    if n_steps < 2:
-        raise ValueError(f"n_steps must be >= 2; got {n_steps}.")
+    if n_steps < 1:
+        raise ValueError(f"n_steps must be >= 1; got {n_steps}.")
 
     name = "direct_collocation" if transcription is None else str(transcription)
     if name == "direct_collocation":

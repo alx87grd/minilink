@@ -189,7 +189,7 @@ class TabularLearningPlanner(Planner):
 
         A cell never visited keeps its initial value, zero: the optimistic
         start that makes untried actions worth trying (``visits`` tells which).
-        Its ``iterations`` counts the episodes learned so far (value iteration's
+        Its ``n_iterations`` counts the episodes learned so far (value iteration's
         counts sweeps), ``delta`` is ``nan``.
         """
         grid = self.grid
@@ -201,7 +201,7 @@ class TabularLearningPlanner(Planner):
         pi = Q.argmin(axis=1)
 
         return DynamicProgrammingResult(
-            grid=grid, J=J, pi=pi, iterations=n_episodes, delta=float("nan")
+            grid=grid, J=J, pi=pi, n_iterations=n_episodes, delta=float("nan")
         )
 
     def solve(
@@ -363,7 +363,7 @@ class TabularLearningPlanner(Planner):
         history = self.history
         visits = self.visits
         Q = self.Q
-        algorithm = type(self.algorithm).__name__
+        method = type(self.algorithm).__name__
 
         # Coverage: the fraction of the nodes with at least one visited cell
         visited_fraction = float(np.mean(visits.sum(axis=1) > 0))
@@ -375,7 +375,7 @@ class TabularLearningPlanner(Planner):
         table_finite = bool(np.all(np.isfinite(Q)))
 
         return TabularLearningRecord(
-            algorithm=algorithm,
+            method=method,
             n_episodes=len(history),
             visited_fraction=visited_fraction,
             cost=cost,
@@ -477,9 +477,9 @@ class TabularLearningPlanner(Planner):
 
 @dataclass(frozen=True)
 class TabularLearningRecord:
-    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``iterations`` the episodes, ``n_episodes``)."""
+    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``)."""
 
-    algorithm: str
+    method: str
     n_episodes: int
     visited_fraction: float
     cost: float
@@ -498,7 +498,7 @@ class TabularLearningRecord:
 
     def __str__(self) -> str:
         return (
-            f"{self.algorithm}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
+            f"{self.method}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
             f"the grid visited, mean episode cost {self.cost:.2f} at the end"
         )
 

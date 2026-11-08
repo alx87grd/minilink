@@ -48,19 +48,19 @@ class KinodynamicExtender(TrajectoryExtender):
         ``"bang-bang"`` (default): the corners of the box ``problem.U`` plus
         its centre, so every planner call works from the input bounds alone.
     horizon : float
-        Edge duration; the control is held over ``n_substeps`` of ``dt = horizon / n_substeps``.
-    n_substeps : int
+        Edge duration; the control is held over ``n_steps`` of ``dt = horizon / n_steps``.
+    n_steps : int
         Integration steps per edge.
     """
 
     def __init__(
-        self, controls="bang-bang", *, horizon: float = 0.3, n_substeps: int = 6
+        self, controls="bang-bang", *, horizon: float = 0.3, n_steps: int = 6
     ) -> None:
-        # The controls, and the edge's duration split into n_substeps steps of dt
+        # The controls, and the edge's duration split into n_steps steps of dt
         self.controls = controls
         self.horizon = float(horizon)
-        self.n_substeps = int(n_substeps)
-        self.dt = self.horizon / self.n_substeps
+        self.n_steps = int(n_steps)
+        self.dt = self.horizon / self.n_steps
 
         # Memory: the NumPy evaluator of the last system, compiled once per system
         self._evaluator = None
@@ -84,8 +84,8 @@ class KinodynamicExtender(TrajectoryExtender):
         return edges
 
     def rollout(self, evaluator, from_state, u, params=None) -> Edge:
-        """Hold ``u`` over the horizon: ``n_substeps`` RK4 steps of ``dt``."""
-        N = self.n_substeps
+        """Hold ``u`` over the horizon: ``n_steps`` RK4 steps of ``dt``."""
+        N = self.n_steps
         dt = self.dt
         T = self.horizon
 

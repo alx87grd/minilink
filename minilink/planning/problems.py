@@ -642,7 +642,7 @@ class PlanningProblem:
         ``substeps`` is the plant's steps per base period, ``None`` the
         automatic step (``problem.compile(mpc % 0.2, substeps=20)``). The
         problem on a clock is its discretization, ``problem.discretize(dt)``,
-        whose ``transition`` and ``run`` answer its step equations.
+        whose ``transition`` and ``rollout`` answer its step equations.
         """
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator
@@ -663,7 +663,7 @@ class PlanningProblem:
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
         ``N = horizon / dt``, ``γ = e^{−ρ dt}``; it answers its own equations,
-        ``transition(x, u, k, params) -> (x_next, c_k)``, ``terminal`` and ``run``.
+        ``transition(x, u, k, params) -> (x_next, c_k)``, ``terminal`` and ``rollout``.
         """
         # Lazy import: the step problem imports this module
         from minilink.planning.step_problems import discretize_problem

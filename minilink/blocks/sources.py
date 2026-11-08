@@ -26,15 +26,15 @@ class Source(System):
     ``WhiteNoise(port="d")``), which is how ``autowire`` finds it.
     """
 
-    def __init__(self, p, *, port="y"):
+    def __init__(self, dim, *, port="y"):
         super().__init__()
 
         # Parameters
-        self.params = {"value": np.zeros(p)}
+        self.params = {"value": np.zeros(dim)}
 
         # Ports: the one output, ``y`` by default, or the input it drives (``port="r"``)
         self.port = port
-        self.add_output_port(port, dim=p, function=self.h)
+        self.add_output_port(port, dim=dim, function=self.h)
 
     @property
     def dim(self):
@@ -48,7 +48,7 @@ class Source(System):
 
         return value
 
-    def show_signal(self, t0=None, tf=None, n_pts=1000, ax=None):
+    def plot_signal(self, t0=None, tf=None, n_samples=1000, ax=None):
         """
         Plot the source output signal over a time range.
 
@@ -58,7 +58,7 @@ class Source(System):
             Start time (default 0.0).
         tf : float, optional
             End time (default 10.0).
-        n_pts : int, optional
+        n_samples : int, optional
             Number of evaluation points used for plotting.
         ax : matplotlib.axes.Axes, optional
             Existing axis to draw on. If None, a new figure is created and shown
@@ -85,11 +85,11 @@ class Source(System):
             t0 = 0.0
         if tf is None:
             tf = 10.0
-        require_plot_points(n_pts)
+        require_plot_points(n_samples)
 
         # The signal sampled on the time grid, one row per channel
         p = self.dim
-        t = np.linspace(t0, tf, int(n_pts))
+        t = np.linspace(t0, tf, int(n_samples))
         y = np.zeros((p, t.size), dtype=float)
         empty_x = np.array([])
         empty_u = np.array([])
@@ -318,21 +318,21 @@ class WhiteNoise(NoiseSource):
     """
 
     def __init__(
-        self, p=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
+        self, dim=1, *, psd=1.0, sample_period=0.01, seed=0, hold="zoh", port="y"
     ):
         require_one_of("hold", hold, self.HOLDS)
         require_seed(seed)
         require_positive_period(sample_period)
 
         # The per-sample law is derived in h from the intensity: the shell is Source's
-        Source.__init__(self, p, port=port)
+        Source.__init__(self, dim, port=port)
         self.hold = hold
 
         # Parameters: the realization's seed, the sample period Δ and the intensity W
         self.params = {
             "seed": seed,
             "sample_period": float(sample_period),
-            "psd": as_intensity(psd, p),
+            "psd": as_intensity(psd, dim),
         }
 
     @property
@@ -436,10 +436,10 @@ class TrajectorySource(Source):
 ###############################################################################
 
 
-def require_plot_points(n_pts):
+def require_plot_points(n_samples):
     """Refuse a time grid of fewer than two points."""
-    if n_pts < 2:
-        raise ValueError("n_pts must be >= 2")
+    if n_samples < 2:
+        raise ValueError("n_samples must be >= 2")
 
 
 def require_matching_levels(initial_value, final_value):
@@ -503,11 +503,11 @@ def require_sample_shape(values, t):
 
 if __name__ == "__main__":
     noise = WhiteNoise(1, psd=0.01, sample_period=0.01, seed=1)
-    fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+    fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
     ax.set_title("Baseline")
 
     # The intensity is fixed: a longer period holds smaller samples for longer
     for period in (0.05, 0.2, 1.0):
         noise.params["sample_period"] = period
-        fig, ax = noise.show_signal(t0=-2.0, tf=12.0)
+        fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
         ax.set_title(f"sample_period = {period}")

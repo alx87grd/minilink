@@ -33,7 +33,7 @@ planner = DynamicProgrammingPlanner(
 )
 planner.solve(verbose=True)
 
-planner.plot_cost_to_go(jmax=INF, show_3d=True)
+planner.plot_cost_to_go(jmax=INF, is_3d=True)
 planner.plot_control_law()
 
 controller = planner.controller

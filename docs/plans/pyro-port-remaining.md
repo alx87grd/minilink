@@ -376,7 +376,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | DynamicProgramming | DynamicProgrammingPlanner | `minilink/planning/dynamic_programming/dp.py` |
 | DynamicProgrammingWithLookUpTable | same planner + lookup | `minilink/planning/dynamic_programming/dp.py` |
 | LookUpTableController | LookupPolicy | `minilink/planning/dynamic_programming/lookup_policy.py` |
-| PolicyEvaluator | PolicyEvaluator | `minilink/planning/dynamic_programming/policy_eval.py` |
+| PolicyEvaluator | `DynamicProgrammingPlanner.evaluate_policy` | `minilink/planning/dynamic_programming/dp.py` |
 | Planner | Planner | `minilink/planning/planner.py` |
 | RRT | RRTPlanner, RRTStarPlanner | `minilink/planning/search/` |
 | DirectCollocationTrajectoryOptimisation | TrajectoryOptimizationPlanner (DirectCollocationTranscription, ShootingTranscription, MultipleShootingTranscription) | `minilink/planning/trajectory_optimization/` |

@@ -75,7 +75,7 @@ class TestJunction(unittest.TestCase):
         np.testing.assert_allclose(_poles(T), _poles(feedback(L)), atol=1e-9)
 
     def test_vector_loop_uses_a_vector_junction(self):
-        T = PID(Kp=[3.0, 5.0], dof=2) @ _TwoInTwoOut()
+        T = PID(Kp=[3.0, 5.0], dim=2) @ _TwoInTwoOut()
         self.assertEqual(list(T.subsystems), ["controller", "plant", "error"])
         self.assertEqual(T.subsystems["error"].dim, 2)
         self.assertEqual(T.inputs["r"].dim, 2)
@@ -425,8 +425,8 @@ class TestLoopInputs(unittest.TestCase):
         outside.add_subsystem(closed_loop(C, self.H), "loop")
         outside.connect("reference", "y", "loop", "r")
         np.testing.assert_allclose(
-            inside.compute_trajectory(tf=4.0, n_steps=201).x,
-            outside.compute_trajectory(tf=4.0, n_steps=201).x,
+            inside.compute_trajectory(tf=4.0, n_samples=201).x,
+            outside.compute_trajectory(tf=4.0, n_samples=201).x,
             atol=1e-9,
         )
 

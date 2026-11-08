@@ -151,8 +151,8 @@ class TestPlanningArchitecture(unittest.TestCase):
             U=sys.input_box,
         )
         options = DirectCollocationOptions(n_steps=5)
-        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 5))
-        self.assertAlmostEqual(options.dt(problem), 0.5)
+        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 6))
+        self.assertAlmostEqual(options.dt(problem), 0.4)
         self.assertNotIn("tf", options.__dataclass_fields__)
         unset = PlanningProblem(
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
@@ -351,8 +351,8 @@ class TestPlanningArchitecture(unittest.TestCase):
         program = to.transcription.transcribe(problem, backend=to.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
-        self.assertEqual(program.n_z, 15)
-        self.assertEqual(program_evaluator.n_h, 12)
+        self.assertEqual(program.n_z, 18)  # (n + m) × 6 knots
+        self.assertEqual(program_evaluator.n_h, 14)  # 2 × 5 defects + 4 boundary rows
 
     def test_direct_collocation_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
@@ -430,7 +430,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "numpy")
-        self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
+        self.assertEqual(planner.last_program.n_z, problem.sys.m * 6)  # 6 knots
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
@@ -450,7 +450,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "numpy")
-        self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
+        self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 6)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
@@ -489,7 +489,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         program = transcription.transcribe(problem, backend="direct")
         z0 = transcription.pack_initial_guess(problem, guess)
-        self.assertEqual(program.n_z, 5)
+        self.assertEqual(program.n_z, 6)  # N = 5 intervals, 6 input knots
         np.testing.assert_allclose(z0, guess.u.reshape(-1))
         self.assertEqual(program.metadata["backend"], "direct")
 
@@ -517,8 +517,8 @@ class TestPlanningArchitecture(unittest.TestCase):
                 z=np.zeros(1),
                 trajectory=traj0,
                 cost=1.0,
-                max_eq=0.0,
-                min_ineq=None,
+                max_equality_violation=0.0,
+                min_inequality_margin=None,
             )
         )
         fig_id = id(callback.fig)
@@ -529,8 +529,8 @@ class TestPlanningArchitecture(unittest.TestCase):
                 z=np.zeros(1),
                 trajectory=traj1,
                 cost=0.5,
-                max_eq=0.0,
-                min_ineq=None,
+                max_equality_violation=0.0,
+                min_inequality_margin=None,
             )
         )
         self.assertEqual(id(callback.fig), fig_id)
@@ -726,8 +726,8 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
         return np.atleast_1d(scalar(z))
 
     g = inequalities(scalar)
-    # 4 state knots + 4 input knots + 1 terminal state, one margin each
-    assert g.shape == (9,)
+    # 5 state knots + 5 input knots + 1 terminal state, one margin each (N = 4)
+    assert g.shape == (11,)
     np.testing.assert_array_equal(g, inequalities(vector))
 
 
@@ -735,7 +735,7 @@ class TestRrtFlatConstructor(unittest.TestCase):
     def test_flat_matches_options(self):
         problem, _ = make_holonomic_obstacle_problem()
         extender = KinodynamicExtender(
-            controls=[np.array([1.0, 0.0])], horizon=0.5, n_substeps=4
+            controls=[np.array([1.0, 0.0])], horizon=0.5, n_steps=4
         )
         nested = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
         flat = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
@@ -777,7 +777,7 @@ def test_kdtree_nearest_and_near_match_brute_force():
     rng = np.random.default_rng(0)
     brute = Tree(Node(np.array([0.0, 0.0]), None, None, 0.0))
     kd = Tree(
-        Node(np.array([0.0, 0.0]), None, None, 0.0), nearest_backend=NEAREST_KD_TREE
+        Node(np.array([0.0, 0.0]), None, None, 0.0), nearest_method=NEAREST_KD_TREE
     )
     for _ in range(40):
         x = rng.uniform(-5.0, 5.0, size=2)
@@ -805,15 +805,15 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=4000,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     solution = planner.solve()
     traj = solution.trajectory
     assert planner.reached_goal and solution.success
-    assert solution.record.reached_goal and solution.record.nodes == len(
+    assert solution.record.reached_goal and solution.record.n_nodes == len(
         planner.tree.nodes
     )
     assert (
@@ -838,21 +838,21 @@ def test_kdtree_requires_euclidean_metric():
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
         metric=dubins.distance,
         seed=0,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     with pytest.raises(ValueError, match="metric=euclidean"):
         planner.solve()
 
 
-def test_unknown_nearest_backend_raises():
+def test_unknown_nearest_method_raises():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
-        nearest_backend="invalid",
+        nearest_method="invalid",
     )
-    with pytest.raises(ValueError, match="nearest_backend"):
+    with pytest.raises(ValueError, match="nearest_method"):
         planner.solve()
 
 
@@ -860,7 +860,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
     problem, X = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=4000,
     )
@@ -878,7 +878,7 @@ def test_kinodynamic_random_controls_reaches_goal():
     problem = problem.replace(Xf=BallSet(problem.goal_point(), 0.6))
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=12, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=12, horizon=0.6, n_steps=6),
         seed=1,
         max_nodes=6000,
     )
@@ -894,9 +894,7 @@ def test_seeded_run_is_deterministic():
         return (
             RRTPlanner(
                 problem,
-                extender=KinodynamicExtender(
-                    controls=COMPASS, horizon=0.6, n_substeps=6
-                ),
+                extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
                 seed=7,
                 max_nodes=4000,
             )
@@ -1032,7 +1030,7 @@ def test_reached_goal_false_on_budget_exhaustion():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=10,
         goal_bias=0.0,
@@ -1046,7 +1044,7 @@ def test_return_best_effort_false_raises():
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
         problem,
-        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6),
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
         max_nodes=5,
         goal_bias=0.0,
@@ -1226,7 +1224,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=4000,
-        nearest_backend="kd_tree",
+        nearest_method="kd_tree",
     )
     traj = planner.solve().trajectory
     assert planner.reached_goal
@@ -2428,7 +2426,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
     np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
     assert face.record.cost == solved.record.cost
-    assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
+    assert pv.n_z == 3 * 12 + 1 and z[-1] == 0.0  # the 12 knots, then the origin
     assert set(pv.params) >= {"x0", "t0", "plant", "cost"}
 
     # The plan's command is its input at t; shifted, it is the same plan read later
@@ -2537,7 +2535,7 @@ def test_every_planner_has_one_tree_shape():
 def test_an_unseeded_search_is_reproducible():
     """RRT's seed defaults to 0, as every other planner's: two runs grow one tree."""
     problem, _ = make_holonomic_obstacle_problem()
-    extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_substeps=6)
+    extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6)
     trees = []
     for _ in range(2):
         planner = RRTPlanner(problem, extender=extender, max_nodes=200)
