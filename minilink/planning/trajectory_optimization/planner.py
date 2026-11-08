@@ -92,7 +92,8 @@ class TrajectoryOptimizationPlanner(Planner):
             String presets: ``\"direct_collocation\"``, ``\"multiple_shooting\"``, ``\"single_shooting\"`` (box-bounded: the native methods solve it).
             Teach demos should pass the string explicitly.
         n_steps : int, optional
-            Knot count when ``transcription`` is omitted or a string preset.
+            The intervals ``N`` of the grid on the horizon (``N + 1`` knots)
+            when ``transcription`` is omitted or a string preset.
             Required in those cases; ignored when a ``Transcription`` instance
             already carries its grid (must not conflict if also passed).
         method, backend, n_iterations, use_hessian, feasibility_tol, guess
@@ -111,7 +112,7 @@ class TrajectoryOptimizationPlanner(Planner):
         super().__init__(problem)
         require_cost(self.problem)
 
-        # Discretization: a transcription instance, or a preset on n_steps knots
+        # Discretization: a transcription instance, or a preset on n_steps intervals
         self.transcription = resolve_transcription(transcription, n_steps)
 
         # Structure
@@ -680,7 +681,7 @@ def resolve_transcription(
     transcription: Transcription | str | None,
     n_steps: int | None,
 ) -> Transcription:
-    """The transcription passed in, or a preset (direct collocation by default) on ``n_steps`` knots."""
+    """The transcription passed in, or a preset (direct collocation by default) on ``n_steps`` intervals."""
     if isinstance(transcription, Transcription):
         if n_steps is not None:
             existing = getattr(getattr(transcription, "options", None), "n_steps", None)
@@ -696,8 +697,8 @@ def resolve_transcription(
             "n_steps is required when transcription is omitted or a string preset."
         )
     n_steps = int(n_steps)
-    if n_steps < 2:
-        raise ValueError(f"n_steps must be >= 2; got {n_steps}.")
+    if n_steps < 1:
+        raise ValueError(f"n_steps must be >= 1; got {n_steps}.")
 
     name = "direct_collocation" if transcription is None else str(transcription)
     if name == "direct_collocation":

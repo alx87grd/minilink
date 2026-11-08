@@ -151,8 +151,8 @@ class TestPlanningArchitecture(unittest.TestCase):
             U=sys.input_box,
         )
         options = DirectCollocationOptions(n_steps=5)
-        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 5))
-        self.assertAlmostEqual(options.dt(problem), 0.5)
+        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 6))
+        self.assertAlmostEqual(options.dt(problem), 0.4)
         self.assertNotIn("tf", options.__dataclass_fields__)
         unset = PlanningProblem(
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
@@ -351,8 +351,8 @@ class TestPlanningArchitecture(unittest.TestCase):
         program = to.transcription.transcribe(problem, backend=to.backend)
         z0 = to.transcription.pack_initial_guess(problem, guess)
         program_evaluator = compile_program_evaluator(program, sample_z=z0)
-        self.assertEqual(program.n_z, 15)
-        self.assertEqual(program_evaluator.n_h, 12)
+        self.assertEqual(program.n_z, 18)  # (n + m) × 6 knots
+        self.assertEqual(program_evaluator.n_h, 14)  # 2 × 5 defects + 4 boundary rows
 
     def test_direct_collocation_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
@@ -430,7 +430,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "numpy")
-        self.assertEqual(planner.last_program.n_z, problem.sys.m * 5)
+        self.assertEqual(planner.last_program.n_z, problem.sys.m * 6)  # 6 knots
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
@@ -450,7 +450,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         traj = planner.solve().trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "numpy")
-        self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 5)
+        self.assertEqual(planner.last_program.n_z, (problem.sys.n + problem.sys.m) * 6)
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
@@ -489,7 +489,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         program = transcription.transcribe(problem, backend="direct")
         z0 = transcription.pack_initial_guess(problem, guess)
-        self.assertEqual(program.n_z, 5)
+        self.assertEqual(program.n_z, 6)  # N = 5 intervals, 6 input knots
         np.testing.assert_allclose(z0, guess.u.reshape(-1))
         self.assertEqual(program.metadata["backend"], "direct")
 
@@ -726,8 +726,8 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
         return np.atleast_1d(scalar(z))
 
     g = inequalities(scalar)
-    # 4 state knots + 4 input knots + 1 terminal state, one margin each
-    assert g.shape == (9,)
+    # 5 state knots + 5 input knots + 1 terminal state, one margin each (N = 4)
+    assert g.shape == (11,)
     np.testing.assert_array_equal(g, inequalities(vector))
 
 
@@ -2428,7 +2428,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
     np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
     assert face.record.cost == solved.record.cost
-    assert pv.n_z == 3 * 11 + 1 and z[-1] == 0.0  # the knots, then the origin
+    assert pv.n_z == 3 * 12 + 1 and z[-1] == 0.0  # the 12 knots, then the origin
     assert set(pv.params) >= {"x0", "t0", "plant", "cost"}
 
     # The plan's command is its input at t; shifted, it is the same plan read later

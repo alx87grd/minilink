@@ -77,6 +77,7 @@ RETIRED = {
     "solve_policy": ("solve", None),
     "N": ("n_steps", ("StepPlanningProblem",)),
     "n_samples": ("n_rollouts", ("MPPIPlanner",)),
+    "n_steps": ("n_samples, the gain schedule's samples", ("LQRPlanner",)),
     "solver": ("record", ("PlanningSolution",)),
     "algorithm": ("method", ("ReinforcementLearningPlanner", "TabularLearningPlanner")),
     "alpha": (

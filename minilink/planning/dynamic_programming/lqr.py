@@ -97,8 +97,8 @@ class LQRPlanner(Planner):
         Sampling period of the score's continuous loop (``solve(evaluate=True)``),
         the grid it is integrated and recorded on; a reporting choice, the law
         is continuous.
-    n_steps : int, optional
-        Samples of the finite-horizon gain schedule ``K(t)``.
+    n_samples : int, optional
+        Samples of the finite-horizon gain schedule ``K(t)``, both ends included.
     t : float, optional
         Time at which the Jacobians are evaluated.
     method : {"auto", "fd", "jax"}, optional
@@ -116,7 +116,7 @@ class LQRPlanner(Planner):
         x_bar=None,
         u_bar=None,
         dt: float = 0.01,
-        n_steps: int = 1001,
+        n_samples: int = 1001,
         t: float = 0.0,
         method: str = "auto",
         eps: float = 1e-6,
@@ -135,7 +135,7 @@ class LQRPlanner(Planner):
 
         # The rollout's period, the schedule's samples, the linearization options
         self.dt = float(dt)
-        self.n_steps = int(n_steps)
+        self.n_samples = int(n_samples)
         self.t = float(t)
         self.method = method
         self.eps = float(eps)
@@ -160,7 +160,7 @@ class LQRPlanner(Planner):
 
         problem = self.problem
         sys = problem.sys
-        n_steps = self.n_steps
+        n_samples = self.n_samples
         dt = self.dt
         rho = problem.discount_rate
 
@@ -183,7 +183,7 @@ class LQRPlanner(Planner):
 
             # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(T) = S_f,
             # and K(t) = R⁻¹ Bᵀ S(t), on the problem's clock t0 … t0 + T
-            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, T, n_steps=n_steps)
+            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, T, n_steps=n_samples)
             t = problem.t0 + s
 
             # Past the horizon, the stationary law at the operating point: K∞ of
@@ -250,7 +250,11 @@ class LQRPlanner(Planner):
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem: the schedule and the linearization, the operating point it was given."""
         kwargs = dict(
-            dt=self.dt, n_steps=self.n_steps, t=self.t, method=self.method, eps=self.eps
+            dt=self.dt,
+            n_samples=self.n_samples,
+            t=self.t,
+            method=self.method,
+            eps=self.eps,
         )
 
         return {**kwargs, **self.given}

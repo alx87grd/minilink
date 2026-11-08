@@ -98,8 +98,8 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         tree = edited(pv.params, {"x0": np.array([0.35])})
         z, status = pv.solve(tree)
         traj = pv.solution(z, params=tree, status=status).trajectory
-        self.assertEqual(traj.x.shape, (1, 5))
-        self.assertEqual(traj.u.shape, (1, 5))
+        self.assertEqual(traj.x.shape, (1, 6))
+        self.assertEqual(traj.u.shape, (1, 6))
         np.testing.assert_allclose(traj.x[:, 0], [0.35], atol=1e-05)
 
         # The next tick from the last plan, a new start
@@ -159,7 +159,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         plan = pv.solution(z, params=tree, status=status)
         rebuilt = self.make_planner(problem_of(0.5, t0=3.0)).solve()
         np.testing.assert_allclose(plan.trajectory.x, rebuilt.trajectory.x, atol=1e-6)
-        np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 5))
+        np.testing.assert_allclose(plan.trajectory.t, 3.0 + np.linspace(0.0, 1.0, 6))
         self.assertLessEqual(plan.trajectory.x.max(), 0.5 + 1e-6)
 
         # A moved ball takes its own bounds: none of the compile-time box stays

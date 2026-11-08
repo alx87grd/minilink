@@ -150,9 +150,9 @@ class DirectCollocationTranscription(Transcription):
         """Return the packed decision-vector dimension for ``problem``."""
         n = problem.sys.n
         m = problem.sys.m
-        n_steps = self.options.n_steps
+        n_knots = self.options.n_knots
 
-        n_z = int((n + m) * n_steps)
+        n_z = int((n + m) * n_knots)
 
         return n_z
 
@@ -172,12 +172,12 @@ class DirectCollocationTranscription(Transcription):
         """Unpack a decision vector into sampled ``(x, u)`` matrices."""
         n = int(problem.sys.n)
         m = int(problem.sys.m)
-        n_steps = self.options.n_steps
+        n_knots = self.options.n_knots
 
         # The states row by row, then the inputs
-        split = n * n_steps
-        x = z[:split].reshape(n, n_steps)
-        u = z[split:].reshape(m, n_steps)
+        split = n * n_knots
+        x = z[:split].reshape(n, n_knots)
+        u = z[split:].reshape(m, n_knots)
 
         return x, u
 
@@ -210,7 +210,7 @@ class DirectCollocationTranscription(Transcription):
         stay in the bounds).
         """
         n = int(problem.sys.n)
-        n_steps = self.options.n_steps
+        n_knots = self.options.n_knots
         n_z = self.decision_dimension(problem)
 
         lower = np.full(n_z, -np.inf)
@@ -219,15 +219,15 @@ class DirectCollocationTranscription(Transcription):
         # The state box on every state knot
         X_box = box_bounds(problem.X, BoxSet, boxes_only)
         if X_box is not None:
-            lower[: n * n_steps] = np.repeat(X_box.lower, n_steps)
-            upper[: n * n_steps] = np.repeat(X_box.upper, n_steps)
+            lower[: n * n_knots] = np.repeat(X_box.lower, n_knots)
+            upper[: n * n_knots] = np.repeat(X_box.upper, n_knots)
 
         # The input box on every input knot
         U_box = box_bounds(problem.U, BoxInputSet, boxes_only)
         if U_box is not None:
-            start = n * n_steps
-            lower[start:] = np.repeat(U_box.lower, n_steps)
-            upper[start:] = np.repeat(U_box.upper, n_steps)
+            start = n * n_knots
+            lower[start:] = np.repeat(U_box.lower, n_knots)
+            upper[start:] = np.repeat(U_box.upper, n_knots)
 
         return lower, upper
 
@@ -396,7 +396,7 @@ class DirectCollocationTranscription(Transcription):
         return equalities, inequalities
 
     def knot_offsets(self, problem: PlanningProblem, xp):
-        """The knots' offsets from the horizon's start, ``linspace(0, tf, N)``: ``t_k = t0 + offset_k``."""
+        """The knots' offsets from the horizon's start, ``linspace(0, tf, N + 1)``: ``t_k = t0 + offset_k``."""
         return xp.asarray(self.options.offsets(problem))
 
     def jax_unpacker(self, problem: PlanningProblem):

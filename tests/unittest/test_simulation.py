@@ -1651,8 +1651,8 @@ N_STEPS_COUNTS = {
     "static compute_trajectory": lambda N: (
         Gain(K=2.0, dim=1).compute_trajectory(tf=1.0, n_steps=N).t.size
     ),
-    "transcription knots": lambda N: fixed_grid_t(1.0, N).size,
     # A run of periods: n_steps transitions, n_steps + 1 samples
+    "transcription knots": lambda N: fixed_grid_t(1.0, N).size - 1,
     "rollout": lambda N: (
         Integrator().compile().rollout(np.zeros(1), None, 0.0, 0.01, n_steps=N).shape[0]
         - 1
