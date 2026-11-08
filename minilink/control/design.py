@@ -189,7 +189,8 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_samples=1001):
     (:func:`~minilink.analysis.riccati.riccati_step`): no integration error, no
     stiffness, and ``S`` stays symmetric. ``t`` holds ``n_samples`` samples from
     ``0`` to ``tf``; ``K`` has shape ``(n_samples, m, n)`` and ``S`` shape
-    ``(n_samples, n, n)``.
+    ``(n_samples, n, n)``. ``S_f`` is the boundary condition ``S(T) = S_f`` of the
+    Riccati equation, the cost's terminal weight ``S``.
     """
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
@@ -248,7 +249,9 @@ def lqr_finite_horizon(
     ``K(t)`` from :func:`lqr_gain_schedule`, minimizing
     ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model. Past the
     horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
-    infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``).
+    infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``). ``S_f`` is
+    the boundary condition ``S(T) = S_f`` of the Riccati equation, the cost's
+    terminal weight ``S``.
     """
     require_after(after)
 
@@ -288,7 +291,8 @@ def trajectory_lqr(
     Q, R : array-like
         LQR weights on the tracking error and on the input deviation.
     S_f : array-like, optional
-        Terminal weight ``S(t_f)``; default the stationary solution at the end.
+        The boundary condition ``S(T) = S_f`` of the Riccati equation, the cost's
+        terminal weight ``S``; default the stationary solution at the end.
     params : dict, optional
         Parameter dict forwarded to ``sys.f``.
     method : {"auto", "fd", "jax"}, optional
