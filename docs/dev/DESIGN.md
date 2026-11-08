@@ -61,17 +61,15 @@ on the root.
 ## 3. Package Map
 
 Component maturity is tracked only in [ROADMAP.md](ROADMAP.md); this section
-describes package ownership. Every package belongs to one of four bands.
-Homes for planned content are pre-decided in the tables below; scheduling is
-in [ROADMAP.md](ROADMAP.md) §5 and the workboard
-[docs/plans/TODO.md](../plans/TODO.md).
+describes package ownership. Every package belongs to one of four bands; scheduling is in
+[ROADMAP.md](ROADMAP.md) §5 and the workboard [docs/plans/TODO.md](../plans/TODO.md).
 
 **Framework** — defines what a `System` is and how diagrams execute
 (NumPy-only; changes are design events):
 
 | Package | Role |
 | --- | --- |
-| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (the package `core/geometry/`: `shapes.py`, the solids by their signed distance, and `paths.py`, the reference paths, a polyline open or `closed`; **planned** in it — Track, Scene, mount, spatial Fields, course catalog: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
+| `core/` | `System` (+ its shortcuts, `facades/` by what they do: `simulation.py`, `analysis.py`, `plotting.py`, `animation.py`), the package import tables (`exports.py`), `DynamicSystem`, `DiagramSystem` (subclasses `DynamicSystem`), shared diagram wiring (`wiring.py`: `WiredDiagramMixin`, gather, params nesting), the port-dependency graph (`topology.py`: evaluation order, algebraic loops), the composition grammar (`operators.py`: `+`, `>>`, `autowire`; `closed_loop.py`: `@`, `closed_loop`, `feedback`; `assembly.py`: the operands laid out flat, their ids, default ports and camera, which both build on; `roles.py`: the block roles the port names declare), signals/ports (`signals.py`), backend policy & helpers (`backends.py`), the parameter trees (`params.py`: the path lookup, merge and flatten of nested `params`, one owner), `Trajectory`, sets, distributions (`distributions.py`), costs, geometry (the package `core/geometry/`: `shapes.py`, the solids by their signed distance, and `paths.py`, the reference paths, a polyline open or `closed`; the track, the scene, `mount` and the spatial fields stay in `planning/spatial/` until the geometry plan moves them: [docs/plans/geometry-module.md](../plans/geometry-module.md)) |
 | `core/discrete/` | the discrete-time sibling, `x_{k+1} = F(x_k, u_k, k)` on an integer index: `StepSystem` (`step_system.py`), `SampledSystem` (`sampled_system.py`: a system on a clock), `StepDiagramSystem` (`step_diagram.py`), `SampledDiagramSystem` (`sampled_diagram.py`: the sampled loop, its holds and the plant's run inside it) |
 | `core/compile/` | the compiler, the two execution plans, one evaluator per system kind |
 
@@ -96,11 +94,11 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k Δ`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`, ruled 2026-11-07) |
+| `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
-| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium in the `full` extra; stable-baselines3 from `environment.yml`); cosimulation / MJX planned |
+| `interfaces/` | lazy facade: `Sys2Gym` / `SB3Controller` (gymnasium in the `full` extra; stable-baselines3 from `environment.yml`) |
 
 **Experimental tier** — unproven modules under `experimental/`:
 
@@ -338,7 +336,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   MPC is one architecture, a box of pure blocks (`PredictiveController`, a
   `SampledDiagramSystem`; `mpc % dt` clocks its blocks): `PlanSolver` under the id `solve`
   (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0)`), `PlanCommand` under `command`
-  (`z → u_k = pv.command(z, t_k)`, and `x_ref`, `u_ref` from `pv.prediction` when the plan
+  (`z → u_k = pv.command(z, x, t_k)`, `x` unread by an open-loop plan, and `x_ref`, `u_ref` from `pv.prediction` when the plan
   carries states) and `PlanMemory` under `memory` (a `UnitDelay` holding the last plan, from
   the default guess); the loop computes each signal once per tick, so a tick solves once. The
   two switches are independent: `warm_start=True` starts each solve from the last plan shifted
@@ -358,7 +356,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   host's. `verbose=True` prints one line per solve on a host run (the tick's time, success,
   iterations, cost, wall time). Ports out: `u`, `z` (the plan solved at this tick) and
   `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
-  plan, `u = pv.command(z, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
+  plan, `u = pv.command(z, x, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
   fast)`, the plan read at the slow tick itself; the one-period-late plan is the user's
   `UnitDelay(dim=n_z)` between them. A native fixed-iteration planner (single shooting,
   `method="adam"`, `n_iterations=K`) makes the tick traceable: `problem.compile(mpc % Δ)` is
@@ -556,9 +554,9 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   `nominal_plant_params(problem)`.
   A new start is a number of the tree like a mass: offline, `planner.solve(params=p)` with
   the new `p["x0"]`; in real time, the compiled face `pv.solve(p, z0)` (§6); moving obstacles
-  online wait for the geometry module. **Gap:** call-time `params` on the base `Shape` and the workspace
-  fields (the geometry module's plan); the fields' wrappers hand their field no tree
-  ([QUESTIONS.md](QUESTIONS.md)).
+  online wait for the geometry module. **Gap:** the base `Shape` and the workspace fields take
+  no call-time `params`, and the fields' wrappers hand their field no tree; both are the
+  geometry plan's ([geometry-module.md](../plans/geometry-module.md)).
 
 ### `DiagramSystem`
 
@@ -576,7 +574,7 @@ nested diagram) and `subsystem_id` a block or its id. **One block selector on ev
 diagram's run carries `roles`, every block's state slice by id (a nested block by its path), so
 `traj.of("plant")` is the plant's own `(t, x, u)` by static indexing on a continuous loop as on
 a sampled one; the input is the recorded signal `"<block>:u"`, else empty, `(0, N)`.
-**What a diagram run records** (ruled 2026-11-06), one rule on every solver and both kinds of
+**What a diagram run records**, one rule on every solver and both kinds of
 loop: `record="plant"`, the default, the plant's whole input `"plant:u"` when the diagram has a
 `plant` block, so `traj.of("plant")` is complete on every default run; `record=None` nothing
 (the fastest run: hand sweeps, benchmarks, library loops); a tuple of names (`"block:port"` an
@@ -838,14 +836,14 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
   a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
-  `(x̄, S, t)` on a finite horizon, `t` on the problem's clock `t0 … t0 + tf`; its law
-  applies the stationary gain `K∞` at `x̄` past `tf`, `K(tf)` held when the algebraic
-  equation has no stabilizing solution).
+  `(x̄, S, t)` on a finite horizon `T`, `t` on the problem's clock `t0 … t0 + T`; its law
+  applies the stationary gain `K∞` at `x̄` past the horizon, `K(t0 + T)` held when the
+  algebraic equation has no stabilizing solution).
   `GridField(levels, values, t=None, *, method="linear", outside=None)` is a table on a
   regular grid read as a field: multilinear in the cell holding `x` (`"nearest"` its closest
   node; both trace), `"cubic"` and `"quintic"` SciPy's splines on NumPy only (the cubic spline
-has that one name: `"spline"` is refused naming `"cubic"`, on the field, on the value-iteration
-grid's `field` and interpolator and so on the planner's `interpolation`; ruled 2026-11-07); a leading time
+  has that one name: `"spline"` is refused naming `"cubic"`, on the field, on the value-iteration
+  grid's `field` and interpolator and so on the planner's `interpolation`); a leading time
   axis on `t` read linearly and held past its ends, the `QuadraticField` rule. Outside the grid
   the edge holds (`x` clamped on each axis), or `V = outside` when a number is given. Its
   `params` are `{"levels", "values"}` and, as given, `t` and `outside`; its gradient is the
@@ -853,7 +851,7 @@ grid's `field` and interpolator and so on the planner's `interpolation`; ruled 2
   `LookupPolicy` shares for its command table (extending the edge cell past the grid, then
   clipping `u`); the field and the lookup law each take their table into the point's array
   module, so both trace with their table a constant: a JAX closed loop runs the law, and
-  `backend="auto"` scores it on JAX like every law that traces (ruled 2026-11-06). Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
+  `backend="auto"` scores it on JAX like every law that traces. Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
 - Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
@@ -871,7 +869,7 @@ grid's `field` and interpolator and so on the planner's `interpolation`; ruled 2
   `w_k ~ N(0, psd / Δ)` held over `Δ` (`hold="zoh"`; `"linear"` interpolates), so the physics
   does not change with the period; `seed`, `sample_period` and `psd` are params, and `h`
   computes `w(t)` from `(t, params)` with a counter-based cipher (Threefry-2x32, the same bits
-  on NumPy and JAX), so the block is pure, traces, and edits without a refresh. `seed=None` is
+  on NumPy and JAX), so the block is pure, traces, and edits in place. `seed=None` is
   the mean, and such a block is not random (`is_random` reads the seed): no realization or
   evaluation reseeds it. `System.realize(key)` returns the params of one realization: every random block
   reseeded under its own stream, named by its id (a diagram nests it like `params`), or every
@@ -888,8 +886,8 @@ grid's `field` and interpolator and so on the planner's `interpolation`; ruled 2
   `dt` tightens it). A step that does not divide `Δ`, a forced
   adaptive solver, two blocks sharing a seed, and a declared disturbance the stepped tools
   never read are announced. Kalman reads `Q = B_w W B_wᵀ`, `R = D_v V D_vᵀ` for the
-  continuous filter (`kalman(sys, Q_n, R_n)`, the intensities); the discrete filter, an
-  estimation follow-up (ROADMAP §5.6), will read `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ`.
+  continuous filter (`kalman(sys, Q_n, R_n)`, the intensities); the discrete filter's
+  `Q_d = B_w W B_wᵀ Δ`, `R_d = D_v V D_vᵀ / Δ` are the estimation plan's (ROADMAP §5.6).
   `NoiseSource(law, *, sample_period, seed, hold)` is sampled noise: `w_k` the law drawn
   at the counter key `CounterKey(seed, k)` by the same cipher (each library law and `BoxSet`
   draw from one), held over `Δ`, the law's numbers under `params["law"]`; a per-sample
@@ -1223,14 +1221,14 @@ computed for the call at other weights, and under a trace the build's (a failure
 with no gradient). One method table
 serves every solve path: `make_optimizer_backend(method, options=)` gives the preset's adapter
 (`adapter.solve(evaluator, z0)`), so a planner's compiled program takes every method, `ipopt`
-among them, as the offline `Optimizer` does (OPW-1).
+among them, as the offline `Optimizer` does.
 
 **Planning:** `PlanningProblem` (a plain class; `problem.replace(**fields)` derives one)
 owns system, sets (`X` and `U` unconstrained unless declared: `X=plant.state.box`,
-`U=plant.input_box`, or a `BoxSet` over the inputs, wrapped), cost, the continuous `horizon` and its start `t0` (the
-horizon is `[t0, t0 + tf]`, `0` by default; a run starts there, costs, sets and
+`U=plant.input_box`, or a `BoxSet` over the inputs, wrapped), cost, the continuous `horizon` `T` and its start `t0` (the
+run spans `[t0, t0 + T]`, `t0 = 0` by default; a run starts there, costs, sets and
 references read absolute time, the discount counts from it, the fixed grids of the
-transcriptions are `t0 + linspace(0, tf, N)`; a leaf of `problem.params` and of the
+transcriptions are `t0 + linspace(0, T, N)`; a leaf of `problem.params` and of the
 evaluator's tree, so `jax.grad` differentiates it), the discount rate and the failure cost
 switch (below). **The boundary dials**: `X0=` is the start constraint `x(0) ∈ X0` (a
 vector is its singleton; by default the start's singleton, a law's support, else the
@@ -1244,7 +1242,7 @@ bias, a plot's anchor); it never constrains a plan. The planners pin the start f
 A planner that needs a finite box (value iteration's grid, RRT's bang-bang) refuses an
 unbounded one with the line to write. Offline entry is
 `Planner.solve()` → `PlanningSolution`, one result for every planner, a frozen
-keyword-only record (ruled 2026-11-07): the `problem` it solved (a reference); the
+keyword-only record: the `problem` it solved (a reference); the
 `controller`, the block you run, always as it is — a feedback law (LQR, value
 iteration in every mode, tabular and deep learning) is continuous, `controller @
 plant`, and a finite-horizon law reads the time (`u = pi(x, t)`); an open-loop plan
@@ -1294,8 +1292,7 @@ the paired `J_a − J_b`. `LQRPlanner
 (problem)` is the linear-quadratic method on a `QuadraticCost` problem: `lqr_matrices`, the
 first function of `lqr.py`, lowers it to the LQR problem in its matrices, `(A, B, Q, R, S)`, at
 the cost's `(x_bar, u_bar)` (`B` and `R` over the command port; the planner's
-`design_matrices()` at its own operating point, ruled 2026-11-07 so the method no longer
-shadows the function), then the algebraic Riccati equation for an
+`design_matrices()` at its own operating point), then the algebraic Riccati equation for an
 infinite horizon, the differential one swept from `S` over a finite horizon. A discounted problem
 (`discount_rate = ρ > 0`) is solved as its textbook equivalent, the undiscounted problem on
 `A − (ρ/2) I` (the same law, in `x̃ = e^{−ρt/2} x`), with a warning, a discounted LQR being
@@ -1450,8 +1447,7 @@ with no gradient, and a non-finite objective at `z0` warns once. A planner's
 evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
 `planning/planner.py`, an internal helper the planners' `solve()` call) is one
 `evaluate(problem, controller, dt=..., ...)` of the controller as it is handed out, on the
-real plant. The planner's `dt` is the integration step of its evidence, for every planner
-(ruled 2026-11-08): a continuous law integrated on it, still continuous, no hold (value
+real plant. The planner's `dt` is the integration step of its evidence, for every planner: a continuous law integrated on it, still continuous, no hold (value
 iteration and tabular learning on their grid's `dt`, deep learning on its environment's,
 the LQR on its reporting grid `dt`, an open-loop plan on its own grid, the interpolation
 its planner states), so `sol.evaluation` equals `evaluate(problem, sol.controller, dt=)`
@@ -1486,7 +1482,7 @@ control problem, a `StepPlanningProblem`: `x_{k+1} = F(x_k, u_k)`, `c_k`,
 the input held and `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated beside the state by the same scheme
 (`g·dt` to the last bit under one Euler step); `terminal(x)`, `h` at the horizon's end;
 `run(controller)` (`J = Σ γᵏ c_k + γᴺ h`; a controller block read on its measurement port,
-or a function `u = π(x, t)`), with `n_steps` (`N = tf/dt`), `gamma` (`e^{−ρ dt}`), `dt`,
+or a function `u = π(x, t)`), with `n_steps` (`N = T/dt`, `T` the horizon), `gamma` (`e^{−ρ dt}`), `dt`,
 the sets, `cost_bound()` and `failure_cost_at()`. `params=None` reads the problem's numbers
 (the plant at its mean, a discretized problem's at its origin's, the cost, `x0`, `t0`, the
 discount). `compile` is the controller's verb only: `problem.compile(controller, dt=None)`
@@ -1614,8 +1610,7 @@ have no wall clock, and leave it `None`.
 `Optimizer`; teach demos pass `transcription=` explicitly. Tier-2 still accepts a
 `Transcription` instance. Offline
 `solve` always rebuilds a fresh
-`MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads
-(PP-2, PP-3): `x0` (the start's residual when `X0` is the start's singleton),
+`MathematicalProgram`. A JAX transcription's program declares the problem's tree it reads: `x0` (the start's residual when `X0` is the start's singleton),
 `t0`, the plant's, the cost's, `discount_rate`, and each set it reads as margins by role
 (`X` and `U` when not lowered to the decision bounds, a non-singleton `X0`, `Xf`; a box in the
 bounds is structure, not a leaf). Two routes replan from new numbers, a new start among them:
@@ -1623,7 +1618,7 @@ offline, `planner.solve(params=p, guess=prev)` with the new `p["x0"]` builds eac
 time, `pv = planner.compile()` then `pv.solve(p, z)`, which the MPC uses, compiles once and never
 for new numbers (`params` is `None` or the complete tree, checked, an unknown or a missing path
 raising and naming the known ones). The
-reserved key ``scene`` raises ``NotImplementedError`` until the scene bind (A3). Carrying the
+reserved key ``scene`` raises ``NotImplementedError`` until the geometry plan binds the scene. Carrying the
 tree stays under 2× the compile, the solve and an evaluator call of the same program with it
 frozen (the bicycle MPC is the check). Every transcription's objective is the
 problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
@@ -1632,7 +1627,7 @@ problem's, discounted from `t0`, `Σ dt/2 (w_k g_k + w_{k+1} g_{k+1}) + w_N h`,
 options); the time grid is
 `t0 + linspace(0, problem.horizon, n_steps)` for a finite `horizon`.
 
-**A planner's four kinds of argument** (ruled 2026-11-04, every planner alike):
+**A planner's four kinds of argument** (every planner alike):
 **structure**, what a change of rebuilds (the grid, the transcription, `n_steps`, `dt`,
 `method`, `backend`, the stopping rules `n_iterations`, `max_iterations` and the
 tolerances), a constructor keyword read back as an attribute; **numbers**, what a sweep, a
@@ -1723,8 +1718,7 @@ is `J` as a `GridField` on the grid (`J(x, t)` on a finite horizon, the stages r
 linearly in `t`; `grid.field(J)`: read by the planner's interpolation,
 the failure cost `out_of_bound_cost` past the grid, the edge held when that cost is a
 callable; `planner.cost_to_go` reads it). The Bellman backup is written in the body of each
-engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (ruled
-2026-11-07: the backup is the lesson, so no helper hides it), each engine reading the grid its
+engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (the backup is the lesson, so no helper hides it), each engine reading the grid its
 own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with the in-bounds
 mask on JAX, zero off the grid); the
 `"loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
@@ -1753,7 +1747,7 @@ stacked with `+` — and a `LinearApproximator` that fits by least squares (`fit
 stochastic-gradient step per sample (`sgd_step`). It is the seed of approximate dynamic
 programming: fit a cost-to-go from value iteration, or learn one online.
 
-**Spatial scene** (`planning/spatial/`; its planned home `core/geometry/` is in §3): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
+**Spatial scene** (`planning/spatial/`; its move to `core/geometry/` is in §3): two domains — **workspace** `p ∈ ℝ²/ℝ³` and
 **state** `x`. On W: hard `Shape` obstacles and soft `WorkspaceField` sources live in
 `Scene` (`obstacles`, `workspace_fields`). On X: a `Field`'s `value(x)` fuses the robot
 placement with scene queries (`clearance_field`, `cost_field`). Export separately —
@@ -1766,10 +1760,11 @@ density over body probes). **Collision reuse:** frameless geometry (`disc`,
 via :func:`~minilink.core.kinematics.apply` — the same FK as rendering. Frameless
 geometry: :func:`~minilink.planning.spatial.collision.disc`,
 :func:`~minilink.planning.spatial.collision.point_probe`,
-:func:`~minilink.planning.spatial.collision.car_outline`. Shape obstacles with
-`quadratic_hinge`, `inverse_barrier`). Compose at `PlanningProblem`:
-`X = bounds & free`, `cost = base + w * terrain`. Scene param overrides online are the reserved `scene` tier (§4,
-'Parameters'): rebuild the `Scene` and recompile the parametric program.
+:func:`~minilink.planning.spatial.collision.car_outline`. A soft obstacle cost shapes the
+clearance with `quadratic_hinge` or `inverse_barrier` (`core/shaping.py`). Compose at
+`PlanningProblem`: `X = bounds & free`, `cost = base + w * terrain`. A scene's numbers are
+not yet leaves of a planner's tree (the reserved `scene` key, above): to move an
+obstacle, rebuild the `Scene` and solve again.
 
 **Reference track** (`core/geometry/paths.py`, `planning/spatial/track.py`): workspace centerlines
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`; `closed=True` adds the
@@ -1807,8 +1802,7 @@ the best goal cost stops improving for `convergence_patience` extensions;
 `solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
 `solve(callback=…)` takes a callable or a list of callables and hands every successful
 extension to each (an `RRSearchIteration`), each hook filtering for itself; the live figure is
-one such hook, `LiveSearchPlot(every=1, pause=…, after_goal_only=False, ax=None)` (ruled
-2026-11-07: an object in place of the five `live_plot*` keywords), exported on
+one such hook, `LiveSearchPlot(every=1, pause=…, after_goal_only=False, ax=None)`, exported on
 `minilink.planning`; the `nearest_backend` setting
 selects brute-force or a SciPy ``cKDTree`` for Euclidean nearest queries.
 
