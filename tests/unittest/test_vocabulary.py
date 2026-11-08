@@ -19,6 +19,7 @@ FACADES = (
     "minilink.optimization",
     "minilink.planning",
     "minilink.learning",
+    "minilink.interfaces",
 )
 PLANT_PACKAGE = "minilink.dynamics"
 
@@ -45,7 +46,7 @@ RETIRED = {
         ),
     ),
     "optimizer_options": ("options", None),
-    "tf": ("horizon", ("PlanningProblem",)),
+    "tf": ("horizon, or episode_length", ("PlanningProblem", "Sys2Gym")),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
