@@ -91,7 +91,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   `solve_*` aliases gone, `verbose=False` by default, the `Optimizer`'s default method
   `"auto"`; the option records (`DynamicProgrammingOptions`, `RRTOptions`, `RRTStarOptions`,
   `TrajectoryOptimizationOptions`) gone for flat keywords, `options=` only the external
-  solver's dict; every planner's `params` tree and `solve(params=)`; trajectory
+  solver's dict; every planner's `params` tree and `solve(params=)` (the neural RL planner's tree a report); trajectory
   optimization's `last_optimization_result`, `iteration_history`, `last_solve_time_s` and
   `last_step_time_s` gone for `solution.record` (RULES 2.4).
 - 2026-11-05 (on `dev`, for `0.4.0`; every notebook migrated in the same commits, no alias):
@@ -448,7 +448,7 @@ PRs #135 and #136 on 2026-11-08. Their contracts are DESIGN's; every name they c
 - *Before them, on `dev` after the tag:* the tutorials in three layers (basics, core,
   advanced); the vocabulary of RULES 2.7 and one last answer per object (RULES 2.4), held by
   `test_vocabulary.py` and `test_last_answer.py`; every planner's `params` tree and
-  `solve(params=)`; the one parameters model and no cache (DESIGN §4); the nine API surface
+  `solve(params=)` (the neural RL planner's tree a report); the one parameters model and no cache (DESIGN §4); the nine API surface
   rulings of 2026-11-05; a diagram run recording the plant's input by default (2026-11-06).
 - *Phase 1, the planners' math and fields* (plans as policies, its first change): the pure
   cores first in their files, the cost-to-go of value iteration and LQR as fields (`GridField`,
