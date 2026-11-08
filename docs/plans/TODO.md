@@ -25,24 +25,21 @@ agent-managed. Landed rows leave this file; their history is git. The pieces liv
 
 Workboard rows marked **[ask]**: each waits for the maintainer's go, pick or review before an
 agent starts. They are details, versions and demos, not design questions (those are
-[QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options.
-
-**The nine API surface rulings of 2026-11-05 landed** (the branch `api-surface-rulings-review`; their
-contracts are DESIGN's).
-
-**The core's leftover rows have the go**: every row of §1.1 to §1.10 is cleared to start under its
-"done when"; the internal choices an agent meets (the default output stub's type under JAX, the
-open-loop face as the evaluator or a sibling, the hold slots' labels) are decided as the
-maintainer would and logged in the run's record.
+[QUESTIONS.md](../dev/QUESTIONS.md)); each row holds its options. The core's leftover rows
+(§1.1 to §1.10) without the mark have the go: the internal choices an agent meets are taken as
+the maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
+| Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
+| The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name |
+| A parameter family's batch price | S53 | v0.4 | the 2× bar: a closed-form small-`H` solve, a plant hook for its parameter-only block, or the bar dropped |
+| One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
 | `Source.show_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
-| Your demo pass, and a tabular Q-learning demo | K4 | v0.4 (the clean-up lane) | now the maintainer's end-of-v0.4 demo rebuild (MS-D1, 2026-11-07) |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
 | SAC's actor step | S50 | v0.5 | the critic before the update (today) or after it |
@@ -50,11 +47,12 @@ maintainer would and logged in the run's record.
 | Approximate dynamic programming | C5 | v0.5 | design first; it touches the planner API |
 | The general serial chain | C6 | v0.5 | one mechanism description (DH table or URDF) |
 | The pyro → minilink migration guide | C1 | v0.5 | its section in README |
+| Which pyro demos the courses need | C1 | v0.5 | your pick |
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | The move of the course material | K6 | v0.9 | only if K5 says so |
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
-| A lighter git history | V11 | v0.9 (after the v0.3 tag) | a force-push without notebook outputs (176 MB clone to under 25 MB) |
+| A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
 | The Stable-Baselines3 notebooks | S49 | v1.0 | retire two, decide two |
@@ -62,47 +60,34 @@ maintainer would and logged in the run's record.
 | Behavior cloning | — | after v1.0 | the game mode and the fitting planner |
 | A plant that owns its noise ports | — | later | the example, then the two noisy plants revisited |
 | Simon's curve speed scaler | — | later | into the path-tracking project, or the cap `v ≤ √(a_y,max / κ)` |
-| The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | the maintainer's review: which class is the child of which, the cars' base, the mass matrix's one name |
 | The compile-time flatten default | — | standing | after one benchmark: off, on, or always |
-| Which pyro demos the courses need | C1 | v0.5 | your pick |
 | Reward scaling by default | — | later | `reward_scale="auto"` the default or opt-in |
 
 ---
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-06). One rule orders v0.4: what changes a public name or a
+**Next, in order** (as of 2026-11-08). One rule orders v0.4: what changes a public name or a
 behaviour lands first, so the demos, notebooks and tests are redrafted once, on the settled
 surface, and the student-facing numbers are re-pinned once, at the release. Additive work that
 breaks nothing goes last and may follow the tag.
 
-0. **The decisions waiting for the maintainer**, in parallel with phases 1 to 4 (the
-   agent does not wait on them; CA-1, CA-2, CA-5 and the root exports ruled 2026-11-07): the
-   later round of API proposals and `refresh()` ruled 2026-11-07, §1.11); the minimal surface's MS-D1 to MS-D6 (§1.12); the
-   root exports (§1.13); the clean-up lane's asks (K4's demo pass, G3, K8-3, S32's rest; §2).
-   All ruled 2026-11-07, or deferred to the end-of-v0.4 rebuilds (the demo set, the test layers,
-   the unsupported plants, GMC714's pins, the tuning demo) and the mechanical hierarchy's review.
-1. **The planners' math and fields** (§1.8, plans as policies, change 1; built on
-   `plans-as-policies-1`, in review): the pure
-   cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
-   discounted LQR. First because it changes a public shape (`solution.cost_to_go` becomes a
-   `Field`) and fixes a known issue, while the tables stay byte-identical.
-2. **Value iteration's finite horizon** (§1.8, change 2; built on `v04-build`, in review): the two modes, the law past
-   the horizon for both planners, the three examples migrated. A behaviour change: before the
-   notebooks' redraft.
-3. **The core API proposals as ruled** (§1.11; built on `v04-build`, in review, the parameters model's follow-up left as deferred): CA-1, CA-2, CA-5, the later round's rulings,
-   `refresh()`, and the parameters model's internal follow-up (no number moves). Names: before
-   the redraft.
-4. **The core's small leftovers** (§1.1, §1.2, §1.6, §1.7, and §1.13's two quirks), each
-   independent; any of them that renames a public name lands before phase 5.
-5. **The surface redrafted on the settled names**: the minimal surface (§1.12: the test
-   layers, the demo set with the maintainer's pass K4, the notebooks, the benchmarks), the root
-   exports (§1.13), the clean-up lane (§2: K8, K9, G3's pins, the car family's time constant).
+Phases 1 to 4 landed on `dev` (2026-11-08): the planners' math and fields and value
+iteration's finite horizon (plans as policies, its first two changes), the core API proposals
+and the later round of API sweeps as ruled, the core's small leftovers, and the maintainer's
+rulings of 2026-11-07. Their contracts are DESIGN's; the release's status is ROADMAP §5.4's.
+What is left:
+
+5. **The surface redrafted on the settled names** (§1.12): the maintainer's demo rebuild, then
+   the tests' clean slate and the course notebooks on the new names; beside it the clean-up lane
+   (§2: the catalog clean-up K8, the experimental tier K9, the car family's time constant), and
+   last GMC714's names pinned (G3). The small rows of §1.1, §1.2, §1.7 and §1.11 are
+   independent and run beside it; one that renames a public name lands before the redraft.
 6. **The release** (§1.10): the student-facing numbers re-pinned once, the course notebooks on
-   the new names, the PR from `dev` to `main`, `0.4.0`; the cart-pole RL demo re-measured.
-7. **The faces and the MPC protocol** (§1.8, change 3; ruled): additive (no name breaks, the
-   open-loop loops byte-identical), so it lands before the tag if it is ready, else in a 0.4.x
-   or with the RL and RRT faces in v0.5 (§4).
+   the new names, the PR from `dev` to `main`, `0.4.0`.
+7. **The faces and the MPC protocol** (§1.8, plans as policies, change 3; ruled): additive (no
+   name breaks, the open-loop loops byte-identical), so it lands before the tag if it is ready,
+   else in a 0.4.x or with the RL and RRT faces in v0.5 (§4).
 
 **How the work flows.**
 - **Status:** [ROADMAP §5.4](../dev/ROADMAP.md#54-v04--the-clean-surface). v0.3 shipped as
@@ -126,8 +111,6 @@ breaks nothing goes last and may follow the tag.
   the student-facing numbers (notebook outputs, course figures) are re-pinned together at the
   merge to `main`.
 
-**The path to the cost (V1)** is closed as a row; its one open step, step 8, is in §1.1.
-
 **Each workstream's main rows landed in v0.3**; the rows below are what is left, each small.
 
 ### 1.1 Every object pure, every number a parameter
@@ -142,84 +125,37 @@ breaks nothing goes last and may follow the tag.
   - the RL critic as a `Field` once training is over;
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
     (scan: examples#10).
-- [ ] **Sets as costs, the lowerings, the metrics as constraints** (was V1
-  step 8):
+- [ ] **Sets as costs, the lowerings, the metrics as constraints** (the path to the cost's last
+  open step, V1 step 8):
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.5 row.
-- [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
-  - one warm-start helper on the plan `Trajectory`: no second caller left. The MPC helpers the
-    scan named are gone; the block warm-starts in `z` under tracing, on its face's `shift`
-    (two faces, two rules: knots linear, MPPI's inputs held), and a planner warm-started from
-    a `Trajectory` goes through `Trajectory.resample`, already the one owner;
-  - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7): the joint and
-    the task impedance read their errors through the spring-damper laws' one helper.
-
-  Built on `v04-build`, in review: the row leaves at the merge.
 
 ### 1.2 The step algebra first-class
 
-- [ ] **The batch price of a parameter family** (S53): profile `rollout_batch` with a `params`
-  family, which takes 278 ms against 27 ms for the plain batch (pendulum, 1000 × 1000 RK4
-  steps). Two mitigations, neither a design change: hoist the plant's pre-computation block
-  (the `m·l²` lines RULES 5.3 already separates) out of the scan when parameters are batched,
-  computing it once per member; or carry the drawn parameters as constant columns of the
-  batched state so they ride the same memory stream. Done when the family path is within 2× of
-  the plain batch. Also: gate the quoted
-  batch-rollout claim, and batch the static-leaf time grid (scan: compile-sim#11, #12).
-  Built on `v04-build`, in review: the row leaves at the merge. Landed: the gate
-  (`core_perf`'s `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last
-  gated in CI) and the static grid (one `vmap` on JAX: `Gain` on 10 001 points 204 → 31 ms,
-  NumPy 26 ms). **Not reached, the 2× bar:** measured warm on a cloud CPU (JAX, median of 7),
-  the plain batch takes 118 ms and the family 693 ms (5.9×; the 27 ms the README quoted was not
-  this machine's). The cost is not the `m·l²` lines: it is `MechanicalSystem.forward_dynamics`'s
-  `solve(H, …)`; with `l` per member, `H` differs per member and each RK4 stage runs `B`
-  one-by-one LAPACK solves where the plain batch runs one. Carrying the parameters in the
-  scan's carry measured 696 ms (no gain); a hoist out of the scan has no generic hook (XLA
-  does not move the batched solve out of the loop). A closed-form `v̇ = rhs / H` for one
-  joint runs the family in 38 ms but changes the pendulum's numbers at 5·10⁻¹⁵ and the
-  textbook line: the **[ask]**, a design change (a closed-form small-`H` solve, or a plant hook
-  for its parameter-only block), or the bar dropped. The README's "27 ms" became DESIGN §5's
-  measured range, 0.12–0.16 s on a cloud CPU, in README and ROADMAP (ruled 2026-11-07).
-- [ ] **One owner per rule** (S65; scan: compile-sim#0, #1, #2, #3, #6, #7, #8, #10, #13,
-  planning#0, #5, #8, #11, core#8, #10). One item per step:
-  - **Read by the loop lane:**
-    - the automatic `dt` as `auto_dt(sys)` in `time_grid.py`, with the discontinuous scale made
-      finer or DESIGN's promise dropped (the duplicated constant goes with it);
-    - what `n_steps` counts on each verb.
-  - **The rest, which no pillar reads and which reviewer C §3.2 would return to standing
-    work:**
-    - the try-JAX-then-NumPy policy in `compile_auto`, with a typed `NotTraceableError`;
-    - `simulation` stops importing `optimization` for display constants;
-    - `scipy_stiff` with explicit tolerances and a Jacobian;
-    - `compile(verbose=True)` in order;
-    - one set of Monte Carlo defaults for `evaluate` and `planner_evidence` (`MonteCarloEvaluator`
-      is gone);
-    - flat-kwarg keys derived from the option dataclasses;
-    - one owner of the sets between `StateSpaceGrid` and its planner;
-    - one print-text rule for the textbook objects;
-    - one verbose and empty-cache rule across the `compute_*` facades.
+- [ ] **A parameter family's batch price** (S53) **[ask]**: `rollout_batch` with a `params`
+  family should run within 2× of the plain batch. Landed in v0.4: the gate (`core_perf`'s
+  `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last gated in CI) and
+  the static leaf's time grid batched (one `vmap` on JAX). Measured warm on a cloud CPU (JAX,
+  median of 7; the pendulum, 1000 × 1000 RK4 steps): the plain batch 118 ms, the family 693 ms
+  (5.9×). The cost is `MechanicalSystem.forward_dynamics`'s `solve(H, …)`: with `l` per member,
+  `H` differs per member and each RK4 stage runs `B` one-by-one LAPACK solves where the plain
+  batch runs one. Carrying the parameters in the scan's carry measured 696 ms (no gain); a hoist
+  out of the scan has no generic hook (XLA does not move the batched solve out of the loop). A
+  closed-form `v̇ = rhs / H` for one joint runs the family in 38 ms, but moves the pendulum's
+  numbers at 5·10⁻¹⁵ and changes the textbook line. The ask: a closed-form small-`H` solve, a
+  plant hook for its parameter-only block, or the bar dropped. Done when the family is within
+  2× of the plain batch, or the bar is dropped.
+- [ ] **One owner per rule, its two public items** (S65; the rest landed in v0.4) **[ask]**,
+  each a public change:
+  - one set of Monte Carlo defaults for `evaluate` and the planners' evidence: `evaluate` takes
+    `backend="auto"` and needs `n_trials` on a stochastic problem, the evidence runs
+    `backend="numpy"`, `n_trials=50`; evidence on `"auto"` moves the stochastic scores by one
+    ulp and adds a JAX compile to every `solve(evaluate=True)`, and `evaluate` defaulting to 50
+    relaxes its documented refusal;
+  - one empty-cache rule across the `compute_*` facades: `plot_rollout()` with no rollout raises,
+    because `compute_rollout(n_steps)` has no default length to compute one with.
 
-  Built on `v04-build`, in review: the row leaves at the merge. Landed: `n_steps` stated (one
-  rule by kind of verb in DESIGN §5, a test per verb; a rename would change public behaviour);
-  `build_on_auto` with `NotTraceableError`; `core/reporting.py`; `scipy_stiff` at `scipy`'s
-  tolerances with the Jacobian on both backends (the pendulum's stiff run moves by 2.8·10⁻⁴);
-  `compile(verbose=True)` named steps; `require_grid_on_sets`; the print-text rule (and the
-  LaTeX one; DESIGN §3's `inspect.py` exception gone). Found already done: the automatic `dt`
-  (one owner, `automatic_step_of` in `core/system.py`, one `AUTO_DT_SCALE`, DESIGN's promise
-  dropped; its stale verbose note fixed), the flat-kwarg keys (the option bags are gone; the
-  unused `_UNSET` removed), the verbose default (`False` on every `compute_*`). **Skipped,
-  each a public change the row does not state, the [ask]:** the Monte Carlo defaults
-  (`evaluate` takes `backend="auto"` and needs `n_trials` on a stochastic problem; the
-  planners' evidence `backend="numpy"`, `n_trials=50`: evidence on `"auto"` moves the
-  stochastic scores by one ulp and adds a JAX compile to every `solve(evaluate=True)`;
-  `evaluate` defaulting to 50 relaxes its documented refusal), and the empty-cache rule
-  (`plot_rollout()` with no rollout raises because `compute_rollout(n_steps)` has no default
-  length to compute one with).
-- [ ] **The root locus and the step response in `z`**: `linearize`, `bode`, `margins`,
-  `nyquist` and `pzmap` read a `StepSystem` or a `SampledSystem` in `z`; `root_locus`
-  and `step_response` stay continuous. Done when both give the discrete answer on a
-  `DiscreteLTISystem` and the continuous callers see no change. Built on `v04-build`, in review: the row
-  leaves at the merge.
+  Done when each is ruled and built, or dropped.
 
 ### 1.3 The draws
 
@@ -229,131 +165,78 @@ the Kalman bridge, the solver hint) and §6 (the problem's laws and sources, `re
 
 ### 1.4 The seeded stochastic policy
 
-Contract: DESIGN §3, `control/stochastic.py` (`GaussianPolicy`, the seeded policy).
-
-No open row: the block and the RL heads on it landed in the v0.3 run (acceptance script 13).
+No open row: the block (`GaussianPolicy`, `control/stochastic.py`) and the RL heads on it
+landed in the v0.3 run; the contract is DESIGN §3.
 
 ### 1.5 The sampled loop: a step diagram, two runners
 
-Contract: DESIGN §3 and §5 (time, the sampled loop), with time in the core and
-`SampledSystem` the sampled-data kind.
-
 No open row: the sampled loop, its two runners and the legacy runtime's removal landed in the
-v0.3 run; every hybrid notebook moved at its step 7. The realtime runner on the pure blocks is
-v0.4 (§4). The conventions' first sampled-loop step (AC-8a) is what the loop does by
-construction.
+v0.3 run (contract: DESIGN §3 and §5). The realtime runner on the pure blocks is v0.5 (§4).
 
 ### 1.6 One score
 
-Contract: DESIGN §6 (the problem evaluator, the step problem's own equations). Ruled, besides it, three
-points: the sampled check accepted, the run priced to the horizon with
-the input held, a solver's own objective allowed but the score always the problem's cost.
-
-- [ ] **A step problem's own tree** (built on `v04-build`, in review: the row leaves at the
-  merge; the rest of the step face and the compiled face; `StepPlanningProblem`, the
-  compiled face, the judge, value iteration and the RL environment on `transition` and the derived
-  RL discount landed in the v0.3 run): `realize` on the step problem's own tree (today the start
-  and the laws through its parts) and `t0` as its tick offset. Done when a grid world with a
-  law as its start realizes from its own tree and a step problem started at `t0 = k₀` scores
-  as from 0 with the cost shifted.
-- [ ] **The RL environment on a native step problem** (built on `v04-build`, in review: the row
-  leaves at the merge): `RolloutEnvironment` refuses a
-  `StepPlanningProblem` by name today (a discretized one names its origin and period); reading
-  the face's `n_steps`, `γ` and cost bound instead needs the step problem's sets, laws and sources.
-  Done when an RL planner trains on a native grid-world problem through its face.
+No open row: the contract is DESIGN §6 (the problem evaluator; the step problem's own equations
+and its own tree, `realize` and the tick offset `t0`, landed in v0.4). Ruled besides it: the
+sampled check accepted, the run priced to the horizon with the input held, a solver's own
+objective allowed but the score always the problem's cost.
 
 ### 1.7 The parametric program; the stochastic program its seed case
 
 Design: [native-optimizers.md](native-optimizers.md) §7.
 
 - [ ] **The friction-aware MPC example from a port** (S76's rest; the program with parameters,
-  its online binding of every leaf, the performance gate, the failure cost under overrides and
-  the stochastic program as the seed case landed in the v0.3 run, and the MPC's `inputs=`
-  bindings with its rebuild): an MPC that plans with the latest friction estimate of a port,
-  `ModelPredictiveController(planner, inputs={"x0": "y", "plant.mu": "mu_hat"})`
-  Done when the example runs as a demo and
-  its plan follows a moved `mu_hat` without a recompile.
-
+  its online binding of every leaf, the performance gate, the failure cost under overrides, the
+  stochastic program as the seed case and the MPC's `inputs=` bindings landed in the v0.3 run):
+  an MPC that plans with the latest friction estimate of a port,
+  `ModelPredictiveController(planner, inputs={"x0": "y", "plant.mu": "mu_hat"})`. Done when the
+  example runs as a demo and its plan follows a moved `mu_hat` without a recompile.
 - [ ] **A demo: an MPC's hyperparameter tuned by minilink's native methods** (ruled 2026-11-07:
-  folded into the maintainer's end-of-v0.4 demo rebuild, which decides whether the new set has
-  it and on which planner and plant; this row is its input): a script that tunes an MPC (or MPPI) hyperparameter on a closed loop richer than the
-  pendulum of `examples/demos/compile/native_mpc_tuning.py` (which tunes a native planner's cost
-  weights by gradient), through the evaluator's program (`problem.compile(mpc % dt)`,
-  `evaluator.program(wrt, bounds=, n_trials=)`) and minilink's own optimizers, no external
-  solver needed. The first attempt (the maintainer's MPPI temperature on the dynamic racecar,
-  removed 2026-11-06) shows the points to design: the solver (Ipopt was assumed; the SLSQP
-  fallback stopped on "Inequality constraints incompatible" and the tuned temperature scored
-  worse than its start), the cost of each evaluation (a JAX MPPI lap took about 76 s of solve
-  for 8 iterations), a hyperparameter with a clear effect on the score, and a gradient through
-  the loop or a derivative-free search, depending on the planner (MPPI's sampling). Options for
-  the maintainer: the planner (native trajectory optimization or MPPI), the plant (racecar lap,
-  cart-pole), the hyperparameter (temperature, horizon, weights). Done when the script runs
-  headless in its time budget, the tuned score beats the start, and its README row says what
-  it teaches.
+  an input to the maintainer's demo rebuild, §1.12, which decides whether the new set has it and
+  on which planner and plant): a script that tunes an MPC (or MPPI) hyperparameter on a closed
+  loop richer than the pendulum of `examples/demos/compile/native_mpc_tuning.py` (which tunes a
+  native planner's cost weights by gradient), through the evaluator's program
+  (`problem.compile(mpc % dt)`, `evaluator.program(wrt, bounds=, n_trials=)`) and minilink's own
+  optimizers, no external solver needed. The first attempt (the MPPI temperature on the dynamic
+  racecar, removed 2026-11-06) shows the points to design: the solver (the SLSQP fallback
+  stopped on "Inequality constraints incompatible" and the tuned temperature scored worse than
+  its start), the cost of each evaluation (a JAX MPPI lap took about 76 s of solve for 8
+  iterations), a hyperparameter with a clear effect on the score, and a gradient through the
+  loop or a derivative-free search, depending on the planner (MPPI's sampling). Options: the
+  planner (native trajectory optimization or MPPI), the plant (racecar lap, cart-pole), the
+  hyperparameter (temperature, horizon, weights). Done when the script runs headless in its
+  time budget, the tuned score beats the start, and its README row says what it teaches.
 
 ### 1.8 The native proof of concept: the planner's pure face and an MPC on it
 
 Design: [native-optimizers.md](native-optimizers.md); the face and the MPC's contract are
-DESIGN §6. Better
-solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
+DESIGN §6. Better solvers are v0.5 (§4); MPPI runs on the face (its rest is S72).
 
-**Plans as policies** (design, rulings `PP-D1` to `PP-D17` and steps `PP-1` to `PP-9`:
-[plans-as-policies.md](plans-as-policies.md)). It absorbs the compiled face of the LQR and
-value-iteration planners, value iteration on a finite horizon (formerly S63, v0.5) and the
-part of the field object the two planners need. The faces of the trajectory-optimization and
-MPPI planners, the MPC as one box on them and its closed loop tuned by gradient landed in the
-v0.3 runs; the RL and RRT faces stay with their v0.5 rows, on the same contract. Three changes,
-each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
+**Plans as policies** (the design of what is left and the rulings that shape it:
+[plans-as-policies.md](plans-as-policies.md)). Its first two changes landed in v0.4: the pure
+cores, `GridField`, the cost-to-go of LQR and value iteration as fields, discounted LQR; value
+iteration's finite horizon and the law past the horizon for both planners (contracts: DESIGN §4
+"Fields" and §6). Left, the third change:
 
-- [ ] **The planners' math and fields** (`PP-1` to `PP-3`; built on the branch
-  `plans-as-policies-1`, in review: the row leaves at the merge): done when the Bellman backup is
-  written in each engine's step (ruled 2026-11-07: inline, its helper `bellman_backup` removed)
-  and `lqr_matrices` opens its file and the planner calls it, the seeded value-iteration and
-  LQR baselines `cmp` byte-identical (NumPy, loop and JAX engines); `GridField` is in
-  `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
-  iteration's `cost_to_go` (the failure cost outside the grid), `QuadraticField` LQR's; each
-  number move of the plan's `PP-2` has its own test; discounted LQR solves on `A − (ρ/2) I`
-  with its warning and agrees with value iteration on a discounted double integrator (its known
-  issue deleted); `test_planning_solution.py`, `test_dynamic_programming.py`,
-  `test_lqr_planner.py` and the GRO860 value-iteration notebooks pass; DESIGN §4 and §6 say what
-  landed.
-- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`; built on the branch `v04-build`,
-  stacked on change 1, in review: the row leaves at the merge; what it built and the choices
-  taken: plans-as-policies.md §14 and §15): done when `solve()` on a
-  finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, its `J_0`
-  equals `solve_steps(N)`'s and its stage-`i` law `solve_steps(N − i)`'s, and LQR and value
-  iteration agree on the finite-horizon double integrator; past the horizon LQR's finite law
-  applies `K∞` at its final operating point and value iteration's its stage 0 (the `h = 0`
-  case tested); the infinite mode stays byte-identical; the README comparison, the showcase and
-  the optimal-control tutorial say their intent and run; every demo calling `solve_steps` runs;
-  DESIGN §6 carries the two modes.
 - [ ] **The faces and the MPC protocol** (`PP-7` to `PP-9`): done when the MPC and the
   follower read the state for a feedback face (`pv.feedback`), the open-loop loops
   byte-identical (`mpc_dual_rate.py`, `test_mpc.py`, `test_v03_core.py`, the MPC parity
   benchmark); `pv.solution(pv.solve(p)[0])` equals `planner.solve()` on the fields of the plan's
-  §8 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py` covers the
+  §6 for LQR and value iteration, both modes, NumPy and JAX; `test_no_recompile.py` covers the
   two faces; LQR and value iteration close in the dual-rate loop (and the MPC loop where `z` fits
   a tick); DESIGN §6 carries the contract and the plan doc is deleted.
 - **Later, the maintainer's own pass:** the GRO860 notebooks' wording on `solve_steps`
   (`grid_world_dynamic_programming.ipynb`, `double_integrator_minimum_time.ipynb` §4) when the
-  course is next taught: after this work the time-varying finite-horizon law is `solve()` on
-  `horizon = N dt`; their cells and plots are unchanged (`PP-D17`).
+  course is next taught: the time-varying finite-horizon law is `solve()` on `horizon = N dt`;
+  their cells and plots are unchanged (`PP-D17`).
 
 ### 1.9 Fields
 
-Contract: DESIGN §4, "Fields". Baselines first.
-
-No open row: `Field`, `QuadraticField` and the four conversions landed in the v0.3 run
-(acceptance script 7).
-
-`GridField` and the cost-to-go of LQR and value iteration as fields are §1.8 (plans as
-policies, its first change). The rest of the field object (`CallableField`, `LinearApproximator`, tabular RL's
-`Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4, after the core.
+No open row: `Field`, `QuadraticField` and the four conversions landed in the v0.3 run,
+`GridField` and the cost-to-go of LQR and value iteration as fields in v0.4 (contract: DESIGN
+§4, "Fields"). The rest of the field object (`CallableField`, `LinearApproximator`, tabular
+RL's `Q` and `PolicyEvaluator`'s field-shaped result) is a row of §4.
 
 ### 1.10 Hardening and the release
-
-v0.3's review and its six release points are done (`0.3.0`). K4 and the hand-loop demos are
-§2's rows.
 
 - [ ] **The release** (every notebook on the v0.4 names, the course notebooks included):
   - the student-facing numbers re-pinned (notebook outputs, course figures, the pipeline figures
@@ -361,142 +244,52 @@ v0.3's review and its six release points are done (`0.3.0`). K4 and the hand-loo
     after the maintainer checks the demos on `dev`;
   - the PR from `dev` to `main`;
   - the `0.4.0` tag.
-- [ ] **The cart-pole RL demo re-measured**: the training reward moved to `−g·dt` and no
-  RL demo was re-run for its numbers; its reliability re-measured on 8 seeds at its budget and
-  reported, no constant changed; the budget after that is the maintainer's **[ask]**.
-  **Measured 2026-11-07** (`v04-build`, the demo unchanged: PPO, 3 M steps, `dt = 0.05`; seeds 0–7;
-  the demo's own `evaluate(n_trials=100, key=1)` and its 10 s run from hanging; success =
-  upright `cos θ < −0.95` and `|cart| < 5 m` over the last 2 s): **1 seed of 8** swings up and
-  balances (seed 2, `J = 1.23 ± 0.84`, every start upright); the other seven swing up once and
-  spin (eval `J` 21 to 1756, median about 32); the training's final episode cost (1.17–1.85)
-  does not tell them apart. The **[ask]** (a larger budget, another reward or exploration
-  setting, or the demo shown as a single seed's result) is **deferred to the maintainer's
-  end-of-v0.4 demo rebuild (ruled 2026-11-07)**; the demo stays as it is until then. Also seen: `evaluate` reports every
-  seed feasible and reached at `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`).
 
 ### 1.11 The core API proposals
 
-Design: [core-api-improvements.md](core-api-improvements.md), each proposal with its reproducer
-and diff (from the core tutorials' review). Each is a core API change **[ask — core]**; one
-commit per proposal, its callers and DESIGN in the same change.
+The proposals and the later round of API sweeps landed in v0.4 as ruled (contracts: DESIGN §4
+to §6, RULES 2.7). Left:
 
-- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go; built on `v04-build`, in review: the row leaves at the merge): `System(0, input_dim=,
-  output_dim=, y_dependencies=)` as `DynamicSystem` and `StepSystem` do, `y_dependencies`
-  defaulting to `("u",)` on a static system with an input; the first argument `n` renamed
-  `state_dim` in every constructor call (about 128 keyword sites, no alias), the attributes `n`,
-  `m`, `p` unchanged. Done when the reproducer builds without `y_dependencies`, no `n=` keyword
-  is left, `test_vocabulary.py` pins `state_dim`, and DESIGN §4 states the shortcut, its static
-  default and the naming.
-- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract; built on `v04-build`, in review: the row leaves at the merge; the transfer-function compensator, `Gain` and `MLP` were found with the same defect and fixed with it):
-  `evaluator.h(x, u, t, params)` on `Evaluator` and `DiscreteEvaluator`, the `"y"` port, empty
-  when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
-  port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
-  pins `sys.h == outputs["y"]` on every block and catalog plant.
-- [ ] **A later round of API proposals** (all five ruled 2026-11-07; all five built on `v04-build`, in review: the row leaves at the merge; from the 2026-11-05
-  public-surface scan, after its nine rulings landed; each needs its own context and options
-  before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
-  full mirror and one meaning per word: the **controller** is the block a loop closes on, the
-  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, the planner
-  mirrors the solution: `planner.controller` for `get_controller()`, `planner.cost_to_go(x)` for
-  `value_at(x)`, `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
-  `animate_solution()`; the `*Policy` class names stay, naming the law a block implements; one
-  sweep, no alias, CONSTITUTION's line amended; the policy as a function on the solution,
-  `sol.policy(x, t)` and `planner.policy(x, t)`, reversed 2026-11-07: the solution hands out
-  the block and the function is the compiled face's `pv.command(z, x, t)`; the solution's shape
-  ruled the same day, `(problem, controller, record, trajectory, cost_to_go, evaluation,
-  params)`, keyword-only, `trajectory` the plan only, `cost_to_go` a `Field` or `None`, the
-  controller as handed out scored and drawn, plans-as-policies.md §15); training budgets
-  `n_episodes` and `n_timesteps` (RULES 2.7; ruled 2026-11-07: the keyword and the record's
-  fields, `solve(n_episodes=)`, `solve(n_timesteps=)`, `record.n_episodes`, `record.n_timesteps`,
-  one sweep, no alias); workflow keywords on constructors (ruled 2026-11-07: on the verb, every
-  planner's `solve`/`solve_steps` takes `verbose`, `callback`, `live_plot`, `record_history`, the
-  constructors keep structure, numbers and `options=`, as `Optimizer.solve` and
-  `compute_trajectory`; a planner rebuilt for a sweep inherits no display; only the orchestrator's verb takes
-  them: the compiled face's `pv.solve(params, z0)` stays pure, fast and free of plots and
-  printing, as today; with it, RRT's live plot is an object, `LiveSearchPlot(every=1, pause=…,
-  after_goal_only=False, ax=None)`, a hook of `solve(callback=…)`, which takes a callable or a
-  list of callables, each hook filtering for itself (ruled 2026-11-07: the five `live_plot*`
-  keywords leave both RRT planners' `solve`; the user's callback sees every extension), and tabular
-  RL gains `solve(verbose=)`; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
-  `problem.compile(controller)` always returning the evaluator (ruled 2026-11-07: one return
-  type per verb; then ruled 2026-11-07, "the step problem answers its own equations; no second
-  noun": `controller` a required argument, the custom refusal gone, `StepPlanningProblem.compile`
-  gone, the step problem's own `transition`, `terminal` and `run` delegating to the internal
-  `StepModel`, the former `StepFace`, exported on no facade); about 80 public helper methods on the diagram, the problem, the
-  evaluator and the planners moved to module functions (ruled 2026-11-07: the helper-shaped
-  ones, about 17 on `PlanningProblem` and the `Planner` base, become `require_*`/`*_of` module
-  functions; a name an example, notebook or tutorial calls stays a method; a planner's algorithm
-  steps stay methods; built inside the minimal surface). Not recommended by the scan: `%` against
-  `discretize`, dropping the analysis method facades, one array layout for every plot and scan,
-  a result object for `pv.solve`. Done when the maintainer rules on each.
-- [ ] **The parameters model's follow-ups** (the one parameters model merged 2026-11-05, its
-  contract DESIGN §4 "Parameters"). Three of its four landed (the problem evaluator was found to
-  run its tree as an argument already, its run jitted on the tree; a planner's method numbers and
-  seed are views of its tree; an intersection's, a union's and a scene's members are keyed by
-  class name, a repeat numbered). Left, deferred in the rulings run (it spans twelve modules and
-  moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
-  `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
-  been dropped.
-- [ ] **`refresh()` retired** (ruled 2026-11-07: removed; built on `v04-build`, in review: the row leaves at the merge): a block's state size is fixed once
-  built (DESIGN §4, build versus run), the diagram's layout computed when blocks are added;
-  `refresh()` goes from `System`, the diagram and the sampled views; the six test calls go
-  (no-ops: a block's `x0` is a live view, checked on a continuous and a sampled loop), and the
-  two tests that pinned it pin the live views instead. Done when no `refresh` is left and
-  DESIGN's "Three owners of a start" drops its sentence.
-- [ ] **The core's mathematical types on `minilink.core`** (CA-5; ruled 2026-11-07, with §1.13's
-  root exports; built on `v04-build`, in review: the row leaves at the merge): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
-  `ScaledCost`, `SampledSystem`, `SampledDiagramSystem` on `minilink.core`; `QuadraticField` and
-  `GridField` on the root. Done when they import from there, `test_teaching_surface.py` pins the
-  two root names, and the tutorials' deep `minilink.core.fields` import and its allowlist entry
-  are gone.
+- [ ] **The parameters model's last follow-up** (the model's contract: DESIGN §4,
+  "Parameters"): the problem's internal helpers (`parts_view`, `sample_params`,
+  `nominal_plant_params`, `drawn_paths`) folded into its held tree; deferred in the rulings run
+  (it spans twelve modules and moves no number). Done when it has landed or been dropped.
+
 ### 1.12 The minimal surface
 
-Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, CI and
-benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
-**[ask]**; the order is the plan's §4.
+Design: [minimal-surface.md](minimal-surface.md), what is left of it: the test layers' options
+and a starting demo list, the inputs of the rebuild below. Landed in v0.4: the CI shape
+(MS-D3), the short-term test restructure (the `slow` marker and `--runslow`), the notebooks
+(MS-D5: the two duplicate topic notebooks gone) and the benchmarks (MS-D6: the regression gate
+alone).
 
-- [ ] **The tests' short-term restructure** (built on `v04-build`, in review: the row leaves at the merge; the tests of the deleted benchmark helpers went, eleven tests over about 15 s carry a `slow` marker, run by `--runslow` in the regression job, the nightly and the release check, the per-change run 8 min 50 s → 4 min 22 s; MS-D1 ruled 2026-11-07: the net for v0.4's sweeps,
-  kept small): the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
-  CI relief), the files otherwise stay; the layers' details (MS-D2a–e) wait for the clean slate.
-- [ ] **The maintainer's demo rebuild, then the tests' clean slate** (MS-D1, 2026-11-07), the
-  last steps of v0.4: the maintainer deletes all demos and rebuilds a minimalist set; once the
-  new demos are what he wants, the test infrastructure is rebuilt from scratch around the new
-  library. Done when the new demo set and the new suite replace the old ones.
-- [ ] **The demo set** (MS-D4): deferred to the maintainer's end-of-v0.4 rebuild (row below).
-- [ ] **The notebooks** (MS-D5, ruled 2026-11-07): the course notebooks keep their paths, their
-  content the maintainer's; the two topic notebooks that duplicate GRO860's go
-  (`topics/reinforcement_learning/drone_ppo.ipynb`,
-  `topics/reinforcement_learning/pendulum_value_iteration_vs_lqr_vs_rl.ipynb`) with their
-  references (the notebook checker, `examples/README.md`, ROADMAP); the five unique topic pages
-  stay until K5. Done when the two are gone and the notebook checks pass.
-- [ ] **The benchmarks** (MS-D6, ruled 2026-11-07): the regression gate stays; the studies, the
-  one-off baselines and the pyro parity scripts go, with `tests/README.md`'s study row. Done
-  when `benchmarks/` holds the gate alone and the CI gate passes. Built on `v04-build`, in
-  review: the row leaves at the merge. What went: the study driver and its presets with their
-  helpers (`step_evaluators.py`, `planning_rrt.py`, `systems/step.py`), its IDE launcher and
-  bridge test; the nested-flatten studies and their scenarios (the flatten-default row's
-  benchmark, in history at `b5b9892`; the two fixtures the flatten tests read moved into
-  `tests/unittest/flatten_diagram_helpers.py`); the one-off captures (`params_baseline.py`,
-  `step_model_baseline.py`, `v03_baseline.py` with `baselines/v03_core.json`, `v03_budget.py`,
-  `compile_once.py`, `params_binding.py`); the pyro parity scripts; the two parity CLI wrappers
-  (`--suite e4|f_mpc --update` does the same); the ODE-solver notebook. `public_names.py` stays
-  beside the gate as a test tool.
+- [ ] **The maintainer's demo rebuild, then the tests' clean slate** (MS-D1, ruled 2026-11-07)
+  **[maintainer]**, the last steps of v0.4: the maintainer deletes all demos and rebuilds a
+  minimalist set (the demo set, MS-D4, is his); once the new demos are what he wants, the test
+  infrastructure is rebuilt from scratch around the new library (the layers' details, MS-D2a–e,
+  decided then). Agents update `examples/README.md`'s map and the demo checks after each of his
+  changes. Decided with the new set:
+  - a demo of tabular Q-learning on the pendulum grid beside value iteration, converging toward
+    the DP cost-to-go (GRO860's RL row, ruled with K4) **[ask — student-facing]**;
+  - the MPC hyperparameter-tuning demo (§1.7);
+  - the cart-pole RL demo's budget **[ask]**: the training reward moved to `−g·dt`; measured
+    2026-11-07 (PPO, 3 M steps, `dt = 0.05`, seeds 0–7, the demo's own
+    `evaluate(n_trials=100, key=1)` and its 10 s run from hanging; success = upright
+    `cos θ < −0.95` and `|cart| < 5 m` over the last 2 s): **1 seed of 8** swings up and
+    balances (seed 2, `J = 1.23 ± 0.84`); the other seven swing up once and spin (eval `J` 21 to
+    1756, median about 32), and the training's final episode cost (1.17–1.85) does not tell them
+    apart. Options: a larger budget, another reward or exploration setting, or the demo shown as
+    one seed's result. Also seen: `evaluate` reports every seed feasible and reached at
+    `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`);
+  - the supported plants (K8-3) and GMC714's pinned names (G3), both in §2, drawn after it.
+
+  Done when the new demo set and the new suite replace the old ones.
 
 ### 1.13 The root exports and the tutorials' quirks
 
-From the three-layer tutorials' audit (the notebooks work around each today):
-- [ ] **The root exports** (ruled 2026-11-07, built with CA-5, §1.11): only `QuadraticField` and
-  `GridField` join the root; `Field` and the sampled classes go on `minilink.core`, MPC and MPPI
-  stay on their bands. Done with CA-5's row.
-- [ ] **A linear model's matrices by name**: `lin.A` is a method, so the tutorials read
-  `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form. The
-  method stays (the class contract, `A(t, params)`); the two tutorials call `lin.A()`.
-  Built on `v04-build`, in review: the row leaves at the merge.
-- [ ] **`plot_bode` on a sampled loop**: a method on continuous systems only, the function form
-  for the sampled loops. Done when both read the same verb. The four linear-analysis plots
-  (`plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`) moved to one mixin both
-  the continuous and the step systems inherit; the discrete tutorial calls `loop.plot_bode()`.
-  Built on `v04-build`, in review: the row leaves at the merge.
+No open row: the root exports (`QuadraticField` and `GridField` on the root, the core's
+mathematical types on `minilink.core`), a linear model's matrices read as `lin.A()`, and the
+four linear-analysis plots on continuous and step systems alike landed in v0.4.
 
 ---
 
@@ -504,17 +297,12 @@ From the three-layer tutorials' audit (the notebooks work around each today):
 
 Not on the core's path; it runs beside it. The course material stays on `main` until the new core is ready.
 
-**Wave K — convergence** (K7's
-analysis is the ruling table K1 asks for). The goal: a
-smaller library that is easier to read and keep — fewer names, fewer demos, prototypes
-labelled as such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so
-the demo sweep touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
+**Wave K — convergence** (K7's analysis is the ruling table K1 asks for). The goal: a smaller
+library that is easier to read and keep — fewer names, fewer demos, prototypes labelled as
+such. It extends D2 (whose open picks join K1's table) and runs before D1.3, so the demo sweep
+touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1). One demo per
+feature (K4) became the maintainer's demo rebuild (§1.12).
 
-- [ ] **One demo per feature** (K4) **[maintainer]**: the maintainer's own pass on the demos,
-  with the K1 inventory's §3 (twins and proposals) as the input; agents update `examples/README.md`'s
-  map and the demo checks after each of his changes. Also, an orphan ruling: one demo of
-  tabular Q-learning on the pendulum grid beside value iteration, converging toward the DP
-  cost-to-go (GRO860's RL row) **[ask — student-facing]**.
 - [ ] **The catalog clean-up** (K8): two import layers and support by
   test. Steps, one commit each: **K8-0** the car family to three models (`KinematicBicycle`,
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
@@ -543,10 +331,6 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
   flagship smoke (both on `minilink.experimental.c_export`). Left: the unsupported plants' test rows
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
-- [ ] **V1.2, the rest** (the evaluation of a run, the problem's fields, the price switch and the cost
-  bound landed; LQR records "U ignored" and never warns): `ReinforcementLearningPlanner` sizes its default `NeuralPolicy`
-  from `problem.U.bounding_box()` and refuses an unbounded `problem.U`, and
-  `StateSpaceGrid.state_bounds` aligns with `input_bounds`.
 - [ ] **The rest of the catalog declares its time constant** (the automatic step's first scope landed:
   the linear blocks, the pendulum, the cart-pole, the dynamic bicycle, the racecar,
   `SlidingMode`): every other catalog plant (the arms and manipulators, the drones, the boats,
@@ -560,51 +344,42 @@ the demo sweep touches fewer files. Nothing leaves without the maintainer's ruli
 workboard; the former wave G rows are §4 rows.
 
 - [ ] **GMC714's names pinned** (G3; ruled 2026-11-07: pinned once, at the very end of v0.4,
-  after the renames and the maintainer's demo rebuild; the agent drafts the list from the GMC714
-  labs, every name they import or call, for the maintainer's review).
-  The moves and renames landed (A6's names,
-  `RRTPlanner` in the teaching lane, `JointImpedance`, `TaskKinematic` and
+  after the maintainer's demo rebuild; the agent drafts the list from the GMC714 labs, every
+  name they import or call, for the maintainer's review). The moves and renames landed (A6's
+  names, `RRTPlanner` in the teaching lane, `JointImpedance`, `TaskKinematic` and
   `TaskKinematicNullspace` on the root prelude, the `minilink.dynamics` band facade,
-  `ModelPredictiveController` in a teaching-lane module), and the MPC's constructor changed once
-  with its rebuild on the planner's face, as planned: `ModelPredictiveController(planner, *,
-  inputs=, delay=False, warm_start=True, backend=, verbose=)`, run as `(mpc % Δ) @ plant`.
-  Left, the gate: every tool a lab uses has one public teaching name, frozen for the term, each
-  with a docstring, a demo and the teaching-surface test (ROADMAP §2's soft rule). Done when
-  `test_teaching_surface.py` pins the list, each name has a demo under `examples/demos/`, and no
-  GMC714 lab needs a deep import.
+  `ModelPredictiveController(planner, *, inputs=, delay=False, warm_start=True, backend=,
+  verbose=)` in a teaching-lane module, run as `(mpc % Δ) @ plant`). Left, the gate: every tool
+  a lab uses has one public teaching name, frozen for the term, each with a docstring, a demo
+  and the teaching-surface test (ROADMAP §2's soft rule). Done when `test_teaching_surface.py`
+  pins the list, each name has a demo under `examples/demos/`, and no GMC714 lab needs a deep
+  import.
 
-- [ ] **One mechanical family** (S32) **[ask — core]**, ruled, v0.4: `GeneralizedMechanicalSystem` a child of `MechanicalSystem` beside `Manipulator`, `H` the
-  one mass-matrix name (`M` renamed in the class, the boat and the plane), `qv2x` / `x2qv` aligned, the
-  model-based controllers accepting every mechanical plant; `Boat2D` (and `Plane3D` in the
-  experimental tier) with `y` and `x` like every mechanical plant (already so today);
-  `DynamicBicycle` on the generalized child (scan: dynamics#5); also `DynamicBicycle.M` (read by the racecar and
-  `BicycleDynRate`) and `examples/projects/car_trajopt`'s ladder, and `DynamicBicycle`'s base
-  moves from `DynamicSystem` to the generalized child. Done when the boat and the plane pass the
-  catalog contract test as children of `MechanicalSystem`, `ComputedTorque` runs on one of them in a
-  test, and no class names the mass matrix `M`.
-  Postponed by the maintainer. Ruled: computed torque on a body-frame
-  plant is `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)`, a non-square `N` refused; a
-  model-based law refuses an underactuated plant at construction, so the done-when runs
-  `ComputedTorque` on a fully actuated body-frame test body, not on the boat or the plane.
-  Still open: `DynamicBicycle`'s base. Its named ports and its subclasses' extra states do not
-  fit `[q; v]`; the recommendation (and the reviewers') is to rename `M` to `H` only now and
-  move the base when K8 reworks the cars.
-  Postponed again (2026-11-07), the `M` → `H` rename included: the maintainer reviews the
-  mechanical hierarchy first (which class is the child of which, `MechanicalSystem` and
-  `GeneralizedMechanicalSystem`, the manipulators, the body-frame vehicles) and the car models'
-  base, at the end-of-v0.4 demo cleanup or later (the row below).
 - [ ] **The mechanical hierarchy and the car models' base, reviewed** **[maintainer]**
-  (2026-11-07): which mechanical class is the child of which, where the car family
-  (`DynamicBicycle` and its children, the racecar, `BicycleDynRate`) sits, and the one
-  mass-matrix name; with the end-of-v0.4 demo cleanup or later. Done when the maintainer rules
-  and the mechanical family's row above is rebuilt on it.
+  (postponed 2026-11-07 to the end-of-v0.4 demo rebuild or later), then **one mechanical
+  family** (S32) **[ask — core]** rebuilt on the ruling. The review: which mechanical class is
+  the child of which (`MechanicalSystem`, `GeneralizedMechanicalSystem`, the manipulators, the
+  body-frame vehicles), where the car family sits (`DynamicBicycle` and its children, the
+  racecar, `BicycleDynRate`), and the one mass-matrix name. The proposal on the table:
+  `GeneralizedMechanicalSystem` a child of `MechanicalSystem` beside `Manipulator`; `H` the one
+  mass-matrix name (`M` renamed in the class, the boat, the plane, `DynamicBicycle.M` read by
+  the racecar and `BicycleDynRate`, and `examples/projects/car_trajopt`'s ladder); `qv2x` /
+  `x2qv` aligned; the model-based controllers accepting every mechanical plant; `DynamicBicycle`
+  on the generalized child (scan: dynamics#5), although its named ports and its subclasses'
+  extra states do not fit `[q; v]` (the reviewers' recommendation: the rename only, the base
+  moved when K8 reworks the cars). Already ruled: computed torque on a body-frame plant is
+  `v̇_des = Kp N(q)⁻¹ (q_d − q) + Kd (v_d − v)`, a non-square `N` refused; a model-based law
+  refuses an underactuated plant at construction. Done when the maintainer rules, the boat and
+  the plane pass the catalog contract test as children of `MechanicalSystem`, `ComputedTorque`
+  runs on a fully actuated body-frame test body in a test, and no class names the mass matrix
+  `M`.
 
 ---
 
 ## 3. Standing work — textbook code, minimal demos, consolidation, the plotting lane
 
 Work that runs across the releases, behaviour-preserving where it touches code. Its core rows
-(A5, RN-2, T1, T2, S53, S65, S66) moved to §1.
+(A5, S53, S65) moved to §1.
 
 - [ ] **Naming, the rest** (A4) (any time, agent; the naming quick wins landed:
   the class name as the default `name`, shortcuts named as the expression they build, `id`
@@ -617,23 +392,15 @@ Work that runs across the releases, behaviour-preserving where it touches code. 
 Release contract:
 [ROADMAP §4.2](../dev/ROADMAP.md#42-v02--gro501-end-to-end).
 
-**Order:** P10's remaining steps (AC-5, AC-6 in the plotting lane; AC-7 and AC-8 in the v0.3
-core, §1.3 and §1.5),
-then the P4 follow-ups. P11 and P6 were dropped; TB-b landed with the
-textbook pass.
+**Order:** P10's remaining steps (AC-5 and AC-6, in the plotting lane), then the P4
+follow-ups.
 
 - [ ] **Automation by convention** (P10):
   standard port names drive the wiring, three reserved names (`plant`, `controller`,
   `observer`) are the roles every tool reads, and the cost is scored on the plant. Its
-  steps, in build order:
-  - AC-0 no controller classes, AC-2a the resolver, AC-OP the operators, AC-3
-    composition on standard names and AC-2b/c the one-time rename and the ports `d` / `n`
-    (all landed; the MPC's `u_ff` → `u` with AC-8a). Wave B
-    of P10 is done.
-  - AC-4 the loop inputs and `observer=` (landed); AC-5
-    plots and AC-6 animation, in the plotting lane; AC-7 the cost on the plant, the v0.3 core
-    (§1.3); AC-8a the sampled loop keeps in step, alongside; AC-8b with S31 (§1.5; it was v0.4
-    before).
+  steps AC-0 to AC-4, AC-7 and AC-8 landed (the roles, the resolver, the operators, the
+  standard names, the loop inputs and `observer=`, the cost on the plant, the sampled loop).
+  Left, in the plotting lane:
   - **AC-5, the plots' rules:** `signals="plant"`, `"controller"` or `"observer"` selects
     every port of that block, as `"plant:y"` selects one; the default auto mode shows every
     port of the plant and the controller, each wire once (the reference, the error, `d` and
@@ -653,11 +420,8 @@ textbook pass.
   `closed_loop` with sources give the same plots and camera, and a census of the loops (ids,
   edge ports with labels and units, roles) is byte-identical apart from the intended change.
 
-  Related rows: S66 lands after
-  AC-4; RN-4 and RN-5 build on AC-2, AC-4 and AC-7; S70 turns P10's refusals into
-  `WiringError`; S31 brings AC-8b. The automatic `dt` and input-hold findings stay with S65.
-  Also, later, not v0.2: `sensitivity(T)` reading the roles of one loop diagram instead of
-  `plant=, controller=`.
+  Related: S70 turns P10's refusals into `WiringError`. Also, later: `sensitivity(T)` reading
+  the roles of one loop diagram instead of `plant=, controller=`.
 - [ ] **follow-ups** (P4) (design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md)):
   named input ports on the state-space base so observers and sensitivity blocks share one
   `f` (scan: analysis#13); the review of the `observer` role against the real blocks when
@@ -667,12 +431,13 @@ textbook pass.
 ### Wave D — textbook code, minimal demos, consolidation
 
 **Order:** the S69 follow-up now; the T rows' leftovers as picked; D1.1, D1.2, then D1.3
-file by file; D2, D3, S67 and S68 as picked (S65 and S66 moved to §1).
+file by file; D2, D3, S67 and S68 as picked.
 
 **T — the textbook pass.** Landed (PR #125, PR #126): the textbook layout of TB-b and T1–T7,
 behaviour- and backend-preserving; its style sheet lives in RULES §5 (5.3's six blocks, 5.8,
-5.10, 5.22, 5.25–5.27) and §7.8. The rows below hold what neither PR touched, each a behaviour, backend or API item verified open
-on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved to §1.1.)
+5.10, 5.22, 5.25–5.27) and §7.8. The rows below hold what neither PR touched, each a
+behaviour, backend or API item, rechecked open on `dev` on 2026-11-08; the recipe and the
+reference are AGENTS'.
 
 - [ ] **dynamics catalog** (T3): `manipulators/arms.py` (`from_manipulator` sets `_kin_arm`,
   `name`, `camera_scale` and `camera_target` on the instance from outside `__init__`;
@@ -684,27 +449,18 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
 - [ ] **planning** (T5): `direct_collocation.py` / `shooting.py` / `multiple_shooting.py`
-  read `self.options.*` inside their bodies (the planner's parametric probe went with the
-  start-only replanning route).
-  `ReinforcementLearningPlanner(verbose=True)` keeps printing by default (ruled). (The planner's
-  method table went with OPW-1, in the v0.3 run.)
-- [ ] **the MPC block's contract** (T6): answered by the compiled face (DESIGN §6);
-  the work is TODO §1.8's "The MPC rebuilt on the planner's face", which removes the `hasattr`
-  probing (`validate_mpc_planner`, `export_mpc_dual_rate_computer`'s `replan_divisor` and
-  `set_after_solve` checks), `Command` and `MPCTickSolve`. The rebuilt MPC's ports are `u`, `z`, `x_ref` and
-  `u_ref`. This row
-  closes when that §1.8 row lands.
+  read `self.options.*` inside their bodies.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
-2026-09-15 foundations review, in git history).
+2026-09-15 foundations review, in git history). The demo rows apply to the demos the
+maintainer's rebuild keeps (§1.12); the notebooks' are unchanged.
 
 - [ ] **Native reporting the demos hand-roll** (D1.1) (agent lane, plotting): an `Optimizer`
   convergence plot (`optim_plot.py`); two planners' trees or solutions side by side
   (`rrt_holonomic_obstacles.py`); a `rollout_batch` family plot (`rollout_param_family.py`);
   a 3-D phase plot (`lorenz_attractor.py`). Each one `plot_*` or `__str__` with a test;
   DESIGN §7 lists them.
-  Also: `print` on `StepRollout` and `HybridSimResult`, one validator shared with
-  `Trajectory` (scan: core#7); `print(controller)` shows the gains (scan: control#10);
+  Also: `print(controller)` shows the gains (scan: control#10);
   several trajectories on one phase plane and two fields on one grid surface (scan:
   examples#6). Also, planned with the evaluation record and not built: the
   `Evaluation` record's `plot_cost` / `plot_trajectories`, `Comparison.plot_cost`, and the
@@ -717,15 +473,13 @@ on `dev` at 638215e; the recipe and the reference are AGENTS'. (T1 and T2 moved 
 - [ ] **The sweep** (D1.3), one file per step, maintainer reviews each diff **[ask per file]**:
   the showcases (`showcase_jax.ipynb` first;
   `showcase_jax` rewritten, awaiting review), then the non-clean demos, then the teaching
-  notebooks; the three `compile/` demos wait for V1 (their helpers *are* that feature). Done when
+  notebooks. Done when
   the D1.2 allowlist is empty and the notebook checks pass.
   Also: the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09 filled (scan:
   examples#3); the facade gaps the import allowlist records closed (scan: examples#13).
 - [ ] **The planning demos and notebooks on the solution verbs** (D1.4) **[ask]**: the
-  `planner.solve().trajectory` one-liners, the hand-rolled comparisons and the per-file
-  `@dataclass` rows become `solution.plot_*` and `compare(...)` (a runnable draft of
-  `vi_pendulum_lqr.py` exists).
-  Also: `Planner.plot_solution` is the solution's own `plot_trajectory` (scan: planning#7).
+  hand-rolled comparisons and the per-file `@dataclass` rows become `solution.plot_*` and
+  `compare(...)` (a runnable draft of `vi_pendulum_lqr.py` exists).
   Also: the Simulator under RULES 2.4, which keeps `last_traj` and `last_solve_time_s`
   besides the `sys.traj` shortcut (the maintainer held it, 2026-11-04); its `last_debug`
   stays a diagnostic.
@@ -747,8 +501,7 @@ pick):
 - [ ] One `ctl` for the model-based laws; `LookupPolicy` beside the other laws
   (scan: control#8, control#13).
 
-**D3 — hardening rows** (research lane, small; S53 and the `HybridSimulator` drift row moved to
-§1):
+**D3 — hardening rows** (research lane, small):
 
 - [ ] RRT checks `X.contains(sample)` and the goal region without the time: a time-varying `X` or
   `Xf` is read at `t = 0` (`rrt.py`, `rrt_star.py`); the tree nodes need a time (the sum of the
@@ -764,12 +517,9 @@ pick):
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
   details in the 2026-09-22 improvement suggestions §2.4, in git history): `step_diagram % dt`
   adds boundary ports to a user `StepDiagramSystem`; the sampled `@` copy of a one-block
-  plant diagram drops a diagram-level function output port; a `%` override that ends in
-  `as_computer(self, schedule)` would recurse, and `System.__mod__` calls a private helper;
-  `RealtimeSimulator`'s offline automatic `dt` reads the hint without `refresh()`; an
-  explicit `backend='jax'` on a NumPy-only set or cost raises a raw trace error;
-  `discretize(diagram, params={'dt': v})` is refused although a diagram would keep its
-  blocks' params, and a raising params setter can leave a diagram half-updated;
+  plant diagram drops a diagram-level function output port; an explicit `backend='jax'` on a
+  NumPy-only set or cost raises a raw trace error; a raising params setter can leave a diagram
+  half-updated;
   assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
   read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
   entry still requires Ipopt).
@@ -830,16 +580,16 @@ pillar names it.
 - [ ] **LQGPlanner** **[ask — planner API]**: `LQGPlanner(problem)` on a
   `PlanningProblem` stochastic by its parts, with a `QuadraticCost` and noise source blocks
   on `d` / `n`, beside
-  `LQRPlanner`: the policy is the `lqg` box, the record holds `K`, `L`, both Riccati matrices
+  `LQRPlanner`: the controller is the `lqg` box, the record holds `K`, `L`, both Riccati matrices
   and the poles, the cost-to-go the certainty-equivalent form; `Q_n = B_w W B_wᵀ`,
   `R_n = D_v V D_vᵀ` from `linearize_matrices(sys, wrt="d")` / `wrt="n"` and the blocks'
   `psd`. With RN-4. Design: [estimation-and-state-feedback.md](estimation-and-state-feedback.md) §5.
 
-- [ ] **The rest of the field object** **[ask — core]** (A1; `GridField` itself and the
-  cost-to-go of LQR and value iteration as fields are §1.8, plans as policies): tabular RL's
-  `Q` as a `GridField` over the joint levels of `(x, u)`, with `min_over_u()` the `J` field and
-  `greedy()` the `LookupPolicy` (ruled 2026-11-06, [plans-as-policies.md](plans-as-policies.md)
-  §6.4), and tabular RL's `cost_to_go` on it; `CallableField` (RL critics); `LinearApproximator`
+- [ ] **The rest of the field object** **[ask — core]** (A1; `GridField` and the cost-to-go
+  of LQR and value iteration as fields landed in v0.4): tabular RL's `Q` as a `GridField` over
+  the joint levels of `(x, u)`, with `min_over_u()` the `J` field and `greedy()` the
+  `LookupPolicy` (ruled 2026-11-06, [plans-as-policies.md](plans-as-policies.md) §7), and
+  tabular RL's `cost_to_go` on it; `CallableField` (RL critics); `LinearApproximator`
   as a field; `LyapunovCertificate.contains`, `slice_extent`, `V_dot` and `search_level` on the
   field (its `V`, `region`, `extent` and `verify`'s draw landed in v0.3); `lqr_finite_horizon`
   handing out `QuadraticField(x̄, S, t)` beside its controller; `PolicyEvaluator` takes the
@@ -847,19 +597,17 @@ pillar names it.
   baselines `cmp` and `test_planning_solution.py`, `test_rl_tabular.py` and
   `test_rl_planner.py` pass.
 
-**Workspace geometry.** Design: [geometry-module.md](geometry-module.md) (the field object is
-§1.9). Baselines first, as each plan states.
+**Workspace geometry.** Design: [geometry-module.md](geometry-module.md). Baselines first, as
+each plan states.
 
-- [ ] **Workspace geometry** (A3) **[ask — core]** (S57 was its earlier id).
-  [geometry-module.md](geometry-module.md) implementation steps 1–6. Landed: the
-  `core/geometry/` package with the shapes and the paths (a polyline open or `closed`), and
-  the path-tracking laws reading a path. Left: track, scene, probes, `mount`, spatial
-  fields, grid, catalog
-  `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
-  plots and overlays under `graphical/` with lazy methods on `Scene` / `Track`;
-  `planning.spatial` re-exports then deletes in the same change as the call sites (the path
-  names already left it, ruled 2026-11-07);
-  the path-tracking laws take a Track once it moves. Done when the two UdeS racecar demos and the RRT forest demo
+- [ ] **Workspace geometry** (A3) **[ask — core]**: the rest of geometry-module.md's steps.
+  Landed: the `core/geometry/` package with the shapes and the paths (a polyline open or
+  `closed`; the path names left `planning.spatial`, ruled 2026-11-07), and the path-tracking
+  laws reading a path. Left: the track, the scene, the probes, `mount`, the spatial fields, the
+  grid, and the catalog (`oval_circuit`, `racecar_circuit`, `holonomic_forest`); the plots and
+  overlays under `graphical/` with lazy methods on `Scene` / `Track`; `planning.spatial`
+  deleted in the same change as its call sites; the path-tracking laws take a `Track` once it
+  moves. Done when the two UdeS racecar demos and the RRT forest demo
   use the catalog, `control` imports geometry with no planning import, and the suite is
   green. Glyph rename stays S30.
   Also: `Shape` unions flatten like `IntersectionSet` and `SumCost` (scan: core#6);
@@ -895,9 +643,9 @@ pillar names it.
     levels, `QFunction` with replay and a target network. Research lane first.
   - [ ] **Approximate dynamic programming** on `dynamic_programming/approximation.py` (fitted
     value iteration); design first, it touches the planner API. **[ask]**
-- [ ] **The Gymnasium view on the step face** (from the v0.3 run): `Sys2Gym` steps the
-  problem's compiled face (`transition`, its failure rule and cost bound) in place of its own
-  compiled step, its reward the RL environment's. Moves the GRO860 Gymnasium notebooks' numbers
+- [ ] **The Gymnasium view on the step problem's equations** (from the v0.3 run): `Sys2Gym`
+  steps the step problem's own equations (`transition`, its failure rule and cost bound) in
+  place of its own compiled step, its reward the RL environment's. Moves the GRO860 Gymnasium notebooks' numbers
   once **[ask — student-facing]**. Done when one policy's return from `Sys2Gym` and from the RL
   environment agree.
 - [ ] **General serial chain** (C6) **[ask — core]**: one mechanism description (DH table or
@@ -949,16 +697,13 @@ pillar names it.
   only the jacobian), self-contained for a cloud agent. Done when `jax.grad` of the phase
   margin and of each closed-loop pole of `PID() @ Pendulum()` with respect to a gain and to
   the mass matches a central difference, and the NumPy callers see no change.
-- [ ] **Native solvers beyond the proof of concept** **[ask — core]** (moved from §6, where it
-  was a Later idea; the proof of concept, NS-1, NS-2's fixed-`K` form, NS-8 and NS-9, is §1.8):
-  native optimizers, the solve as a rollout (the maintainer's vision): native
-  solvers as pure laws beside the wrapped ones, program categories, fully traced JAX solves
-  (NS-2's tolerance form, NS-3 implicit differentiation, NS-4 least squares, NS-6 the augmented
-  Lagrangian, NS-7 the stochastic category); MPPI's tick a pure instance of the
-  fixed-iteration tick (native-optimizers.md §4.6b; the proof of concept puts the gradient MPC
-  first); long term, convergence analysed as stability
-  (NS-5, with the discrete step analysis ruled in) —
-  [native-optimizers.md](native-optimizers.md) (its shape a choice; v0.5).
+- [ ] **Native solvers beyond the proof of concept** **[ask — core]** (the proof of concept,
+  NS-1, NS-2's fixed-`K` form, NS-8 and NS-9, landed in v0.3): native solvers as pure laws
+  beside the wrapped ones, program categories, fully traced JAX solves (NS-2's tolerance form,
+  NS-3 implicit differentiation, NS-4 least squares, NS-6 the augmented Lagrangian, NS-7 the
+  stochastic category); long term, convergence analysed as stability (NS-5's lesson on
+  `optimizer.as_step_system()`) — [native-optimizers.md](native-optimizers.md) (its shape a
+  choice; v0.5).
 
 ---
 
@@ -967,8 +712,8 @@ pillar names it.
 ROADMAP §5.5 and §5.6: v1.0 means a colleague builds a course on minilink and trusts it for
 three years. The foundation rows are design conversations before code.
 
-**Order:** the foundations (S27, S44, S30, V3; S31 and S75 moved to v0.3, S37 absorbed by S75) before the trust contract; V11 once,
-after the v0.3 tag; the v1.0 rows after two cohorts.
+**Order:** the foundations (S27, S44, S30, V3) before the trust contract; V11 once, between
+terms; the v1.0 rows after two cohorts.
 
 ### v0.9 — what could still break a name
 
@@ -1054,7 +799,7 @@ after the v0.3 tag; the v1.0 rows after two cohorts.
   linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
   the dual of `trajectory_lqr`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
   R_n, x0, P0)`, `P` a state, Jacobians taken on the model's `f`, `h` inside its own `f`);
-  the sampled filters (unscented, discrete Kalman, particle) after AC-8a / S31; the
+  the sampled filters (unscented, discrete Kalman, particle) on the sampled loop; the
   `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);
   online parameter estimators (recursive least squares, gradient laws) under a role of their
   own. Each revisits the observer conventions of
