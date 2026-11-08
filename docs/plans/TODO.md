@@ -928,8 +928,6 @@ One line each; open a plan doc only when a design needs a writeup.
   shaping filter `τ ż = −z + w`, its state started from `N(0, W / 2τ)` so it is stationary
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
-- Multiple shooting with the problem's parameters: shooting and collocation take the
-  program's tree on the compiled face; multiple shooting does not yet.
 - A training run that rebinds its numbers: the RL planner's `params` is a report
   today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
   one.
