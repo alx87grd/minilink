@@ -245,7 +245,7 @@ construction.
 
 ### 1.6 One score
 
-Contract: DESIGN §6 (the problem evaluator, the step face). Ruled, besides it, three
+Contract: DESIGN §6 (the problem evaluator, the step problem's own equations). Ruled, besides it, three
 points: the sampled check accepted, the run priced to the horizon with
 the input held, a solver's own objective allowed but the score always the problem's cost.
 
@@ -418,9 +418,11 @@ commit per proposal, its callers and DESIGN in the same change.
   list of callables, each hook filtering for itself (ruled 2026-11-07: the five `live_plot*`
   keywords leave both RRT planners' `solve`; the user's callback sees every extension), and tabular
   RL gains `solve(verbose=)`; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
-  `problem.compile()` always returning the evaluator, the step face from
-  `discretize(dt).compile()` (ruled 2026-11-07: one return type per verb, a controller-less
-  `problem.compile` refused with that pointer; 14 call sites); about 80 public helper methods on the diagram, the problem, the
+  `problem.compile(controller)` always returning the evaluator (ruled 2026-11-07: one return
+  type per verb; then ruled 2026-11-07, "the step problem answers its own equations; no second
+  noun": `controller` a required argument, the custom refusal gone, `StepPlanningProblem.compile`
+  gone, the step problem's own `transition`, `terminal` and `run` delegating to the internal
+  `StepModel`, the former `StepFace`, exported on no facade); about 80 public helper methods on the diagram, the problem, the
   evaluator and the planners moved to module functions (ruled 2026-11-07: the helper-shaped
   ones, about 17 on `PlanningProblem` and the `Planner` base, become `require_*`/`*_of` module
   functions; a name an example, notebook or tutorial calls stays a method; a planner's algorithm

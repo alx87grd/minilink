@@ -13,6 +13,7 @@ from minilink.core.fields import Field
 from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_model import step_model_of
 from minilink.planning.step_problems import StepPlanningProblem
 
 pytest.importorskip("jax")
@@ -888,7 +889,7 @@ def test_environment_reward_stays_finite_when_a_step_blows_up():
         dt=0.1,
         backend="numpy",
     )
-    env.face.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
+    env.model.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
     x = np.array([0.1, 0.0])
     x_next, _, reward, terminated, _ = env.step(x, 0.0, np.array([0.0]), None)
     assert np.all(np.isfinite(x_next)) and np.isfinite(reward) and bool(terminated)
@@ -967,22 +968,22 @@ def grid_world(**fields):
     )
 
 
-def test_an_rl_planner_trains_on_a_native_grid_world_through_its_face():
+def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     problem = grid_world(gamma=0.9)
     planner = ReinforcementLearningPlanner(
         problem, n_envs=8, n_steps=32, hidden=(32,), episode_length=12, seed=0
     )
 
-    # The environment reads the face: ticks of 1, its γ, its cost bound over an episode
-    face = problem.compile()
+    # The environment reads the step model: ticks of 1, its γ, its cost bound over an episode
+    model = step_model_of(problem)
     env = planner.env
     assert (planner.dt, env.n_steps_per_episode, env.reward) == (1.0, 12, "stage")
-    assert planner.gamma == face.gamma == 0.9
-    assert env.failure_cost == face.failure_cost_over(12, 0.9)
+    assert planner.gamma == problem.gamma == 0.9
+    assert env.failure_cost == model.failure_cost_over(12, 0.9)
 
-    # The face scores a law: J = Σ γᵏ c_k over 12 ticks from the start
+    # The problem scores a law: J = Σ γᵏ c_k over 12 ticks from the start
     def score(controller):
-        return face.run(lambda x, k: np.asarray(controller.action(x)), n_steps=12)
+        return problem.run(lambda x, k: np.asarray(controller.action(x)), n_steps=12)
 
     untrained = score(planner.actor)
     solution = planner.solve(n_timesteps=5_000)
@@ -996,13 +997,14 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_face():
         np.abs(untrained[0][-1] - [5.0, 3.0])
     )
 
-    # Its score is its face's rollout over the episode, the controller handed out
-    # read by the face as a block
+    # Its score is the problem's rollout over the episode, the controller handed out
+    # read as a block
     scored = planner.solve(n_timesteps=256, evaluate=True)
     assert scored.evaluation.n_trials == 1 and scored.trajectory is None
     assert float(scored.evaluation.J[0]) == score(scored.controller)[3]
     assert (
-        float(face.run(scored.controller, n_steps=12)[3]) == score(scored.controller)[3]
+        float(problem.run(scored.controller, n_steps=12)[3])
+        == score(scored.controller)[3]
     )
 
 
@@ -1011,6 +1013,6 @@ def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():
         planner = ReinforcementLearningPlanner(
             grid_world(), n_envs=2, n_steps=8, hidden=(4,), episode_length=6
         )
-    assert planner.gamma == 0.99 and planner.env.face.gamma == 1.0
+    assert planner.gamma == 0.99 and planner.env.model.gamma == 1.0
     with pytest.raises(ValueError, match="own clock"):
         ReinforcementLearningPlanner(grid_world(gamma=0.9), dt=0.1, hidden=(4,))

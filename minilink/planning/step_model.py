@@ -1,4 +1,4 @@
-"""The compiled step face of a problem: ``transition(x, u, k, params) -> (x_next, c_k)``."""
+"""The step model of a problem: ``transition(x, u, k, params) -> (x_next, c_k)``, the evaluator its step problem delegates to."""
 
 from __future__ import annotations
 
@@ -24,21 +24,21 @@ from minilink.planning.step_problems import (
 ###############################################################################
 
 
-class StepFace:
+class StepModel:
     """
-    The step face of a problem: one tick of its plant and its stage cost, the one face the step tools read.
+    The step model of a problem: one tick of its plant and its stage cost, the one evaluator the step tools read.
 
     ``transition(x, u, k, params) -> (x_next, c_k)`` advances the plant one
     tick from ``x`` under ``u`` and returns the stage cost of the tick:
 
-    - for a continuous problem at ``dt`` (``problem.discretize(dt).compile()``),
-      the plant's step model over one period, the input held, with
+    - for a continuous problem at ``dt`` (``problem.discretize(dt)``),
+      the plant stepped over one period, the input held, with
       ``c_k = ∫₀^dt e^{−ρτ} g dτ`` integrated beside the state by the same
       scheme and substeps (under one Euler step ``g dt`` to the last bit);
     - for a :class:`~minilink.planning.step_problems.StepPlanningProblem`, its
       system's ``step`` and its cost's ``c`` (a discretized problem's
       :class:`~minilink.core.costs.SampledCost` fused into the same one step,
-      so its face equals the continuous problem's).
+      so its model equals the continuous problem's).
 
     ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``. :attr:`n_steps` (``N``) is the horizon in ticks
     (``None`` infinite), :attr:`gamma` the discount per tick, :attr:`params`
@@ -46,7 +46,8 @@ class StepFace:
     :meth:`time_of` the time of tick ``k`` (``t0 + k dt``, or the tick for
     a native problem), :meth:`terminal` the terminal cost, :attr:`X`,
     :attr:`U` and :attr:`Xf` the sets. Value iteration, the RL environment and
-    the judge read this face only.
+    the judge read this model only; the step problem's ``transition``,
+    ``terminal`` and ``run`` delegate to it.
     """
 
     def __init__(self, problem, *, dt=None, solver="rk4", substeps=1):
@@ -68,7 +69,7 @@ class StepFace:
         # A continuous problem at dt: N = tf / dt, γ = e^{−ρ dt}, the stage its SampledCost
         else:
             require_period(dt)
-            # Lazy import: the evaluator's grid helper loads with the first face
+            # Lazy import: the evaluator's grid helper loads with the first model
             from minilink.planning.evaluator import steps_of
 
             self.dt = float(dt)
@@ -174,7 +175,7 @@ class StepFace:
         return x_next, c
 
     def step_at(self, x, u, t, plant_params=None):
-        """``x_next`` alone of the tick that starts at ``t``: the plant's step model (no cost evaluated), on ``plant_params`` (``None``: the face's)."""
+        """``x_next`` alone of the tick that starts at ``t``: the plant over one period (no cost evaluated), on ``plant_params`` (``None``: the model's)."""
         plant = self.params["plant"] if plant_params is None else plant_params
 
         # A native step system: its own step at the tick
@@ -277,27 +278,27 @@ class StepFace:
     @property
     def cost_bound(self) -> float:
         """
-        The face's one cost bound: its own sum with the maxima, ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
+        The model's one cost bound: its own sum with the maxima, ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
 
         It bounds every stage, ``c_k ≤ g_max dt``; the infinite horizon is its
         geometric limit ``g_max dt / (1 − γ)``, no ``h``; a native step
-        problem's is ``Σ γᵏ c_max + γᴺ h_max``. The judge on the face, the RL
+        problem's is ``Σ γᵏ c_max + γᴺ h_max``. The judge on the model, the RL
         environment and value iteration read it.
         """
         return self.cost_bound_over(self.n_steps, self.gamma)
 
     @property
     def failure_cost(self) -> float:
-        """What a failure is charged on the face: the problem's ``failure_cost`` when a number, else :attr:`cost_bound`."""
+        """What a failure is charged on the model: the problem's ``failure_cost`` when a number, else :attr:`cost_bound`."""
         return self.failure_cost_over(self.n_steps, self.gamma)
 
     def cost_bound_over(self, N, gamma) -> float:
         """
-        The face's sum with the maxima over ``N`` ticks (``None``: its geometric limit) at the discount ``gamma`` per tick.
+        The model's sum with the maxima over ``N`` ticks (``None``: its geometric limit) at the discount ``gamma`` per tick.
 
         One formula, each tool over the horizon its own sum runs: the RL
         environment over its episode, value iteration over its sweeps (to
-        convergence: the geometric limit), the face's own over :attr:`n_steps`.
+        convergence: the geometric limit), the model's own over :attr:`n_steps`.
         """
         problem = self.problem
 
@@ -320,11 +321,11 @@ class StepFace:
 
     def run(self, policy, x0=None, params=None, n_steps=None):
         """
-        The face's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
+        The model's rollout under a law ``u = policy(x, t)``: ``(xs, us, cs, J)``, ``J = Σ γᵏ c_k + γᴺ h``.
 
         ``policy`` is a function or a controller block (its state on its
         measurement port, its other inputs at their nominal values).
-        ``n_steps`` defaults to the face's :attr:`n_steps`. The states ``(n_steps + 1, n)``, the
+        ``n_steps`` defaults to the model's :attr:`n_steps`. The states ``(n_steps + 1, n)``, the
         inputs and stage costs ``(n_steps,)``-long, on the array module of the
         start: the one sum every tool's score is.
         """
@@ -356,14 +357,14 @@ class StepFace:
         return np.stack(xs), np.stack(us), np.asarray(cs), J
 
 
-def face_of(problem, dt=None, *, solver="rk4", substeps=1) -> StepFace:
-    """The problem's step face: a continuous problem's at ``dt`` on ``solver``, a step problem's own (it ticks on its own clock: no ``dt``)."""
+def step_model_of(problem, dt=None, *, solver="rk4", substeps=1) -> StepModel:
+    """The problem's step model: a continuous problem's at ``dt`` on ``solver``, a step problem's own (it ticks on its own clock: no ``dt``)."""
     if is_continuous(problem):
-        return StepFace(problem, dt=dt, solver=solver, substeps=substeps)
+        return StepModel(problem, dt=dt, solver=solver, substeps=substeps)
 
     require_no_period_on_ticks(problem, dt)
 
-    return problem.compile()
+    return StepModel(problem)
 
 
 def is_continuous(problem) -> bool:
@@ -377,10 +378,10 @@ def is_continuous(problem) -> bool:
 
 
 def require_period(dt):
-    """Refuse a continuous problem's face without its period."""
+    """Refuse a continuous problem's step model without its period."""
     if dt is None:
         raise ValueError(
-            "a continuous problem's step face needs its period: problem.discretize(dt).compile()"
+            "a continuous problem's step model needs its period: problem.discretize(dt)"
         )
 
 

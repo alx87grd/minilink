@@ -544,22 +544,21 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     from tests.unittest.test_step_problems import grid_world
 
     problem = grid_world()
-    face = problem.compile()
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
     )
     vi.solve()
 
-    # J(x) = the moves to the goal, the face's c summed: the Chebyshev distance
+    # J(x) = the moves to the goal, the problem's c summed: the Chebyshev distance
     J = vi.result.J.reshape(7, 7)
     cells = np.arange(7.0)
     np.testing.assert_array_equal(
         J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     )
 
-    # The greedy walk from the start, rolled out on the face, pays J(x0)
+    # The greedy walk from the start, rolled out by the problem, pays J(x0)
     law = vi.controller
-    walk = face.run(
+    walk = problem.run(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
     )
     assert walk[3] == J[0, 0] == 5.0
@@ -590,9 +589,9 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
-    # The step tool's sum on the face value iteration backs up: Σ γᵏ c_k + γᴺ h
-    face = problem.discretize(dt, solver="rk4").compile()
-    J_face = face.run(policy)[3]
+    # The step tool's sum on the discretization value iteration backs up: Σ γᵏ c_k + γᴺ h
+    step_problem = problem.discretize(dt, solver="rk4")
+    J_step = step_problem.run(policy)[3]
 
     # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
@@ -603,26 +602,26 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     x, t, J_env = problem.x0, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
         x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
-        J_env += face.gamma**k * -float(reward)
+        J_env += step_problem.gamma**k * -float(reward)
     assert bool(terminated)
 
-    # One J of the law held over each period: the environment's on the face's model
+    # One J of the law held over each period: the environment's on the step problem's
     # to the bit; the judge integrates the plant at the continuous simulator's step,
-    # the face in one RK4 step a period
-    np.testing.assert_allclose(J_env, J_face, rtol=1e-14, atol=0.0)
-    np.testing.assert_allclose(J_judge, J_face, rtol=1e-3)
+    # the step problem in one RK4 step a period
+    np.testing.assert_allclose(J_env, J_step, rtol=1e-14, atol=0.0)
+    np.testing.assert_allclose(J_judge, J_step, rtol=1e-3)
     J_stepped = problem.compile(law % dt, substeps=1, backend="numpy").evaluate()
-    np.testing.assert_allclose(J_stepped.objective, J_face, rtol=1e-14, atol=0.0)
+    np.testing.assert_allclose(J_stepped.objective, J_step, rtol=1e-14, atol=0.0)
 
-    # The held loop on the face's step runs the face's own states
+    # The held loop on the step problem's step runs its own states
     held = problem.compile(law % dt, substeps=1, backend="numpy").trajectory()
-    np.testing.assert_array_equal(held.of("plant").x.T, face.run(policy)[0])
+    np.testing.assert_array_equal(held.of("plant").x.T, step_problem.run(policy)[0])
 
     # The planner's own score is the law it hands out, as it is: the continuous
     # loop on the evaluator's automatic step, a different controller than the held one
     J_planner = float(np.squeeze(solution.evaluation.J))
     assert J_planner == float(problem.compile(law).evaluate().objective)
-    np.testing.assert_allclose(J_planner, J_face, rtol=1e-2)
+    np.testing.assert_allclose(J_planner, J_step, rtol=1e-2)
 
 
 # Script 5
@@ -792,7 +791,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     assert J_ended < 0.1 * J_short
 
 
-def test_a_held_loops_run_scores_on_the_faces_own_sum():
+def test_a_held_loops_run_scores_on_the_step_problems_own_sum():
     from minilink.planning import DynamicProgrammingPlanner
     from minilink.planning.evaluation import evaluate_trajectory
 
@@ -812,9 +811,9 @@ def test_a_held_loops_run_scores_on_the_faces_own_sum():
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
-    # The law held over each period on the face's own step: the run carries the
+    # The law held over each period on the step problem's own step: the run carries the
     # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
     held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
-    J_face = problem.discretize(0.1).compile().run(policy)[3]
+    J_step = problem.discretize(0.1).run(policy)[3]
     J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
-    np.testing.assert_allclose(J, J_face, rtol=1e-12)
+    np.testing.assert_allclose(J, J_step, rtol=1e-12)

@@ -15,7 +15,7 @@ from minilink.planning.dynamic_programming.progress import (
     progress,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.step_face import face_of, is_continuous
+from minilink.planning.step_model import is_continuous, step_model_of
 
 #: Node-action pairs evaluated per JAX chunk when building tables on device.
 PAIR_CHUNK_SIZE = 50_000
@@ -84,15 +84,15 @@ class StateSpaceGrid:
         precompute_backend: str = BACKEND_NUMPY,
         verbose: bool = False,
     ) -> None:
-        # The problem, its system's dimensions and its step face: one period
-        # of the plant and its stage cost, the one face value iteration reads
+        # The problem, its system's dimensions and its step model: one period
+        # of the plant and its stage cost, the one model value iteration reads
         require_step_knobs(solver, 1)
         self.problem = problem
         self.sys = problem.sys
         self.n = int(self.sys.n)
         self.m = int(self.sys.m)
-        self.face = face_of(problem, dt, solver=solver)
-        self.dt = self.face.period
+        self.model = step_model_of(problem, dt, solver=solver)
+        self.dt = self.model.period
         self.solver = solver
 
         # Levels per axis, and the box they span
@@ -228,24 +228,24 @@ class StateSpaceGrid:
     # The successor map
 
     def successor(self, x, u, t, params=None):
-        """``x_{k+1}``: the plant one period after ``x``, ``u`` held: the step face's step (``params``: the plant's numbers)."""
-        return self.face.step_at(x, u, t, params)
+        """``x_{k+1}``: the plant one period after ``x``, ``u`` held: the step model's step (``params``: the plant's numbers)."""
+        return self.model.step_at(x, u, t, params)
 
     def stage_cost(self, x, u, t, params=None):
-        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step face's (``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
-        return self.face.stage_cost_at(x, u, t, params)
+        """``c``: the stage cost of the period starting at ``t`` from ``x`` under ``u``, the step model's (``g dt`` under Euler); ``params`` its tree, read once by a table's caller."""
+        return self.model.stage_cost_at(x, u, t, params)
 
     def stage_cost_law(self, t, params=None):
         """``c(x, u)``: :meth:`stage_cost` of the period starting at ``t`` as a function of the pair, built once for a table."""
-        return self.face.stage_cost_law(t, params)
+        return self.model.stage_cost_law(t, params)
 
     # The successor tables
 
     def compute_transition_numpy(self, t):
-        """Build the successors of the step face and the input/state validity masks."""
+        """Build the successors of the step model and the input/state validity masks."""
         X = self.problem.X
         U = self.problem.U
-        sys_params = self.face.params["plant"]
+        sys_params = self.model.params["plant"]
         set_params = None
         states = self.states
         inputs = self.inputs
@@ -291,7 +291,7 @@ class StateSpaceGrid:
         N = self.nodes_n
         A = self.actions_n
         n = self.n
-        sys_params = self.face.params["plant"]
+        sys_params = self.model.params["plant"]
         X = self.problem.X
         U = self.problem.U
         set_params = None

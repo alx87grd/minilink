@@ -524,7 +524,7 @@ class CompiledMPPIPlanner:
         jnp = self.jnp
         env = self.env
         episode = problem_leaves(P)
-        gamma = env.face.gamma_at(episode)
+        gamma = env.model.gamma_at(episode)
 
         def period(carry, v):
             x, t, S, alive, discount = carry

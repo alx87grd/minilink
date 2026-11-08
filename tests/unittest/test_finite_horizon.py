@@ -131,9 +131,9 @@ def test_the_cost_to_go_reads_each_stage_at_its_time():
 
 def test_the_failure_cost_sums_over_the_horizon():
     planner = DynamicProgrammingPlanner(reach(), **GRID)
-    face = planner.grid.face
+    model = planner.grid.model
 
-    assert planner.out_of_bound_cost == face.failure_cost_over(N, 1.0)
+    assert planner.out_of_bound_cost == model.failure_cost_over(N, 1.0)
 
 
 def test_a_horizon_too_long_for_memory_is_refused_with_its_numbers():

@@ -108,7 +108,7 @@ class PolicyEvaluator:
             k = k + 1
 
             # Bellman expectation backup, the action fixed by the policy:
-            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the face's stage cost and step
+            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the model's stage cost and step
             J_next = J
             J_arrival = grid.interpolate(J_next, x_next, method)
             J = G + gamma * J_arrival
@@ -147,7 +147,7 @@ class PolicyEvaluator:
         policy = self.policy
         X = self.problem.X
         U = self.problem.U
-        tree = grid.face.params
+        tree = grid.model.params
         sys_params = tree["plant"]
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
@@ -179,7 +179,7 @@ class PolicyEvaluator:
             )
 
             if valid:
-                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the face
+                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the model
                 G[s] = float(stage_cost(x, u))
             else:
                 # The step leaves the admissible set: the penalty
@@ -190,12 +190,12 @@ class PolicyEvaluator:
     def terminal_cost(self, t):
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
-        face = grid.face
-        tree = face.params
+        model = grid.model
+        tree = model.params
         N = grid.nodes_n
 
-        # Final cost of every state node: the face's h(x, t)
-        J = np.array([float(face.terminal(grid.states[s], t, tree)) for s in range(N)])
+        # Final cost of every state node: the model's h(x, t)
+        J = np.array([float(model.terminal(grid.states[s], t, tree)) for s in range(N)])
 
         return J
 

@@ -1,4 +1,4 @@
-"""The step problem and the compiled step face."""
+"""The step problem, its own equations, and the step model they delegate to."""
 
 import numpy as np
 import pytest
@@ -8,7 +8,7 @@ from minilink.core.compile.evaluators.stepping import step_body
 from minilink.core.costs import SampledCost, StepCost
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.core.discrete.step_system import StepSystem
-from minilink.planning.step_face import StepFace
+from minilink.planning.step_model import StepModel, step_model_of
 from minilink.planning.step_problems import StepPlanningProblem
 
 
@@ -24,12 +24,12 @@ def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
     solver, substeps
 ):
     problem = swing_problem(discount_rate=0.4, t0=1.5)
-    face = problem.discretize(0.05, solver=solver, substeps=substeps).compile()
+    sampled = problem.discretize(0.05, solver=solver, substeps=substeps)
     plant = problem.sys
     rng = np.random.default_rng(3)
     for k in range(20):
         x, u = rng.uniform(-3.0, 3.0, 2), rng.uniform(-5.0, 5.0, 1)
-        x_next, c = face.transition(x, u, k)
+        x_next, c = sampled.transition(x, u, k)
         t_k = 1.5 + k * 0.05
 
         # The state rows are the step model's, to the bit
@@ -42,34 +42,37 @@ def test_the_augmented_step_is_the_step_model_and_its_cost_g_dt_under_euler(
         if solver == "euler":
             assert c == problem.cost.g(x, u, t_k, None) * 0.05
 
-    assert face.n_steps == 40 and face.gamma == np.exp(-0.4 * 0.05)
+    assert sampled.n_steps == 40 and sampled.gamma == np.exp(-0.4 * 0.05)
 
 
 @pytest.mark.parametrize("solver", ["euler", "rk4"])
-def test_the_discretized_problem_compiles_to_the_same_face(solver):
+def test_the_discretized_problem_answers_as_the_continuous_problems_model(solver):
     problem = swing_problem(discount_rate=0.2)
-    face = StepFace(problem, dt=0.05, solver=solver, substeps=1)
+    model = StepModel(problem, dt=0.05, solver=solver, substeps=1)
     sampled = problem.discretize(0.05, solver=solver)
     assert isinstance(sampled, StepPlanningProblem)
     assert isinstance(sampled.sys, SampledSystem) and isinstance(
         sampled.cost, SampledCost
     )
-    other = sampled.compile()
-    assert (other.n_steps, other.gamma, other.dt) == (face.n_steps, face.gamma, face.dt)
+    assert (sampled.n_steps, sampled.gamma, sampled.dt) == (
+        model.n_steps,
+        model.gamma,
+        model.dt,
+    )
 
     rng = np.random.default_rng(5)
     for k in range(10):
         x, u = rng.uniform(-3.0, 3.0, 2), rng.uniform(-5.0, 5.0, 1)
-        a, b = face.transition(x, u, k), other.transition(x, u, k)
+        a, b = model.transition(x, u, k), sampled.transition(x, u, k)
         np.testing.assert_array_equal(a[0], b[0])
         assert a[1] == b[1]
 
         # The SampledCost called directly integrates the same period
         assert sampled.cost.c(x, u, k) == a[1]
 
-    # One rollout, one J: Σ γᵏ c_k + γᴺ h on both faces
+    # One rollout, one J: Σ γᵏ c_k + γᴺ h on both
     law = lambda x, t: np.array([-2.0 * x[0] - x[1]])  # noqa: E731
-    assert face.run(law)[3] == other.run(law)[3]
+    assert model.run(law)[3] == sampled.run(law)[3]
 
 
 def test_the_stationary_stage_cost_is_the_discounted_integral():
@@ -80,8 +83,8 @@ def test_the_stationary_stage_cost_is_the_discounted_integral():
 
     problem = swing_problem(discount_rate=0.7)
     problem.cost = Unit.from_system(problem.sys)
-    face = problem.discretize(0.1, solver="rk4", substeps=4).compile()
-    _, c = face.transition(np.array([0.1, 0.0]), np.zeros(1), 3)
+    sampled = problem.discretize(0.1, solver="rk4", substeps=4)
+    _, c = sampled.transition(np.array([0.1, 0.0]), np.zeros(1), 3)
     assert c == pytest.approx((1.0 - np.exp(-0.7 * 0.1)) / 0.7, rel=1e-10)
 
 
@@ -117,11 +120,10 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
     problem = StepPlanningProblem(
         Walk(), n_steps=6, cost=Moves([4.0]), gamma=0.9, x0=[1.0], t0=2
     )
-    face = problem.compile()
-    xs, us, cs, J = face.run(lambda x, t: np.ones(1))
+    xs, us, cs, J = problem.run(lambda x, t: np.ones(1))
     np.testing.assert_array_equal(xs[:, 0], [1, 2, 3, 4, 5, 5, 5])
     assert J == pytest.approx(1 + 0.9 + 0.81 + 0.0 + 0.9**4 + 0.9**5)
-    assert face.time_of(3) == 5  # the tick offset, an integer
+    assert step_model_of(problem).time_of(3) == 5  # the tick offset, an integer
     assert set(problem.params) >= {"plant", "cost", "x0", "t0", "gamma"}
 
     with pytest.raises(TypeError, match="SampledCost"):
@@ -132,37 +134,35 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
         StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]), t0=0.5)
 
 
-def test_one_face_of_every_problem_and_its_period():
-    from minilink.planning.step_face import face_of
-
+def test_one_step_model_of_every_problem_and_its_period():
     # A continuous problem at dt, its discretization, and a native step problem's ticks
     problem = swing_problem()
-    assert face_of(problem, 0.05).period == 0.05
-    assert face_of(problem.discretize(0.05)).period == 0.05
+    assert step_model_of(problem, 0.05).period == 0.05
+    assert step_model_of(problem.discretize(0.05)).period == 0.05
     native = StepPlanningProblem(Walk(), n_steps=3, cost=Moves([4.0]))
-    assert face_of(native).period == 1.0 and face_of(native).dt is None
+    assert step_model_of(native).period == 1.0 and step_model_of(native).dt is None
 
     # A step problem ticks on its own clock; a continuous one needs its period
     with pytest.raises(ValueError, match="own clock"):
-        face_of(native, 0.1)
+        step_model_of(native, 0.1)
     with pytest.raises(ValueError, match="needs its period"):
-        face_of(problem)
+        step_model_of(problem)
 
 
-def test_the_state_only_step_is_the_transitions_state_on_both_faces():
+def test_the_state_only_step_is_the_transitions_state_on_both_models():
     problem = swing_problem(t0=2.0)
-    face = StepFace(problem, dt=0.05, solver="rk4", substeps=1)
-    sampled = problem.discretize(0.05, solver="rk4").compile()
+    model = StepModel(problem, dt=0.05, solver="rk4", substeps=1)
+    sampled = step_model_of(problem.discretize(0.05, solver="rk4"))
     x, u = np.array([0.4, -0.3]), np.array([1.0])
     for t in (2.0, 2.35):
         np.testing.assert_array_equal(
-            face.step_at(x, u, t), face.transition_at(x, u, t)[0]
+            model.step_at(x, u, t), model.transition_at(x, u, t)[0]
         )
-        np.testing.assert_array_equal(sampled.step_at(x, u, t), face.step_at(x, u, t))
+        np.testing.assert_array_equal(sampled.step_at(x, u, t), model.step_at(x, u, t))
 
     # A problem without a cost still steps: a grid needs only its successors
     free = PlanningProblem(problem.sys, x0=[0.0, 0.0])
-    assert StepFace(free, dt=0.1, solver="rk4", substeps=1).step_at(
+    assert StepModel(free, dt=0.1, solver="rk4", substeps=1).step_at(
         x, u, 0.0
     ).shape == (2,)
 
@@ -272,14 +272,14 @@ def test_a_step_problem_started_at_k0_scores_as_from_0_with_the_cost_shifted(n_s
 
     # J = Σ γᵏ c(x_k, u_k, k₀ + k) + γᴺ h(x_N, k₀ + N), the discount counted from the start
     law = lambda x, t: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
-    xs, us, cs, J = late.compile().run(law, n_steps=4)
-    xs_0, us_0, cs_0, J_0 = shifted.compile().run(law, n_steps=4)
+    xs, us, cs, J = late.run(law, n_steps=4)
+    xs_0, us_0, cs_0, J_0 = shifted.run(law, n_steps=4)
     np.testing.assert_array_equal(xs, xs_0)
     np.testing.assert_array_equal(cs, cs_0)
     assert J == J_0 == 13.0 + 0.9 * 11.0 + 0.81 * 7.0
 
     # The same cost bound: the stage and terminal costs read at the tick offset
-    assert late.compile().cost_bound == shifted.compile().cost_bound
+    assert late.cost_bound() == shifted.cost_bound()
 
 
 def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
@@ -298,7 +298,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     assert vi.grid.dt == 1.0 and vi.gamma == 1.0
 
 
-def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_face():
+def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_run():
     import copy
 
     from minilink.learning import TabularLearningPlanner
@@ -327,14 +327,13 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_fa
     problem.params = edited
     assert (problem.gamma, problem.t0) == (0.8, 2)
 
-    # A step problem's law is scored by its face, the controller block run as it is:
+    # A step problem's law is scored by its run, the controller block run as it is:
     # an infinite horizon over an episode of 10 ticks
     from minilink.planning.results import drawn_trajectory_of
 
-    face = vi.problem.compile()
     solution = vi.solve(evaluate=True)
     assert solution.evaluation.n_trials == 1 and solution.trajectory is None
-    J = face.run(solution.controller, n_steps=10)[3]
+    J = vi.problem.run(solution.controller, n_steps=10)[3]
     assert float(solution.evaluation.J[0]) == J == sum(0.9**k for k in range(5))
     assert bool(solution.evaluation.reached[0]) and not solution.evaluation.failed[0]
     run = drawn_trajectory_of(solution)
@@ -347,10 +346,7 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_fa
     finite = DynamicProgrammingPlanner(
         grid_world(gamma=0.9, n_steps=8), x_grid=(7, 7), u_grid=(3, 3)
     ).solve(evaluate=True)
-    assert (
-        float(finite.evaluation.J[0])
-        == finite.problem.compile().run(finite.controller)[3]
-    )
+    assert float(finite.evaluation.J[0]) == finite.problem.run(finite.controller)[3]
     from minilink import Uniform
 
     spread = DynamicProgrammingPlanner(
@@ -373,7 +369,7 @@ class TimedTerminal(QuadraticCost):
         return 1.0 + t + 0.0 * x[0]
 
 
-def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
+def test_the_discretized_problem_charges_the_terminal_cost_at_the_horizons_time():
     plant = Pendulum()
     problem = PlanningProblem(
         plant,
@@ -382,12 +378,12 @@ def test_the_discretized_face_charges_the_terminal_cost_at_the_horizons_time():
         horizon=2.0,
         t0=0.5,
     )
-    face = StepFace(problem, dt=0.05, solver="rk4", substeps=1)
-    sampled = problem.discretize(0.05).compile()
+    model = StepModel(problem, dt=0.05, solver="rk4", substeps=1)
+    sampled = problem.discretize(0.05)
     x = np.array([0.1, 0.2])
-    assert face.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
+    assert model.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
     law = lambda x, t: np.array([-x[0]])  # noqa: E731
-    assert face.run(law)[3] == sampled.run(law)[3]
+    assert model.run(law)[3] == sampled.run(law)[3]
 
 
 def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
@@ -464,8 +460,8 @@ def test_the_design_point_of_a_random_plant_parameter_is_its_mean():
         distributions={"plant": {"m": Uniform(1.5, 2.5)}},
     )
     assert problem.sample_params(None)["plant"]["m"] == 2.0
-    face = problem.discretize(0.1).compile()
-    assert face.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]
+    model = step_model_of(problem.discretize(0.1))
+    assert model.params["plant"]["m"] == 2.0 == problem.nominal().sys.params["m"]
 
 
 def episode_return(env, law):
@@ -474,37 +470,37 @@ def episode_return(env, law):
     total, k = 0.0, 0
     while True:
         x, t, r, terminated, truncated = env.step(x, t, law(x), None)
-        total += env.face.gamma**k * float(r)
+        total += env.model.gamma**k * float(r)
         k += 1
         if terminated or truncated:
             return total, k
 
 
-def test_the_rollout_environment_steps_a_native_step_problem_on_its_face():
+def test_the_rollout_environment_steps_a_native_step_problem_on_its_model():
     from minilink.planning.environment import RolloutEnvironment
 
-    # The face's N, γ and cost bound; a native problem ticks, its time the tick k₀ + k
+    # The model's N, γ and cost bound; a native problem ticks, its time the tick k₀ + k
     late, shifted = late_and_shifted(4)
     env = RolloutEnvironment(late, backend="numpy")
-    face = late.compile()
+    model = step_model_of(late)
     assert (env.dt, env.t0, env.n_steps_per_episode) == (1.0, 3.0, 4)
     assert env.finite_horizon and env.reward == "stage"
-    assert env.failure_cost == face.failure_cost_over(4, 0.9) == face.cost_bound
+    assert env.failure_cost == model.failure_cost_over(4, 0.9) == late.cost_bound()
 
-    # One step is the face's transition, rewarded −c_k
+    # One step is the model's transition, rewarded −c_k
     x_next, t_next, r, terminated, truncated = env.step(
         np.array([1.0]), 3.0, np.array([1.0]), None
     )
     assert (
         x_next[0] == 2.0
         and t_next == 4.0
-        and r == -face.transition_at(np.array([1.0]), np.array([1.0]), 3.0)[1]
+        and r == -late.transition(np.array([1.0]), np.array([1.0]), 0)[1]
     )
     assert not terminated and not truncated
 
-    # The return is −J of the face's run, and the same from k₀ as from 0 on the shifted cost
+    # The return is −J of the problem's run, and the same from k₀ as from 0 on the shifted cost
     law = lambda x: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
-    J = face.run(lambda x, t: law(x))[3]
+    J = late.run(lambda x, t: law(x))[3]
     assert episode_return(env, law) == (-J, 4)
     shifted_env = RolloutEnvironment(shifted, backend="numpy")
     assert episode_return(shifted_env, law) == (-J, 4)
@@ -529,13 +525,14 @@ def test_the_rollout_environment_steps_a_discretized_problem_as_its_origin():
 
 
 def test_a_problem_compiles_a_controllers_evaluator_only():
-    # One verb, one return type: the step face is the discretization's
+    # One verb, one return type: the problem on a clock is its discretization
     problem = swing_problem()
 
-    with pytest.raises(ValueError, match="discretize"):
+    with pytest.raises(TypeError, match="controller"):
         problem.compile()
-    with pytest.raises(ValueError, match="discretize"):
+    with pytest.raises(TypeError, match="controller"):
         problem.compile(dt=0.05)
+    assert not hasattr(problem.discretize(0.05), "compile")
 
 
 def test_a_discretized_random_plant_steps_at_its_mean():
@@ -550,7 +547,7 @@ def test_a_discretized_random_plant_steps_at_its_mean():
         distributions={"plant": {"m": Uniform(1.5, 2.5)}},
     )
 
-    assert problem.discretize(0.1).compile().params["plant"]["m"] == 2.0
+    assert step_model_of(problem.discretize(0.1)).params["plant"]["m"] == 2.0
 
 
 def test_a_step_problem_prints_its_horizon_its_discount_and_its_parts():

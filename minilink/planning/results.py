@@ -15,7 +15,7 @@ from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import EPISODE_LENGTH
 from minilink.planning.problems import PlanningProblem, require_cost
-from minilink.planning.step_face import is_continuous
+from minilink.planning.step_model import is_continuous, step_model_of
 
 ###############################################################################
 # Public API
@@ -116,7 +116,7 @@ class PlanningSolution:
 
         The run is the loop the score runs, ``problem.compile(controller)``
         (a continuous law on the evaluator's automatic step, a clocked one on
-        its own clock; a step problem's face), once from the start with
+        its own clock; a step problem's model), once from the start with
         nominal parameters. The figure is titled plan or run.
         """
         # A real cycle: comparison imports PlanningSolution from this module
@@ -201,7 +201,7 @@ def drawn_trajectory_of(solution) -> Trajectory:
 
     The run is the loop the score runs, ``problem.compile(controller)``, with
     nominal parameters (a stochastic problem at its mean start), the plant's
-    own run read back (``traj.of("plant")``); on a step problem, its face's
+    own run read back (``traj.of("plant")``); on a step problem, its model's
     rollout (:func:`step_run_of`).
     """
     if solution.trajectory is not None:
@@ -221,33 +221,33 @@ def drawn_trajectory_of(solution) -> Trajectory:
 
 def step_run_of(problem, controller, params=None, *, episode_length=None) -> Trajectory:
     """
-    A step problem's rollout under ``controller`` from its start: the face's run as a trajectory.
+    A step problem's rollout under ``controller`` from its start: the model's run as a trajectory.
 
-    ``N`` ticks of its face, ``problem.compile().run(controller)``: its own
+    ``N`` ticks of the step problem's ``run(controller)``: its own
     horizon, else an episode of ``episode_length`` (10 by default) in its
-    time. ``params`` is the face's tree (``None``: its own). The last input is
+    time. ``params`` is the model's tree (``None``: its own). The last input is
     held at the final state, so ``x`` and ``u`` share the ``N + 1`` times.
     """
-    face = problem.compile()
-    params = face.params if params is None else params
-    N = episode_ticks_of(face, episode_length)
+    model = step_model_of(problem)
+    params = model.params if params is None else params
+    N = episode_ticks_of(model, episode_length)
 
     # x_0 … x_N and u_0 … u_{N−1} on the ticks t0 + k, the last input held
-    xs, us, _, _ = face.run(controller, params=params, n_steps=N)
-    t = np.array([face.time_of(k, params) for k in range(N + 1)], dtype=float)
+    xs, us, _, _ = model.run(controller, params=params, n_steps=N)
+    t = np.array([model.time_of(k, params) for k in range(N + 1)], dtype=float)
     u = np.concatenate([us, us[-1:]], axis=0)
 
     return Trajectory(t=t, x=xs.T, u=u.T)
 
 
-def episode_ticks_of(face, episode_length=None) -> int:
-    """The ticks of a face's rollout: its horizon ``N``, else an episode of ``episode_length`` (10 by default) in its time."""
-    if face.n_steps is not None:
-        return int(face.n_steps)
+def episode_ticks_of(model, episode_length=None) -> int:
+    """The ticks of a model's rollout: its horizon ``N``, else an episode of ``episode_length`` (10 by default) in its time."""
+    if model.n_steps is not None:
+        return int(model.n_steps)
 
     length = EPISODE_LENGTH if episode_length is None else float(episode_length)
 
-    return max(1, int(round(length / face.period)))
+    return max(1, int(round(length / model.period)))
 
 
 def solution_text(solution):

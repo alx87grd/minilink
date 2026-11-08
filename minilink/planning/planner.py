@@ -13,7 +13,7 @@ from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution, episode_ticks_of
-from minilink.planning.step_face import is_continuous
+from minilink.planning.step_model import is_continuous, step_model_of
 
 ###############################################################################
 # Public API
@@ -214,7 +214,7 @@ def planner_evidence(
     no cost (a search without one). A continuous controller runs on ``dt`` (an
     open-loop plan on its own grid), else on the evaluator's automatic step; a
     clocked one on its own clock; ``tf`` is the run of an infinite horizon. On
-    a step problem, the face's rollouts (:func:`step_evaluation`).
+    a step problem, the model's rollouts (:func:`step_evaluation`).
     """
     problem = planner.problem if problem is None else problem
 
@@ -225,7 +225,7 @@ def planner_evidence(
     # One run when nothing is random, n_trials draws otherwise
     trials = int(n_trials) if problem.is_stochastic else None
 
-    # A step problem is scored on its face
+    # A step problem is scored on its model
     if not is_continuous(problem):
         return step_evaluation(problem, controller, trials, episode_length=tf)
 
@@ -244,31 +244,31 @@ def step_evaluation(
     problem, controller, n_trials=None, *, key=0, episode_length=None
 ) -> Evaluation:
     """
-    The :class:`~minilink.planning.evaluation.Evaluation` of a controller on a step problem: its face's rollouts, scored.
+    The :class:`~minilink.planning.evaluation.Evaluation` of a controller on a step problem: its model's rollouts, scored.
 
     One run on a deterministic problem, ``n_trials`` draws of
-    ``problem.realize(key, n_trials)`` otherwise, each the face's
+    ``problem.realize(key, n_trials)`` otherwise, each the model's
     ``J = Σ γᵏ c_k + γᴺ h`` over its horizon (an infinite one over an episode
     of ``episode_length`` ticks, 10 by default), with the judge's facts: the
     least margin of ``x_k`` to ``X`` and of ``u_k`` to ``U``, the margin of
-    ``x_N`` to ``Xf``, and with ``penalize_failure`` the face's failure cost
-    (a run not finite: the face's cost bound and it).
+    ``x_N`` to ``Xf``, and with ``penalize_failure`` the model's failure cost
+    (a run not finite: the model's cost bound and it).
     """
-    face = problem.compile()
-    N = episode_ticks_of(face, episode_length)
+    model = step_model_of(problem)
+    N = episode_ticks_of(model, episode_length)
     n = 1 if n_trials is None else int(n_trials)
     draws = problem.realize(key if problem.is_stochastic else None, n)
     drawn = [("x0",), *(path for path, _ in flatten(problem.distributions))]
-    failure_cost = face.failure_cost
-    bound = face.cost_bound
+    failure_cost = model.failure_cost
+    bound = model.cost_bound
 
     rows = []
     for i in range(n):
         params = trial_of(draws, drawn, i)
 
-        # The face's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h
-        xs, us, _, cost = face.run(controller, params=params, n_steps=N)
-        t = [face.time_of(k, params) for k in range(N + 1)]
+        # The model's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h
+        xs, us, _, cost = model.run(controller, params=params, n_steps=N)
+        t = [model.time_of(k, params) for k in range(N + 1)]
 
         # The judge's facts: finite, the least margin to X and U, the margin to Xf
         finite = bool(np.all(np.isfinite(xs)) and np.all(np.isfinite(us)))

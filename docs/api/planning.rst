@@ -7,9 +7,6 @@ Planning
 .. automodule:: minilink.planning.step_problems
    :members:
 
-.. automodule:: minilink.planning.step_face
-   :members:
-
 .. automodule:: minilink.planning.planner
    :members:
 

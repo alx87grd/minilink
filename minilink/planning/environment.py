@@ -19,7 +19,7 @@ from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
 from minilink.core.wiring import WiredDiagramMixin
 from minilink.planning.problems import require_cost
-from minilink.planning.step_face import face_of, is_continuous
+from minilink.planning.step_model import is_continuous, step_model_of
 
 ###############################################################################
 # Public API
@@ -40,11 +40,11 @@ class RolloutEnvironment:
     """
     A planning problem seen by a learner: ``reset`` draws a start, ``step`` runs one control period.
 
-    The problem is compiled once to its step face, and the environment reads
-    that face only: its horizon ``N``, its discount ``γ`` and its cost bound.
-    ``step`` is the face's ``transition``: the plant over ``dt`` with the input
+    The problem's step model is built once, and the environment reads
+    that model only: its horizon ``N``, its discount ``γ`` and its cost bound.
+    ``step`` is the model's ``transition``: the plant over ``dt`` with the input
     held; the training reward is ``r_k = −g(x_k, u_k, t_k) dt``, the running
-    cost at the period's start (``reward="stage"``: ``−c_k``, the face's stage
+    cost at the period's start (``reward="stage"``: ``−c_k``, the model's stage
     cost ``∫₀^dt e^{−ρτ} g dτ`` integrated beside the state, the score's own; a
     step problem's reward is its ``−c_k``); the score of a trained law is
     always the problem's. A
@@ -108,7 +108,7 @@ class RolloutEnvironment:
         self.backend = backend
         self.n = int(self.sys.n)
 
-        # Plant and stage cost: the problem's step face, one transition per control
+        # Plant and stage cost: the problem's step model, one transition per control
         # period (a step problem's own, on its clock), on nominal or drawn parameters
         require_rollout_backend(backend)
         require_step_knobs(solver, substeps)
@@ -116,15 +116,15 @@ class RolloutEnvironment:
         self.substeps = int(substeps)
         if dt is None and is_continuous(problem):
             dt = DEFAULT_PERIOD
-        self.face = face_of(problem, dt, solver=solver, substeps=self.substeps)
-        self.face_params = self.face.params
-        self.dt = self.face.period
+        self.model = step_model_of(problem, dt, solver=solver, substeps=self.substeps)
+        self.model_params = self.model.params
+        self.dt = self.model.period
         self.t0 = float(problem.t0)
 
-        # Horizon: a finite one ends after the face's N periods, an infinite one runs
+        # Horizon: a finite one ends after the model's N periods, an infinite one runs
         # episodes of fixed length
-        self.finite_horizon = self.face.n_steps is not None
-        self.tf = episode_time_of(problem, self.face, self.dt, episode_length)
+        self.finite_horizon = self.model.n_steps is not None
+        self.tf = episode_time_of(problem, self.model, self.dt, episode_length)
         self.n_steps_per_episode = int(round(self.tf / self.dt))
         require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
 
@@ -156,10 +156,10 @@ class RolloutEnvironment:
         u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
         self.nominal_inputs = self.sys.get_port_values_from_u(u_nominal)
 
-        # The cost a failure is charged: declared on the problem, else the face's cost
+        # The cost a failure is charged: declared on the problem, else the model's cost
         # bound over the episode, the sum the return runs
-        self.failure_cost = self.face.failure_cost_over(
-            self.n_steps_per_episode, self.face.gamma
+        self.failure_cost = self.model.failure_cost_over(
+            self.n_steps_per_episode, self.model.gamma
         )
 
         # Noise the held-input rollout never sees is announced
@@ -217,7 +217,7 @@ class RolloutEnvironment:
         tf = self.tf
         t0 = self.t0 if t_origin is None else t_origin
         finite_horizon = self.finite_horizon
-        face = self.face
+        model = self.model
         X = self.X
         U = self.U
         zone = self.training_zone
@@ -225,13 +225,15 @@ class RolloutEnvironment:
         X_params = (params or {}).get("X", self.set_params)
         U_params = self.set_params
         tree = self.episode_tree(params)
-        gamma = face.gamma_at(tree) if "discount_rate" in (params or {}) else face.gamma
+        gamma = (
+            model.gamma_at(tree) if "discount_rate" in (params or {}) else model.gamma
+        )
 
         # Plant input: the action on its port, each source's signal at t on theirs
         u_full = self.input_vector(u, t, params)
 
         # Transition: x_{k+1}, c_k over one control period, input held
-        x_next, c = face.transition_at(x, u_full, t, tree)
+        x_next, c = model.transition_at(x, u_full, t, tree)
         t_next = t + dt
 
         # A step that blew up ends the episode; the last finite state stands in
@@ -258,10 +260,10 @@ class RolloutEnvironment:
 
         # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
-        # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the face's J does
+        # so the return Σ γᵏ r_k carries γᴺ h(x_N), as the model's J does
         reward = reward - xp.where(failed, failure_cost, 0.0)
         if finite_horizon:
-            h_N = face.terminal(x_next, t_next, tree)
+            h_N = model.terminal(x_next, t_next, tree)
             reward = reward - horizon_reached * gamma * h_N
 
         # What is paid is terminal; what is left unpaid is truncated
@@ -274,21 +276,21 @@ class RolloutEnvironment:
         """``x_next`` alone of one control period, on the nominal or the episode's parameters (no cost evaluated)."""
         tree = self.episode_tree(params)
 
-        return self.face.step_at(x, u_full, t, tree["plant"])
+        return self.model.step_at(x, u_full, t, tree["plant"])
 
     def episode_tree(self, params=None):
-        """The face's tree with the episode's plant draws, and a planner's cost and discount, merged in (none: the face's own)."""
+        """The model's tree with the episode's plant draws, and a planner's cost and discount, merged in (none: the model's own)."""
         params = params or {}
         plant = params.get("plant")
         cost = params.get("cost")
         if not plant and cost is None and "discount_rate" not in params:
-            return self.face_params
+            return self.model_params
 
-        tree = dict(self.face_params)
+        tree = dict(self.model_params)
         if plant:
-            tree["plant"] = merge_tree(self.face_params["plant"], plant)
+            tree["plant"] = merge_tree(self.model_params["plant"], plant)
         if cost is not None:
-            tree["cost"] = merge_tree(self.face_params["cost"], cost)
+            tree["cost"] = merge_tree(self.model_params["cost"], cost)
         if "discount_rate" in params:
             tree["discount_rate"] = params["discount_rate"]
 
@@ -328,7 +330,7 @@ class RolloutEnvironment:
         randomized = f", randomized params {sorted(names)}" if self.laws else ""
         episodes = (
             f"episodes of {self.n_steps_per_episode} ticks"
-            if self.face.dt is None
+            if self.model.dt is None
             else f"episodes of {self.tf:g} s at dt={self.dt:g}"
         )
 
@@ -345,9 +347,9 @@ class RolloutEnvironment:
 ###############################################################################
 
 
-def episode_time_of(problem, face, dt, episode_length):
+def episode_time_of(problem, model, dt, episode_length):
     """An episode's length: a continuous problem's finite horizon, a step problem's ``N`` periods, else ``episode_length`` (default :data:`DEFAULT_EPISODE_LENGTH`)."""
-    if face.n_steps is None:
+    if model.n_steps is None:
         return (
             DEFAULT_EPISODE_LENGTH if episode_length is None else float(episode_length)
         )
@@ -355,7 +357,7 @@ def episode_time_of(problem, face, dt, episode_length):
     if is_continuous(problem):
         return float(problem.horizon)
 
-    return face.n_steps * dt
+    return model.n_steps * dt
 
 
 def require_reward(reward, supported):

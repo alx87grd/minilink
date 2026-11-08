@@ -96,7 +96,7 @@ state-feedback block):
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
 | `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k Δ`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
-| `planning/` | `problems.py`, `step_problems.py` and `step_face.py` (the step problem and the compiled step face), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`, ruled 2026-11-07) |
+| `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`, ruled 2026-11-07) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
 | `graphical/` | signals, phase plane, diagrams, animation |
@@ -201,7 +201,7 @@ third argument is, never the operator:
 A static block in a *pure* step diagram (no clock anywhere) receives `t = k`. `block % Δ` is a
 `SampledSystem` of kind `"law"`: never integrated inside its period (no substeps, no dense
 points, never adaptive). `discretize(sys, Δ, solver=, substeps=)` is the textbook verb, a
-discrete-time model (kind `"model"`) for the discrete tools (the step face, value iteration,
+discrete-time model (kind `"model"`) for the discrete tools (the step problem, value iteration,
 the RL environment, z-domain analysis), never needed to close a loop: a loop built on one is a
 loop of step systems, which has only its ticks. On a step diagram (a box
 of tick laws and static blocks, the MPC box among them) `box % dt` clocks each block with
@@ -1281,7 +1281,7 @@ the box, anchored at the goal), and `plot_trajectory`, `animate` and `plot_cost`
 plan when there is one, else the controller run once from the problem's start through
 the problem's evaluator (`problem.compile(controller)`, the loop the score runs: a
 continuous law on the evaluator's automatic step, nominal parameters; a step problem's
-face), titled plan or run.
+`run`), titled plan or run.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
@@ -1308,7 +1308,7 @@ infinite horizon and `h` is never charged (`problem.horizon_kind()`). How long t
 an infinite-horizon problem is a tool setting, `episode_length` on the evaluator and
 the RL planner.
 The discount rate `rho` is the problem's, `problem.discount_rate`; value iteration and the
-RL planner read its per-tick `gamma` from the problem's step face, `e^{−ρ dt}` (a step
+RL planner read its per-tick `gamma` from the problem's step model, `e^{−ρ dt}` (a step
 problem's own `gamma`), and tabular learning from `problem.discount_factor(dt)`, the same
 number. `X` and `U` are hard
 constraints in every tool: a run that leaves them is a failure. **The failure switch**
@@ -1319,10 +1319,10 @@ number, `None` for the cost bound). **The cost bound** is one formula owned by t
 over the declared boxes for the continuous judge, and with a tool's `dt` the same maxima on its
 own sum, `g_max dt Σ_{k<N} γᵏ + γᴺ h_max`, `γ = e^{−ρ dt}` (it bounds every stage,
 `c_k ≤ g_max dt`), else the plant's declared ranges; always finite (`1e6` with a warning naming
-`failure_cost` when no bound exists). The step face reads it at its period
-(`face.cost_bound`, `face.cost_bound_over(N, γ)`), each tool over the horizon its own sum runs:
+`failure_cost` when no bound exists). The step model reads it at its period
+(`model.cost_bound`, `model.cost_bound_over(N, γ)`), each tool over the horizon its own sum runs:
 the RL environment over its episode, value iteration over its sweeps (to convergence: the
-geometric limit `g_max dt/(1 − γ)`), the face over its `N`; on a finite undiscounted problem
+geometric limit `g_max dt/(1 − γ)`), the step problem over its `N`; on a finite undiscounted problem
 the judge's integral and the three sums are one number. Trajopt and RRT keep the sets exact;
 value iteration, tabular learning, the RL environment and the Gym bridge always charge a
 failure the failure cost (`failure_cost`, else that bound), and DP treats
@@ -1352,7 +1352,7 @@ cost `C(t) = ∫ e^{−ρ(τ − t0)} g(x_plant, u_plant, τ) dτ` beside the lo
 scheme and substeps, read at the plant block's own state and input in the pass that computes
 `dx` (a sampled loop: inside the plant's period, `SampledSystem.update_with_cost`), recorded as
 the signal `"plant:running_cost"`; its last value is the run's running cost, the stage costs
-`c_k` of the step face summed with their discount. `evaluate_trajectory` reads that signal when
+`c_k` of the step problem summed with their discount. `evaluate_trajectory` reads that signal when
 the run carries it (one score) and scores a logged run, which has none, by the trapezoid on its
 samples. A run that is not finite is scored on zeros behind a safe `where`, and with the failure
 charged its cost term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach
@@ -1367,7 +1367,7 @@ trajectory with recorded signals and no role is refused.
 through its `plant` role; a logged plant run without signals). **The planning problem defines
 the problem**: a tool may plan or train on a modified copy of it and its record names
 the modification, but the score is always the problem's. RL *trains* on `r_k = −g(x_k, u_k, t_k)
-dt`, one call of the cost's `g` at the period's start (`reward="stage"`: `−c_k`, the face's stage
+dt`, one call of the cost's `g` at the period's start (`reward="stage"`: `−c_k`, the step model's stage
 cost `∫₀^dt e^{−ρτ} g dτ`, the score's), with per-step factor `gamma`; `exp(-rho t)` is not folded
 into the reward (that would discount twice); its record says "trained on −g dt, scored on the
 problem's cost". A tool's own discount (value iteration's `gamma`, RL's `gamma` with the stage
@@ -1451,7 +1451,7 @@ evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
 `evaluate(problem, controller, ...)` of the controller as it is handed out, on the real
 plant: a continuous law on the evaluator's automatic step (the LQR on its reporting grid
 `dt`, an open-loop plan on its own grid, the interpolation its planner states), a clocked
-controller on its own clock, a step problem's law on its face (each run the face's
+controller on its own clock, a step problem's law on its own `run` (each run the step problem's
 `J = Σ γᵏ c_k + γᴺ h` with the judge's margins and failure charge, an infinite horizon over
 an episode of 10 ticks of its time); the planner's own `J` stays in its record beside it,
 so the evidence does not repeat the planner's own belief. A law held over each period
@@ -1473,28 +1473,33 @@ of its grid is another controller, `law % dt`, scored as such:
   the margins are the numbers a course reports, not an NLP objective (a smooth bound, the
   sensitivity peak `M_s`, is the traceable-analysis row of TODO §4).
 
-**The step face (`planning/step_face.py`):** `problem.discretize(dt, solver="rk4",
-substeps=1).compile()` is the problem's `StepFace` (`compile` gives each problem its
-evaluated face: `problem.compile(controller)` is the controller's evaluator, and refuses
-no controller with this pointer; a step problem's `compile()` is its step face): `transition(x, u, k, params)
--> (x_next, c_k)`, one period of the step model with `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated
-beside the state by the same scheme (`g·dt` to the last bit under one Euler step),
-`N = tf/dt`, `gamma = e^{−ρ dt}`, `terminal`, the sets, `cost_bound`, `failure_cost` and `run(policy)`
-(`J = Σ γᵏ c_k + γᴺ h`; `policy` a function `u = π(x, t)` or a controller block, read on its
-measurement port); `params` is the tree its calls read (the plant at its mean, a
-discretized problem's at its origin's, the cost, `x0`, `t0`, the discount). A `StepPlanningProblem(sys, *, N, cost, gamma,
-...)` (`planning/step_problems.py`) is the native form on a `StepSystem` with a `StepCost`
-(`c(x, u, k)`, `h(x, k)`), its start and sets a `PlanningProblem`'s by composition, its
-face `problem.compile()`. Its laws are over its own tree, `params = {"plant", "cost", the
-sets', "x0", "t0", "gamma"}` (the cost's numbers among them), and `realize(key, n)` draws
-them into that tree as a continuous problem's does (the start from the stream `"x0"`, each
-law from its path's; `sample_params(key)` one draw); the face's plant is at its laws' mean.
-A native `t0 = k₀` is a whole tick offset: tick `k` charges `c(x_k, u_k, k₀ + k)` discounted
-by `γᵏ` and `h` at `k₀ + N`, and the cost bound reads `c` and `h` at `k₀`, so a problem
-started at `k₀` scores as from 0 on the cost shifted by `k₀`. `problem.discretize(dt)` is the explicit step problem of a
-continuous one, its cost a `SampledCost`, compiling to the face the library builds inside
-(`StepFace(problem, dt=)`) to the bit.
-Value iteration, the RL environment and a planner's evidence read only this face.
+**The step problem answers its own equations (`planning/step_problems.py`):**
+`problem.discretize(dt, solver="rk4", substeps=1)` is the textbook's discrete-time optimal
+control problem, a `StepPlanningProblem`: `x_{k+1} = F(x_k, u_k)`, `c_k`,
+`J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)`, and it evaluates them itself (no second noun):
+`transition(x, u, k, params=None) -> (x_next, c_k)`, one period of the plant stepped with
+the input held and `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated beside the state by the same scheme
+(`g·dt` to the last bit under one Euler step); `terminal(x)`, `h` at the horizon's end;
+`run(controller)` (`J = Σ γᵏ c_k + γᴺ h`; a controller block read on its measurement port,
+or a function `u = π(x, t)`), with `n_steps` (`N = tf/dt`), `gamma` (`e^{−ρ dt}`), `dt`,
+the sets, `cost_bound()` and `failure_cost_at()`. `params=None` reads the problem's numbers
+(the plant at its mean, a discretized problem's at its origin's, the cost, `x0`, `t0`, the
+discount). `compile` is the controller's verb only: `problem.compile(controller, dt=None)`
+takes the controller as a required argument, and a step problem has no `compile` (`run`
+scores a controller). A `StepPlanningProblem(sys, *, n_steps, cost, gamma, ...)` is the
+native form on a `StepSystem` with a `StepCost` (`c(x, u, k)`, `h(x, k)`), its start and
+sets a `PlanningProblem`'s by composition, the same methods. Its laws are over its own tree,
+`params = {"plant", "cost", the sets', "x0", "t0", "gamma"}` (the cost's numbers among
+them), and `realize(key, n)` draws them into that tree as a continuous problem's does (the
+start from the stream `"x0"`, each law from its path's; `sample_params(key)` one draw); its
+equations read the plant at its laws' mean. A native `t0 = k₀` is a whole tick offset: tick
+`k` charges `c(x_k, u_k, k₀ + k)` discounted by `γᵏ` and `h` at `k₀ + N`, and the cost bound
+reads `c` and `h` at `k₀`, so a problem started at `k₀` scores as from 0 on the cost shifted
+by `k₀`. The methods delegate to `StepModel` (`planning/step_model.py`), internal machinery
+built on each call (nothing cached, RULES 5.6) and exported on no facade: the one evaluator
+value iteration's grid (`grid.model`), the RL environment (`env.model`) and a planner's
+evidence read, built once per tool by `step_model_of(problem, dt)`; a continuous problem's
+model at `dt` (`StepModel(problem, dt=)`) equals its discretization's to the bit.
 
 The pipeline (its map: [docs/pipelines.md](../pipelines.md)). Every object carries its own
 parameters `p`, and they form one tree `θ = pe.params`, a branch per object under its key; the plant,
@@ -1548,23 +1553,23 @@ attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JA
 Flax/Optax dependency. Training prints one line per update; `verbose=False` silences it.
 
 `RolloutEnvironment(problem, dt=, backend=)` is the problem's semantics as
-step functions on either backend — the step face's `transition` with the training reward `r = −g dt` (`reward="stage"`: `r = −c_k`),
+step functions on either backend — the step model's `transition` with the training reward `r = −g dt` (`reward="stage"`: `r = −c_k`),
 the judge's failure rule at the sample (`X` at `x_{k+1}`, `U` at `u_k`; the episode ends at
 the first failure, a training device) and the horizon — shared by the JAX collectors
 and the tabular learners, so one object owns what a training episode means (an evaluation
 scores the learned law by `evaluate`, the law as it is handed out). The heads draw at a JAX
 key or at a `CounterKey(seed, k)`; the collectors carry one policy seed per episode and draw
 tick `k = ⌊t/dt⌋` at it, the draw `GaussianPolicy(..., seed=)` makes. The discount is
-the face's `γ` (the problem's `e^{−ρ dt}`) unless `gamma=` overrides it, and the record (`gamma`,
-`scored_gamma`) says when the two differ. The environment reads the face only: its `N`
+the step model's `γ` (the problem's `e^{−ρ dt}`) unless `gamma=` overrides it, and the record (`gamma`,
+`scored_gamma`) says when the two differ. The environment reads the step model only: its `N`
 (an episode's ticks on a finite horizon), its `γ` and its cost bound over the episode (the
-failure charge). So a `StepPlanningProblem` trains through its own face, on its own clock
+failure charge). So a `StepPlanningProblem` trains through its own step model, on its own clock
 (no `dt`: a native one's period is one tick, its time the tick `t0 + k`; a discretized one's
 its `dt`), its reward `−c_k`, its start and laws drawn by its `sample_x0` and
 `sample_params`, no source; a discretized problem steps as its origin at that `dt` with
 `reward="stage"`, to the bit. `ReinforcementLearningPlanner` trains on either problem (`dt`
 defaults to 0.05 s on a continuous one, none on a step problem); a step problem's learned
-law is scored by its face, `problem.compile().run(controller)`, the block read as its law,
+law is scored by its own `problem.run(controller)`, the block read as its law,
 which `solve(evaluate=True)` reports.
 Teaching demos write the observation map by hand
 (``z = (cos θ, sin θ, scaled rate)``). `control.angle_features(angles, scales)`
@@ -1692,11 +1697,11 @@ continuous plant. A `StateSpaceGrid` discretizes the `PlanningProblem` — grid 
 comes from the sets' bounding boxes (so it stays finite), grid *validity* from
 the sets (`contains` on NumPy, `margin >= 0` on the JAX precompute, so `X = bounds & free`
 works on both); `grid.X` and `grid.U` are the boxes it spans. The grid reads the problem's
-step face (`grid.face`): the successors are one period of the step model, forward
+step model (`grid.model`): the successors are one period of the plant, forward
 Euler by default (`x_next = x + f(x,u,t)·dt`; the grid's `solver="rk4"` otherwise; the time
-step `dt` lives on the grid, not on `System`), and the backup's stage cost is the face's
+step `dt` lives on the grid, not on `System`), and the backup's stage cost is the model's
 `c = ∫₀^dt e^{−ρτ} g dτ` integrated by the same scheme (`g·dt` to the last bit under Euler),
-the discount the face's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
+the discount the model's `γ` and the failure cost its rule; a `StepPlanningProblem` (a grid world)
 solves on its own step and stage cost, its grid needing no `dt`. `DynamicProgrammingPlanner` runs value iteration backward, and the problem's horizon
 picks the mode of `solve` (LQR's rule): an infinite one sweeps until the change per sweep
 falls under `tol` (not an error bound on `J`: with `γ < 1` the bound is `γ·tol/(1 − γ)`);

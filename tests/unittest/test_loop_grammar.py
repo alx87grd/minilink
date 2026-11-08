@@ -23,6 +23,7 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
+from minilink.planning.step_model import step_model_of
 
 
 class DiscreteLowPass(StepSystem):
@@ -138,11 +139,11 @@ def test_the_models_for_the_discrete_tools():
     exact = discretize(linearize(plant), 0.1, solver="exact")
     assert isinstance(exact, SampledSystem) and exact.kind == "model"
     problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
-    face = problem.discretize(0.1).compile()
     step_problem = problem.discretize(0.1)
     x, u = np.array([0.2, 0.0]), np.zeros(1)
     np.testing.assert_array_equal(
-        face.transition(x, u, 0)[0], step_problem.compile().transition(x, u, 0)[0]
+        step_problem.transition(x, u, 0)[0],
+        step_model_of(problem, 0.1).transition(x, u, 0)[0],
     )
 
 

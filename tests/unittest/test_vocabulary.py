@@ -103,6 +103,7 @@ RETIRED = {
     "num_timesteps": ("n_timesteps", ("ReinforcementLearningPlanner",)),
     "controller": ("actor", ("ExplorationPolicy",)),
     "lqr_matrices": ("design_matrices", ("LQRPlanner",)),
+    "compile": ("transition, terminal or run", ("StepPlanningProblem",)),
 }
 
 

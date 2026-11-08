@@ -24,7 +24,7 @@ from minilink.planning.planner import (
 )
 from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution
-from minilink.planning.step_face import is_continuous
+from minilink.planning.step_model import is_continuous
 
 ###############################################################################
 # Public API

@@ -44,9 +44,10 @@ class StepPlanningProblem:
     tick ``k`` of a run is ``t0 + k``, its stage cost ``c(x_k, u_k, t0 + k)``
     discounted by ``γᵏ``; a discretized problem
     (:meth:`PlanningProblem.discretize`) keeps ``(dt, t0)`` in seconds, its plant a :class:`~minilink.core.discrete.sampled_system.SampledSystem`
-    and its cost a :class:`~minilink.core.costs.SampledCost`. ``compile()``
-    gives the step face (:class:`~minilink.planning.step_face.StepFace`), the
-    one face value iteration, the RL environment and the judge read.
+    and its cost a :class:`~minilink.core.costs.SampledCost`. The problem
+    answers its own equations: :meth:`transition` (``x_{k+1}``, ``c_k``),
+    :meth:`terminal` (``h``), :meth:`run` (``J`` under a controller),
+    :meth:`cost_bound` and :meth:`failure_cost_at`.
     """
 
     def __init__(
@@ -231,14 +232,40 @@ class StepPlanningProblem:
         """One draw of each law, at its path in the problem's tree (empty when nothing is drawn)."""
         return law_draws(self.distributions, self.parts_view(), key)
 
-    def compile(self, controller=None):
-        """The step face (:class:`~minilink.planning.step_face.StepFace`): ``transition(x, u, k, params) -> (x_next, c_k)``."""
-        require_no_controller(controller)
+    def transition(self, x, u, k, params=None):
+        """
+        ``(x_{k+1}, c_k)``: tick ``k`` of the plant from ``x_k`` under ``u_k``, and its stage cost.
 
-        # Lazy import: the face imports this module
-        from minilink.planning.step_face import StepFace
+        ``x_{k+1} = F(x_k, u_k)`` is the system's step at the time of tick
+        ``k`` (``t0 + k dt`` seconds for a discretized problem, the tick
+        ``t0 + k`` for a native one), ``c_k`` the cost's ``c`` there.
+        ``params`` is the tree of numbers (``plant``, ``cost``, ``t0``;
+        ``None``: the problem's, a random plant at its mean).
+        """
+        model = build_step_model(self)
 
-        return StepFace(self)
+        return model.transition(x, u, k, params)
+
+    def terminal(self, x, t=None, params=None):
+        """The terminal cost ``h(x_N)`` at the horizon's end (or at the time ``t``); ``0`` on an infinite horizon."""
+        model = build_step_model(self)
+
+        return model.terminal(x, t, params)
+
+    def run(self, controller, x0=None, params=None, n_steps=None):
+        """
+        The rollout under ``controller``: ``(xs, us, cs, J)``, ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)``.
+
+        ``controller`` is a controller block (its state on its measurement
+        port, its other inputs at their nominal values) or a law
+        ``u = policy(x, t)``. From ``x0`` (``None``: the problem's start) over
+        ``n_steps`` ticks (``None``: :attr:`n_steps`; an infinite horizon needs
+        it). The states ``(n_steps + 1, n)``, the inputs and the stage costs
+        ``(n_steps,)``-long.
+        """
+        model = build_step_model(self)
+
+        return model.run(controller, x0, params, n_steps)
 
     def horizon_kind(self) -> str:
         """``"finite"`` with a horizon ``N`` (``h`` is charged there), ``"infinite"`` without."""
@@ -254,7 +281,7 @@ class StepPlanningProblem:
         infinite horizon is ``c_max / (1 − γ)``. With ``γ = 1`` on an infinite horizon, or boxes
         with no finite bound, it falls back to ``1e6`` with a warning naming
         ``failure_cost``. A discretized problem's bound is the continuous
-        problem's on its own sum at ``dt`` (the face's one number):
+        problem's on its own sum at ``dt`` (one number with the continuous problem):
         ``g_max dt Σ_{k<N} γᵏ + γᴺ h_max``.
         """
         cost = require_cost(self)
@@ -324,8 +351,8 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
     the cost a :class:`~minilink.core.costs.SampledCost` (the one-period
     integral of ``e^{−ρτ} g``), ``N = tf / dt``, ``γ = e^{−ρ dt}``,
     ``(dt, t0)`` in seconds; the start, the sets and the laws as
-    they are. Its face equals ``StepFace(problem, dt=dt, solver=, substeps=)``'s
-    to the bit, its cost bound the continuous problem's on the same sum. A problem
+    they are. Its transitions equal the continuous problem's step model at
+    ``dt`` to the bit, its cost bound the continuous problem's on the same sum. A problem
     with disturbance sources is refused: the step problem feeds no source.
     """
     require_no_sources(problem)
@@ -368,7 +395,7 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
         criterion=problem.criterion,
     )
 
-    # The continuous description it samples: its cost bound is the face's
+    # The continuous description it samples: its cost bound is the step model's
     step.origin = problem
 
     return step
@@ -398,6 +425,14 @@ def sampled_cost_bound(problem, N, gamma, dt, params=None):
         rho = np.inf
 
     return problem.cost_bound(tf, discount_rate=rho, dt=dt, params=params)
+
+
+def build_step_model(problem):
+    """Build the step model a step problem's equations delegate to, on each call (nothing cached)."""
+    # A real cycle: the step model imports this module
+    from minilink.planning.step_model import StepModel
+
+    return StepModel(problem)
 
 
 def coerce_horizon(N):
@@ -449,15 +484,6 @@ def require_no_period_on_ticks(problem, dt):
         raise ValueError(
             "a step problem ticks on its own clock: omit dt (its period, if it has "
             "one, is the problem's dt)"
-        )
-
-
-def require_no_controller(controller):
-    """Refuse a controller on a step problem's compile: the step face scores a policy itself."""
-    if controller is not None:
-        raise NotImplementedError(
-            "StepPlanningProblem.compile() takes no controller: it gives the step face; "
-            "score a policy with face.run(policy, x0)"
         )
 
 

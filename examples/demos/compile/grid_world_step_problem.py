@@ -1,4 +1,4 @@
-"""A grid world as a step problem: a native step system, its cost per tick, solved by value iteration on its step face."""
+"""A grid world as a step problem: a native step system, its cost per tick, solved by value iteration on its transition."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -70,17 +70,16 @@ problem = StepPlanningProblem(
     failure_cost=100.0,
 )
 
-# Value iteration on the face's transition, one cell per grid node
+# Value iteration on the problem's transition, one cell per grid node
 vi = DynamicProgrammingPlanner(
     problem, x_grid=(SIZE, SIZE), u_grid=(3, 3), tol=1e-9, max_iterations=100
 )
 solution = vi.solve()
 print(solution.record)
 
-# The greedy walk on the same face: J = Σ c_k, the moves to the goal
-face = problem.compile()
+# The greedy walk on the same problem: J = Σ c_k, the moves to the goal
 law = vi.controller
-xs, us, cs, J = face.run(
+xs, us, cs, J = problem.run(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
 print(

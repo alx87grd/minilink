@@ -20,7 +20,7 @@ from minilink.planning.planner import (
 )
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
-from minilink.planning.step_face import is_continuous
+from minilink.planning.step_model import is_continuous
 from minilink.planning.step_problems import (
     require_no_period_on_ticks,
 )
@@ -82,7 +82,7 @@ class DynamicProgrammingPlanner(Planner):
         ``out_of_bound_cost(x_next, t)`` at each inadmissible pair's successor
         (the ``"jax"`` backend needs it traceable and time-invariant). Unset,
         the cost of a failure: the problem's ``failure_cost`` when a number,
-        else the face's cost bound on this discount (:func:`grid_failure_cost`).
+        else the model's cost bound on this discount (:func:`grid_failure_cost`).
     clean_infeasible : bool
         After each solve, pin saturated cost-to-go cells to ``out_of_bound_cost``
         and their policy to the nominal action (:meth:`clean_infeasible_set`);
@@ -171,7 +171,7 @@ class DynamicProgrammingPlanner(Planner):
         ``cost_to_go`` the interpolated ``J``. ``evaluate=True``
         also scores the controller, as it is, over the problem's draws (a
         continuous problem's on the evaluator's automatic step, a step
-        problem's on its face). ``params`` (the complete tree of :attr:`params`, a copy
+        problem's on its model). ``params`` (the complete tree of :attr:`params`, a copy
         edited) solves the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`),
         this one unchanged. ``verbose`` prints the table builds and the sweeps;
         ``record_history`` keeps ``(t, J, pi)`` per sweep in the tables, for
@@ -187,7 +187,7 @@ class DynamicProgrammingPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        N = self.grid.face.n_steps
+        N = self.grid.model.n_steps
 
         # Infinite horizon: backward sweeps until the cost-to-go stops changing
         if N is None:
@@ -344,7 +344,7 @@ class DynamicProgrammingPlanner(Planner):
             t = tf - k * dt
 
             # Bellman backup from the cost-to-go one step ahead:
-            # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the face's stage cost and
+            # J(x_k) = min_u [ c(x_k, u) + γ J_next(x_{k+1}) ], the model's stage cost and
             # step: the textbook loop, the same step over lookup tables, or on device
             J_next = J
             if backend == BACKEND_LOOP:
@@ -388,8 +388,8 @@ class DynamicProgrammingPlanner(Planner):
         up the arrival cost-to-go, and keep the cheapest action.
         """
         grid = self.grid
-        face = grid.face
-        params = face.params
+        model = grid.model
+        params = model.params
         X = self.problem.X
         U = self.problem.U
         gamma = self.gamma
@@ -412,8 +412,8 @@ class DynamicProgrammingPlanner(Planner):
             for a in range(grid.actions_n):
                 u = grid.inputs[a]
 
-                # x_{k+1}, c = transition(x_k, u, t): the step face's tick
-                x_next, c = face.transition_at(x, u, t, params)
+                # x_{k+1}, c = transition(x_k, u, t): the step model's tick
+                x_next, c = model.transition_at(x, u, t, params)
 
                 # If action is in allowable set
                 if U.contains(u, x, t):
@@ -475,7 +475,7 @@ class DynamicProgrammingPlanner(Planner):
     def terminal_cost(self, t, *, verbose: bool = False) -> np.ndarray:
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id (``verbose``: the build's progress)."""
         grid = self.grid
-        face = grid.face
+        model = grid.model
         N = grid.nodes_n
 
         J = np.empty(N, dtype=float)
@@ -486,7 +486,7 @@ class DynamicProgrammingPlanner(Planner):
             x = grid.states[s]
 
             # Final cost of the state
-            J[s] = float(face.terminal(x, t))
+            J[s] = float(model.terminal(x, t))
 
         return J
 
@@ -494,7 +494,7 @@ class DynamicProgrammingPlanner(Planner):
         self, t, admissible=None, x_next=None, *, verbose: bool = False
     ) -> np.ndarray:
         """
-        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step face's ``c`` (``g dt`` under Euler).
+        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step model's ``c`` (``g dt`` under Euler).
 
         Pairs that are not ``admissible`` (action outside the input set, or a
         successor outside the state set or the grid) cost ``out_of_bound_cost``:
@@ -509,7 +509,7 @@ class DynamicProgrammingPlanner(Planner):
         time-varying cost.
         """
         grid = self.grid
-        params = grid.face.params
+        params = grid.model.params
         N = grid.nodes_n
         A = grid.actions_n
         INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
@@ -876,20 +876,20 @@ def require_dp_backend(backend):
 
 
 def grid_numbers_of(grid, gamma, out_of_bound_cost):
-    """``(gamma, out_of_bound_cost, final_time)``: the given numbers, else the face's discount and failure cost; the face's horizon end."""
-    face = grid.face
+    """``(gamma, out_of_bound_cost, final_time)``: the given numbers, else the model's discount and failure cost; the model's horizon end."""
+    model = grid.model
 
-    # The face's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is given
+    # The model's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is given
     if gamma is None:
-        gamma = face.gamma if face.gamma < 1.0 else 1.0
+        gamma = model.gamma if model.gamma < 1.0 else 1.0
     gamma = float(gamma)
 
-    # The cost of leaving the grid, unless given: the problem's, else the face's cost bound
+    # The cost of leaving the grid, unless given: the problem's, else the model's cost bound
     if out_of_bound_cost is None:
         out_of_bound_cost = grid_failure_cost(grid, gamma)
 
     # The horizon's end (t0 + horizon, or a step problem's last tick), 0 without one
-    end = face.horizon_end()
+    end = model.horizon_end()
     final_time = 0.0 if end is None else float(end)
 
     return gamma, out_of_bound_cost, final_time
@@ -897,15 +897,15 @@ def grid_numbers_of(grid, gamma, out_of_bound_cost):
 
 def grid_failure_cost(grid, gamma):
     """
-    The cost of an inadmissible pair at the discount ``gamma`` per step: the face's failure cost over the sweeps' horizon.
+    The cost of an inadmissible pair at the discount ``gamma`` per step: the model's failure cost over the sweeps' horizon.
 
     A finite horizon's ``N`` sweeps sum over ``N`` steps; an infinite one's
-    sweeps run to convergence, so the face's sum is its geometric limit
+    sweeps run to convergence, so the model's sum is its geometric limit
     ``g_max dt / (1 − γ)``.
     """
-    face = grid.face
+    model = grid.model
 
-    return face.failure_cost_over(face.n_steps, gamma)
+    return model.failure_cost_over(model.n_steps, gamma)
 
 
 #: The largest finite-horizon stacks a solve keeps, in bytes (``J``, ``π`` and the law's table).

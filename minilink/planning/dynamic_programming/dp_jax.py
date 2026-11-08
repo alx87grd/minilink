@@ -97,7 +97,7 @@ def terminal_cost(planner, t, verbose=False) -> np.ndarray:
     jnp = jax.numpy
 
     grid = planner.grid
-    face = grid.face
+    model = grid.model
     N = grid.nodes_n
 
     states = jnp.asarray(grid.states)
@@ -107,7 +107,7 @@ def terminal_cost(planner, t, verbose=False) -> np.ndarray:
 
     # Final cost of one node
     def node(s):
-        return face.terminal(states[s], t)
+        return model.terminal(states[s], t)
 
     try:
         J = build_jax_node_chunks(
@@ -133,8 +133,8 @@ def running_cost_table(planner, t, verbose=False) -> np.ndarray:
     jnp = jax.numpy
 
     grid = planner.grid
-    face = grid.face
-    params = face.params
+    model = grid.model
+    params = model.params
     N = grid.nodes_n
     A = grid.actions_n
     failure_cost = planner.out_of_bound_cost
@@ -145,9 +145,9 @@ def running_cost_table(planner, t, verbose=False) -> np.ndarray:
     if verbose:
         print(f"Computing g(x,u,t) look-up table.. {N * A:,} pairs", flush=True)
 
-    # The stage cost of one pair over one step: the face's c (g dt under Euler)
+    # The stage cost of one pair over one step: the model's c (g dt under Euler)
     def pair(s, a):
-        return face.stage_cost_at(states[s], inputs[a], t, params)
+        return model.stage_cost_at(states[s], inputs[a], t, params)
 
     try:
         G = build_jax_sa_chunks(

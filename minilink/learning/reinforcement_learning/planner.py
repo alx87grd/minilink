@@ -39,7 +39,7 @@ from minilink.learning.reinforcement_learning.policy import (
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import Planner, planner_evidence
 from minilink.planning.results import PlanningSolution
-from minilink.planning.step_face import is_continuous
+from minilink.planning.step_model import is_continuous
 
 #: The update rule of each name ``method=`` accepts.
 ALGORITHMS = {
@@ -65,7 +65,7 @@ class ReinforcementLearningPlanner(Planner):
     The training objective is the expected discounted return on the control
     grid, ``E[Σ_k γᵏ r_k]``, the reward ``r_k = −g(x_k, u_k, t_k) dt`` the
     running cost at each period's start (``reward="stage"``: ``−c_k``, the stage
-    cost of the problem's step face): a failure (leaving ``X`` or ``U``) is
+    cost of the problem's step model): a failure (leaving ``X`` or ``U``) is
     charged the problem's failure cost, leaving the training zone truncates the
     episode; the record says what it trained on, the score is the problem's. The
     discount ``γ`` is the problem's own per period unless ``gamma=`` overrides
@@ -86,7 +86,7 @@ class ReinforcementLearningPlanner(Planner):
     ----------
     problem : PlanningProblem or StepPlanningProblem
         Task with a start (a law, a set, or one point to train from), cost and
-        constraint set; a step problem trains through its step face, on its
+        constraint set; a step problem trains through its step model, on its
         own clock.
     dt : float, optional
         Control period of the learned law on a continuous problem (one RK4
@@ -110,7 +110,7 @@ class ReinforcementLearningPlanner(Planner):
         ticks of a native step problem).
     gamma : float, optional
         Discount per control period, used when the algorithm does not set its
-        own. Default: the step face's ``γ`` (``e^{−ρ dt}`` on a continuous
+        own. Default: the step model's ``γ`` (``e^{−ρ dt}`` on a continuous
         problem, a step problem's own) when it discounts, else 0.99 with a
         warning that states the effective horizon.
     log_std_init : float
@@ -214,7 +214,7 @@ class ReinforcementLearningPlanner(Planner):
         # Trained on the stage cost with a discount of its own: the stage integral at
         # the same rate, ρ = −ln γ / dt, so one discount runs inside and between
         # periods; the score's discount stays the problem's
-        self.scored_gamma = float(self.env.face.gamma)
+        self.scored_gamma = float(self.env.model.gamma)
         stage_on_own_rate = self.env.reward == "stage" and is_continuous(problem)
         if stage_on_own_rate and self.gamma != self.scored_gamma:
             rate = -math.log(self.gamma) / self.dt if self.gamma > 0.0 else math.inf
@@ -287,7 +287,7 @@ class ReinforcementLearningPlanner(Planner):
         The solver record carries the training facts. ``evaluate=True`` also
         scores the deterministic law, as it is handed out, by Monte Carlo over
         ``n_trials`` draws of the problem (a continuous problem's on the
-        evaluator's automatic step, a step problem's on its face). ``verbose``
+        evaluator's automatic step, a step problem's on its model). ``verbose``
         prints the environment's semantics and one line per learning iteration.
         """
         # Train, then store the learned law as the planner's solution
@@ -472,16 +472,16 @@ class ReinforcementLearningPlanner(Planner):
             return float(gamma)
 
         problem = self.env.problem
-        face = self.env.face
+        model = self.env.model
         dt = self.dt
 
-        # The problem's discount over one control period: its step face's γ
-        if face.gamma < 1.0:
-            return face.gamma
+        # The problem's discount over one control period: its step model's γ
+        if model.gamma < 1.0:
+            return model.gamma
 
         # The default, announced with its effective horizon dt / (−ln γ)
         horizon = dt / -math.log(DEFAULT_GAMMA)
-        hint = effective_horizon_text(problem, face, horizon)
+        hint = effective_horizon_text(problem, model, horizon)
         warnings.warn(
             f"the problem is undiscounted, so training discounts at gamma={DEFAULT_GAMMA} "
             f"per control period, an effective horizon of {hint} or pass gamma to "
@@ -649,7 +649,7 @@ class ReinforcementLearningPlanner(Planner):
         if self.algorithm.critic_kind != "V":
             return None
 
-        if self.gamma != self.env.face.gamma:
+        if self.gamma != self.env.model.gamma:
             return None
 
         w = self.algorithm.params(self.train_state)["critic"]
@@ -717,11 +717,11 @@ class ReinforcementLearningRecord:
 ###############################################################################
 
 
-def effective_horizon_text(problem, face, horizon):
+def effective_horizon_text(problem, model, horizon):
     """The effective horizon in the problem's time, and where its discount is declared."""
-    if face.dt is None:
+    if model.dt is None:
         return f"{horizon:.1f} ticks; declare gamma on the step problem"
-    span = f"{horizon:.1f} s at dt={face.dt:g}"
+    span = f"{horizon:.1f} s at dt={model.dt:g}"
     if not is_continuous(problem):
         return f"{span}; declare discount_rate on the problem it discretizes"
 

@@ -310,6 +310,20 @@ Choices the rulings left open, each taken as recommended; the maintainer may ove
 - **`problem.compile`:** the library builds its faces with `StepFace(problem, dt=)` directly
   (value iteration byte-identical); a discretized problem's face now reads a random plant at
   its mean (a defect found with it).
+- **The step problem answers its own equations (ruled 2026-11-07):** "no second noun". A
+  `StepPlanningProblem` is the textbook's discrete-time optimal control problem, so it
+  evaluates `x_{k+1} = F(x_k, u_k)`, `c_k` and `J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)` itself:
+  `transition(x, u, k, params=None) -> (x_next, c_k)`, `terminal(x)`, `run(controller)`, beside
+  its `cost_bound()` and `failure_cost_at()`, each delegating to the evaluator built on the
+  call (no cache, RULES 5.6). The evaluator, `StepFace`, became internal machinery, renamed
+  `StepModel` (`planning/step_model.py`, exported on no facade), read directly by value
+  iteration's grid (`grid.model`), the RL environment (`env.model`) and a planner's evidence
+  through `step_model_of`. `StepPlanningProblem.compile` went (a step problem does not compile
+  a controller; `run` scores one), and `PlanningProblem.compile(controller, dt=None, ...)` takes
+  the controller as a required argument: Python's missing-argument `TypeError` names it, so the
+  custom refusal `require_controller_to_compile` went too. The step problem kept its own
+  `failure_cost` (the declared number, `None` for the bound) and `cost_bound(...)`/
+  `failure_cost_at(...)` methods, which already give the evaluator's numbers to the bit.
 - **Helpers to module functions:** `move_start` folded into the `x0` setter;
   `open_loop_controller_of` takes the plant; `store_solution`, `build_kwargs` and `parts_view`
   stay methods (the planner's own memory, overridden per planner, the deferred parameters

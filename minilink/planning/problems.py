@@ -623,7 +623,7 @@ class PlanningProblem:
 
     def compile(
         self,
-        controller=None,
+        controller,
         dt=None,
         *,
         solver="rk4",
@@ -641,11 +641,9 @@ class PlanningProblem:
         clock: ``dt`` omitted reads its base period. On a sampled loop
         ``substeps`` is the plant's steps per base period, ``None`` the
         automatic step (``problem.compile(mpc % 0.2, substeps=20)``). The
-        problem's step face is its discretization's,
-        ``problem.discretize(dt).compile()``.
+        problem on a clock is its discretization, ``problem.discretize(dt)``,
+        whose ``transition`` and ``run`` answer its step equations.
         """
-        require_controller_to_compile(controller)
-
         # Lazy import: the engine loads with its first evaluator
         from minilink.planning.evaluator import ProblemEvaluator
 
@@ -664,8 +662,8 @@ class PlanningProblem:
         The problem on its plant sampled at ``dt``: a :class:`~minilink.planning.step_problems.StepPlanningProblem`.
 
         Its cost is the :class:`~minilink.core.costs.SampledCost` of this one,
-        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; ``compile()`` gives its step
-        face, ``transition(x, u, k, params) -> (x_next, c_k)``.
+        ``N = horizon / dt``, ``γ = e^{−ρ dt}``; it answers its own equations,
+        ``transition(x, u, k, params) -> (x_next, c_k)``, ``terminal`` and ``run``.
         """
         # Lazy import: the step problem imports this module
         from minilink.planning.step_problems import discretize_problem
@@ -832,15 +830,6 @@ def require_finite_horizon(problem) -> float:
         )
 
     return float(problem.horizon)
-
-
-def require_controller_to_compile(controller):
-    """Refuse a compile with no controller: a problem compiles a controller's evaluator, its step face is its discretization's."""
-    if controller is None:
-        raise ValueError(
-            "problem.compile(controller) builds the controller's evaluator; the "
-            "problem's step face is problem.discretize(dt).compile()"
-        )
 
 
 class SetStart(Distribution):
