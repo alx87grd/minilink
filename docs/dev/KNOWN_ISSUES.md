@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-11-05.
+lands. Last checked against the code: 2026-11-08.
 
 ## Composition and control
 
@@ -14,8 +14,9 @@ lands. Last checked against the code: 2026-11-05.
   coordinate, which fits only when `B = I`; the boat and the 3-D plane (body-frame velocities)
   are refused as not mechanical.
 - **Workaround:** a fully actuated plant, or the allocation `u = B⁺ τ` in a custom block.
-- **Fix:** the one-mechanical-family work (S32, postponed): a model-based law will refuse an
-  underactuated plant at construction, with a clear message.
+- **Fix:** the one-mechanical-family work (TODO §2, S32), postponed until the maintainer
+  reviews the mechanical hierarchy: a model-based law then refuses an underactuated plant at
+  construction, with a clear message.
 
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
@@ -28,6 +29,13 @@ lands. Last checked against the code: 2026-11-05.
   ruling of 2026-11-05 (DESIGN §4, "Parameters", rule 5).
 
 ## Tooling
+
+### Two racecar demos hang when run headless
+- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py` and `los_racecar.py`
+  compute their lap, print the meshcat viewer's URL and then wait: with no browser open on the
+  viewer, the script never ends (both still running after 110 s on a cloud machine, 2026-11-08).
+- **Workaround:** run them interactively, with a browser open on the URL they print.
+- **Fix:** the maintainer's end-of-v0.4 demo rebuild (TODO §1.12, the demo set).
 
 ### The RL-to-Bode showcase notebook runs close to the notebook checker's time limit
 - **Symptom:** `showcase_from_rl_to_bode` takes about 8 minutes on a cloud machine (465 s
