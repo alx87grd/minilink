@@ -36,12 +36,11 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 
 | Doc | Scope | Where it sits |
 | --- | --- | --- |
-| [core-api-improvements.md](core-api-improvements.md) | The core API proposals from the `examples/tutorial/core/` review (`CA-1`, `CA-2` and `CA-5` open; `CA-3`, `CA-6` and `CA-7` landed), with reproducers and diffs | v0.4 (TODO §1.11) |
-| [plans-as-policies.md](plans-as-policies.md) | One face for every planner (a plan is a policy, open loop or feedback, finite or infinite horizon), value iteration's two modes, the pure cores, `GridField` and the planners' cost-to-go as fields; the rulings `PP-D1`–`PP-D17`; three changes ordered by value | v0.4 (TODO §1.8; its last change may follow the tag) |
-| [minimal-surface.md](minimal-surface.md) | **Decisions open.** Demos, notebooks, tests and CI redrafted on the core: the audit, the decisions `MS-D1`–`MS-D6` with options, the order | v0.4 (TODO §1.12) |
-| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves; the fixed-iteration MPC; the stochastic program (§7); NS-1–NS-9 | v0.5 (the proof of concept landed in v0.3) |
+| [plans-as-policies.md](plans-as-policies.md) | The compiled faces of LQR and value iteration on one contract (two axes: open loop or feedback, stationary or time-varying), the MPC and the follower reading the state; the rulings that shape it (its first two changes landed in v0.4) | v0.4 or after the tag (TODO §1.8) |
+| [minimal-surface.md](minimal-surface.md) | The inputs of the end-of-v0.4 rebuild: the test layers and their open options (`MS-D2a`–`e`), a starting demo list, the course-link constraint | v0.4, the last steps (TODO §1.12) |
+| [native-optimizers.md](native-optimizers.md) | Native solvers as pure laws, the solve as a rollout, traced solves, implicit differentiation, least squares, constraints, convergence as stability; the stochastic program (§7); NS-2's rest to NS-7 | v0.5 (the proof of concept landed in v0.3) |
 | [estimation-and-state-feedback.md](estimation-and-state-feedback.md) | State feedback and estimation as duals: `LQGPlanner` (§5), the estimation follow-ups and their slots (§3, §6). | v0.5; v0.9 |
-| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes, paths, track, scene, `mount`, spatial fields, course catalog); `planning.spatial` retires | v0.5 (A3) |
+| [geometry-module.md](geometry-module.md) | Workspace geometry in `core/geometry/` (shapes and paths landed; track, scene, `mount`, spatial fields, course catalog left); `planning.spatial` retires | v0.5 (A3) |
 | [cbf-safety-filter.md](cbf-safety-filter.md) | Control barrier functions: SDF interpolation, DCBF with slacks, HOCBF, the safety-filter block; the barrier a `Field` | unscheduled (TODO §6) |
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.5 (C1) |
 | [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
