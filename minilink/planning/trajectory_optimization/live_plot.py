@@ -55,7 +55,7 @@ class LiveTrajectoryPlotCallback:
                 self.sys,
                 iteration.trajectory,
                 signals=self.signals,
-                backend=self.renderer,
+                renderer=self.renderer,
                 show=True,
                 pause=self.pause,
             )

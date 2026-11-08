@@ -359,7 +359,7 @@ def render_port_map_matplotlib(
             plt.pause(pause)
 
     return PlotResult(
-        backend="matplotlib",
+        renderer="matplotlib",
         payload=(fig, ax),
         figure=fig,
         axes=ax,

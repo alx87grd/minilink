@@ -177,7 +177,7 @@ class DynamicAnimation:
         joystick_axes=None,
         camera_axes=((3, -1.0), (4, -1.0)),
         plot=False,
-        plot_backend="matplotlib",
+        plot_renderer="matplotlib",
         sync="locked",
         backend=None,
         max_steps=None,
@@ -207,7 +207,7 @@ class DynamicAnimation:
         a :class:`~minilink.simulation.realtime.RealtimeOutput` via
         ``output=`` receives every frame). Pass ``plot=True``, or the signals
         to show (``plot=("slip", "grip")``), to open a live rolling-window
-        time-signal plot alongside the scene, on ``plot_backend``.
+        time-signal plot alongside the scene, on ``plot_renderer``.
 
         ``backend=None`` (default) tries JAX when available and
         compatible, otherwise NumPy — preferred for live sessions where speed
@@ -230,7 +230,7 @@ class DynamicAnimation:
             renderer=renderer,
             is_3d=is_3d,
             plot=plot,
-            plot_backend=plot_backend,
+            plot_renderer=plot_renderer,
             input=input,
             output=output,
             backend=backend,

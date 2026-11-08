@@ -509,7 +509,7 @@ class TestFacadesRollout(unittest.TestCase):
         plant = Counter()
         rollout = plant.compute_rollout(n_steps=3)
         result = plant.plot_rollout(rollout, show=False)
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         fig, axes = result.payload
         self.assertEqual(axes[-1].get_xlabel(), "Step [k]")
 

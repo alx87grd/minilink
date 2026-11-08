@@ -1154,7 +1154,7 @@ class TestPhasePlane(unittest.TestCase):
         result = plot_phase_plane(
             sys, traj, bounds=((-1.0, 1.0), (-1.5, 1.5)), grid_shape=(3, 3), show=False
         )
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         self.assertIsNotNone(result.figure)
         self.assertIs(result.axes.figure, result.figure)
         self.assertEqual(len(result.axes.lines), 3)
@@ -1169,13 +1169,13 @@ class TestPhasePlane(unittest.TestCase):
         result = sys.plot_phase_plane(
             bounds=((-1.0, 1.0), (-1.0, 1.0)), grid_shape=(3, 3), show=False
         )
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         self.assertEqual(len(result.axes.lines), 3)
 
     def test_unsupported_backend_reports_clear_error(self):
         sys = PhasePlaneTestSystem()
-        with self.assertRaisesRegex(ValueError, "Unknown plot backend"):
-            plot_phase_plane(sys, backend="bokeh", show=False)
+        with self.assertRaisesRegex(ValueError, "Unknown renderer"):
+            plot_phase_plane(sys, renderer="bokeh", show=False)
 
     def test_axes_and_grid_refuse_booleans_and_floats(self):
         sys = PhasePlaneTestSystem()
@@ -1195,7 +1195,7 @@ class TestPhasePlane(unittest.TestCase):
     def test_plotly_refuses_the_keywords_it_does_not_take(self):
         sys = PhasePlaneTestSystem()
         with self.assertRaisesRegex(TypeError, "dpi, figsize"):
-            plot_phase_plane(sys, backend="plotly", figsize=(4, 3), dpi=80, show=False)
+            plot_phase_plane(sys, renderer="plotly", figsize=(4, 3), dpi=80, show=False)
 
 
 from minilink.analysis.discretization import SampledSystem, discretize

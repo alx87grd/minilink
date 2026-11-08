@@ -24,7 +24,7 @@ def render_matplotlib_signal_plot(
     """Render a one-shot time-signal plot with matplotlib."""
     fig, axes, _ = create_figure(spec, show=show, **kwargs)
 
-    return PlotResult(backend="matplotlib", payload=(fig, axes), figure=fig, axes=axes)
+    return PlotResult(renderer="matplotlib", payload=(fig, axes), figure=fig, axes=axes)
 
 
 def open_matplotlib_signal_plot(

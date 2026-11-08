@@ -170,7 +170,7 @@ def plot_step_response(
     n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Step response of the selected channel with rise time, settling time and overshoot.
@@ -197,7 +197,7 @@ def plot_step_response(
 
     figure = step_figure(time, y, info, sys, of, wrt, discrete_period(sys))
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 ###############################################################################

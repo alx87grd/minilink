@@ -151,6 +151,17 @@ RETIRED = {
             "animate_modal",
         ),
     ),
+    "backend": (
+        "renderer (backend is the array module)",
+        (
+            "plot_bode",
+            "plot_pzmap",
+            "plot_root_locus",
+            "plot_nyquist",
+            "plot_step_response",
+        ),
+    ),
+    "plot_backend": ("plot_renderer", None),
 }
 
 

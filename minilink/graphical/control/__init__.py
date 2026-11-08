@@ -25,10 +25,10 @@ __all__ = [
 ###############################################################################
 
 
-def render_control_figure(spec: ControlFigure, *, backend="matplotlib", show=True):
-    """Render ``spec`` with the selected backend and return a ``PlotResult``."""
-    key = str(backend).strip().lower()
-    require_plot_backend(key, backend)
+def render_control_figure(spec: ControlFigure, *, renderer="matplotlib", show=True):
+    """Render ``spec`` with the selected renderer and return a ``PlotResult``."""
+    key = str(renderer).strip().lower()
+    require_renderer(key, renderer)
 
     if key in ("matplotlib", "mpl"):
         # Lazy import: the graphics load on first use, not with the core
@@ -47,9 +47,9 @@ def render_control_figure(spec: ControlFigure, *, backend="matplotlib", show=Tru
 ###############################################################################
 
 
-def require_plot_backend(key, backend):
-    """Refuse a backend other than matplotlib (or ``"mpl"``) and plotly."""
+def require_renderer(key, renderer):
+    """Refuse a renderer other than matplotlib (or ``"mpl"``) and plotly."""
     if key not in ("matplotlib", "mpl", "plotly"):
         raise ValueError(
-            f"Unknown plot backend {backend!r}. Expected 'matplotlib' or 'plotly'."
+            f"Unknown renderer {renderer!r}. Expected 'matplotlib' or 'plotly'."
         )

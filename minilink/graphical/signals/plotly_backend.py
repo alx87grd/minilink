@@ -40,7 +40,7 @@ def render_plotly_signal_plot(
     if show:
         fig.show()
 
-    return PlotResult(backend="plotly", payload=fig, figure=fig)
+    return PlotResult(renderer="plotly", payload=fig, figure=fig)
 
 
 def open_plotly_signal_plot(

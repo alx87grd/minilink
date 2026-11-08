@@ -1063,12 +1063,12 @@ class TestRealtimeSimulator(unittest.TestCase):
         self.assertEqual(spec.traces[2].label, "pos")
         plt.close("all")
 
-        # The backend is plot_backend; a name passed as plot is refused and says so
-        with self.assertRaisesRegex(ValueError, "plot_backend"):
+        # The renderer is plot_renderer; a name passed as plot is refused and says so
+        with self.assertRaisesRegex(ValueError, "plot_renderer"):
             RealtimeSimulator(sys, renderer=None, plot="plotly")
-        with self.assertRaisesRegex(ValueError, "Unknown signal backend"):
+        with self.assertRaisesRegex(ValueError, "Unknown signal renderer"):
             RealtimeSimulator(
-                sys, renderer=None, plot=("y",), plot_backend="invalid_backend"
+                sys, renderer=None, plot=("y",), plot_renderer="invalid_renderer"
             )
 
 

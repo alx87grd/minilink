@@ -70,7 +70,7 @@ def render_matplotlib(spec: ControlFigure, *, show: bool = True) -> PlotResult:
     axes_out = axes[0] if n_panels == 1 else axes
 
     return PlotResult(
-        backend="matplotlib", payload=(fig, axes_out), figure=fig, axes=axes_out
+        renderer="matplotlib", payload=(fig, axes_out), figure=fig, axes=axes_out
     )
 
 

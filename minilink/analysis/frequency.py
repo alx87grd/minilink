@@ -340,7 +340,7 @@ def plot_bode(
     margins: bool = True,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
     title: str | None = None,
 ) -> PlotResult:
@@ -374,7 +374,7 @@ def plot_bode(
         w_plot, magnitude_db, phase_deg, sys, of, wrt, loop_margins, title=title
     )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_pzmap(
@@ -390,7 +390,7 @@ def plot_pzmap(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Pole-zero map of the selected channel: ``x`` poles, ``o`` zeros.
@@ -414,7 +414,7 @@ def plot_pzmap(
 
     figure = pzmap_figure(z, p, sys, of, wrt, radius, discrete_period(sys))
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_root_locus(
@@ -431,7 +431,7 @@ def plot_root_locus(
     eps: float = 1e-6,
     minimal: bool | None = None,
     radius: float | None = None,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Root locus of the selected channel closed with ``u = -K y``.
@@ -455,7 +455,7 @@ def plot_root_locus(
         A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
     )
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 def plot_nyquist(
@@ -471,7 +471,7 @@ def plot_nyquist(
     n_samples: int = 500,
     method: str = "auto",
     eps: float = 1e-6,
-    backend="matplotlib",
+    renderer="matplotlib",
     show: bool = True,
 ) -> PlotResult:
     """Nyquist diagram of the selected channel with the critical point ``-1``."""
@@ -491,7 +491,7 @@ def plot_nyquist(
 
     figure = nyquist_figure(w, G, sys, of, wrt)
 
-    return render_control_figure(figure, backend=backend, show=show)
+    return render_control_figure(figure, renderer=renderer, show=show)
 
 
 ###############################################################################

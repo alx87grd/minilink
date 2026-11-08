@@ -348,7 +348,7 @@ def plot_solution_trajectory(solution, traj, *, signals, renderer, show):
         solution.problem.sys,
         traj,
         signals=signals,
-        backend=renderer,
+        renderer=renderer,
         show=False,
     )
 

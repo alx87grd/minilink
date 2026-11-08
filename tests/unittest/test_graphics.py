@@ -1230,7 +1230,7 @@ class TestAdvancedPlotting(unittest.TestCase):
     def test_plot_trajectory_computes_missing_trajectory_then_plots(self):
         sys = Integrator()
         result = sys.plot_trajectory(show=False)
-        self.assertEqual(result.backend, "matplotlib")
+        self.assertEqual(result.renderer, "matplotlib")
         self.assertIsNotNone(result.figure)
         self.assertIsNotNone(sys.traj)
         plt.close(result.figure)
@@ -1571,12 +1571,12 @@ class TestPlotlySignalPlot(unittest.TestCase):
             u=np.array([[0.25, 0.25]]),
         )
         result = plot_time_signals(
-            sys, traj0, signals=("x", "u"), backend="plotly", show=False
+            sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         self.assertEqual(len(result.figure.data), 2)
         self.assertEqual(result.figure.layout.width, PLOTLY_FIG_WIDTH)
         handle = open_time_signal_plot(
-            sys, traj0, signals=("x", "u"), backend="plotly", show=False
+            sys, traj0, signals=("x", "u"), renderer="plotly", show=False
         )
         handle.update(traj1)
         np.testing.assert_allclose(handle.fig.data[0].y, np.array([0.0, 0.25]))
@@ -1590,7 +1590,7 @@ class TestPlotlySignalPlot(unittest.TestCase):
             t=np.array([0.0, 1.0]), x=np.array([[0.0, 1.0]]), u=np.array([[1.0, 1.0]])
         )
         result = plot_time_signals(
-            sys, traj, signals=("x", "u"), backend="plotly", show=False
+            sys, traj, signals=("x", "u"), renderer="plotly", show=False
         )
         layout = result.figure.layout
         self.assertEqual(layout.yaxis.title.text, "x[0] [m]")

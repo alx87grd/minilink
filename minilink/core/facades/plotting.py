@@ -18,7 +18,7 @@ class SystemPlotting:
         traj=None,
         *,
         signals=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """
@@ -62,11 +62,11 @@ class SystemPlotting:
             self,
             traj,
             signals=signals,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
-    def plot_cost(self, cost, *, of=None, traj=None, backend="matplotlib", show=True):
+    def plot_cost(self, cost, *, of=None, traj=None, renderer="matplotlib", show=True):
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
@@ -85,7 +85,7 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("cost_rate", "cost"), backend=backend, show=show
+            scored, signals=("cost_rate", "cost"), renderer=renderer, show=show
         )
 
     def plot_input_output_map(self, **kwargs):
@@ -212,7 +212,7 @@ class LinearPlotting:
         margins=True,
         method="auto",
         eps=1e-6,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
         title=None,
     ):
@@ -236,7 +236,7 @@ class LinearPlotting:
             margins=margins,
             method=method,
             eps=eps,
-            backend=backend,
+            renderer=renderer,
             show=show,
             title=title,
         )
@@ -255,7 +255,7 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Root locus of one SISO channel closed with ``u = -K y``.
@@ -278,7 +278,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -295,7 +295,7 @@ class LinearPlotting:
         eps=1e-6,
         minimal=None,
         radius=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Plot poles and zeros of one SISO channel.
@@ -317,7 +317,7 @@ class LinearPlotting:
             eps=eps,
             minimal=minimal,
             radius=radius,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -334,7 +334,7 @@ class LinearPlotting:
         n_samples=500,
         method="auto",
         eps=1e-6,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """Step response of one SISO channel of the linear model, with rise time, settling time and overshoot.
@@ -356,7 +356,7 @@ class LinearPlotting:
             n_samples=n_samples,
             method=method,
             eps=eps,
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 
@@ -372,7 +372,7 @@ class DynamicPlotting(LinearPlotting):
         *,
         x_axis=0,
         y_axis=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
         **kwargs,
     ):
@@ -395,7 +395,7 @@ class DynamicPlotting(LinearPlotting):
             traj,
             x_axis=x_axis,
             y_axis=y_axis,
-            backend=backend,
+            renderer=renderer,
             show=show,
             **kwargs,
         )
@@ -411,7 +411,7 @@ class StepPlotting(LinearPlotting):
         rollout=None,
         *,
         signals=None,
-        backend="matplotlib",
+        renderer="matplotlib",
         show=True,
     ):
         """
@@ -445,7 +445,7 @@ class StepPlotting(LinearPlotting):
                 if self.sample_period is None
                 else TIME_ABSCISSA_LABEL
             ),
-            backend=backend,
+            renderer=renderer,
             show=show,
         )
 

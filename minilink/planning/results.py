@@ -146,7 +146,7 @@ class PlanningSolution:
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
             traj=drawn_trajectory_of(self, dt),
-            backend=renderer,
+            renderer=renderer,
             show=show,
         )
 
