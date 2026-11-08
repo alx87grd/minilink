@@ -87,7 +87,6 @@ RETIRED = {
     "solve_policy": ("solve", None),
     "N": ("n_steps", ("StepPlanningProblem",)),
     "n_samples": ("n_rollouts", ("MPPIPlanner",)),
-    "n_steps": ("n_samples, the gain schedule's samples", ("LQRPlanner",)),
     "nearest_backend": ("nearest_method", None),
     "solver": ("record", ("PlanningSolution",)),
     "algorithm": (
@@ -149,6 +148,7 @@ RETIRED = {
             "lqr_gain_schedule",
             "lqr_finite_horizon",
             "animate_modal",
+            "LQRPlanner",
         ),
     ),
     "backend": (
