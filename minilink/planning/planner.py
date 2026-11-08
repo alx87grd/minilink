@@ -43,7 +43,8 @@ class Planner(ABC):
     :class:`~minilink.planning.results.PlanningSolution`, and mirrors it:
     :attr:`controller` is its block, :meth:`cost_to_go` its cost-to-go at a
     state, :meth:`plot_trajectory`, :meth:`animate` and :meth:`plot_cost` its
-    plan or its controller's run, :meth:`plot_control_law` and
+    plan or its controller's run (integrated on the planner's :attr:`dt`, the
+    step of its evidence), :meth:`plot_control_law` and
     :meth:`plot_cost_to_go` its law and cost-to-go.
     """
 
@@ -53,6 +54,10 @@ class Planner(ABC):
 
     #: The constructor keywords that are the method's numbers, ``params["method"]``
     number_names: tuple = ()
+
+    #: The planner's own step: the integration step of its evidence and of its
+    #: views' run of a feedback law (``None``: none, the evaluator's automatic step)
+    dt = None
 
     def __init__(self, problem: PlanningProblem) -> None:
         # The declarative problem, and the seed of a planner that draws (None: none)
@@ -129,16 +134,16 @@ class Planner(ABC):
     # Views of the latest solution
 
     def plot_trajectory(self, **kwargs):
-        """The latest solution's plan, else its controller's run (:meth:`PlanningSolution.plot_trajectory`)."""
-        return require_solution(self).plot_trajectory(**kwargs)
+        """The latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_trajectory`)."""
+        return require_solution(self).plot_trajectory(**{"dt": self.dt, **kwargs})
 
     def animate(self, **kwargs):
-        """The latest solution's plan, else its controller's run, animated (:meth:`PlanningSolution.animate`)."""
-        return require_solution(self).animate(**kwargs)
+        """The latest solution's plan, else its controller's run on the planner's ``dt``, animated (:meth:`PlanningSolution.animate`)."""
+        return require_solution(self).animate(**{"dt": self.dt, **kwargs})
 
     def plot_cost(self, **kwargs):
-        """The running cost along the latest solution's plan, else its controller's run (:meth:`PlanningSolution.plot_cost`)."""
-        return require_solution(self).plot_cost(**kwargs)
+        """The running cost along the latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_cost`)."""
+        return require_solution(self).plot_cost(**{"dt": self.dt, **kwargs})
 
     def plot_control_law(self, **kwargs):
         """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
@@ -211,10 +216,13 @@ def planner_evidence(
     The :func:`~minilink.planning.evaluator.evaluate` of ``controller`` on the
     planner's problem (or ``problem``): one run when nothing is random,
     ``n_trials`` draws from key 0 otherwise; ``None`` when the problem declares
-    no cost (a search without one). A continuous controller runs on ``dt`` (an
-    open-loop plan on its own grid), else on the evaluator's automatic step; a
-    clocked one on its own clock; ``tf`` is the run of an infinite horizon. On
-    a step problem, the model's rollouts (:func:`step_evaluation`).
+    no cost (a search without one). A continuous controller runs on ``dt``, the
+    planner's own step (ruled 2026-11-08: the grid's for value iteration and
+    tabular learning, the environment's for deep learning, the LQR's, an
+    open-loop plan's own grid), the law continuous, ``dt`` only how finely its
+    loop is integrated; a clocked one on its own clock; ``tf`` is the run of an
+    infinite horizon. On a step problem, the model's rollouts
+    (:func:`step_evaluation`).
     """
     problem = planner.problem if problem is None else problem
 

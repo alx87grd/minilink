@@ -618,9 +618,9 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     np.testing.assert_array_equal(held.of("plant").x.T, step_problem.run(policy)[0])
 
     # The planner's own score is the law it hands out, as it is: the continuous
-    # loop on the evaluator's automatic step, a different controller than the held one
+    # loop integrated on the planner's dt, a different controller than the held one
     J_planner = float(np.squeeze(solution.evaluation.J))
-    assert J_planner == float(problem.compile(law).evaluate().objective)
+    assert J_planner == float(problem.compile(law, vi.dt).evaluate().objective)
     np.testing.assert_allclose(J_planner, J_step, rtol=1e-2)
 
 

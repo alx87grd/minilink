@@ -247,6 +247,11 @@ class DynamicProgrammingPlanner(Planner):
         )
 
     @property
+    def dt(self) -> float | None:
+        """The grid's step: the period the sweeps back up over, and the integration step of the evidence and the views' run."""
+        return self.grid.dt
+
+    @property
     def result(self) -> DynamicProgrammingResult | None:
         """The latest solution's tables, ``J`` and ``pi`` (a shortcut: a tool reads ``solution.record.tables``)."""
         if self.last_solution is None:
@@ -663,7 +668,7 @@ class DynamicProgrammingPlanner(Planner):
         evaluation = None
         if evaluate:
             evaluation = planner_evidence(
-                self, policy, n_trials=n_trials, backend="auto"
+                self, policy, dt=self.dt, n_trials=n_trials, backend="auto"
             )
 
         # The solution: the law, the record, the score, and the cost-to-go as a field

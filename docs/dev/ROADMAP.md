@@ -130,9 +130,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   as a function the compiled face's `pv.command(z, x, t)`); `trajectory` the plan of an
   open-loop planner only, `None` for a feedback law; `cost_to_go` a `Field` or `None` (the RL
   critic a `CriticField`); `evaluation` the controller as it is handed out, a feedback law
-  scored continuously on the evaluator's automatic step (value iteration, tabular and deep RL
-  no longer held on their `dt`), so `solve(evaluate=True)`, `evaluate(problem,
-  sol.controller)` and `compare` agree; the views run the controller through the problem's
+  scored continuously, integrated on the planner's own `dt` (ruled 2026-11-08; value
+  iteration, tabular and deep RL no longer held on it), so `solve(evaluate=True)`,
+  `evaluate(problem, sol.controller, dt=)` and `compare(..., dt=)` agree; the views run the controller through the problem's
   evaluator; every planner's `nominal_trajectory` and `holds_policy` gone; a step problem's
   `run` takes a controller block, and its planners' `evaluate=True` scores on its `run`.
 

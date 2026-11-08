@@ -174,6 +174,11 @@ class TabularLearningPlanner(Planner):
         self.history = []
 
     @property
+    def dt(self) -> float:
+        """The grid's step: the period of an episode's interactions, and the integration step of the evidence and the views' run."""
+        return self.grid.dt
+
+    @property
     def result(self) -> DynamicProgrammingResult:
         """
         The table as it stands, as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
@@ -237,7 +242,12 @@ class TabularLearningPlanner(Planner):
         evaluation = None
         if evaluate:
             evaluation = planner_evidence(
-                self, controller, n_trials=n_trials, tf=self.env.tf, backend="auto"
+                self,
+                controller,
+                dt=self.dt,
+                n_trials=n_trials,
+                tf=self.env.tf,
+                backend="auto",
             )
 
         # The solution: the law, the record, the score, and the cost-to-go as a field

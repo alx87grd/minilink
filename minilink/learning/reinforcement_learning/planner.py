@@ -600,7 +600,12 @@ class ReinforcementLearningPlanner(Planner):
         evaluation = None
         if evaluate:
             evaluation = planner_evidence(
-                self, controller, n_trials=n_trials, tf=self.env.tf, backend="jax"
+                self,
+                controller,
+                dt=self.dt,
+                n_trials=n_trials,
+                tf=self.env.tf,
+                backend="jax",
             )
 
         return PlanningSolution(

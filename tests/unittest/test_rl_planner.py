@@ -328,6 +328,7 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
     alone = evaluate(
         planner.problem,
         solution.controller,
+        dt=planner.dt,
         n_trials=4,
         key=0,
         backend="jax",

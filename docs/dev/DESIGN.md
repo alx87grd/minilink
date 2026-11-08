@@ -1279,9 +1279,10 @@ the solution's views run on demand, nothing stored — `plot_control_law` (the l
 the problem's box, one colour scale from its inputs), `plot_cost_to_go` (the field over
 the box, anchored at the goal), and `plot_trajectory`, `animate` and `plot_cost`: the
 plan when there is one, else the controller run once from the problem's start through
-the problem's evaluator (`problem.compile(controller)`, the loop the score runs: a
-continuous law on the evaluator's automatic step, nominal parameters; a step problem's
-`run`), titled plan or run.
+the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
+continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
+step, and the planner's mirrors pass the planner's own `dt`; nominal parameters; a step
+problem's `run`), titled plan or run.
 `compare(VI=..., LQR=..., PPO=...)` → `Comparison` reads named solutions
 side by side: `print` is the table of records and evaluations,
 `plot_control_law` / `plot_cost_to_go` / `plot_trajectory` the overlays on
@@ -1448,9 +1449,13 @@ backends for an integer key, while a deterministic problem runs each block's own
 with no gradient, and a non-finite objective at `z0` warns once. A planner's
 evidence (`solve(evaluate=True)`, default off; `planner_evidence` in
 `planning/planner.py`, an internal helper the planners' `solve()` call) is one
-`evaluate(problem, controller, ...)` of the controller as it is handed out, on the real
-plant: a continuous law on the evaluator's automatic step (the LQR on its reporting grid
-`dt`, an open-loop plan on its own grid, the interpolation its planner states), a clocked
+`evaluate(problem, controller, dt=..., ...)` of the controller as it is handed out, on the
+real plant. The planner's `dt` is the integration step of its evidence, for every planner
+(ruled 2026-11-08): a continuous law integrated on it, still continuous, no hold (value
+iteration and tabular learning on their grid's `dt`, deep learning on its environment's,
+the LQR on its reporting grid `dt`, an open-loop plan on its own grid, the interpolation
+its planner states), so `sol.evaluation` equals `evaluate(problem, sol.controller, dt=)`
+on that step; a clocked
 controller on its own clock, a step problem's law on its own `run` (each run the step problem's
 `J = Σ γᵏ c_k + γᴺ h` with the judge's margins and failure charge, an infinite horizon over
 an episode of 10 ticks of its time); the planner's own `J` stays in its record beside it,

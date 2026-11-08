@@ -620,7 +620,8 @@ it is (a continuous law on the evaluator's automatic step, which a continuous lo
 now runs on; a clocked one on its clock; a step problem's on its face, whose `run` takes a
 controller block). So value iteration, tabular and deep learning are scored continuously, no
 longer held on their `dt`, and `solve(evaluate=True)`, `evaluate(problem, sol.controller)` and
-`compare` agree; a law held on its grid is the other controller `law % dt`. The views
+`compare` agree; a law held on its grid is the other controller `law % dt`. The planner's dt
+is the integration step of its evidence (ruled 2026-11-08). The views
 (`plot_trajectory`, `animate`, `plot_cost`) draw the plan, else the controller run once from the
 start through the problem's evaluator, nothing stored; the planner mirrors the solution
 (`controller`, `cost_to_go`, the views).

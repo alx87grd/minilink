@@ -110,31 +110,39 @@ class PlanningSolution:
 
     # Views, run on demand: the plan, else the controller run from the problem's start
 
-    def plot_trajectory(self, *, signals=("x", "u"), backend="matplotlib", show=True):
+    def plot_trajectory(
+        self, *, dt=None, signals=("x", "u"), backend="matplotlib", show=True
+    ):
         """
         Draw the plan, else the controller's run from the problem's start, on the problem's system.
 
-        The run is the loop the score runs, ``problem.compile(controller)``
-        (a continuous law on the evaluator's automatic step, a clocked one on
-        its own clock; a step problem's model), once from the start with
-        nominal parameters. The figure is titled plan or run.
+        The run is the loop the score runs, ``problem.compile(controller, dt)``
+        (a continuous law integrated on ``dt``, ``None`` the evaluator's
+        automatic step; a clocked one on its own clock; a step problem's
+        model), once from the start with nominal parameters. The planner's
+        mirror passes its own ``dt``, the step of its evidence. The figure is
+        titled plan or run.
         """
         # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_solution_trajectory
 
         return plot_solution_trajectory(
-            self, drawn_trajectory_of(self), signals=signals, backend=backend, show=show
+            self,
+            drawn_trajectory_of(self, dt),
+            signals=signals,
+            backend=backend,
+            show=show,
         )
 
-    def animate(self, **kwargs):
-        """Animate the plan, else the controller's run from the problem's start (:meth:`plot_trajectory`), on the problem's system."""
-        return self.problem.sys.animate(drawn_trajectory_of(self), **kwargs)
+    def animate(self, *, dt=None, **kwargs):
+        """Animate the plan, else the controller's run from the problem's start on ``dt`` (:meth:`plot_trajectory`), on the problem's system."""
+        return self.problem.sys.animate(drawn_trajectory_of(self, dt), **kwargs)
 
-    def plot_cost(self, *, backend="matplotlib", show=True):
-        """Draw the running cost and ``J(t)`` along the plan, else the controller's run (:meth:`plot_trajectory`)."""
+    def plot_cost(self, *, dt=None, backend="matplotlib", show=True):
+        """Draw the running cost and ``J(t)`` along the plan, else the controller's run on ``dt`` (:meth:`plot_trajectory`)."""
         return self.problem.sys.plot_cost(
             require_cost(self.problem),
-            traj=drawn_trajectory_of(self),
+            traj=drawn_trajectory_of(self, dt),
             backend=backend,
             show=show,
         )
@@ -195,11 +203,12 @@ class PlanningSolution:
 ###############################################################################
 
 
-def drawn_trajectory_of(solution) -> Trajectory:
+def drawn_trajectory_of(solution, dt=None) -> Trajectory:
     """
     What a solution's views draw: its plan, else its controller run once from the problem's start.
 
-    The run is the loop the score runs, ``problem.compile(controller)``, with
+    The run is the loop the score runs, ``problem.compile(controller, dt)`` (a
+    continuous law integrated on ``dt``, ``None`` the automatic step), with
     nominal parameters (a stochastic problem at its mean start), the plant's
     own run read back (``traj.of("plant")``); on a step problem, its model's
     rollout (:func:`step_run_of`).
@@ -211,7 +220,7 @@ def drawn_trajectory_of(solution) -> Trajectory:
     if not is_continuous(problem):
         return step_run_of(problem, solution.controller)
 
-    run = problem.compile(solution.controller).trajectory().of("plant")
+    run = problem.compile(solution.controller, dt).trajectory().of("plant")
     plant_run = Trajectory(
         t=np.asarray(run.t), x=np.asarray(run.x), u=np.asarray(run.u)
     )

@@ -241,37 +241,48 @@ def test_grid_laws_are_scored_and_drawn_as_handed_out(make):
     assert solution.controller is planner.controller
     assert solution.evaluation.n_trials == 1
 
-    # The score is the controller's continuous loop on the evaluator's automatic step
-    alone = evaluate(problem, solution.controller)
+    # The score is the controller's continuous loop integrated on the planner's dt
+    assert planner.dt == 0.2
+    alone = evaluate(problem, solution.controller, dt=planner.dt)
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
 
-    # The views draw that loop's run from the start, the plant's own run
+    # The views draw that loop's run from the start, the plant's own run: on dt
+    # when given (the planner's mirrors give its own), else on the automatic step
     run = problem.compile(solution.controller).trajectory().of("plant")
     np.testing.assert_array_equal(drawn_trajectory_of(solution).x, np.asarray(run.x))
     np.testing.assert_array_equal(drawn_trajectory_of(solution).x[:, 0], problem.x0)
+    on_dt = problem.compile(solution.controller, planner.dt).trajectory().of("plant")
+    drawn = drawn_trajectory_of(solution, planner.dt)
+    np.testing.assert_array_equal(drawn.x, np.asarray(on_dt.x))
+    np.testing.assert_allclose(np.diff(drawn.t), planner.dt, rtol=1e-9)
     assert solution.cost_to_go(problem.x0) == planner.cost_to_go(problem.x0)
     assert str(solution.evaluation).startswith("J = ")
 
 
 def test_value_iteration_scores_the_law_it_hands_out_continuously():
-    """solve(evaluate=True), evaluate(problem, controller) and compare agree: no hold on dt."""
+    """solve(evaluate=True), evaluate(problem, controller, dt) and compare(dt) agree: the planner's dt, no hold."""
     from minilink.planning import compare
 
     problem = pendulum_problem().replace(Xf=None)
     vi = DynamicProgrammingPlanner(problem, x_grid=(41, 41), u_grid=(5,), dt=0.1)
     solution = vi.solve(evaluate=True)
 
-    # The three scores of the law handed out are one number
-    alone = evaluate(problem, solution.controller)
-    raced = compare(problem, VI=solution).evaluations["VI"]
+    # The three scores of the law handed out, integrated on the planner's dt, are one
+    # number
+    assert vi.dt == 0.1
+    alone = evaluate(problem, solution.controller, dt=vi.dt)
+    raced = compare(problem, VI=solution, dt=vi.dt).evaluations["VI"]
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     np.testing.assert_array_equal(solution.evaluation.J, raced.J)
 
-    # The continuous law on the automatic step (dt = 2 / 45 s here), not the law
-    # held over each period of the grid, a different controller with its own score
+    # The continuous law integrated on the grid's dt (ruled 2026-11-08), not the
+    # law held over each period of the grid, a different controller with its own
+    # score, nor the law on the automatic step (dt = 2 / 45 s here)
     held = evaluate(problem, solution.controller % 0.1)
-    np.testing.assert_allclose(solution.evaluation.J, [23.37795258655731], rtol=1e-9)
+    automatic = evaluate(problem, solution.controller)
+    np.testing.assert_allclose(solution.evaluation.J, [23.38524887320534], rtol=1e-9)
     np.testing.assert_allclose(held.J, [23.36262222847119], rtol=1e-9)
+    np.testing.assert_allclose(automatic.J, [23.37795258655731], rtol=1e-9)
 
 
 def test_one_evaluation_scores_an_open_loop_and_a_feedback_law_on_the_same_draws():
@@ -319,11 +330,13 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
     )
     solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=3)
 
-    # A feedback law: no plan; its score is the continuous loop of the copy handed out
+    # A feedback law: no plan; its score is the continuous loop of the copy handed
+    # out, integrated on the planner's dt
     assert solution.trajectory is None and solution.evaluation.n_trials == 3
     alone = evaluate(
         problem,
         solution.controller,
+        dt=planner.dt,
         n_trials=3,
         key=0,
         backend="jax",
@@ -653,7 +666,7 @@ def test_a_solution_is_built_by_keyword_with_its_optional_evidence():
 
 
 @pytest.mark.parametrize("make", ["dp", "lqr"])
-def test_the_planner_mirrors_its_latest_solution(make):
+def test_the_planner_mirrors_its_latest_solution(make, monkeypatch):
     import matplotlib.pyplot as plt
 
     from minilink import LQRPlanner
@@ -695,6 +708,16 @@ def test_the_planner_mirrors_its_latest_solution(make):
     planner.plot_trajectory(show=False)
     planner.plot_cost(show=False)
     plt.close("all")
+
+    # The views run the law on the planner's own dt, the step of its evidence
+    given = []
+    monkeypatch.setattr(
+        PlanningSolution, "plot_cost", lambda self, **kwargs: given.append(kwargs)
+    )
+    planner.plot_cost(show=False)
+    planner.plot_cost(dt=0.01)
+    assert planner.dt is not None
+    assert given == [{"dt": planner.dt, "show": False}, {"dt": 0.01}]
 
 
 def test_the_planners_cost_to_go_reads_the_time_on_a_finite_horizon():
