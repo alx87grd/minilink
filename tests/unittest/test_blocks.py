@@ -187,14 +187,14 @@ class TestRoutingBlocks(unittest.TestCase):
 class TestNonlinearBlocks(unittest.TestCase):
     def test_saturation_clips(self):
         sat = Saturation(lower=-1.0, upper=2.0)
-        out = [sat.compute(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
+        out = [sat.h(None, np.array([v]))[0] for v in (-3.0, 0.5, 5.0)]
         np.testing.assert_allclose(out, [-1.0, 0.5, 2.0])
 
     def test_saturation_refuses_crossed_limits(self):
         with self.assertRaisesRegex(ValueError, "upper end stop must sit above"):
             Saturation(lower=1.0, upper=-1.0)
         flat = Saturation(lower=0.5, upper=0.5)  # equal limits: a constant output
-        np.testing.assert_allclose(flat.compute(None, np.array([3.0])), [0.5])
+        np.testing.assert_allclose(flat.h(None, np.array([3.0])), [0.5])
 
 
 class TestFilterBlocks(unittest.TestCase):
@@ -407,7 +407,7 @@ class TestOneHiddenLayerMLP(unittest.TestCase):
             "b1": np.array([0.25]),
         }
         u = np.array([0.2, -0.4])
-        y = net.compute(np.array([]), u, params=params)
+        y = net.h(np.array([]), u, params=params)
         expected = (
             params["W1"] @ np.tanh(params["W0"] @ u + params["b0"]) + params["b1"]
         )
@@ -428,18 +428,18 @@ class TestOneHiddenLayerMLP(unittest.TestCase):
             "W1": np.zeros((1, 2)),
             "b1": np.array([3.0]),
         }
-        y_default = net.compute(np.array([]), np.array([1.0]))
-        y_override = net.compute(np.array([]), np.array([1.0]), params=override)
+        y_default = net.h(np.array([]), np.array([1.0]))
+        y_override = net.h(np.array([]), np.array([1.0]), params=override)
         np.testing.assert_allclose(y_default, [2.0 * np.tanh(1.0)])
         np.testing.assert_allclose(y_override, [3.0])
 
-    def test_compute_is_jax_traceable(self):
+    def test_h_is_jax_traceable(self):
         jax = pytest.importorskip("jax")
         import jax.numpy as jnp
 
         net = MLP(input_dim=2, output_dim=1, hidden=(3,))
         params = {key: jnp.asarray(value) for key, value in net.params.items()}
-        y = jax.jit(lambda u, params: net.compute([], u, params=params))(
+        y = jax.jit(lambda u, params: net.h([], u, params=params))(
             jnp.array([1.0, -1.0]), params
         )
         self.assertEqual(np.asarray(y).shape, (1,))

@@ -72,7 +72,6 @@ class PurePursuit(System):
         require_positive("lookahead", lookahead)
 
         super().__init__()
-        self.name = "Pure pursuit"
 
         # The path the law reads: its shape is structure, its numbers a part of params
         self.path = path
@@ -253,7 +252,6 @@ class Stanley(System):
         require_positive("softening", softening)
 
         super().__init__()
-        self.name = "Stanley"
 
         # The path the law reads: its shape is structure, its numbers a part of params
         self.path = path
@@ -285,7 +283,7 @@ class Stanley(System):
         path = self.path
         path_params = params["path"]
         k = params["gain"]
-        k_s = params["softening"]
+        v_s = params["softening"]
         delta_max = params["delta_max"]
         a = params["front_offset"]
 
@@ -310,8 +308,8 @@ class Stanley(System):
         # The heading error ψ_e = ψ_p − θ, wrapped to (−π, π]
         psi_e = xp.arctan2(xp.sin(psi_p - theta), xp.cos(psi_p - theta))
 
-        # δ = ψ_e + arctan(−k e / (k_s + |vx|)), within the end stops
-        delta = psi_e + xp.arctan(-k * e / (k_s + xp.abs(vx)))
+        # δ = ψ_e + arctan(−k e / (v_s + |vx|)), within the end stops
+        delta = psi_e + xp.arctan(-k * e / (v_s + xp.abs(vx)))
         delta = xp.clip(delta, -delta_max, delta_max)
         delta_cmd = xp.array([delta])
 
@@ -394,7 +392,6 @@ class LineOfSight(System):
         require_positive("lookahead", lookahead)
 
         super().__init__()
-        self.name = "Line of sight"
 
         # The path the law reads: its shape is structure, its numbers a part of params
         self.path = path
@@ -506,7 +503,7 @@ class HeadingController(System):
     ----------
     gain : float
         Heading gain [1/s], the rate at which the heading error decays. A turn at yaw
-        rate ``r`` holds a standing heading error ``r / gain``, so a gentle gain cuts
+        rate ``θ̇`` holds a standing heading error ``θ̇ / gain``, so a gentle gain cuts
         every corner.
     wheelbase : float
         Distance between the axles [m].
@@ -531,7 +528,6 @@ class HeadingController(System):
         require_positive("softening", softening)
 
         super().__init__()
-        self.name = "Heading controller"
 
         # Parameters
         self.params = {

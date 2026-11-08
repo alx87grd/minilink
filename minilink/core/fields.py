@@ -546,16 +546,18 @@ class GridField(Field):
         require_grid_shapes(levels, values, t)
         require_grid_method(method, self.METHODS)
 
-        # The reading rule is structure; the table, its axes, its times and the value
-        # outside the grid are numbers
+        # The reading rule, a time axis and a value outside the grid are structure; the
+        # table, its axes, its times and that value are numbers
         self.method = method
+        self.timed = t is not None
+        self.has_outside = outside is not None
         self.params = {
             "levels": {str(k): level for k, level in enumerate(levels)},
             "values": values,
         }
-        if t is not None:
+        if self.timed:
             self.params["t"] = t
-        if outside is not None:
+        if self.has_outside:
             self.params["outside"] = float(outside)
 
     @property
@@ -573,7 +575,7 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = xp.asarray(self.table_at(t, params))
+        table = xp.asarray(self.table_at(t, params))  # On x's module, x traced or not
         X = xp.asarray(x, dtype=float)
 
         # x held inside the grid on each axis: the edge's value past it
@@ -588,7 +590,7 @@ class GridField(Field):
             V = spline_value(levels, table, X_held, self.method)
 
         # A number outside the grid, when one is given
-        if "outside" in params:
+        if self.has_outside:
             inside = xp.all((X >= lower) & (X <= upper), axis=-1)
             V = xp.where(inside, V, params["outside"])
 
@@ -601,14 +603,14 @@ class GridField(Field):
         xp = array_module(x, t, params["values"])
 
         levels = levels_of(params, self.n, xp)
-        table = xp.asarray(self.table_at(t, params))
+        table = xp.asarray(self.table_at(t, params))  # On x's module, x traced or not
         X = xp.asarray(x, dtype=float)
 
         # Zero along an axis where x is held, and everywhere outside with a number
         lower = xp.stack([level[0] for level in levels])
         upper = xp.stack([level[-1] for level in levels])
         inside = (X >= lower) & (X <= upper)
-        if "outside" in params:
+        if self.has_outside:
             inside = inside & xp.all(inside, axis=-1, keepdims=True)
 
         # ∂V/∂x_k of the cell's multilinear form; zero for the nearest node
@@ -628,7 +630,7 @@ class GridField(Field):
         values = xp.asarray(params["values"])
 
         # A table that does not vary in time is its own value at every t
-        if self.t is None:
+        if not self.timed:
             return values
         times = xp.asarray(params["t"])
 
@@ -696,21 +698,16 @@ def grid_value(levels, table, X, *, nearest=False):
 
     # On each axis the cell l_{i_k} ≤ x_k < l_{i_k + 1} (the edge cell past the grid)
     # and the position in it, y_k = (x_k − l_{i_k}) / (l_{i_k + 1} − l_{i_k})
-    cells = []
-    for k in range(n):
-        level = levels[k]
-        i = xp.clip(xp.searchsorted(level, X[..., k]) - 1, 0, level.shape[0] - 2)
-        y = (X[..., k] - level[i]) / (level[i + 1] - level[i])
-        cells.append((i, y))
+    cells = grid_cells(levels, X)
 
     # Nearest: the node of each axis's closer end, the lower one on a tie
     if nearest:
-        index = tuple(xp.where(y <= 0.5, i, i + 1) for i, y in cells)
+        index = tuple(xp.where(y <= 0.5, i, i + 1) for i, y, _ in cells)
         return table[index]
 
     # Each axis's two weights, 1 − y_k toward its lower node and y_k toward its upper,
     # shaped to multiply a vector per node
-    weights = [(1.0 - y, y) for _, y in cells]
+    weights = [(1.0 - y, y) for _, y, _ in cells]
     if trailing:
         weights = [
             tuple(xp.reshape(w, w.shape + trailing) for w in pair) for pair in weights
@@ -719,7 +716,7 @@ def grid_value(levels, table, X, *, nearest=False):
     # Linear: V = Σ_corners V_corner Πₖ (y_k or 1 − y_k) over the cell's 2ⁿ corners
     V = 0.0
     for corner in itertools.product((0, 1), repeat=n):
-        index = tuple(i + upper for (i, _), upper in zip(cells, corner))
+        index = tuple(i + upper for (i, _, _), upper in zip(cells, corner))
         term = table[index]
         for w, upper in zip(weights, corner):
             term = term * w[upper]
@@ -734,13 +731,7 @@ def grid_gradient(levels, table, X):
     n = len(levels)
 
     # The cell and the position in it on each axis, and the cell's width
-    cells = []
-    for k in range(n):
-        level = levels[k]
-        i = xp.clip(xp.searchsorted(level, X[..., k]) - 1, 0, level.shape[0] - 2)
-        width = level[i + 1] - level[i]
-        y = (X[..., k] - level[i]) / width
-        cells.append((i, y, width))
+    cells = grid_cells(levels, X)
 
     # ∂V/∂x_k = Σ_corners V_corner (±1 / Δ_k) Π_{j ≠ k} (y_j or 1 − y_j)
     columns = []
@@ -758,6 +749,26 @@ def grid_gradient(levels, table, X):
         columns.append(dV)
 
     return xp.stack(columns, axis=-1)
+
+
+def grid_cells(levels, X):
+    """
+    Each axis's cell holding ``X`` (``(n,)`` or ``(M, n)``) on the grid's ``levels``: ``(i, y, width)`` per axis.
+
+    ``i`` the cell's lower node, ``l_i ≤ x < l_{i+1}`` (the edge cell past the
+    grid), ``y = (x − l_i) / (l_{i+1} − l_i)`` the position in it and ``width``
+    its ``l_{i+1} − l_i``. NumPy or JAX through the array module.
+    """
+    xp = array_module(X, levels[0])
+
+    cells = []
+    for k, level in enumerate(levels):
+        i = xp.clip(xp.searchsorted(level, X[..., k]) - 1, 0, level.shape[0] - 2)
+        width = level[i + 1] - level[i]
+        y = (X[..., k] - level[i]) / width
+        cells.append((i, y, width))
+
+    return cells
 
 
 def spline_value(levels, table, X, method):
@@ -786,18 +797,20 @@ def require_grid_shapes(levels, values, t):
             )
     shape = tuple(level.size for level in levels)
     expected = shape if t is None else (t.size, *shape)
+    axes = "the levels' sizes" if t is None else "the levels' sizes, the times first"
     if values.shape != expected:
         raise ValueError(
-            f"values must have shape {expected} (the levels' sizes{', the times first' if t is not None else ''}), got {values.shape}"
+            f"values must have shape {expected} ({axes}), got {values.shape}"
         )
     if t is not None and (t.size < 2 or np.any(np.diff(t) <= 0.0)):
         raise ValueError("the times t must be at least two increasing values")
 
 
 def require_grid_method(method, supported):
-    """Refuse a reading rule the grid field does not have."""
+    """Refuse a reading rule the grid field does not have, ``"spline"`` with its name, ``"cubic"``."""
     if method not in supported:
-        raise ValueError(f"method must be one of {supported}, got {method!r}")
+        hint = ': the cubic spline is "cubic"' if method == "spline" else ""
+        raise ValueError(f"method must be one of {supported}, got {method!r}{hint}")
 
 
 def require_a_bound(lower, upper):

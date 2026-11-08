@@ -866,9 +866,8 @@ def test_a_user_set_with_numbers_is_moved_on_a_deep_copy():
     assert moved.margin(np.zeros(2)) == 4.0
 
 
-def test_a_source_policy_is_held_from_the_problems_start_time():
+def test_a_source_controller_runs_from_the_problems_start_time():
     from minilink.blocks.sources import TrajectorySource
-    from minilink.planning.evaluator import nominal_trajectory
 
     plant = Pendulum()
     cost = QuadraticCost.from_system(plant, x_bar=np.array([np.pi, 0.0]))
@@ -882,7 +881,8 @@ def test_a_source_policy_is_held_from_the_problems_start_time():
     )
     t_grid = 1.5 + 0.1 * np.arange(21)
     source = TrajectorySource(t_grid, np.sin(t_grid).reshape(1, -1), port="u")
-    traj = nominal_trajectory(problem, source, dt=0.1)
+    traj = problem.compile(source, dt=0.1, backend="numpy").trajectory().of("plant")
+    np.testing.assert_allclose(traj.t[0], 1.5)
     np.testing.assert_allclose(traj.u[:, 0], [np.sin(1.5)])
 
 
@@ -895,19 +895,19 @@ def test_the_cost_bound_is_one_formula_read_by_the_judge_the_environment_and_val
         plant, cost=cost, horizon=2.0, X=plant.state.box, U=plant.input_box
     )
     dt = 0.1
-    face = problem.compile(dt=dt)
+    step_problem = problem.discretize(dt)
     env = RolloutEnvironment(problem, dt=dt, backend="numpy")
     vi = DynamicProgrammingPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=dt)
 
     # Undiscounted and finite: the integral g_max T and the sum g_max dt N agree
     bound = problem.cost_bound()
     np.testing.assert_allclose(
-        [face.cost_bound, env.failure_cost, vi.out_of_bound_cost],
+        [step_problem.cost_bound(), env.failure_cost, vi.out_of_bound_cost],
         bound,
         rtol=1e-12,
     )
 
     # A failure cost given: every tool charges it
     fixed = problem.replace(penalize_failure=True, failure_cost=7.0)
-    assert fixed.compile(dt=dt).failure_cost == 7.0
+    assert fixed.discretize(dt).failure_cost_at() == 7.0
     assert RolloutEnvironment(fixed, dt=dt, backend="numpy").failure_cost == 7.0

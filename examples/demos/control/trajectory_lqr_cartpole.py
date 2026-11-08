@@ -45,7 +45,7 @@ planner = TrajectoryOptimizationPlanner(
     method=OPTIMIZER,
 )
 reference = planner.solve().trajectory
-planner.plot_solution()
+planner.plot_trajectory()
 
 # Open-loop replay of the reference
 replay = TrajectorySource(reference.t, reference.u) >> plant

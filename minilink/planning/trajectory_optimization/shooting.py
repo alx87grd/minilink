@@ -17,7 +17,11 @@ from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+)
 from minilink.planning.trajectory_optimization.transcription import (
     ConstraintFunction,
     FixedGridOptions,
@@ -62,7 +66,7 @@ class ShootingTranscription(Transcription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
 
         # The states are not decision variables: each function of z rolls them out
         rollout = self.make_rollout(problem, backend, dynamics)
@@ -201,7 +205,7 @@ class ShootingTranscription(Transcription):
         jax = ensure_jax_x64()
         jnp = jax.numpy
 
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         grid = jnp.asarray(self.options.offsets(problem))
         dt = jnp.asarray(self.options.dt(problem))
         n_steps = int(self.options.n_steps)
@@ -276,7 +280,7 @@ class ShootingTranscription(Transcription):
             "x0": np.asarray(problem.x0, dtype=float),
             "t0": float(problem.t0),
             "plant": problem.sys.params if plant is None else plant,
-            "cost": problem.require_cost().params,
+            "cost": require_cost(problem).params,
             "discount_rate": float(problem.discount_rate),
         }
         for role in shooting_roles(problem):
@@ -485,7 +489,7 @@ class ShootingTranscription(Transcription):
         rollout,
     ):
         """Bolza objective ``J(z)`` of the input knots, the states rolled out."""
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         u = self.unpack(z, problem)
         x = rollout(u)
         t = self.options.t(problem)

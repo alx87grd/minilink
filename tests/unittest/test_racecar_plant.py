@@ -63,6 +63,7 @@ def test_solver_hint_is_under_the_fastest_mode():
     assert hint < car.params["engine_tau"]
 
 
+@pytest.mark.slow
 def test_rigid_tires_reproduce_the_kinematic_bicycle():
     """With no slip left, the rear axle follows the textbook bicycle path."""
     car = UdeSRacecarDyn()

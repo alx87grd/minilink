@@ -2,6 +2,7 @@
 
 from minilink.blocks.neural import MLP
 from minilink.core.backends import require_jax, require_jax_numpy
+from minilink.core.fields import Field
 from minilink.learning.reinforcement_learning.policy import over_states
 
 ###############################################################################
@@ -50,7 +51,7 @@ class ValueFunction:
 
         # V_w(x) = MLP(z(x)), on the policy's features z
         z = features(x)
-        V = mlp.compute(None, z, params=w)[0]
+        V = mlp.h(None, z, params=w)[0]
 
         return V
 
@@ -86,7 +87,7 @@ class QFunction(ValueFunction):
 
         # Q_w(x, a) = MLP([z(x), a]), the action appended to the features
         z = jnp.concatenate([features(x), a])
-        Q = mlp.compute(None, z, params=w)[0]
+        Q = mlp.h(None, z, params=w)[0]
 
         return Q
 
@@ -104,3 +105,28 @@ class QFunction(ValueFunction):
             seed=seed,
             output_gain=1.0,
         )
+
+
+class CriticField(Field):
+    """
+    The cost-to-go a state-value critic estimates: ``J(x) = −V_w(x)``.
+
+    A :class:`~minilink.core.fields.Field` of the state: its numbers
+    ``params`` are the critic's weights ``w``, so it traces and differentiates
+    in them like any field; ``value`` takes one state or a batch of states.
+    """
+
+    def __init__(self, critic: ValueFunction, w) -> None:
+        # The critic network, and its weights as the field's numbers
+        self.critic = critic
+        self.params = w
+
+    def value(self, x, u=None, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        critic = self.critic
+
+        # J(x) = −V_w(x)
+        J = -critic.value(params, x)
+
+        return J

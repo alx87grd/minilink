@@ -52,7 +52,7 @@ class ThreeBodyProblem(DynamicSystem):
     """
 
     def __init__(self, preset="figure_eight", masses=None, G=1.0, softening=0.0):
-        super().__init__(n=18, output_dim=18, expose_state=True)
+        super().__init__(state_dim=18, output_dim=18, expose_state=True)
 
         # Parameters: three unit masses unless given
         if masses is None:

@@ -28,7 +28,7 @@ class LowPass(StepSystem):
     """``z_{k+1} = α z_k + (1 − α) u_k``, ``y = z``."""
 
     def __init__(self, alpha=0.6):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
 
     def step(self, x, u, k=0, params=None):
@@ -171,6 +171,7 @@ def test_script_01_objects_an_lqg_loop_scores_its_covariance_prediction():
 
 @pytest.mark.optional
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_02_loop_a_digital_pid_has_a_gradient():
     jax = pytest.importorskip("jax")
     problem, pid = digital_pid_problem()
@@ -457,6 +458,7 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"
 
 
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
     planner = bicycle_planner()
     pv = planner.compile()
@@ -542,22 +544,21 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     from tests.unittest.test_step_problems import grid_world
 
     problem = grid_world()
-    face = problem.compile()
     vi = DynamicProgrammingPlanner(
         problem, x_grid=(7, 7), u_grid=(3, 3), tol=1e-9, max_iterations=50
     )
     vi.solve()
 
-    # J(x) = the moves to the goal, the face's c summed: the Chebyshev distance
+    # J(x) = the moves to the goal, the problem's c summed: the Chebyshev distance
     J = vi.result.J.reshape(7, 7)
     cells = np.arange(7.0)
     np.testing.assert_array_equal(
         J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     )
 
-    # The greedy walk from the start, rolled out on the face, pays J(x0)
-    law = vi.get_controller()
-    walk = face.run(
+    # The greedy walk from the start, rolled out by the problem, pays J(x0)
+    law = vi.controller
+    walk = problem.run(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
     )
     assert walk[3] == J[0, 0] == 5.0
@@ -583,14 +584,14 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
         problem, x_grid=(41, 41), u_grid=(11,), dt=dt, solver="rk4"
     )
     solution = vi.solve(evaluate=True)
-    law = vi.get_controller()
+    law = vi.controller
 
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
-    # The step tool's sum on the face value iteration backs up: Σ γᵏ c_k + γᴺ h
-    face = problem.compile(dt=dt, solver="rk4")
-    J_face = face.run(policy)[3]
+    # The step tool's sum on the discretization value iteration backs up: Σ γᵏ c_k + γᴺ h
+    step_problem = problem.discretize(dt, solver="rk4")
+    J_step = step_problem.run(policy)[3]
 
     # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
@@ -601,22 +602,26 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     x, t, J_env = problem.x0, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
         x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
-        J_env += face.gamma**k * -float(reward)
+        J_env += step_problem.gamma**k * -float(reward)
     assert bool(terminated)
 
-    # One J, the planner's own score among them (the law held over each period): the
-    # environment's on the face's model to the bit; the judge integrates the plant at
-    # the continuous simulator's step, the face in one RK4 step a period
-    J_planner = float(np.squeeze(solution.evaluation.J))
-    assert J_judge == J_planner
-    np.testing.assert_allclose(J_env, J_face, rtol=1e-14, atol=0.0)
-    np.testing.assert_allclose(J_judge, J_face, rtol=1e-3)
+    # One J of the law held over each period: the environment's on the step problem's
+    # to the bit; the judge integrates the plant at the continuous simulator's step,
+    # the step problem in one RK4 step a period
+    np.testing.assert_allclose(J_env, J_step, rtol=1e-14, atol=0.0)
+    np.testing.assert_allclose(J_judge, J_step, rtol=1e-3)
     J_stepped = problem.compile(law % dt, substeps=1, backend="numpy").evaluate()
-    np.testing.assert_allclose(J_stepped.objective, J_face, rtol=1e-14, atol=0.0)
+    np.testing.assert_allclose(J_stepped.objective, J_step, rtol=1e-14, atol=0.0)
 
-    # The planner's evidence is the same held loop on the face
-    evidence = vi.nominal_trajectory()
-    np.testing.assert_array_equal(evidence.x.T, face.run(policy)[0])
+    # The held loop on the step problem's step runs its own states
+    held = problem.compile(law % dt, substeps=1, backend="numpy").trajectory()
+    np.testing.assert_array_equal(held.of("plant").x.T, step_problem.run(policy)[0])
+
+    # The planner's own score is the law it hands out, as it is: the continuous
+    # loop integrated on the planner's dt, a different controller than the held one
+    J_planner = float(np.squeeze(solution.evaluation.J))
+    assert J_planner == float(problem.compile(law, vi.dt).evaluate().objective)
+    np.testing.assert_allclose(J_planner, J_step, rtol=1e-2)
 
 
 # Script 5
@@ -651,6 +656,7 @@ def native_mpc_problem():
 
 @pytest.mark.optional
 @pytest.mark.jax
+@pytest.mark.slow
 def test_script_05_join_the_native_mpcs_closed_loop_is_one_scan_tuned_by_gradient():
     jax = pytest.importorskip("jax")
     import jax.numpy as jnp
@@ -785,7 +791,7 @@ def test_script_07_fields_the_lqr_value_ends_a_short_mpc():
     assert J_ended < 0.1 * J_short
 
 
-def test_a_planners_evidence_scores_on_the_faces_own_sum():
+def test_a_held_loops_run_scores_on_the_step_problems_own_sum():
     from minilink.planning import DynamicProgrammingPlanner
     from minilink.planning.evaluation import evaluate_trajectory
 
@@ -800,13 +806,14 @@ def test_a_planners_evidence_scores_on_the_faces_own_sum():
     )
     vi = DynamicProgrammingPlanner(problem, x_grid=(21, 21), u_grid=(5,), dt=0.1)
     vi.solve()
-    law = vi.get_controller()
+    law = vi.controller
 
     def policy(x, t):
         return np.asarray(law.outputs["u"].compute(None, x, t)).reshape(-1)
 
-    # The evidence carries the running cost: its score is J = Σ γᵏ c_k + γᴺ h
-    evidence = vi.nominal_trajectory()
-    J_face = problem.compile(dt=0.1).run(policy)[3]
-    J = float(np.squeeze(evaluate_trajectory(problem, evidence).cost))
-    np.testing.assert_allclose(J, J_face, rtol=1e-12)
+    # The law held over each period on the step problem's own step: the run carries the
+    # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
+    held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
+    J_step = problem.discretize(0.1).run(policy)[3]
+    J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
+    np.testing.assert_allclose(J, J_step, rtol=1e-12)

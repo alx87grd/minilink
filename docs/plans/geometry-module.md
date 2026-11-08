@@ -110,6 +110,10 @@ minilink/graphical/          # drawing only
 1. `geometry.py` → `core/geometry/shapes.py` (landed).
 2. Move Path (landed), Track, Scene, probes, `mount`, spatial Fields, grid; shaping next to `Field.as_cost`; plots/overlays under `graphical/` with lazy methods on Scene/Track.
 3. `planning.spatial` re-exports, then delete in the same change as call-site updates ([RULES.md](../dev/RULES.md) 3.4).
+   The moved path names (`PolylinePath`, `ReferencePath`, `circuit_waypoints`,
+   `from_waypoints`) left `planning.spatial` on 2026-11-07 (ruled): every caller imports them
+   from `minilink.core.geometry`, or from the `minilink.planning` facade that exports two of
+   them; the scene names stay on `planning.spatial` until they move.
 4. Catalog factories; switch the two UdeS racecar demos and the RRT forest demo.
 5. The path-tracking laws accept a `Path` (landed; a `Track`, once it moves).
 6. The minimal `Field` (landed in v0.3): spatial subclasses already live in geometry when `Field` lands.

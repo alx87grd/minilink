@@ -440,7 +440,7 @@ class ANCFTireSystem(DynamicSystem):
         n = 2 * q_dim
         m = 3 * n_nodes
         super().__init__(
-            n=n,
+            state_dim=n,
             input_dim=m,
             output_dim=n,
             expose_state=True,

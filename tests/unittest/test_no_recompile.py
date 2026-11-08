@@ -138,7 +138,6 @@ def test_one_planner_solve_compiles_the_plant_once():
         backend="numpy",
         method="scipy_slsqp",
         options={"maxiter": 5, "disp": False},
-        record_history=True,
     )
     compile_system = problem.sys.compile
     with mock.patch.object(
@@ -147,6 +146,6 @@ def test_one_planner_solve_compiles_the_plant_once():
         autospec=True,
         side_effect=lambda self, *a, **k: compile_system(*a, **k),
     ) as compiles:
-        planner.solve()
+        planner.solve(record_history=True)
 
     assert compiles.call_count == 1

@@ -87,10 +87,10 @@ breaks nothing goes last and may follow the tag.
    cores first in their files, `GridField`, LQR's and value iteration's cost-to-go as fields,
    discounted LQR. First because it changes a public shape (`solution.cost_to_go` becomes a
    `Field`) and fixes a known issue, while the tables stay byte-identical.
-2. **Value iteration's finite horizon** (§1.8, change 2; ruled): the two modes, the law past
+2. **Value iteration's finite horizon** (§1.8, change 2; built on `v04-build`, in review): the two modes, the law past
    the horizon for both planners, the three examples migrated. A behaviour change: before the
    notebooks' redraft.
-3. **The core API proposals as ruled** (§1.11): CA-1, CA-2, CA-5, the later round's rulings,
+3. **The core API proposals as ruled** (§1.11; built on `v04-build`, in review, the parameters model's follow-up left as deferred): CA-1, CA-2, CA-5, the later round's rulings,
    `refresh()`, and the parameters model's internal follow-up (no number moves). Names: before
    the redraft.
 4. **The core's small leftovers** (§1.1, §1.2, §1.6, §1.7, and §1.13's two quirks), each
@@ -119,7 +119,7 @@ breaks nothing goes last and may follow the tag.
   relative differences in the step's report.
 - **A rename or keyword change** lands with all its callers, with no alias.
 - **A step that restructures a computation** records a seeded baseline first (AGENTS' recipe,
-  the JSONs and scripts under `benchmarks/`), and its math is read next to
+  a scratch script and its JSON, run twice and `cmp`'d), and its math is read next to
   `planning/dynamic_programming/dp.py`.
 - **Re-pinning:** an intended change re-pins the regression baselines it moves
   (`benchmarks/baselines/`) in its own commit, with its closeness report, so CI stays green;
@@ -147,8 +147,14 @@ breaks nothing goes last and may follow the tag.
   - the robust-tuning and identification demos run on the export;
   - the metric objective and the margin-floor example wait for S73, a v0.5 row.
 - [ ] **Blocks and control leftovers** (T2; its first two items and T1 landed in the v0.3 run):
-  - one warm-start helper on the plan `Trajectory`;
-  - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7).
+  - one warm-start helper on the plan `Trajectory`: no second caller left. The MPC helpers the
+    scan named are gone; the block warm-starts in `z` under tracing, on its face's `shift`
+    (two faces, two rules: knots linear, MPPI's inputs held), and a planner warm-started from
+    a `Trajectory` goes through `Trajectory.resample`, already the one owner;
+  - the impedance and robotic law bodies consolidated (scan: control#2, #5, #7): the joint and
+    the task impedance read their errors through the spring-damper laws' one helper.
+
+  Built on `v04-build`, in review: the row leaves at the merge.
 
 ### 1.2 The step algebra first-class
 
@@ -160,6 +166,20 @@ breaks nothing goes last and may follow the tag.
   batched state so they ride the same memory stream. Done when the family path is within 2× of
   the plain batch. Also: gate the quoted
   batch-rollout claim, and batch the static-leaf time grid (scan: compile-sim#11, #12).
+  Built on `v04-build`, in review: the row leaves at the merge. Landed: the gate
+  (`core_perf`'s `rollout_batch.pendulum.plain_s`, `family_s` and `family_speedup`, the last
+  gated in CI) and the static grid (one `vmap` on JAX: `Gain` on 10 001 points 204 → 31 ms,
+  NumPy 26 ms). **Not reached, the 2× bar:** measured warm on a cloud CPU (JAX, median of 7),
+  the plain batch takes 118 ms and the family 693 ms (5.9×; the 27 ms the README quoted was not
+  this machine's). The cost is not the `m·l²` lines: it is `MechanicalSystem.forward_dynamics`'s
+  `solve(H, …)`; with `l` per member, `H` differs per member and each RK4 stage runs `B`
+  one-by-one LAPACK solves where the plain batch runs one. Carrying the parameters in the
+  scan's carry measured 696 ms (no gain); a hoist out of the scan has no generic hook (XLA
+  does not move the batched solve out of the loop). A closed-form `v̇ = rhs / H` for one
+  joint runs the family in 38 ms but changes the pendulum's numbers at 5·10⁻¹⁵ and the
+  textbook line: the **[ask]**, a design change (a closed-form small-`H` solve, or a plant hook
+  for its parameter-only block), or the bar dropped. The README's "27 ms" became DESIGN §5's
+  measured range, 0.12–0.16 s on a cloud CPU, in README and ROADMAP (ruled 2026-11-07).
 - [ ] **One owner per rule** (S65; scan: compile-sim#0, #1, #2, #3, #6, #7, #8, #10, #13,
   planning#0, #5, #8, #11, core#8, #10). One item per step:
   - **Read by the loop lane:**
@@ -178,10 +198,28 @@ breaks nothing goes last and may follow the tag.
     - one owner of the sets between `StateSpaceGrid` and its planner;
     - one print-text rule for the textbook objects;
     - one verbose and empty-cache rule across the `compute_*` facades.
+
+  Built on `v04-build`, in review: the row leaves at the merge. Landed: `n_steps` stated (one
+  rule by kind of verb in DESIGN §5, a test per verb; a rename would change public behaviour);
+  `build_on_auto` with `NotTraceableError`; `core/reporting.py`; `scipy_stiff` at `scipy`'s
+  tolerances with the Jacobian on both backends (the pendulum's stiff run moves by 2.8·10⁻⁴);
+  `compile(verbose=True)` named steps; `require_grid_on_sets`; the print-text rule (and the
+  LaTeX one; DESIGN §3's `inspect.py` exception gone). Found already done: the automatic `dt`
+  (one owner, `automatic_step_of` in `core/system.py`, one `AUTO_DT_SCALE`, DESIGN's promise
+  dropped; its stale verbose note fixed), the flat-kwarg keys (the option bags are gone; the
+  unused `_UNSET` removed), the verbose default (`False` on every `compute_*`). **Skipped,
+  each a public change the row does not state, the [ask]:** the Monte Carlo defaults
+  (`evaluate` takes `backend="auto"` and needs `n_trials` on a stochastic problem; the
+  planners' evidence `backend="numpy"`, `n_trials=50`: evidence on `"auto"` moves the
+  stochastic scores by one ulp and adds a JAX compile to every `solve(evaluate=True)`;
+  `evaluate` defaulting to 50 relaxes its documented refusal), and the empty-cache rule
+  (`plot_rollout()` with no rollout raises because `compute_rollout(n_steps)` has no default
+  length to compute one with).
 - [ ] **The root locus and the step response in `z`**: `linearize`, `bode`, `margins`,
   `nyquist` and `pzmap` read a `StepSystem` or a `SampledSystem` in `z`; `root_locus`
   and `step_response` stay continuous. Done when both give the discrete answer on a
-  `DiscreteLTISystem` and the continuous callers see no change.
+  `DiscreteLTISystem` and the continuous callers see no change. Built on `v04-build`, in review: the row
+  leaves at the merge.
 
 ### 1.3 The draws
 
@@ -207,17 +245,19 @@ construction.
 
 ### 1.6 One score
 
-Contract: DESIGN §6 (the problem evaluator, the step face). Ruled, besides it, three
+Contract: DESIGN §6 (the problem evaluator, the step problem's own equations). Ruled, besides it, three
 points: the sampled check accepted, the run priced to the horizon with
 the input held, a solver's own objective allowed but the score always the problem's cost.
 
-- [ ] **A step problem's own tree** (the rest of the step face and the compiled face; `StepPlanningProblem`, the
+- [ ] **A step problem's own tree** (built on `v04-build`, in review: the row leaves at the
+  merge; the rest of the step face and the compiled face; `StepPlanningProblem`, the
   compiled face, the judge, value iteration and the RL environment on `transition` and the derived
   RL discount landed in the v0.3 run): `realize` on the step problem's own tree (today the start
   and the laws through its parts) and `t0` as its tick offset. Done when a grid world with a
   law as its start realizes from its own tree and a step problem started at `t0 = k₀` scores
   as from 0 with the cost shifted.
-- [ ] **The RL environment on a native step problem**: `RolloutEnvironment` refuses a
+- [ ] **The RL environment on a native step problem** (built on `v04-build`, in review: the row
+  leaves at the merge): `RolloutEnvironment` refuses a
   `StepPlanningProblem` by name today (a discretized one names its origin and period); reading
   the face's `n_steps`, `γ` and cost bound instead needs the step problem's sets, laws and sources.
   Done when an RL planner trains on a native grid-world problem through its face.
@@ -266,8 +306,9 @@ v0.3 runs; the RL and RRT faces stay with their v0.5 rows, on the same contract.
 each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
 
 - [ ] **The planners' math and fields** (`PP-1` to `PP-3`; built on the branch
-  `plans-as-policies-1`, in review: the row leaves at the merge): done when `bellman_backup` and
-  `lqr_matrices` open their files and the planners call them, the seeded value-iteration and
+  `plans-as-policies-1`, in review: the row leaves at the merge): done when the Bellman backup is
+  written in each engine's step (ruled 2026-11-07: inline, its helper `bellman_backup` removed)
+  and `lqr_matrices` opens its file and the planner calls it, the seeded value-iteration and
   LQR baselines `cmp` byte-identical (NumPy, loop and JAX engines); `GridField` is in
   `core/fields.py` on the reading shared with `LookupPolicy`, traces under JAX, and is value
   iteration's `cost_to_go` (the failure cost outside the grid), `QuadraticField` LQR's; each
@@ -276,7 +317,9 @@ each merged on its own, in the order of "Next, in order" (phases 1, 2 and 7):
   issue deleted); `test_planning_solution.py`, `test_dynamic_programming.py`,
   `test_lqr_planner.py` and the GRO860 value-iteration notebooks pass; DESIGN §4 and §6 say what
   landed.
-- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`): done when `solve()` on a
+- [ ] **Value iteration's finite horizon** (`PP-4` to `PP-6`; built on the branch `v04-build`,
+  stacked on change 1, in review: the row leaves at the merge; what it built and the choices
+  taken: plans-as-policies.md §14 and §15): done when `solve()` on a
   finite-horizon problem runs `T / dt` sweeps with a time-varying law and `J(x, t)`, its `J_0`
   equals `solve_steps(N)`'s and its stage-`i` law `solve_steps(N − i)`'s, and LQR and value
   iteration agree on the finite-horizon double integrator; past the horizon LQR's finite law
@@ -321,6 +364,15 @@ v0.3's review and its six release points are done (`0.3.0`). K4 and the hand-loo
 - [ ] **The cart-pole RL demo re-measured**: the training reward moved to `−g·dt` and no
   RL demo was re-run for its numbers; its reliability re-measured on 8 seeds at its budget and
   reported, no constant changed; the budget after that is the maintainer's **[ask]**.
+  **Measured 2026-11-07** (`v04-build`, the demo unchanged: PPO, 3 M steps, `dt = 0.05`; seeds 0–7;
+  the demo's own `evaluate(n_trials=100, key=1)` and its 10 s run from hanging; success =
+  upright `cos θ < −0.95` and `|cart| < 5 m` over the last 2 s): **1 seed of 8** swings up and
+  balances (seed 2, `J = 1.23 ± 0.84`, every start upright); the other seven swing up once and
+  spin (eval `J` 21 to 1756, median about 32); the training's final episode cost (1.17–1.85)
+  does not tell them apart. The **[ask]** (a larger budget, another reward or exploration
+  setting, or the demo shown as a single seed's result) is **deferred to the maintainer's
+  end-of-v0.4 demo rebuild (ruled 2026-11-07)**; the demo stays as it is until then. Also seen: `evaluate` reports every
+  seed feasible and reached at `J ≈ 1756` (seed 5), to check against its `X` (`|θ| ≤ 20`).
 
 ### 1.11 The core API proposals
 
@@ -328,28 +380,32 @@ Design: [core-api-improvements.md](core-api-improvements.md), each proposal with
 and diff (from the core tutorials' review). Each is a core API change **[ask — core]**; one
 commit per proposal, its callers and DESIGN in the same change.
 
-- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go): `System(0, input_dim=,
+- [ ] **Static systems take the port shortcuts** (CA-1; ruled 2026-11-07, go; built on `v04-build`, in review: the row leaves at the merge): `System(0, input_dim=,
   output_dim=, y_dependencies=)` as `DynamicSystem` and `StepSystem` do, `y_dependencies`
   defaulting to `("u",)` on a static system with an input; the first argument `n` renamed
   `state_dim` in every constructor call (about 128 keyword sites, no alias), the attributes `n`,
   `m`, `p` unchanged. Done when the reproducer builds without `y_dependencies`, no `n=` keyword
   is left, `test_vocabulary.py` pins `state_dim`, and DESIGN §4 states the shortcut, its static
   default and the naming.
-- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract):
+- [ ] **The output map on the compiled evaluators** (CA-2; ruled 2026-11-07, one contract; built on `v04-build`, in review: the row leaves at the merge; the transfer-function compensator, `Gain` and `MLP` were found with the same defect and fixed with it):
   `evaluator.h(x, u, t, params)` on `Evaluator` and `DiscreteEvaluator`, the `"y"` port, empty
   when there is none, as `sys.h`; `Mux`, `Saturation` and `Sum` fixed so `sys.h` is their `"y"`
   port. Done when a compiled diagram's and a compiled leaf's `h` equal the system's, and a test
   pins `sys.h == outputs["y"]` on every block and catalog plant.
-- [ ] **A later round of API proposals** (all five ruled 2026-11-07; from the 2026-11-05
+- [ ] **A later round of API proposals** (all five ruled 2026-11-07; all five built on `v04-build`, in review: the row leaves at the merge; from the 2026-11-05
   public-surface scan, after its nine rulings landed; each needs its own context and options
   before a ruling): the planner's shortcuts taking the solution's names (ruled 2026-11-07, a
   full mirror and one meaning per word: the **controller** is the block a loop closes on, the
-  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, a new
-  `sol.policy(x, t)` evaluates it, the planner mirrors the solution: `planner.controller` for
-  `get_controller()`, `planner.policy(x, t)`, `planner.cost_to_go(x)` for `value_at(x)`,
-  `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
+  **policy** the function `u = π(x, t)`; `sol.policy` becomes `sol.controller`, the planner
+  mirrors the solution: `planner.controller` for `get_controller()`, `planner.cost_to_go(x)` for
+  `value_at(x)`, `planner.plot_trajectory()` for `plot_solution()`, `planner.animate()` for
   `animate_solution()`; the `*Policy` class names stay, naming the law a block implements; one
-  sweep, no alias, CONSTITUTION's line amended); training budgets
+  sweep, no alias, CONSTITUTION's line amended; the policy as a function on the solution,
+  `sol.policy(x, t)` and `planner.policy(x, t)`, reversed 2026-11-07: the solution hands out
+  the block and the function is the compiled face's `pv.command(z, x, t)`; the solution's shape
+  ruled the same day, `(problem, controller, record, trajectory, cost_to_go, evaluation,
+  params)`, keyword-only, `trajectory` the plan only, `cost_to_go` a `Field` or `None`, the
+  controller as handed out scored and drawn, plans-as-policies.md §15); training budgets
   `n_episodes` and `n_timesteps` (RULES 2.7; ruled 2026-11-07: the keyword and the record's
   fields, `solve(n_episodes=)`, `solve(n_timesteps=)`, `record.n_episodes`, `record.n_timesteps`,
   one sweep, no alias); workflow keywords on constructors (ruled 2026-11-07: on the verb, every
@@ -357,13 +413,16 @@ commit per proposal, its callers and DESIGN in the same change.
   constructors keep structure, numbers and `options=`, as `Optimizer.solve` and
   `compute_trajectory`; a planner rebuilt for a sweep inherits no display; only the orchestrator's verb takes
   them: the compiled face's `pv.solve(params, z0)` stays pure, fast and free of plots and
-  printing, as today; with it, RRT's display knobs (`live_plot_every`, `live_plot_pause`,
-  `live_plot_after_goal_only`, `live_plot_ax`) move to `solve`, RRT runs `callback` and
-  `live_plot` together (today the live plot is silently dropped beside a callback), and tabular
+  printing, as today; with it, RRT's live plot is an object, `LiveSearchPlot(every=1, pause=…,
+  after_goal_only=False, ax=None)`, a hook of `solve(callback=…)`, which takes a callable or a
+  list of callables, each hook filtering for itself (ruled 2026-11-07: the five `live_plot*`
+  keywords leave both RRT planners' `solve`; the user's callback sees every extension), and tabular
   RL gains `solve(verbose=)`; one sweep of about 60 constructors, no alias; DESIGN §6's four kinds say so when it lands);
-  `problem.compile()` always returning the evaluator, the step face from
-  `discretize(dt).compile()` (ruled 2026-11-07: one return type per verb, a controller-less
-  `problem.compile` refused with that pointer; 14 call sites); about 80 public helper methods on the diagram, the problem, the
+  `problem.compile(controller)` always returning the evaluator (ruled 2026-11-07: one return
+  type per verb; then ruled 2026-11-07, "the step problem answers its own equations; no second
+  noun": `controller` a required argument, the custom refusal gone, `StepPlanningProblem.compile`
+  gone, the step problem's own `transition`, `terminal` and `run` delegating to the internal
+  `StepModel`, the former `StepFace`, exported on no facade); about 80 public helper methods on the diagram, the problem, the
   evaluator and the planners moved to module functions (ruled 2026-11-07: the helper-shaped
   ones, about 17 on `PlanningProblem` and the `Planner` base, become `require_*`/`*_of` module
   functions; a name an example, notebook or tutorial calls stays a method; a planner's algorithm
@@ -378,14 +437,14 @@ commit per proposal, its callers and DESIGN in the same change.
   moves no number): the problem's internal helpers (`parts_view`, `sample_params`,
   `nominal_plant_params`, `drawn_paths`) folded into its held tree. Done when it has landed or
   been dropped.
-- [ ] **`refresh()` retired** (ruled 2026-11-07: removed): a block's state size is fixed once
+- [ ] **`refresh()` retired** (ruled 2026-11-07: removed; built on `v04-build`, in review: the row leaves at the merge): a block's state size is fixed once
   built (DESIGN §4, build versus run), the diagram's layout computed when blocks are added;
   `refresh()` goes from `System`, the diagram and the sampled views; the six test calls go
   (no-ops: a block's `x0` is a live view, checked on a continuous and a sampled loop), and the
   two tests that pinned it pin the live views instead. Done when no `refresh` is left and
   DESIGN's "Three owners of a start" drops its sentence.
 - [ ] **The core's mathematical types on `minilink.core`** (CA-5; ruled 2026-11-07, with §1.13's
-  root exports): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
+  root exports; built on `v04-build`, in review: the row leaves at the merge): `MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
   `ScaledCost`, `SampledSystem`, `SampledDiagramSystem` on `minilink.core`; `QuadraticField` and
   `GridField` on the root. Done when they import from there, `test_teaching_surface.py` pins the
   two root names, and the tutorials' deep `minilink.core.fields` import and its allowlist entry
@@ -396,7 +455,7 @@ Design: [minimal-surface.md](minimal-surface.md): the demos, notebooks, tests, C
 benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the maintainer's pick
 **[ask]**; the order is the plan's §4.
 
-- [ ] **The tests' short-term restructure** (MS-D1 ruled 2026-11-07: the net for v0.4's sweeps,
+- [ ] **The tests' short-term restructure** (built on `v04-build`, in review: the row leaves at the merge; the tests of the deleted benchmark helpers went, eleven tests over about 15 s carry a `slow` marker, run by `--runslow` in the regression job, the nightly and the release check, the per-change run 8 min 50 s → 4 min 22 s; MS-D1 ruled 2026-11-07: the net for v0.4's sweeps,
   kept small): the tests of deleted things go, the slow tests leave the per-change run (MS-D3's
   CI relief), the files otherwise stay; the layers' details (MS-D2a–e) wait for the clean slate.
 - [ ] **The maintainer's demo rebuild, then the tests' clean slate** (MS-D1, 2026-11-07), the
@@ -412,7 +471,16 @@ benchmarks redrafted on the core. Its decisions MS-D1 to MS-D6 wait for the main
   stay until K5. Done when the two are gone and the notebook checks pass.
 - [ ] **The benchmarks** (MS-D6, ruled 2026-11-07): the regression gate stays; the studies, the
   one-off baselines and the pyro parity scripts go, with `tests/README.md`'s study row. Done
-  when `benchmarks/` holds the gate alone and the CI gate passes.
+  when `benchmarks/` holds the gate alone and the CI gate passes. Built on `v04-build`, in
+  review: the row leaves at the merge. What went: the study driver and its presets with their
+  helpers (`step_evaluators.py`, `planning_rrt.py`, `systems/step.py`), its IDE launcher and
+  bridge test; the nested-flatten studies and their scenarios (the flatten-default row's
+  benchmark, in history at `b5b9892`; the two fixtures the flatten tests read moved into
+  `tests/unittest/flatten_diagram_helpers.py`); the one-off captures (`params_baseline.py`,
+  `step_model_baseline.py`, `v03_baseline.py` with `baselines/v03_core.json`, `v03_budget.py`,
+  `compile_once.py`, `params_binding.py`); the pyro parity scripts; the two parity CLI wrappers
+  (`--suite e4|f_mpc --update` does the same); the ODE-solver notebook. `public_names.py` stays
+  beside the gate as a test tool.
 
 ### 1.13 The root exports and the tutorials' quirks
 
@@ -421,9 +489,14 @@ From the three-layer tutorials' audit (the notebooks work around each today):
   `GridField` join the root; `Field` and the sampled classes go on `minilink.core`, MPC and MPPI
   stay on their bands. Done with CA-5's row.
 - [ ] **A linear model's matrices by name**: `lin.A` is a method, so the tutorials read
-  `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form.
+  `lin.params["A"]`; one of the two forms. Done when the tutorial reads one form. The
+  method stays (the class contract, `A(t, params)`); the two tutorials call `lin.A()`.
+  Built on `v04-build`, in review: the row leaves at the merge.
 - [ ] **`plot_bode` on a sampled loop**: a method on continuous systems only, the function form
-  for the sampled loops. Done when both read the same verb.
+  for the sampled loops. Done when both read the same verb. The four linear-analysis plots
+  (`plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`) moved to one mixin both
+  the continuous and the step systems inherit; the discrete tutorial calls `loop.plot_bode()`.
+  Built on `v04-build`, in review: the row leaves at the merge.
 
 ---
 
@@ -700,16 +773,14 @@ pick):
   assigning into `q.labels[i]` in place no longer sticks; the gravity hook's signature is
   read on every call; the collocation demo's SLSQP fallback is not run in CI (its manifest
   entry still requires Ipopt).
-- [ ] Bare `import jax` in `simulation/compile_backend.py` and `from jax.errors` in
-  `analysis/derivatives.py` → `require_jax()` (RULES 5.12); the two rows the textbook-style
-  allowlist still carries.
 
 **S67–S69 — one plot vocabulary, contracts as tests, students' laptops** (S65 and S66 moved to
 §1):
 
 - [ ] **The compile-time flatten default**: `compile_diagram(..., flatten=False)` inlines nested
-  boxes with `__` ids; the parity tests and `benchmarks/scenarios/nested_compile_flatten.py`
-  compare the nested compile, `flatten=True` and hand-flat wiring. Run the benchmark once on the
+  boxes with `__` ids; the parity tests compare the nested compile, `flatten=True` and
+  hand-flat wiring (the timing scenario, `benchmarks/scenarios/nested_compile_flatten.py`, left
+  with the studies in v0.4: in history at `b5b9892`). Run it once on the
   maintainer's reference machine, then keep the default off, turn it on, or drop the flag and
   always flatten if parity holds (reviewer A's lean) **[ask — core]**.
 - [ ] **One plot vocabulary** (S67) (scan: graphics#0, graphics#4, graphics#5, graphics#6,
@@ -786,7 +857,8 @@ pillar names it.
   fields, grid, catalog
   `oval_circuit` / `racecar_circuit` / `holonomic_forest`); shaping next to `Field.as_cost`;
   plots and overlays under `graphical/` with lazy methods on `Scene` / `Track`;
-  `planning.spatial` re-exports then deletes in the same change as the call sites;
+  `planning.spatial` re-exports then deletes in the same change as the call sites (the path
+  names already left it, ruled 2026-11-07);
   the path-tracking laws take a Track once it moves. Done when the two UdeS racecar demos and the RRT forest demo
   use the catalog, `control` imports geometry with no planning import, and the suite is
   green. Glyph rename stays S30.

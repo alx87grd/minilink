@@ -4,7 +4,6 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.inspect import latex_inspect
 from minilink.core.system import DynamicSystem, fastest_time_constant
 
 ###############################################################################
@@ -28,18 +27,20 @@ class StateSpaceSystem(DynamicSystem):
     def __init__(
         self,
         *,
-        n,
-        m,
-        p=None,
+        state_dim,
+        input_dim,
+        output_dim=None,
         feedthrough=False,
         name=None,
         declare_ports=True,
         expose_state=True,
     ):
+        n = state_dim
+        p = n if output_dim is None else output_dim
         super().__init__(
-            n=n,
-            input_dim=m if declare_ports else None,
-            output_dim=(n if p is None else p) if declare_ports else None,
+            state_dim=n,
+            input_dim=input_dim if declare_ports else None,
+            output_dim=p if declare_ports else None,
             expose_state=declare_ports and expose_state,
             y_dependencies=("u",) if feedthrough else (),
         )
@@ -147,9 +148,9 @@ class LTISystem(StateSpaceSystem):
         n, m, p = dimensions_of(A, B, C, D)
         feedthrough = bool(np.any(np.asarray(D)))
         super().__init__(
-            n=n,
-            m=m,
-            p=p,
+            state_dim=n,
+            input_dim=m,
+            output_dim=p,
             feedthrough=feedthrough,
             name=name,
             declare_ports=declare_ports,
@@ -190,7 +191,7 @@ class LTISystem(StateSpaceSystem):
         return f"{super().__str__()}\n{matrices_text(self)}"
 
     def _repr_latex_(self):
-        return latex_inspect(self)
+        return lti_latex()
 
 
 class DiscreteLTISystem(StepSystem):
@@ -232,7 +233,7 @@ class DiscreteLTISystem(StepSystem):
         n, m, p = dimensions_of(A, B, C, D)
         feedthrough = bool(np.any(np.asarray(D)))
         super().__init__(
-            n=n,
+            state_dim=n,
             input_dim=m,
             output_dim=p,
             y_dependencies=("u",) if feedthrough else (),
@@ -364,3 +365,13 @@ def matrices_text(sys):
             + np.array2string(values, precision=4, suppress_small=True, prefix=prefix)
         )
     return "\n".join(blocks)
+
+
+def lti_latex():
+    """The state-space equations in LaTeX."""
+    return (
+        r"\begin{align*}"
+        r"\dot{x} &= A x + B u \\"
+        r"y &= C x + D u"
+        r"\end{align*}"
+    )

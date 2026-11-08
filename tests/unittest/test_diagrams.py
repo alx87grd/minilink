@@ -787,7 +787,7 @@ from minilink.simulation.static_simulator import StaticSimulator
 
 class _Counter(StepSystem):
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
 
 
 def _unity_feedback_diagram():
@@ -890,7 +890,7 @@ class TestFeedbackMissingPortMessage(unittest.TestCase):
 
         class NoOutput(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, expose_state=True)
+                super().__init__(state_dim=2, input_dim=1, expose_state=True)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], u[0] - x[0]])
@@ -1002,6 +1002,33 @@ def test_a_nested_blocks_signal_is_recorded_by_its_path():
         _inner_run(outer, traj), ports=("plant:u",)
     ).get_signal("plant:u")
     np.testing.assert_allclose(run.u, expected, atol=1e-12)
+
+
+def test_a_sampled_loops_nested_block_is_selected_by_the_id_it_was_added_under():
+    """A hand-built plant diagram: its leaf's path is the id it carries there, not "plant"."""
+    from minilink import PID, Demux, Pendulum
+
+    pendulum = Pendulum()
+    pendulum.x0 = np.array([0.4, 0.0])
+    inner = DiagramSystem()
+    inner.add_subsystem(pendulum, "car")
+    inner.add_subsystem(Demux((1, 1), port="y"), "angle")
+    inner.add_input_port("u", dim=1)
+    inner.connect("input", "u", "car", "u")
+    inner.connect("car", "y", "angle", "y")
+    inner.connect_new_output_port("angle", "y[0]", "y")
+    loop = (PID(Kp=8.0, Kd=1.0) % 0.05) @ inner
+    traj = loop.compute_trajectory(tf=0.5, dt=0.01, verbose=False)
+
+    # The leaf's run under "<loop id>/<its id>": the inner diagram's only state
+    car = traj.of("plant/car")
+    assert car.x.shape == (2, traj.n_samples)
+    np.testing.assert_array_equal(car.x, traj.of("plant").x)
+    assert np.abs(car.x[0] - 0.4).max() > 1e-3  # the loop actually moves it
+
+    # The loop's role name repeated is no path: the refusal lists the recorded ones
+    with pytest.raises(ValueError, match="plant/car"):
+        traj.of("plant/plant")
 
 
 def _inner_run(outer, traj):

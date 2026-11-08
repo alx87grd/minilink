@@ -792,7 +792,7 @@ class KinematicManipulator(DynamicSystem):
         self.effector_dim = int(effector_dim)
         self._kin_arm = None
         super().__init__(
-            n=self.dof,
+            state_dim=self.dof,
             input_dim=self.dof,
             output_dim=self.dof,
             expose_state=True,

@@ -1,6 +1,7 @@
-"""Performance benchmarks for minilink (not shipped, not correctness tests).
+"""The regression gate of minilink (not shipped, not correctness tests).
 
-Helpers per domain (``f_evaluators``, ``simulation``, ``optimization``,
-``trajopt``), shared plumbing (``common``), synthetic fixtures
-(``systems``), and flat ``run_*.py`` scripts runnable from the repo root.
+``run_regression_check.py`` runs the suites (``suites``, ``scenarios``) against the
+committed ``baselines``; the measuring helpers (``f_evaluators``, ``simulation``,
+``optimization``, ``trajopt``, ``dynamic_programming``), shared plumbing (``common``,
+``baseline``, ``host_profiles``) and synthetic fixtures (``systems``) serve it.
 """

@@ -47,13 +47,11 @@ planner = TrajectoryOptimizationPlanner(
     method=OPTIMIZER,
     # method="scipy_slsqp",
     # options={"maxiter": 500, "ftol": 1e-2},
-    verbose=PRINT_SOLVE_REPORT,
-    live_plot=LIVE_PLOT,
 )
 
-planner.solve()
-planner.plot_solution()
-planner.animate_solution()
+planner.solve(verbose=PRINT_SOLVE_REPORT, live_plot=LIVE_PLOT)
+planner.plot_trajectory()
+planner.animate()
 
 # traj2 = traj.resample(n_samples=200)
 # planner.problem.sys.animate(traj2)

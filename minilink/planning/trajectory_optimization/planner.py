@@ -10,6 +10,11 @@ import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY
 from minilink.core.params import checked
+from minilink.core.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    preview_vector,
+)
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
@@ -21,21 +26,20 @@ from minilink.optimization.optimizer import (
     Optimizer,
     method_params_of,
 )
-from minilink.optimization.reporting import (
-    DISP_RULE_DIV,
-    DISP_RULE_MAIN,
-    preview_vector,
-)
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import Planner, host_tree, planner_evidence, problem_with
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.planner import (
+    Planner,
+    host_tree,
+    open_loop_controller_of,
+    planner_evidence,
+    problem_with,
+)
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.transcription import (
     Transcription,
     dynamics_function,
 )
-
-_UNSET = object()  # Marks a keyword the caller did not pass
 
 _TRANSCRIPTION_PRESETS = frozenset(
     {"direct_collocation", "multiple_shooting", "single_shooting"}
@@ -76,10 +80,6 @@ class TrajectoryOptimizationPlanner(Planner):
         feasibility_tol: float = 1e-6,
         guess=None,
         options: dict | None = None,
-        verbose: bool = False,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        record_history: bool = False,
         **method_numbers,
     ) -> None:
         """
@@ -104,17 +104,12 @@ class TrajectoryOptimizationPlanner(Planner):
         options : dict, optional
             An external solver's own knobs (SciPy's ``maxiter``, ``ftol``;
             Ipopt's), passed through untouched.
-        verbose, callback, live_plot, record_history
-            Workflow: the preamble and report, a per-iterate callback (it takes
-            precedence over ``live_plot``), the live redraw, and a full
-            :class:`Trajectory` per iterate (one rollout each: leave it off for
-            production solves).
         **method_numbers
             A native method's own numbers (``learning_rate``, ``b1``, ``b2``,
             ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``.
         """
         super().__init__(problem)
-        self.require_cost()
+        require_cost(self.problem)
 
         # Discretization: a transcription instance, or a preset on n_steps knots
         self.transcription = resolve_transcription(transcription, n_steps)
@@ -133,12 +128,6 @@ class TrajectoryOptimizationPlanner(Planner):
         self.method_numbers = method_params_of(
             method, method_numbers_of(method, self.options, method_numbers)
         )
-
-        # Workflow
-        self.verbose = bool(verbose)
-        self.callback = callback
-        self.live_plot = bool(live_plot)
-        self.record_history = bool(record_history)
 
         # Diagnostics: the machinery of the latest offline solve, never read by a tool
         # (its answer, timings and history are in solution.record)
@@ -189,6 +178,10 @@ class TrajectoryOptimizationPlanner(Planner):
         guess=None,
         evaluate: bool = False,
         n_trials: int = 50,
+        verbose: bool = False,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        record_history: bool = False,
     ) -> PlanningSolution:
         """
         Offline trajopt entry.
@@ -200,19 +193,44 @@ class TrajectoryOptimizationPlanner(Planner):
         a packed ``z`` (a compiled face's, its origin dropped), or a
         :class:`~minilink.planning.results.PlanningSolution`
         (a warm start: ``planner.solve(guess=previous)``); ``None`` takes the
-        options' guess, else the default. The solution's policy is the optimized
-        input as a source block, ``policy >> plant``; ``evaluate=True`` also
+        options' guess, else the default. The solution's controller is the optimized
+        input as a source block, ``controller >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
+        The workflow: ``verbose`` prints the preamble and the report,
+        ``callback(iteration)`` sees every iterate, ``live_plot`` redraws the
+        plan beside it, and ``record_history`` keeps a full :class:`Trajectory`
+        per iterate in the record (one rollout each: leave it off for
+        production solves).
         """
         problem_params, method = planner_parts(
             None if params is None else checked(params, self.params)
         )
         problem = problem_with(self.problem, host_tree(problem_params))
 
-        return self.solve_on(problem, guess, evaluate, n_trials, method)
+        return self.solve_on(
+            problem,
+            guess,
+            evaluate,
+            n_trials,
+            method,
+            verbose=verbose,
+            callback=callback,
+            live_plot=live_plot,
+            record_history=record_history,
+        )
 
     def solve_on(
-        self, problem, guess, evaluate, n_trials, method=None
+        self,
+        problem,
+        guess,
+        evaluate,
+        n_trials,
+        method=None,
+        *,
+        verbose=False,
+        callback=None,
+        live_plot=False,
+        record_history=False,
     ) -> PlanningSolution:
         """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store."""
         workflow_t0 = time.perf_counter()
@@ -236,7 +254,7 @@ class TrajectoryOptimizationPlanner(Planner):
         warm_bound_form(optimizer)
         compile_s = time.perf_counter() - compile_t0
 
-        if self.verbose:
+        if verbose:
             self.print_solve_preamble(
                 program=program,
                 optimizer=optimizer,
@@ -252,7 +270,14 @@ class TrajectoryOptimizationPlanner(Planner):
             params=None if method is None else {**optimizer.params, "method": method},
             z0=z0,
             callback=self.build_callback(
-                optimizer, problem, backend, history, dynamics
+                optimizer,
+                problem,
+                backend,
+                history,
+                dynamics,
+                callback=callback,
+                live_plot=live_plot,
+                record_history=record_history,
             ),
             verbose=False,
         )
@@ -307,7 +332,7 @@ class TrajectoryOptimizationPlanner(Planner):
             )
         )
 
-        if self.verbose:
+        if verbose:
             self.print_solve_report(
                 record=record,
                 result=optimization_result,
@@ -406,12 +431,14 @@ class TrajectoryOptimizationPlanner(Planner):
         backend: str,
         history: list,
         dynamics,
+        *,
+        callback: Callable | None = None,
+        live_plot: bool = False,
+        record_history: bool = False,
     ) -> OptimizationProgressCallback | None:
         """The optimizer's progress hook (``history`` appended to, live plot, user callback) on the solve's compiled ``dynamics``, or ``None``."""
-        callback = self.callback
-
         # The live figure, beside the user's callback when there is one
-        if self.live_plot:
+        if live_plot:
             # Lazy import: the graphics load on first use, not with the core
             from minilink.planning.trajectory_optimization.live_plot import (
                 LiveTrajectoryPlotCallback,
@@ -427,7 +454,7 @@ class TrajectoryOptimizationPlanner(Planner):
                     live_callback(iteration)
                     user_callback(iteration)
 
-        if not self.record_history and callback is None:
+        if not record_history and callback is None:
             return None
 
         iteration_index = 0
@@ -444,7 +471,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 cost=J,
                 dynamics=dynamics,
             )
-            if self.record_history:
+            if record_history:
                 history.append(iteration)
             if callback is not None:
                 callback(iteration)
@@ -489,21 +516,27 @@ class TrajectoryOptimizationPlanner(Planner):
     ) -> PlanningSolution:
         """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
         problem = self.problem if problem is None else problem
-        policy = self.open_loop_policy(trajectory)
+        controller = open_loop_controller_of(trajectory, self.problem.sys)
 
         evaluation = None
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
             evaluation = planner_evidence(
                 self,
-                policy,
+                controller,
                 dt=dt,
                 n_trials=n_trials,
                 tf=float(trajectory.tf - trajectory.t[0]),
                 problem=problem,
             )
 
-        return PlanningSolution(problem, policy, record, trajectory, evaluation)
+        return PlanningSolution(
+            problem=problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            evaluation=evaluation,
+        )
 
     def print_solve_report(
         self,

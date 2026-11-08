@@ -127,6 +127,7 @@ def test_child_seed_is_stable_and_distinct_by_name():
     assert 0 <= child_seed(5, "seed") < 2**31
 
 
+@pytest.mark.slow
 def test_the_held_train_reproduces_the_lyapunov_variance():
     # ẋ = −a x + w, w white of intensity W: the stationary variance solves 0 = −2 a P + W
     from minilink import WhiteNoise

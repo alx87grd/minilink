@@ -1,4 +1,4 @@
-"""A grid world as a step problem: a native step system, its cost per tick, solved by value iteration on its step face."""
+"""A grid world as a step problem: a native step system, its cost per tick, solved by value iteration on its transition."""
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,7 +16,7 @@ class Walker(StepSystem):
     """A walker on the cells: ``x_{k+1} = x_k + u_k`` (a move to any of the 8 neighbours, or none), blocked by the wall and the edges."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2)
         self.state.lower_bound[:] = [0.0, 0.0]
         self.state.upper_bound[:] = [SIZE - 1.0, SIZE - 1.0]
         self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
@@ -70,21 +70,20 @@ problem = StepPlanningProblem(
     failure_cost=100.0,
 )
 
-# Value iteration on the face's transition, one cell per grid node
+# Value iteration on the problem's transition, one cell per grid node
 vi = DynamicProgrammingPlanner(
     problem, x_grid=(SIZE, SIZE), u_grid=(3, 3), tol=1e-9, max_iterations=100
 )
 solution = vi.solve()
 print(solution.record)
 
-# The greedy walk on the same face: J = Σ c_k, the moves to the goal
-face = problem.compile()
-law = vi.get_controller()
-xs, us, cs, J = face.run(
+# The greedy walk on the same problem: J = Σ c_k, the moves to the goal
+law = vi.controller
+xs, us, cs, J = problem.run(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
 print(
-    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.value_at(problem.x0):g}"
+    f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.cost_to_go(problem.x0):g}"
 )
 
 # The cost-to-go and the walk

@@ -16,7 +16,7 @@ from minilink.planning.initial_guess import (
     default_initial_trajectory,
     mechanical_cubic_initial_trajectory,
 )
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import require_finite_horizon, PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationOptions,
     DirectCollocationTranscription,
@@ -36,6 +36,7 @@ from minilink.planning.trajectory_optimization.shooting import (
     ShootingOptions,
     ShootingTranscription,
 )
+from minilink.planning.planner import require_solution
 
 
 class TestPlanningArchitecture(unittest.TestCase):
@@ -43,7 +44,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
         class TestPlant(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1, output_dim=2, y_dependencies=())
+                super().__init__(
+                    state_dim=2, input_dim=1, output_dim=2, y_dependencies=()
+                )
                 self.state.lower_bound = np.array([-1.0, -2.0])
                 self.state.upper_bound = np.array([1.0, 2.0])
                 self.inputs["u"].lower_bound = np.array([-3.0])
@@ -62,7 +65,9 @@ class TestPlanningArchitecture(unittest.TestCase):
 
         class SingleIntegrator(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+                super().__init__(
+                    state_dim=1, input_dim=1, output_dim=1, y_dependencies=()
+                )
                 self.state.lower_bound = np.array([-10.0])
                 self.state.upper_bound = np.array([10.0])
                 self.inputs["u"].lower_bound = np.array([-10.0])
@@ -137,7 +142,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         self.assertTrue(np.isposinf(infinite.horizon))
         with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
-            infinite.require_finite_horizon()
+            require_finite_horizon(infinite)
         problem = PlanningProblem(
             sys=sys,
             Xf=SingletonSet(np.array([0.0, 0.0])),
@@ -294,9 +299,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
         )
         with self.assertRaises(ValueError):
-            planner.require_solution()
+            require_solution(planner)
         with self.assertRaises(ValueError):
-            planner.get_controller()
+            planner.controller
 
     def test_mathematical_program_constraints_are_backend_neutral(self):
         program = MathematicalProgram(
@@ -381,11 +386,10 @@ class TestPlanningArchitecture(unittest.TestCase):
             ),
             backend="numpy",
             options={"maxiter": 100, "ftol": 1e-09},
-            verbose=True,
         )
         stdout = io.StringIO()
         with contextlib.redirect_stdout(stdout):
-            planner.solve()
+            planner.solve(verbose=True)
         report = stdout.getvalue()
         self.assertIn("Trajectory Optimization Program", report)
         self.assertIn("transcription: DirectCollocationTranscription", report)
@@ -403,10 +407,11 @@ class TestPlanningArchitecture(unittest.TestCase):
             transcription=transcription,
             backend="direct",
             options={"maxiter": 100, "ftol": 1e-09},
-            record_history=True,
         )
-        traj = planner.solve().trajectory
-        warm_started = planner.solve(guess=planner.last_solution).trajectory
+        traj = planner.solve(record_history=True).trajectory
+        warm_started = planner.solve(
+            guess=planner.last_solution, record_history=True
+        ).trajectory
         self.assertTrue(planner.last_solution.record.optimization_result.success)
         self.assertEqual(planner.last_program.metadata["backend"], "direct")
         self.assertGreater(len(planner.last_solution.record.history), 0)
@@ -587,7 +592,7 @@ from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
 
 class _SingleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.state.lower_bound = np.array([-10.0])
         self.state.upper_bound = np.array([10.0])
         self.inputs["u"].lower_bound = np.array([-10.0])
@@ -602,7 +607,7 @@ class _SingleIntegrator(DynamicSystem):
 
 class _DoubleIntegrator(DynamicSystem):
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
         self.state.lower_bound = np.array([-3.0, -3.0])
         self.state.upper_bound = np.array([3.0, 3.0])
         self.inputs["u"].lower_bound = np.array([-1.0])
@@ -812,7 +817,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
         planner.tree.nodes
     )
     assert (
-        int(solution.policy.m) == 0 and solution.evaluation is None
+        int(solution.controller.m) == 0 and solution.evaluation is None
     )  # open loop; no cost to score
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
@@ -1310,7 +1315,8 @@ def test_rrt_star_requires_rewire_eta_for_unknown_extender():
         planner.max_connection()
 
 
-def test_search_callback_invoked_on_rrt():
+def test_search_callback_sees_every_extension():
+    """The user's callback sees every successful extension, none filtered."""
     calls = []
 
     class RecordingCallback:
@@ -1323,21 +1329,29 @@ def test_search_callback_invoked_on_rrt():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=200,
-        callback=RecordingCallback(),
-        live_plot_every=1,
     )
-    planner.solve()
-    assert calls
-    assert all((step.iteration > 0 for step in calls))
+    planner.solve(callback=RecordingCallback())
+    assert [step.iteration for step in calls] == list(range(1, planner.iterations + 1))
     assert calls[-1].phase == "explore"
 
 
-def test_live_plot_after_goal_only_skips_explore_phase():
-    calls = []
+def test_the_live_plot_filters_for_itself():
+    """LiveSearchPlot(after_goal_only=True) draws nothing before the goal; a callback beside it sees every extension."""
+    import matplotlib
 
-    class RecordingCallback:
-        def __call__(self, step):
-            calls.append(step.phase)
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from minilink.planning import LiveSearchPlot
+
+    _, ax = plt.subplots()
+    seen = []
+    lines_before_goal = []
+
+    def record(step):
+        seen.append(step.phase)
+        if not step.reached_goal:
+            lines_before_goal.append(len(ax.lines))
 
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTStarPlanner(
@@ -1347,32 +1361,39 @@ def test_live_plot_after_goal_only_skips_explore_phase():
         max_nodes=2500,
         optimize_after_goal=True,
         convergence_patience=100,
-        callback=RecordingCallback(),
-        live_plot_every=1,
-        live_plot_after_goal_only=True,
     )
-    planner.solve()
+    live = LiveSearchPlot(every=25, pause=0.0, after_goal_only=True, ax=ax)
+    planner.solve(callback=[live, record])
     assert planner.reached_goal
-    assert calls
-    assert all((phase == "optimize" for phase in calls))
+    assert len(seen) == planner.iterations
+    assert "explore" in seen and "optimize" in seen
+    assert lines_before_goal and not any(lines_before_goal)
+    assert ax.lines
+    plt.close(ax.figure)
 
 
-def test_live_plot_option_builds_callback():
+def test_live_plot_runs_beside_the_callback():
+    """A solve with callback=[record, LiveSearchPlot(...)] hands every step to both."""
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from minilink.planning import LiveSearchPlot
+
+    calls = []
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
-        problem,
-        extender=make_steering_extender(),
-        seed=0,
-        max_nodes=10,
-        live_plot=True,
-        live_plot_every=1,
+        problem, extender=make_steering_extender(), seed=0, max_nodes=10
     )
-    callback = planner.resolve_search_callback()
-    from minilink.planning.search.live_plot import LiveSearchPlotCallback
+    _, ax = plt.subplots()
+    planner.solve(callback=[calls.append, LiveSearchPlot(pause=0.0, ax=ax)])
+    assert calls
+    assert ax.lines
+    plt.close(ax.figure)
 
-    assert isinstance(callback, LiveSearchPlotCallback)
 
-
+@pytest.mark.slow
 def test_optimize_after_goal_runs_longer_and_refines_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
@@ -1423,10 +1444,8 @@ def test_record_history_for_animation():
         extender=make_steering_extender(),
         seed=0,
         max_nodes=800,
-        record_history=True,
-        history_stride=25,
     )
-    planner.solve()
+    planner.solve(record_history=True, history_stride=25)
     assert len(planner.history) >= 2
     assert planner.history[0].iteration == 1
     assert all((frame.tree_edges for frame in planner.history[1:]))
@@ -1504,7 +1523,7 @@ class _Point3D(DynamicSystem):
     """Velocity-controlled point in 3-D whose ``body`` frame sits at its position."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=3, output_dim=3)
+        super().__init__(state_dim=3, input_dim=3, output_dim=3)
 
     def f(self, x, u, t=0, params=None):
         return np.asarray(u)
@@ -1936,6 +1955,19 @@ def test_polyline_sample_and_tangent_take_a_vector_of_arc_lengths():
         np.testing.assert_allclose(tangents[k], path.tangent(s_k), rtol=0, atol=1e-15)
 
 
+def test_the_paths_import_from_core_geometry_alone():
+    """The path names live on minilink.core.geometry; planning.spatial keeps the scene names."""
+    import minilink.core.geometry as geometry
+    import minilink.planning.spatial as spatial
+
+    paths = {"PolylinePath", "ReferencePath", "circuit_waypoints", "from_waypoints"}
+
+    assert paths <= set(geometry.__all__)
+    assert not paths & set(spatial.__all__)
+    assert not any(hasattr(spatial, name) for name in paths)
+    assert {"ReferenceTrack", "Scene", "mount"} <= set(spatial.__all__)
+
+
 def test_from_waypoints_default_is_polyline():
     path = from_waypoints([[0, 0], [1, 0], [1, 1]])
     assert isinstance(path, PolylinePath)
@@ -2121,13 +2153,13 @@ class TestTextbookOptions(unittest.TestCase):
             U=plant.input_box,
         )
         planner = TrajectoryOptimizationPlanner(
-            problem, n_steps=5, transcription="direct_collocation", live_plot=True
+            problem, n_steps=5, transcription="direct_collocation"
         )
-        self.assertTrue(planner.live_plot)
         self.assertIsNotNone(
-            planner.build_callback(None, planner.problem, "numpy", [], None)
+            planner.build_callback(
+                None, planner.problem, "numpy", [], None, live_plot=True
+            )
         )
-        planner.live_plot = False
         self.assertIsNone(
             planner.build_callback(None, planner.problem, "numpy", [], None)
         )
@@ -2150,11 +2182,7 @@ class TestTextbookOptions(unittest.TestCase):
         )
         seen = []
         planner = TrajectoryOptimizationPlanner(
-            problem,
-            n_steps=5,
-            transcription="direct_collocation",
-            live_plot=True,
-            callback=seen.append,
+            problem, n_steps=5, transcription="direct_collocation"
         )
         live = mock.MagicMock()
         with mock.patch(
@@ -2163,7 +2191,13 @@ class TestTextbookOptions(unittest.TestCase):
             return_value=live,
         ):
             progress = planner.build_callback(
-                mock.MagicMock(), planner.problem, "numpy", [], None
+                mock.MagicMock(),
+                planner.problem,
+                "numpy",
+                [],
+                None,
+                callback=seen.append,
+                live_plot=True,
             )
             planner.iteration_from_z = lambda *a, **k: "iteration"
             progress(np.zeros(3), 0.0, 0.0)
@@ -2212,7 +2246,7 @@ def test_collocation_bounds_survive_an_intersection():
 
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2)
             self.state.lower_bound = np.array([-2.0, -3.0])
             self.state.upper_bound = np.array([2.0, 3.0])
             self.inputs["u"].lower_bound = np.array([-1.0])
@@ -2487,9 +2521,7 @@ def test_every_planner_has_one_tree_shape():
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
         MPPIPlanner(problem, dt=0.1, n_rollouts=16),
-        ReinforcementLearningPlanner(
-            problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,), verbose=False
-        ),
+        ReinforcementLearningPlanner(problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,)),
     ]
     for planner in planners:
         tree = planner.params

@@ -185,7 +185,7 @@ class NeuralPolicy(System):
         z = self.observe(x)
 
         # a = MLP(z), on the weights params["mlp"]
-        a = mlp.compute(None, z, params=params["mlp"])
+        a = mlp.h(None, z, params=params["mlp"])
 
         return a
 

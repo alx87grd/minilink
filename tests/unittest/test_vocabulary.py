@@ -37,7 +37,7 @@ RETIRED = {
     ),
     "optimizer_options": ("options", None),
     "tf": ("horizon", ("PlanningProblem",)),
-    "require_finite_tf": ("require_finite_horizon", None),
+    "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
     "ybar": ("y_bar", None),
@@ -58,6 +58,9 @@ RETIRED = {
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
     "sample": ("at", ("Trajectory",)),
+    "n": ("state_dim", ("System", "DynamicSystem", "StepSystem")),
+    "episodes": ("n_episodes", None),
+    "timesteps": ("n_timesteps", None),
     "with_signal": ("with_signals", ("Trajectory",)),
     "time_duration": ("tf - t0", ("Trajectory",)),
     "copy": ("a frozen record needs no copy", ("Trajectory",)),
@@ -84,6 +87,23 @@ RETIRED = {
             "TabularLearningPlanner",
         ),
     ),
+    "get_controller": ("controller", None),
+    "value_at": (
+        "cost_to_go",
+        ("Planner", "DynamicProgrammingPlanner", "TabularLearningPlanner"),
+    ),
+    "plot_solution": ("plot_trajectory", None),
+    "animate_solution": ("animate", None),
+    "live_plot": ("callback=LiveSearchPlot()", ("RRTPlanner", "RRTStarPlanner")),
+    "live_plot_every": ("LiveSearchPlot(every=)", None),
+    "live_plot_pause": ("LiveSearchPlot(pause=)", None),
+    "live_plot_after_goal_only": ("LiveSearchPlot(after_goal_only=)", None),
+    "live_plot_ax": ("LiveSearchPlot(ax=)", None),
+    "animate_policy": ("animate_control_law", None),
+    "num_timesteps": ("n_timesteps", ("ReinforcementLearningPlanner",)),
+    "controller": ("actor", ("ExplorationPolicy",)),
+    "lqr_matrices": ("design_matrices", ("LQRPlanner",)),
+    "compile": ("transition, terminal or run", ("StepPlanningProblem",)),
 }
 
 
@@ -143,3 +163,107 @@ def retired_on(qualname, owners):
     if owners is None:
         return True
     return qualname.rsplit(".", 1)[-1] in owners
+
+
+# The helpers that are module functions, never methods of the problems or the planner base
+# (RULES 5.25): the refusals and readers a planner reads a problem and its latest solution through
+MODULE_HELPERS = {
+    "PlanningProblem": {
+        "require_cost",
+        "require_goal",
+        "require_finite_horizon",
+        "default_x0",
+        "move_start",
+        "sources_by_id",
+        "part_trees",
+    },
+    "StepPlanningProblem": {"require_cost"},
+    "Planner": {
+        "require_solution",
+        "require_cost",
+        "require_goal",
+        "solution_trajectory",
+        "open_loop_controller",
+    },
+}
+
+
+def test_the_helpers_are_module_functions_not_methods():
+    from minilink.planning.planner import Planner
+    from minilink.planning.problems import PlanningProblem
+    from minilink.planning.step_problems import StepPlanningProblem
+
+    owners = {
+        cls.__name__: cls for cls in (PlanningProblem, StepPlanningProblem, Planner)
+    }
+    hits = sorted(
+        f"{owner}.{name}"
+        for owner, names in MODULE_HELPERS.items()
+        for name in names
+        if hasattr(owners[owner], name)
+    )
+    assert not hits, f"module functions, not methods: {hits}"
+
+
+# The workflow a planner's verb takes (DESIGN §6, the four kinds of argument): what is shown,
+# never what is computed, a keyword of solve and never of the constructor
+WORKFLOW = {
+    "verbose",
+    "callback",
+    "live_plot",
+    "record_history",
+    "history_stride",
+}
+SEARCH_DISPLAY = {"callback"}
+VERB_WORKFLOW = {
+    "DynamicProgrammingPlanner": {"verbose", "record_history"},
+    "TrajectoryOptimizationPlanner": {
+        "verbose",
+        "callback",
+        "live_plot",
+        "record_history",
+    },
+    "RRTPlanner": SEARCH_DISPLAY,
+    "RRTStarPlanner": SEARCH_DISPLAY | {"record_history", "history_stride"},
+    "ReinforcementLearningPlanner": {"verbose"},
+    "TabularLearningPlanner": {"verbose"},
+}
+
+
+def planner_classes():
+    """Every planner class of the library: the subclasses of Planner, at any depth."""
+    import minilink.learning
+    import minilink.planning
+    from minilink.planning.planner import Planner
+
+    # The facades load lazily: every exported name read once, so each planner registers
+    for facade in (minilink.planning, minilink.learning):
+        for name in facade.__all__:
+            getattr(facade, name)
+
+    found = []
+    pending = list(Planner.__subclasses__())
+    while pending:
+        cls = pending.pop()
+        if cls.__module__.startswith("minilink.") and cls not in found:
+            found.append(cls)
+        pending += cls.__subclasses__()
+    return found
+
+
+def test_the_workflow_is_on_the_verb_never_on_the_constructor():
+    classes = {cls.__name__: cls for cls in planner_classes()}
+    assert set(VERB_WORKFLOW) <= set(classes)
+
+    for name, cls in classes.items():
+        constructor = set(inspect.signature(cls.__init__).parameters)
+        assert not constructor & WORKFLOW, (
+            f"{name}.__init__ takes {constructor & WORKFLOW}"
+        )
+
+    for name, words in VERB_WORKFLOW.items():
+        cls = classes[name]
+        verbs = [cls.solve] + ([cls.solve_steps] if hasattr(cls, "solve_steps") else [])
+        for verb in verbs:
+            missing = words - set(inspect.signature(verb).parameters)
+            assert not missing, f"{name}.{verb.__name__} lacks {missing}"

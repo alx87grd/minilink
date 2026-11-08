@@ -26,7 +26,7 @@ class _TwoInTwoOut(DynamicSystem):
     """dx = -x + u, y = x on two channels."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2)
 
     def f(self, x, u, t=0, params=None):
         return -x + u
@@ -34,7 +34,7 @@ class _TwoInTwoOut(DynamicSystem):
 
 class _TwoInThreeOut(DynamicSystem):
     def __init__(self):
-        super().__init__(n=3, input_dim=2, output_dim=3)
+        super().__init__(state_dim=3, input_dim=2, output_dim=3)
 
     def f(self, x, u, t=0, params=None):
         return -x + np.array([u[0], u[1], u[0] + u[1]])

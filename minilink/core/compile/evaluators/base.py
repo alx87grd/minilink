@@ -143,6 +143,24 @@ class Evaluator(JacobianMixin):
         """Every boundary output port at ``(x, u, t)``; ``params=None`` reads the compiled ones."""
         raise NotImplementedError
 
+    def h(self, x, u=None, t=0.0, params=None):
+        """
+        The output map ``y = h(x, u, t; p)``: the ``"y"`` port, as ``sys.h``; empty when there is none.
+
+        ``u=None`` holds the nominal input; on a discrete evaluator ``t`` is
+        the tick ``k``. The other ports are :meth:`outputs`'.
+        """
+        xp = self.xp
+        u = self.nominal_input if u is None else u
+
+        # Every output port at (x, u, t), then the y port among them
+        outputs = self.outputs(x, u, t, params)
+        if "y" not in outputs:
+            return xp.zeros(0)
+        y = outputs["y"]
+
+        return y
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
@@ -335,6 +353,9 @@ class ContinuousEvaluator(Evaluator):
             required), one sequence shared by the batch, or one per member.
         t0, dt : float
             Start time and step, shared by the batch.
+        n_steps : int, optional
+            Number of periods: ``n_steps + 1`` samples per member (required
+            with the nominal input, else read off ``u_sequences``).
         params : None or pytree
             ``None`` uses the compiled values. Otherwise a params pytree whose
             leaves are either shared by the batch or carry a leading axis of
@@ -484,16 +505,18 @@ def require_jax_evaluator(evaluator, verb):
         raise TypeError(f"{verb} needs a JAX evaluator: compile(backend='jax')")
 
 
-def check_jax_compatible(func, label, dummy_x, dummy_u, dummy_t, params, jax):
-    """Refuse a block function that does not trace (``jax.make_jaxpr``)."""
-    from jax.errors import ConcretizationTypeError
+class NotTraceableError(RuntimeError):
+    """A block function that JAX cannot trace: the verdict on which an automatic backend falls back to NumPy."""
 
+
+def require_jax_traceable(func, label, dummy_x, dummy_u, dummy_t, params, jax):
+    """Refuse a block function that does not trace (``jax.make_jaxpr``), with a :class:`NotTraceableError`."""
     try:
         jax.make_jaxpr(lambda x, u, t: func(x, u, t, params))(dummy_x, dummy_u, dummy_t)
-    except (ConcretizationTypeError, TypeError, Exception) as e:
-        raise RuntimeError(
+    except Exception as e:
+        raise NotTraceableError(
             f"\n\nBlock '{label}' is not JAX-traceable.\n"
-            f"Its f()/compute() likely performs in-place array mutation "
+            f"Its f()/h() likely performs in-place array mutation "
             f"(e.g., x[0] = ...)\n"
             f"or uses Python control flow on traced values "
             f"(e.g., if t < threshold).\n"

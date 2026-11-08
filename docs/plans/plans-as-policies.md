@@ -142,29 +142,27 @@ numbers) and closes in the follower only; an infinite one is refused above a siz
 
 ## 4. Value iteration: one backup, two modes
 
-### 4.1 The pure core, first in `dp.py`
+### 4.1 The backup, in each engine's body
+
+Ruled 2026-11-07 (`PP-D6` amended): the backup is written in the body of the NumPy table step
+(`backward_step_table`) and of the JAX step (`dp_jax.py`), not in a helper; the textbook lines
+are the lesson (RULES 5.3):
 
 ```python
-def bellman_backup(J_next, G, arrival, gamma):
-    """One Bellman backup: J(x) = min_u [ c(x, u) + γ J_next(x_next) ], with π(x) its argmin."""
-    # The cost-to-go one step ahead at every pair's successor (zero off the grid: the pair
-    # is inadmissible and G already holds its failure cost)
-    J_arrival = arrival(J_next)
+# The cost-to-go one step ahead at every pair's successor (zero off the grid)
+J_arrival = grid.interpolate(J_next, x_next.reshape(-1, n), method).reshape(N, A)
 
-    # Q(x, u) = c(x, u) + γ J_next(x_next), for every (node, action) pair at once
-    Q = G + gamma * J_arrival
+# Q(x, u) = c(x, u) + γ J_next(x_next)
+Q = G + gamma * J_arrival
 
-    # The best action at every node
-    J = Q.min(axis=1)
-    pi = Q.argmin(axis=1)
-
-    return J, pi
+# J(x) = min_u Q(x, u), π(x) = argmin_u Q(x, u)
+J = Q.min(axis=1)
+pi = Q.argmin(axis=1)
 ```
 
-`arrival` reads `J_next` at the successors of every pair, shape `(nodes, actions)`, zero off
-the grid: on NumPy the grid's SciPy reader (today's numbers, bit for bit), on JAX the engine's
-`map_coordinates` reader with its `in_bounds` mask. The backup is then one function on both
-backends (the JAX `step` calls it), and the reading of the grid stays the grid's. The `"loop"`
+The arrival reads `J_next` at the successors of every pair, shape `(nodes, actions)`, zero off
+the grid: on NumPy the grid's SciPy reader, on JAX `map_coordinates` with its `in_bounds` mask,
+inline the same way. The `"loop"`
 backend stays the reference double loop written for teaching, the one deliberate second
 spelling. The transition-matrix form, `J_arrival = W J_next` with the interpolation weights
 `W` built once (the successors never move), is a later speed-up of `arrival` alone (§10,
@@ -173,7 +171,7 @@ spelling. The transition-matrix form, `J_arrival = W J_next` with the interpolat
 ### 4.2 The loop, visible in the planner
 
 `value_iteration` keeps the sweep loop, the stopping rule, the progress printing and the
-history; it calls `bellman_backup` once per sweep. The pure function is one backup, not the
+history; it runs one backup per sweep. The engine's step is one backup, not the
 loop: the loop is where the workflow lives (`verbose`, `record_history`), and it reads as the
 textbook recursion.
 
@@ -188,7 +186,7 @@ textbook recursion.
 | Stage of `t` | `i = round((t − t0) / dt)` taken down when `t` falls short of `t_i` beyond a tolerance (no `floor` on float ticks); a step problem's tick difference | — |
 | Cost-to-go | `J(x, t)`, the value discounted to `t` (the problem's from `t0` is `γ^i J_i`) | `J(x)` |
 | JAX | one `lax.scan(reverse=True)` over `N` sweeps, stacking the tables | today's `lax.while_loop` |
-| Record | `mode="finite"`, `N`, the stacks in `tables` | `mode="converged"`; `tol` documented as a change per sweep, not an error bound on `J` (with `γ < 1` the bound is `γ·tol/(1 − γ)`; with `γ = 1` none) |
+| Record | `mode="finite"`, `N`, the stacks in `tables` | `mode="infinite"` (ruled 2026-11-07: the mode names the horizon, `converged` the outcome); `tol` documented as a change per sweep, not an error bound on `J` (with `γ < 1` the bound is `γ·tol/(1 − γ)`; with `γ = 1` none) |
 
 Symbols: `i` is the stage counted forward from `t0`; `k` stays the sweep count (steps left),
 `i = N − k`. The stacks are the per-sweep history, reversed: they are the solution's single
@@ -335,7 +333,7 @@ class GridField(Field):
 ### 6.3 Outside the grid, and the infeasible cells
 
 - **The sweeps keep their rule** (arrival cost `0` off the grid, the pair priced by `G`):
-  `bellman_backup` never sees the field's outside rule, so the tables stay byte-identical.
+  the backup never sees the field's outside rule, so the tables stay byte-identical.
 - **A bare `GridField` holds the edge** (`PP-D10`); `outside=` a number on request.
 - **The planner's cost-to-go** charges `out_of_bound_cost` outside the grid (`PP-D15`): the
   meaning the sweeps give to leaving it, so `J.as_set(upper=…)` never contains an off-grid
@@ -403,11 +401,15 @@ workflow, outside the comparison.
 - `PP-D2` **Value iteration supports both horizons**, chosen by the problem; the finite
   horizon (formerly S63, v0.5) moves to this work. The three examples of §2 migrate (`PP-D13`).
 - `PP-D3` **The policy stays in `z`** (as the command table, §4.5).
-- `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law.
+- `PP-D4` **`solve_steps(n)` stays,** documented as the receding `n`-step law. Its parameter
+  is `n_steps` (ruled 2026-11-07, RULES 2.7: a count of time steps is `n_steps`).
 - `PP-D5` **`LookupPolicy` takes a schedule** for the finite horizon (§4.4).
-- `PP-D6` **The core math first:** a pure function at the top of each planner's file,
-  `bellman_backup` (one backup; the loop stays in the planner) and, for LQR, `lqr_matrices`
-  (§5.1: the Riccati solvers are already pure); the planner and the face both call them.
+- `PP-D6` **The core math first:** for LQR, `lqr_matrices` at the top of its file (§5.1: the
+  Riccati solvers are already pure); the planner and the face both call it. Amended
+  2026-11-07: it keeps returning `(A, B, Q, R, S)`, the LQR problem in its matrices, and the
+  planner's method that shadowed it is `LQRPlanner.design_matrices()`. Amended
+  2026-11-07: value iteration's backup is written in the body of each engine's step, its
+  helper `bellman_backup` removed (§4.1).
 - `PP-D7` **The MPC reads the state** (§7); replanning at a slow rate is the dual-rate loop.
 - `PP-D8` **Every planner's cost-to-go is a `Field`:** LQR and value iteration in this work, RL
   with the rest of the field object in v0.5.
@@ -469,8 +471,8 @@ The agent's to settle, recorded here:
 - §3: `t0` last in `z`; `pv.feedback`; `initial` never a corner; `status["cost"]`; `shift` the
   warm guess, unchanged for a method that ignores `z0`; the shrinking-horizon claim dropped;
   trajectory plus tracking added as a row; commands deterministic; discrete LQR out of scope.
-- §4: `bellman_backup` takes an `arrival` reader (zero off the grid), one backup on NumPy and
-  JAX; stage index with a tolerance, `steps_of` for `T / dt`, one symbol each for the stage and
+- §4: the backup reads the arrival (zero off the grid), one backup on NumPy and
+  JAX (written in each engine's body since 2026-11-07); stage index with a tolerance, `steps_of` for `T / dt`, one symbol each for the stage and
   the sweep count; the discounted meaning of `J(x, t)`; `solve_steps`' record and a test tying it
   to the finite mode; the failure cost over `N`; frozen tables named; the stacks the single
   home; `z` holds the command table, not action ids; the table-rebuild rule covers every leaf
@@ -493,8 +495,8 @@ payoff (§1: the two methods do not read the measured state, and their faces run
 come last. Each change merges on its own.
 
 **Change 1: the math and the fields** (no table moves; each field move has its own test):
-- `PP-1` `bellman_backup` (with its `arrival` reader, NumPy and JAX) and `lqr_matrices` first in
-  their files, the planners calling them: seeded baselines byte-identical.
+- `PP-1` The backup (with its arrival reading, NumPy and JAX; in each engine's body since the
+  2026-11-07 ruling) and `lqr_matrices` first in its file, the planners calling it: seeded baselines byte-identical.
 - `PP-2` The shared grid reading; `GridField` in `core/fields.py`; value iteration's and LQR's
   `cost_to_go` as fields (`PP-D15` outside the grid); `quadratic_cost_to_go` removed. Number
   moves, each tested: the cost-to-go read natively (about `1e-16` inside the grid), the
@@ -524,8 +526,9 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
 
 ## 13. What change 1 built (branch `plans-as-policies-1`)
 
-- `bellman_backup(J_next, G, arrival, gamma)` opens `dp.py`; the NumPy table step and the JAX
-  step call it, each with its own `arrival` (SciPy; `map_coordinates` with the in-bounds mask).
+- `bellman_backup(J_next, G, arrival, gamma)` opened `dp.py`, the NumPy table step and the JAX
+  step calling it, each with its own `arrival` (SciPy; `map_coordinates` with the in-bounds
+  mask); the 2026-11-07 ruling wrote it back into both steps' bodies (§4.1), byte-identical.
   `lqr_matrices` opens `lqr.py`. Seeded baseline byte-identical (NumPy, loop and JAX engines;
   `solve` and `solve_steps`; a discounted, a finite-horizon and a `gamma`-overridden problem;
   the lookup law inside and outside the grid; LQR in both horizons).
@@ -554,3 +557,71 @@ loops byte-identical, so it may land after the `0.4.0` tag without blocking it):
   own table the same way. The core planners tutorial gives LQR the undiscounted problem
   (value iteration keeps its `ρ = 0.2`, which its sweeps need to converge: undiscounted they
   stop at the 1000-sweep cap with `ΔJ = 19`).
+
+## 14. What change 2 built (branch `v04-build`)
+
+- `solve()` reads the problem's horizon: `face.n_steps` set, exactly `N` sweeps with every
+  stage kept (`record.mode == "finite"`); unset, today's sweeps to `tol` (`"infinite"`,
+  byte-identical: the seeded baseline of change 1, its finite case swapped for the same problem
+  on no horizon, `cmp` equal on the NumPy, loop and JAX engines). `solve_steps(n)` is the
+  receding law (`"receding"`); `fixed_horizon` is gone from the record.
+- The stages live on the raw result as `record.tables.schedule = (t, J, pi)`, LQR's
+  `record.schedule` shape: `t_0 … t_N`, `J_0 … J_N` (`J_N = h`), `π_0 … π_{N−1}`.
+  `record.tables.J` and `pi` stay stage 0, so the plots, `value_at` and `save` read what they
+  read. On JAX the `N` sweeps are one `lax.scan` (`compiled_scan`, one compile per `N`);
+  verbose or recorded, one jitted sweep at a time as before.
+- `LookupPolicy(grid, pi, t=None)`: a stacked `pi` on its stage times, the stage of `t` by
+  `stage_of` (traced), stage 0 outside `[t_0, t_N)`. `action(x, params=None, *, t=0.0)`.
+- `cost_to_go` is `J(x, t)`, `grid.field(J_stack, t)`.
+- The failure cost sums over the sweeps' horizon: `face.failure_cost_over(face.n_steps, γ)`
+  (a discounted finite problem's moves from the geometric limit to the `N`-step sum).
+- LQR's finite law runs on the problem's clock (`t0 + s`) and applies `K∞` past `tf`
+  (`stationary_gain`, `K(tf)` held when the algebraic equation has no stabilizing solution).
+- The three examples solve value iteration on `problem.replace(horizon=None)`, each saying why:
+  on the README's 4 s swing-up the finite law stays down (`J = 39.3`, the pendulum hanging for
+  4 s, cheaper than pumping with no terminal cost), which is right for that problem and not
+  what the example shows.
+- Measured (pendulum, 101 × 101 nodes, 11 inputs, `dt = 0.05`, best of 3, 300-sweep cap): the
+  infinite mode NumPy 2.81 s against 2.70 s on the base (noise, same code path), JAX 260 ms
+  against 256 ms; the finite mode (`N = 80`) NumPy 1.30 s, JAX 165 ms.
+
+## 15. Decisions taken during the automatic run (2026-11-07)
+
+Choices the plan left open, each taken as recommended; the maintainer may overturn any.
+
+- **Where the stages live:** `DynamicProgrammingResult.schedule = (t, J, pi)`, mirroring LQR's
+  `RiccatiRecord.schedule`, with `J` and `pi` kept as stage 0 (no reader of the tables moves).
+- **The frozen tables:** the record's `frozen_at` (the final time) on a finite solve whose
+  running-cost and transition tables served every sweep (a precomputed grid, the JAX engine);
+  `None` otherwise.
+- **The stage tolerance:** `1e-9` of a period, so a tick summed from `dt` reads its own stage.
+- **The memory limit:** 1 GiB over `J`, `π` and the law's command table, refused with the
+  numbers and the two ways out (a coarser grid, or the converged law).
+- **LQR without `K∞`:** a finite horizon needs no stabilizability, so a pair without a
+  stabilizing algebraic solution holds `K(tf)` past the horizon instead of failing.
+- **The examples:** none shows the finite law on purpose, so all three migrate to the converged
+  law; the finite mode is shown by its tests.
+
+**PlanningSolution shape (ruled 2026-11-07).** A planner returns one keyword-only record,
+`PlanningSolution(problem, controller, record, trajectory=None, cost_to_go=None,
+evaluation=None, params=None)`, under one rule: what is handed out (`controller`) is exactly
+what is scored (`evaluation`) and drawn, with no hidden `% dt`. The controller is the block as
+it is: a feedback law (value iteration in every mode, LQR, tabular and deep learning) closes as
+`controller @ plant`, continuous; an open-loop plan source (trajectory optimization, the
+compiled face's `pv.solution`, MPPI, RRT) drives as `controller >> plant`; on a step problem the
+law ticks with the plant. `trajectory` has one meaning, the plan an open-loop planner computed,
+`None` for a feedback law even with `evaluate=True`; `cost_to_go` is a `Field` or `None` (the
+deep RL critic a `CriticField`, its weights its `params`). The policy as a function on the
+solution (`solution.policy(x, t)`, `planner.policy(x, t)`, ruled earlier the same day) is
+reversed: the function is the compiled face's `pv.command(z, x, t)`. Gone with it: every
+planner's `nominal_trajectory`, `holds_policy`, the held rollout and its adapters, RL's
+`rollout_law`. A planner's evidence is one `evaluate(problem, controller)` of the controller as
+it is (a continuous law on the evaluator's automatic step, which a continuous loop with no `dt`
+now runs on; a clocked one on its clock; a step problem's on its face, whose `run` takes a
+controller block). So value iteration, tabular and deep learning are scored continuously, no
+longer held on their `dt`, and `solve(evaluate=True)`, `evaluate(problem, sol.controller)` and
+`compare` agree; a law held on its grid is the other controller `law % dt`. The planner's dt
+is the integration step of its evidence (ruled 2026-11-08). The views
+(`plot_trajectory`, `animate`, `plot_cost`) draw the plan, else the controller run once from the
+start through the problem's evaluator, nothing stored; the planner mirrors the solution
+(`controller`, `cost_to_go`, the views).

@@ -7,9 +7,6 @@ Planning
 .. automodule:: minilink.planning.step_problems
    :members:
 
-.. automodule:: minilink.planning.step_face
-   :members:
-
 .. automodule:: minilink.planning.planner
    :members:
 
@@ -84,6 +81,9 @@ Search
    :members:
 
 .. automodule:: minilink.planning.search.tree
+   :members:
+
+.. automodule:: minilink.planning.search.live_plot
    :members:
 
 Dynamic programming

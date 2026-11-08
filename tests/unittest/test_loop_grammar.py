@@ -23,13 +23,14 @@ from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
+from minilink.planning.step_model import step_model_of
 
 
 class DiscreteLowPass(StepSystem):
     """``z_{k+1} = α z_k + (1 − α) u_k``, ``y = z``: a tick law."""
 
     def __init__(self, alpha=0.6):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.params = {"alpha": float(alpha)}
 
     def step(self, x, u, k=0, params=None):
@@ -138,11 +139,11 @@ def test_the_models_for_the_discrete_tools():
     exact = discretize(linearize(plant), 0.1, solver="exact")
     assert isinstance(exact, SampledSystem) and exact.kind == "model"
     problem = PlanningProblem(plant, cost=QuadraticCost.from_system(plant), horizon=1.0)
-    face = problem.compile(dt=0.1)
     step_problem = problem.discretize(0.1)
     x, u = np.array([0.2, 0.0]), np.zeros(1)
     np.testing.assert_array_equal(
-        face.transition(x, u, 0)[0], step_problem.compile().transition(x, u, 0)[0]
+        step_problem.transition(x, u, 0)[0],
+        step_model_of(problem, 0.1).transition(x, u, 0)[0],
     )
 
 

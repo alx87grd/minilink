@@ -1,5 +1,7 @@
 """Every planner's numbers: one tree, overridden per solve (DESIGN §6, the four kinds of argument)."""
 
+from unittest import mock
+
 import numpy as np
 import pytest
 
@@ -147,12 +149,8 @@ def test_the_shortcuts_read_the_solution_a_solve_at_a_tree_returned(name):
     x = np.array([0.5, 0.0])
 
     assert solution is planner.last_solution
-    assert planner.value_at(x) == solution.cost_to_go(x)
-    assert planner.get_controller() is solution.policy
-    np.testing.assert_array_equal(
-        planner.nominal_trajectory(1.0).x,
-        planner.nominal_trajectory(1.0, solution=solution).x,
-    )
+    assert planner.cost_to_go(x) == solution.cost_to_go(x)
+    assert planner.controller is solution.controller
 
 
 def test_every_planner_takes_params_by_keyword_only():
@@ -174,3 +172,54 @@ def test_every_planner_takes_params_by_keyword_only():
     for planner in planners:
         parameter = inspect.signature(planner.solve).parameters["params"]
         assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+WORKFLOW = {"verbose", "callback", "live_plot", "record_history", "history_stride"}
+
+
+@pytest.mark.parametrize("name", list(PLANNERS))
+def test_a_rebuilt_planner_inherits_no_display(name):
+    build, _ = PLANNERS[name]
+    kwargs = build().build_kwargs()
+
+    assert not {key for key in kwargs if key in WORKFLOW or key.startswith("live_plot")}
+
+
+def test_a_verbose_solve_at_a_tree_reports_once_from_the_verb(capsys):
+    """``solve(params=, verbose=True)``: the rebuilt planner gets no display keyword, its solve prints once."""
+    from unittest import mock
+
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    constructor = DynamicProgrammingPlanner.__init__
+    with mock.patch.object(
+        DynamicProgrammingPlanner, "__init__", autospec=True, side_effect=constructor
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+
+    assert built.call_count == 1
+    assert not set(built.call_args.kwargs) & WORKFLOW
+    assert capsys.readouterr().out.count("Bellman equation solved!") == 1
+
+
+def test_the_grids_table_options_survive_a_discount_and_a_tree():
+    """A grid built with precompute=False keeps it through gamma= and solve(params=)."""
+    from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid
+
+    problem = regulation()
+    grid = StateSpaceGrid(
+        problem, x_grid_shape=(9, 9), u_grid_shape=(3,), dt=0.1, precompute=False
+    )
+    planner = DynamicProgrammingPlanner(problem, grid=grid, gamma=0.9, max_iterations=5)
+    assert planner.grid is not grid and not planner.grid.precompute
+
+    with mock.patch.object(
+        DynamicProgrammingPlanner,
+        "__init__",
+        autospec=True,
+        side_effect=DynamicProgrammingPlanner.__init__,
+    ) as built:
+        planner.solve(params=edited(planner.params, {"method": {"gamma": 0.8}}))
+    rebuilt = built.call_args.args[0]
+    assert rebuilt.grid.precompute is False and rebuilt.grid.precomputed is False
+    assert rebuilt.gamma == 0.8

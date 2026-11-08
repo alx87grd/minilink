@@ -12,10 +12,10 @@ from minilink.core.compile.evaluators.base import (
     added,
     assigned,
     blocks_params,
-    check_jax_compatible,
     every_block,
     gather_u,
     gathered_on_host,
+    require_jax_traceable,
 )
 from minilink.core.compile.evaluators.compiled import compiled
 from minilink.core.compile.evaluators.stepping import held_inputs, iterate, step_body
@@ -348,10 +348,10 @@ def check_blocks_trace(evaluator, diagram, verbose):
         params = sys.params
         if isinstance(sys, DynamicSystem):
             label = f"{sys_id} ({sys.name})"
-            check_jax_compatible(sys.f, label, dummy_x, dummy_u, 0.0, params, jax)
+            require_jax_traceable(sys.f, label, dummy_x, dummy_u, 0.0, params, jax)
         for port_id, port in sys.outputs.items():
             label = f"{sys_id}:{port_id} ({sys.name})"
-            check_jax_compatible(
+            require_jax_traceable(
                 port.compute, label, dummy_x, dummy_u, 0.0, params, jax
             )
 

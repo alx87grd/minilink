@@ -7,7 +7,8 @@ from typing import Any, TypeAlias
 import numpy as np
 
 from minilink.core.backends import BACKEND_NUMPY, array_module
-from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
+from minilink.core.inspect import body_line, format_inspect, repr_pretty
+from minilink.core.reporting import preview_vector
 
 # These stay loose on purpose: the runtime contract is native-backend behavior
 # plus shape checks in evaluators, without making JAX a core dependency.
@@ -126,13 +127,13 @@ class MathematicalProgram:
     # Display
 
     def __str__(self):
-        return inspect_text(self)
+        return program_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
     def _repr_latex_(self):
-        return latex_inspect(self)
+        return program_latex(self)
 
 
 @dataclass(frozen=True)
@@ -172,10 +173,22 @@ class OptimizationResult:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
 
     def __str__(self):
-        return inspect_text(self)
+        return optimization_result_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
+
+
+def program_class(program) -> str:
+    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
+    if program.g is not None or program.h is not None:
+        return "constrained"
+
+    faces = [side for side in (program.lower, program.upper) if side is not None]
+    if any(np.any(np.isfinite(side)) for side in faces):
+        return "bounded"
+
+    return "unconstrained"
 
 
 ###############################################################################
@@ -211,3 +224,74 @@ def require_ordered_bounds(lower, upper):
     """Refuse a lower bound above its upper bound."""
     if lower is not None and upper is not None and np.any(lower > upper):
         raise ValueError("lower bounds must be less than or equal to upper bounds")
+
+
+def program_text(program):
+    """The print text of a program: its class, constraint rows, backend and bounds."""
+    kind = program_class(program)
+    has_h = program.h is not None
+    has_g = program.g is not None
+    headline = f"MathematicalProgram, n_z={program.n_z}"
+    body = [
+        body_line("class", kind),
+        body_line("h", f"{'yes' if has_h else 'no'} (n={constraint_rows(program.h)})"),
+        body_line("g", f"{'yes' if has_g else 'no'} (n={constraint_rows(program.g)})"),
+        body_line("backend", program.backend),
+    ]
+
+    sides = []
+    if program.lower is not None:
+        sides.append("lower")
+    if program.upper is not None:
+        sides.append("upper")
+    if sides:
+        body.append(body_line("bounds", ", ".join(sides)))
+
+    return format_inspect(headline, body)
+
+
+def constraint_rows(fn):
+    """The number of rows of a constraint function (``?`` when it does not say)."""
+    if fn is None:
+        return 0
+
+    n_out = getattr(fn, "n_out", None)
+    if n_out is not None:
+        return int(n_out)
+
+    return "?"
+
+
+def optimization_result_text(result):
+    """The print text of a result: success, ``J*``, ``z*``, the message and the time."""
+    success = "yes" if result.success else "no"
+    headline = f"OptimizationResult, success={success}"
+    body = []
+
+    if result.cost is not None:
+        body.append(body_line("J*", f"{float(result.cost):.6g}"))
+    body.append(body_line("z*", preview_vector(result.z)))
+    if result.message:
+        message = result.message.strip()
+        if len(message) > 72:
+            message = message[:69] + "..."
+        body.append(body_line("message", message))
+    if result.solve_time_s is not None:
+        body.append(body_line("solve_time_s", f"{result.solve_time_s:g}"))
+
+    return format_inspect(headline, body)
+
+
+def program_latex(program):
+    """The program's LaTeX summary: ``min J(z)`` and the kinds of constraint it holds."""
+    parts = [r"\min_{z} J(z)"]
+    if program.h is not None:
+        parts.append(r"\text{subject to } h(z) = 0")
+    if program.g is not None:
+        parts.append(r"g(z) \geq 0")
+    if program.lower is not None or program.upper is not None:
+        parts.append(r"\text{box bounds on } z")
+
+    body = r" \\ ".join(parts)
+
+    return rf"\begin{{align*}}{body}\end{{align*}}"

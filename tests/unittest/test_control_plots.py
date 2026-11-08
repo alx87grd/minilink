@@ -27,6 +27,7 @@ from minilink.analysis.time_response import (
     step_info,
     step_response,
 )
+from minilink.dynamics.abstraction.state_space import DiscreteLTISystem
 from minilink.graphical.common import PlotResult
 
 PLOTLY = pytest.importorskip
@@ -262,6 +263,70 @@ class TestChannelTools(unittest.TestCase):
         # through infinity there
         gains, roots = root_locus(tf, gains=[-3.0, -0.9])
         np.testing.assert_allclose(gains, [-3.0, -0.9])
+
+
+class TestInZ(unittest.TestCase):
+    """The root locus and the step response of a difference equation, in ``z``."""
+
+    def setUp(self):
+        # x_{k+1} = a x_k + u_k, y_k = x_k: G(z) = 1 / (z − a), Δ = 0.1 s
+        self.a = 0.5
+        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]], period=0.1)
+
+    def tearDown(self):
+        import matplotlib.pyplot as plt
+
+        plt.close("all")
+
+    def test_the_step_response_is_the_geometric_sum_at_the_ticks(self):
+        # y_k = Σ_{i<k} aⁱ = (1 − aᵏ) / (1 − a), at t_k = k Δ
+        time, y = step_response(self.G, tf=1.0)
+        k = np.arange(11)
+        np.testing.assert_allclose(time, 0.1 * k)
+        np.testing.assert_allclose(y, (1.0 - self.a**k) / (1.0 - self.a))
+
+    def test_the_default_horizon_is_eight_time_constants_of_the_pole_in_z(self):
+        # σ = −ln a / Δ, the horizon 8 / σ = 1.154 s: the ticks 0 to 11
+        time, _ = step_response(self.G)
+        self.assertEqual(time[-1], 0.1 * 11)
+
+    def test_a_deadbeat_system_shows_a_few_ticks_not_ten_seconds(self):
+        # Its pole at z = 0 settles in n = 1 tick: the horizon spans n + 1 ticks
+        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]], period=0.001)
+        time, y = step_response(G)
+        np.testing.assert_allclose(time, [0.0, 0.001, 0.002])
+        np.testing.assert_allclose(y, [0.0, 1.0, 1.0])
+
+    def test_a_tick_law_steps_once_per_unit_of_time(self):
+        G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]])
+        time, y = step_response(G, tf=4.0)
+        np.testing.assert_allclose(time, np.arange(5.0))
+        np.testing.assert_allclose(y[-1], (1.0 - self.a**4) / (1.0 - self.a))
+
+    def test_the_root_locus_is_the_closed_loop_pole_in_z(self):
+        # 1 + K G(z) = 0 at z = a − K
+        gains, roots = root_locus(self.G, gains=[0.0, 0.5, 1.5, 2.0])
+        np.testing.assert_allclose(roots[:, 0], self.a - gains)
+
+    def test_a_held_continuous_channel_steps_as_its_continuous_response(self):
+        from minilink import discretize
+
+        # The zero-order hold is exact under a step: the two agree at the ticks
+        G = TransferFunction([1.0], [1.0, 3.0, 2.0])
+        time, y = step_response(discretize(G, 0.1, solver="exact"), tf=2.0)
+        time_c, y_c = step_response(G, tf=2.0, n=21)
+        np.testing.assert_allclose(time, time_c)
+        np.testing.assert_allclose(y, y_c, atol=1e-12)
+
+    def test_the_plots_draw_the_unit_circle_and_the_samples(self):
+        r = plot_root_locus(self.G, show=False)
+        circle = r.axes.lines[0]
+        np.testing.assert_allclose(
+            np.hypot(circle.get_xdata(), circle.get_ydata()), 1.0, atol=1e-12
+        )
+        r = plot_step_response(self.G, show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linear Step Response")
+        self.assertEqual(r.axes.lines[0].get_linestyle(), "None")
 
 
 class TestPlots(unittest.TestCase):

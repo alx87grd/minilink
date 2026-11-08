@@ -54,27 +54,30 @@ class SweepLog:
     Bookkeeping of the backward sweeps: the pyro-style report and the ``(t, J, pi)`` history.
 
     Verbose solves print a banner, one line per sweep (a progress line for a
-    fixed horizon) and a closing line. ``history`` is the recorded list, or
-    ``None`` when the options do not ask for it.
+    finite or receding horizon's fixed number of sweeps) and a closing line.
+    ``history`` is the recorded list, or ``None`` when the solve does not ask
+    for it.
     """
 
-    def __init__(self, options, max_sweeps, stop_on_tol):
+    def __init__(
+        self, max_sweeps, stop_on_tol, tol, *, verbose=False, record_history=False
+    ):
         # What to report
-        self.verbose = options.verbose
+        self.verbose = bool(verbose)
         self.max_sweeps = max_sweeps
         self.stop_on_tol = stop_on_tol
 
         # Memory: the recorded sweeps, the clock and the progress line's throttle
-        self.history = [] if options.record_history else None
+        self.history = [] if record_history else None
         self.clock = time.time()
-        self.state = {"enabled": options.verbose}
+        self.state = {"enabled": self.verbose}
 
         if not self.verbose:
             return
 
         # The banner: sweeps until dJ < tol, or a fixed number of them
         if stop_on_tol:
-            print(f"\nComputing backward DP iterations until dJ<{options.tol:.2f}:")
+            print(f"\nComputing backward DP iterations until dJ<{tol:.2f}:")
             print("---------------------------------------------------------")
         else:
             print(f"\nComputing {max_sweeps} backward DP iterations:")
@@ -102,7 +105,7 @@ class SweepLog:
                 f"max:{J.max():7.2f} dmax:{delta.max():7.2f} dmin:{delta.min():7.2f}"
             )
         else:
-            # A fixed horizon: the throttled progress line over its sweeps
+            # A fixed number of sweeps: the throttled progress line over them
             maybe_print_build_progress(
                 k,
                 self.max_sweeps,

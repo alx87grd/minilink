@@ -84,8 +84,8 @@ class ForceInputBicycle(DynamicSystem):
     body-frame velocities. Inputs ``f_rear`` [N] and ``delta`` [rad].
     """
 
-    def __init__(self, n=6):
-        super().__init__(n=n)
+    def __init__(self, state_dim=6):
+        super().__init__(state_dim=state_dim)
         self.name = "Force-input bicycle"
 
         # Signal labels and units
@@ -100,7 +100,7 @@ class ForceInputBicycle(DynamicSystem):
         self.inputs["delta"].labels = ["delta"]
         self.inputs["delta"].units = ["rad"]
 
-        self.add_output_port("y", dim=n, function=self.h, dependencies=())
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
         # Parameters: steer limits [rad], CG-to-axle distances a and b, wheelbase L
         # and wheel radii [m]
@@ -447,8 +447,8 @@ class ForceInputBicycle(DynamicSystem):
 class RearDriveBicycle(ForceInputBicycle):
     """Dynamic bicycle with rear and front wheel spin states."""
 
-    def __init__(self, n=8):
-        super().__init__(n)
+    def __init__(self, state_dim=8):
+        super().__init__(state_dim)
         self.name = "Rear-drive bicycle"
 
         # Signal labels and units: the body's six, then the two wheel spin rates
@@ -483,7 +483,7 @@ class RearDriveBicycle(ForceInputBicycle):
         self.inputs["delta"].units = ["rad"]
 
         self.outputs = {}
-        self.add_output_port("y", dim=n, function=self.h, dependencies=())
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
 
         # Parameters: wheel bearing friction, rolling-resistance coefficient, and
         # wheel spin inertias [kg m²]
@@ -705,8 +705,8 @@ class EngineBicycle(RearDriveBicycle):
     (steer command) [rad].
     """
 
-    def __init__(self, n=10):
-        super().__init__(n=n)
+    def __init__(self, state_dim=10):
+        super().__init__(state_dim=state_dim)
         self.name = "Engine bicycle"
 
         # Signal labels and units: the rear-drive bicycle's eight, then the engine
@@ -747,7 +747,7 @@ class EngineBicycle(RearDriveBicycle):
         self.inputs["delta"].units = ["rad"]
 
         self.outputs = {}
-        self.add_output_port("y", dim=n, function=self.h, dependencies=())
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
         self.add_output_port(
             "rear_tire_data",
             dim=4,

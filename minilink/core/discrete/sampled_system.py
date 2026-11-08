@@ -137,16 +137,6 @@ class SampledSystem(StepSystem):
         # The System shell's defaults: the view's hints are its source's
         return
 
-    def refresh(self):
-        """Refresh the source, then read again the structure the view took from it: its size, state and ports."""
-        source = self.source
-        source.refresh()
-
-        self.n = source.n
-        self.state = source.state
-        self.inputs = source.inputs
-        self.outputs = source.outputs
-
     @property
     def counts(self) -> bool:
         """Whether the block counts its own ticks: a tick source, which reads ``k``, never seconds."""
@@ -329,7 +319,7 @@ class NativeSampledSystem(SampledSystem):
     (rule 1 of the loop's grammar).
     """
 
-    def __init__(self, n=0, sample_period=None):
+    def __init__(self, state_dim=0, sample_period=None):
         # No source: the clock alone, set at construction
         self.source = None
         self.solver = None
@@ -338,7 +328,7 @@ class NativeSampledSystem(SampledSystem):
         self.sample_period = positive_period(require_period(sample_period))
 
         # The System shell: its own state, ports, parameters and hints
-        System.__init__(self, n)
+        System.__init__(self, state_dim)
 
     @property
     def params(self) -> dict:
@@ -366,10 +356,6 @@ class NativeSampledSystem(SampledSystem):
     @solver_info.setter
     def solver_info(self, value: dict):
         self.__dict__["own_solver_info"] = value
-
-    def refresh(self):
-        """Nothing derived to refresh: the law owns its structure."""
-        return
 
     @property
     def counts(self) -> bool:

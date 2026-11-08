@@ -42,7 +42,7 @@ class _Affine(DynamicSystem):
     c = np.array([0.5, -1.0])
 
     def __init__(self):
-        super().__init__(n=2)
+        super().__init__(state_dim=2)
         self.name = "Affine"
         self.params = {"gain": 1.0}
         self.add_input_port("force")
@@ -66,7 +66,7 @@ class _Counter(StepSystem):
     """x_{k+1} = a x_k + b u_k."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.params = {"a": 0.9, "b": 0.2}
 
     def step(self, x, u, k=0, params=None):
@@ -177,7 +177,7 @@ class TestJacobianSelectors(unittest.TestCase):
     def test_dynamic_block_with_clashing_port_is_refused(self):
         class Clash(DynamicSystem):
             def __init__(self):
-                super().__init__(n=1, output_dim=1)
+                super().__init__(state_dim=1, output_dim=1)
                 self.add_input_port("x")
 
             def f(self, x, u, t=0, params=None):
@@ -428,7 +428,7 @@ class TestFamilyPattern(unittest.TestCase):
     def test_linearize_without_y_port_uses_the_state(self):
         class Bare(DynamicSystem):
             def __init__(self):
-                super().__init__(n=2, input_dim=1)
+                super().__init__(state_dim=2, input_dim=1)
 
             def f(self, x, u, t=0, params=None):
                 return np.array([x[1], -x[0] + u[0]])

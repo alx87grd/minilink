@@ -21,7 +21,7 @@ class SingleMass(StateSpaceSystem):
     """Single linear mass-spring-damper model."""
 
     def __init__(self, mass=1.0, k=2.0, b=0.0):
-        super().__init__(n=2, m=1, p=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
         # Parameters
         self.params = {"mass": float(mass), "k": float(k), "b": float(b)}
@@ -117,7 +117,7 @@ class TwoMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        super().__init__(n=4, m=1, p=1)
+        super().__init__(state_dim=4, input_dim=1, output_dim=1)
 
         # Parameters: the measured mass, then the chain's masses, springs and dampers
         self.output_mass = int(output_mass)
@@ -246,7 +246,7 @@ class ThreeMass(StateSpaceSystem):
     """
 
     def __init__(self, m=1.0, k=2.0, b=0.2, output_mass=2):
-        super().__init__(n=6, m=1, p=1)
+        super().__init__(state_dim=6, input_dim=1, output_dim=1)
 
         # Parameters: the measured mass, then the chain's masses, springs and dampers
         self.output_mass = int(output_mass)

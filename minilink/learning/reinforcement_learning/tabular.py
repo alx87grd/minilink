@@ -12,15 +12,19 @@ from minilink.planning.dynamic_programming.dp import (
     grid_failure_cost,
     grid_of,
 )
+from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
+from minilink.planning.dynamic_programming.progress import progress as report_progress
 from minilink.planning.environment import RolloutEnvironment
-from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
     given_numbers,
     planner_at,
     planner_evidence,
+    require_solution,
 )
+from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution
+from minilink.planning.step_model import is_continuous
 
 ###############################################################################
 # Public API
@@ -44,7 +48,7 @@ class TabularLearningPlanner(Planner):
     SARSA with the action actually taken next, Monte Carlo control with the
     cost observed to the end of the episode. The result is the cost-to-go
     field and greedy policy that value iteration returns, so ``plot_cost_to_go``,
-    ``plot_control_law`` and ``get_controller`` (a lookup-table block) read the
+    ``plot_control_law`` and ``controller`` (a lookup-table block) read the
     same way, and the same grid solved by
     :class:`~minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner`
     is the exact answer the learner approaches.
@@ -123,7 +127,8 @@ class TabularLearningPlanner(Planner):
         seed=0,
     ):
         super().__init__(problem)
-        self.require_cost()
+        require_cost(self.problem)
+        require_continuous_problem(problem)
 
         # Discretized state and input spaces
         grid = grid_of(problem, grid, x_grid, u_grid, dt)
@@ -169,70 +174,97 @@ class TabularLearningPlanner(Planner):
         self.history = []
 
     @property
+    def dt(self) -> float:
+        """The grid's step: the period of an episode's interactions, and the integration step of the evidence and the views' run."""
+        return self.grid.dt
+
+    @property
     def result(self) -> DynamicProgrammingResult:
         """
         The table as it stands, as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
 
         The learner's own model, updated by every episode; the shortcuts
-        (:meth:`get_controller`, :meth:`value_at`, the plots) read the latest
+        (:attr:`controller`, :meth:`cost_to_go`, the plots) read the latest
         solution's tables instead, ``solution.record.tables``.
 
         A cell never visited keeps its initial value, zero: the optimistic
         start that makes untried actions worth trying (``visits`` tells which).
+        Its ``iterations`` counts the episodes learned so far (value iteration's
+        counts sweeps), ``delta`` is ``nan``.
         """
         grid = self.grid
         Q = self.Q
-        episodes = len(self.history)
+        n_episodes = len(self.history)
 
         # J(x) = min_u Q(x, u) and π(x) = argmin_u Q(x, u)
         J = Q.min(axis=1)
         pi = Q.argmin(axis=1)
 
         return DynamicProgrammingResult(
-            grid=grid, J=J, pi=pi, iterations=episodes, delta=float("nan")
+            grid=grid, J=J, pi=pi, iterations=n_episodes, delta=float("nan")
         )
 
     def solve(
-        self, episodes=1000, *, params=None, evaluate=False, n_trials=50
+        self,
+        n_episodes=1000,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        verbose: bool = False,
     ) -> PlanningSolution:
         """
-        Learn for ``episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
+        Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
-        ``evaluate=True`` also rolls the law out from the problem's start and
-        scores it over the problem's draws.
+        ``evaluate=True`` also scores the law, as it is, over the problem's
+        draws (on the evaluator's automatic step, over an episode on an
+        infinite horizon).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
+        ``verbose`` prints the episodes' progress and, at the end, the record.
         """
 
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                episodes, evaluate=evaluate, n_trials=n_trials
+                n_episodes, evaluate=evaluate, n_trials=n_trials, verbose=verbose
             )
             return self.store_solution(solution)
 
         # Episodes of interaction, learning as they go
-        self.learn(episodes)
+        self.learn(n_episodes, verbose=verbose)
 
         # The greedy law of the learned table
         result = self.result
-        policy = plotting.get_controller(result)
+        controller = LookupPolicy(result.grid, result.pi)
 
-        # Optionally, roll the law out from the problem's start and score it over
-        # its draws
-        trajectory = None
+        # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
         if evaluate:
-            dt = self.grid.dt
-            tf = self.env.tf
-            trajectory = nominal_trajectory(self.problem, policy, dt=dt, tf=tf)
-            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials, tf=tf)
+            evaluation = planner_evidence(
+                self,
+                controller,
+                dt=self.dt,
+                n_trials=n_trials,
+                tf=self.env.tf,
+                backend="auto",
+            )
 
-        # The solution: the law, the record, the rollout, the interpolated cost-to-go
+        # The solution: the law, the record, the score, and the cost-to-go as a field
+        # on the grid, the failure cost past it (the price of leaving the grid)
         record = self.learning_record(result)
-        solution = PlanningSolution(
-            self.problem, policy, record, trajectory, evaluation, result.value_at
+        cost_to_go = result.grid.field(
+            result.J, method="linear", outside=self.env.failure_cost
         )
+        solution = PlanningSolution(
+            problem=self.problem,
+            controller=controller,
+            record=record,
+            cost_to_go=cost_to_go,
+            evaluation=evaluation,
+        )
+        if verbose:
+            print(record)
 
         return self.store_solution(solution)
 
@@ -258,8 +290,8 @@ class TabularLearningPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def learn(self, episodes):
-        """Run ``episodes`` episodes of interaction, learning as they go; returns ``self``."""
+    def learn(self, n_episodes, *, verbose=False):
+        """Run ``n_episodes`` episodes of interaction, learning as they go; returns ``self`` (``verbose``: the episodes' progress)."""
         grid = self.grid
         env = self.env
         Q = self.Q
@@ -269,11 +301,14 @@ class TabularLearningPlanner(Planner):
         eta = self.eta
         gamma = self.gamma
         rng = self.rng
+        episodes = report_progress(
+            range(n_episodes), "Learning Q(x,u)", verbose, unit="episodes"
+        )
 
-        for episode in range(episodes):
+        for episode in episodes:
             # The episode's exploration schedule, parameter draw, start node and
             # first action
-            progress = episode / max(episodes - 1, 1)
+            progress = episode / max(n_episodes - 1, 1)
             params = env.sample_params(rng)
             s = self.node(self.start())
             t = env.t0
@@ -341,7 +376,7 @@ class TabularLearningPlanner(Planner):
 
         return TabularLearningRecord(
             algorithm=algorithm,
-            episodes=len(history),
+            n_episodes=len(history),
             visited_fraction=visited_fraction,
             cost=cost,
             table_finite=table_finite,
@@ -349,40 +384,16 @@ class TabularLearningPlanner(Planner):
             tables=tables,
         )
 
-    # Controller and plots
-
-    def get_controller(self, **kwargs):
-        """The latest solution's greedy policy; ``interpolation=`` builds a variant of it."""
-        solution = self.require_solution()
-        if not kwargs:
-            return solution.policy
-
-        return plotting.get_controller(solution.record.tables, **kwargs)
-
-    def value_at(self, x) -> float:
-        """Interpolate the latest solution's cost-to-go at a state ``x``."""
-        return self.require_solution().record.tables.value_at(x)
-
-    def nominal_trajectory(self, tf=None, *, solution=None):
-        """``solution``'s greedy law (the latest when none is given) from the problem's start on the grid's control period."""
-        solution = self.require_solution() if solution is None else solution
-        return nominal_trajectory(
-            self.problem,
-            solution.policy,
-            dt=self.grid.dt,
-            tf=self.env.tf if tf is None else tf,
-        )
+    # Plots
 
     def plot_cost_to_go(self, **kwargs):
         """The latest solution's cost-to-go table on the grid itself, as value iteration draws it."""
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
-        return plotting.plot_cost_to_go(self.require_solution().record.tables, **kwargs)
+        return plotting.plot_cost_to_go(require_solution(self).record.tables, **kwargs)
 
     def plot_control_law(self, **kwargs):
         """The latest solution's greedy policy table on the grid itself, as value iteration draws it."""
-        return plotting.plot_control_law(
-            self.require_solution().record.tables, **kwargs
-        )
+        return plotting.plot_control_law(require_solution(self).record.tables, **kwargs)
 
     def plot_learning_curve(self, ax=None, window=20):
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
@@ -466,10 +477,10 @@ class TabularLearningPlanner(Planner):
 
 @dataclass(frozen=True)
 class TabularLearningRecord:
-    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from."""
+    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``iterations`` the episodes, ``n_episodes``)."""
 
     algorithm: str
-    episodes: int
+    n_episodes: int
     visited_fraction: float
     cost: float
     table_finite: bool
@@ -487,7 +498,7 @@ class TabularLearningRecord:
 
     def __str__(self) -> str:
         return (
-            f"{self.algorithm}: {self.episodes} episodes, {100 * self.visited_fraction:.0f}% of "
+            f"{self.algorithm}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
             f"the grid visited, mean episode cost {self.cost:.2f} at the end"
         )
 
@@ -616,6 +627,15 @@ class UCB:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_continuous_problem(problem):
+    """Refuse a step problem: the learner rounds a continuous plant's states to the grid; a step problem's table is value iteration's."""
+    if not is_continuous(problem):
+        raise NotImplementedError(
+            "TabularLearningPlanner learns on a continuous problem's grid; solve a "
+            "step problem's table with DynamicProgrammingPlanner(problem, x_grid=, u_grid=)"
+        )
 
 
 def require_rounding(rounding):

@@ -36,7 +36,7 @@ class GeneralizedMechanicalSystem(DynamicSystem):
         p = n
 
         super().__init__(
-            n=n,
+            state_dim=n,
             input_dim=m,
             output_dim=p,
             expose_state=True,

@@ -64,11 +64,9 @@ class Sum(System):
         # Ports: one input per sign, the signed sum out
         for i in range(self.signs.size):
             self.add_input_port(f"in{i}", dim=self.dim)
-        self.add_output_port(
-            "y", dim=self.dim, function=self.compute, dependencies="all"
-        )
+        self.add_output_port("y", dim=self.dim, function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         xp = array_module(u)
 
         signs = xp.asarray(self.signs)
@@ -101,9 +99,9 @@ class Gain(System):
         # Ports: u in, y = K u out
         p, m = K.shape
         self.add_input_port("u", dim=m)
-        self.add_output_port("y", dim=p, function=self.compute, dependencies="all")
+        self.add_output_port("y", dim=p, function=self.h, dependencies="all")
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
         K = params["K"]
@@ -131,10 +129,10 @@ class Mux(System):
         for i, d in enumerate(self.dims):
             self.add_input_port(f"in{i}", dim=d)
         self.add_output_port(
-            "y", dim=sum(self.dims), function=self.compute, dependencies="all"
+            "y", dim=sum(self.dims), function=self.h, dependencies="all"
         )
 
-    def compute(self, x, u, t=0, params=None):
+    def h(self, x, u, t=0, params=None):
         return u
 
 
@@ -210,7 +208,7 @@ if __name__ == "__main__":
     print("Error:", error.compute(None, np.array([5.0, 2.0])))  # 3.0
 
     gain = Gain([2.0, 3.0])
-    print("Gain:", gain.compute(None, np.array([1.0, 1.0])))  # [2, 3]
+    print("Gain:", gain.h(None, np.array([1.0, 1.0])))  # [2, 3]
 
     split = Demux(dims=(2, 1))
     print("Demux u[2]:", split.outputs["u[2]"].compute(None, np.array([1.0, 2.0, 9.0])))

@@ -9,11 +9,11 @@ from minilink.core.backends import (
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
-from minilink.core.inspect import inspect_text
+from minilink.core.compile.compiler import build_on_auto
+from minilink.core.inspect import body_line, format_inspect, inspect_inline
 from minilink.core.params import checked
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
-from minilink.simulation.compile_backend import resolve_auto_backend
 from minilink.simulation.input_coercion import coerce_forced_input, require_x0
 from minilink.simulation.sim_reporting import (
     print_simulation_preamble,
@@ -39,7 +39,12 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
     ),
     "scipy_stiff": (
         "scipy",
-        {"method": "Radau", "use_jac": True},
+        {
+            "method": "Radau",
+            "rtol": 1e-4,
+            "atol": 1e-7,
+            "use_jac": True,
+        },
     ),
     "scipy_max": (
         "scipy",
@@ -215,7 +220,7 @@ class Simulator:
             print_setup_panel(self, setup_notes)
 
     def __str__(self):
-        return inspect_text(self)
+        return simulator_text(self)
 
     def solve(self, *, u=None, input_port_id=None, params=None, record=()):
         """
@@ -383,7 +388,7 @@ class Simulator:
 
     def resolve_and_build_evaluator(self, sys, backend):
         """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
-        return resolve_auto_backend(
+        return build_on_auto(
             lambda backend: self.build_evaluator(sys, backend), backend
         )
 
@@ -392,10 +397,12 @@ class Simulator:
         return sys.compile(backend=backend)
 
     def parse_solver(self, solver):
-        """``(backend key, options)`` of a solver label."""
+        """``(backend key, options)`` of a solver label, the options a copy of the preset's."""
         if solver not in _USER_SOLVER_MODES:
             raise ValueError(f"Unknown solver '{solver}'")
-        return _USER_SOLVER_MODES[solver]
+        key, options = _USER_SOLVER_MODES[solver]
+
+        return key, dict(options)
 
     def select_backend(self, solver_backend_key):
         """A fresh solver backend for its key."""
@@ -533,3 +540,11 @@ def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
         solver_options=sim.solver_backend_options or None,
         notes=notes or None,
     )
+
+
+def simulator_text(sim):
+    """The print text of a simulator: its solver, step and grid, and the system."""
+    headline = f"Simulator, solver={sim.solver_mode!r}, dt={sim.dt:g}, N={sim.n_pts}"
+    body = [body_line("sys", inspect_inline(sim.sys))]
+
+    return format_inspect(headline, body)

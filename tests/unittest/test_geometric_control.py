@@ -110,6 +110,19 @@ def test_an_open_path_holds_its_ends():
     assert line.sample(15.0) == pytest.approx([10.0, 0.0])
 
 
+def test_the_laws_are_named_by_their_class():
+    """Each law's display name is its class name (RULES 2.6)."""
+    path = straight_path()
+    laws = [
+        PurePursuit(path, wheelbase=WHEELBASE, lookahead=LOOKAHEAD),
+        Stanley(path),
+        LineOfSight(path),
+        HeadingController(),
+    ]
+
+    assert [law.name for law in laws] == [type(law).__name__ for law in laws]
+
+
 # Pure pursuit
 
 

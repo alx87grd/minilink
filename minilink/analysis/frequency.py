@@ -13,6 +13,7 @@ from minilink.analysis.linear import Margins
 from minilink.analysis.linearization import (
     channel_label,
     channel_subtitle,
+    discrete_period,
     siso_matrices,
 )
 from minilink.graphical.common import PlotResult
@@ -241,7 +242,8 @@ def root_locus(
     ``gains`` defaults to an adaptive sweep from ``K = 0`` to the gain where
     the far branches leave the picture. Returns ``(gains, roots)`` with
     ``roots`` of shape ``(len(gains), n)``, one continuous branch per column.
-    ``minimal`` as in :func:`pzmap`.
+    ``minimal`` as in :func:`pzmap`. A step or sampled system's roots are the
+    poles in ``z`` of its difference equation closed with ``u_k = -K y_k``.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -416,7 +418,8 @@ def plot_root_locus(
 
     ``minimal`` as in :func:`pzmap`. ``radius`` frames the branches within that
     distance of the origin; the default frames three times the radius of the
-    open-loop roots, so the far tails of the asymptotes leave the picture.
+    open-loop roots, so the far tails of the asymptotes leave the picture. A
+    step or sampled system's locus is in ``z``, drawn with the unit circle.
     """
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
@@ -428,7 +431,9 @@ def plot_root_locus(
     # p(K) = eig(A − B K (1 + K d)⁻¹ C) over the gain sweep
     gains, roots = linear.root_locus(A, B, C, D, gains)
 
-    figure = root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius)
+    figure = root_locus_figure(
+        A, B, C, D, gains, roots, sys, of, wrt, radius, discrete_period(sys)
+    )
 
     return render_control_figure(figure, backend=backend, show=show)
 
@@ -480,19 +485,6 @@ def frequency_grid(A, B, C, D, w, n, period=None):
         raise ValueError("Frequencies must be positive.")
 
     return w
-
-
-def discrete_period(sys):
-    """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
-    # Lazy import: the step system loads with the first discrete analysis
-    from minilink.analysis.linearization import period_of
-    from minilink.core.discrete.step_system import StepSystem
-
-    if not isinstance(sys, StepSystem):
-        return None
-    period = period_of(sys)
-
-    return 1.0 if period is None else period
 
 
 def loop_response(A, B, C, D, period=None):
@@ -611,8 +603,7 @@ def pzmap_figure(z, p, sys, of, wrt, radius=None, period=None):
     # In z, the unit circle |z| = 1, the stability boundary, framed too
     traces = root_markers(p, z)
     if period is not None:
-        theta = np.linspace(0.0, 2.0 * np.pi, 361)
-        circle = np.exp(1j * theta)
+        circle = unit_circle()
         traces = (
             Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
         ) + traces
@@ -665,8 +656,8 @@ def root_text(s) -> str:
     return f"s = {s.real:.3g} {s.imag:+.3g}j<br>ζ = {zeta:.3f}, ωn = {wn:.3g} rad/s"
 
 
-def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
-    """The root-locus figure: one trace per branch, with the open-loop poles and zeros."""
+def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None, period=None):
+    """The root-locus figure: one trace per branch, with the open-loop poles and zeros; a difference equation's with the unit circle."""
     # The view keeps the poles, zeros and the branches near them; the far tails
     # of the asymptotes leave the frame as they do in MATLAB, or the window
     # within radius of the origin when one is given.
@@ -689,14 +680,22 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
         )
         for j in range(roots.shape[1])
     )
+    traces = branches + root_markers(linear.poles(A), linear.zeros(A, B, C, D))
+
+    # In z, the unit circle |z| = 1, the stability boundary, framed too
+    if period is not None:
+        circle = unit_circle()
+        traces = (
+            Trace(circle.real, circle.imag, style.AXIS_COLOR, dash="dash"),
+        ) + traces
+        near = np.concatenate([near, circle])
 
     return ControlFigure(
         title=style.ROOT_LOCUS_TITLE,
         subtitle=channel_subtitle(sys, of, wrt),
         panels=(
             Panel(
-                traces=branches
-                + root_markers(linear.poles(A), linear.zeros(A, B, C, D)),
+                traces=traces,
                 x_label=style.REAL_LABEL,
                 y_label=style.IMAG_LABEL,
                 zero_lines=True,
@@ -705,6 +704,14 @@ def root_locus_figure(A, B, C, D, gains, roots, sys, of, wrt, radius=None):
             ),
         ),
     )
+
+
+def unit_circle():
+    """The unit circle ``|z| = 1``, 361 points from ``θ = 0`` to ``2π``."""
+    theta = np.linspace(0.0, 2.0 * np.pi, 361)
+    circle = np.exp(1j * theta)
+
+    return circle
 
 
 def nyquist_figure(w, G, sys, of, wrt):

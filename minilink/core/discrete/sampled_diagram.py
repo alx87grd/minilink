@@ -59,10 +59,6 @@ class SampledDiagramSystem(StepDiagramSystem):
         super().add_subsystem(sys, sys_id)
         self.add_hold_slots()
 
-    def refresh(self):
-        super().refresh()
-        self.add_hold_slots()
-
     @property
     def x0(self):
         """The loop's initial state: its blocks' ``x0`` (a view), then the held outputs' own start."""

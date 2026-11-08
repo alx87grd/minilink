@@ -145,7 +145,7 @@ class PID(ErrorDriven, DynamicSystem):
         # One integrator state and one filter state per axis, for the terms carried
         self.n_int = n if self.has_integrator else 0
         self.n_filt = n if self.has_filter else 0
-        super().__init__(n=self.n_int + self.n_filt)
+        super().__init__(state_dim=self.n_int + self.n_filt)
         self.dof = n
         self.name = type(self).__name__
 

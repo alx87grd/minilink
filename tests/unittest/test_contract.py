@@ -64,6 +64,7 @@ SYSTEM_FACTORIES = {
     "MLP": lambda: minilink.MLP(2, 1, hidden=(4,)),
     "LookupPolicy": lambda: lookup_policy(),
     "NeuralPolicy": lambda: minilink.NeuralPolicy(minilink.Pendulum(), hidden=(4,)),
+    "SampledSystem": lambda: core.SampledSystem(minilink.Pendulum(), 0.1),
 }
 SYSTEM_EXCEPTIONS = {
     # The abstract shells and the diagrams: their params are their blocks' (walked as blocks)
@@ -72,6 +73,7 @@ SYSTEM_EXCEPTIONS = {
     "StepSystem",
     "DiagramSystem",
     "StepDiagramSystem",
+    "SampledDiagramSystem",
 }
 
 
@@ -141,7 +143,7 @@ def other_cases():
     from minilink import Gaussian, Pendulum, QuadraticCost, TimeCost, Uniform
     from minilink.core.distributions import Particles
     from minilink.core.fields import QuadraticField
-    from minilink.core.geometry import Box, Sphere
+    from minilink.core.geometry import Box, Sphere, from_waypoints
     from minilink.core.sets import (
         BallSet,
         BoxInputSet,
@@ -149,7 +151,7 @@ def other_cases():
         CallableSet,
         SingletonSet,
     )
-    from minilink.planning.spatial import ReferenceTrack, from_waypoints
+    from minilink.planning.spatial import ReferenceTrack
 
     plant = Pendulum()
     quadratic = QuadraticCost.from_system(plant, x_bar=np.array([1.0, 0.0]))

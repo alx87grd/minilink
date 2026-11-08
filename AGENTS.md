@@ -186,6 +186,7 @@ is set up (tests/README.md, "Setup").
 | Any change touching math | the textbook check against `dp.py` (above), stated in the report, plus the row that fits |
 | Narrow module + tests already updated | "Narrow module change" |
 | Cross-cutting or before handoff/push | "Cross-cutting or handoff" |
+| A change to what a slow test covers (`@pytest.mark.slow`), or before a release | "Slow tests" |
 | Compile backend, simulator, trajopt, MPC or value-iteration changes | "Regression gates, CI flags" |
 | Big review pass (compile backend, `Simulator`, trajectory optimization, or cross-cutting dynamics changes) | "Regression gates, full local" (its `--update` rule included) |
 | Teaching notebooks | "Notebook change" |

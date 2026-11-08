@@ -1,6 +1,6 @@
 # Nightly — everything the per-push gates leave out, with the full optional
 # stack (every extra, Ipopt, Stable-Baselines3 on CPU torch): the whole pytest
-# suite (symbolic and Ipopt tests included), every example script, and every
+# suite (symbolic, Ipopt and slow tests included), every example script, and every
 # teaching notebook (`--all`: the ones marked `smoke: false` in
 # notebook_overrides.json too, except `nightly: false`). Not a merge gate (see tests/README.md); CI's jobs are the per-push
 # gates. Also the other Pythons (3.10, 3.11, 3.13) and the students' laptops. Run on demand with
@@ -41,10 +41,10 @@ jobs:
     - name: Check the optional stack imports
       run: python -c "import cyipopt, sympy, jax, graphviz, meshcat, pygame, plotly, gymnasium, torch, stable_baselines3"
 
-    - name: Test with pytest (every marker)
+    - name: Test with pytest (every marker, the slow tests included)
       env:
         SDL_VIDEODRIVER: dummy
-      run: pytest
+      run: pytest --runslow
 
     # The experimental tier's tests: off the merge gate, smoked here (ROADMAP §2)
     - name: Test the experimental tier

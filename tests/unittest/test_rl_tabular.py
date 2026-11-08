@@ -62,12 +62,13 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     learner = TabularLearningPlanner(
         problem, gamma=0.9, eta=0.1, solver="euler", seed=0, **GRID
     )
-    solution = learner.solve(episodes=2000)
+    solution = learner.solve(n_episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
-    assert isinstance(solution.policy, LookupPolicy)
+    assert isinstance(solution.controller, LookupPolicy)
     assert isinstance(learner.result, DynamicProgrammingResult)
-    assert solution.record.episodes == 2000 and len(learner.history) == 2000
-    assert solution.cost_to_go(np.zeros(2)) == learner.value_at(np.zeros(2))
+    assert solution.record.n_episodes == 2000 and len(learner.history) == 2000
+    assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
+    assert learner.cost_to_go(np.zeros(2), t=1.0) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
     J_vi = vi.result.J
@@ -75,7 +76,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
     assert np.median(error) < 0.35 * np.median(J_vi)
 
     # The greedy law is a lookup-table block that closes the loop and regulates
-    ctl = learner.get_controller()
+    ctl = learner.controller
     assert isinstance(ctl, LookupPolicy)
     plant = problem.sys
     plant.x0 = np.array([1.0, 0.0])
@@ -153,10 +154,10 @@ def test_exploration_policies_choose_valid_actions():
 def test_sample_average_step_and_the_planner_arguments():
     problem = double_integrator_problem()
     learner = TabularLearningPlanner(problem, eta=None, **GRID)
-    solution = learner.solve(episodes=5, evaluate=True)
+    solution = learner.solve(n_episodes=5, evaluate=True)
     assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
-    assert solution.evaluation.n_trials == 1 and solution.trajectory is not None
+    assert solution.evaluation.n_trials == 1 and solution.trajectory is None
     assert "episodes" in str(solution.record)
     with pytest.raises(ValueError):
         TabularLearningPlanner(problem, x_grid=(5, 5))
@@ -181,3 +182,28 @@ def test_numpy_environment_steps_like_the_problem():
         np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
     )
     assert bool(terminated) and not bool(truncated) and float(r) < -19.0
+
+
+def test_a_verbose_solve_reports_the_episodes_and_the_record(capsys):
+    planner = TabularLearningPlanner(double_integrator_problem(), seed=0, **GRID)
+    planner.solve(5)
+    assert capsys.readouterr().out == ""
+
+    solution = planner.solve(5, verbose=True)
+    printed = capsys.readouterr().out
+    assert "Learning Q(x,u)" in printed and "(5 episodes)" in printed
+    assert str(solution.record) in printed
+
+
+def test_the_learned_cost_to_go_is_a_grid_field_priced_at_the_failure_cost_past_the_grid():
+    from minilink.core.fields import GridField
+
+    learner = TabularLearningPlanner(double_integrator_problem(), seed=0, **GRID)
+    solution = learner.solve(n_episodes=50)
+
+    # The table read on the grid, the failure cost of leaving it past its edge
+    J = solution.cost_to_go
+    assert isinstance(J, GridField)
+    node = learner.grid.states[17]
+    assert J(node) == pytest.approx(solution.record.tables.J[17])
+    assert J(np.array([3.0, 0.0])) == learner.env.failure_cost == 20.0

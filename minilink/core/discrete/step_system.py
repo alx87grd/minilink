@@ -6,7 +6,7 @@ from minilink.core.backends import array_module
 from minilink.core.facades.analysis import StepAnalysis
 from minilink.core.facades.plotting import StepPlotting
 from minilink.core.facades.simulation import StepSimulation
-from minilink.core.system import System, add_standard_ports
+from minilink.core.system import System
 
 ###############################################################################
 # Public API
@@ -30,7 +30,7 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
 
     def __init__(
         self,
-        n,
+        state_dim,
         *,
         input_dim=None,
         output_dim=None,
@@ -42,8 +42,8 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
 
         Parameters
         ----------
-        n : int
-            Number of discrete states.
+        state_dim : int
+            Number of discrete states, :attr:`n`.
         input_dim : int, optional
             If provided, create a standard input port named ``u``.
         output_dim : int, optional
@@ -53,11 +53,17 @@ class StepSystem(StepSimulation, StepAnalysis, StepPlotting, System):
         y_dependencies : tuple or "all", optional
             Direct-feedthrough dependencies for the standard ``y`` output.
         """
-        require_step_state(n)
-        System.__init__(self, n)
+        require_step_state(state_dim)
 
         # Ports, each when asked: the input u, the output y_k = h(x, u), the state x
-        add_standard_ports(self, input_dim, output_dim, expose_state, y_dependencies)
+        System.__init__(
+            self,
+            state_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            expose_state=expose_state,
+            y_dependencies=y_dependencies,
+        )
 
     def step(self, x, u, k=0, params=None):
         """

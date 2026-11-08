@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 import numpy as np
 
+from minilink.control.impedance import reference_errors, tracking_errors
 from minilink.control.siso import as_dof_vector
 from minilink.core.backends import array_module
 from minilink.core.system import System
@@ -86,18 +87,10 @@ class JointImpedance(System):
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])
 
-        r = u[:ref_dim]
-        q = u[ref_dim : ref_dim + n]
-        dq = u[ref_dim + n : ref_dim + 2 * n]
+        e, de = tracking_errors(u, n, ref_dim)
 
-        # τ = Kp e + Kd ė: regulation holds the rate reference at zero, tracking
-        # reads the stacked reference [q_d; dq_d]
-        if ref_dim == n:
-            tau = Kp * (r - q) - Kd * dq
-        else:
-            q_d = r[:n]
-            dq_d = r[n:]
-            tau = Kp * (q_d - q) + Kd * (dq_d - dq)
+        # τ = Kp e + Kd ė
+        tau = Kp * e + Kd * de
 
         return tau.reshape(-1)
 
@@ -213,14 +206,12 @@ class TaskImpedance(System):
         J = xp.asarray(plant.J(q, model))
         pdot = J @ dq
 
-        # Task spring-damper force f = Kp e_p + Kd e_v (regulation: ṗ_d = 0)
-        if ref_dim == task_dim:
-            p_d = r
-            f_task = Kp * (r - p) - Kd * pdot
-        else:
-            p_d = r[:task_dim]
-            pdot_d = r[task_dim:]
-            f_task = Kp * (p_d - p) + Kd * (pdot_d - pdot)
+        # The task errors e_p = p_d − p, e_v = ṗ_d − ṗ (regulation: ṗ_d = 0)
+        p_d = r[:task_dim]
+        e_p, e_v = reference_errors(r, p, pdot)
+
+        # f = Kp e_p + Kd e_v, the task spring-damper force
+        f_task = Kp * e_p + Kd * e_v
 
         return q, p, p_d, J, f_task
 

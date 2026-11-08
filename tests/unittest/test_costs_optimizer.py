@@ -24,7 +24,7 @@ def test_time_cost_is_unity_off_target_zero_on_target():
 def test_time_cost_from_system_targets_the_nominal_state():
     from minilink.core.system import DynamicSystem
 
-    sys = DynamicSystem(n=2, input_dim=1)
+    sys = DynamicSystem(state_dim=2, input_dim=1)
     sys.state.nominal_value = np.array([np.pi, 0.0])
     cost = TimeCost.from_system(sys, radius=0.1)
     np.testing.assert_array_equal(cost.x_bar, [np.pi, 0.0])
@@ -565,7 +565,7 @@ def quadratic_program(**fields):
 
 
 def test_the_program_class_is_read_from_its_fields():
-    from minilink.optimization.optimizer import program_class
+    from minilink.optimization.mathematical_program import program_class
 
     assert program_class(quadratic_program()) == "unconstrained"
     assert program_class(quadratic_program(lower=[0.0, -np.inf])) == "bounded"

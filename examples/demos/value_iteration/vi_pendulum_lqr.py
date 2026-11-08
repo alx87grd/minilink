@@ -58,8 +58,8 @@ grid.plot_value(J_lqr, vmax=INF, title="LQR cost-to-go, measured")
 
 # Close the loops, explicitly, and simulate each from the same start
 plant.x0 = X0
-vi_diagram = sol_vi.policy @ plant
-lqr_diagram = sol_lqr.policy @ plant
+vi_diagram = sol_vi.controller @ plant
+lqr_diagram = sol_lqr.controller @ plant
 vi_diagram.name = "Pendulum swing-up (value iteration)"
 lqr_diagram.name = "Pendulum swing-up (LQR)"
 vi_diagram.plot_diagram()
@@ -69,7 +69,7 @@ lqr_traj = lqr_diagram.compute_trajectory(tf=10.0)
 vi_diagram.plot_trajectory(vi_traj)
 lqr_diagram.plot_trajectory(lqr_traj)
 
-# print("VI  cost-to-go at x0:", round(planner.value_at(X0), 2))
+# print("VI  cost-to-go at x0:", round(planner.cost_to_go(X0), 2))
 # print("LQR cost-to-go at x0:", round(float(grid.interpolate(J_lqr, X0.reshape(1, -1))[0]), 2))
 # print("VI  | final angle error:", round(abs(vi_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")
 # print("LQR | final angle error:", round(abs(lqr_traj.x[0, -1] - UPRIGHT[0]), 3), "rad")

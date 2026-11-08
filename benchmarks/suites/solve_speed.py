@@ -139,7 +139,6 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             "ftol": PENDULUM_FTOL,
             "disp": False,
         },
-        verbose=False,
     )
 
     total_times: list[float] = []

@@ -48,12 +48,6 @@ def main() -> int:
             return _common.run_demo_check_script(
                 "tests/demo_checks/run_notebook_checks.py"
             )
-        case "benchmark_study_list":
-            return _common.run_study_script(["--list"])
-        case "benchmark_study_f_eval":
-            return _common.run_study_script(
-                ["--preset", "f_eval", "--plant", "pendulum"]
-            )
         case other:
             print(f"Unknown CHECK={other!r}. See docstring for options.")
             return 2

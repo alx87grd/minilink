@@ -74,11 +74,11 @@ planner = ReinforcementLearningPlanner(
     gamma=0.995,
     log_std_init=-1.0,  # gentle exploration: a twitchy attitude loop
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=1, y_axis=4, u_axis=0)  # thrust vs (altitude, vy)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

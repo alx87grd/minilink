@@ -23,7 +23,7 @@ def _have_jax() -> bool:
 
 class StableLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "StableLinearSystem"
         self.x0 = np.array([1.0])
 
@@ -38,7 +38,7 @@ class StableLinearSystem(DynamicSystem):
 
 class TwoPortLinearSystem(DynamicSystem):
     def __init__(self):
-        super().__init__(n=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, output_dim=1, y_dependencies=())
         self.name = "TwoPortLinearSystem"
         self.add_input_port("left", nominal_value=1.0)
         self.add_input_port("right", nominal_value=2.0)
@@ -1087,7 +1087,7 @@ class UndeclaredPlant(DynamicSystem):
     """A custom plant that declares no time constant: ``ẋ = −x + u``."""
 
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
 
     def f(self, x, u, t=0, params=None):
         xp = array_module(x)
@@ -1499,7 +1499,7 @@ def test_every_solver_holds_a_sampled_input_and_reads_a_function_where_it_evalua
 
     class Integrator(DynamicSystem):
         def __init__(self):
-            super().__init__(n=1, input_dim=1, output_dim=1)
+            super().__init__(state_dim=1, input_dim=1, output_dim=1)
 
         def f(self, x, u, t=0.0, params=None):
             return np.array([u[0]])
@@ -1606,3 +1606,114 @@ def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
             run.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
         )
         assert not np.allclose(run.get_signal("plant:u"), stale.get_signal("plant:u"))
+
+
+def test_the_stiff_preset_tightens_only_the_method_and_takes_the_jacobian_on_both_backends():
+    """scipy_stiff is Radau at scipy's tolerances, with ∂f/∂x from the evaluator on NumPy and JAX alike."""
+    from minilink.simulation.simulator import _USER_SOLVER_MODES
+
+    smooth = _USER_SOLVER_MODES["scipy"][1]
+    stiff = _USER_SOLVER_MODES["scipy_stiff"][1]
+    assert stiff["method"] == "Radau"
+    assert (stiff["rtol"], stiff["atol"]) == (smooth["rtol"], smooth["atol"])
+
+    runs = {}
+    backends = ("numpy", "jax") if _have_jax() else ("numpy",)
+    for backend in backends:
+        plant = Pendulum()
+        plant.x0[0] = 1.0
+        sim = Simulator(plant, tf=2.0, solver="scipy_stiff", backend=backend)
+        runs[backend] = sim.solve().x
+        assert sim.solver_backend.last_debug["jac_applied"]
+        assert sim.solver_backend.last_debug["njev"] >= 1
+
+    # The two Jacobians (central differences, forward mode) give one trajectory
+    if len(runs) == 2:
+        np.testing.assert_allclose(runs["numpy"], runs["jax"], atol=1e-9)
+
+    # At scipy's tolerances, the stiff run meets the default one
+    plant = Pendulum()
+    plant.x0[0] = 1.0
+    smooth_run = Simulator(plant, tf=2.0, solver="scipy").solve().x
+    np.testing.assert_allclose(runs["numpy"], smooth_run, atol=1e-3)
+
+
+from minilink.planning.trajectory_optimization.transcription import (  # noqa: E402
+    fixed_grid_t,
+)
+
+N_STEPS_COUNTS = {
+    # A horizon verb: n_steps points on [t0, tf], endpoints included
+    "Simulator": lambda N: Simulator(Integrator(), tf=1.0, n_steps=N).solve().t.size,
+    "compute_trajectory": lambda N: (
+        Integrator().compute_trajectory(tf=1.0, n_steps=N).t.size
+    ),
+    "static compute_trajectory": lambda N: (
+        Gain(K=2.0, dim=1).compute_trajectory(tf=1.0, n_steps=N).t.size
+    ),
+    "transcription knots": lambda N: fixed_grid_t(1.0, N).size,
+    # A run of periods: n_steps transitions, n_steps + 1 samples
+    "rollout": lambda N: (
+        Integrator().compile().rollout(np.zeros(1), None, 0.0, 0.01, n_steps=N).shape[0]
+        - 1
+    ),
+    "compute_rollout": lambda N: (
+        Integrator().discretize(0.01).compute_rollout(N).t.size - 1
+    ),
+}
+
+
+@pytest.mark.parametrize("verb", sorted(N_STEPS_COUNTS))
+def test_n_steps_counts_points_on_a_horizon_and_transitions_on_a_run(verb):
+    """One rule (DESIGN §5): n_steps is the grid's points on a horizon verb, the transitions on a stepping verb."""
+    assert N_STEPS_COUNTS[verb](7) == 7
+
+
+def test_rollout_batch_counts_transitions_like_rollout():
+    """rollout_batch(n_steps=N) gives N + 1 samples per member, as rollout does."""
+    pytest.importorskip("jax")
+    ev = Pendulum().compile(backend="jax")
+    xs = ev.rollout_batch(np.zeros((3, 2)), dt=0.01, n_steps=7)
+    assert xs.shape == (3, 8, 2)
+
+
+def test_a_static_leaf_samples_its_grid_in_one_jax_call():
+    """On JAX the static grid is one vmapped call, sampling what the NumPy loop samples."""
+    pytest.importorskip("jax")
+    from minilink.blocks.sources import Sine
+
+    blocks = {
+        "gain": lambda: Gain(K=np.array([[2.0, 0.0], [1.0, -1.0]])),
+        "step": lambda: Step(np.array([0.0]), np.array([1.0]), 0.5),
+        "sine": lambda: Sine(amplitude=[1.0, 2.0], omega=[3.0, 5.0]),
+    }
+    for name, make in blocks.items():
+        runs = {}
+        for backend in ("numpy", "jax"):
+            block = make()
+            sim = StaticSimulator(block, tf=1.0, n_steps=101, backend=backend)
+            u = (lambda t: np.array([t, 1.0 - t])) if block.m else None
+            runs[backend] = sim.solve(u=u)
+            if backend == "jax":
+                # The grid's map is compiled once, then reused by every solve
+                assert "outputs_on_grid" in sim.evaluator.compiled_forms
+        numpy_run, jax_run = runs["numpy"], runs["jax"]
+        assert list(jax_run.signals) == list(numpy_run.signals), name
+        for key in numpy_run.signals:
+            np.testing.assert_allclose(
+                jax_run.signals[key], numpy_run.signals[key], atol=1e-12, err_msg=name
+            )
+
+
+def test_a_simulators_solver_options_are_its_own_copy_of_the_preset():
+    from minilink import Pendulum
+    from minilink.simulation.simulator import Simulator
+
+    edited = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+    edited.solver_backend_options.update(rtol=1e-10, atol=1e-10)
+    fresh = Simulator(Pendulum(), tf=0.1, solver="scipy_stiff")
+
+    assert (
+        fresh.solver_backend_options["rtol"],
+        fresh.solver_backend_options["atol"],
+    ) == (1e-4, 1e-7)

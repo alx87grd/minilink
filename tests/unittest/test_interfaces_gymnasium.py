@@ -30,7 +30,7 @@ def make_unbounded_pendulum():
 
     class UnboundedPendulum(DynamicSystem):
         def __init__(self):
-            super().__init__(n=2, input_dim=1, output_dim=2, expose_state=True)
+            super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
 
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], -np.sin(x[0]) + u[0]])
@@ -297,7 +297,7 @@ class TestSys2GymJax(unittest.TestCase):
             """A Python branch on the state value: NumPy only."""
 
             def __init__(self):
-                super().__init__(n=1, input_dim=1, output_dim=1)
+                super().__init__(state_dim=1, input_dim=1, output_dim=1)
                 self.state.lower_bound = np.array([-5.0])
                 self.state.upper_bound = np.array([5.0])
                 self.inputs["u"].lower_bound = np.array([-1.0])

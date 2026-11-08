@@ -20,13 +20,13 @@ the loop structure and I/O contracts may still move.
 
 from __future__ import annotations
 
-import logging
 import time
 import warnings
 
 import numpy as np
 
-from minilink.core.backends import BACKEND_AUTO, BACKEND_JAX, BACKEND_NUMPY
+from minilink.core.backends import BACKEND_AUTO, BACKEND_NUMPY
+from minilink.core.compile.compiler import build_on_auto
 from minilink.core.compile.evaluators.stepping import substeps_of
 from minilink.core.system import DynamicSystem, automatic_step_of
 from minilink.core.trajectory import Trajectory
@@ -185,7 +185,7 @@ class RealtimeSimulator:
         self._compile_s = 0.0
 
         t_compile = time.perf_counter()
-        self.backend, self.evaluator = self._resolve_and_build_evaluator(backend)
+        self.backend, self.evaluator = self.resolve_and_build_evaluator(backend)
         self._compile_s = time.perf_counter() - t_compile
 
         # Build the live view up front so bad renderer names fail fast; the
@@ -387,25 +387,11 @@ class RealtimeSimulator:
 
     # Internal machinery
 
-    def _resolve_and_build_evaluator(self, backend):
-        """Compile with an explicit backend, or auto-try JAX then NumPy.
+    def resolve_and_build_evaluator(self, backend):
+        """Compile with an explicit backend, or for ``None`` and ``"auto"`` by the compiler's one rule (JAX, else NumPy)."""
+        backend = BACKEND_AUTO if backend is None else backend
 
-        ``None`` and ``"auto"`` share the same policy: prefer JAX when the
-        package is installed and the system is JAX-compatible.
-        """
-        if backend is None or backend == BACKEND_AUTO:
-            try:
-                import jax  # noqa: F401
-            except ImportError:
-                return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-            try:
-                return BACKEND_JAX, self.sys.compile(backend=BACKEND_JAX)
-            except Exception:
-                logging.getLogger(__name__).debug(
-                    "JAX compile failed, falling back to numpy", exc_info=True
-                )
-                return BACKEND_NUMPY, self.sys.compile(backend=BACKEND_NUMPY)
-        return backend, self.sys.compile(backend=backend)
+        return build_on_auto(lambda backend: self.sys.compile(backend=backend), backend)
 
     def _auto_n_sub_max(self):
         """Max ZOH substeps/frame: offline auto-``dt`` floor, live ceiling.

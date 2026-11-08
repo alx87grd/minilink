@@ -29,6 +29,8 @@ from collections import Counter
 from pathlib import Path
 from unittest import mock
 
+import pytest
+
 from tests.demo_checks import run_flagship_demos as flagship_runner
 from tests.demo_checks import run_notebook_checks as notebook_runner
 from tests.run import _common as launcher
@@ -89,6 +91,7 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
 
+    @pytest.mark.slow
     def test_flagship_demos_exit_zero(self):
         proc = self._run("tests/demo_checks/run_flagship_demos.py")
         if proc.returncode != 0:
@@ -104,15 +107,6 @@ class TestDemoCheckRunners(unittest.TestCase):
                 f"flagship graphics failed (exit {proc.returncode})\n"
                 f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
             )
-
-    def test_run_study_list_exit_zero(self):
-        proc = self._run("benchmarks/run_study.py", "--list")
-        if proc.returncode != 0:
-            self.fail(
-                f"run_study --list failed (exit {proc.returncode})\n"
-                f"stdout:\n{proc.stdout}\nstderr:\n{proc.stderr}"
-            )
-        self.assertIn("f_eval", proc.stdout)
 
     def test_notebook_checks_exit_zero(self):
         if os.environ.get("MINILINK_NOTEBOOK_CHECKS") != "1":
@@ -216,11 +210,8 @@ class TestDemoCheckManifests(unittest.TestCase):
             (flagship_runner, ["--demo", "mpc_minimal"], ["mpc_car_minimal"]),
             (
                 notebook_runner,
-                ["--notebook", "teaching_drone_ppo"],
-                [
-                    "teaching_courses_udes_gro860_drone_ppo",
-                    "teaching_topics_reinforcement_learning_drone_ppo",
-                ],
+                ["--notebook", "teaching_drone_pp"],
+                ["teaching_drone_ppo"],
             ),
             (
                 notebook_runner,

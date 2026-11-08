@@ -9,22 +9,29 @@ import numpy as np
 
 from minilink.core.backends import array_module
 from minilink.core.discrete.step_system import StepSystem
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import (
+    body_line,
+    format_inspect,
+    inspect_inline,
+    inspect_text,
+    repr_pretty,
+)
 from minilink.core.params import require_complete
+from minilink.core.reporting import (
+    DISP_RULE_DIV,
+    DISP_RULE_MAIN,
+    preview_vector,
+)
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.evaluators.program_evaluator import require_declared_params
 from minilink.optimization.mathematical_program import (
     MathematicalProgram,
     OptimizationResult,
+    program_class,
 )
 from minilink.optimization.optimizers.optimizer_backend import (
     BackendIterateCallback,
     OptimizerBackend,
-)
-from minilink.optimization.reporting import (
-    DISP_RULE_DIV,
-    DISP_RULE_MAIN,
-    preview_vector,
 )
 
 # User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
@@ -106,9 +113,11 @@ class Optimizer:
         Optimizer method preset, named by algorithm: ``"gd"`` and ``"adam"``
         (first-order, projected on the box), ``"l-bfgs"``, ``"scipy_slsqp"``,
         ``"scipy_trust_constr"``, ``"ipopt"``; or ``"auto"``, the default of the
-        program's class (see :func:`program_class`): L-BFGS for an unconstrained
-        or box-bounded program, SLSQP for a constrained one. A method the class
-        does not admit is refused (``gd`` on a program with constraint rows).
+        program's class (see
+        :func:`~minilink.optimization.mathematical_program.program_class`):
+        L-BFGS for an unconstrained or box-bounded program, SLSQP for a
+        constrained one. A method the class does not admit is refused (``gd``
+        on a program with constraint rows).
     backend : str, optional
         Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
         Defaults to ``program.backend`` (the native backend of the program's
@@ -165,7 +174,7 @@ class Optimizer:
         self.adapter = make_optimizer_backend(method, options=options, **method_kwargs)
 
     def __str__(self):
-        return inspect_text(self)
+        return optimizer_text(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -532,18 +541,6 @@ def require_no_hook(callback):
         )
 
 
-def program_class(program) -> str:
-    """The program's class from its fields: ``"constrained"`` (rows ``g`` or ``h``), ``"bounded"`` (a finite box face) or ``"unconstrained"``."""
-    if program.g is not None or program.h is not None:
-        return "constrained"
-
-    faces = [side for side in (program.lower, program.upper) if side is not None]
-    if any(np.any(np.isfinite(side)) for side in faces):
-        return "bounded"
-
-    return "unconstrained"
-
-
 def method_for(program, method):
     """The preset to run: the class default for ``"auto"``; refuse one the class does not admit."""
     require_method(method)
@@ -624,6 +621,18 @@ def backend_kwargs_of(preset, method_kwargs, options):
         kwargs["options"] = {**existing, **options}
 
     return kwargs
+
+
+def optimizer_text(opt):
+    """The print text of an optimizer: its method, program, start and backend."""
+    headline = f"Optimizer, method={opt.method!r}"
+    body = [
+        body_line("program", inspect_inline(opt.program)),
+        body_line("z0", preview_vector(opt.z0)),
+        body_line("backend", opt.backend),
+    ]
+
+    return format_inspect(headline, body)
 
 
 if __name__ == "__main__":

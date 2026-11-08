@@ -102,6 +102,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "KinodynamicExtender",
     ),
     "SteeringExtender": ("minilink.planning.search.extenders", "SteeringExtender"),
+    "LiveSearchPlot": ("minilink.planning.search.live_plot", "LiveSearchPlot"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

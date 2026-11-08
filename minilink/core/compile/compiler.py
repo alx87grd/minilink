@@ -9,12 +9,14 @@ import numpy as np
 
 from minilink.core.assembly import flatten_diagram
 from minilink.core.backends import (
+    BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
     jax_installed,
     normalize_backend,
     require_jax_numpy,
 )
+from minilink.core.compile.evaluators.base import NotTraceableError
 from minilink.core.compile.evaluators.diagram import DiagramEvaluator
 from minilink.core.compile.evaluators.discrete import (
     SampledDiagramEvaluator,
@@ -106,20 +108,34 @@ def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
 def compile_auto(system, verbose=False):
     """Compile with JAX when it is installed and ``system`` traces, else with NumPy.
 
-    Returns ``(backend, evaluator)``. Only two verdicts fall back to NumPy:
-    JAX cannot be imported, or the system is "not JAX-traceable"; any other
-    error from the JAX compile surfaces.
+    Returns ``(backend, evaluator)``; the policy is :func:`build_on_auto`'s.
     """
+    return build_on_auto(
+        lambda backend: compile(system, backend=backend, verbose=verbose)
+    )
 
+
+def build_on_auto(build, backend=BACKEND_AUTO):
+    """``(backend, build(backend))``: a named backend as requested; ``"auto"`` JAX when it imports and the build traces, else NumPy.
+
+    Only two verdicts fall back to NumPy: JAX cannot be imported, or a block is
+    not JAX-traceable (:class:`NotTraceableError`); any other error from the
+    JAX build surfaces. Every automatic backend (``compile_auto``, the
+    simulators' ``backend="auto"``) reads this one rule.
+    """
+    # A named backend compiles as requested
+    if backend != BACKEND_AUTO:
+        return backend, build(backend)
+
+    # JAX first; NumPy when JAX is on disk but does not import (blocked, a broken
+    # install) or a block does not trace
     if jax_installed():
         try:
-            return BACKEND_JAX, compile(system, backend=BACKEND_JAX, verbose=verbose)
-        except ImportError:
-            pass  # present on disk but not importable (e.g. blocked, broken install)
-        except RuntimeError as exc:
-            if "JAX-traceable" not in str(exc):
-                raise
-    return BACKEND_NUMPY, compile(system, backend=BACKEND_NUMPY, verbose=verbose)
+            return BACKEND_JAX, build(BACKEND_JAX)
+        except (ImportError, NotTraceableError):
+            pass
+
+    return BACKEND_NUMPY, build(BACKEND_NUMPY)
 
 
 def compile_diagram(
@@ -183,7 +199,7 @@ def compile_diagram(
         if verbose:
             t0 = time.perf_counter()
             n_before = len(diagram.subsystems)
-            print("[compile] Step 0: Flattening nested diagrams...", end="", flush=True)
+            print("[compile] Flattening nested diagrams...", end="", flush=True)
         diagram, _flatten_report = flatten_diagram(diagram)
         if verbose:
             print(
@@ -191,10 +207,10 @@ def compile_diagram(
                 f"{time.perf_counter() - t0:.3f}s)"
             )
 
-    # Step 1: Algebraic loop detection
+    # Algebraic loop detection
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+        print("[compile] Checking for algebraic loops...", end="", flush=True)
 
     for sys_id, subsystem in diagram.subsystems.items():
         validate_equation_shapes(subsystem, label=f"{subsystem.name} ({sys_id})")
@@ -204,7 +220,7 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # Step 2: Build execution plan
+    # The execution plan
     if verbose:
         t0 = time.perf_counter()
         n_ports = len(port_execution_order)
@@ -212,7 +228,7 @@ def compile_diagram(
             1 for s in diagram.subsystems.values() if isinstance(s, DynamicSystem)
         )
         print(
-            f"[compile] Step 2: Building execution plan "
+            f"[compile] Building execution plan "
             f"({n_ports} ports, {n_states} states)...",
             end="",
             flush=True,
@@ -223,7 +239,7 @@ def compile_diagram(
     if verbose:
         print(f"  ({time.perf_counter() - t0:.3f}s)")
 
-    # Create evaluator (steps 0, 3, 4 handled inside for JAX)
+    # The evaluator (its JAX trace check inside)
     key = normalize_backend(backend)
     if key != BACKEND_NUMPY:
         require_jax_numpy()
@@ -271,7 +287,7 @@ def compile_step_diagram(
 
     if verbose:
         t0 = time.perf_counter()
-        print("[compile] Step 1: Checking for algebraic loops...", end="", flush=True)
+        print("[compile] Checking for algebraic loops...", end="", flush=True)
 
     port_execution_order = evaluation_order_of(diagram)
 
@@ -285,7 +301,7 @@ def compile_step_diagram(
             1 for s in diagram.subsystems.values() if isinstance(s, StepSystem)
         )
         print(
-            f"[compile] Step 2: Building step execution plan "
+            f"[compile] Building step execution plan "
             f"({n_ports} ports, {n_states} step states)...",
             end="",
             flush=True,

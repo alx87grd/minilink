@@ -11,7 +11,7 @@ from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
 from minilink.planning.plotting import maybe_show
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, drawn_trajectory_of
 
 # Matplotlib is imported inside each view, so the planning layer stays importable
 # without a display backend until a plot is requested.
@@ -45,7 +45,8 @@ def compare(
     an :class:`~minilink.planning.evaluation.Evaluation` already computed.
     ``dt`` follows :func:`~minilink.planning.evaluator.evaluate`: a sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous one needs ``dt``, the period its loop is integrated on.
+    continuous one runs on ``dt``, the period its loop is integrated on, and
+    with ``dt`` omitted on the evaluator's automatic step.
     """
     problem, named = split_entries(args, entries)
 
@@ -167,7 +168,7 @@ class Comparison:
         return fig, axes
 
     def plot_trajectory(self, *, signals=("x", "u"), show=True):
-        """The plans and nominal rollouts overlaid, one row per signal component, legend by name."""
+        """The plans and the controllers' runs overlaid, one row per signal component, legend by name."""
         import matplotlib.pyplot as plt
 
         # Lazy import: the graphics load on first use, not with the core
@@ -178,7 +179,7 @@ class Comparison:
         sys = first.problem.sys
         specs = {
             name: build_signal_plot_spec(
-                sys, solution.require_trajectory(), signals=signals
+                sys, drawn_trajectory_of(solution), signals=signals
             )
             for name, solution in self.items()
         }
@@ -199,7 +200,7 @@ class Comparison:
             ax.set_ylabel(trace.label + unit)
             ax.grid(True, alpha=0.3)
         axes[0].legend(loc="upper right", fontsize=8)
-        axes[0].set_title("plans and nominal rollouts")
+        axes[0].set_title("plans and runs")
         axes[-1].set_xlabel("Time [s]")
 
         maybe_show(plt, show)
@@ -323,22 +324,22 @@ def sample_cost_to_go(
     return x_level, y_level, J
 
 
-def plot_solution_trajectory(solution, *, signals, backend, show):
-    """The solution's trajectory on its system, the figure titled as plan or nominal rollout."""
+def plot_solution_trajectory(solution, traj, *, signals, backend, show):
+    """The solution's plan, or its controller's run ``traj``, on its system, the figure titled as plan or run."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.signals.time_signals import plot_time_signals
 
     # The trajectory on the solution's system, shown once it is titled
     result = plot_time_signals(
         solution.problem.sys,
-        solution.require_trajectory(),
+        traj,
         signals=signals,
         backend=backend,
         show=False,
     )
 
-    # The title says which: the plan of an open-loop policy, or the nominal rollout
-    kind = "plan" if solution.open_loop else "nominal rollout"
+    # The title says which: the plan the planner computed, or the controller's run
+    kind = "plan" if solution.trajectory is not None else "run"
     if backend == "matplotlib":
         import matplotlib.pyplot as plt
 
@@ -447,13 +448,7 @@ def solution_of(problem, entry):
     if isinstance(entry, PlanningSolution):
         return entry
 
-    return PlanningSolution(
-        problem=problem,
-        policy=entry,
-        record=GivenPolicy(),
-        trajectory=None,
-        evaluation=None,
-    )
+    return PlanningSolution(problem=problem, controller=entry, record=GivenPolicy())
 
 
 def require_no_scoring(dt, n_trials):

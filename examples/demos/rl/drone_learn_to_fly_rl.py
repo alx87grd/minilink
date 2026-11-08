@@ -69,11 +69,11 @@ problem = PlanningProblem(
 planner = ReinforcementLearningPlanner(
     problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
 )
-solution = planner.solve(timesteps=TRAINING_TIMESTEPS)
+solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)
 planner.plot_learning_curve()
 
-ppo_ctl = planner.get_controller()
+ppo_ctl = planner.controller
 ppo_ctl.plot_control_law(x_axis=2, y_axis=5, u_axis=0)  # T1 vs (theta, omega)
 
 report = evaluate(problem, ppo_ctl, dt=DT, n_trials=100, key=1)

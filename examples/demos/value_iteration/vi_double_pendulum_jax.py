@@ -83,10 +83,9 @@ planner = DynamicProgrammingPlanner(
     gamma=1.0,
     max_iterations=n_steps,
     out_of_bound_cost=INF,
-    verbose=True,
 )
 t_xnext = time.perf_counter()
-planner.solve_steps(n_steps)
+planner.solve_steps(n_steps, verbose=True)
 t_done = time.perf_counter()
 
 print("\ntiming summary:")
@@ -102,7 +101,7 @@ planner.plot_cost_to_go(
 )
 planner.plot_control_law(axis=[0, 1], axes=[(0, 1), (0, 1)], anchor=GOAL)
 
-controller = planner.get_controller()
+controller = planner.controller
 diagram = DiagramSystem()
 diagram.add_subsystem(controller, "controller")
 diagram.add_subsystem(plant, "plant")

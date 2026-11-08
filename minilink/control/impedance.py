@@ -142,7 +142,7 @@ class IntegralImpedance(DynamicSystem):
         n = int(dof)
         require_positive_dof(n)
 
-        super().__init__(n=n)
+        super().__init__(state_dim=n)
         self.dof = n
 
         # Parameters: stiffness and damping as (n, n) matrices, the integral gain,
@@ -248,14 +248,23 @@ def declare_impedance_ports(
 
 
 def tracking_errors(u, n, ref_dim):
-    """``(e, ė)`` from the flat input ``[r; q; dq]``: ``q_d − q`` and ``dq_d − dq``, ``dq_d = 0`` unless ``r`` carries it."""
+    """``(e, ė)`` from the flat input ``[r; q; dq]``, as :func:`reference_errors`."""
     r = u[:ref_dim]
     q = u[ref_dim : ref_dim + n]
     dq = u[ref_dim + n : ref_dim + 2 * n]
 
+    e, de = reference_errors(r, q, dq)
+
+    return e, de
+
+
+def reference_errors(r, q, dq):
+    """``(e, ė) = (q_d − q, dq_d − dq)`` of a measured ``(q, dq)``, joint or task coordinates; ``r`` is ``q_d`` (``dq_d = 0``) or ``[q_d; dq_d]``."""
+    n = q.shape[0]
+
     # The reference [q_d; dq_d], or q_d alone with dq_d = 0 (regulation)
     q_d = r[:n]
-    dq_d = r[n:] if ref_dim == 2 * n else 0.0
+    dq_d = r[n:] if r.shape[0] == 2 * n else 0.0
 
     e = q_d - q
     de = dq_d - dq

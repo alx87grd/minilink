@@ -85,7 +85,7 @@ class MassSpringDamper(DynamicSystem):
     """The README's model, kept in step with its "Write a model" section."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1)
 
     def f(self, x, u, t=0, params=None):
         m, k, b = 1.0, 4.0, 0.3
@@ -143,7 +143,9 @@ def tool_montage() -> None:
     swing.x0[0] = 2.0
     swing.compute_trajectory(tf=10.0)
     loop = lqr(plant, np.eye(2), np.eye(1), x_bar=x_up) @ plant
-    vi = DynamicProgrammingPlanner(problem, x_grid=(101, 101), u_grid=(11,), dt=0.05)
+    vi = DynamicProgrammingPlanner(
+        problem.replace(horizon=None), x_grid=(101, 101), u_grid=(11,), dt=0.05
+    )
     vi.solve()
     rrt = RRTPlanner(problem, seed=0)
     rrt.solve()
@@ -205,7 +207,6 @@ def gif_cartpole() -> None:
         transcription="direct_collocation",
         backend="jax",
         method="scipy_slsqp",
-        verbose=False,
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
     camera = camera_matrix(
@@ -467,10 +468,10 @@ def gif_rocket() -> None:
         log_std_init=-1.0,
         seed=0,
     )
-    planner.solve(timesteps=TRAINING_TIMESTEPS)
+    planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 
     plant.x0 = np.array([6.0, 14.0, 0.0, 0.0, 0.0, 0.0])
-    cl_sys = planner.get_controller() @ plant
+    cl_sys = planner.controller @ plant
     traj = cl_sys.compute_trajectory(tf=TF_SHOWN, dt=0.01)
     camera = camera_matrix(
         target=(3.0, 7.0, 0.0), scale=8.0

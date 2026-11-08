@@ -72,7 +72,7 @@ concrete formatting, ordered by the cost of being wrong:
   carries its whole account: the answer with its timings, its history and the solver's raw
   output (`Trajectory`, `PlanningSolution` and its `record`, `OptimizationResult`,
   `Evaluation`). An object stores no other run state, with one exception: an object whose
-  convenience verbs need a default (plot, animate, `get_controller`) keeps the last result it
+  convenience verbs need a default (plot, animate, `controller`) keeps the last result it
   returned, once, as the same object, never a copy. That is `sys.traj` on a `System`,
   `last_solution` on a `Planner` (value iteration's `result` reads through it), `last_J` on a
   `PolicyEvaluator`; a new one is named `last_<what the run returns>`. Only those verbs read
@@ -115,6 +115,7 @@ concrete formatting, ordered by the cost of being wrong:
   | Final time, absolute (a run's end, `Trajectory.tf`) | `tf` | `tf` as a length |
   | Start time (a run's, a problem's) | `t0` | `t_start` |
   | A problem's length, from `t0` (`[t0, t0 + horizon]`) | `horizon` | `tf` on a problem |
+  | A system's dimensions, in its constructor (words), and as its attributes (textbook symbols) | `state_dim`, `input_dim`, `output_dim`; `n`, `m`, `p` | `n=` as the constructor's keyword |
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
@@ -134,12 +135,12 @@ concrete formatting, ordered by the cost of being wrong:
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
   | Print text / draw a figure | `verbose` (default `False`) / `show` | |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
-  | Cost-to-go and control-law plots | `plot_cost_to_go`, `plot_control_law` | `plot_cost2go`, `plot_policy` |
+  | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
 
   **A naming pattern, not a hard rule (the maintainer, 2026-11-07): the controller is the block,
   the policy the function.** Use it where it fits:
   - a **policy** (or **control law**) is a pure function, `u = π(x, t)`: arrays in, arrays out,
-    no state (`solution.policy(x, t)`, the compiled face's `pv.command(z, x, t)`);
+    no state (the compiled face's `pv.command(z, x, t)`);
   - a **controller** is the block, or the diagram of blocks, a loop closes on: it may carry a
     state and several functions (a PID's integrator, an observer, the MPC box), wired with
     `controller @ plant` (`solution.controller`, `planner.controller`).
@@ -525,7 +526,7 @@ concrete formatting, ordered by the cost of being wrong:
   from the top level, its numbers named as 6.16 says, a one-line title docstring and the story in
   short inline comments (5.22–5.23). Less is better. Reporting goes through the objects
   themselves: their `print` (`__str__`) and their native plots (`plot_trajectory`,
-  `plot_solution`, `plot_control_law`, `plot_cost_to_go`, `plot_learning_curve`, `plot_tree`,
+  `plot_control_law`, `plot_cost_to_go`, `plot_learning_curve`, `plot_tree`,
   `scene.plot`, ...). That is `print(solution)` or `planner.plot_learning_curve()`, not an
   f-string of fields (6.13). A report the library cannot give is first a library gap — a
   missing `__str__` or `plot_*`, in the agent's plotting lane — and only then a demo cell.

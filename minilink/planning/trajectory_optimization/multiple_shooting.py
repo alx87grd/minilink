@@ -9,7 +9,7 @@ from minilink.core.backends import (
 )
 from minilink.core.compile.evaluators.stepping import step_body
 from minilink.optimization.mathematical_program import MathematicalProgram
-from minilink.planning.problems import PlanningProblem
+from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
@@ -59,7 +59,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         if normalize_backend(backend, allow_direct=True) == BACKEND_JAX:
             return self.transcribe_jax(problem, backend=backend)
 
-        problem.require_cost()
+        require_cost(problem)
         step = self.make_step(problem, backend, dynamics)
 
         # Dynamics: the shooting defect of every interval vanishes
@@ -103,7 +103,7 @@ class MultipleShootingTranscription(DirectCollocationTranscription):
         """
         jnp = jax.numpy
 
-        cost = problem.require_cost()
+        cost = require_cost(problem)
         grid = self.knot_offsets(problem, jnp)
         dt = jnp.asarray(self.options.dt(problem))
         unpack_jax = self.jax_unpacker(problem)

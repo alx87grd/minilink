@@ -208,7 +208,7 @@ def animate_cost_to_go(
     )
 
 
-def animate_policy(
+def animate_control_law(
     result,
     *,
     axis=0,
@@ -218,7 +218,7 @@ def animate_policy(
     save_path=None,
     show=True,
 ):
-    """Animate policy sweeps recorded on ``result.history``."""
+    """Animate the control-law sweeps recorded on ``result.history``."""
     require_history(result)
 
     return animate(
@@ -375,16 +375,6 @@ def cost_scale_limit(failure_cost):
         return None
 
     return float(failure_cost)
-
-
-def get_controller(result, *, interpolation="linear"):
-    """Build a :class:`~minilink.planning.dynamic_programming.lookup_policy.LookupPolicy`."""
-    # Lazy import: the lookup law loads on first use, not with the plots
-    from minilink.planning.dynamic_programming.lookup_policy import (
-        LookupPolicy,
-    )
-
-    return LookupPolicy(result.grid, result.pi, interpolation=interpolation)
 
 
 ###############################################################################

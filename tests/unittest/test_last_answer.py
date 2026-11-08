@@ -10,7 +10,7 @@ PACKAGE = Path(__file__).resolve().parents[2] / "minilink"
 # returned; a new reader here is a tool leaning on hidden state.
 SHORTCUTS = {
     "last_solution": {
-        "planning/planner.py": {"Planner.require_solution"},
+        "planning/planner.py": {"require_solution"},
         "planning/dynamic_programming/dp.py": {"DynamicProgrammingPlanner.result"},
         "planning/search/plotting.py": {"plot_tree", "animate_search.update"},
     },
@@ -90,11 +90,9 @@ def test_a_kept_trajectory_optimization_solution_keeps_its_own_account():
         U=plant.input_box,
         horizon=1.0,
     )
-    planner = TrajectoryOptimizationPlanner(
-        problem, n_steps=8, record_history=True, options={"maxiter": 20}
-    )
-    first = planner.solve()
-    second = planner.solve(guess=first)
+    planner = TrajectoryOptimizationPlanner(problem, n_steps=8, options={"maxiter": 20})
+    first = planner.solve(record_history=True)
+    second = planner.solve(guess=first, record_history=True)
 
     assert second is planner.last_solution
     for solution in (first, second):

@@ -3,6 +3,7 @@
 import numpy as np
 from scipy import signal
 
+from minilink.core.backends import array_module
 from minilink.core.inspect import inspect_text
 from minilink.core.kinematics import translation
 from minilink.core.roles import ErrorDriven
@@ -64,13 +65,14 @@ class TransferFunction(ErrorDriven, LTISystem):
 
         # Ports: a compensator reads its error layout and outputs u, fed through
         # from the error only when D ≠ 0
+        self.compensator = compensator
         if compensator:
             feedthrough = bool(np.any(D))
             self.port_layout = self.add_error_ports(ports, 1)
             self.add_output_port(
                 "u",
                 dim=1,
-                function=self.h,
+                function=self.ctl,
                 dependencies=self.error_dependencies if feedthrough else (),
             )
         else:
@@ -82,7 +84,15 @@ class TransferFunction(ErrorDriven, LTISystem):
         return super().f(x, self.error(u), t, params)
 
     def h(self, x, u, t=0, params=None):
-        # y = C x + D e
+        # A compensator has no output y (its output is the command u): h is empty
+        if self.compensator:
+            return array_module(x, u).zeros(0)
+
+        # y = C x + D e, a plant's output (its error e is u itself)
+        return super().h(x, self.error(u), t, params)
+
+    def ctl(self, x, u, t=0, params=None):
+        # u = C x + D e, the compensator's command from its error
         return super().h(x, self.error(u), t, params)
 
     def __str__(self):

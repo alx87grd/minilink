@@ -32,6 +32,12 @@ Core
    :members:
    :undoc-members:
 
+.. automodule:: minilink.core.discrete.sampled_system
+   :members:
+
+.. automodule:: minilink.core.discrete.sampled_diagram
+   :members:
+
 .. automodule:: minilink.core.operators
    :members:
 

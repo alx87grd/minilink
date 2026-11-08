@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 
@@ -15,10 +15,15 @@ from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import (
     Planner,
     host_tree,
+    open_loop_controller_of,
     planner_evidence,
     problem_with,
 )
-from minilink.planning.problems import nominal_plant_params
+from minilink.planning.problems import (
+    nominal_plant_params,
+    require_cost,
+    require_finite_horizon,
+)
 from minilink.planning.results import PlanningSolution
 
 # A solve between two knots folds its offset in, in this many parts of dt
@@ -89,7 +94,7 @@ class MPPIPlanner(Planner):
     ):
         require_jax()
         super().__init__(problem)
-        tf = problem.require_finite_horizon()
+        tf = require_finite_horizon(problem)
 
         # The structure: the grid, the sample count, the passes, the scheme
         self.dt = float(dt)
@@ -123,7 +128,7 @@ class MPPIPlanner(Planner):
             "plant": copy.deepcopy(
                 (problem.sys.params if plant is None else plant) or {}
             ),
-            "cost": copy.deepcopy(problem.require_cost().params),
+            "cost": copy.deepcopy(require_cost(problem).params),
             "discount_rate": float(problem.discount_rate),
         }
         if problem.X.params:
@@ -146,8 +151,8 @@ class MPPIPlanner(Planner):
 
         ``params`` is ``None`` (the problem as it is) or the complete tree of
         :attr:`params`, edited; ``guess`` (a trajectory or
-        a solution) seeds ``U``, else the ports' nominal input. The policy is the
-        held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
+        a solution) seeds ``U``, else the ports' nominal input. The controller is
+        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
         """
         pv = self.compile()
         z0 = pv.initial(params) if guess is None else pv.pack(guess, params)
@@ -157,15 +162,9 @@ class MPPIPlanner(Planner):
 
         if evaluate:
             evaluation = planner_evidence(
-                self, solution.policy, dt=self.dt, n_trials=n_trials
+                self, solution.controller, dt=self.dt, n_trials=n_trials
             )
-            solution = PlanningSolution(
-                solution.problem,
-                solution.policy,
-                solution.record,
-                solution.trajectory,
-                evaluation,
-            )
+            solution = replace(solution, evaluation=evaluation)
 
         return self.store_solution(solution)
 
@@ -463,14 +462,17 @@ class CompiledMPPIPlanner:
             iterations=int(status.get("iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
-        policy = self.planner.open_loop_policy(trajectory, interpolation="previous")
+        controller = open_loop_controller_of(
+            trajectory, self.planner.problem.sys, interpolation="previous"
+        )
 
         return PlanningSolution(
-            problem_with(self.problem, host_tree(problem_part(self.merged(params)))),
-            policy,
-            record,
-            trajectory,
-            None,
+            problem=problem_with(
+                self.problem, host_tree(problem_part(self.merged(params)))
+            ),
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
         )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:
@@ -522,7 +524,7 @@ class CompiledMPPIPlanner:
         jnp = self.jnp
         env = self.env
         episode = problem_leaves(P)
-        gamma = env.face.gamma_at(episode)
+        gamma = env.model.gamma_at(episode)
 
         def period(carry, v):
             x, t, S, alive, discount = carry

@@ -5,10 +5,10 @@ import unittest
 from importlib import import_module
 from unittest import mock
 
-from minilink import InvertedPendulum, TransferFunction
+from minilink import PID, InvertedPendulum, Pendulum, TransferFunction
 from minilink.core.facades.analysis import DynamicAnalysis
 from minilink.core.facades.animation import DynamicAnimation
-from minilink.core.facades.plotting import DynamicPlotting
+from minilink.core.facades.plotting import DynamicPlotting, LinearPlotting
 
 # name -> (owner class, band function "module:attr", kind)
 #   forward: the shortcut's parameters are the band function's after its first one
@@ -30,17 +30,17 @@ SHORTCUTS = {
         "forward",
     ),
     "plot_bode": (
-        DynamicPlotting,
+        LinearPlotting,
         "minilink.analysis.frequency:plot_bode",
         "forward",
     ),
     "plot_root_locus": (
-        DynamicPlotting,
+        LinearPlotting,
         "minilink.analysis.frequency:plot_root_locus",
         "forward",
     ),
     "plot_pzmap": (
-        DynamicPlotting,
+        LinearPlotting,
         "minilink.analysis.frequency:plot_pzmap",
         "forward",
     ),
@@ -56,14 +56,14 @@ SHORTCUTS = {
         "narrowed",
     ),
     "plot_step_response": (
-        DynamicPlotting,
+        LinearPlotting,
         "minilink.analysis.time_response:plot_step_response",
         "forward",
     ),
 }
 
 # The shortcut mixins of a DynamicSystem
-DYNAMIC_SHORTCUTS = (DynamicAnalysis, DynamicPlotting, DynamicAnimation)
+DYNAMIC_SHORTCUTS = (DynamicAnalysis, DynamicPlotting, LinearPlotting, DynamicAnimation)
 
 # The data verbs stay band functions
 REMOVED = (
@@ -149,6 +149,17 @@ class TestSystemShortcuts(unittest.TestCase):
                 self.assertIs(bound.arguments[first], plant)
                 for p in rest:
                     self.assertIs(bound.arguments[p], sentinels[p], f"{name}: {p}")
+
+    def test_a_sampled_loop_has_the_linear_plots_of_a_continuous_one(self):
+        loop = (PID(Kp=20.0, Ki=5.0, Kd=4.0) % 0.05) @ Pendulum()
+        for name, (owner, target, _) in SHORTCUTS.items():
+            if owner is not LinearPlotting:
+                continue
+            with self.subTest(name):
+                module, attr = target.split(":")
+                with mock.patch(f"{module}.{attr}") as recorder:
+                    getattr(loop, name)(show=False)
+                self.assertIs(recorder.call_args.args[0], loop)
 
     def test_each_docstring_names_its_band_function(self):
         for name, (owner, target, _) in SHORTCUTS.items():

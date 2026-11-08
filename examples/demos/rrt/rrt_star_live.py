@@ -11,6 +11,7 @@ from minilink import (
     RRTStarPlanner,
 )
 from minilink.core.geometry import Sphere
+from minilink.planning import LiveSearchPlot
 from minilink.planning.search.extenders import SteeringExtender
 from minilink.planning.search.steering import StraightLineSteering
 from minilink.planning.spatial.collision import disc, mount
@@ -59,7 +60,7 @@ extender = SteeringExtender(
     StraightLineSteering(speed=1.0), max_distance=0.55, resolution=0.05
 )
 
-live_ax = None
+live_plot = None
 if LIVE_PLOT:
     import matplotlib.pyplot as plt
 
@@ -74,6 +75,12 @@ if LIVE_PLOT:
         "Live RRT* convergence — blue path shortens as the tree rewires",
         fontsize=11,
     )
+    live_plot = LiveSearchPlot(
+        every=LIVE_PLOT_EVERY,
+        pause=LIVE_PLOT_PAUSE,
+        after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
+        ax=live_ax,
+    )
 
 
 planner = RRTStarPlanner(
@@ -85,13 +92,6 @@ planner = RRTStarPlanner(
     optimize_after_goal=True,
     cost_tol=COST_TOL,
     convergence_patience=CONVERGENCE_PATIENCE,
-    record_history=REPLAY_HISTORY,
-    history_stride=HISTORY_STRIDE,
-    live_plot=LIVE_PLOT,
-    live_plot_ax=live_ax,
-    live_plot_every=LIVE_PLOT_EVERY,
-    live_plot_pause=LIVE_PLOT_PAUSE,
-    live_plot_after_goal_only=LIVE_PLOT_AFTER_GOAL_ONLY,
 )
 
 print("RRT* post-goal convergence demo")
@@ -101,12 +101,16 @@ print(
 )
 if LIVE_PLOT:
     print(
-        f"  live_plot_after_goal_only={LIVE_PLOT_AFTER_GOAL_ONLY}  "
+        f"  after_goal_only={LIVE_PLOT_AFTER_GOAL_ONLY}  "
         f"every={LIVE_PLOT_EVERY}  pause={LIVE_PLOT_PAUSE}"
     )
 
 t0 = time.perf_counter()
-traj = planner.solve().trajectory
+traj = planner.solve(
+    record_history=REPLAY_HISTORY,
+    history_stride=HISTORY_STRIDE,
+    callback=live_plot,
+).trajectory
 elapsed = time.perf_counter() - t0
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))

@@ -60,6 +60,8 @@ class SystemSimulation:
             input, a constant vector, or a scalar on a one-input system; ``None``
             is the nominal input. With ``input_port_id`` it describes that one
             port, the others at their nominal values.
+        n_steps : int, optional
+            Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to the simulator (default ``"numpy"``).
             Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
@@ -175,6 +177,8 @@ class DynamicSimulation:
         input_port_id : str, optional
             The one input port ``u`` describes, the others kept at their nominal
             values.
+        n_steps : int, optional
+            Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
             Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
@@ -400,7 +404,7 @@ class StepSimulation:
         Parameters
         ----------
         n_steps : int
-            Number of step transitions to apply.
+            Number of step transitions to apply: ``n_steps + 1`` samples.
         u : array, sequence, callable, or None, optional
             The input of each step: ``None`` (the nominal input), a constant
             vector, an ``(m, n_steps)`` sequence (a column per step, the layout

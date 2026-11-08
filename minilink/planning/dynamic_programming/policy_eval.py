@@ -2,13 +2,14 @@
 
 import numpy as np
 
-from minilink.core.roles import block_roles
 from minilink.planning.dynamic_programming.dp import (
     grid_numbers_of,
     infeasible_penalty,
+    require_grid_on_sets,
 )
 from minilink.planning.dynamic_programming.plotting import cost_scale_limit
-from minilink.planning.evaluator import policy_of
+from minilink.planning.evaluator import controller_of
+from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem
 
 ###############################################################################
@@ -34,7 +35,7 @@ class PolicyEvaluator:
     grid : StateSpaceGrid
         Discretization of the state and input spaces.
     policy : callable, System or PlanningSolution
-        State-feedback law ``u = policy(x)``, a solution (its policy), or a
+        State-feedback law ``u = policy(x)``, a solution (its controller), or a
         controller block that reads the state on an input named ``x`` (or
         ``y``) and commands ``u`` (:func:`minilink.core.roles.block_roles`):
         the grid state feeds that port, the reference stays pinned at its
@@ -61,13 +62,14 @@ class PolicyEvaluator:
         interpolation: str = "linear",
     ) -> None:
         require_problem_cost(problem)
+        require_grid_on_sets(problem, grid)
 
         # The problem and its discretization
         self.problem = problem
         self.grid = grid
 
-        # The fixed law u = π(x): a callable, a solution's policy, or a controller block
-        policy = policy_of(policy)
+        # The fixed law u = π(x): a callable, a solution's controller, or a controller block
+        policy = controller_of(policy)
         self.policy = policy if callable(policy) else policy_from_block(policy)
 
         # The numbers, the problem's unless given, and the terminal time
@@ -86,12 +88,11 @@ class PolicyEvaluator:
     def solve(self) -> np.ndarray:
         """Iterate the fixed-policy Bellman update to tolerance and return ``J``."""
         grid = self.grid
-        opt = self
-        tf = opt.final_time
-        gamma = opt.gamma
-        method = opt.interpolation
-        tol = opt.tol
-        max_iterations = opt.max_iterations
+        tf = self.final_time
+        gamma = self.gamma
+        method = self.interpolation
+        tol = self.tol
+        max_iterations = self.max_iterations
 
         # Successor and running cost of every node under the policy's action
         x_next, G = self.policy_transition(tf)
@@ -107,7 +108,7 @@ class PolicyEvaluator:
             k = k + 1
 
             # Bellman expectation backup, the action fixed by the policy:
-            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the face's stage cost and step
+            # J(x_k) = c(x_k, π(x_k)) + γ J_next(x_{k+1}), the model's stage cost and step
             J_next = J
             J_arrival = grid.interpolate(J_next, x_next, method)
             J = G + gamma * J_arrival
@@ -146,9 +147,8 @@ class PolicyEvaluator:
         policy = self.policy
         X = self.problem.X
         U = self.problem.U
-        tree = grid.face.params
+        tree = grid.model.params
         sys_params = tree["plant"]
-        set_params = None
         N = grid.nodes_n  # Number of nodes
         n = grid.n  # State dimension
         INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
@@ -173,13 +173,13 @@ class PolicyEvaluator:
             # An admissible action, and a successor in X and on the grid (the
             # table's domain)
             valid = (
-                U.contains(u, x, t, set_params)
-                and X.contains(x_next, t, set_params)
+                U.contains(u, x, t)
+                and X.contains(x_next, t)
                 and grid.X.contains(x_next)
             )
 
             if valid:
-                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the face
+                # The stage cost of the period: c = ∫₀^dt e^{−ρτ} g dτ on the model
                 G[s] = float(stage_cost(x, u))
             else:
                 # The step leaves the admissible set: the penalty
@@ -190,12 +190,12 @@ class PolicyEvaluator:
     def terminal_cost(self, t):
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id."""
         grid = self.grid
-        face = grid.face
-        tree = face.params
+        model = grid.model
+        tree = model.params
         N = grid.nodes_n
 
-        # Final cost of every state node: the face's h(x, t)
-        J = np.array([float(face.terminal(grid.states[s], t, tree)) for s in range(N)])
+        # Final cost of every state node: the model's h(x, t)
+        J = np.array([float(model.terminal(grid.states[s], t, tree)) for s in range(N)])
 
         return J
 
@@ -209,44 +209,6 @@ def require_problem_cost(problem):
     """Refuse a problem without a cost: there is no cost-to-go to evaluate."""
     if problem.cost is None:
         raise ValueError("PolicyEvaluator requires problem.cost")
-
-
-def policy_from_block(block):
-    """Adapt a controller block into a ``u = policy(x)`` callable.
-
-    The block is evaluated through its control-port compute at nominal
-    internal state, with the grid state on the measurement port and every
-    other input (reference) pinned at its port nominal.
-    """
-    roles = block_roles(block)
-    require_feedback_roles(block, roles)
-
-    output = block.outputs[roles.command]
-    measurement = block.get_input_port_slice(roles.measurement)
-    u_base = block.get_u_from_input_ports().astype(float)
-    x_ctrl = np.asarray(block.x0, dtype=float)
-
-    # The command of the block, the grid state on its measurement port
-    def policy(x):
-        u = u_base.copy()
-        u[measurement] = np.asarray(x, dtype=float).reshape(-1)
-        command = np.asarray(output.compute(x_ctrl, u, 0.0, None), dtype=float)
-        command = command.reshape(-1)
-
-        return command
-
-    return policy
-
-
-def require_feedback_roles(block, roles):
-    """Refuse a block that does not read the state on ``x`` (or ``y``) and command ``u``."""
-    if roles.measurement is None or roles.command is None:
-        raise ValueError(
-            "policy must be a callable u = policy(x) or a controller block that "
-            "reads the state on an input named 'x' (or 'y') and commands 'u'; "
-            f"{type(block).__name__} reads {list(block.inputs)} and gives "
-            f"{list(block.outputs)}"
-        )
 
 
 def require_solved(J, verb):

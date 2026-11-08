@@ -32,15 +32,14 @@ planner = DynamicProgrammingPlanner(
     tol=0.1,
     max_iterations=2000,
     out_of_bound_cost=INF,
-    verbose=True,
     # backend="jax",
 )
-planner.solve()
+planner.solve(verbose=True)
 
 planner.plot_cost_to_go(jmax=INF, show_3d=True)
 planner.plot_control_law()
 
-controller = planner.get_controller()
+controller = planner.controller
 diagram = controller @ plant
 
 plant.x0 = X0

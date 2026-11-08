@@ -341,7 +341,7 @@ def test_the_default_output_stub_is_on_the_arrays_module():
     jnp = pytest.importorskip("jax.numpy")
     from minilink.core.system import DynamicSystem
 
-    sys = DynamicSystem(n=2, input_dim=1, output_dim=1)
+    sys = DynamicSystem(state_dim=2, input_dim=1, output_dim=1)
     y = sys.h(jnp.zeros(2), jnp.zeros(1))
     assert type(y).__module__.startswith("jax") and y.shape == (1,)
 
@@ -360,3 +360,30 @@ def test_an_explicit_precision_choice_survives_the_next_jax_evaluator(monkeypatc
         assert jax.config.read("jax_enable_x64") is False
     finally:
         configure_jax(enable_x64=True)
+
+
+def test_simulation_band_loads_no_optimization_module():
+    """A verbose simulation reads its panel frame from core: the optimization band stays unloaded."""
+    probe = (
+        "import sys\n"
+        "from minilink.dynamics.catalog.pendulum.pendulum import Pendulum\n"
+        "from minilink.simulation.simulator import Simulator\n"
+        "Simulator(Pendulum(), tf=0.1, verbose=True).solve()\n"
+        "print(sorted(m for m in sys.modules if m.startswith('minilink.optimization')))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"
+
+
+def test_the_core_printer_loads_no_tool_band():
+    """print() on a core object reads core alone: each tool band writes its own objects' text."""
+    probe = (
+        "import sys\n"
+        "import numpy as np\n"
+        "from minilink.blocks.basic import Integrator\n"
+        "from minilink.core.inspect import inspect_text, latex_inspect\n"
+        "from minilink.core.sets import BoxSet\n"
+        "inspect_text(Integrator()); inspect_text(BoxSet([0.0], [1.0])); latex_inspect(1.0)\n"
+        "bands = ('minilink.optimization', 'minilink.planning', 'minilink.simulation')\n"
+        "print(sorted(m for m in sys.modules if m.startswith(bands)))"
+    )
+    assert _run_fresh_python(probe, {}) == "[]"

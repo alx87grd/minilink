@@ -14,6 +14,7 @@ from minilink.core.backends import (
     ensure_jax_x64,
 )
 from minilink.core.trajectory import Trajectory
+from minilink.planning.problems import require_cost
 
 PROBLEM_FAILURE_COST = "problem"  # score_run's failure cost read from the problem
 
@@ -170,7 +171,7 @@ def score_run(
     params = problem_leaves(problem) if params is None else params
     xp = array_module(traj.x)
 
-    cost_fn = problem.require_cost()
+    cost_fn = require_cost(problem)
     rho = params.get("discount_rate", problem.discount_rate)
     t0 = params.get("t0", problem.t0)
     finite_horizon = problem.horizon_kind() == "finite"

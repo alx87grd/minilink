@@ -37,58 +37,57 @@ class RRSearchIteration:
     planner: object
 
 
-class LiveSearchPlotCallback:
+class LiveSearchPlot:
     """
-    Matplotlib live updater for the RRT family search loop.
+    Matplotlib live figure of an RRT-family search, a callback of the planner's ``solve``.
 
-    Redraws the current tree (including RRT* rewiring) on each successful
-    extension, mirroring pyro's live RRT display and
-    :class:`~minilink.planning.trajectory_optimization.live_plot.LiveTrajectoryPlotCallback`.
+    Redraws the current tree (RRT* rewiring included) and the best path as the
+    search grows, mirroring pyro's live RRT display and
+    :class:`~minilink.planning.trajectory_optimization.live_plot.LiveTrajectoryPlotCallback`::
+
+        planner.solve(callback=LiveSearchPlot(every=10, after_goal_only=True))
+
+    It filters the extensions for itself: a callback beside it in the same
+    ``solve(callback=[...])`` still sees every extension.
 
     Parameters
     ----------
-    planner : RRTPlanner
-        Planner being solved; read on each callback invocation.
-    ax : matplotlib Axes, optional
-        Axes to draw on. When omitted, a new figure is opened on the first update.
-    x_axis, y_axis : int
-        State indices for the phase-plane projection.
     every : int
-        Update every ``every`` successful extensions.
+        Redraw every ``every`` successful extensions.
     pause : float
         ``plt.pause`` duration after each redraw (matplotlib only).
     after_goal_only : bool
-        When ``True``, skip updates until the first goal connection (RRT*
+        When ``True``, skip redraws until the first goal connection (RRT*
         convergence phase only if ``optimize_after_goal`` is also set).
+    ax : matplotlib Axes, optional
+        Axes to draw on. When omitted, a new figure is opened on the first redraw.
+    x_axis, y_axis : int
+        State indices for the phase-plane projection.
     tree_color, path_color : str
         Edge and best-path colours.
     """
 
     def __init__(
         self,
-        planner,
-        *,
-        ax=None,
-        x_axis: int = 0,
-        y_axis: int = 1,
         every: int = 1,
         pause: float = 0.001,
         after_goal_only: bool = False,
+        ax=None,
+        *,
+        x_axis: int = 0,
+        y_axis: int = 1,
         tree_color="0.75",
         path_color="tab:blue",
     ) -> None:
-        # The planner, and the axes to draw on
-        self.planner = planner
-        self.ax = ax
-
-        # The state projection
-        self.x_axis = int(x_axis)
-        self.y_axis = int(y_axis)
-
         # When to redraw
         self.every = max(1, int(every))
         self.pause = float(pause)
         self.after_goal_only = bool(after_goal_only)
+
+        # The axes to draw on, and the state projection
+        self.ax = ax
+        self.x_axis = int(x_axis)
+        self.y_axis = int(y_axis)
 
         # Graphics
         self.tree_color = tree_color
@@ -132,10 +131,11 @@ class LiveSearchPlotCallback:
             self.fig = self.ax.figure
 
         # The frame, set once: the limits, labels and endpoints stay fixed
+        planner = step.planner
         if not self._limits_set:
-            set_limits(self.ax, self.planner, self.x_axis, self.y_axis)
-            label_axes(self.ax, self.planner.problem.sys, self.x_axis, self.y_axis)
-            mark_endpoints(self.ax, self.planner, self.x_axis, self.y_axis)
+            set_limits(self.ax, planner, self.x_axis, self.y_axis)
+            label_axes(self.ax, planner.problem.sys, self.x_axis, self.y_axis)
+            mark_endpoints(self.ax, planner, self.x_axis, self.y_axis)
             self._limits_set = True
 
         # The tree and the best path, redrawn in place of the previous ones
@@ -143,7 +143,7 @@ class LiveSearchPlotCallback:
         self._path_line = None
         self._tree_lines, self._path_line = draw_search_state(
             self.ax,
-            self.planner,
+            planner,
             x_axis=self.x_axis,
             y_axis=self.y_axis,
             tree_color=self.tree_color,

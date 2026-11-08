@@ -16,7 +16,7 @@ class DoubleIntegrator(DynamicSystem):
     """Double integrator ``d(position)/dt = speed``, ``d(speed)/dt = u``."""
 
     def __init__(self):
-        super().__init__(n=2, input_dim=1, output_dim=1, expose_state=True)
+        super().__init__(state_dim=2, input_dim=1, output_dim=1, expose_state=True)
 
         # Signal labels, units and bounds
         self.state.labels = ["position", "speed"]
@@ -67,7 +67,7 @@ class TripleIntegrator(DynamicSystem):
     """Triple integrator with force as the third state."""
 
     def __init__(self):
-        super().__init__(n=3, input_dim=1, output_dim=1, expose_state=True)
+        super().__init__(state_dim=3, input_dim=1, output_dim=1, expose_state=True)
 
         # Signal labels, units and bounds
         self.state.labels = ["position", "speed", "force"]

@@ -7,8 +7,12 @@ from dataclasses import dataclass
 import numpy as np
 
 from minilink.analysis import linear
-from minilink.analysis.linearization import channel_subtitle, siso_matrices
-from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.analysis.linearization import (
+    channel_subtitle,
+    discrete_period,
+    siso_matrices,
+)
+from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
 from minilink.graphical.common import PlotResult
 from minilink.graphical.control import (
     ControlFigure,
@@ -57,7 +61,10 @@ def step_response(
     when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
     channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
     defaults to eight times the slowest stable time constant, and ``n``
-    samples span ``[0, tf]``. The step of the nonlinear loop itself is a
+    samples span ``[0, tf]``. A step or sampled system's response is its
+    difference equation's, ``y_k`` at the ticks ``t_k = k Δ`` within
+    ``[0, tf]`` (``Δ = 1`` for a tick law), and ``n`` is not read. The step of
+    the nonlinear loop itself is a
     simulation, ``closed_loop(C, plant, reference=Step(...))`` then
     ``compute_trajectory``, and :func:`step_info` reads its sampled output the
     same way.
@@ -65,14 +72,20 @@ def step_response(
     A, B, C, D = siso_matrices(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, method=method, eps=eps
     )
+    period = discrete_period(sys)
 
     # The horizon: eight slowest time constants unless given
     if tf is None:
-        tf = linear.settling_horizon(A)
-    time = np.linspace(0.0, float(tf), int(n))
+        tf = linear.settling_horizon(A, period)
 
-    # y(t) from rest under a unit step
-    y = linear.step_response(A, B, C, D, time)
+    # n samples over [0, tf]; a difference equation's ticks t_k = k Δ within it
+    if period is None:
+        time = np.linspace(0.0, float(tf), int(n))
+    else:
+        time = period * np.arange(np.floor(float(tf) / period + 1e-9) + 1)
+
+    # y(t) from rest under a unit step; y_k under a unit step held from k = 0
+    y = linear.step_response(A, B, C, D, time, period)
 
     return time, y
 
@@ -164,14 +177,15 @@ def plot_step_response(
 
     The linear model's response, as :func:`step_response`; the title reads
     "Linear Step Response" for an ``LTISystem`` and "Linearized Step
-    Response" for a system linearized here.
+    Response" for a system linearized here. A step or sampled system's
+    response is drawn as its samples ``y_k``.
     """
     time, y = step_response(
         sys, x_bar, u_bar, t, params, of=of, wrt=wrt, tf=tf, n=n, method=method, eps=eps
     )
     info = step_info(time, y)
 
-    figure = step_figure(time, y, info, sys, of, wrt)
+    figure = step_figure(time, y, info, sys, of, wrt, discrete_period(sys))
 
     return render_control_figure(figure, backend=backend, show=show)
 
@@ -194,8 +208,8 @@ def first_time_reaching(time, progress, level):
     return time[reached[0]] if reached.size else np.nan
 
 
-def step_figure(time, y, info, sys, of, wrt):
-    """The step-response figure: the response and its peak, the steady state and the figures' note."""
+def step_figure(time, y, info, sys, of, wrt, period=None):
+    """The step-response figure: the response and its peak, the steady state and the figures' note; a difference equation's as its samples."""
     # The steady-state line once settled, and the note of the finite figures
     lines = () if np.isnan(info.steady_state) else (RefLine("y", info.steady_state),)
     note = "\n".join(
@@ -210,13 +224,24 @@ def step_figure(time, y, info, sys, of, wrt):
     span = float(np.ptp(y)) or 1.0
 
     # The title says whether the model is linear or was linearized here
-    linear_model = isinstance(sys, LTISystem)
+    linear_model = isinstance(sys, (LTISystem, DiscreteLTISystem))
     title = style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE
     subtitle = channel_subtitle(sys, of, wrt)
 
-    # The response, hovered sample by sample, and its peak
+    # The response, hovered sample by sample, and its peak; in z, the samples y_k
     hover = tuple(f"t = {tk:.3g} s<br>y = {yk:.3g}" for tk, yk in zip(time, y))
-    response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
+    if period is None:
+        response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
+    else:
+        response = Trace(
+            time,
+            y,
+            style.SYSTEM_COLOR,
+            mode="markers",
+            marker="o",
+            size=5.0,
+            hover=hover,
+        )
     t_peak = np.array([info.peak_time])
     y_peak = np.array([info.peak])
     peak = Trace(t_peak, y_peak, style.SYSTEM_COLOR, mode="markers", marker="o")

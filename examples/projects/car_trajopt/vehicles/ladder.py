@@ -41,7 +41,7 @@ class Holonomic(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=2, input_dim=2, output_dim=2, expose_state=True)
+        super().__init__(state_dim=2, input_dim=2, output_dim=2, expose_state=True)
         self.name = "Holonomic"
 
         # Parameters: none
@@ -105,7 +105,7 @@ class HolonomicAccel(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=4, input_dim=2, output_dim=4, expose_state=True)
+        super().__init__(state_dim=4, input_dim=2, output_dim=4, expose_state=True)
         self.name = "HolonomicAccel"
 
         # Parameters: none
@@ -179,7 +179,7 @@ class BicycleKin(DynamicSystem):
     """
 
     def __init__(self):
-        super().__init__(n=3, input_dim=2, output_dim=3, expose_state=True)
+        super().__init__(state_dim=3, input_dim=2, output_dim=3, expose_state=True)
         self.name = "BicycleKin"
 
         # Parameters: the wheelbase L [m]

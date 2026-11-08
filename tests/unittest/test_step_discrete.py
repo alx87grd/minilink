@@ -9,7 +9,7 @@ from minilink.core.system import System
 
 class Accumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -95,7 +95,7 @@ class KDependentPort(System):
 
 class Accumulator_step_diagram(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -176,7 +176,7 @@ from minilink.graphical.diagrams.dot import block_html
 
 class Accumulator_step_diagram_topology(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = array_module().zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -215,7 +215,7 @@ from minilink.control.siso import P
 
 class DiscreteAccumulator(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.name = "DiscreteAccumulator"
         self.x0 = np.zeros(1)
 
@@ -308,7 +308,7 @@ except ImportError:
 
 class AffineStep(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1)
+        super().__init__(state_dim=1, input_dim=1, output_dim=1)
         self.x0 = np.array([0.0])
 
     def step(self, x, u, k=0, params=None):
@@ -400,7 +400,7 @@ class TestStepRolloutJax(unittest.TestCase):
 
         class JaxFriendlyStep(StepSystem):
             def __init__(self):
-                super().__init__(n=1, input_dim=1)
+                super().__init__(state_dim=1, input_dim=1)
                 self.x0 = np.array([0.0])
 
             def step(self, x, u, k=0, params=None):
@@ -429,7 +429,7 @@ except ImportError:
 
 class Accumulator_step_diagram_jax(StepSystem):
     def __init__(self):
-        super().__init__(n=1, input_dim=1, output_dim=1, y_dependencies=())
+        super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):
@@ -484,7 +484,7 @@ class TestStepDiagramJax(unittest.TestCase):
 
 class Counter(StepSystem):
     def __init__(self):
-        super().__init__(n=1)
+        super().__init__(state_dim=1)
         self.x0 = np.zeros(1)
 
     def step(self, x, u, k=0, params=None):

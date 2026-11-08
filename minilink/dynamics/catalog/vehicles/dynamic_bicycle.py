@@ -32,7 +32,7 @@ class DynamicBicycle(DynamicSystem):
     """
 
     def __init__(self, named_ports=True):
-        super().__init__(n=6)
+        super().__init__(state_dim=6)
         self.named_ports = bool(named_ports)
 
         # Parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],

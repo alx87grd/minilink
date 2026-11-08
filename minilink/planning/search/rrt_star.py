@@ -38,9 +38,11 @@ class RRTStarPlanner(RRTPlanner):
     - ``rewire``: ``False`` keeps the parent selection and skips the rewiring;
     - ``optimize_after_goal``, ``cost_tol``, ``convergence_patience``: keep
       searching after the first goal connection until the best goal cost has
-      not improved by ``cost_tol`` for ``convergence_patience`` extensions;
-    - ``record_history``, ``history_stride``: record an :class:`RRTStarSnapshot`
-      every ``history_stride`` extensions, for the animation.
+      not improved by ``cost_tol`` for ``convergence_patience`` extensions.
+
+    Its :meth:`solve` takes RRT's workflow, plus ``record_history`` and
+    ``history_stride``: an :class:`RRTStarSnapshot` every ``history_stride``
+    extensions, for the animation.
 
     Attributes
     ----------
@@ -51,7 +53,7 @@ class RRTStarPlanner(RRTPlanner):
     best_goal_cost : float or None
         Best cost-to-come among nodes in the goal region.
     history : list of RRTStarSnapshot
-        Recorded frames when ``record_history`` is enabled.
+        Recorded frames of a ``solve(record_history=True)``.
     """
 
     number_names = RRTPlanner.number_names + ("radius_constant", "rewire_eta")
@@ -68,12 +70,6 @@ class RRTStarPlanner(RRTPlanner):
         edge_resolution: float | None = None,
         max_sample_attempts: int = 100,
         return_best_effort: bool = True,
-        callback: Callable | None = None,
-        live_plot: bool = False,
-        live_plot_every: int = 5,
-        live_plot_pause: float = 0.001,
-        live_plot_after_goal_only: bool = False,
-        live_plot_ax: object | None = None,
         nearest_backend: str = "brute_force",
         radius_constant: float | None = None,
         rewire_eta: float | None = None,
@@ -81,8 +77,6 @@ class RRTStarPlanner(RRTPlanner):
         optimize_after_goal: bool = False,
         cost_tol: float = 0.05,
         convergence_patience: int = 500,
-        record_history: bool = False,
-        history_stride: int = 1,
     ) -> None:
         super().__init__(
             problem,
@@ -94,12 +88,6 @@ class RRTStarPlanner(RRTPlanner):
             edge_resolution=edge_resolution,
             max_sample_attempts=max_sample_attempts,
             return_best_effort=return_best_effort,
-            callback=callback,
-            live_plot=live_plot,
-            live_plot_every=live_plot_every,
-            live_plot_pause=live_plot_pause,
-            live_plot_after_goal_only=live_plot_after_goal_only,
-            live_plot_ax=live_plot_ax,
             nearest_backend=nearest_backend,
         )
 
@@ -113,26 +101,39 @@ class RRTStarPlanner(RRTPlanner):
         self.cost_tol = float(cost_tol)
         self.convergence_patience = int(convergence_patience)
 
-        # Workflow: the snapshots for the animation
-        self.record_history = bool(record_history)
-        self.history_stride = int(history_stride)
-
         # The search's convergence, refreshed by every solve
         self.converged: bool = False
         self.iterations: int = 0
         self.best_goal_cost: float | None = None
         self.history: list[RRTStarSnapshot] = []
 
-    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
-        """Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
+    def solve(
+        self,
+        *,
+        params=None,
+        evaluate=False,
+        n_trials=50,
+        callback: Callable | list[Callable] | None = None,
+        record_history: bool = False,
+        history_stride: int = 1,
+    ) -> PlanningSolution:
+        """
+        Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
+
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
+        The workflow is :meth:`RRTPlanner.solve`'s, plus ``record_history``: an
+        :class:`RRTStarSnapshot` in :attr:`history` on the first and every
+        ``history_stride``-th extension, and on the last.
         """
-
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials
+                evaluate=evaluate,
+                n_trials=n_trials,
+                record_history=record_history,
+                history_stride=history_stride,
+                callback=callback,
             )
             return self.store_solution(solution)
 
@@ -146,8 +147,7 @@ class RRTStarPlanner(RRTPlanner):
         optimize_after_goal = self.optimize_after_goal
         cost_tol = self.cost_tol
         patience = self.convergence_patience
-        record_history = self.record_history
-        history_stride = max(1, self.history_stride)
+        history_stride = max(1, int(history_stride))
         x0 = np.asarray(self.problem.x0, dtype=float)
 
         # The tree, rooted at the start
@@ -161,7 +161,7 @@ class RRTStarPlanner(RRTPlanner):
         self.iterations = 0
         self.best_goal_cost = None
         self.history = []
-        self.search_callback = self.resolve_search_callback()
+        report = self.build_search_report(callback)
 
         best_goal_node = None
         stale_extensions = 0
@@ -187,7 +187,7 @@ class RRTStarPlanner(RRTPlanner):
                 "optimize" if self.reached_goal and optimize_after_goal else "explore"
             )
             self.record_search_step(
-                best_goal_node, phase, record_history, history_stride
+                report, best_goal_node, phase, record_history, history_stride
             )
 
             # Stop at the first goal hit, or once the goal cost has gone patience
@@ -231,8 +231,6 @@ class RRTStarPlanner(RRTPlanner):
         kwargs["optimize_after_goal"] = self.optimize_after_goal
         kwargs["cost_tol"] = self.cost_tol
         kwargs["convergence_patience"] = self.convergence_patience
-        kwargs["record_history"] = self.record_history
-        kwargs["history_stride"] = self.history_stride
 
         return kwargs
 
@@ -251,7 +249,7 @@ class RRTStarPlanner(RRTPlanner):
         )
 
     def animate_convergence(self, **kwargs):
-        """Animate recorded RRT* history (requires ``record_history=True``)."""
+        """Animate recorded RRT* history (a ``solve(record_history=True)``)."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_convergence
 
@@ -396,9 +394,11 @@ class RRTStarPlanner(RRTPlanner):
 
         return best_goal_node, improved
 
-    def record_search_step(self, best_goal_node, phase, record_history, history_stride):
-        """Hand the step to the solve's callback, then snapshot it on the first and every ``history_stride``-th extension."""
-        self.on_search_step(phase=phase)
+    def record_search_step(
+        self, report, best_goal_node, phase, record_history, history_stride
+    ):
+        """Hand the step to the solve's ``report``, then snapshot it on the first and every ``history_stride``-th extension."""
+        report(phase)
 
         if record_history and (
             self.iterations == 1 or self.iterations % history_stride == 0

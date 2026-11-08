@@ -43,7 +43,7 @@ from minilink.planning.evaluation import (
     register_evaluation_pytree,
     score_run,
 )
-from minilink.planning.problems import seeds_of, source_id, stack_leaves
+from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
 EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
@@ -75,14 +75,16 @@ class ProblemEvaluator:
         The task: plant, cost, sets, horizon, failure switch (and, for a stochastic
         problem, the draws and the criterion).
     controller : System or PlanningSolution
-        A controller block (or a solution's policy) closed on the plant, a source
+        A controller block (or a solution's controller) closed on the plant, a source
         block (no input) driving the plant's command, or a built loop with a
         ``plant`` block.
     dt : float, optional
         Sample period of the run: the free inputs are held over it and the run is
         recorded on its grid. A sampled controller (``pid % 0.01``, a loop on a
         clock) runs on its own base period: ``dt`` omitted reads it, and a ``dt``
-        that differs is refused.
+        that differs is refused. A continuous loop with ``dt`` omitted runs on
+        its automatic step, the continuous simulator's ``Δt = 0.1 τ_min``
+        shortened to divide the run.
     solver : {"rk4", "euler"}
         Integration formula of one step (a sampled loop: its plant's).
     substeps : int, optional
@@ -125,9 +127,12 @@ class ProblemEvaluator:
         self.solver = solver
         self.substeps = 1 if substeps is None else int(substeps)
 
-        # The grid: N periods of dt to the horizon
-        self.dt = float(require_dt(dt))
+        # The grid: N periods of dt to the horizon, a continuous loop that names
+        # no dt on its automatic step
         self.tf = horizon_of(problem, episode_length)
+        if dt is None:
+            dt = automatic_dt_of(self.loop, self.tf)
+        self.dt = float(dt)
         self.n_steps = steps_of(self.tf, self.dt)
 
         # The loop, compiled once on its backend
@@ -541,7 +546,7 @@ class ProblemEvaluator:
 
     def cost_rate(self, params):
         """The plant's discounted cost rate ``e^{−ρ(τ − t0)} g(x, u, τ)`` on the run's tree: the integrand the run carries."""
-        g = self.problem.require_cost().g
+        g = require_cost(self.problem).g
         cost_params = params["cost"]
         rho = params["discount_rate"]
         t0 = params["t0"]
@@ -661,8 +666,8 @@ def evaluate(
     One run for a deterministic problem, ``n_trials`` draws for a stochastic one;
     see :class:`ProblemEvaluator` for the loop, the run and the score. A sampled
     controller (``pid % 0.01``) runs on its own clock, ``dt`` omitted; a
-    continuous controller needs ``dt``, the period its loop is integrated and
-    recorded on.
+    continuous controller runs on ``dt``, the period its loop is integrated and
+    recorded on, and with ``dt`` omitted on its automatic step.
     """
     pe = ProblemEvaluator(
         problem,
@@ -677,67 +682,13 @@ def evaluate(
     return pe.evaluate(key=key, n_trials=n_trials, record=record)
 
 
-def nominal_trajectory(problem, policy, *, dt, tf=None) -> Trajectory:
-    """
-    The planner's evidence: ``policy`` held over each period of ``dt`` from the problem's start.
-
-    ``u_k = π(x_k, t_k)`` held while one step of the problem's step face
-    takes ``x_k`` to ``x_{k+1}`` (one RK4 step per period), nominal
-    parameters, on NumPy, from ``t0``: the sampled loop a feedback planner
-    designs for (its grid, its model), reported beside its policy; the
-    planner's evaluation scores the same law held on the plant's own clock. A stochastic problem runs at its mean start; ``tf`` is the run's
-    length for an infinite horizon. ``u`` is the plant's command port. The run
-    carries the face's running cost, ``C_{k+1} = C_k + γᵏ c_k``, and the plant
-    role, so :func:`~minilink.planning.evaluation.evaluate_trajectory` scores
-    it on the face's own sum, ``J = Σ γᵏ c_k + γᴺ h``, not by the trapezoid.
-    """
-    # Lazy import: the loop roles load with the first rollout
-    from minilink.core.roles import command_port
-
-    nominal = problem.nominal() if problem.is_stochastic else problem
-    policy = policy_of(policy)
-    plant = nominal.sys
-    n_steps = steps_of(horizon_of(nominal, tf), float(dt))
-
-    # The face's step, the law on the grid, the command's slice of the plant input
-    face = nominal.compile(dt=float(dt))
-    t = nominal.t0 + float(dt) * np.arange(n_steps + 1)
-    law = held_law(policy, t)
-    command = plant.get_input_port_slice(command_port(plant))
-    u_full = np.asarray(plant.get_u_from_input_ports(), dtype=float)
-
-    face_params = face.params
-    gamma = float(face.gamma_at(face_params))
-
-    # u_k = π(x_k, t_k) held over the period, one step to x_{k+1} with its stage cost
-    # c_k; C_{k+1} = C_k + γᵏ c_k; the last sample takes its input only
-    xs = np.zeros((plant.n, n_steps + 1))
-    us = np.zeros((command.stop - command.start, n_steps + 1))
-    running = np.zeros(n_steps + 1)
-    xs[:, 0] = nominal.x0
-    for k in range(n_steps + 1):
-        us[:, k] = law(xs[:, k], t[k])
-        if k == n_steps:
-            break
-        u_full[command] = us[:, k]
-        x_next, c = face.transition_at(xs[:, k], u_full, t[k], face_params)
-        xs[:, k + 1] = x_next
-        running[k + 1] = running[k] + gamma**k * float(c)
-
-    # The plant role and its running cost: the run scores on the face's own sum
-    roles = {"plant": {"x": (0, int(plant.n)), "u": PLANT_INPUT}}
-    signals = {PLANT_INPUT: us, RUNNING_COST: running.reshape(1, -1)}
-
-    return Trajectory(t=t, x=xs, u=us, signals=signals, roles=roles)
-
-
-def policy_of(controller):
-    """The block itself, or the policy of a :class:`~minilink.planning.results.PlanningSolution`."""
+def controller_of(controller):
+    """The block itself, or the controller of a :class:`~minilink.planning.results.PlanningSolution`."""
     # A real cycle: results imports Evaluation from this module
     from minilink.planning.results import PlanningSolution
 
     if isinstance(controller, PlanningSolution):
-        return controller.policy
+        return controller.controller
 
     return controller
 
@@ -746,7 +697,7 @@ def closed_loop_of(problem, controller):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
     A built loop (a diagram with a block ``plant`` of the plant's state size) is
-    taken as it is; a solution gives its policy; a source block (no input) drives
+    taken as it is; a solution gives its controller; a source block (no input) drives
     the plant's command; any other block is closed by ``controller @ plant``.
     """
     # Lazy imports: the composition tools and the results load with the first loop
@@ -756,7 +707,7 @@ def closed_loop_of(problem, controller):
     from minilink.core.discrete.step_system import StepSystem
 
     plant = problem.sys
-    controller = policy_of(controller)
+    controller = controller_of(controller)
 
     require_continuous_or_clocked(controller)
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
@@ -829,80 +780,6 @@ def integrate_adaptive(f, x0, u, ts, options):
     )
 
     return solution.y.T
-
-
-def held_law(policy, t):
-    """``u = π(x, t)`` of a policy block on NumPy: a source by its table on the grid ``t``, a feedback block by its state law."""
-    if int(policy.m) == 0:
-        return time_law(policy, t)
-
-    return static_law(policy)
-
-
-def time_law(source, t):
-    """``u = π(t)`` of a source block, sampled on the grid ``t`` and held over each period."""
-    empty = np.zeros(0)
-
-    # u_k = π(t_k): the source's output at each sample of the grid
-    table = np.stack([np.asarray(source.h(empty, empty, float(t_k))) for t_k in t])
-    t_0 = float(t[0])
-    dt = float(t[1] - t[0])
-
-    # u(t) = u_k at the nearest sample, k = round((t − t_0) / dt)
-    return lambda x, t: table[int(round((t - t_0) / dt))]
-
-
-def static_law(controller):
-    """
-    ``u = π(x, t)`` of a static feedback block on NumPy: the state on its measurement port.
-
-    Every other input of the block holds its nominal value (an unconnected
-    reference its set point); the time reaches the block, so a time-varying
-    gain ``K(t)`` is read at each instant.
-    """
-    # Lazy import: the loop roles load with the first law
-    from minilink.core.roles import block_roles
-
-    roles = block_roles(controller)
-    require_feedback_roles(controller, roles)
-    require_static_law(controller)
-    ev = controller.compile(backend=BACKEND_NUMPY, verbose=False)
-
-    # The measurement's slice of the block's stacked input vector
-    start = 0
-    for port_id, port in controller.inputs.items():
-        if port_id == roles.measurement:
-            measurement = slice(start, start + port.dim)
-        start += port.dim
-    u_nominal = np.asarray(controller.get_u_from_input_ports(), dtype=float)
-    x_ctl = np.zeros(0)
-
-    # u = π(x, t): the state on the measurement port, every other input at nominal
-    def law(x, t=0.0):
-        u_in = u_nominal.copy()
-        u_in[measurement] = x
-        return np.asarray(ev.outputs(x_ctl, u_in, float(t))[roles.command])
-
-    return law
-
-
-def require_feedback_roles(controller, roles):
-    """Refuse a block that reads no state or commands no ``u``."""
-    if roles.measurement is None or roles.command is None:
-        raise ValueError(
-            "the policy must read the state on an input named 'x' (or 'y') "
-            f"and command 'u'; {controller.name!r} reads {list(controller.inputs)} "
-            f"and gives {list(controller.outputs)}"
-        )
-
-
-def require_static_law(controller):
-    """Refuse a policy with internal state for the held rollout: a sample holds none."""
-    if int(controller.n) > 0:
-        raise ValueError(
-            "the planner's rollout holds a static law u = pi(x, t); a controller "
-            "with internal state is scored by evaluate(problem, controller, dt=)"
-        )
 
 
 def compile_loop(loop, backend):
@@ -1007,13 +884,22 @@ def plant_stepped(loop, solver, substeps):
     return with_plant_steps(loop, substeps=substeps, solver=solver)
 
 
-def require_dt(dt):
-    """Refuse a continuous loop with no sample period: its run is recorded on the grid of ``dt``."""
-    if dt is None:
-        raise TypeError(
-            "a continuous loop needs dt, the sample period of its run: "
-            "problem.compile(controller, dt=0.01)"
-        )
+def automatic_dt_of(loop, tf):
+    """
+    A continuous loop's period when it names none: its automatic step, shortened to divide the run.
+
+    ``Δt`` is the continuous simulator's automatic step of the loop
+    (:func:`~minilink.core.system.automatic_step_of`, ``0.1 τ_min``), and
+    ``dt = tf / ⌈tf / Δt⌉``, the largest step under it that ends on the horizon.
+    """
+    # A real cycle: the system module imports the compile chain, which loads after this one
+    from minilink.core.system import automatic_step_of
+
+    step = automatic_step_of(loop.solver_info)
+
+    # n = ⌈tf / Δt⌉ periods, a multiple landing on its round despite the division
+    n = max(1, int(np.ceil(tf / step - 1e-9)))
+    dt = tf / n
 
     return dt
 

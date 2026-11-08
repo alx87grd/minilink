@@ -130,7 +130,6 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
             "ftol": PENDULUM_FTOL,
             "disp": False,
         },
-        verbose=False,
     )
 
     total_times: list[float] = []

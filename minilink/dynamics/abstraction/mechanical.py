@@ -35,7 +35,7 @@ class MechanicalSystem(DynamicSystem):
         p = dof * 2
 
         super().__init__(
-            n=n,
+            state_dim=n,
             input_dim=m,
             output_dim=p,
             expose_state=True,

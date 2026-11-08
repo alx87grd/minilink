@@ -312,7 +312,7 @@ class VelocityPID(DynamicSystem):
     """
 
     def __init__(self, r_rear: float):
-        super().__init__(n=2)
+        super().__init__(state_dim=2)
         self.r_rear = float(r_rear)
         self.name = "Velocity PID"
         self.params = {

@@ -18,14 +18,18 @@ from minilink.core.costs import QuadraticCost
 from minilink.core.fields import QuadraticField
 from minilink.core.roles import command_port
 from minilink.core.sets import is_bounded
-from minilink.planning.evaluator import nominal_trajectory
 from minilink.planning.planner import (
     Planner,
     given_numbers,
     planner_at,
     planner_evidence,
 )
-from minilink.planning.problems import PlanningProblem, nominal_plant_params
+from minilink.planning.problems import (
+    PlanningProblem,
+    nominal_plant_params,
+    require_cost,
+    require_finite_horizon,
+)
 from minilink.planning.results import PlanningSolution
 
 ###############################################################################
@@ -37,9 +41,11 @@ def lqr_matrices(
     sys, x_bar, u_bar, Q, R, S, *, t=0.0, params=None, method="auto", eps=1e-6
 ):
     """
-    ``(A, B, Q, R, S)``: a quadratic problem lowered to the textbook LQR matrices at ``(x̄, ū, t)``.
+    The LQR problem in its matrices, ``(A, B, Q, R, S)``: a quadratic problem lowered at ``(x̄, ū, t)``.
 
-    The plant linearized at the operating point, ``B`` over its command port
+    The linear model ``(A, B)``, the running weights ``Q`` and ``R`` and the
+    terminal weight ``S``: the textbook linear-quadratic problem the Riccati
+    equations solve. The plant is linearized at the operating point, ``B`` over its command port
     alone (a disturbance ``d`` or a noise ``n`` is never decided), and the
     weights over that port: ``R[c, c]`` of a weight that spans every input.
     ``params`` are the plant's numbers to linearize with (its own for
@@ -72,7 +78,8 @@ class LQRPlanner(Planner):
     model and the closed-loop poles. The problem's horizon picks the equation:
     infinite, the algebraic one; finite, the differential one swept backward
     from the terminal weight ``S``, and the law is then
-    ``u = ū − K(t) (x − x̄)``.
+    ``u = ū − K(t) (x − x̄)`` on the problem's clock ``t0 … t0 + horizon``, and
+    past it the stationary law ``K∞`` at the operating point.
 
     Parameters
     ----------
@@ -81,13 +88,15 @@ class LQRPlanner(Planner):
         operating point is the cost's ``(x_bar, u_bar)`` unless given here. A
         cost over every input stacked weighs the command by its block of
         ``R``.
-        A finite ``tf`` selects the finite-horizon design with the cost's
-        terminal weight ``S``; an infinite or unset ``tf`` the stationary one.
+        A finite ``horizon`` selects the finite-horizon design with the
+        cost's terminal weight ``S``; an infinite or unset one the stationary
+        design.
     x_bar, u_bar : array-like, optional
         Operating point of the linearization; default the cost's target.
     dt : float, optional
-        Sampling period of the nominal rollout and the Monte Carlo score
-        (``solve(evaluate=True)``); a reporting choice, the law is continuous.
+        Sampling period of the score's continuous loop (``solve(evaluate=True)``),
+        the grid it is integrated and recorded on; a reporting choice, the law
+        is continuous.
     n_steps : int, optional
         Samples of the finite-horizon gain schedule ``K(t)``.
     t : float, optional
@@ -97,9 +106,6 @@ class LQRPlanner(Planner):
     eps : float, optional
         Central-difference step.
     """
-
-    # The law is continuous: its score closes it as a continuous loop
-    holds_policy = False
 
     number_names = ("x_bar", "u_bar", "t")
 
@@ -118,7 +124,7 @@ class LQRPlanner(Planner):
         super().__init__(problem)
 
         # The quadratic cost: its weights and its target
-        cost = self.require_cost()
+        cost = require_cost(self.problem)
         require_quadratic_cost(cost)
         self.cost = cost
 
@@ -138,14 +144,13 @@ class LQRPlanner(Planner):
         """
         Solve the Riccati equation of the linearized problem.
 
-        The solution's policy is the state-feedback block, its ``cost_to_go``
-        the quadratic form of the linear model. ``evaluate=True`` also rolls
-        the law out from the problem's start on the nonlinear plant and scores
-        it over the problem's draws.
+        The solution's controller is the state-feedback block, its ``cost_to_go``
+        the quadratic form of the linear model. ``evaluate=True`` also scores
+        the law, as it is, on the nonlinear plant over the problem's draws (the
+        continuous loop on the grid of ``dt``).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         """
-
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
@@ -161,7 +166,7 @@ class LQRPlanner(Planner):
 
         # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
         # weights over the command port
-        A, B, Q, R, S_f = self.lqr_matrices()
+        A, B, Q, R, S_f = self.design_matrices()
 
         # An e^{−ρt}-discounted cost is the undiscounted one on A_ρ = A − (ρ/2) I (in
         # x̃ = e^{−ρt/2} x, ũ = e^{−ρt/2} u, the same law); A_ρ = A undiscounted
@@ -174,16 +179,23 @@ class LQRPlanner(Planner):
         u_bar = command_block(sys, self.u_bar)
 
         if problem.horizon_kind() == "finite":
-            tf = problem.require_finite_horizon()
+            T = require_finite_horizon(problem)
 
-            # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f,
-            # and K(t) = R⁻¹ Bᵀ S(t)
-            t, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, tf, n_steps=n_steps)
+            # −Ṡ = A_ρᵀ S + S A_ρ − S B R⁻¹ Bᵀ S + Q, swept backward from S(T) = S_f,
+            # and K(t) = R⁻¹ Bᵀ S(t), on the problem's clock t0 … t0 + T
+            s, K, S = lqr_gain_schedule(A_rho, B, Q, R, S_f, T, n_steps=n_steps)
+            t = problem.t0 + s
+
+            # Past the horizon, the stationary law at the operating point: K∞ of
+            # A_ρᵀ P + P A_ρ − P B R⁻¹ Bᵀ P + Q = 0 (K(T) held when there is none)
+            K_after = stationary_gain(A_rho, B, Q, R)
 
             # The law u = ū − K(t) (x − x̄)
-            policy = TimeVaryingFeedback(t, K, x_bar=x_bar, u_bar=u_bar)
+            controller = TimeVaryingFeedback(
+                t, K, x_bar=x_bar, u_bar=u_bar, K_after=K_after
+            )
 
-            # Closed-loop poles at t = 0: eig(A − B K(0))
+            # Closed-loop poles at the horizon's start: eig(A − B K(t0))
             poles = np.linalg.eigvals(A - B @ K[0])
 
             # The record, and the cost-to-go J(x, t) = (x − x̄)ᵀ S(t) (x − x̄)
@@ -191,7 +203,7 @@ class LQRPlanner(Planner):
                 K=K[0],
                 P=S[0],
                 poles=poles,
-                horizon=tf,
+                horizon=T,
                 schedule=(t, K, S),
                 U_ignored=is_bounded(problem.U.bounding_box()),
             )
@@ -204,7 +216,7 @@ class LQRPlanner(Planner):
             K = np.linalg.solve(R, B.T @ P)
 
             # The law u = ū − K (x − x̄)
-            policy = StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
+            controller = StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
 
             # Closed-loop poles: eig(A − B K)
             poles = np.linalg.eigvals(A - B @ K)
@@ -219,17 +231,18 @@ class LQRPlanner(Planner):
             )
             cost_to_go = QuadraticField(x_bar, P)
 
-        # Optionally, roll the law out from the problem's start and score it over
-        # its draws
-        trajectory = None
+        # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
         if evaluate:
-            trajectory = nominal_trajectory(problem, policy, dt=dt)
-            evaluation = planner_evidence(self, policy, dt=dt, n_trials=n_trials)
+            evaluation = planner_evidence(self, controller, dt=dt, n_trials=n_trials)
 
-        # The solution: the law, the record, the rollout, the quadratic cost-to-go
+        # The solution: the law, the record, the quadratic cost-to-go, the score
         solution = PlanningSolution(
-            problem, policy, record, trajectory, evaluation, cost_to_go
+            problem=problem,
+            controller=controller,
+            record=record,
+            cost_to_go=cost_to_go,
+            evaluation=evaluation,
         )
 
         return self.store_solution(solution)
@@ -242,19 +255,14 @@ class LQRPlanner(Planner):
 
         return {**kwargs, **self.given}
 
-    def nominal_trajectory(self, tf=None, *, solution=None):
-        """``solution``'s law (the latest when none is given) from the problem's start on the nonlinear plant, sampled every ``dt``."""
-        solution = self.require_solution() if solution is None else solution
-        return nominal_trajectory(self.problem, solution.policy, dt=self.dt, tf=tf)
-
     def linear_model(self):
         """``(A, B)``: the plant's Jacobians at the operating point, ``B`` over its command port."""
-        A, B, _, _, _ = self.lqr_matrices()
+        A, B, _, _, _ = self.design_matrices()
 
         return A, B
 
-    def lqr_matrices(self):
-        """``(A, B, Q, R, S)`` of :func:`lqr_matrices` at this planner's operating point, the plant at its design numbers."""
+    def design_matrices(self):
+        """The LQR problem in its matrices, ``(A, B, Q, R, S)`` of :func:`lqr_matrices`, at this planner's operating point, the plant at its design numbers."""
         cost = self.cost
         params = nominal_plant_params(self.problem)
 
@@ -277,7 +285,7 @@ class RiccatiRecord:
     """
     The Riccati solution: the gain, the cost-to-go matrix, the closed-loop poles.
 
-    ``K`` and ``P`` are the values at ``t = 0``; on a finite horizon
+    ``K`` and ``P`` are the values at the horizon's start; on a finite horizon
     ``schedule`` holds the whole sweep ``(t, K(t), S(t))``. ``success`` is
     the closed loop of the linear model being stable (every pole in the left
     half-plane) on the infinite horizon, a finite sweep otherwise.
@@ -312,6 +320,29 @@ class RiccatiRecord:
             )
 
         return f"K = {K}, closed-loop poles {poles}{ignored}"
+
+
+def stationary_gain(A, B, Q, R):
+    """
+    The infinite-horizon gain ``K∞ = R⁻¹ Bᵀ P`` of ``Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0``; ``None`` without a stabilizing solution.
+
+    A finite horizon needs no stabilizability, so a pair the algebraic
+    equation cannot solve keeps its last gain past the horizon instead.
+    """
+    try:
+        P = care(A, B, Q, R)
+    except (np.linalg.LinAlgError, ValueError):
+        return None
+
+    # K∞ = R⁻¹ Bᵀ P
+    K = np.linalg.solve(R, B.T @ P)
+
+    return K
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
 
 
 def require_quadratic_cost(cost):
@@ -365,7 +396,7 @@ if __name__ == "__main__":
     solution = LQRPlanner(problem).solve(evaluate=True)
     print(solution)
 
-    loop = solution.policy @ plant
+    closed_loop = solution.controller @ plant
     plant.x0 = problem.x0
-    loop.compute_trajectory(tf=8.0)
-    loop.plot_trajectory()
+    closed_loop.compute_trajectory(tf=8.0)
+    closed_loop.plot_trajectory()
