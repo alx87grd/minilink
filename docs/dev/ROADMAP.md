@@ -411,6 +411,20 @@ The toolbox chapters on the spine are:
 - identification and imitation;
 - estimation.
 
+**A direction to promote: the fair comparison across control approaches** (the maintainer,
+2026-11-09). One `PlanningProblem` handed to every planner (dynamic programming, LQR, tree
+search, trajectory optimization, MPC, reinforcement learning), each answer a `PlanningSolution`
+whose controller is scored by the one judge, `evaluate` and `compare(problem, ...)`: the same
+model, cost, sets, start law and disturbances for every approach. This is the contribution the
+toolbox can make that the specialised tools do not, and it ranks above new planners:
+- the `compare` path is hardened first (its maturity is TRL 4 in §3, "Planning / evaluation"),
+  and the README's own comparison example is fixed (KNOWN_ISSUES, "The README's examples");
+- a comparison is fair when it also reports what each approach was given and what it spent:
+  the model access (equations, gradients, samples only), the compute time, the samples or
+  iterations, and the numbers a user tuned;
+- where the idea is stated (CONSTITUTION §1, the README's lead) is an open question for the
+  maintainer: [QUESTIONS.md](QUESTIONS.md), "Where is the fair comparison stated?".
+
 The releases: **v0.3 built the complete core** (§5.3), **v0.4 makes its surface clean**
 (§5.4), **v0.5 adds the features built on it** (§5.5), v0.9 decides what can still break a name,
 and v1.0 freezes when the API is mature.
