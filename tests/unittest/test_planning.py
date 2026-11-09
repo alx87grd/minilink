@@ -2170,6 +2170,34 @@ class TestTextbookOptions(unittest.TestCase):
         self.assertEqual(seen, ["iteration"])
         live.assert_called_once_with("iteration")
 
+    def test_problem_evaluator_live_plot_callback_updates_figure(self):
+        import matplotlib
+
+        from minilink import IntegralImpedance, Optimizer
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        matplotlib.use("Agg")
+        plant = Pendulum()
+        ctl = IntegralImpedance(Kp=1.0, Ki=0.0, Kd=1.0)
+        problem = PlanningProblem(
+            plant,
+            x0=np.array([0.5, 0.0]),
+            horizon=0.5,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1)),
+        )
+        pe = problem.compile(ctl, dt=0.1)
+        wrt = ["controller.Kp", "controller.Kd"]
+        program = pe.program(wrt)
+        cb = pe.live_plot(wrt, every=1, pause=0.0)
+        Optimizer(
+            program,
+            method="gd",
+            learning_rate=0.1,
+            options={"maxiter": 2},
+        ).solve(callback=cb)
+        self.assertIsNotNone(cb.plotter.fig)
+        self.assertGreater(len(cb.plotter.lines), 0)
+
 
 def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     """``RRTPlanner(problem)`` needs no extender: corners of ``problem.U`` plus its centre."""
