@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-11-08.
+lands. Last checked against the code: 2026-11-09.
 
 ## Composition and control
 
@@ -27,6 +27,52 @@ lands. Last checked against the code: 2026-11-08.
   key and names the known ones. Or read the key back (`plant.params["m"]`) after a change.
 - **Fix:** none: the bare item write on a leaf stays a plain dict write, by the maintainer's
   ruling of 2026-11-05 (DESIGN §4, "Parameters", rule 5).
+
+## The README's examples
+
+Found by running the README's snippets as written (2026-11-09, a 4-core cloud machine, JAX
+0.12, NumPy backend unless the snippet says otherwise).
+
+### The "One problem, every planner" example shows two planners missing the goal
+- **Symptom:** README §7 as written: value iteration ends with `success = no`
+  ("max_iterations=1000 reached before tol=0.1 (delta=5.48)") after a warning that an infinite
+  undiscounted horizon has no cost bound (a failure costs 1e6), and `compare` scores it
+  `J = 88.25 (goal missed)`; RRT is scored `J = 133.3 (goal missed)`; only trajectory
+  optimization succeeds (`J = 89.82`). Times: value iteration 10.1 s, RRT 0.4 s, trajectory
+  optimization 10.8 s.
+- **Workaround:** none in the snippet; a discount on the problem (`discount_rate=`) or a
+  `failure_cost` gives value iteration a cost bound.
+- **Fix:** **[ask]** the README is the maintainer's: the example's numbers chosen so each
+  planner reaches the goal (TODO, "Rows waiting for the maintainer's go").
+
+### The co-design example returns a negative gain and a 3.5 cm pendulum
+- **Symptom:** README §5: `Optimizer(pe.program(wrt=["controller.Kp", "plant.l"])).solve()`
+  converges to `z* = [-1.162, 0.0349]` (`J* = 5.506`): nothing bounds the gain or the rod
+  length, so the optimum is not a design one would build.
+- **Workaround:** optimize the gains only, or a cost that prices the parameters.
+- **Fix:** **[ask]** with the entry above: bounds on the decision variables, or another pair.
+
+## Messages and small surprises
+
+### An unknown solver name is refused without the list of valid ones
+- **Symptom:** `Pendulum().compute_trajectory(tf=1.0, solver="rk45")` raises
+  `ValueError: Unknown solver 'rk45'` (`simulation/simulator.py`, two raises); the sampled
+  system's own message does list its solvers.
+- **Workaround:** the solver names are in `Simulator`'s docstring.
+- **Fix:** agent-managed, any run: name the valid solvers in the message.
+
+### The Jacobian's error message lists `'u'` twice
+- **Symptom:** `Pendulum().jacobian("f", "z", x)` raises "wrt must be 'x' or 'u' or 't' or
+  'params' or 'u'; got 'z'" (`core/compile/evaluators/jacobian.py`, the `choices` list).
+- **Workaround:** none needed; the valid names are the first four.
+- **Fix:** agent-managed, any run: the list without the repeat.
+
+### A linear model's matrices are methods
+- **Symptom:** `plant.linearize().A` is a bound method; the matrix is `plant.linearize().A()`.
+  A student who writes `np.linalg.eigvals(lin.A)` gets "0-dimensional array given".
+- **Workaround:** call it: `lin.A()`, `lin.B()`.
+- **Fix:** **[ask]** a public-API choice, not a defect by itself (the matrices are functions
+  of `params`): keep the call, or read `A` as an attribute at the block's own `params`.
 
 ## Tooling
 
