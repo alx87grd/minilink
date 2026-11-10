@@ -177,7 +177,9 @@ Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
 `blocks/` holds plant-agnostic wiring primitives; `dynamics/catalog/equations/`
 holds canonical textbook ODEs (the double and triple integrators, `VanderPol`) with
 graphics, labels, and bounds for teaching demos; the single integrator is the `Integrator`
-block.
+block. The one-signal blocks are one channel unless told otherwise (`dim=1` on `Integrator`,
+`Gain(2.0)`, `Sum`, `Saturation`, `UnitDelay`); `Saturation` also takes one end stop per
+channel (`Saturation([-1, -2], [1, 2])`, its `dim` the bounds' size).
 
 ### Continuous-time core; step/hybrid subsidiary
 

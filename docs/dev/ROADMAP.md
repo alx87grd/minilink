@@ -394,7 +394,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `QuadraticCost(Q, R)` (`S`, `x_bar`, `u_bar` zero by default); `lower`, `upper`, `dim` on
     `BoxInputSet` and `Uniform`, `dim` on every set and field that knows its size,
     `BallSet.sample` and `SingletonSet.sample` (so a ball is a start a problem draws from);
-    `CostFunction.h` zero by default (a running cost writes `g` only).
+    `CostFunction.h` zero by default (a running cost writes `g` only); `Gain(2.0)` one channel
+    (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel.
 
 ## 3. Maturity (TRL)
 
