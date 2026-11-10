@@ -402,7 +402,7 @@ class TestLoopInputs(unittest.TestCase):
                 loop = closed_loop(
                     C,
                     self.H,
-                    reference=Step(0.0, 1.0),
+                    reference=Step(1.0, 0.0),
                     disturbance=WhiteNoise(1, psd=1e-2, seed=1),
                     noise=WhiteNoise(1, psd=1e-4, seed=2),
                 )
@@ -419,9 +419,9 @@ class TestLoopInputs(unittest.TestCase):
         from minilink.core.diagram import DiagramSystem
 
         C = PID(4.0, 2.0, 0.5)
-        inside = closed_loop(C, self.H, reference=Step(0.0, 1.0))
+        inside = closed_loop(C, self.H, reference=Step(1.0, 0.0))
         outside = DiagramSystem()
-        outside.add_subsystem(Step(0.0, 1.0), "reference")
+        outside.add_subsystem(Step(1.0, 0.0), "reference")
         outside.add_subsystem(closed_loop(C, self.H), "loop")
         outside.connect("reference", "y", "loop", "r")
         np.testing.assert_allclose(

@@ -1662,7 +1662,7 @@ def test_a_static_leaf_samples_its_grid_in_one_jax_call():
 
     blocks = {
         "gain": lambda: Gain(K=np.array([[2.0, 0.0], [1.0, -1.0]])),
-        "step": lambda: Step(np.array([0.0]), np.array([1.0]), 0.5),
+        "step": lambda: Step(np.array([1.0]), np.array([0.0]), 0.5),
         "sine": lambda: Sine(amplitude=[1.0, 2.0], omega=[3.0, 5.0]),
     }
     for name, make in blocks.items():

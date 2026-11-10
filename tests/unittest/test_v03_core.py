@@ -223,7 +223,7 @@ def multi_rate_loop():
     return closed_loop(
         P(10.0, ports="reference") % 0.1,
         discretize(Integrator(), 0.01, substeps=5),
-        reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
+        reference=Step(np.array([0.0]), np.array([1.0]), step_time=1.0),
         filter=LowPass(alpha=0.6) % 0.01,
     )
 

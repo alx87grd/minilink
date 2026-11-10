@@ -135,18 +135,22 @@ class Source(System):
 
 
 class Step(Source):
-    """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``."""
+    """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``.
 
-    def __init__(
-        self, initial_value=None, final_value=None, step_time=1.0, *, port="y"
-    ):
-        # The levels before and after the step: flat vectors of one shape, zero by default
-        if initial_value is None:
-            initial_value = np.zeros(1)
-        if final_value is None:
-            final_value = np.zeros(1)
-        initial_value = np.asarray(initial_value, dtype=float).reshape(-1)
+    ``Step()`` is the unit step at ``t = 1 s``; ``Step(2.0)`` steps to 2. A
+    scalar level is broadcast to the other level's size, which sets the
+    dimension.
+    """
+
+    def __init__(self, final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y"):
+        # The levels after and before the step: flat vectors of one size
         final_value = np.asarray(final_value, dtype=float).reshape(-1)
+        initial_value = np.asarray(initial_value, dtype=float).reshape(-1)
+        size = max(final_value.shape[0], initial_value.shape[0])
+        if final_value.shape[0] == 1:
+            final_value = as_channels(final_value[0], size)
+        if initial_value.shape[0] == 1:
+            initial_value = as_channels(initial_value[0], size)
         require_matching_levels(initial_value, final_value)
 
         p = initial_value.shape[0]

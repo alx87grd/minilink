@@ -356,6 +356,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     "Linearized" and drawn as the deviation `Δy`. The matrices stay methods, `lin.A()`; a
     method passed where its matrix goes (`lqr_gain(lin.A, …)`) is refused with the call to
     write. `sys.get_u_from_input_ports()` → the read-only `sys.u_nominal`.
+  - *`Step` reads its final level first* (the maintainer's ruling 13):
+    `Step(initial_value=None, final_value=None, step_time=1.0)` →
+    `Step(final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y")`, so `Step()` is the
+    unit step at `t = 1 s` (it was zero) and `Step(1.0)` steps up (it stepped down); a scalar
+    level takes the other level's size. The positional callers were flipped; a bare `Step()`'s
+    numbers move once (no test asserted them).
 
 ## 3. Maturity (TRL)
 

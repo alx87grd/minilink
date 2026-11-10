@@ -23,6 +23,16 @@ class TestBlocks(unittest.TestCase):
         np.testing.assert_array_equal(y_before, np.array([0.0]))
         np.testing.assert_array_equal(y_after, np.array([1.0]))
 
+    def test_a_bare_step_is_the_unit_step_at_one_second(self):
+        np.testing.assert_array_equal(Step().h(x=[], u=[], t=0.999), [0.0])
+        np.testing.assert_array_equal(Step().h(x=[], u=[], t=1.0), [1.0])
+        # the final level first; a scalar level takes the other's size
+        np.testing.assert_array_equal(Step(2.0, 0.5).h(x=[], u=[], t=0.0), [0.5])
+        np.testing.assert_array_equal(Step(2.0, 0.5).h(x=[], u=[], t=2.0), [2.0])
+        np.testing.assert_array_equal(Step([1.0, 2.0]).h(x=[], u=[], t=0.0), [0, 0])
+        with self.assertRaisesRegex(ValueError, "same shape"):
+            Step([1.0, 2.0], [0.0, 0.0, 0.0])
+
     def test_sine_source(self):
         sine = Sine(amplitude=[2.0, 1.0], omega=3.0, phase=[0.0, np.pi / 2], offset=1.0)
         t = 0.4

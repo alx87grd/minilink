@@ -402,6 +402,13 @@ LEADING_POSITIONALS = {
     "minilink.control.impedance.Impedance.__init__": ("Kp", "Kd"),
     "minilink.control.impedance.IntegralImpedance.__init__": ("Kp", "Ki", "Kd"),
     "minilink.control.siso.PID.__init__": ("Kp", "Ki", "Kd", "tau"),
+    # The step reads its final level first: Step() is the unit step at t = 1 s
+    # (the maintainer's ruling 13 of 2026-11-10)
+    "minilink.blocks.sources.Step.__init__": (
+        "final_value",
+        "initial_value",
+        "step_time",
+    ),
 }
 
 
