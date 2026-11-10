@@ -124,7 +124,7 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 14 | **Riccati on a discrete model:** refuse (AS-1) or solve the discrete equation | none | **Ruled 2026-11-10: refuse** (landed with AS-1); the discrete Riccati designs come with the sampled filters in v0.9 — not the time for new discrete-time tools |
 | 15 | **MPC's name and place.** `ModelPredictiveController` is a function returning a `PredictiveController`, on no facade; examples import the deep path 12 times | 7 tests | **Ruled 2026-11-10: option 1** — `ModelPredictiveController` is the class (`PredictiveController` renamed, the factory's signature its constructor); the deep imports move to `minilink.control`. Landed on `api-settle`. |
 | 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | **Ruled 2026-11-10: option 1** — the planning plots take one keyword set, written out (`sol.plot_cost_to_go(*, x_axis=, y_axis=, is_3d=, ax=, renderer=, show=)`, `plot_control_law` alike); the planner's method a thin call to the solution's, keeping only its extra `field=`; every plot returns `PlotResult`; scoped to the planning plots, the rest of S67 its own row. Landed on `api-settle`. |
-| 17 | **Records.** `DynamicProgrammingResult` / `record.tables` / `planner.result` (which means two things between value iteration and tabular learning); `cost` is five different quantities across records; timings on two records only | 60 | **Ruled 2026-11-10: option 1** — `DynamicProgrammingResult` → `ValueTables` (`sol.record.tables`); `planner.result` → `planner.tables` on both grid planners, one meaning (the latest solution's tables), tabular learning's live table its own name (`planner.q_table`); a record's `cost` named by its quantity (RRT's `path_cost`, the learners' `episode_cost`; the `Optimizer`'s `cost` stays `J(z*)`; `Evaluation` keeps one of `cost` / `J` after a count); `solve_time_s` on every record |
+| 17 | **Records.** `DynamicProgrammingResult` / `record.tables` / `planner.result` (which means two things between value iteration and tabular learning); `cost` is five different quantities across records; timings on two records only | 60 | **Ruled 2026-11-10: option 1** — `DynamicProgrammingResult` → `ValueTables` (`sol.record.tables`); `planner.result` → `planner.tables` on both grid planners, one meaning (the latest solution's tables), tabular learning's live table its own name (`planner.q_table`); a record's `cost` named by its quantity (RRT's `path_cost`, the learners' `episode_cost`; the `Optimizer`'s `cost` stays `J(z*)`; `Evaluation` keeps one of `cost` / `J` after a count); `solve_time_s` on every record. Landed on `api-settle`. |
 | 18 | **The learners' words.** `n_envs`, `n_steps` (periods per update, where `n_steps` is the horizon everywhere else), `policy=` that becomes `planner.actor`, `learn` and `predict` beside `solve`; `Sys2Gym` | 67; 45 | `n_rollouts`, `n_steps_per_update`, `actor=`; `predict` to the SB3 bridge; `Sys2Gym` kept (research lane) |
 | 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | `lqr_trajectory`; `horizon`; `StateObserver(model, L)` |
 | 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first |
@@ -564,3 +564,39 @@ each row: byte-identical every time (the additions move no existing number).
   and the learning curves return their axis. Callers migrated: four tests and the call table of
   `examples/tutorial/core/08_planners.ipynb` (its planner, solution and comparison rows); no
   example or course notebook unpacked a planning plot.
+
+The run of ruling 17 on the branch `api-settle` (2026-11-10), one commit per step. A new seeded
+baseline (every field of every planner's record, timings left out, under the pre-ruling names:
+value iteration infinite, finite, receding and on the loop engine with its tables; the tabular
+learner's records, its live table and its solution's tables after more learning; the LQR,
+infinite and finite; RRT and RRT*; trajectory optimization with its history; MPPI; the neural
+learner; `evaluate` on a stochastic problem), run twice and compared, then after each step:
+byte-identical.
+
+- **Ruling 17, the tabular learner's live table.** Its `result` returned a `ValueTables` built
+  from `Q` (`J = min Q`, `pi = argmin Q`), not the table: the table itself is already
+  `planner.Q`. Named for what it is, `planner.greedy_tables`, rather than the ruling's
+  `q_table`, which would read as `Q`. `planner.tables` reads the latest solution's, as on value
+  iteration; the last-answer test lists both grid planners' `tables` as shortcuts.
+- **Ruling 17, the learners' `episode_cost`.** Neither record held the last episode's cost: the
+  tabular one is the mean over the last tenth of the episodes, the neural one the mean episode
+  cost of the last collection. Both keep the ruling's name, `episode_cost`, documented as that
+  mean (their `str` already said "mean episode cost"); `mean_episode_cost` is the alternative.
+  The per-episode and per-iteration `history` dicts keep their `"cost"` key.
+- **Ruling 17, MPPI's and trajectory optimization's `cost`.** Both are the objective at the
+  returned plan, the quantity of the `Optimizer`'s `cost`, so they keep it.
+- **Ruling 17, the evaluation's count.** `J`: every statistic, the objective and about thirty
+  reads in tests, examples and benchmarks; `cost`: two test reads and a tutorial's table. They
+  differ (`J` adds the failure cost of a failed or missed run under `penalize_failure`), so both
+  stay and `cost` is renamed by its quantity, `raw_cost` (the tutorial's own "raw integral +
+  terminal cost"), in the record, `score_run`'s row and formula and the step problem's scoring;
+  the one-run `str` reads "raw cost = …".
+- **Ruling 17, what `solve_time_s` times.** The wall time of the user's verb without the
+  evidence's scoring: value iteration's sweeps, the Riccati design, the search, MPPI's compile
+  and solve until the plan is on the host, the learners' training (the tabular one with its
+  greedy law). A first JAX call's compilation is inside it (value iteration on JAX, MPPI, the
+  neural learner); trajectory optimization keeps its own, the optimizer's backend solve after
+  the warm-up. `None` on a compiled face's solve. The neural learner's `train_time_s` stays: it
+  counts every training of the planner, collections and updates only, with `n_timesteps`.
+  Each record's `str` ends with "; solved in … s" (the LQR's before "; U ignored").
+
