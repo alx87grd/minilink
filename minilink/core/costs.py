@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 from minilink.core.backends import array_module
-from minilink.core.inspect import inspect_text, latex_inspect, repr_pretty
+from minilink.core.inspect import inspect_text, latex_inspect, repr_line, repr_pretty
 from minilink.core.params import (
     held_params,
     own_params,
@@ -138,6 +138,9 @@ class CostFunction(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
@@ -326,8 +329,8 @@ class SumCost(CostFunction):
     obstacle or traversability term to a base objective. The terms are keyed
     by id, as a diagram keys its blocks (:meth:`of`): ``terms`` is
     ``{term_id: cost}`` and :attr:`params` the live view
-    ``{term_id: cost.params}``, its setter routing each entry to its term, so
-    a partial dictionary changes only the terms it names. A sum holds each cost
+    ``{term_id: cost.params}``, its setter routing each entry to its term (a
+    complete tree: every term's id). A sum holds each cost
     object once: ``q + 10 * q`` is refused, ``11 * q`` is the same cost.
     """
 
@@ -507,6 +510,9 @@ class StepCost(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

@@ -75,7 +75,7 @@ class Trajectory(SampledSignals):
     -----
     The trajectory semantic core is ``(t, x, u)``. Extra signals such as
     outputs, derivatives, or reconstructed internal ports can be attached
-    through :meth:`with_signal` or :meth:`with_signals`. The samples keep their
+    through :meth:`with_signals`. The samples keep their
     array module: NumPy arrays are copied as floats, JAX arrays are kept, and a
     trajectory is a JAX pytree, so ``jit``, ``grad`` and ``vmap`` pass through a
     function that returns one.

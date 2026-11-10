@@ -857,7 +857,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   clipping `u`); the field and the lookup law each take their table into the point's array
   module, so both trace with their table a constant: a JAX closed loop runs the law, and
   `backend="auto"` scores it on JAX like every law that traces. Value iteration's `cost_to_go` is one (`StateSpaceGrid.field`).
-- Distributions (`core/distributions.py`): a duck type — `dim`, `mean` (an array),
+- Distributions (`core/distributions.py`): one small base class, `Distribution` — `dim`, `mean` (an array),
   `sample(key, n=None, params=None)` with `key` a NumPy generator, an integer seed or a JAX
   PRNG key (JAX arrays out, traceable); `(dim,)` for one draw, `(n, dim)` with `n`; `support`
   an optional `Set`. **No key, no draw:** `sample(None)` is the mean at the law's numbers
@@ -1192,8 +1192,8 @@ is a sampled loop: `(ctl % dt) @ plant` holds the torque between ticks, the inte
 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
 `Optimizer(program, z0=None, method=)` binds a method preset named by algorithm: `gd`
-and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_slsqp`
-(the default), `scipy_trust_constr`, `ipopt`. The program's class is read from its
+and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_slsqp`,
+`scipy_trust_constr`, `ipopt`; the default is `method="auto"`. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
 constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
@@ -1255,8 +1255,8 @@ plant`, and a finite-horizon law reads the time (`u = pi(x, t)`); an open-loop p
 source (trajectory optimization, MPPI, RRT) is a `TrajectorySource` `u = pi(t)`,
 `controller >> plant` (`solution.open_loop`); on a step problem the law ticks with the
 plant; the `record` (one
-frozen dataclass per planner with `success` and a one-line `str`; `method`
-names it; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
+frozen dataclass per planner with `success` and a one-line `str`; the solution's
+`family` names the method; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
 bounds the command, since the Riccati law never reads `U` (LQR never
 warns)); the
 `trajectory`, one meaning: the plan an open-loop planner computed, `None` for a
@@ -1410,7 +1410,7 @@ path. A deterministic planner given a stochastic problem plans
 from the mean start and warns; `Sys2Gym(sys, cost, x0=law)` draws each episode's start
 from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 `Sys2Gym.from_problem(problem, dt=)` is the Gymnasium view
-(draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's duck type.
+(draws of `x0`, the exit rule, `h` at a finite horizon). Distributions are §4's `Distribution`.
 
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
 `pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto", episode_length=None)` closes

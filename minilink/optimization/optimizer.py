@@ -14,6 +14,7 @@ from minilink.core.inspect import (
     format_inspect,
     inspect_inline,
     inspect_text,
+    repr_line,
     repr_pretty,
 )
 from minilink.core.params import require_complete
@@ -180,6 +181,9 @@ class Optimizer:
     def __str__(self):
         return optimizer_text(self)
 
+    def __repr__(self):
+        return repr_line(self)
+
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
@@ -204,10 +208,9 @@ class Optimizer:
         Parameters
         ----------
         params : dict, optional
-            The values of the program's parameters for this solve, a partial
-            tree merged once onto the program's defaults (a path the
-            program does not declare raises), and under ``"method"`` the
-            method's numbers (:attr:`params`). ``None`` solves at the
+            The values of the program's parameters for this solve, the complete
+            tree (a copy of :attr:`params`, edited; a missing or unknown path
+            raises), with the method's numbers under ``"method"``. ``None`` solves at the
             defaults. The compiled program is reused: a new value never
             recompiles.
         z0 : array_like, optional

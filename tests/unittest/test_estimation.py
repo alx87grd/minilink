@@ -429,3 +429,26 @@ def test_refusals_name_what_to_pass():
         Optimizer(
             MathematicalProgram(n_z=2, J=lambda z: z @ z), np.zeros(2), method="gd"
         )
+
+
+def test_a_design_warning_points_at_the_line_that_called_it():
+    """A warning of a default is raised at the caller's line, not inside the library."""
+    plant = Pendulum()
+
+    with pytest.warns(UserWarning, match="does not rest") as caught:
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[1.0, 0.0])
+
+    assert caught[0].filename == __file__
+
+
+def test_core_objects_print_one_line_in_a_list():
+    """``repr`` is the head of the summary, so a list, a record or an error names its objects."""
+    from minilink.core.roles import roles
+    from minilink.core.sets import BoxSet
+
+    plant = Pendulum()
+    gain = lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi, 0.0])
+
+    assert repr(plant) == "<Pendulum, n=2>"
+    assert repr(BoxSet([-1.0], [1.0])).startswith("<BoxSet, dim=1")
+    assert "plant=<Pendulum, n=2>" in repr(roles(gain @ plant))

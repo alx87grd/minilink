@@ -75,6 +75,16 @@ def latex_inspect(obj):
     return own()
 
 
+def repr_line(obj) -> str:
+    """The one-line ``repr``: the head of the inspect summary, the default address for an object not yet built."""
+    try:
+        head = str(obj).splitlines()[0]
+    except Exception:
+        return object.__repr__(obj)
+
+    return f"<{head}>"
+
+
 def repr_pretty(obj, p, cycle):
     """IPython pretty-printer: the inspect summary, not the dataclass dump."""
     p.text("..." if cycle else inspect_text(obj))

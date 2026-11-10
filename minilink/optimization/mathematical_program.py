@@ -38,7 +38,7 @@ class MathematicalProgram:
     A program may declare parameters: with ``params`` a tree of
     numbers, every callable takes ``(z, params)`` (``J(z, params)``,
     ``h(z, params)``, ``grad_J(z, params)``, …), ``params`` the frozen default
-    the values of a solve are merged onto
+    a solve reads, or replaces whole
     (``Optimizer(program).solve(params=...)``), so one compiled program is
     solved for many values without a recompile. Without ``params`` the
     callables take ``z`` alone, as a hand-written program does. The tree's

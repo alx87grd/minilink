@@ -194,7 +194,7 @@ class TrajectoryOptimizationPlanner(Planner):
         a packed ``z`` (a compiled face's, its origin dropped), or a
         :class:`~minilink.planning.results.PlanningSolution`
         (a warm start: ``planner.solve(guess=previous)``); ``None`` takes the
-        options' guess, else the default. The solution's controller is the optimized
+        planner's own guess, else the default. The solution's controller is the optimized
         input as a source block, ``controller >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
         The workflow: ``verbose`` prints the preamble and the report,
@@ -351,7 +351,7 @@ class TrajectoryOptimizationPlanner(Planner):
     ###########################################################################
 
     def resolve_guess(self, problem, guess) -> np.ndarray | Trajectory:
-        """The seed: the given guess (a solution's trajectory), the options' guess, else the default on ``problem``."""
+        """The seed: the given guess (a solution's trajectory), the planner's own guess, else the default on ``problem``."""
         if guess is None:
             guess = self.guess
         if guess is not None:

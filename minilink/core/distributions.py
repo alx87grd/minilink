@@ -14,7 +14,7 @@ from minilink.core.backends import (
     numpy_generator,
     require_jax,
 )
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, repr_line, repr_pretty
 from minilink.core.params import delegated_params, own_params, param_view
 from minilink.core.sets import BoxSet, Set
 
@@ -53,6 +53,9 @@ class Distribution(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

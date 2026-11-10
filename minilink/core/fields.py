@@ -19,7 +19,7 @@ from minilink.core.backends import (
 from minilink.core.compile.evaluators.jacobian import central_difference
 from minilink.core.costs import CostFunction
 from minilink.core.distributions import is_counter_key
-from minilink.core.inspect import inspect_text, repr_pretty
+from minilink.core.inspect import inspect_text, repr_line, repr_pretty
 from minilink.core.params import (
     delegated_params,
     held_params,
@@ -108,6 +108,9 @@ class Field(ABC):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)

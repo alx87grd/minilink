@@ -10,7 +10,7 @@ from minilink.core.facades.analysis import DynamicAnalysis, SystemAnalysis
 from minilink.core.facades.animation import DynamicAnimation, SystemAnimation
 from minilink.core.facades.plotting import DynamicPlotting, SystemPlotting
 from minilink.core.facades.simulation import DynamicSimulation, SystemSimulation
-from minilink.core.inspect import inspect_text
+from minilink.core.inspect import inspect_text, repr_line
 from minilink.core.params import own_params
 from minilink.core.signals import InputPort, OutputPort, VectorSignal
 
@@ -61,7 +61,7 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
       expression still draws the Graphviz block.
     - **Names**: :attr:`name` is the display name, the class name unless the
       block sets its own; :attr:`id` is the key the block takes in a diagram
-      built by ``+``, ``>>`` or a loop (``None``: its name in snake case; in
+      built by ``+``, ``>>`` or a loop (``None``: its name; in
       ``@`` the role names ``plant``, ``controller`` and ``observer`` win).
 
     Overridden :meth:`h` and port ``compute`` functions are functions of
@@ -506,6 +506,9 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
     def __str__(self):
         return inspect_text(self)
+
+    def __repr__(self):
+        return repr_line(self)
 
     def _repr_pretty_(self, p, cycle):
         p.text("..." if cycle else str(self))
