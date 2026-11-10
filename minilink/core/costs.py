@@ -401,8 +401,7 @@ class SumCost(CostFunction):
         params = self.params if params is None else params
 
         return sum(
-            cost.g_max(X, U, params.get(term_id))
-            for term_id, cost in self.terms.items()
+            cost.g_max(X, U, params[term_id]) for term_id, cost in self.terms.items()
         )
 
     def h_max(self, X, params=None):
@@ -410,7 +409,7 @@ class SumCost(CostFunction):
         params = self.params if params is None else params
 
         return sum(
-            cost.h_max(X, params.get(term_id)) for term_id, cost in self.terms.items()
+            cost.h_max(X, params[term_id]) for term_id, cost in self.terms.items()
         )
 
 

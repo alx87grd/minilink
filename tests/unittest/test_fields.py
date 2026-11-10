@@ -197,3 +197,39 @@ def test_a_set_seen_as_a_cost_carries_the_sets_numbers():
         "field": {"lower": -np.ones(2), "upper": np.array([2.0, 1.0])},
     }
     assert float(cost.g(x, np.zeros(1), params=narrow)) == 0.0
+
+
+def test_a_field_with_an_upper_level_alone_is_its_sublevel_set():
+    """``as_set(upper=level)`` is ``V ≤ level``: a field that goes negative keeps the points below zero."""
+    from minilink.core.fields import MarginField
+
+    clearance = MarginField(BoxSet([-1.0], [1.0]))
+    x_outside = np.array([3.0])  # V = −2
+
+    assert clearance.as_set(upper=0.5).contains(x_outside)
+    assert "lower" not in clearance.as_set(upper=0.5).params
+    assert not clearance.as_set().contains(x_outside)
+    assert clearance.as_set(lower=0.0, upper=0.5).params["lower"] == 0.0
+
+
+def test_a_box_drawn_with_no_key_is_its_center():
+    """No key, no draw: a box answers its center, as a uniform law does."""
+    box = BoxSet([-1.0, 0.0], [3.0, 2.0])
+
+    np.testing.assert_allclose(box.sample(None), [1.0, 1.0])
+    np.testing.assert_allclose(box.sample(None, n=3), [[1.0, 1.0]] * 3)
+
+
+def test_a_summed_cost_bound_refuses_a_partial_tree():
+    """A sum's bounds index their terms' numbers as ``g`` does: a tree missing a term is refused."""
+    from minilink.core.costs import QuadraticCost
+
+    total = QuadraticCost(np.eye(1), np.eye(1), np.eye(1), np.zeros(1), np.zeros(1))
+    total = total + 2.0 * QuadraticCost(
+        np.eye(1), np.eye(1), np.eye(1), np.ones(1), np.zeros(1)
+    )
+    X = BoxSet([-1.0], [1.0])
+    partial = dict(list(total.params.items())[:1])
+
+    with pytest.raises(KeyError):
+        total.g_max(X, X, partial)
