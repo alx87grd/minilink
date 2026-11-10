@@ -89,16 +89,16 @@ the export landed, `period` keeps its name (see the decisions below).
 
 | Step | Addition |
 | --- | --- |
-| AS-40 | `QuadraticCost(Q, R)` works: `S`, `x_bar`, `u_bar` default to zero (today five required positionals, so every call goes through `from_system`) |
-| AS-41 | `lower`, `upper`, `dim` on `BoxInputSet` and `Uniform` (`plant.input_box.lower` fails today, `plant.state.box.lower` works); `dim` on every set and field where it is known; `BallSet.sample`, `SingletonSet.sample` |
-| AS-42 | `CostFunction.h` defaults to `0.0` (a running cost no longer writes `return 0.0`) |
-| AS-43 | `Gain(2.0)` works (`dim=1`, as `Sum`, `Saturation`, `UnitDelay`); `Integrator(dim=1)`; `Saturation` takes vector bounds |
-| AS-44 | `poles(sys, …)` on `minilink.analysis`, the root and as a `System` shortcut (the examples write `np.linalg.eigvals` 22 times); `print(lqr(…))` shows `K` as an observer shows `L`, with a read-only `K` |
-| AS-45 | `plot_nyquist` as a `System` shortcut (the fifth of five one-channel plots); `linearize` and `transfer_function` on a `StepSystem` (the plots already work there) |
-| AS-46 | `diagram.add_subsystem(sys)` without an id (the operators' rule); `StepPlanningProblem.replace`; a scalar `u` on a one-input step rollout; the shape error of a sampled `u` naming `n_samples=` / `dt=` |
-| AS-47 | `verbose=False` on every planner's `solve` (missing on LQR, RRT, MPPI); `callback` a callable or a list everywhere; `params=` on `solve_steps`; `show=` on every plot |
-| AS-48 | `sensitivity(plant, controller, …)` positional, with `of=` / `wrt=` and the channel default of `bode` (today keyword-only, and it refuses the default pendulum the sibling verbs accept) |
-| AS-49 | On the facades: `LTISystem`, `MechanicalSystem`, `step_info` on the root (the design verbs' own error tells the student to build an `LTISystem`); `Margins`, `StepInfo` on `minilink.analysis`; the shaping functions on `minilink.core` |
+| AS-40 | `QuadraticCost(Q, R)` works: `S`, `x_bar`, `u_bar` default to zero (today five required positionals, so every call goes through `from_system`) Landed on `api-settle`. |
+| AS-41 | `lower`, `upper`, `dim` on `BoxInputSet` and `Uniform` (`plant.input_box.lower` fails today, `plant.state.box.lower` works); `dim` on every set and field where it is known; `BallSet.sample`, `SingletonSet.sample` Landed on `api-settle`. |
+| AS-42 | `CostFunction.h` defaults to `0.0` (a running cost no longer writes `return 0.0`) Landed on `api-settle`. |
+| AS-43 | `Gain(2.0)` works (`dim=1`, as `Sum`, `Saturation`, `UnitDelay`); `Integrator(dim=1)`; `Saturation` takes vector bounds Landed on `api-settle`. |
+| AS-44 | `poles(sys, …)` on `minilink.analysis`, the root and as a `System` shortcut (the examples write `np.linalg.eigvals` 22 times); `print(lqr(…))` shows `K` as an observer shows `L`, with a read-only `K` Landed on `api-settle`, but for the `System` shortcut (a question, below). |
+| AS-45 | `plot_nyquist` as a `System` shortcut (the fifth of five one-channel plots); `linearize` and `transfer_function` on a `StepSystem` (the plots already work there) Landed on `api-settle`. |
+| AS-46 | `diagram.add_subsystem(sys)` without an id (the operators' rule); `StepPlanningProblem.replace`; a scalar `u` on a one-input step rollout; the shape error of a sampled `u` naming `n_samples=` / `dt=` Landed on `api-settle`. |
+| AS-47 | `verbose=False` on every planner's `solve` (missing on LQR, RRT, MPPI); `callback` a callable or a list everywhere; `params=` on `solve_steps`; `show=` on every plot Landed on `api-settle`. |
+| AS-48 | `sensitivity(plant, controller, …)` positional, with `of=` / `wrt=` and the channel default of `bode` (today keyword-only, and it refuses the default pendulum the sibling verbs accept) Landed on `api-settle`. |
+| AS-49 | On the facades: `LTISystem`, `MechanicalSystem`, `step_info` on the root (the design verbs' own error tells the student to build an `LTISystem`); `Margins`, `StepInfo` on `minilink.analysis`; the shaping functions on `minilink.core` Landed on `api-settle`, with `LinearizedSystem` beside `LTISystem` and `poles` on the root. |
 
 ## 4. Decisions for the maintainer
 
@@ -123,7 +123,7 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 13 | **`Step(1.0)` steps down** (`initial_value` first) and `Step()` is zero | 9 positional, 16 bare | **Ruled 2026-11-10: option 1** — `Step(final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y")`: `Step()` the unit step at `t = 1 s`; positional callers migrated; a bare `Step()`'s numbers move once. Landed on `api-settle`. |
 | 14 | **Riccati on a discrete model:** refuse (AS-1) or solve the discrete equation | none | **Ruled 2026-11-10: refuse** (landed with AS-1); the discrete Riccati designs come with the sampled filters in v0.9 — not the time for new discrete-time tools |
 | 15 | **MPC's name and place.** `ModelPredictiveController` is a function returning a `PredictiveController`, on no facade; examples import the deep path 12 times | 7 tests | **Ruled 2026-11-10: option 1** — `ModelPredictiveController` is the class (`PredictiveController` renamed, the factory's signature its constructor); the deep imports move to `minilink.control`. Landed on `api-settle`. |
-| 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | **Ruled 2026-11-10: option 1** — the planning plots take one keyword set, written out (`sol.plot_cost_to_go(*, x_axis=, y_axis=, is_3d=, ax=, renderer=, show=)`, `plot_control_law` alike); the planner's method a thin call to the solution's, keeping only its extra `field=`; every plot returns `PlotResult`; scoped to the planning plots, the rest of S67 its own row |
+| 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | **Ruled 2026-11-10: option 1** — the planning plots take one keyword set, written out (`sol.plot_cost_to_go(*, x_axis=, y_axis=, is_3d=, ax=, renderer=, show=)`, `plot_control_law` alike); the planner's method a thin call to the solution's, keeping only its extra `field=`; every plot returns `PlotResult`; scoped to the planning plots, the rest of S67 its own row. Landed on `api-settle`. |
 | 17 | **Records.** `DynamicProgrammingResult` / `record.tables` / `planner.result` (which means two things between value iteration and tabular learning); `cost` is five different quantities across records; timings on two records only | 60 | `ValueTables`, `planner.tables`; `path_cost` on RRT; `solve_time_s` on every record |
 | 18 | **The learners' words.** `n_envs`, `n_steps` (periods per update, where `n_steps` is the horizon everywhere else), `policy=` that becomes `planner.actor`, `learn` and `predict` beside `solve`; `Sys2Gym` | 67; 45 | `n_rollouts`, `n_steps_per_update`, `actor=`; `predict` to the SB3 bridge; `Sys2Gym` kept (research lane) |
 | 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | `lqr_trajectory`; `horizon`; `StateObserver(model, L)` |
@@ -471,3 +471,96 @@ moved.
   `Saturation`'s `lower` / `upper`, the sets' and the program's were already the word; the
   laws' signal limits (`u_min`, `u_max`, `delta_max`, `e_int_min`, `e_int_max`) are
   unchanged.
+
+The run of AS-40 to AS-49 and ruling 16 on the branch `api-settle` (2026-11-10), one commit per
+row. The seeded baselines of the earlier runs (`baseline_r.py` at rulings 5, 12 and 15, and
+the ruling-11 analysis baseline) were run twice and compared before the first edit, then after
+each row: byte-identical every time (the additions move no existing number).
+
+- **AS-40.** `QuadraticCost(Q, R, S=None, x_bar=None, u_bar=None)`: the zeros are sized by `Q`
+  (`n × n`) and `R` (`m × m`); a call that gives all five is unchanged.
+- **AS-41, `dim` where it is known.** On `BoxInputSet` (with `lower`, `upper`), an intersection
+  (its first member that states one), a field set and a margin field (what they wrap), the
+  quadratic field (its center) and the grid field (its `n`); none on a callable set or a field's
+  input set (no input size is declared). `BallSet.sample` draws as the ellipsoid does (a
+  Gaussian direction, a radius `s^(1/n)`; a counter key refused, the ellipsoid's refusal now
+  names both); `SingletonSet.sample` gives its point whatever the key. **A ball is now a start
+  a problem draws from** (`x0=BallSet(...)` was refused as unable to draw): the test that pinned
+  the refusal refuses an intersection instead, and the refusal names the sets that draw.
+- **AS-42.** `CostFunction.h` returns `xp.zeros(())` on `x`'s array module. The library costs
+  that write `return 0.0` (`TimeCost`, `FieldCost`) keep it, and the demos' own `return 0.0`
+  are left for the rebuild.
+- **AS-43.** `Gain(K, dim=1)` (the test that pinned `Gain(2.0)`'s refusal now pins the one
+  channel). `Integrator(dim=1)` writes `ẋ = k u`, `y = x` on the whole vector (the same floats
+  on one channel). `Saturation(lower, upper, dim=None)`: `dim` is the bounds' size, 1 for
+  scalars; bounds of two sizes, or a `dim` the bounds contradict, are refused; a scalar stop
+  stays a float in `params`.
+- **AS-44, the `System` shortcut not added: a question.** `sys.poles(...)` would be shadowed
+  where `poles` already means an array: `TransferFunction` (and `LowPassFilter`, `Lead`) store
+  `self.poles` in `__init__`, and `StateObserver.poles` is a property (the error poles,
+  `eig(A − L C)`). The options: a method on every system, the two attributes renamed or turned
+  into it (a public change); a read-only property `sys.poles` at the nominal point, which the
+  observer's and the transfer function's already are (`TransferFunction` would then stop
+  assigning it); or the band function only, as landed. The function is `poles(sys, x_bar, …)`
+  on `minilink.analysis.modal`, through `linearize_matrices`, so a linearization is read as
+  stored and a step system gives its poles in `z`. `StateFeedback` and `OutputReference` print
+  `K` under the block and read it as a read-only `K`; no caller assigned `.K` on them.
+- **AS-45.** `linearize` and `transfer_function` moved to a `LinearAnalysis` mixin that
+  `DynamicAnalysis` and `StepAnalysis` inherit (the band functions already read a step system;
+  ruling 11 had given it `LinearizedStepSystem`). **Found, a question:** `transfer_function` on
+  a step system returns a continuous `TransferFunction` block holding `G(z)`'s coefficients,
+  printed `G(s)`; simulating it reads them in `s`. Logged in KNOWN_ISSUES; the options are a
+  discrete transfer-function block, or the verb refused on a step system.
+- **AS-46.** `add_subsystem(sys, sys_id=None)` on the flow, step and sampled diagrams, through
+  `DiagramWiring.new_subsystem_id` (the operators' `default_subsystem_id`, `unique_id`, and the
+  reserved-role check before numbering, so a second `plant` is refused, not renamed `plant2`);
+  it returns the id. `StepPlanningProblem.replace` keeps `origin` (the continuous problem a
+  discretized one samples, which gives its cost bound and design point) only when the change is
+  the start, `X0`, the failure's price or the criterion. The sampled-input refusal names
+  `n_samples=` and `dt=` only when the rows are right and the sample count is off the grid.
+- **AS-47.** LQR, RRT, RRT* and MPPI print their record once when `verbose=True` (none has a
+  progress of its own; the tabular learner already ends so). `callback` lists through one
+  helper, `core/reporting.one_callback`, on `Optimizer.solve` and trajectory optimization (RRT's
+  own list handling kept). `show=` added where a plot had none: `Source.plot_signal` and both
+  learning curves; the learning curves now show a figure they make by default (they left it to
+  the next plot), `show=False` builds only. The planners' `**kwargs` delegations
+  (`plot_trajectory`, `plot_cost`, `plot_tree`, the scene and track plots) already reach a
+  `show=`.
+- **AS-48.** All four sensitivity functions take `(plant, controller, x_bar, u_bar, t, params,
+  *, filter=, of=, wrt=, method=, eps=)`; the plant is read by `transfer_function(…, of=, wrt=)`
+  (bode's channel), the controller and filter keep the SISO refusal. Keyword callers unchanged.
+- **AS-49.** Root: `LTISystem`, `LinearizedSystem`, `MechanicalSystem`, `step_info` (and
+  `poles`, AS-44); `minilink.analysis`: `Margins`, `StepInfo`; `minilink.core`: the four
+  shaping functions. Each in the teaching-surface registry; their modules were already on the
+  API pages.
+- **Ruling 16, the keyword set.** Written out on `PlanningSolution`, the base `Planner` (so LQR,
+  RRT, trajectory optimization, MPPI, RL and the tabular learner, whose overrides were deleted)
+  and value iteration (plus `field=`): `plot_cost_to_go(*, x_axis=0, y_axis=1, anchor=None,
+  bounds=None, grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None,
+  ax=None, renderer="matplotlib", show=True)`; `plot_control_law` the same with `u_axis=0`
+  after `y_axis`, `x_axis=None`, `y_axis=None` (the controller's own default sweep),
+  `grid_shape=(101, 101)` and no `jmax`. Beyond the ruling's six keywords, the set keeps what
+  the callers used today (`anchor`, `bounds`, `grid_shape`, `t`, `jmax`, `trajectory`, `title`):
+  the course notebooks pass `jmax=`, `title=`, `trajectory=`, and a demo `anchor=`. Dropped from
+  the planners' plots: `cmap`, `vmin`, `overlay_labels` (no planning caller; still on the grid's
+  and the controller's own plots). `renderer` other than `"matplotlib"` is refused (the planning
+  plots have no Plotly path).
+- **Ruling 16, which drawing.** A grid planner's solution (its record carries `tables`) is drawn
+  on the grid's own nodes, as value iteration drew it, unless the call asks for another mesh
+  (`bounds`, `grid_shape`), a time, or a control law's surface: then the field (or the
+  controller's law) is sampled, as for any other solution. So the planners' figures are the
+  ones they drew before, and `sol.plot_*` of a grid solution now draws the table too (it
+  sampled the field). `jmax=None` tops the scale at the field's `outside` value (the failure
+  cost), as value iteration's and the learner's defaults did; `jmax=np.inf` is Matplotlib's own
+  scale (it was `jmax=None` on the planners; one test migrated). A finite horizon's table is
+  stage 0. `anchor` on a law the controller draws is refused (it pins the other coordinates at
+  their nominal values). A batch of slices (lists of axes, the grid path only) returns a list
+  of `PlotResult`.
+- **Ruling 16, the returns.** `PlotResult` as the library builds it (`.figure`, `.axes`; the
+  ruling's `.fig` is `.figure` on today's record, no alias added). The comparison's three plots
+  return one too (`.axes` its list of panels): they were the third shape. Out of scope, as
+  ruled: the grid's own `StateSpaceGrid.plot_cost_to_go` and the module functions of
+  `dynamic_programming/plotting.py` still return `(fig, ax)` (a GRO860 notebook unpacks them),
+  and the learning curves return their axis. Callers migrated: four tests and the call table of
+  `examples/tutorial/core/08_planners.ipynb` (its planner, solution and comparison rows); no
+  example or course notebook unpacked a planning plot.
