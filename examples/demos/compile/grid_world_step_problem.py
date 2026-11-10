@@ -89,7 +89,7 @@ print(
 
 # The cost-to-go and the walk
 fig, ax = plt.subplots()
-J_grid = vi.result.J.reshape(SIZE, SIZE).T
+J_grid = vi.tables.J.reshape(SIZE, SIZE).T
 image = ax.imshow(J_grid, origin="lower", cmap="viridis")
 ax.plot(walk.x[0], walk.x[1], "w.-", label="greedy walk")
 ax.plot(*GOAL, "r*", markersize=14, label="goal")

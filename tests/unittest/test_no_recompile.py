@@ -114,10 +114,10 @@ def test_a_cost_edit_inside_the_problem_is_seen_by_the_next_value_iteration_solv
             max_iterations=5,
         )
         planner.solve()
-        J_before = planner.result.J.copy()
+        J_before = planner.tables.J.copy()
         problem.cost.params["R"] = 100.0 * problem.cost.params["R"]
         planner.solve()
-        J_after = planner.result.J.copy()
+        J_after = planner.tables.J.copy()
         problem.cost.params["R"] = problem.cost.params["R"] / 100.0
 
         assert not np.allclose(J_before, J_after), backend

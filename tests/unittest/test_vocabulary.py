@@ -45,7 +45,7 @@ RETIRED = {
             "TrajectoryOptimizationRecord",
             "ValueIterationRecord",
             "TreeSearchRecord",
-            "DynamicProgrammingResult",
+            "ValueTables",
         ),
     ),
     "optimizer_options": ("options", None),
@@ -265,6 +265,16 @@ RETIRED_NAMES = {
     ),
     "minilink.planning.trajectory_optimization.mpc.predictive.PredictiveController": (
         "ModelPredictiveController, the class (ruling 15)"
+    ),
+    # One name per thing in the planners' records (the maintainer's ruling 17 of 2026-11-10)
+    "minilink.planning.dynamic_programming.dp.DynamicProgrammingResult": (
+        "ValueTables, read as solution.record.tables"
+    ),
+    "minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.result": (
+        "planner.tables, the latest solution's"
+    ),
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
+        "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
     ),
 }
 

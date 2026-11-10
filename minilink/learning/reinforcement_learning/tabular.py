@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingResult,
+    ValueTables,
     grid_failure_cost,
     grid_of,
 )
@@ -177,13 +177,21 @@ class TabularLearningPlanner(Planner):
         return self.grid.dt
 
     @property
-    def result(self) -> DynamicProgrammingResult:
-        """
-        The table as it stands, as a cost-to-go field ``J = min_u Q`` and greedy policy ``pi = argmin_u Q``.
+    def tables(self) -> ValueTables | None:
+        """The latest solution's tables, ``J`` and ``pi`` (``None`` before a solve; a shortcut: a tool reads ``solution.record.tables``)."""
+        if self.last_solution is None:
+            return None
 
-        The learner's own model, updated by every episode; the shortcuts
-        (:attr:`controller`, :meth:`cost_to_go`, the plots) read the latest
-        solution's tables instead, ``solution.record.tables``.
+        return self.last_solution.record.tables
+
+    @property
+    def greedy_tables(self) -> ValueTables:
+        """
+        The greedy reading of the table ``Q`` as it stands: ``J = min_u Q`` and ``pi = argmin_u Q``.
+
+        The learner's own model, updated by every episode; :attr:`tables` and
+        the shortcuts (:attr:`controller`, :meth:`cost_to_go`, the plots) read
+        the latest solution's instead, ``solution.record.tables``.
 
         A cell never visited keeps its initial value, zero: the optimistic
         start that makes untried actions worth trying (``visits`` tells which).
@@ -198,7 +206,7 @@ class TabularLearningPlanner(Planner):
         J = Q.min(axis=1)
         pi = Q.argmin(axis=1)
 
-        return DynamicProgrammingResult(
+        return ValueTables(
             grid=grid, J=J, pi=pi, n_iterations=n_episodes, delta=float("nan")
         )
 
@@ -233,8 +241,8 @@ class TabularLearningPlanner(Planner):
         self.learn(n_episodes, verbose=verbose)
 
         # The greedy law of the learned table
-        result = self.result
-        controller = LookupPolicy(result.grid, result.pi)
+        tables = self.greedy_tables
+        controller = LookupPolicy(tables.grid, tables.pi)
 
         # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
@@ -250,9 +258,9 @@ class TabularLearningPlanner(Planner):
 
         # The solution: the law, the record, the score, and the cost-to-go as a field
         # on the grid, the failure cost past it (the price of leaving the grid)
-        record = self.learning_record(result)
-        cost_to_go = result.grid.field(
-            result.J, method="linear", outside=self.env.failure_cost
+        record = self.learning_record(tables)
+        cost_to_go = tables.grid.field(
+            tables.J, method="linear", outside=self.env.failure_cost
         )
         solution = PlanningSolution(
             problem=self.problem,
@@ -484,9 +492,7 @@ class TabularLearningRecord:
     cost: float
     table_finite: bool
     history: list
-    tables: DynamicProgrammingResult | None = field(
-        default=None, repr=False, compare=False
-    )
+    tables: ValueTables | None = field(default=None, repr=False, compare=False)
 
     @property
     def success(self) -> bool:

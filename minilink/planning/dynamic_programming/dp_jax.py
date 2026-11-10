@@ -7,7 +7,7 @@ import numpy as np
 from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingResult,
+    ValueTables,
     stage_schedule,
 )
 from minilink.planning.dynamic_programming.progress import (
@@ -22,7 +22,7 @@ from minilink.planning.dynamic_programming.progress import (
 
 def value_iteration(
     planner, max_sweeps, stop_on_tol=True, keep_stages=False
-) -> DynamicProgrammingResult:
+) -> ValueTables:
     """
     The planner's value iteration, run on device.
 
@@ -55,7 +55,7 @@ def value_iteration(
     J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
 
-    return DynamicProgrammingResult(
+    return ValueTables(
         grid=planner.grid,
         J=np.array(J),
         pi=np.array(pi, dtype=int),
@@ -237,7 +237,7 @@ def require_device_interpolation(interpolation):
         raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
-def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingResult:
+def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> ValueTables:
     """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
     jax = ensure_jax_x64()
 
@@ -259,7 +259,7 @@ def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingRes
     # The stages forward in time: J_0 … J_N (J_N = h) and π_0 … π_{N−1}
     schedule = stage_schedule(tf, dt, [np.array(J0), *J_swept], list(pi_swept))
 
-    return DynamicProgrammingResult(
+    return ValueTables(
         grid=planner.grid,
         J=np.array(J_swept[-1]),
         pi=np.array(pi_swept[-1], dtype=int),

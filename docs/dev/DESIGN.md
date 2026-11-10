@@ -1592,8 +1592,9 @@ own sample of the cost-to-go, `Q <- Q + η (q - Q)`, `η` the `learning_rate=`: 
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `controller`,
-`J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.result` is the
-table as it stands, a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), and
+`J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.tables` is the latest
+solution's `ValueTables`, as on value iteration, and `planner.greedy_tables` the greedy reading
+of the table as it stands (`J = min Q`, `pi = argmin Q`), and
 `plot_cost_to_go`, `plot_control_law` (the solution's, through the planner's thin calls),
 `cost_to_go` and `controller` (a `LookupPolicy`)
 are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
@@ -1790,8 +1791,8 @@ callable; `planner.cost_to_go` reads it). The Bellman backup is written in the b
 engine's step, `Q = G + γ J_next(x_next)`, `J = min_u Q` and `π = argmin_u Q` (the backup is the lesson, so no helper hides it), each engine reading the grid its
 own way at the successors (SciPy's interpolator on NumPy, `map_coordinates` with the in-bounds
 mask on JAX, zero off the grid); the
-`method="loop"` engine stays the double loop written for teaching (the raw `DynamicProgrammingResult`, `J` and `pi` as action ids, is
-`solution.record.tables`, and `planner.result` the latest solution's); out-of-domain
+`method="loop"` engine stays the double loop written for teaching (the raw `ValueTables`, `J` and `pi` as action ids, is
+`solution.record.tables`, and `planner.tables` the latest solution's); out-of-domain
 transitions are charged a finite `out_of_bound_cost` (pyro's
 `cf.INF`), or, when it is a callable, its cost `out_of_bound_cost(x_next, t)` at each
 such transition's successor. Three interchangeable

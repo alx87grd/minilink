@@ -74,7 +74,7 @@ concrete formatting, ordered by the cost of being wrong:
   `Evaluation`). An object stores no other run state, with one exception: an object whose
   convenience verbs need a default (plot, animate, `controller`) keeps the last result it
   returned, once, as the same object, never a copy. That is `sys.traj` on a `System`,
-  `last_solution` on a `Planner` (value iteration's `result` reads through it); a new one is
+  `last_solution` on a `Planner` (the grid planners' `tables` read through it); a new one is
   named `last_<what the run returns>`. Only those verbs read
   it, as a default; library code never does. A tool takes the result it needs, or uses the one
   its run returned (`tests/unittest/test_last_answer.py` lists every reader). An engine that
@@ -137,6 +137,7 @@ concrete formatting, ordered by the cost of being wrong:
   | The drawing library of a plot or an animation | `renderer` (`plot_renderer` on `game`) | `backend`, `plot_backend` |
   | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |
   | A planner's record | `solution.record` | `solution.solver` |
+  | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
@@ -304,7 +305,7 @@ concrete formatting, ordered by the cost of being wrong:
      block 4 (`J11`, `J12`, …), and the matrix is assembled here, row by row (5.5).
   6. **Return** (output). `return` of a name. Never an equation or an array on the
      `return` line; a result object built from named results may be
-     (`return DynamicProgrammingResult(grid=grid, J=J, …)`).
+     (`return ValueTables(grid=grid, J=J, …)`).
 
   A delegation, a constant, a dict literal or a frame composition stays the one line it is:
   the blocks are for equations (`tf` returns its frames as one dict literal). A numeric

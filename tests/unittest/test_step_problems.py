@@ -299,7 +299,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     vi.solve()
 
     # J(x) = the moves to the goal, diagonal moves allowed: the Chebyshev distance
-    J = vi.result.J.reshape(7, 7)
+    J = vi.tables.J.reshape(7, 7)
     cells = np.arange(7.0)
     distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     np.testing.assert_array_equal(J, distance)
@@ -408,8 +408,8 @@ def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
     assert vi.out_of_bound_cost == vd.out_of_bound_cost
     vi.solve()
     vd.solve()
-    np.testing.assert_array_equal(vi.result.J, vd.result.J)
-    np.testing.assert_array_equal(vi.result.pi, vd.result.pi)
+    np.testing.assert_array_equal(vi.tables.J, vd.tables.J)
+    np.testing.assert_array_equal(vi.tables.pi, vd.tables.pi)
 
 
 def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize():
@@ -449,7 +449,7 @@ def test_policy_evaluation_scores_value_iterations_policy_on_the_face():
     vi.solve()
     J_pi = vi.evaluate_policy(vi.controller)
     np.testing.assert_allclose(
-        J_pi.params["values"].reshape(-1), vi.result.J, atol=1e-6
+        J_pi.params["values"].reshape(-1), vi.tables.J, atol=1e-6
     )
 
 

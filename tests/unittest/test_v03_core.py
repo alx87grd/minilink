@@ -548,7 +548,7 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     vi.solve()
 
     # J(x) = the moves to the goal, the problem's c summed: the Chebyshev distance
-    J = vi.result.J.reshape(7, 7)
+    J = vi.tables.J.reshape(7, 7)
     cells = np.arange(7.0)
     np.testing.assert_array_equal(
         J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))

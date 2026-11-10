@@ -223,7 +223,7 @@ class DynamicProgrammingPlanner(Planner):
             mode = "finite"
 
         # The cost-to-go and policy tables as a planning solution
-        return self.dp_result_to_planning_solution(
+        return self.tables_to_planning_solution(
             result, mode=mode, evaluate=evaluate, n_trials=n_trials
         )
 
@@ -266,7 +266,7 @@ class DynamicProgrammingPlanner(Planner):
         )
 
         # The cost-to-go and policy tables as a planning solution
-        return self.dp_result_to_planning_solution(
+        return self.tables_to_planning_solution(
             result, mode="receding", evaluate=evaluate, n_trials=n_trials
         )
 
@@ -332,8 +332,8 @@ class DynamicProgrammingPlanner(Planner):
         return self.grid.dt
 
     @property
-    def result(self) -> DynamicProgrammingResult | None:
-        """The latest solution's tables, ``J`` and ``pi`` (a shortcut: a tool reads ``solution.record.tables``)."""
+    def tables(self) -> ValueTables | None:
+        """The latest solution's tables, ``J`` and ``pi`` (``None`` before a solve; a shortcut: a tool reads ``solution.record.tables``)."""
         if self.last_solution is None:
             return None
 
@@ -368,14 +368,14 @@ class DynamicProgrammingPlanner(Planner):
         keep_stages: bool = False,
         verbose: bool = False,
         record_history: bool = False,
-    ) -> DynamicProgrammingResult:
+    ) -> ValueTables:
         """
         Sweep the Bellman equation backward from the terminal cost.
 
         Each sweep steps time back by ``dt`` and replaces the cost-to-go with
         the best one-step backup. Stops after ``max_sweeps`` or, with
         ``stop_on_tol``, once the largest change falls under ``tol``.
-        ``keep_stages`` keeps every sweep's tables as the result's
+        ``keep_stages`` keeps every sweep's tables as their
         ``schedule``, forward in time; ``verbose`` reports the builds and the
         sweeps, ``record_history`` keeps every sweep's ``(t, J, pi)``. Returns
         the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
@@ -391,7 +391,7 @@ class DynamicProgrammingPlanner(Planner):
         # or recorded; then its jitted step, bound to its device tables, from here
         device_step = None
         if backend == BACKEND_JAX:
-            # A real cycle: dp_jax imports DynamicProgrammingResult from this module
+            # A real cycle: dp_jax imports ValueTables from this module
             from minilink.planning.dynamic_programming import dp_jax
 
             if not (verbose or record_history):
@@ -456,7 +456,7 @@ class DynamicProgrammingPlanner(Planner):
         if keep_stages:
             schedule = stage_schedule(tf, dt, J_stages, pi_stages)
 
-        return DynamicProgrammingResult(
+        return ValueTables(
             grid=self.grid,
             J=np.array(J),
             pi=np.array(pi, dtype=int),
@@ -687,9 +687,7 @@ class DynamicProgrammingPlanner(Planner):
 
     # Rollout, cleanup and plots
 
-    def clean_infeasible_set(
-        self, tol: float = 1.0, *, tables=None
-    ) -> DynamicProgrammingResult:
+    def clean_infeasible_set(self, tol: float = 1.0, *, tables=None) -> ValueTables:
         """
         Flag states whose cost-to-go has saturated at ``out_of_bound_cost``.
 
@@ -700,33 +698,33 @@ class DynamicProgrammingPlanner(Planner):
         level: the tables are then left as solved. ``tables`` defaults to the
         latest solution's; a solve passes its own before building its solution.
         """
-        result = self.result if tables is None else tables
-        require_tables(result)
+        tables = self.tables if tables is None else tables
+        require_tables(tables)
 
         INF = self.out_of_bound_cost
 
         # A cost that varies with the exit state saturates at no single level
         if callable(INF):
-            return result
+            return tables
 
         # The action nearest the system's nominal input
         u_nominal = self.problem.sys.u_nominal
         default_action = self.grid.nearest_action(u_nominal)
 
         # Nodes from which leaving the admissible set is unavoidable
-        infeasible = result.J > (INF - tol)
+        infeasible = tables.J > (INF - tol)
 
-        result.J[infeasible] = INF
-        result.pi[infeasible] = default_action
+        tables.J[infeasible] = INF
+        tables.pi[infeasible] = default_action
 
         # The same at every stage of a finite horizon (π_i is read on J_i's cells)
-        if result.schedule is not None:
-            _, J_stages, pi_stages = result.schedule
+        if tables.schedule is not None:
+            _, J_stages, pi_stages = tables.schedule
             infeasible = J_stages > (INF - tol)
             J_stages[infeasible] = INF
             pi_stages[infeasible[:-1]] = default_action
 
-        return result
+        return tables
 
     def plot_cost_to_go(
         self,
@@ -782,18 +780,18 @@ class DynamicProgrammingPlanner(Planner):
     def animate_cost_to_go(self, **kwargs):
         require_solution(self)
         kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
-        return plotting.animate_cost_to_go(self.result, **kwargs)
+        return plotting.animate_cost_to_go(self.tables, **kwargs)
 
     def animate_control_law(self, **kwargs):
         require_solution(self)
-        return plotting.animate_control_law(self.result, **kwargs)
+        return plotting.animate_control_law(self.tables, **kwargs)
 
     ###########################################################################
     # Internal machinery
     ###########################################################################
 
-    def dp_result_to_planning_solution(
-        self, result: DynamicProgrammingResult, *, mode, evaluate, n_trials
+    def tables_to_planning_solution(
+        self, tables: ValueTables, *, mode, evaluate, n_trials
     ) -> PlanningSolution:
         """
         Turn the value-iteration tables into the planner's :class:`PlanningSolution`.
@@ -806,29 +804,29 @@ class DynamicProgrammingPlanner(Planner):
 
         # Pin the saturated cells to the penalty, before the law is built from them
         if self.clean_infeasible:
-            self.clean_infeasible_set(tables=result)
+            self.clean_infeasible_set(tables=tables)
 
         # The greedy policy: the minimizing action of every node, interpolated between
         # nodes, and held per stage on a finite horizon
-        if result.schedule is None:
-            policy = LookupPolicy(result.grid, result.pi)
+        if tables.schedule is None:
+            policy = LookupPolicy(tables.grid, tables.pi)
         else:
-            t_stages, _, pi_stages = result.schedule
-            policy = LookupPolicy(result.grid, pi_stages, t_stages)
+            t_stages, _, pi_stages = tables.schedule
+            policy = LookupPolicy(tables.grid, pi_stages, t_stages)
 
         # How the sweeps ended: converged to tol (a finite or receding horizon always
         # completes its sweeps); a finite horizon's tables frozen at the final time
         # when one table served every sweep
         frozen = self.grid.precomputed or self.backend == BACKEND_JAX
         record = ValueIterationRecord(
-            n_iterations=result.n_iterations,
-            delta=float(result.delta),
+            n_iterations=tables.n_iterations,
+            delta=float(tables.delta),
             tol=tol,
-            converged=mode != "infinite" or result.delta <= tol,
+            converged=mode != "infinite" or tables.delta <= tol,
             mode=mode,
             discount_rate=self.discount_rate,
             frozen_at=self.tf if mode == "finite" and frozen else None,
-            tables=result,
+            tables=tables,
         )
 
         # Optionally, the law, as it is, scored over the problem's draws
@@ -842,13 +840,13 @@ class DynamicProgrammingPlanner(Planner):
         # on the grid, read as the planner's options say, the failure cost past the
         # grid (the price the sweeps give to leaving it)
         outside = None if callable(self.out_of_bound_cost) else self.out_of_bound_cost
-        if result.schedule is None:
-            cost_to_go = result.grid.field(
-                result.J, method=self.interpolation, outside=outside
+        if tables.schedule is None:
+            cost_to_go = tables.grid.field(
+                tables.J, method=self.interpolation, outside=outside
             )
         else:
-            t_stages, J_stages, _ = result.schedule
-            cost_to_go = result.grid.field(
+            t_stages, J_stages, _ = tables.schedule
+            cost_to_go = tables.grid.field(
                 J_stages, t_stages, method=self.interpolation, outside=outside
             )
         solution = PlanningSolution(
@@ -863,14 +861,17 @@ class DynamicProgrammingPlanner(Planner):
 
 
 @dataclass
-class DynamicProgrammingResult:
+class ValueTables:
     """
-    Cost-to-go field and greedy policy from value iteration.
+    The value tables on a grid: the cost-to-go ``J`` and the greedy law ``pi`` by node.
+
+    What value iteration's sweeps end on, and the greedy reading of a tabular
+    learner's ``Q`` (``J = min_u Q``, ``pi = argmin_u Q``).
 
     Parameters
     ----------
     grid : StateSpaceGrid
-        Grid the result is defined on.
+        Grid the tables are defined on.
     J : np.ndarray
         Cost-to-go by node id, shape ``(n_nodes,)`` (a finite horizon's: stage 0).
     pi : np.ndarray
@@ -902,8 +903,8 @@ class DynamicProgrammingResult:
         np.savez(path, J=self.J, pi=self.pi)
 
     @classmethod
-    def load(cls, path: str, grid: StateSpaceGrid) -> DynamicProgrammingResult:
-        """Load a result saved by :meth:`save`, bound to ``grid``."""
+    def load(cls, path: str, grid: StateSpaceGrid) -> ValueTables:
+        """Load tables saved by :meth:`save`, bound to ``grid``."""
         data = np.load(path)
 
         return cls(
@@ -936,9 +937,7 @@ class ValueIterationRecord:
     mode: str
     discount_rate: float | None = None
     frozen_at: float | None = None
-    tables: DynamicProgrammingResult | None = field(
-        default=None, repr=False, compare=False
-    )
+    tables: ValueTables | None = field(default=None, repr=False, compare=False)
 
     @property
     def success(self) -> bool:
@@ -1122,7 +1121,7 @@ def infeasible_penalty(failure_cost, x_next, t):
     return float(failure_cost(x_next, t)) if callable(failure_cost) else failure_cost
 
 
-def require_tables(result):
+def require_tables(tables):
     """Refuse a cleanup before any solve has produced the tables."""
-    if result is None:
+    if tables is None:
         raise ValueError("No solution has been computed yet")

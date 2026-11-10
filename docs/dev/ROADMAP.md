@@ -423,6 +423,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     a grid planner, as its default was; `jmax=np.inf` gives Matplotlib's own scale (it was
     `jmax=None`). Keywords outside the set (`cmap=`, `vmin=`, `overlay_labels=`) are the grid's
     and the controller's own plots'. The tutorial's call table follows.
+  - *A grid planner's tables, one name.* `DynamicProgrammingResult` → `ValueTables` (it holds
+    `J` and `pi`), read as `solution.record.tables`; `planner.result` → `planner.tables` on
+    value iteration and on the tabular learner, one meaning on both, the latest solution's
+    (`None` before a solve). The tabular learner's `result` was the table as it stands: that is
+    `planner.greedy_tables` (`J = min Q`, `pi = argmin Q` of the live `planner.Q`).
 
 ## 3. Maturity (TRL)
 

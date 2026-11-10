@@ -11,7 +11,8 @@ PACKAGE = Path(__file__).resolve().parents[2] / "minilink"
 SHORTCUTS = {
     "last_solution": {
         "planning/planner.py": {"require_solution"},
-        "planning/dynamic_programming/dp.py": {"DynamicProgrammingPlanner.result"},
+        "planning/dynamic_programming/dp.py": {"DynamicProgrammingPlanner.tables"},
+        "learning/reinforcement_learning/tabular.py": {"TabularLearningPlanner.tables"},
         "planning/search/plotting.py": {"plot_tree", "animate_search.update"},
     },
     "traj": {
