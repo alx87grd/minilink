@@ -128,7 +128,7 @@ def test_the_continuous_dynamics_the_computer_does_not_own_are_the_plants():
 
 def test_a_plants_euler_model_on_the_computer_is_never_adaptive():
     predictor = Pendulum() % 0.01
-    assert predictor.kind == "law" and not predictor.resolves
+    assert predictor.kind == "law" and not predictor.is_integrated
     ticks = predictor.compute_rollout(5)
     host = predictor.compute_trajectory(tf=0.05, solver="scipy")
     np.testing.assert_array_equal(host.x, ticks.x)

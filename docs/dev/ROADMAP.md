@@ -317,6 +317,16 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `signal.nominal_value = v`); `RRTPlanner.reached_goal` and `.iterations`, and RRT*'s,
     copies of the record (`solution.record.reached_goal`, `solution.record.n_iterations`);
     the comparison's record `GivenPolicy` → `GivenController`.
+  - *Library-internal helpers, one name each.* The problem's five checks (`coerce_horizon`,
+    `coerce_state`, `require_type`, `check_state_shape`, `require_member`) and the
+    `Optimizer`'s `start_vector`, `decision_vector` and solve panel
+    (`print_program_preamble`, `print_program_report`) are module functions, no longer
+    methods; `steps_of`, `planner_parts` and `require_cost_to_go` have one body each (MPPI's
+    refusal of a `dt` that does not divide the horizon now says `dt=… must divide the horizon
+    …`); MPPI's episode tree is `episode_leaves` and the step problem's check
+    `coerce_n_steps`, beside `problem_leaves` and `coerce_horizon`. A sampled block's
+    predicates read as questions: `SampledSystem.counts` → `is_tick_law`, `resolves` →
+    `is_integrated`; `minilink.core.sets.is_bounded(box)` → `has_finite_face(box)`.
 
 ## 3. Maturity (TRL)
 

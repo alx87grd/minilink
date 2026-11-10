@@ -162,7 +162,7 @@ class Optimizer:
 
         # The program, compiled once at the default start
         self.program = program
-        self.z0 = self.decision_vector(start_of(program, z0), program.n_z)
+        self.z0 = decision_vector(start_of(program, z0), program.n_z)
         self.method = method
         self.backend = program.backend if backend is None else backend
         self.program_evaluator = compile_program_evaluator(
@@ -239,13 +239,13 @@ class Optimizer:
             require_no_hook(callback)
             return self.solve_count(params, z0, method)
 
-        z_start = self.z0 if z0 is None else self.decision_vector(z0, self.program.n_z)
+        z_start = self.z0 if z0 is None else decision_vector(z0, self.program.n_z)
 
         # The values of this solve, bound once at the boundary
         self.program_evaluator.bind(params)
 
         if verbose:
-            self.print_solve_preamble(z_start)
+            print_program_preamble(self, z_start)
         t0 = time.perf_counter()
 
         # The user's hook, fed (z, J(z), elapsed time) at each iterate of the backend
@@ -254,7 +254,7 @@ class Optimizer:
             t_cb0 = time.perf_counter()
 
             def backend_cb(z: np.ndarray) -> None:
-                z_arr = self.decision_vector(z, self.program.n_z)
+                z_arr = decision_vector(z, self.program.n_z)
                 J = self.program_evaluator.objective(z_arr)
                 t_elapsed = time.perf_counter() - t_cb0
                 callback(z_arr.copy(), J, t_elapsed)
@@ -273,7 +273,7 @@ class Optimizer:
         result = replace(result, solve_time_s=elapsed)
 
         if verbose:
-            self.print_solve_report(result)
+            print_program_report(result)
 
         return result
 
@@ -302,7 +302,7 @@ class Optimizer:
 
         # The start and the tree, merged once, bound to nothing
         tree = evaluator.merged(params)
-        z_start = self.z0 if z0 is None else self.start_vector(z0)
+        z_start = self.z0 if z0 is None else start_vector(self, z0)
 
         # z_K = S^K(z0; p), and J(z_K; p)
         z, J = self.adapter.run(evaluator, z_start, tree, K, method)
@@ -314,48 +314,6 @@ class Optimizer:
             message=f"{K} steps taken",
             stats={"nit": K, "method": self.method},
         )
-
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def start_vector(self, z0):
-        """A start checked as :meth:`decision_vector` when it has values, a traced one by its shape."""
-        n_z = self.program.n_z
-        try:
-            return self.decision_vector(z0, n_z)
-        except TypeError:  # a tracer has no value
-            require_start_shape(z0, n_z)
-            return z0
-
-    @staticmethod
-    def decision_vector(z, n_z: int) -> np.ndarray:
-        """``z`` as a flat float array of shape ``(n_z,)``."""
-        arr = np.asarray(z, dtype=float).reshape(-1)
-        if arr.shape != (int(n_z),):
-            raise ValueError(f"decision vector must have shape ({int(n_z)},)")
-        return arr
-
-    def print_solve_preamble(self, z0: np.ndarray) -> None:
-        """Open the solve panel: the program, the start and the method."""
-        print()
-        print(DISP_RULE_MAIN)
-        print("===               Optimization Program                   ===")
-        print(DISP_RULE_MAIN)
-        for line in inspect_text(self).splitlines():
-            print(line)
-        print("z0:", preview_vector(z0))
-        print("options:", getattr(self.adapter, "options", {}))
-        print(DISP_RULE_DIV)
-        print("Running solver...")
-
-    def print_solve_report(self, result: OptimizationResult) -> None:
-        """Print the **After solve** section and close the solve panel."""
-        print(DISP_RULE_DIV)
-        for line in inspect_text(result).splitlines():
-            print(line)
-        print("stats:", result.stats)
-        print(DISP_RULE_MAIN)
 
 
 def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs):
@@ -474,6 +432,47 @@ class IterationSystem(StepSystem):
             start += size
 
         return state
+
+
+def start_vector(optimizer, z0):
+    """A start checked as :func:`decision_vector` when it has values, a traced one by its shape."""
+    n_z = optimizer.program.n_z
+    try:
+        return decision_vector(z0, n_z)
+    except TypeError:  # a tracer has no value
+        require_start_shape(z0, n_z)
+        return z0
+
+
+def decision_vector(z, n_z: int) -> np.ndarray:
+    """``z`` as a flat float array of shape ``(n_z,)``."""
+    arr = np.asarray(z, dtype=float).reshape(-1)
+    if arr.shape != (int(n_z),):
+        raise ValueError(f"decision vector must have shape ({int(n_z)},)")
+    return arr
+
+
+def print_program_preamble(optimizer, z0: np.ndarray) -> None:
+    """Open the solve panel: the program, the start and the method."""
+    print()
+    print(DISP_RULE_MAIN)
+    print("===               Optimization Program                   ===")
+    print(DISP_RULE_MAIN)
+    for line in inspect_text(optimizer).splitlines():
+        print(line)
+    print("z0:", preview_vector(z0))
+    print("options:", getattr(optimizer.adapter, "options", {}))
+    print(DISP_RULE_DIV)
+    print("Running solver...")
+
+
+def print_program_report(result: OptimizationResult) -> None:
+    """Print the **After solve** section and close the solve panel."""
+    print(DISP_RULE_DIV)
+    for line in inspect_text(result).splitlines():
+        print(line)
+    print("stats:", result.stats)
+    print(DISP_RULE_MAIN)
 
 
 def method_params_of(method: str, options: dict | None = None) -> dict:

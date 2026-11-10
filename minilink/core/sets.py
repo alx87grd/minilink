@@ -508,8 +508,8 @@ def is_finite_box(box) -> bool:
     )
 
 
-def is_bounded(box) -> bool:
-    """Whether a set's bounding box has any finite face (``None``, no box, counts as bounded: a general set)."""
+def has_finite_face(box) -> bool:
+    """Whether a set's bounding box has a finite face (``None``, no box, counts as having one: a general set)."""
     if box is None:
         return True
 

@@ -74,7 +74,7 @@ class StepPlanningProblem:
 
         # The task: the step system, its horizon, its cost and discount per tick
         self.sys = sys
-        self.n_steps = coerce_horizon(n_steps)
+        self.n_steps = coerce_n_steps(n_steps)
         self.cost = cost
         self.gamma = coerce_gamma(gamma)
         self.dt = None if dt is None else float(dt)
@@ -439,7 +439,7 @@ def build_step_model(problem):
     return StepModel(problem)
 
 
-def coerce_horizon(N):
+def coerce_n_steps(N):
     """The horizon: ``None`` (infinite), or a positive whole number of ticks."""
     if N is None:
         return None

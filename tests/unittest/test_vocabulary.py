@@ -225,6 +225,15 @@ RETIRED_NAMES = {
         "signal.nominal_value = value"
     ),
     "minilink.planning.comparison.GivenPolicy": "GivenController",
+    "minilink.core.discrete.sampled_system.SampledSystem.counts": "is_tick_law",
+    "minilink.core.discrete.sampled_system.SampledSystem.resolves": "is_integrated",
+    "minilink.core.sets.is_bounded": "has_finite_face",
+    "minilink.planning.trajectory_optimization.path_integral.problem_leaves": (
+        "episode_leaves (problem_leaves reads a problem: planning.evaluation's)"
+    ),
+    "minilink.planning.step_problems.coerce_horizon": (
+        "coerce_n_steps (coerce_horizon is the continuous problem's)"
+    ),
     "minilink.planning.trajectory_optimization.transcription.FixedGridOptions": (
         "FixedGridTranscription(n_steps=)"
     ),
@@ -283,9 +292,6 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluation.score_run": {"tf": "horizon"},
     "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
-    "minilink.planning.trajectory_optimization.path_integral.steps_of": {
-        "tf": "horizon"
-    },
     "minilink.core.closed_loop.feedback": {"validate": "the loop check always runs"},
     "minilink.core.closed_loop.closed_loop": {"validate": "the loop check always runs"},
     "minilink.core.operators.autowire": {"validate": "the loop check always runs"},
@@ -529,6 +535,11 @@ def retired_on(qualname, owners):
 # (RULES 5.25): the refusals and readers a planner reads a problem and its latest solution through
 MODULE_HELPERS = {
     "PlanningProblem": {
+        "coerce_horizon",
+        "coerce_state",
+        "require_type",
+        "check_state_shape",
+        "require_member",
         "require_cost",
         "require_goal",
         "require_finite_horizon",
@@ -538,6 +549,12 @@ MODULE_HELPERS = {
         "part_trees",
     },
     "StepPlanningProblem": {"require_cost"},
+    "Optimizer": {
+        "start_vector",
+        "decision_vector",
+        "print_solve_preamble",
+        "print_solve_report",
+    },
     "Planner": {
         "require_solution",
         "require_cost",
@@ -549,12 +566,14 @@ MODULE_HELPERS = {
 
 
 def test_the_helpers_are_module_functions_not_methods():
+    from minilink.optimization.optimizer import Optimizer
     from minilink.planning.planner import Planner
     from minilink.planning.problems import PlanningProblem
     from minilink.planning.step_problems import StepPlanningProblem
 
     owners = {
-        cls.__name__: cls for cls in (PlanningProblem, StepPlanningProblem, Planner)
+        cls.__name__: cls
+        for cls in (PlanningProblem, StepPlanningProblem, Planner, Optimizer)
     }
     hits = sorted(
         f"{owner}.{name}"
@@ -563,6 +582,35 @@ def test_the_helpers_are_module_functions_not_methods():
         if hasattr(owners[owner], name)
     )
     assert not hits, f"module functions, not methods: {hits}"
+
+
+# One helper per name (api-stabilization AS-31): a helper is defined once, every other module
+# imports it; two bodies under one name were two ideas, now two names
+ONE_HELPER = {
+    "steps_of": (
+        "minilink.planning.evaluator",
+        "minilink.planning.trajectory_optimization.path_integral",
+        "minilink.planning.step_model",
+    ),
+    "planner_parts": (
+        "minilink.planning.trajectory_optimization.planner",
+        "minilink.planning.trajectory_optimization.compiled",
+    ),
+    "require_cost_to_go": (
+        "minilink.planning.planner",
+        "minilink.planning.comparison",
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(ONE_HELPER))
+def test_a_helper_name_has_one_body(name):
+    home, *users = ONE_HELPER[name]
+    defined = getattr(importlib.import_module(home), name)
+    for user in users:
+        module = importlib.import_module(user)
+        if hasattr(module, name):
+            assert getattr(module, name) is defined, f"{user}.{name} is another body"
 
 
 # The workflow a planner's verb takes (DESIGN §6, the four kinds of argument): what is shown,

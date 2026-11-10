@@ -17,7 +17,7 @@ from minilink.control.state import (
 from minilink.core.costs import QuadraticCost
 from minilink.core.fields import QuadraticField
 from minilink.core.roles import command_port
-from minilink.core.sets import is_bounded
+from minilink.core.sets import has_finite_face
 from minilink.planning.planner import (
     Planner,
     given_numbers,
@@ -206,7 +206,7 @@ class LQRPlanner(Planner):
                 poles=poles,
                 horizon=T,
                 schedule=(t, K, S),
-                U_ignored=is_bounded(problem.U.bounding_box()),
+                U_ignored=has_finite_face(problem.U.bounding_box()),
             )
             cost_to_go = QuadraticField(x_bar, S, t)
         else:
@@ -228,7 +228,7 @@ class LQRPlanner(Planner):
                 P=P,
                 poles=poles,
                 horizon=np.inf,
-                U_ignored=is_bounded(problem.U.bounding_box()),
+                U_ignored=has_finite_face(problem.U.bounding_box()),
             )
             cost_to_go = QuadraticField(x_bar, P)
 

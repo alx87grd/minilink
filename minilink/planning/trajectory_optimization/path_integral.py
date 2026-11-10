@@ -12,6 +12,7 @@ from minilink.core.params import checked
 from minilink.core.roles import command_port
 from minilink.core.trajectory import Trajectory
 from minilink.planning.environment import RolloutEnvironment
+from minilink.planning.evaluator import steps_of
 from minilink.planning.planner import (
     Planner,
     host_tree,
@@ -523,7 +524,7 @@ class CompiledMPPIPlanner:
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        episode = problem_leaves(P)
+        episode = episode_leaves(P)
         gamma = env.model.gamma_at(episode)
 
         def period(carry, v):
@@ -556,7 +557,7 @@ class CompiledMPPIPlanner:
         jax = self.jax
         jnp = self.jnp
         env = self.env
-        episode = problem_leaves(P)
+        episode = episode_leaves(P)
 
         def period(carry, u):
             x, t = carry
@@ -570,7 +571,7 @@ class CompiledMPPIPlanner:
         return x_path
 
 
-def problem_leaves(P):
+def episode_leaves(P):
     """The episode tree a rollout reads from the planner's tree: the plant's, the cost's, the discount and ``X``'s numbers."""
     leaves = {
         "plant": P["plant"],
@@ -581,17 +582,6 @@ def problem_leaves(P):
         leaves["X"] = P["X"]
 
     return leaves
-
-
-def steps_of(horizon, dt) -> int:
-    """``N = horizon / dt``, refused unless whole."""
-    N = int(round(horizon / dt))
-    if N < 1 or abs(N * dt - horizon) > 1e-9 * max(1.0, horizon):
-        raise ValueError(
-            f"the horizon {horizon:g} s is not a whole number of periods dt = {dt:g} s"
-        )
-
-    return N
 
 
 def action_box(problem):

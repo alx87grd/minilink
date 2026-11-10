@@ -165,7 +165,7 @@ class StepEvaluator(DiscreteEvaluator):
         self.params_reader = lambda: system.params
 
         # A system on a clock steps its seconds face at t0 + k Δ
-        self.seconds = isinstance(system, SampledSystem) and not system.counts
+        self.seconds = isinstance(system, SampledSystem) and not system.is_tick_law
 
         if backend == BACKEND_JAX:
             check_leaf_traces(self, system, system.step, 0, verbose)
@@ -211,7 +211,7 @@ class StepEvaluator(DiscreteEvaluator):
         ks = self.indices(u_seq.shape[0])
 
         def period(x, k, u_k):
-            if not system.resolves:
+            if not system.is_integrated:
                 x_next = xp.reshape(self.step(x, u_k, k, params, t0=t0), (n,))
                 return x_next, x_next[None, :]
             # The plant integrated once over the period: the path's last row is the tick

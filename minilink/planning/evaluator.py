@@ -31,7 +31,7 @@ from minilink.core.params import (
     split_path,
     with_leaf,
 )
-from minilink.core.sets import is_bounded
+from minilink.core.sets import has_finite_face
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import (
     RUNNING_COST,
@@ -1187,7 +1187,9 @@ def require_free_names(free_inputs, subsystem_ids):
 def declared_rows(problem):
     """The program's constraint rows: the feasibility margin for a bounded ``X`` or ``U``, the reachability margin for ``Xf``."""
     rows = []
-    if is_bounded(problem.X.bounding_box()) or is_bounded(problem.U.bounding_box()):
+    if has_finite_face(problem.X.bounding_box()) or has_finite_face(
+        problem.U.bounding_box()
+    ):
         rows.append("feasibility_margin")
     if problem.Xf is not None:
         rows.append("reachability_margin")

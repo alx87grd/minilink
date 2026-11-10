@@ -17,6 +17,7 @@ from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.planner import planner_parts
 
 ###############################################################################
 # Public API
@@ -369,14 +370,6 @@ class CompiledTrajectoryPlanner:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def planner_parts(params):
-    """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the planner's :func:`~minilink.planning.trajectory_optimization.planner.planner_parts`)."""
-    # Lazy import: the planner module imports this one
-    from minilink.planning.trajectory_optimization import planner
-
-    return planner.planner_parts(params)
 
 
 def has_values(tree) -> bool:

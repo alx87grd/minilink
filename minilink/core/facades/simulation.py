@@ -506,7 +506,7 @@ def require_continuous_underneath(system):
         not on_a_clock
         or system.sample_period is None
         or isinstance(system, SampledSystem)
-        and system.counts
+        and system.is_tick_law
     ):
         raise TypeError(
             f"{type(system).__name__} {system.name!r} counts its ticks: it has no continuous "
@@ -537,7 +537,7 @@ def stepped_view(system, dt=None, solver=None):
         return system
     if isinstance(system, SampledDiagramSystem):
         return with_plant_steps(system, **plant_steps_of(system, dt, solver))
-    if system.resolves:
+    if system.is_integrated:
         substeps = None if dt is None else steps_per_period(system.sample_period, dt)
         return system.with_steps(substeps=substeps, solver=solver)
 
@@ -659,7 +659,7 @@ def dense_points_of(system, ev):
     if plan is not None:
         return plan.dense_points
 
-    return system.substeps if system.resolves else 1
+    return system.substeps if system.is_integrated else 1
 
 
 def scored_trajectory(system, of, traj):

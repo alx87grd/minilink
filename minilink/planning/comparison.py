@@ -9,6 +9,7 @@ import numpy as np
 from minilink.core.sets import is_finite_box
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import ProblemEvaluator
+from minilink.planning.planner import require_cost_to_go
 from minilink.planning.plotting import maybe_show
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.results import PlanningSolution, drawn_trajectory_of
@@ -525,15 +526,6 @@ def state_labels(sys) -> list:
         + (f" [{units[i]}]" if units and units[i] else "")
         for i in range(n)
     ]
-
-
-def require_cost_to_go(solution):
-    """Refuse a solution that carries no cost-to-go field; return the field."""
-    field = solution.cost_to_go
-    if field is None:
-        raise ValueError(f"this {solution.family} solution carries no cost_to_go")
-
-    return field
 
 
 def state_box(problem):

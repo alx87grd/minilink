@@ -120,7 +120,7 @@ class Planner(ABC):
     def cost_to_go(self, x, t=None) -> float:
         """The latest solution's cost-to-go field read at ``x`` (at ``t`` when given), a ``float``."""
         solution = require_solution(self)
-        J = require_cost_to_go(self, solution)
+        J = require_cost_to_go(solution, type(self).__name__)
         x = np.asarray(x, dtype=float)
 
         # J(x), or J(x, t) on a field that reads the time
@@ -176,12 +176,12 @@ def require_solution(planner) -> PlanningSolution:
     return planner.last_solution
 
 
-def require_cost_to_go(planner, solution):
-    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``."""
+def require_cost_to_go(solution, owner=None):
+    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``. ``owner`` names the solution's planner in the refusal (its family when ``None``)."""
     if solution.cost_to_go is None:
+        owner = f"this {solution.family}" if owner is None else f"{owner}'s"
         raise ValueError(
-            f"{type(planner).__name__}'s solution carries no cost-to-go field "
-            "(its cost_to_go is None)"
+            f"{owner} solution carries no cost-to-go field (its cost_to_go is None)"
         )
 
     return solution.cost_to_go

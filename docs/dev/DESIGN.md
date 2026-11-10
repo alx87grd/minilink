@@ -1065,7 +1065,7 @@ or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of
 a static source has `n = 0`), its output ports functions in seconds; the tick face
 `step(x, u, k)` and `h(x, u, k)`, `t_k = k·sample_period` (the origin 0; a consumer with an origin
 calls the seconds face). A tick source (a `StepSystem`) keeps its count and has no seconds
-face (`counts` is true). The sample time is `dt` alone, never a key of the plant's `params`. The
+face (`is_tick_law` is true). The sample time is `dt` alone, never a key of the plant's `params`. The
 hold belongs to sequences (`rollout`), never to a step.
 
 Layout of `core/compile/`: `compiler.py` (`compile`, `compile_auto`, `compile_diagram`,

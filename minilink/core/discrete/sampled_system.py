@@ -138,7 +138,7 @@ class SampledSystem(StepSystem):
         return
 
     @property
-    def counts(self) -> bool:
+    def is_tick_law(self) -> bool:
         """Whether the block counts its own ticks: a tick source, which reads ``k``, never seconds."""
         return isinstance(self.source, StepSystem)
 
@@ -212,7 +212,7 @@ class SampledSystem(StepSystem):
         return x_next, c
 
     @property
-    def resolves(self) -> bool:
+    def is_integrated(self) -> bool:
         """Whether a continuous source is integrated inside the period, so its substeps can be kept: a model or a plant, never a law."""
         source = self.source
         continuous = isinstance(source, DynamicSystem) and source.n > 0
@@ -265,7 +265,7 @@ class SampledSystem(StepSystem):
 
         dt = self.sample_period
 
-        if self.counts:
+        if self.is_tick_law:
             return self.source.step(x, u, k, params)
 
         t_k = k * dt
@@ -281,7 +281,7 @@ class SampledSystem(StepSystem):
         h = self.source.h
         dt = self.sample_period
 
-        if self.counts:
+        if self.is_tick_law:
             return h(x, u, k, params)
 
         t_k = k * dt
@@ -363,7 +363,7 @@ class NativeSampledSystem(SampledSystem):
         self.__dict__["own_solver_info"] = value
 
     @property
-    def counts(self) -> bool:
+    def is_tick_law(self) -> bool:
         """A native law reads seconds, never its tick count."""
         return False
 
@@ -377,7 +377,7 @@ class NativeSampledSystem(SampledSystem):
         return self.params
 
     @property
-    def resolves(self) -> bool:
+    def is_integrated(self) -> bool:
         """A native law has no source integrated inside the period."""
         return False
 
@@ -530,7 +530,7 @@ def require_kind(kind) -> None:
 
 def require_resolved(system) -> None:
     """Refuse the substeps of a block that integrates nothing inside its period."""
-    if not system.resolves:
+    if not system.is_integrated:
         raise TypeError(
             f"{system.name} integrates no continuous state inside its period: it has "
             "no substeps to keep"
@@ -539,7 +539,7 @@ def require_resolved(system) -> None:
 
 def require_seconds_face(system) -> None:
     """Refuse the seconds face of a tick source: it counts its ticks, it reads no seconds."""
-    if system.counts:
+    if system.is_tick_law:
         raise TypeError(
             f"{system.source.name} is a tick law: it reads its count k, never seconds; "
             "call step(x, u, k)"
