@@ -207,7 +207,7 @@ class BoxSet(Set):
         return margin
 
     def sample(self, key, n=None, params=None):
-        """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``."""
+        """Draw uniformly from a finite box: ``(dim,)`` for one point, ``(n, dim)`` with ``n``; the center with no key."""
         params = self.params if params is None else params
 
         lower = params["lower"]
@@ -220,7 +220,16 @@ class BoxSet(Set):
         shape = (dim,) if n is None else (int(n), dim)
 
         # A real cycle: the distributions build on the sets
-        from minilink.core.distributions import is_counter_key, standard_uniform
+        from minilink.core.distributions import (
+            is_counter_key,
+            standard_uniform,
+            tiled_mean,
+        )
+
+        # No key, no draw: the box's center, (lower + upper) / 2
+        if key is None:
+            center = 0.5 * (lower + upper)
+            return tiled_mean(center, n)
 
         # z ~ U(lower, upper), drawn on the key's backend (a counter key by the cipher)
         if is_counter_key(key):
