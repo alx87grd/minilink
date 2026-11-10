@@ -1428,6 +1428,10 @@ class TestDtTimeGrid(unittest.TestCase):
             with self.subTest(dt=bad), self.assertRaisesRegex(ValueError, message):
                 build_time_grid(0.0, 1.0, n_samples=11, dt=bad)
 
+        # A count and a step together are refused: the grid has one owner
+        with self.assertRaisesRegex(ValueError, "n_samples or dt, not both"):
+            build_time_grid(0.0, 1.0, n_samples=11, dt=0.1)
+
 
 def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
     """A sampled input is held over each period; a function of time is read at the RK4 stage times."""

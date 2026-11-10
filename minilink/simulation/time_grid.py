@@ -1,7 +1,5 @@
 """The simulation time grid: the output samples on ``[t0, tf]``."""
 
-import logging
-
 import numpy as np
 
 # Automatic output grid (points on [t0, tf]) when neither ``n_samples`` nor ``dt``
@@ -28,8 +26,8 @@ def build_time_grid(
     """
     Build time samples on ``[t0, tf]`` and return ``(time_vector, dt, n_samples)``.
 
-    If ``n_samples`` is set, uses a uniform grid of that many points. If only
-    ``dt`` is set, samples ``t0 + k dt``. When ``dt`` divides ``tf - t0`` (to
+    If ``n_samples`` is set, uses a uniform grid of that many points. If
+    ``dt`` is set, samples ``t0 + k dt``; both together are refused. When ``dt`` divides ``tf - t0`` (to
     a relative tolerance of 1e-9, which absorbs round-off such as
     ``1.1 / 0.1``), the grid has ``round((tf - t0) / dt) + 1`` points and
     ends at ``tf``. Otherwise it steps on until it covers ``tf``: the last
@@ -64,13 +62,13 @@ def build_time_grid(
         time_vector = dt_grid(t0, tf, dt)
 
     else:
-        # Both given: n_samples wins, once both are valid
+        # Both given: refused, once each is valid on its own
         require_n_samples(n_samples)
         require_dt(dt)
-        logging.warning(
-            "You must choose between n_samples and dt: using the specified n_samples"
+        raise ValueError(
+            f"a time grid takes n_samples or dt, not both (n_samples={n_samples}, "
+            f"dt={dt}): n_samples points on [t0, tf], or steps of dt from t0"
         )
-        time_vector = np.linspace(t0, tf, n_samples)
 
     require_two_samples(time_vector)
 
