@@ -9,6 +9,7 @@ import numpy as np
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
 from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.step_system import StepSystem
+from minilink.core.options import caller_stacklevel
 from minilink.core.roles import command_port
 from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
@@ -419,7 +420,7 @@ def warn_off_equilibrium(sys, x_bar, u_bar, t, params):
             f"{rate:.3g}. The linear model drops that term, so the loop will not hold "
             "x_bar: pass the input that holds it (u_bar=), or find the point with "
             "find_equilibrium(sys, x_guess)",
-            stacklevel=4,
+            stacklevel=caller_stacklevel(),
         )
 
 

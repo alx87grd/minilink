@@ -18,6 +18,7 @@ from minilink.core.inspect import (
     inspect_inline,
     repr_pretty,
 )
+from minilink.core.options import caller_stacklevel
 from minilink.core.params import (
     flatten,
     lookup,
@@ -133,7 +134,7 @@ class PlanningProblem:
     discount_rate : float, optional
         The continuous discount rate ``ρ ≥ 0`` of the objective
         ``∫ e^{−ρ(t − t0)} g dt + e^{−ρ T} h`` (``T`` the horizon), applied by every consumer (value
-        iteration's ``α`` and reinforcement learning's ``γ`` are
+        iteration's and reinforcement learning's ``γ`` are
         :meth:`discount_factor` of their step). ``0`` (default) is undiscounted.
     penalize_failure : bool, optional
         Whether an evaluation charges a run that fails (leaves ``X`` or ``U``, or
@@ -1159,8 +1160,9 @@ def finite_box_or(box, fallback):
 def fallback_bound(reason):
     """``1e6``, announced with the reason and the line that sets the failure's cost."""
     warnings.warn(
-        f"{reason}: a failure costs 1e6; set failure_cost on the problem to choose it",
-        stacklevel=4,
+        f"{reason}: a failure costs 1e6; set failure_cost on the problem to choose "
+        "it, or a discount_rate, which bounds the cost of an infinite horizon",
+        stacklevel=caller_stacklevel(),
     )
 
     return 1.0e6

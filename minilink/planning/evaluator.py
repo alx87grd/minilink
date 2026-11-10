@@ -17,7 +17,7 @@ from minilink.core.backends import (
 from minilink.core.compile.evaluators.stepping import require_step_knobs
 from minilink.core.compile.plan import PLANT_INPUT
 from minilink.core.distributions import child_seed
-from minilink.core.options import require_one_of
+from minilink.core.options import caller_stacklevel, require_one_of
 from minilink.core.params import (
     Batched,
     canonical_tree,
@@ -1064,7 +1064,7 @@ def horizon_of(problem, episode_length):
             f"the problem has no finite horizon, so the run is scored over "
             f"{EPISODE_LENGTH:g} s: pass episode_length= to choose it, or give the "
             "problem a horizon",
-            stacklevel=4,
+            stacklevel=caller_stacklevel(),
         )
         return EPISODE_LENGTH
 
