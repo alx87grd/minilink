@@ -261,7 +261,7 @@ class ReinforcementLearningPlanner(Planner):
         self.train_state = self.algorithm.init(k_init)
         self.carry = reset_carry(self.env, k_reset, self.n_rollouts)
 
-        # One jitted call per collection, update and action; an off-policy method
+        # One jitted call per collection and update; an off-policy method
         # updates from a replay of its transitions
         self.rollout_jit = jax.jit(
             partial(
@@ -280,9 +280,6 @@ class ReinforcementLearningPlanner(Planner):
                 self.algorithm.buffer_size, self.env.n, self.env.m
             )
             self.update_jit = jax.jit(self.replay_updates)
-        self.action_jit = jax.jit(
-            lambda theta, x: self.actor.action(x, params={"mlp": theta["mlp"]})
-        )
 
     @property
     def dt(self):
@@ -324,6 +321,10 @@ class ReinforcementLearningPlanner(Planner):
         """
         Train for ``n_timesteps`` plant steps; return the learned law as a :class:`PlanningSolution`.
 
+        The steps are rounded up to whole collections, and each solve
+        continues the training where the last one stopped (:attr:`actor` at
+        its weights, :attr:`n_timesteps` counting every solve); the solution
+        holds a copy of the law, which later training leaves as it is.
         The solver record carries the training facts. ``evaluate=True`` also
         scores the deterministic law, as it is handed out, by Monte Carlo over
         ``n_trials`` draws of the problem (a continuous problem's integrated on
@@ -341,24 +342,8 @@ class ReinforcementLearningPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        # Train, timed, then store the learned law as the planner's solution
-        started = time.perf_counter()
-        self.learn(n_timesteps, verbose=verbose)
-        solve_time_s = time.perf_counter() - started
-        solution = self.solution(evaluate, n_trials, solve_time_s)
-
-        return self.store_solution(solution)
-
-    # Training
-
-    def learn(self, n_timesteps, *, verbose=False):
-        """
-        Train for ``n_timesteps`` plant steps (rounded up to whole collections); returns ``self``.
-
-        ``verbose`` prints the environment's semantics, then one line per
-        learning iteration.
-        """
         jax = require_jax()
+        started = time.perf_counter()
 
         steps_per_iteration = self.n_steps_per_update * self.n_rollouts
         n_iterations = math.ceil(n_timesteps / steps_per_iteration)
@@ -386,7 +371,13 @@ class ReinforcementLearningPlanner(Planner):
             if verbose:
                 self.print_iteration(record, stats)
 
-        return self
+        # The training timed, then the learned law stored as the planner's solution
+        solve_time_s = time.perf_counter() - started
+        solution = self.solution(evaluate, n_trials, solve_time_s)
+
+        return self.store_solution(solution)
+
+    # Training
 
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another tree: those it was given, its actor and update rule as they were before learning."""
@@ -427,43 +418,6 @@ class ReinforcementLearningPlanner(Planner):
         """Copy the current policy network weights into the actor block."""
         theta = self.algorithm.params(self.train_state)["policy"]
         self.actor.params["mlp"] = {k: np.asarray(v) for k, v in theta["mlp"].items()}
-
-    # The learned law
-
-    def predict(self, x, deterministic=True):
-        """
-        The learned law ``u = pi(x)`` for one state or a batch of states (rows).
-
-        ``deterministic=False`` draws the action from the exploration policy
-        instead, ``a ~ pi_theta(. | x)`` on a fresh split of the planner's key,
-        and maps it onto the input port. Returns ``(u, None)``, the shape of
-        Stable-Baselines3's ``predict``, so a script written for one trains and
-        evaluates with the other.
-        """
-        jax = require_jax()
-        jnp = require_jax_numpy()
-
-        theta = self.algorithm.params(self.train_state)["policy"]
-        x = jnp.asarray(x, dtype=float)
-
-        # u = π(x), row by row for a batch of states
-        if deterministic:
-            if x.ndim == 2:
-                u = jax.vmap(self.action_jit, in_axes=(None, 0))(theta, x)
-            else:
-                u = self.action_jit(theta, x)
-
-        # a ~ π_θ(· | x), one key per state, then u = u_mid + u_half clip(a, −1, 1)
-        else:
-            self.key, key = jax.random.split(self.key)
-            if x.ndim == 2:
-                key = jax.random.split(key, x.shape[0])
-            a = self.exploration_policy.sample(theta, x, key)
-            u = self.exploration_policy.input(a)
-
-        u = np.asarray(u)
-
-        return u, None
 
     # Plots
 

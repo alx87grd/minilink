@@ -286,6 +286,13 @@ RETIRED_NAMES = {
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
         "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
     ),
+    # The RL planner speaks minilink's words (the maintainer's ruling 18 of 2026-11-10)
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.learn": (
+        "solve(n_timesteps=), which continues the training"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.predict": (
+        "solution.controller or planner.actor.action(x); predict is SB3's, through SB3Controller"
+    ),
 }
 
 

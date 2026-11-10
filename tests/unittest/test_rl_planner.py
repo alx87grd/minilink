@@ -219,8 +219,8 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     np.testing.assert_allclose(
         solution.controller.params["mlp"]["W0"], np.asarray(actor["W0"])
     )
-    u, _ = planner.predict(np.zeros((3, 2)))
-    assert u.shape == (3, 1)
+    u = solution.controller.action(np.zeros(2))
+    assert u.shape == (1,)
 
 
 def test_the_planner_trains_the_actor_it_is_given():
@@ -243,7 +243,7 @@ def test_the_planner_trains_the_actor_it_is_given():
     )
 
 
-def test_predict_draws_unless_deterministic():
+def test_the_exploration_policy_draws_around_the_actors_law():
     planner = ReinforcementLearningPlanner(
         problem(horizon=np.inf),
         dt=0.1,
@@ -251,17 +251,25 @@ def test_predict_draws_unless_deterministic():
         n_rollouts=4,
         n_steps_per_update=8,
     )
+    policy = planner.exploration_policy
+    theta = planner.algorithm.params(planner.train_state)["policy"]
     x = np.array([[0.1, 0.0], [-0.2, 0.3], [0.4, -0.1], [0.0, 0.2]])
-    mean_1, _ = planner.predict(x)
-    mean_2, _ = planner.predict(x)
-    draw_1, _ = planner.predict(x, deterministic=False)
-    draw_2, _ = planner.predict(x, deterministic=False)
-    np.testing.assert_array_equal(mean_1, mean_2)
-    assert draw_1.shape == mean_1.shape == (4, 1)
+    mean = np.stack([planner.actor.action(xi) for xi in x])
+    np.testing.assert_array_equal(
+        mean, np.stack([planner.actor.action(xi) for xi in x])
+    )
+
+    def draw(seed, states):
+        key = jax.random.PRNGKey(seed)
+        if states.ndim == 2:
+            key = jax.random.split(key, states.shape[0])
+        return np.asarray(policy.input(policy.sample(theta, jnp.asarray(states), key)))
+
+    draw_1, draw_2 = draw(0, x), draw(1, x)
+    assert draw_1.shape == mean.shape == (4, 1)
     assert not np.array_equal(draw_1, draw_2)
     assert np.all(np.abs(draw_1) <= 4.0)  # mapped onto the input port's bounds
-    one, _ = planner.predict(x[0], deterministic=False)
-    assert one.shape == (1,)
+    assert draw(2, x[0]).shape == (1,)
 
 
 def test_training_reports_only_when_the_verb_asks(capsys):
@@ -274,7 +282,7 @@ def test_training_reports_only_when_the_verb_asks(capsys):
         batch_size=32,
     )
     assert capsys.readouterr().out == ""
-    planner.learn(32, verbose=True)
+    planner.solve(n_timesteps=32, verbose=True)
     logged = capsys.readouterr().out
     assert "ReinforcementLearningPlanner: " in logged and "steps" in logged
     planner.solve(n_timesteps=32)
@@ -420,7 +428,7 @@ def test_plain_planning_problem_trains_from_its_single_start():
         prob, dt=0.1, n_rollouts=2, n_steps_per_update=16, batch_size=32
     )
     np.testing.assert_allclose(np.asarray(planner.carry[0]), [[0.2, 0.0], [0.2, 0.0]])
-    planner.learn(32)
+    planner.solve(n_timesteps=32)
     assert planner.n_timesteps == 32
 
 
@@ -472,7 +480,9 @@ def test_sac_trains_through_the_same_planner_loop():
     )
     assert isinstance(planner.algorithm, SAC) and not planner.algorithm.on_policy
     assert planner.actor.squash == "tanh"
-    planner.learn(48)  # three collections: fill the buffer, then two update rounds
+    planner.solve(
+        n_timesteps=48
+    )  # three collections: fill the buffer, then two update rounds
     assert planner.replay.size == 48
     assert "critic_loss" in planner.history[-1] and "alpha" in planner.history[-1]
     u = planner.actor.action(np.zeros(2))
@@ -537,8 +547,8 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
     assert reused.target_entropy is None  # the user's choice, kept
     planner = sac_planner(three_inputs, reused)
     fresh = sac_planner(three_inputs, sac())
-    planner.learn(32)
-    fresh.learn(32)
+    planner.solve(n_timesteps=32)
+    fresh.solve(n_timesteps=32)
     np.testing.assert_allclose(
         np.asarray(planner.train_state["log_alpha"]),
         np.asarray(fresh.train_state["log_alpha"]),
@@ -626,7 +636,7 @@ def test_planner_trains_with_randomized_parameters():
     )
     episode = planner.carry[3]
     assert set(np.unique(np.asarray(episode["plant"]["m"]))) <= {0.5, 2.0}
-    planner.learn(64)
+    planner.solve(n_timesteps=64)
     assert np.all(np.isfinite(np.asarray(planner.carry[0])))
 
 
@@ -668,7 +678,7 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
         prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=16, batch_size=32
     )
     assert planner.env.action_port == "r" and planner.env.m == 2
-    planner.learn(64)
+    planner.solve(n_timesteps=64)
     ctl = planner.actor
     u = ctl.action(np.zeros(2))
     assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
@@ -733,13 +743,12 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     expected = {"reinforce": REINFORCE, "actor_critic": ActorCritic}[algorithm]
     assert isinstance(planner.algorithm, expected) and planner.algorithm.on_policy
     if algorithm == "reinforce":
-        assert (
-            planner.critic is None and planner.n_steps_per_update == 5
-        )  # one episode length
+        # one episode length
+        assert planner.critic is None and planner.n_steps_per_update == 5
     else:
         assert planner.critic is not None and planner.n_steps_per_update == 16
     before = np.asarray(planner.actor.params["mlp"]["W0"]).copy()
-    planner.learn(2 * planner.n_steps_per_update * planner.n_rollouts)
+    planner.solve(n_timesteps=2 * planner.n_steps_per_update * planner.n_rollouts)
     assert len(planner.history) == 2
     assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
     solution = planner.solve(
@@ -748,6 +757,10 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
     assert (
         solution.success and solution.record.method == type(planner.algorithm).__name__
     )
+    # a solve continues the training where the last one stopped
+    per_update = planner.n_steps_per_update * planner.n_rollouts
+    assert solution.record.n_timesteps == planner.n_timesteps == 3 * per_update
+    assert len(planner.history) == 3
 
 
 def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():

@@ -451,6 +451,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     transitions), read back as `planner.n_rollouts` and `planner.n_steps_per_update`;
     `policy=` → `actor=`, the block it trains, read back as `planner.actor` (the handed-out
     copy stays `solution.controller`; the `…Policy` classes keep their names, an open question).
+    `planner.learn(n)` → `planner.solve(n_timesteps=n)`: each solve continues the training where
+    the last one stopped, as `learn` did, and hands out its copy of the law;
+    `planner.predict(x)` is gone: the law is `solution.controller` (or
+    `planner.actor.action(x)`), an exploration draw the planner's `exploration_policy`
+    (`sample`, then `input`); `predict` is Stable-Baselines3's word, read by `SB3Controller`.
 
 ## 3. Maturity (TRL)
 

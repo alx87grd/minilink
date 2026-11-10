@@ -1617,7 +1617,10 @@ weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's runs with draws are
 `evaluate(problem, solution.controller, trajectories=True)`. The block being trained (given as `actor=`, else built
 from `hidden=` and `features=`), updated in place every learning iteration, is `planner.actor`; the plant steps trained so far,
-`planner.n_timesteps`.
+`planner.n_timesteps`. `solve` is the one verb: each call continues the training where the last
+one stopped and hands out a copy of the law at its weights (no `learn`); the law is read as
+`solution.controller` or `planner.actor.action(x)` (no `predict`, which is Stable-Baselines3's
+own word, read through the bridge's `SB3Controller`).
 What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy`): the actor's
 mean action (its `actor`, the planner's) with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
