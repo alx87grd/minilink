@@ -42,7 +42,7 @@ class TabularLearningPlanner(Planner):
     ``(x_k, u_k, c_k, x_{k+1})`` between nodes. Every algorithm updates one cell of the table by a
     moving average toward its own sample ``q`` of the cost-to-go,
 
-        Q(x, u) <- Q(x, u) + eta (q - Q(x, u)),
+        Q(x, u) <- Q(x, u) + η (q - Q(x, u)),
 
     Q-learning with the Bellman target ``q = c + gamma min_u' Q(x', u')``,
     SARSA with the action actually taken next, Monte Carlo control with the
@@ -67,9 +67,9 @@ class TabularLearningPlanner(Planner):
     exploration : EpsilonGreedy or UCB, optional
         How actions are chosen while learning (default ``EpsilonGreedy()``,
         annealed from 1 to 0.05 over each call to :meth:`learn`).
-    eta : float, optional
-        Learning rate of the moving average; ``None`` averages the samples of
-        each cell (the step ``1/N(x, u)``).
+    learning_rate : float, optional
+        Learning rate ``η`` of the moving average; ``None`` averages the samples
+        of each cell (the step ``1/N(x, u)``).
     gamma : float, optional
         Discount per control period; default the problem's
         ``discount_factor(dt)``, which is 1 for an undiscounted problem, as for
@@ -105,7 +105,7 @@ class TabularLearningPlanner(Planner):
 
     accepts_stochastic = True
 
-    number_names = ("eta", "gamma")
+    number_names = ("learning_rate", "gamma")
 
     def __init__(
         self,
@@ -117,7 +117,7 @@ class TabularLearningPlanner(Planner):
         dt=None,
         method="q_learning",
         exploration=None,
-        eta=0.1,
+        learning_rate=0.1,
         gamma=None,
         episode_length=None,
         exploring_starts=True,
@@ -156,7 +156,7 @@ class TabularLearningPlanner(Planner):
         self.rounding = rounding
         self.algorithm = self.build_algorithm(method)
         self.exploration = EpsilonGreedy() if exploration is None else exploration
-        self.eta = None if eta is None else float(eta)
+        self.learning_rate = None if learning_rate is None else float(learning_rate)
         self.gamma = problem.discount_factor(grid.dt) if gamma is None else float(gamma)
         self.given = given_numbers(gamma=gamma)
         self.exploring_starts = bool(exploring_starts)
@@ -279,7 +279,7 @@ class TabularLearningPlanner(Planner):
             dt=grid.dt,
             method=self.algorithm,
             exploration=self.exploration,
-            eta=self.eta,
+            learning_rate=self.learning_rate,
             episode_length=self.episode_length,
             exploring_starts=self.exploring_starts,
             rounding=self.rounding,
@@ -298,7 +298,7 @@ class TabularLearningPlanner(Planner):
         N = self.visits
         algorithm = self.algorithm
         explore = self.exploration
-        eta = self.eta
+        eta = self.learning_rate
         gamma = self.gamma
         rng = self.rng
         episodes = report_progress(

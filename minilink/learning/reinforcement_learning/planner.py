@@ -193,7 +193,7 @@ class ReinforcementLearningPlanner(Planner):
         # Training progress: plant steps, wall-clock time, the latest mean episode
         # return, and one record per learning iteration
         self.n_timesteps = 0
-        self.train_time = 0.0
+        self.train_time_s = 0.0
         self.last_ep_return_mean = np.nan
         self.history = []
 
@@ -369,7 +369,7 @@ class ReinforcementLearningPlanner(Planner):
             # Collect experience and update the weights, timed to completion
             batch, stats = self.collect_and_update(k_collect, k_update)
             jax.block_until_ready(self.train_state)
-            self.train_time += time.time() - t0
+            self.train_time_s += time.time() - t0
             self.n_timesteps += steps_per_iteration
 
             # The new weights, copied into the actor block
@@ -651,7 +651,7 @@ class ReinforcementLearningPlanner(Planner):
             "ep_return_mean": self.last_ep_return_mean,
             "n_episodes": int(ep_returns.size),
             "fps": self.n_steps * self.n_envs / max(time.time() - t0, 1e-9),
-            "elapsed": self.train_time,
+            "elapsed": self.train_time_s,
             **{k: float(v) for k, v in stats.items()},
         }
         self.history.append(record)
@@ -721,7 +721,7 @@ class ReinforcementLearningPlanner(Planner):
         return ReinforcementLearningRecord(
             method=type(self.algorithm).__name__,
             n_timesteps=self.n_timesteps,
-            train_time_s=self.train_time,
+            train_time_s=self.train_time_s,
             cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,

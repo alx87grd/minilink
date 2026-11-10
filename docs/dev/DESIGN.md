@@ -1537,7 +1537,7 @@ policy-family planners beside DP, one per representation of the law.
 the cost-to-go table `Q(x, u)` on a `StateSpaceGrid` from transitions alone,
 NumPy only: the state is rounded to its nearest node, the action taken among
 the grid's input levels, and every algorithm is a moving average toward its
-own sample of the cost-to-go, `Q <- Q + eta (q - Q)`: `QLearning` (target
+own sample of the cost-to-go, `Q <- Q + η (q - Q)`, `η` the `learning_rate=`: `QLearning` (target
 `c + gamma min Q(x', .)`, off-policy), `SARSA` (the action taken next,
 on-policy), `MonteCarloControl` (the cost observed to the episode's end).
 Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`

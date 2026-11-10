@@ -2107,7 +2107,7 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
                 backend="numpy",
             ).solve()
         self.assertEqual(plan.record.message, "solver claims success")
-        self.assertTrue(plan.record.solver_success)
+        self.assertTrue(plan.record.optimizer_success)
         self.assertFalse(plan.record.feasible)
         self.assertFalse(plan.success)
 

@@ -60,7 +60,7 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
 
     # The same grid, Euler step and exit failure_cost; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
-        problem, gamma=0.9, eta=0.1, solver="euler", seed=0, **GRID
+        problem, gamma=0.9, learning_rate=0.1, solver="euler", seed=0, **GRID
     )
     solution = learner.solve(n_episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
@@ -153,7 +153,7 @@ def test_exploration_policies_choose_valid_actions():
 
 def test_sample_average_step_and_the_planner_arguments():
     problem = double_integrator_problem()
-    learner = TabularLearningPlanner(problem, eta=None, **GRID)
+    learner = TabularLearningPlanner(problem, learning_rate=None, **GRID)
     solution = learner.solve(n_episodes=5, evaluate=True)
     assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]

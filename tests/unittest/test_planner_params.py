@@ -67,7 +67,7 @@ PLANNERS = {
     ),
     "tabular": (
         lambda **k: TabularLearningPlanner(regulation(), **GRID, **k),
-        {"eta": 0.5},
+        {"learning_rate": 0.5},
     ),
     "LQR": (
         lambda **k: LQRPlanner(reach().replace(Xf=None), **k),

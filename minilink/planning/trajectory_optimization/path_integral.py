@@ -110,7 +110,7 @@ class MPPIPlanner(Planner):
         Sigma = covariance_of(noise, lower, upper)
 
         # The method's numbers: the defaults of params["method"] and params["seed"]
-        self.method = {
+        self.method_numbers = {
             "temperature": float(temperature),
             "noise": Sigma,
             "control_cost": float(control_cost),
@@ -133,7 +133,7 @@ class MPPIPlanner(Planner):
         }
         if problem.X.params:
             tree["X"] = copy.deepcopy(problem.X.params)
-        tree["method"] = self.method
+        tree["method"] = self.method_numbers
         tree["seed"] = self.seed
 
         return tree

@@ -313,7 +313,7 @@ class TrajectoryOptimizationPlanner(Planner):
         # The solver's account of the solve, beside the feasibility check
         record = TrajectoryOptimizationRecord(
             cost=optimization_result.cost,
-            solver_success=bool(optimization_result.success),
+            optimizer_success=bool(optimization_result.success),
             message=str(optimization_result.message),
             n_iterations=dict(optimization_result.stats).get("nit"),
             solve_time_s=optimization_result.solve_time_s,
@@ -587,11 +587,11 @@ class TrajectoryOptimizationRecord:
     ``success`` is *the returned plan satisfies the program constraints to
     ``feasibility_tol``*, nothing else: an iteration-limit stop on a feasible
     plan is not a failure, a solver that reports convergence on an infeasible
-    plan is. The solver's own flag and message stay beside it.
+    plan is. The optimizer's own flag, ``optimizer_success``, and its message stay beside it.
     """
 
     cost: float | None
-    solver_success: bool
+    optimizer_success: bool
     message: str
     n_iterations: int | None
     solve_time_s: float | None
@@ -611,7 +611,7 @@ class TrajectoryOptimizationRecord:
     def success(self) -> bool:
         """The plan is feasible to ``feasibility_tol``; on an online tick, the solver's flag."""
         if self.feasible is None:
-            return bool(self.solver_success)
+            return bool(self.optimizer_success)
 
         return bool(self.feasible)
 
@@ -629,7 +629,9 @@ class TrajectoryOptimizationRecord:
         if self.max_equality_violation is not None:
             check += f" (max defect {self.max_equality_violation:.2g})"
 
-        solver = f"solver {'ok' if self.solver_success else 'stopped'}: {self.message}"
+        solver = (
+            f"solver {'ok' if self.optimizer_success else 'stopped'}: {self.message}"
+        )
         if self.n_iterations is not None:
             solver += f", {self.n_iterations} iterations"
         if self.solve_time_s is not None:

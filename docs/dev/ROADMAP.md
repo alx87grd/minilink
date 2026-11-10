@@ -279,6 +279,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     params)` → `step(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *,
     t=0.0)` and `NeuralPolicy.action(x, params=None)` → `action(x, t=0.0, params=None)`
     (pass `params=` by keyword).
+  - *A word per idea.* `MPPIPlanner.method` (its dict of numbers, `params["method"]`'s
+    defaults) → `planner.method_numbers`; `TabularLearningPlanner(eta=)` and `.eta` →
+    `learning_rate` (the `params["method"]` key with them), as the `Optimizer`'s;
+    `ReinforcementLearningPlanner.train_time` → `train_time_s`, as its record;
+    `TrajectoryOptimizationRecord.solver_success` → `optimizer_success`.
 
 ## 3. Maturity (TRL)
 

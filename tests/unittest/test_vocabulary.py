@@ -196,6 +196,9 @@ RETIRED = {
     "save_path": ("file_name", None),
     "plot_policy_field": ("plot_control_law_field", None),
     "plot_value": ("plot_cost_to_go", ("StateSpaceGrid",)),
+    "eta": ("learning_rate", ("TabularLearningPlanner",)),
+    "train_time": ("train_time_s", None),
+    "solver_success": ("optimizer_success", None),
     "options": (
         "n_steps",
         (
@@ -227,6 +230,9 @@ RETIRED_NAMES = {
     ),
     "minilink.planning.dynamic_programming.discretizer.StateSpaceGrid.plot_value": (
         "plot_cost_to_go"
+    ),
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationRecord.solver_success": (
+        "optimizer_success"
     ),
 }
 
@@ -308,7 +314,13 @@ def test_a_method_takes_the_model_order(path):
 @pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
 def test_no_retired_name_at_its_path(path):
     name = path.rsplit(".", 1)[-1]
-    assert not hasattr(owner_of(path), name), (
+    owner = owner_of(path)
+    fields = (
+        {f.name for f in dataclasses.fields(owner)}
+        if dataclasses.is_dataclass(owner)
+        else set()
+    )
+    assert not hasattr(owner, name) and name not in fields, (
         f"{path} is retired, write {RETIRED_NAMES[path]!r}"
     )
 

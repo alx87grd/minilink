@@ -306,7 +306,7 @@ class CompiledTrajectoryPlanner:
 
         record = TrajectoryOptimizationRecord(
             cost=result.cost,
-            solver_success=result.success,
+            optimizer_success=result.success,
             message="",
             n_iterations=status.get("n_iterations"),
             solve_time_s=None,
