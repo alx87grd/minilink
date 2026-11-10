@@ -661,18 +661,18 @@ class TestImpedanceController(unittest.TestCase):
         np.testing.assert_allclose(ctl.params["Kd"], [[10.0]])
 
     def test_vector_regulation(self):
-        ctl = Impedance(dof=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
+        ctl = Impedance(dim=2, Kp=[2.0, 3.0], Kd=[0.5, 0.5])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.3, 0.4]))
         np.testing.assert_allclose(u, [2.0 * 0.9 - 0.5 * 0.3, 3.0 * 1.8 - 0.5 * 0.4])
 
     def test_a_full_stiffness_matrix_couples_the_axes(self):
         Kp = np.array([[2.0, 1.0], [0.0, 3.0]])
-        ctl = Impedance(dof=2, Kp=Kp, Kd=0.0)
+        ctl = Impedance(dim=2, Kp=Kp, Kd=0.0)
         e = np.array([0.9, 1.8])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.1, 0.2, 0.0, 0.0]))
         np.testing.assert_allclose(u, Kp @ e)
         with self.assertRaisesRegex(ValueError, r"\(2, 2\) matrix"):
-            Impedance(dof=2, Kp=np.ones((3, 3)))
+            Impedance(dim=2, Kp=np.ones((3, 3)))
 
     def test_the_limits_clip_the_command_and_hold_the_integrator(self):
         ctl = Impedance(Kp=10.0, Kd=0.0, u_max=1.0)
@@ -688,7 +688,7 @@ class TestImpedanceController(unittest.TestCase):
         )
 
     def test_vector_tracking_ref(self):
-        ctl = Impedance(dof=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0])
+        ctl = Impedance(dim=2, tracking_ref=True, Kp=[1.0, 1.0], Kd=[1.0, 1.0])
         u = ctl.ctl(None, np.array([1.0, 2.0, 0.0, 0.0, 0.5, 0.1, 0.2, 0.3]))
         np.testing.assert_allclose(
             u,

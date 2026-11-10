@@ -1780,7 +1780,7 @@ class TestPlotControlLaw(unittest.TestCase):
         plt.close(res.figure)
 
     def test_impedance_error_plane_values(self):
-        pd = Impedance(dof=1, Kp=10.0, Kd=1.0)
+        pd = Impedance(dim=1, Kp=10.0, Kd=1.0)
         res = pd.plot_control_law(
             bounds=((-1.0, 1.0), (-2.0, 2.0)), grid_shape=(5, 5), show=False
         )

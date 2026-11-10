@@ -20,9 +20,11 @@ from minilink.core.system import DynamicSystem, System
 class Impedance(System):
     """Virtual spring-damper ``u = Kp (q_d − q) + Kd (dq_d − dq)`` on a measured ``[q; dq]``.
 
-    The measurement port ``y`` carries ``[q; dq]`` (dim ``2·dof``). The reference
-    ``r`` is ``q_d`` (dim ``dof``, regulation: ``dq_d = 0``) or ``[q_d; dq_d]``
-    (dim ``2·dof``, ``tracking_ref=True``). No state: the loop adds no pole.
+    The measurement port ``y`` carries ``[q; dq]`` (dim ``2·dim``). The reference
+    ``r`` is ``q_d`` (dim ``dim``, regulation: ``dq_d = 0``) or ``[q_d; dq_d]``
+    (dim ``2·dim``, ``tracking_ref=True``). No state: the loop adds no pole.
+    The signature is the PID family's: the gains first, ``Impedance(10.0, 1.0)``,
+    the channel count ``dim`` a keyword.
 
     What is measured decides the derivative: this block reads the rate, so it
     carries no filter state, where :class:`~minilink.control.siso.PD` and
@@ -31,14 +33,14 @@ class Impedance(System):
 
     Parameters
     ----------
-    dof : int
+    Kp, Kd : float, vector or (dim, dim) array
+        Stiffness and damping: a scalar or a per-axis vector is a diagonal
+        matrix, a full matrix couples the axes. Stored in ``self.params`` as
+        ``(dim, dim)`` arrays, the shape a value assigned there later must have.
+    dim : int
         Number of axes.
     tracking_ref : bool
         If ``True``, ``r`` is ``[q_d; dq_d]``; otherwise ``q_d`` alone.
-    Kp, Kd : float, vector or (dof, dof) array
-        Stiffness and damping: a scalar or a per-axis vector is a diagonal
-        matrix, a full matrix couples the axes. Stored in ``self.params`` as
-        ``(dof, dof)`` arrays, the shape a value assigned there later must have.
     u_min, u_max : float or vector
         Actuator limits per axis.
     y_labels, y_units, u_labels, u_units : sequence of str, optional
@@ -49,11 +51,11 @@ class Impedance(System):
 
     def __init__(
         self,
-        dof: int = 1,
-        *,
-        tracking_ref: bool = False,
         Kp=10.0,
         Kd=1.0,
+        *,
+        dim: int = 1,
+        tracking_ref: bool = False,
         u_min: float = -np.inf,
         u_max: float = np.inf,
         y_labels=None,
@@ -61,11 +63,11 @@ class Impedance(System):
         u_labels=None,
         u_units=None,
     ):
-        n = int(dof)
-        require_positive_dim(n, "dof")
+        n = int(dim)
+        require_positive_dim(n)
 
         super().__init__()
-        self.dof = n
+        self.dim = n
 
         # Parameters: stiffness and damping as (n, n) matrices, the limits per axis
         self.params = {
@@ -86,7 +88,7 @@ class Impedance(System):
 
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])
-        n = self.dof
+        n = self.dim
         ref_dim = self.inputs["r"].dim
 
         e, de = tracking_errors(u, n, ref_dim)
@@ -110,7 +112,7 @@ class IntegralImpedance(DynamicSystem):
 
     Parameters
     ----------
-    dof, tracking_ref, Kp, Kd, u_min, u_max : as :class:`Impedance`.
+    Kp, Kd, dim, tracking_ref, u_min, u_max : as :class:`Impedance`.
     Ki : float or vector
         Integral gain per axis, never a matrix: the anti-windup hold pairs a
         command with its own error.
@@ -124,12 +126,12 @@ class IntegralImpedance(DynamicSystem):
 
     def __init__(
         self,
-        dof: int = 1,
-        *,
-        tracking_ref: bool = False,
         Kp=10.0,
         Ki=1.0,
         Kd=1.0,
+        *,
+        dim: int = 1,
+        tracking_ref: bool = False,
         u_min: float = -np.inf,
         u_max: float = np.inf,
         e_int_min: float = -np.inf,
@@ -139,11 +141,11 @@ class IntegralImpedance(DynamicSystem):
         u_labels=None,
         u_units=None,
     ):
-        n = int(dof)
-        require_positive_dim(n, "dof")
+        n = int(dim)
+        require_positive_dim(n)
 
         super().__init__(state_dim=n)
-        self.dof = n
+        self.dim = n
 
         # Parameters: stiffness and damping as (n, n) matrices, the integral gain,
         # the limits and the end stops per axis
@@ -169,7 +171,7 @@ class IntegralImpedance(DynamicSystem):
         params = self.params if params is None else params
         xp = array_module(x)
 
-        n = self.dof
+        n = self.dim
         ref_dim = self.inputs["r"].dim
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])
@@ -190,7 +192,7 @@ class IntegralImpedance(DynamicSystem):
         params = self.params if params is None else params
         xp = array_module(x)
 
-        n = self.dof
+        n = self.dim
         ref_dim = self.inputs["r"].dim
         Kp = xp.asarray(params["Kp"])
         Kd = xp.asarray(params["Kd"])

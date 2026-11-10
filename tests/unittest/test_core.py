@@ -331,11 +331,11 @@ class TestDiagramCompositionShortcuts(unittest.TestCase):
     def test_a_mechanical_plant_closes_on_its_state_y(self):
         plant = TwoLinkManipulator()
         self.assertFalse({"q", "dq"} & set(plant.outputs))  # y is [q; dq]
-        diagram = closed_loop(Impedance(dof=2), plant)
+        diagram = closed_loop(Impedance(dim=2), plant)
         self.assertEqual(list(diagram.subsystems), ["controller", "plant"])
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
         with self.assertRaisesRegex(ValueError, "declares measurement 'y' dim 2"):
-            closed_loop(Impedance(dof=1), plant)
+            closed_loop(Impedance(dim=1), plant)
 
 
 from minilink.core.closed_loop import closed_loop, resolve_standard_feedback

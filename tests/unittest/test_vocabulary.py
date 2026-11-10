@@ -178,7 +178,10 @@ RETIRED = {
     ),
     "plot_backend": ("plot_renderer", None),
     "p": ("dim", ("Source", "WhiteNoise")),
-    "dof": ("dim (dof stays a manipulator's joints)", ("P", "PI", "PD", "PID")),
+    "dof": (
+        "dim (dof stays a manipulator's joints)",
+        ("P", "PI", "PD", "PID", "Impedance", "IntegralImpedance"),
+    ),
     "filename": ("file_name", None),
     "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
     "show_signal": ("plot_signal", None),
@@ -381,6 +384,11 @@ LEADING_POSITIONALS = {
     ),
     "minilink.planning.evaluator.evaluate": ("problem", "controller", "dt"),
     "minilink.planning.problems.PlanningProblem.compile": ("controller", "dt"),
+    # The impedance laws take the PID family's signature: the gains first, dim a keyword
+    # (the maintainer's ruling 9 of 2026-11-10)
+    "minilink.control.impedance.Impedance.__init__": ("Kp", "Kd"),
+    "minilink.control.impedance.IntegralImpedance.__init__": ("Kp", "Ki", "Kd"),
+    "minilink.control.siso.PID.__init__": ("Kp", "Ki", "Kd", "tau"),
 }
 
 

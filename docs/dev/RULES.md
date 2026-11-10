@@ -138,7 +138,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
-  | A block's channel count (sources, white noise, routing, saturation, delay, the PID family) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
+  | A block's channel count (sources, white noise, routing, saturation, delay, the PID family, the impedance laws) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
   | The fixed-step time integration of `solver=` (the simulator, as `discretize` and the evaluators) | `"rk4"`, `"euler"` | `"rk4_fixedsteps"`, `"euler_fixedsteps"` |
   | An author's reads: the input ports' values in `u`, by name; a recorded signal of a run | `sys.ports(u, "r", "y")`; `traj.signal(name)` | `get_port_values_from_u`, `get_signal` |
   | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |

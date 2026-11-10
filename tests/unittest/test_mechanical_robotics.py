@@ -463,7 +463,7 @@ class TestManipulatorPorts(unittest.TestCase):
 
 class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop(self):
-        diagram = closed_loop(Impedance(dof=2), TwoLinkManipulator())
+        diagram = closed_loop(Impedance(dim=2), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 

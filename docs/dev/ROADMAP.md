@@ -333,6 +333,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `plot_diagram(show_inline=True)` → `plot_diagram(show="inline")`, `show_pdf=True` →
     `show="pdf"`, `show="window"` the Matplotlib window; `show=True` still picks the place
     (inline in a notebook, a window in a script) and `show=False` builds the graph only.
+  - *The impedance laws take the PID family's signature* (the maintainer's ruling 9):
+    `Impedance(dof=1, *, Kp=10.0, Kd=1.0, …)` → `Impedance(Kp=10.0, Kd=1.0, *, dim=1,
+    tracking_ref=False, …)` and `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`, so
+    `Impedance(10.0)` is a stiffness of 10, no longer a 10-axis block; `dof=` → `dim=` and the
+    attribute `.dof` → `.dim`, as `PD(Kp, Kd, *, dim=1)`. `JointImpedance` and
+    `TaskImpedance` take the plant and keep its `dof` (a manipulator's joints).
 
 ## 3. Maturity (TRL)
 
