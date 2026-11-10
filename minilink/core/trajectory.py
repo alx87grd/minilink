@@ -38,7 +38,7 @@ class SampledSignals:
         """Return ``True`` when a named signal is available."""
         return name in {"x", "u"} or name in self.signals
 
-    def get_signal(self, name: str) -> np.ndarray:
+    def signal(self, name: str) -> np.ndarray:
         """Return a sampled signal by name."""
         if name == "x":
             return self.x
@@ -183,7 +183,7 @@ class Trajectory(SampledSignals):
         Linear between the samples and held outside them, shape ``(dim,)``;
         ``name`` is ``"x"``, ``"u"`` or a recorded signal.
         """
-        values = self.get_signal(name)
+        values = self.signal(name)
         xp = array_module(values)
 
         value = interpolate_schedule(xp, self.t, values.T, t)

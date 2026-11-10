@@ -712,7 +712,7 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
     late.x0 = mpc.pv.initial()
     computer = (mpc % 0.05) >> (late % 0.05) >> (PlanFollower(planner) % 0.01)
     pe = problem.compile(computer, backend="jax")
-    u = np.asarray(pe.trajectory().get_signal("plant:u"))[0]
+    u = np.asarray(pe.trajectory().signal("plant:u"))[0]
 
     # The first slow period applies the guess (zero); the plan solved at t = 0 from
     # x(0) arrives at t = 0.05 and is read at the fast ticks

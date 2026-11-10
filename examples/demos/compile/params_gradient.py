@@ -59,7 +59,7 @@ class TraceableImpedanceController(System):
         Kp = params["Kp"]
         Kd = params["Kd"]
         xp = array_module(u)
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
 
         # PD law on the angle with rate damping: tau = Kp (r - q) - Kd dq
         tau = Kp * (r[0] - y[0]) - Kd * y[1]

@@ -140,6 +140,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
   | A block's channel count (sources, white noise, routing, saturation, delay, the PID family) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
   | The fixed-step time integration of `solver=` (the simulator, as `discretize` and the evaluators) | `"rk4"`, `"euler"` | `"rk4_fixedsteps"`, `"euler_fixedsteps"` |
+  | An author's reads: the input ports' values in `u`, by name; a recorded signal of a run | `sys.ports(u, "r", "y")`; `traj.signal(name)` | `get_port_values_from_u`, `get_signal` |
   | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |
   | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
   | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |

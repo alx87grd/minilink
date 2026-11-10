@@ -1542,7 +1542,7 @@ def test_a_diagram_run_records_the_plants_input_from_the_run_itself(run):
     assert traj.of("plant").u.shape == (1, traj.n_samples)
     expected = loop.reconstruct_internal_signals(bare, ports=("plant:u",))
     np.testing.assert_allclose(
-        traj.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+        traj.signal("plant:u"), expected.signal("plant:u"), atol=1e-12
     )
 
     # record=None keeps nothing, the plant's role still names its state slice
@@ -1583,9 +1583,9 @@ def test_a_held_simulator_records_on_the_numbers_the_run_was_made_with():
         expected = loop.reconstruct_internal_signals(run, ("plant:u",), params=tree)
         stale = loop.reconstruct_internal_signals(run, ("plant:u",))
         np.testing.assert_allclose(
-            run.get_signal("plant:u"), expected.get_signal("plant:u"), atol=1e-12
+            run.signal("plant:u"), expected.signal("plant:u"), atol=1e-12
         )
-        assert not np.allclose(run.get_signal("plant:u"), stale.get_signal("plant:u"))
+        assert not np.allclose(run.signal("plant:u"), stale.signal("plant:u"))
 
 
 def test_the_stiff_preset_tightens_only_the_method_and_takes_the_jacobian_on_both_backends():

@@ -283,9 +283,7 @@ class CommandPorts:
         jnp = require_jax_numpy()
 
         if self.named_ports:
-            parts = self.get_port_values_from_u(
-                u, *[name for name, _ in self.port_specs]
-            )
+            parts = self.ports(u, *[name for name, _ in self.port_specs])
             commands = jnp.array([part[0] for part in parts])
         else:
             commands = jnp.asarray(u)

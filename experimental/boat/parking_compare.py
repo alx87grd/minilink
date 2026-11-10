@@ -51,7 +51,7 @@ for water, current in WATERS.items():
     for name, ctl in (("Cascade", cascade), ("PPO", ppo)):
         loop = ctl @ boat
         traj = loop.reconstruct_internal_signals(loop.compute_trajectory(tf=TF, dt=DT))
-        runs[name, water] = Trajectory(traj.t, traj.x, traj.get_signal("controller:u"))
+        runs[name, water] = Trajectory(traj.t, traj.x, traj.signal("controller:u"))
 
     # MPC: the parking cost over a receding horizon; its program carries this water
     planner = TrajectoryOptimizationPlanner(

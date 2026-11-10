@@ -42,7 +42,7 @@ class _JAXFriendlyPController(System):
             params = self.params
         Kp = params["Kp"]
         xp = array_module(u)
-        r, y_ = self.get_port_values_from_u(u, "r", "y")
+        r, y_ = self.ports(u, "r", "y")
         return xp.array([Kp * (r[0] - y_[0])])
 
 

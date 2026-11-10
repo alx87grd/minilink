@@ -40,12 +40,12 @@ class _PortLinearSystem(DynamicSystem):
         self.add_output_port("speed", dim=1, function=self.speed)
 
     def f(self, x, u, t=0, params=None):
-        force, bias = self.get_port_values_from_u(u, "force", "bias")
+        force, bias = self.ports(u, "force", "bias")
         xp = array_module(x, u)
         return xp.array([x[1] + bias[0], -2.0 * x[0] + 3.0 * force[0] + 5.0 * bias[0]])
 
     def h(self, x, u, t=0, params=None):
-        _, bias = self.get_port_values_from_u(u, "force", "bias")
+        _, bias = self.ports(u, "force", "bias")
         xp = array_module(x, u)
         return xp.array([x[0] + 2.0 * bias[0]])
 
@@ -835,19 +835,19 @@ class FrequencyPlant(DynamicSystem):
         )
 
     def f(self, x, u, t=0, params=None):
-        force, bias = self.get_port_values_from_u(u, "force", "bias")
+        force, bias = self.ports(u, "force", "bias")
         xp = array_module(x, u)
         dx = xp.array([-2.0 * x[0] + 3.0 * force[0] + 5.0 * force[1] + 7.0 * bias[0]])
         return dx
 
     def h(self, x, u, t=0, params=None):
-        force, _ = self.get_port_values_from_u(u, "force", "bias")
+        force, _ = self.ports(u, "force", "bias")
         xp = array_module(x, u)
         y = xp.array([x[0] + 11.0 * force[0], 2.0 * x[0] + 13.0 * force[1]])
         return y
 
     def sensor(self, x, u, t=0, params=None):
-        _, bias = self.get_port_values_from_u(u, "force", "bias")
+        _, bias = self.ports(u, "force", "bias")
         xp = array_module(x, u)
         y = xp.array([4.0 * x[0] + 17.0 * bias[0]])
         return y

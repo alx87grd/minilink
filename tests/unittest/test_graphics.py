@@ -1105,7 +1105,7 @@ class PController(System):
 
     def ctl(self, x, u, t=0, params=None):
         Kp = params["Kp"] if params else self.params["Kp"]
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
         return np.array([Kp * (r[0] - y[0])])
 
 
@@ -1150,7 +1150,7 @@ class TestAdvancedPlotting(unittest.TestCase):
         self.assertTrue(traj_plus.has_signal("controller:u"))
         self.assertTrue(traj_plus.has_signal("plant:y"))
         n_pts = len(self.traj.t)
-        self.assertEqual(traj_plus.get_signal("controller:u").shape, (1, n_pts))
+        self.assertEqual(traj_plus.signal("controller:u").shape, (1, n_pts))
 
     def test_plot_time_signals_does_not_crash(self):
         from minilink.graphical.common.environment import override_env

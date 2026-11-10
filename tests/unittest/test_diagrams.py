@@ -963,7 +963,7 @@ def test_record_keeps_a_diagrams_signals_equal_to_the_reconstruction():
     traj = loop.compute_trajectory(tf=1.0, record=("controller:u",), verbose=False)
     full = loop.reconstruct_internal_signals(traj)
     np.testing.assert_array_equal(
-        traj.get_signal("controller:u"), full.get_signal("controller:u")
+        traj.signal("controller:u"), full.signal("controller:u")
     )
 
 
@@ -1000,7 +1000,7 @@ def test_a_nested_blocks_signal_is_recorded_by_its_path():
     assert run.u.shape == (1, traj.n_samples)
     expected = inner.reconstruct_internal_signals(
         _inner_run(outer, traj), ports=("plant:u",)
-    ).get_signal("plant:u")
+    ).signal("plant:u")
     np.testing.assert_allclose(run.u, expected, atol=1e-12)
 
 

@@ -152,10 +152,10 @@ def build_signal_plot_spec(
             labels = labels_for_vector(input_labels, values.shape[0], "u")
             units = units_for_vector(input_units, values.shape[0])
         elif signal_name in nested:
-            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            values = np.asarray(traj.signal(signal_name), dtype=float)
             labels, units = nested[signal_name]
         else:
-            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            values = np.asarray(traj.signal(signal_name), dtype=float)
             labels, units = labels_and_units_for_extra_signal(
                 sys,
                 signal_name,
@@ -376,7 +376,7 @@ def nested_signal(sys, traj, name):
     # The port among the internal signals of the diagram holding the block
     diagram_traj = diagram.reconstruct_internal_signals(diagram_traj)
     key = f"{block_id}:{port_id}"
-    values = np.asarray(diagram_traj.get_signal(key), dtype=float)
+    values = np.asarray(diagram_traj.signal(key), dtype=float)
     labels, units = labels_and_units_for_extra_signal(diagram, key, values.shape[0])
 
     return values, labels, units
@@ -510,7 +510,7 @@ def evaluate_system_channel(
         return np.asarray(port.compute(x, u, t), dtype=float).reshape(port.dim).copy()
     if name in sys.inputs:
         port = sys.inputs[name]
-        (val,) = sys.get_port_values_from_u(u, name)
+        (val,) = sys.ports(u, name)
         return np.asarray(val, dtype=float).reshape(port.dim).copy()
     idx = list(sys.state.labels).index(name)
     return np.asarray(x[idx : idx + 1], dtype=float).copy()

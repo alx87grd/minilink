@@ -572,7 +572,7 @@ class TestThePureMPCAndTheFollower(unittest.TestCase):
         assert computer.sample_period == 0.05
         pe = planner.problem.compile(computer, backend="numpy")
         run = pe.trajectory()
-        u = run.get_signal("plant:u")[0]
+        u = run.signal("plant:u")[0]
 
         # The first slow period applies the guess (zero input); the plan solved at
         # t = 0 arrives at t = 0.2 and is read at the fast ticks

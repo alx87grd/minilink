@@ -602,7 +602,7 @@ class WiredDiagramMixin:
         source_sys_id, source_port_id = source
 
         if source_sys_id == "input":
-            return self.get_port_values_from_u(u)[source_port_id]
+            return self.ports(u)[source_port_id]
         return self.compute_subsystem_output_port(
             x, u, t, source_sys_id, source_port_id, params=params
         )

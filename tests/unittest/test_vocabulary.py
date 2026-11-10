@@ -173,6 +173,8 @@ RETIRED = {
     "samples": ("n_samples", ("region_of_attraction",)),
     "get_subsys_input_port": ("get_subsystem_input_port", None),
     "compute_subsys_output_port": ("compute_subsystem_output_port", None),
+    "get_port_values_from_u": ("ports", None),
+    "get_signal": ("signal", None),
 }
 
 

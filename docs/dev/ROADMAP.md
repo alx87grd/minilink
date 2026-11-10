@@ -245,6 +245,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *A set's `margin` takes its member first, on every set* (`X.margin(x, t)`,
     `U.margin(u, x, t)`), now written in CONSTITUTION §2; a box, a ball or a singleton refuses
     a member of another size (`Pendulum().input_box.margin(x, u)` returned four numbers).
+  - *The author's reads.* `sys.get_port_values_from_u(u, "r", "y")` → `sys.ports(u, "r", "y")`
+    (the same three return forms: every port as a dict, one port, a tuple of several);
+    `traj.get_signal(name)` → `traj.signal(name)`.
 
 ## 3. Maturity (TRL)
 

@@ -291,7 +291,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `QuadraticCost.from_system` included); on a linear model, `x_bar`, `u_bar` and `y_bar`,
   where its deviations are measured from.
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
-  slices with `get_port_values_from_u(u, "r", "y")`.
+  slices with `ports(u, "r", "y")`.
 - **Constructor shortcuts:** `System(state_dim=0, *, input_dim=, output_dim=, expose_state=,
   y_dependencies=)`, the same on `DynamicSystem(state_dim, ...)` and
   `StepSystem(state_dim, ...)`, create the standard ports `u`/`y`/`x`. Words in the

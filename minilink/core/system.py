@@ -363,7 +363,7 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return u
 
-    def get_port_values_from_u(self, u, *port_ids):
+    def ports(self, u, *port_ids):
         """
         Extract named port signals from the concatenated input vector ``u``.
 

@@ -152,7 +152,7 @@ class RolloutEnvironment:
         self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
         u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
-        self.nominal_inputs = self.sys.get_port_values_from_u(u_nominal)
+        self.nominal_inputs = self.sys.ports(u_nominal)
 
         # The cost a failure is charged: declared on the problem, else the model's cost
         # bound over the episode, the sum the return runs

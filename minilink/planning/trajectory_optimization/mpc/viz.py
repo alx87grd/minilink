@@ -406,7 +406,7 @@ def plan_history_of(rollout, mpc, loop, block):
     path = subsystem_path_of(rollout, mpc, loop, block)
     name = f"{'/'.join(path)}:z"
     if rollout.has_signal(name):
-        return rollout.get_signal(name)
+        return rollout.signal(name)
     require_loop(loop, name)
 
     # The block's state slice in the loop's nested layout, by its path ("a/b")

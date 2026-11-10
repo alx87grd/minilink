@@ -202,7 +202,7 @@ def open_loop_controller_of(
 
     # The command port's values, when the plant has a u port or a single input
     if "u" in sys.inputs or len(sys.inputs) == 1:
-        u = sys.get_port_values_from_u(u, command_port(sys))
+        u = sys.ports(u, command_port(sys))
 
     return TrajectorySource(trajectory.t, u, interpolation=interpolation)
 
