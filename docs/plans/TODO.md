@@ -54,7 +54,6 @@ the maintainer would and logged in the run's record.
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
-| The fork PR from August, Simon's `place-modules` | — | now | close [alx87grd/minilink#99](https://github.com/alx87grd/minilink/pull/99) as superseded (recommended): its LOS guidance and motor map live in `examples/projects/pathtracking/`, `LineOfSight` and the PID family in the library, its curve speed scaler is the "later" row below; merging it would bring 2 900 lines on the pre-rewrite history into `dev-alex` |
 | The README's two headline examples | — | v0.4 (with the demo rebuild) | the planner comparison's numbers so each planner reaches the goal, and bounds on the co-design example (KNOWN_ISSUES, "The README's examples") |
 | A linear model's matrices | — | before the v0.9 freeze | `lin.A()` kept as a call, or `lin.A` an attribute at the block's own `params` (KNOWN_ISSUES) |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
