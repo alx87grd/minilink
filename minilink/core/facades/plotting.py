@@ -381,6 +381,45 @@ class LinearPlotting:
             show=show,
         )
 
+    def plot_nyquist(
+        self,
+        x_bar=None,
+        u_bar=None,
+        t=0.0,
+        params=None,
+        *,
+        of=None,
+        wrt=None,
+        w=None,
+        n_samples=500,
+        method="auto",
+        eps=1e-6,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """Nyquist diagram of one SISO channel, with the critical point ``-1``.
+
+        See :func:`minilink.analysis.frequency.plot_nyquist`.
+        """
+        # A real cycle through minilink.core.system
+        from minilink.analysis.frequency import plot_nyquist
+
+        return plot_nyquist(
+            self,
+            x_bar,
+            u_bar,
+            t,
+            params,
+            of=of,
+            wrt=wrt,
+            w=w,
+            n_samples=n_samples,
+            method=method,
+            eps=eps,
+            renderer=renderer,
+            show=show,
+        )
+
     def plot_step_response(
         self,
         x_bar=None,

@@ -397,7 +397,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `CostFunction.h` zero by default (a running cost writes `g` only); `Gain(2.0)` one channel
     (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel;
     `poles(sys, x_bar)` on `minilink.analysis` and the root (the linear model's eigenvalues, in
-    `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`.
+    `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`;
+    `sys.plot_nyquist(…)` beside the other one-channel plots; `step_sys.linearize(…)` and
+    `step_sys.transfer_function(…)` as on a continuous system.
 
 ## 3. Maturity (TRL)
 

@@ -424,11 +424,12 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   `simulation.py` (`SystemSimulation`: `compile`, static `compute_trajectory` (the nominal
   input, or `u=`), `compute_cost`; `DynamicSimulation`: the continuous one;
   `StepSimulation`: `compute_rollout`), `analysis.py` (`SystemAnalysis`:
-  `jacobian`; `DynamicAnalysis`: `linearize`, `transfer_function`,
-  `find_equilibrium`; `StepAnalysis`: `jacobian` with `k`), `plotting.py`
+  `jacobian`; `LinearAnalysis`: `linearize`, `transfer_function`, in `s` or in `z`;
+  `DynamicAnalysis`: `discretize`, `find_equilibrium`; `StepAnalysis`: `jacobian` with `k`;
+  both inherit `LinearAnalysis`), `plotting.py`
   (`SystemPlotting`: `plot_trajectory`, `plot_cost`, the maps, `plot_diagram`;
   `DynamicPlotting`: `plot_phase_plane`; `StepPlotting`: `plot_rollout`; both inherit
-  `LinearPlotting`: `plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`,
+  `LinearPlotting`: `plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_nyquist`, `plot_step_response`,
   one channel's plots in `s` or in `z`) and
   `animation.py` (`SystemAnimation`: `render`, `animate`; `DynamicAnimation`:
   `animate_modal`, `game`). `System`, `DynamicSystem` and `StepSystem` list
