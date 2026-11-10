@@ -118,8 +118,9 @@ def require_uniform_times(times: np.ndarray, solver: str) -> float:
     dt = float(times[1] - times[0])
     if not np.allclose(np.diff(times), dt, atol=0.0):
         raise ValueError(
-            f"{solver} requires a uniform time grid; use solver='euler' "
-            "for variable dt between knots"
+            f"solver={solver!r} steps at a fixed dt and needs a uniform time grid; "
+            "pass a uniform grid (dt= or n_samples=), or solver='scipy' for an "
+            "adaptive run on these knots"
         )
     return dt
 

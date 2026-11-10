@@ -13,9 +13,6 @@ Simulation
 .. automodule:: minilink.simulation.solvers.scipy_ivp
    :members:
 
-.. automodule:: minilink.simulation.solvers.euler
-   :members:
-
 .. automodule:: minilink.simulation.solvers.euler_fixed
    :members:
 

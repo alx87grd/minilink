@@ -288,9 +288,7 @@ def test_script_11_loop_a_bare_reference_reads_seconds():
     draws = [ev.signals(ticks.x[:, k], np.zeros(0), k)[0] for k in range(40)]
     t = dt * np.arange(40)
     np.testing.assert_array_equal(draws, [noise.h(None, None, tk)[0] for tk in t])
-    traj = continuous.compute_trajectory(
-        tf=0.4, dt=dt, solver="euler_fixedsteps", verbose=False
-    )
+    traj = continuous.compute_trajectory(tf=0.4, dt=dt, solver="euler", verbose=False)
     np.testing.assert_allclose(ticks.x[0], traj.x[0], rtol=1e-12, atol=1e-15)
 
 

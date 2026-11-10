@@ -59,7 +59,7 @@ sys.x0 = x0
 sys.compute_trajectory(
     tf=10.0,
     show=False,
-    solver="rk4_fixedsteps",
+    solver="rk4",
     dt=0.001,
     verbose=True,
     backend="jax",

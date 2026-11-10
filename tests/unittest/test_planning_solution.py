@@ -96,7 +96,7 @@ def shooting(n_steps):
     return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
 
 
-def replay(problem, solution, solver="rk4_fixedsteps"):
+def replay(problem, solution, solver="rk4"):
     """The open-loop policy driving the plant in series, sampled on the solution's grid."""
     plant = problem.sys
     planned = solution.trajectory

@@ -60,7 +60,7 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
   The plan ends at `[3.31, −0.15]`; the handed-out controller, a `TrajectorySource` holding
   each edge's input, replayed on the plan's own `dt = 0.05`, misses the ball, and still at
   `dt = 0.01`; at `dt = 0.002` it reaches it. The same samples given as a held input,
-  `plant.compute_trajectory(u=plan.u, dt=0.05, solver="rk4_fixedsteps")`, reproduce the plan
+  `plant.compute_trajectory(u=plan.u, dt=0.05, solver="rk4")`, reproduce the plan
   exactly. The source is read at each RK4 stage like any block, so the last stage of a step
   reads the next edge's input (first order at each switch, large for a bang-bang plan).
 - **Workaround:** score the plan itself, `evaluate_trajectory(problem, solution.trajectory)`,

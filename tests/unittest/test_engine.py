@@ -608,7 +608,7 @@ def test_a_deterministic_problem_runs_the_noise_blocks_own_seed():
     x0 = np.array(loop.x0, dtype=float)
     a, b = loop.state_index["plant"]
     x0[a:b] = [0.5, 0.0]
-    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4_fixedsteps").solve()
+    reference = Simulator(loop, x0=x0, tf=1.0, dt=0.01, solver="rk4").solve()
     np.testing.assert_allclose(traj.x[:, -1], reference.x[:, -1], rtol=1e-9)
 
     # An evaluation draws a seed per trial: a block's own seed is only its default

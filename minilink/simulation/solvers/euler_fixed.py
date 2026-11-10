@@ -32,7 +32,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "euler_fixedsteps")
+        dt = require_uniform_times(times, "euler")
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
@@ -43,7 +43,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: one evaluation of f per step
-        self.last_debug = fixed_step_debug("euler_fixedsteps", "nominal", n_pts, 1)
+        self.last_debug = fixed_step_debug("euler", "nominal", n_pts, 1)
 
         return x_traj if not record else (x_traj, records)
 
@@ -59,7 +59,7 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "euler_fixedsteps")
+        dt = require_uniform_times(times, "euler")
 
         # The samples that drive a step: the last one starts none
         u_sequence = np.asarray(u[:, : n_pts - 1].T)
@@ -72,6 +72,6 @@ class EulerFixedStepSolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T
 
         # The run's record: one evaluation of f per step
-        self.last_debug = fixed_step_debug("euler_fixedsteps", "forced", n_pts, 1)
+        self.last_debug = fixed_step_debug("euler", "forced", n_pts, 1)
 
         return x_traj if not record else (x_traj, records)

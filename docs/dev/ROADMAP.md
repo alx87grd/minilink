@@ -237,6 +237,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `subsystems:` (it said `blocks:`); `get_subsys_input_port` → `get_subsystem_input_port`,
     `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning,
     the standard components of `minilink.blocks`.
+  - *Solver names.* `Simulator` and `compute_trajectory` take the step model's words, as
+    `discretize`, the evaluators and the sampled loop do: `solver="rk4_fixedsteps"` →
+    `"rk4"`, `"euler_fixedsteps"` → `"euler"`, both fixed-step; the variable-step Euler is
+    gone, and a non-uniform grid on a fixed-step solver is refused, naming `solver="scipy"`
+    or a uniform `dt`. The SciPy presets are unchanged.
 
 ## 3. Maturity (TRL)
 

@@ -176,6 +176,22 @@ RETIRED = {
 }
 
 
+# A retired value of a keyword: the value that replaced it. The simulator's solver names are the
+# step model's words on every tool (the ruling of 2026-11-10)
+RETIRED_SOLVERS = {"rk4_fixedsteps": "rk4", "euler_fixedsteps": "euler"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_SOLVERS))
+def test_no_retired_solver_name(retired):
+    from minilink import Pendulum
+    from minilink.simulation.simulator import Simulator
+
+    with pytest.raises(
+        ValueError, match=f"Unknown solver.*'{RETIRED_SOLVERS[retired]}'"
+    ):
+        Simulator(Pendulum(), tf=0.1, n_samples=3, solver=retired)
+
+
 def public_objects():
     """Every exported class and function of the facades, once, plants aside."""
     found = {}

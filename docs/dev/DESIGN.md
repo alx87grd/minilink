@@ -587,8 +587,8 @@ output port, `"block:u"` a subsystem's whole input when it has no output port na
 subsystem by its path, `"plant/arm:u"`); `record="all"` every output port. A lone system records
 nothing and refuses names. A fixed-step run reads the record off each step's own first stage
 (`rollout(record=)`: `k₁` and the record from one signal pass, the states bit for bit the
-unrecorded run's, its program the same when the record is empty); an adaptive run, the
-variable-step Euler and a run forced by a function of time take one signal pass per saved
+unrecorded run's, its program the same when the record is empty); an adaptive run and a run
+forced by a function of time take one signal pass per saved
 sample after the run, inside the `Simulator`, on the numbers the run was made with. A cost
 written for the plant alone scores the plant inside any loop, `loop.compute_cost(cost,
 of="plant")` (the subsystem or its id): the recorded run, else the plant's input rebuilt from the
@@ -1131,7 +1131,7 @@ samples, `N − 1` intervals). `n_samples=100` on `[0, 1]` is thus a step of `1/
 `n_steps=100` is `100` steps of `dt` (`test_simulation.py` pins each verb).
 
 **Automatic grid.** With neither `n_samples` nor `dt`, the solver is chosen first
-(user choice, else `euler` for discontinuous plants, else `rk4_fixedsteps` when a block
+(user choice, else `euler` for discontinuous plants, else `rk4` when a block
 holds a signal over a `sample_period`, else `scipy`) and the grid
 is sized to it: adaptive solvers report on `DEFAULT_N_STEPS = 10001` points (a
 plotting resolution — the integrator picks its own steps); fixed-step solvers
@@ -1167,8 +1167,8 @@ evaluator's tree gives every other stateful subsystem its start as a leaf (`cont
 Solver presets: `scipy`, `scipy_stiff` (Radau at `scipy`'s tolerances, `rtol=1e-4`,
 `atol=1e-7`, with `∂f/∂x` from the evaluator: forward mode on JAX, central differences on
 NumPy), `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
-`euler` (variable knot spacing), `euler_fixedsteps` (uniform grid via the step
-model's Euler rollout), `rk4_fixedsteps` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both fixed-step backends refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator.
+and the two fixed-step solvers, the step model's words on every tool: `euler` (the step
+model's Euler rollout) and `rk4` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator, naming `solver="scipy"` or a uniform `dt`.
 **One input rule on every solver** (`Simulator.solve(u=)`, `compute_trajectory(u=)`): a sampled
 input `(m, N)` is held over each sample period (`u(t) = u_k` on `[t_k, t_{k+1})`), and a function
 of time is read where the method evaluates `f`: the stage times of RK4, the adaptive solver's own
@@ -1180,7 +1180,7 @@ choice never changes the input model.
 A discontinuous law (`SlidingMode`'s `sign(s)`) on a continuous closed loop sets
 `discontinuous_behavior`, which diagrams aggregate; the automatic solver choice then takes
 explicit Euler at `dt = AUTO_DT_SCALE × τ_min` and warns on every solve (louder when
-`rk4_fixedsteps` or a SciPy solver is forced). The reason: the diagram evaluator re-solves
+`rk4` or a SciPy solver is forced). The reason: the diagram evaluator re-solves
 the feedback at every call to `f`, so RK4's four sub-steps can flip `sign(s)` and nearly
 cancel, and the adaptive SciPy solvers may stall near the switching surface; the
 `Trajectory` records the output grid only, so a reconstructed `controller:u` at grid states

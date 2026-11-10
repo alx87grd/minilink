@@ -20,7 +20,6 @@ from minilink.simulation.sim_reporting import (
     print_simulation_report,
 )
 from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
-from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
@@ -74,8 +73,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
         },
     ),
     "euler": ("euler", {}),
-    "euler_fixedsteps": ("euler_fixed", {}),
-    "rk4_fixedsteps": ("rk4", {}),
+    "rk4": ("rk4", {}),
 }
 
 # Long *explicit* uniform rollouts can use fixed-step RK4 (JIT) instead of
@@ -127,10 +125,10 @@ class Simulator:
         ``dt`` divides ``tf - t0``; otherwise its last sample is the first
         step past ``tf``.
     solver : str, optional
-        Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
-        ``"euler"`` for variable ``dt`` per output knot, or
-        ``"euler_fixedsteps"`` for uniform grids via compiled Euler rollouts
-        (same pattern as ``"rk4_fixedsteps"``).
+        Solver mode; if ``None``, chosen by :meth:`select_solver`. ``"rk4"`` and
+        ``"euler"`` step at the grid's fixed ``dt`` (compiled rollouts, uniform
+        grid only); ``"scipy"`` and its presets (``"scipy_stiff"``,
+        ``"scipy_max"``, ``"scipy_ultra"``, ``"scipy_lsoda"``) are adaptive.
     verbose : bool
         Print setup information (default quiet).
     backend : str
@@ -361,11 +359,11 @@ class Simulator:
         - If the user has specified a solver, return it.
         - If the system has discontinuous behavior, return ``"euler"``.
         - If a block holds a signal over a sample period (``solver_info
-          ["sample_period"]``, a noise source), return ``"rk4_fixedsteps"``:
+          ["sample_period"]``, a noise source), return ``"rk4"``:
           the automatic grid then steps at a divisor of that period.
         - If the time grid was given explicitly, ``backend`` is
           ``"jax"``, the grid is uniform, and it has at least
-          :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
+          :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4"``
           (fast JIT rollout). The automatic grid never triggers this rule.
         - Otherwise, return ``"scipy"``.
         """
@@ -374,14 +372,14 @@ class Simulator:
         if sys.solver_info.get("discontinuous_behavior", False):
             return "euler"
         if sys.solver_info.get("sample_period") is not None:
-            return "rk4_fixedsteps"
+            return "rk4"
         if (
             not self.auto_time_grid
             and self.backend == BACKEND_JAX
             and self.n_samples >= RK4_AUTO_MIN_TIME_POINTS
             and time_grid_is_uniform(self.t)
         ):
-            return "rk4_fixedsteps"
+            return "rk4"
         return "scipy"
 
     ###########################################################################
@@ -413,8 +411,6 @@ class Simulator:
         if solver_backend_key == "scipy":
             return SciPySolverBackend()
         if solver_backend_key == "euler":
-            return EulerSolverBackend()
-        if solver_backend_key == "euler_fixed":
             return EulerFixedStepSolverBackend()
         if solver_backend_key == "rk4":
             return RK4SolverBackend()

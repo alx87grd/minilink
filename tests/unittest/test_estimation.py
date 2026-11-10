@@ -415,7 +415,7 @@ def test_refusals_name_what_to_pass():
         lqr(plant, [1.0, 1.0], [1.0], x_bar=upright)
     with pytest.raises(ValueError, match=r"Q_n must have shape \(n, n\)"):
         kalman(plant, 0.1, 0.1, x_bar=upright)
-    with pytest.raises(ValueError, match="expected one of.*rk4_fixedsteps"):
+    with pytest.raises(ValueError, match="expected one of.*rk4"):
         plant.compute_trajectory(1.0, solver="rk45")
     with pytest.raises(ValueError, match="wrt must be 'x' or 'u' or 't' or 'params';"):
         plant.jacobian("f", "z", np.zeros(2))

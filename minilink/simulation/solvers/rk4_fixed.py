@@ -33,7 +33,7 @@ class RK4SolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "rk4_fixedsteps")
+        dt = require_uniform_times(times, "rk4")
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt/6 (k₁ + 2k₂ + 2k₃ + k₄), n_steps steps from x₀ in one
@@ -45,7 +45,7 @@ class RK4SolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
 
         # The run's record: four evaluations of f per step
-        self.last_debug = fixed_step_debug("rk4_fixedsteps", "nominal", n_pts, 4)
+        self.last_debug = fixed_step_debug("rk4", "nominal", n_pts, 4)
 
         return x_traj if not record else (x_traj, records)
 
@@ -61,7 +61,7 @@ class RK4SolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "rk4_fixedsteps")
+        dt = require_uniform_times(times, "rk4")
 
         # The same RK4 step, each sample u_k held over [t_k, t_{k+1}]; one compiled rollout
         run = evaluator.rollout(x0, u[:, : n_pts - 1].T, t0, dt, params, record=record)
@@ -69,7 +69,7 @@ class RK4SolverBackend(SolverBackend):
         x_traj = np.asarray(x_seq).T
 
         # The run's record: four evaluations of f per step
-        self.last_debug = fixed_step_debug("rk4_fixedsteps", "forced", n_pts, 4)
+        self.last_debug = fixed_step_debug("rk4", "forced", n_pts, 4)
 
         return x_traj if not record else (x_traj, records)
 
@@ -77,7 +77,7 @@ class RK4SolverBackend(SolverBackend):
         """The RK4 step with the input ``u(t)`` read at each stage time, not held."""
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "rk4_fixedsteps")
+        dt = require_uniform_times(times, "rk4")
         u_unused = np.zeros(evaluator.m)
 
         def f(x, u, t):
@@ -92,6 +92,6 @@ class RK4SolverBackend(SolverBackend):
         x_traj = np.array(x_seq).T
 
         # The run's record: four evaluations of f per step
-        self.last_debug = fixed_step_debug("rk4_fixedsteps", "forced", n_pts, 4)
+        self.last_debug = fixed_step_debug("rk4", "forced", n_pts, 4)
 
         return x_traj
