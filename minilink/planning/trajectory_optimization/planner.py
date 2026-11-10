@@ -750,8 +750,13 @@ def method_numbers_of(method, options, numbers):
     unknown = sorted(key for key in numbers if key not in own)
     if unknown:
         raise TypeError(
-            f"TrajectoryOptimizationPlanner got unexpected keyword(s) {unknown}; "
-            f"method {method!r} takes the numbers {sorted(own) or 'none'}"
+            f"TrajectoryOptimizationPlanner got unexpected keyword(s) {unknown}: "
+            + (
+                f"method {method!r} takes the numbers {sorted(own)}"
+                if own
+                else f"method {method!r} takes no numbers of its own; an external "
+                "solver's knobs go in options= (options={'maxiter': 50})"
+            )
         )
 
     return dict(numbers)

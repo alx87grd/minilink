@@ -143,6 +143,7 @@ class TaskImpedance(System):
         task_target_radius: float = 0.04,
     ):
         super().__init__()
+        require_manipulator(plant)
 
         # The embedded kinematic model, and its custom gravity hook
         self.plant = plant
@@ -422,6 +423,15 @@ def require_mechanical_plant(plant):
     """Refuse a plant without the mechanical structure the joint law reads."""
     if not isinstance(plant, MechanicalSystem):
         raise TypeError("JointImpedance requires a MechanicalSystem plant")
+
+
+def require_manipulator(plant):
+    """Refuse a plant without the task kinematics the task law reads."""
+    if not isinstance(plant, Manipulator):
+        raise TypeError(
+            "TaskImpedance requires a Manipulator plant (its task_dim, "
+            f"forward_kinematics and J), not {type(plant).__name__}"
+        )
 
 
 def require_gravity_model(plant, gravity_comp, gravity):

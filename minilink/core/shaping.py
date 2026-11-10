@@ -166,5 +166,10 @@ def shaping_of(shaping):
     """The shaping a cost holds: ``None``, a :class:`Shaping`, or a plain function wrapped as one."""
     if shaping is None or isinstance(shaping, Shaping):
         return shaping
+    if not callable(shaping):
+        raise TypeError(
+            f"shaping is a function of the field's value, v -> cost, or a Shaping "
+            f"(quadratic_hinge(), inverse_barrier(...)), not {shaping!r}"
+        )
 
     return CallableShaping(shaping)

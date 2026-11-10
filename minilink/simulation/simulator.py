@@ -401,7 +401,9 @@ class Simulator:
     def parse_solver(self, solver):
         """``(backend key, options)`` of a solver label, the options a copy of the preset's."""
         if solver not in _USER_SOLVER_MODES:
-            raise ValueError(f"Unknown solver '{solver}'")
+            raise ValueError(
+                f"Unknown solver {solver!r}; expected one of {list(_USER_SOLVER_MODES)!r}."
+            )
         key, options = _USER_SOLVER_MODES[solver]
 
         return key, dict(options)

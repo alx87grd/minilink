@@ -497,7 +497,10 @@ def require_solutions(named):
         raise ValueError("compare needs at least one solution")
     for name, solution in named.items():
         if not isinstance(solution, PlanningSolution):
-            raise TypeError(f"{name!r} is not a PlanningSolution")
+            raise TypeError(
+                f"{name!r} is not a PlanningSolution: to score a controller, pass the "
+                "problem first, compare(problem, name=controller, ...)"
+            )
 
 
 def panels(plt, n):

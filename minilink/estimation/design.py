@@ -5,7 +5,7 @@ import re
 import numpy as np
 
 from minilink.analysis.linearization import design_model, require_continuous_model
-from minilink.analysis.riccati import care
+from minilink.analysis.riccati import care, require_weight
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
 from minilink.estimation.observer import StateObserver
@@ -36,6 +36,8 @@ def kalman_gain(A, C, Q_n, R_n):
     C = np.atleast_2d(np.asarray(C, dtype=float))
     Q_n = np.asarray(Q_n, dtype=float)
     R_n = np.atleast_2d(np.asarray(R_n, dtype=float))
+    require_weight(Q_n, A.shape[0], "Q_n", "n")
+    require_weight(R_n, C.shape[0], "R_n", "p")
 
     # A P + P Aᵀ − P Cᵀ R_n⁻¹ C P + Q_n = 0: the control equation on the dual pair (Aᵀ, Cᵀ)
     P = care(A.T, C.T, Q_n, R_n)

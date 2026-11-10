@@ -8,6 +8,7 @@ from minilink.analysis.linearization import design_model, require_continuous_mod
 from minilink.analysis.riccati import (
     care,
     hamiltonian_matrix,
+    require_weight,
     riccati_map,
     riccati_step,
     riccati_transition,
@@ -32,6 +33,8 @@ def lqr_gain(A, B, Q, R):
     B = np.atleast_2d(np.asarray(B, dtype=float))
     Q = np.asarray(Q, dtype=float)
     R = np.atleast_2d(np.asarray(R, dtype=float))
+    require_weight(Q, A.shape[0], "Q", "n")
+    require_weight(R, B.shape[1], "R", "m")
 
     # Aᵀ P + P A − P B R⁻¹ Bᵀ P + Q = 0
     P = care(A, B, Q, R)

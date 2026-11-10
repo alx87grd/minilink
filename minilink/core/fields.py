@@ -207,6 +207,7 @@ class FieldInputSet(InputSet):
     def margin(self, u, x=None, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(u)
+        require_state(x)
 
         field = self.field
         field_params = params["field"]
@@ -827,6 +828,14 @@ def level_bounds(lower, upper):
         return lower
 
     return 0.0 if upper is None else None
+
+
+def require_state(x):
+    """Refuse a field's input set read without the state it is taken at."""
+    if x is None:
+        raise ValueError(
+            "a field's input set is read at a state: margin(u, x), contains(u, x)"
+        )
 
 
 def require_a_bound(lower, upper):

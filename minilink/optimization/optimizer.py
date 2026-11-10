@@ -168,6 +168,10 @@ class Optimizer:
             use_hessian=use_hessian,
         )
 
+        # A first-order method needs the gradient: refused here, not at the solve
+        if method in NATIVE_METHODS:
+            require_gradient(self.program_evaluator, method)
+
         # The solver adapter: the method's preset, the caller's keywords and options
         # over it; a native law's own numbers may come as keywords (learning_rate=)
         options, method_numbers = method_options_of(method, options, method_numbers)
@@ -568,6 +572,15 @@ def start_of(program, z0):
     raise ValueError(
         "Optimizer needs z0: this program carries no start (metadata['z0'])"
     )
+
+
+def require_gradient(program_evaluator, method):
+    """Refuse a first-order method on a program without the objective's gradient."""
+    if not program_evaluator.has_gradient:
+        raise ValueError(
+            f"method {method!r} needs the objective's gradient: give the program "
+            "grad_J, or compile it on JAX (backend='jax')"
+        )
 
 
 def require_method(method):

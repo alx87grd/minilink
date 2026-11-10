@@ -398,3 +398,34 @@ def test_a_design_at_a_point_the_plant_does_not_rest_at_is_announced():
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi, 0.0])
+
+
+def test_refusals_name_what_to_pass():
+    """A wrong weight, solver, plant or shaping is refused in the caller's words, with the valid choices."""
+    from minilink import Optimizer, compare
+    from minilink.control.robotic import TaskImpedance
+    from minilink.control.siso import PID
+    from minilink.core.sets import BoxSet
+    from minilink.optimization.mathematical_program import MathematicalProgram
+
+    plant = Pendulum()
+    upright = [np.pi, 0.0]
+
+    with pytest.raises(ValueError, match=r"Q must have shape \(n, n\) = \(2, 2\)"):
+        lqr(plant, [1.0, 1.0], [1.0], x_bar=upright)
+    with pytest.raises(ValueError, match=r"Q_n must have shape \(n, n\)"):
+        kalman(plant, 0.1, 0.1, x_bar=upright)
+    with pytest.raises(ValueError, match="expected one of.*rk4_fixedsteps"):
+        plant.compute_trajectory(1.0, solver="rk45")
+    with pytest.raises(ValueError, match="wrt must be 'x' or 'u' or 't' or 'params';"):
+        plant.jacobian("f", "z", np.zeros(2))
+    with pytest.raises(TypeError, match="requires a Manipulator plant"):
+        TaskImpedance(plant)
+    with pytest.raises(TypeError, match="shaping is a function"):
+        BoxSet([-1.0], [1.0]).as_cost(shaping="quadratic_hinge")
+    with pytest.raises(TypeError, match="pass the problem first"):
+        compare(A=PID(1.0, 0.0, 0.0))
+    with pytest.raises(ValueError, match="needs the objective's gradient"):
+        Optimizer(
+            MathematicalProgram(n_z=2, J=lambda z: z @ z), np.zeros(2), method="gd"
+        )

@@ -99,3 +99,12 @@ def substeps(H, dt):
     n_sub = max(1, int(np.ceil(np.linalg.norm(H, 2) * dt)))
 
     return n_sub
+
+
+def require_weight(W, size, name, size_name):
+    """Refuse a weight matrix that is not ``(size, size)``, by its name."""
+    if W.shape != (size, size):
+        raise ValueError(
+            f"{name} must have shape ({size_name}, {size_name}) = ({size}, {size}), "
+            f"got {W.shape}"
+        )
