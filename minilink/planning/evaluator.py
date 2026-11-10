@@ -702,8 +702,8 @@ class ProblemEvaluator:
 def evaluate(
     problem,
     controller,
-    *,
     dt=None,
+    *,
     solver="rk4",
     substeps=None,
     n_trials=None,

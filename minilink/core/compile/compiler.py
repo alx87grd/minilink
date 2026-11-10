@@ -48,7 +48,7 @@ DEPENDENCY_PROBE = 0.5
 ###############################################################################
 
 
-def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
+def compile(system, *, backend=BACKEND_NUMPY, verbose=False, flatten=False):
     """Compile a system into a typed evaluator.
 
     Returns a :class:`DynamicEvaluator` for a :class:`DynamicSystem`, a

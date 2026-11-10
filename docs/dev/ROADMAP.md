@@ -299,6 +299,15 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     (`"linear"` the default, `from_trajectory(hold=)` with it, `source.hold` the attribute),
     and the step model's `evaluator.rollout(…, hold="foh")` → `hold="linear"`, as the noise
     sources already said.
+  - *Keyword-only where every sibling already is.* `PlanningProblem(sys, *, x0=, cost=, …)`;
+    a system's `compile(*, backend=, verbose=)` (`plant.compile("jax")` →
+    `plant.compile(backend="jax")`, the module function `compile(system, *, backend=, …)`
+    with it); `sys.animate(traj=None, *, speed=, …)` and `sys.render(x, u, t, *, is_3d=, …)`;
+    `MLP(input_dim, output_dim, *, hidden=, …)`; `Sys2Gym(sys, cost, *, dt=, …)`;
+    `NativeSampledSystem(state_dim=0, *, sample_period=, input_dim=, expose_state=)`, the
+    port shortcuts of a `System` but the output, declared in seconds. The reverse:
+    `evaluate(problem, controller, dt=None, *, …)` takes `dt` by position, as
+    `problem.compile(controller, dt)` does.
 
 ## 3. Maturity (TRL)
 

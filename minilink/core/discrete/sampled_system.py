@@ -316,10 +316,15 @@ class NativeSampledSystem(SampledSystem):
     update(x, u, k h)``. Its ``params``, ``x0`` and solver hints are its own.
     Its equation needs its period, so ``sample_period`` is set at
     construction, and ``law % dt`` is refused: it is already on its clock
-    (rule 1 of the loop's grammar).
+    (rule 1 of the loop's grammar). The keyword shortcuts create the standard
+    ports, as :class:`~minilink.core.system.System` does: the input ``u``
+    (``input_dim``) and the state output ``x`` (``expose_state``); the outputs
+    in seconds are declared with ``add_output_port``.
     """
 
-    def __init__(self, state_dim=0, sample_period=None):
+    def __init__(
+        self, state_dim=0, *, sample_period=None, input_dim=None, expose_state=False
+    ):
         # No source: the clock alone, set at construction
         self.source = None
         self.solver = None
@@ -328,7 +333,7 @@ class NativeSampledSystem(SampledSystem):
         self.sample_period = positive_period(require_period(sample_period))
 
         # The System shell: its own state, ports, parameters and hints
-        System.__init__(self, state_dim)
+        System.__init__(self, state_dim, input_dim=input_dim, expose_state=expose_state)
 
     @property
     def params(self) -> dict:

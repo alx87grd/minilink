@@ -118,7 +118,7 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return y
 
-    def compile(self, backend="numpy", verbose=False, *, substeps=None, solver=None):
+    def compile(self, *, backend="numpy", verbose=False, substeps=None, solver=None):
         """
         Compile the sampled diagram into its stateless evaluator, the schedule in its plan.
 

@@ -280,7 +280,9 @@ class TestCartPole(unittest.TestCase):
         sys = CartPole()
         x = np.zeros(sys.n)
         u = np.zeros(sys.m)
-        np.testing.assert_allclose(sys.compile("numpy").f(x, u, 0.0), np.zeros(sys.n))
+        np.testing.assert_allclose(
+            sys.compile(backend="numpy").f(x, u, 0.0), np.zeros(sys.n)
+        )
         frame = resolve_draw_frame(sys)
         cart_boxes = [
             primitive for primitive in frame["primitives"] if isinstance(primitive, Box)
@@ -338,7 +340,7 @@ class TestDoublePendulum(unittest.TestCase):
         )
         x = np.zeros(sys.n)
         np.testing.assert_allclose(
-            sys.compile("numpy").f(x, np.zeros(sys.m), 0.0), np.zeros(sys.n)
+            sys.compile(backend="numpy").f(x, np.zeros(sys.m), 0.0), np.zeros(sys.n)
         )
         geometry_smoke(sys)
 

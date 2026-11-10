@@ -135,7 +135,14 @@ class NeuralPolicy(System):
         # Parameters: the policy network, sized on the features of the plant's x0
         z0 = self.observe(np.asarray(sys.x0, dtype=float))
         n_features = int(np.asarray(z0).shape[0])
-        self.mlp = MLP(n_features, m, hidden, activation, seed=seed, output_gain=0.01)
+        self.mlp = MLP(
+            n_features,
+            m,
+            hidden=hidden,
+            activation=activation,
+            seed=seed,
+            output_gain=0.01,
+        )
         self.params = {"mlp": self.mlp.params}
 
         # Ports: the plant state in, the bounded command out

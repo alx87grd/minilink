@@ -197,6 +197,7 @@ class PlanningProblem:
     def __init__(
         self,
         sys: System,
+        *,
         x0=None,
         cost: CostFunction | None = None,
         X: Set | None = None,

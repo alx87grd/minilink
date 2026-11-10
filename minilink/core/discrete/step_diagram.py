@@ -94,7 +94,7 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
 
         return x_next
 
-    def compile(self, backend="numpy", verbose=False):
+    def compile(self, *, backend="numpy", verbose=False):
         """
         Compile the step diagram into a stateless step evaluator.
 

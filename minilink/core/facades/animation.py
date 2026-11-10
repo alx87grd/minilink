@@ -16,6 +16,7 @@ class SystemAnimation:
         x,
         u,
         t,
+        *,
         is_3d=False,
         renderer="matplotlib",
         camera=None,
@@ -45,6 +46,7 @@ class SystemAnimation:
     def animate(
         self,
         traj=None,
+        *,
         speed=1.0,
         is_3d=False,
         html: bool | None = None,

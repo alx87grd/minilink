@@ -96,6 +96,7 @@ class Sys2Gym(gym.Env):
         self,
         sys,
         cost,
+        *,
         dt=0.05,
         episode_length=10.0,
         t0=0.0,

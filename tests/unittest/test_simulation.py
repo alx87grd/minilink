@@ -1412,7 +1412,7 @@ def test_rk4_forced_holds_a_sampled_input_and_reads_a_function_at_its_stages():
 
     plant = Pendulum()
     plant.x0 = np.array([0.4, -0.2])
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     t = np.linspace(0.0, 1.0, 20)
     dt = t[1] - t[0]
     u = 0.5 * np.sin(2.0 * t)[None, :]

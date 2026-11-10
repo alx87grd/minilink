@@ -99,7 +99,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return dx
 
-    def compile(self, backend="numpy", verbose=False, *, flatten=False):
+    def compile(self, *, backend="numpy", verbose=False, flatten=False):
         """
         Compile the diagram into a stateless evaluator for fast simulation.
 

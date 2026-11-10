@@ -19,7 +19,7 @@ class SystemSimulation:
     :class:`DynamicSimulation` and :class:`StepSimulation` override it.
     """
 
-    def compile(self, backend="numpy", verbose=False):
+    def compile(self, *, backend="numpy", verbose=False):
         """
         Convenience shortcut to compile the system into a backend evaluator.
 

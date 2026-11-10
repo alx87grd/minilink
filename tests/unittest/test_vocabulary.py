@@ -328,6 +328,41 @@ def test_a_method_takes_the_model_order(path):
     assert leading == ONE_SIGNATURE[path], f"{path} takes {leading}"
 
 
+# Keyword-only where every sibling already is (api-stabilization AS-29): the leading
+# parameters a caller may pass by position, at the function's full path; every other one is
+# keyword-only
+LEADING_POSITIONALS = {
+    "minilink.planning.problems.PlanningProblem.__init__": ("sys",),
+    "minilink.core.facades.simulation.SystemSimulation.compile": (),
+    "minilink.core.diagram.DiagramSystem.compile": (),
+    "minilink.core.discrete.step_diagram.StepDiagramSystem.compile": (),
+    "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.compile": (),
+    "minilink.core.compile.compiler.compile": ("system",),
+    "minilink.core.facades.animation.SystemAnimation.animate": ("traj",),
+    "minilink.core.facades.animation.SystemAnimation.render": ("x", "u", "t"),
+    "minilink.blocks.neural.MLP.__init__": ("input_dim", "output_dim"),
+    "minilink.interfaces.gymnasium.Sys2Gym.__init__": ("sys", "cost"),
+    "minilink.core.discrete.sampled_system.NativeSampledSystem.__init__": (
+        "state_dim",
+    ),
+    "minilink.planning.evaluator.evaluate": ("problem", "controller", "dt"),
+    "minilink.planning.problems.PlanningProblem.compile": ("controller", "dt"),
+}
+
+
+@pytest.mark.parametrize("path", sorted(LEADING_POSITIONALS))
+def test_only_the_leading_parameters_are_positional(path):
+    function = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    positional = tuple(
+        name
+        for name, parameter in inspect.signature(function).parameters.items()
+        if name != "self"
+        and parameter.kind
+        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+    )
+    assert positional == LEADING_POSITIONALS[path], f"{path} takes {positional}"
+
+
 @pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
 def test_no_retired_name_at_its_path(path):
     name = path.rsplit(".", 1)[-1]

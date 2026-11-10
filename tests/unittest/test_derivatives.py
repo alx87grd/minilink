@@ -360,7 +360,7 @@ class TestEvaluatorArrayForm(unittest.TestCase):
 
     def test_numpy_evaluator_returns_the_array_and_keeps_the_built_derivative(self):
         plant = _Affine()
-        ev = plant.compile("numpy")
+        ev = plant.compile(backend="numpy")
         A = ev.jacobian("f", "x", np.zeros(2), np.zeros(2), 0.0, plant.params)
         np.testing.assert_allclose(A, _Affine.A, atol=1e-6)
 
@@ -376,7 +376,7 @@ class TestEvaluatorArrayForm(unittest.TestCase):
         import jax.numpy as jnp
 
         plant = _Affine()
-        dfdx = jax.jit(partial(plant.compile("jax").jacobian, "f", "x"))
+        dfdx = jax.jit(partial(plant.compile(backend="jax").jacobian, "f", "x"))
         J = dfdx(jnp.zeros(2), jnp.zeros(2), 0.0, plant.params)
         np.testing.assert_allclose(np.asarray(J), _Affine.A, atol=1e-6)
 
