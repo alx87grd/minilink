@@ -371,6 +371,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `"[Nm]"`), `GeneralizedMechanicalSystem`'s → `q1`, `v1`, `u1`; a manipulator's task ports
     read `p1…`, `dp1…` in `"m"`, `"m/s"`, and the robotic and model-based laws' inputs
     `q1…`, `dq1…`.
+  - *`ModelPredictiveController` is the class* (the maintainer's ruling 15): it was a function
+    returning a `PredictiveController`; the class takes the function's signature,
+    `ModelPredictiveController(planner, *, inputs=None, delay=False, warm_start=True,
+    backend=None, verbose=False)`, so `isinstance(mpc, ModelPredictiveController)` holds and
+    `PredictiveController` is gone. Import it from the teaching facade,
+    `from minilink.control import ModelPredictiveController` (the
+    `minilink.planning.trajectory_optimization.mpc` export stays).
 
 ## 3. Maturity (TRL)
 

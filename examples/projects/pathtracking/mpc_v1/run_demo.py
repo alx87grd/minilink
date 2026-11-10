@@ -21,6 +21,7 @@ from examples.projects.pathtracking.mpc_v1.plant_to_mpc import (
 )
 from examples.projects.pathtracking.mpc_v1.servos import Servos
 from minilink import BicycleDynRate
+from minilink.control import ModelPredictiveController
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.diagram import DiagramSystem
@@ -29,10 +30,7 @@ from minilink.core.shaping import quadratic_excess, quadratic_hinge
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.spatial.collision import car_outline, mount
 from minilink.planning.spatial.track import ReferenceTrack
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )

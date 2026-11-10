@@ -47,7 +47,7 @@ def mpc_animation_overlays(
     rollout : Trajectory
         A run of the loop ``mpc % dt @ plant`` (``compute_rollout``, or the
         evaluator's ``trajectory``), the MPC block's ``z`` among its signals.
-    mpc : PredictiveController
+    mpc : ModelPredictiveController
         The MPC box (its compiled face reads the plans).
     loop : SampledDiagramSystem, optional
         The loop the run is of, for a run that records its state only

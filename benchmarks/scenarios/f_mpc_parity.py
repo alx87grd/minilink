@@ -18,16 +18,13 @@ from benchmarks.scenarios.common import (
 from benchmarks.trajopt import jax_trajopt_available
 from minilink import BicycleDynRate
 from minilink.blocks.step import UnitDelay
+from minilink.control import ModelPredictiveController, PlanFollower
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
-)
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    PlanFollower,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,

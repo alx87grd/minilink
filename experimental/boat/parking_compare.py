@@ -21,11 +21,9 @@ from minilink import (
     Trajectory,
     TrajectoryOptimizationPlanner,
 )
+from minilink.control import ModelPredictiveController
 from minilink.planning import evaluate_trajectory
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    plant_run,
-)
+from minilink.planning.trajectory_optimization.mpc import plant_run
 
 TF = 60.0  # [s]
 DT = 0.05  # [s] plant step

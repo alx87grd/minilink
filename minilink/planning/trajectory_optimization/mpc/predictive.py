@@ -24,15 +24,7 @@ STANDARD_STATUS = ("success", "n_iterations", "cost")
 ###############################################################################
 
 
-def ModelPredictiveController(
-    planner,
-    *,
-    inputs=None,
-    delay=False,
-    warm_start=True,
-    backend=None,
-    verbose=False,
-):
+class ModelPredictiveController(SampledDiagramSystem):
     """
     Model predictive control on a planner's compiled face: re-plan from the measured state at each tick, apply the plan.
 
@@ -84,31 +76,32 @@ def ModelPredictiveController(
         and the solve's wall time (default off; host runs only, a traced run
         prints nothing).
 
+    Every block is pure and the loop computes each signal once per tick, so a
+    tick solves once; ``mpc % dt`` puts its blocks on the clock (a step
+    diagram's ``%``).
+
     Ports: inputs per ``inputs``; outputs ``u`` (the command), ``z`` (the plan
     solved at this tick, for dual rate and logging) and, when the plan carries
     states, ``x_ref`` and ``u_ref`` (the applied plan's state and input now).
     """
-    pv = planner.compile(backend)
-    require_point_start(planner.problem)
-    bindings = bindings_of(inputs)
 
-    return PredictiveController(
-        pv, bindings, delay=delay, warm_start=warm_start, verbose=verbose
-    )
-
-
-class PredictiveController(SampledDiagramSystem):
-    """
-    The MPC box: the planner's solve, the command and the plan's memory, with a unit delay before the command when ``delay``.
-
-    Every block is pure and the loop computes each signal once per tick, so a
-    tick solves once. Built by :func:`ModelPredictiveController`; ``mpc % dt``
-    puts its blocks on the clock (a step diagram's ``%``).
-    """
-
-    def __init__(self, pv, bindings, *, delay=False, warm_start=True, verbose=False):
+    def __init__(
+        self,
+        planner,
+        *,
+        inputs=None,
+        delay=False,
+        warm_start=True,
+        backend=None,
+        verbose=False,
+    ):
         super().__init__()
         self.name = "ModelPredictiveController"
+
+        # The planner's compiled face, from a point start; the leaves bound to ports
+        pv = planner.compile(backend)
+        require_point_start(planner.problem)
+        bindings = bindings_of(inputs)
 
         # The face, the bindings and the switches, shared by the blocks
         self.pv = pv

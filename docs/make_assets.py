@@ -269,6 +269,7 @@ def ur5_impedance() -> None:
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
     from minilink.catalog import UdeSRacecarDyn
+    from minilink.control import ModelPredictiveController
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
         ReferenceTrack,
@@ -283,7 +284,6 @@ def racecar_mpc() -> None:
         quadratic_hinge,
     )
     from minilink.planning.trajectory_optimization.mpc import (
-        ModelPredictiveController,
         mpc_animation_overlays,
         plant_run,
     )

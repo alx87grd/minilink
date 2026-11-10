@@ -3,11 +3,9 @@
 from parking import CURRENT, X_START, ParkingBoat, parking_cost
 
 from minilink import PlanningProblem, TrajectoryOptimizationPlanner
+from minilink.control import ModelPredictiveController
 from minilink.graphical.catalog.boat_skin import boat_skin_3d
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    mpc_animation_overlays,
-)
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
 TF_SIM = 60.0  # [s]
 SIM_DT = 0.05  # [s] inner plant step

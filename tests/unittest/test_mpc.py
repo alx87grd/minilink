@@ -21,18 +21,14 @@ from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
+from minilink.control import ModelPredictiveController, PlanFollower
 from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    PlanFollower,
     mpc_animation_overlays,
     mpc_plans_from_rollout,
     plant_run,
 )
 from minilink.core.compile.plan import nested_layout
-from minilink.planning.trajectory_optimization.mpc.predictive import (
-    PredictiveController,
-    warm_guess,
-)
+from minilink.planning.trajectory_optimization.mpc.predictive import warm_guess
 from minilink.planning.trajectory_optimization.compiled import (
     CompiledTrajectoryPlanner,
 )
@@ -269,7 +265,7 @@ class TestTheDelayedMPC(unittest.TestCase):
 
     def test_the_delay_is_a_visible_unit_delay_before_the_command(self):
         mpc, pv = self.mpc, self.pv
-        assert isinstance(mpc, PredictiveController)
+        assert isinstance(mpc, ModelPredictiveController)
         assert list(mpc.subsystems) == ["solve", "command", "memory", "delay"]
         assert list(mpc.inputs) == ["y"]
         assert list(mpc.outputs) == ["u", "z", "x_ref", "u_ref"]
@@ -346,7 +342,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
 
     def test_it_is_a_solve_a_command_and_a_memory_holding_the_plan(self):
         mpc, pv = self.mpc, self.pv
-        assert isinstance(mpc, PredictiveController)
+        assert isinstance(mpc, ModelPredictiveController)
         assert list(mpc.subsystems) == ["solve", "command", "memory"]
         assert list(mpc.inputs) == ["y"]
         assert list(mpc.outputs) == ["u", "z", "x_ref", "u_ref"]

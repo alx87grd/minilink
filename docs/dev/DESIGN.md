@@ -350,7 +350,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
   delay=False, warm_start=True, backend=None, verbose=False)` closes a planner's compiled face
   `pv = planner.compile()` on the loop, one solve per tick, `(mpc % dt) @ plant`. Every
-  MPC is one architecture, a box of pure blocks (`PredictiveController`, a
+  MPC is one architecture, a box of pure blocks (the class itself, a
   `SampledDiagramSystem`; `mpc % dt` clocks its blocks): `PlanSolver` under the id `solve`
   (static, `(y, z_prev) → z*_k = pv.solve(P_k, z0)`), `PlanCommand` under `command`
   (`z → u_k = pv.command(z, x, t_k)`, `x` unread by an open-loop plan, and `x_ref`, `u_ref` from `pv.prediction` when the plan

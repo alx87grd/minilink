@@ -261,6 +261,9 @@ RETIRED_NAMES = {
     "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationRecord.solver_success": (
         "optimizer_success"
     ),
+    "minilink.planning.trajectory_optimization.mpc.predictive.PredictiveController": (
+        "ModelPredictiveController, the class (ruling 15)"
+    ),
 }
 
 

@@ -22,9 +22,6 @@ from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
     DoubleIntegrator,
 )
 from minilink.planning import MPPIPlanner, MPPIRecord  # noqa: E402
-from minilink.planning.trajectory_optimization.mpc.predictive import (  # noqa: E402
-    PredictiveController,
-)
 
 DT = 0.05
 
@@ -130,7 +127,7 @@ def test_shift_holds_the_last_input_and_command_reads_the_held_one():
 def test_the_mpc_runs_mppi_in_every_form(form, blocks):
     planner = swing_up_planner()
     mpc = ModelPredictiveController(planner, **form)
-    assert isinstance(mpc, PredictiveController) and list(mpc.subsystems) == blocks
+    assert isinstance(mpc, ModelPredictiveController) and list(mpc.subsystems) == blocks
     loop = (mpc % DT) @ planner.problem.sys
     run = loop.compute_trajectory(tf=0.5, dt=DT)
     assert np.all(np.isfinite(run.x)) and run.has_signal("plant:u")

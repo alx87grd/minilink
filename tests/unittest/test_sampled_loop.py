@@ -487,11 +487,9 @@ def test_a_bare_tick_law_is_refused_where_a_nested_box_would_speed_it_up():
 
 
 def test_the_mpc_box_has_no_clock_operator_of_its_own():
-    from minilink.planning.trajectory_optimization.mpc.predictive import (
-        PredictiveController,
-    )
+    from minilink.control import ModelPredictiveController
 
-    assert "__mod__" not in vars(PredictiveController)
+    assert "__mod__" not in vars(ModelPredictiveController)
 
 
 def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
