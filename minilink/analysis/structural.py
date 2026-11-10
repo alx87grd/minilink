@@ -6,6 +6,7 @@ import numpy as np
 
 from minilink.analysis.linearization import design_model
 from minilink.core.system import System
+from minilink.dynamics.abstraction.state_space import require_arrays
 
 # Relative singular-value threshold of every rank decision: the Kalman matrices raise
 # A to the power n − 1, so their rounding sits far above machine precision
@@ -22,6 +23,7 @@ def controllability_matrix(A, B):
 
     The arrays twin of :func:`controllability`, as ``lqr_gain`` is ``lqr``'s.
     """
+    require_arrays(A=A, B=B)
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     n = A.shape[0]
@@ -40,6 +42,7 @@ def observability_matrix(A, C):
 
     The arrays twin of :func:`observability`.
     """
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     n = A.shape[0]
@@ -67,7 +70,7 @@ def controllability(
     """Return the controllability test of ``sys``'s linear model.
 
     The pair ``(A, B)`` is controllable when its Kalman controllability matrix
-    has full row rank ``n``. ``sys`` is an ``LTISystem``, read as is, or any
+    has full row rank ``n``. ``sys`` is a linear model, read as is, or any
     plant, linearized at ``(x_bar, u_bar)`` about its command port alone (the
     nominal point by default), as ``lqr`` and ``place`` read it. ``tol`` is
     the relative singular-value threshold below which a direction counts as
@@ -105,7 +108,7 @@ def observability(
     """Return the observability test of ``sys``'s linear model.
 
     The pair ``(A, C)`` is observable when its Kalman observability matrix has
-    full column rank ``n``. ``sys`` is an ``LTISystem``, read as is, or any
+    full column rank ``n``. ``sys`` is a linear model, read as is, or any
     plant, linearized at ``(x_bar, u_bar)`` with ``C`` over its measured
     output ``y`` (a plant without ``y`` is refused), as ``luenberger`` and
     ``kalman`` read it; ``tol`` as in :func:`controllability`. On arrays,

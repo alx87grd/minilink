@@ -90,13 +90,13 @@ or neural network alike):
 
 **Tools** — verbs on a `System`; they return data or plots and never define
 user-facing systems (factories are fine: `linearize_matrices()` returns arrays,
-`linearize()` wraps them as an `LTISystem`, and an LQR design function returns a
+`linearize()` wraps them as a `LinearizedSystem`, and an LQR design function returns a
 state-feedback block):
 
 | Package | Role |
 | --- | --- |
 | `simulation/` | `Simulator`, `StaticSimulator`, solvers, forcing; `discrete/` (`clock_runner.py`: the host clock runner of a sampled loop); `realtime/` (`RealtimeSimulator`, `RealtimeInput`/`RealtimeOutput`, `PygameInput`, `LiveSignalPlotOutput`) |
-| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LTISystem`; a step or sampled system → `DiscreteLTISystem`, `x_{k+1} = A_d x_k + B_d u_k` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k Δ`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
+| `analysis/` | one calling pattern `tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)` on any `System` (the linear model as is, the rest linearized at the operating point): `jacobian`, `linearize` (→ `LinearizedSystem`, `ẋ = f(x̄, ū) + A (x − x̄) + B (u − ū)` in the plant's own coordinates, ports, labels and units, `deviation_model()` its pure `LTISystem`; a step or sampled system → `LinearizedStepSystem`, `x_{k+1} = F(x̄, ū) + A_d (x_k − x̄) + B_d (u_k − ū)` with its period, its poles in `z`, its frequency tools at `G(e^{jωΔ})` up to `π/Δ`, its `plot_pzmap` and `plot_root_locus` with the unit circle, its `step_response` the samples `y_k` at `t_k = k Δ`), the one-channel frequency and time tools (`bode`, `pzmap`, `nyquist`, `margins`, `root_locus`, `step_response`, `step_info`, `transfer_function`, the sensitivity functions) with their `plot_` twins, `structural` (controllability, observability), `linear` (the one-channel matrix math, `minreal`), `equilibria`, `modal`, `lyapunov`, `riccati`, `discretization`. The API reference is the docs site |
 | `planning/` | `problems.py`, `step_problems.py` (the step problem, which answers its own equations) and `step_model.py` (the internal evaluator they delegate to), `results.py`, `policies.py` (a controller block read as its policy `u = π(x, t)`), `evaluator.py` (the problem evaluator, `evaluate`), `evaluation.py` (`score_run`, `evaluate_trajectory`, the `Evaluation` record), `environment.py` (`RolloutEnvironment`: the problem as step functions for the learners and MPPI), `comparison.py`; `dynamic_programming/` (value iteration, policy evaluation, `LQRPlanner`, the lookup policy), `trajectory_optimization/` (collocation, shooting; `compiled.py` the planner's face; `path_integral.py` MPPI; `mpc/`, the receding-horizon block, provisional), `search/` (RRT), `spatial/` (scenes, obstacles and the workspace fields; the paths and shapes they read live in `core/geometry/` and import from there, never through `planning.spatial`) |
 | `learning/` | policies learned from interaction: `reinforcement_learning/` (the neural planner, the tabular learners); identification and imitation later |
 | `optimization/` | `MathematicalProgram`, `Optimizer` (generic NLP) |
@@ -258,7 +258,19 @@ The host clock runner records nothing.
 The reusable bases are `dynamics/abstraction`: `StateSpaceSystem` builds its matrices
 through methods `A(t, params)`, `B(t, params)`, `C(t, params)`, `D(t, params)`
 (`dx = A @ x + B @ u`), as `MechanicalSystem` builds `H(q, params)`; `LTISystem` is the
-constant-matrix convenience built from arrays; `Manipulator` (`MechanicalSystem` plus the
+constant-matrix convenience built from arrays, pure `dx = A @ x + B @ u` about the origin
+(`DiscreteLTISystem` its difference equation); `LinearizedSystem` is what `linearize`
+returns, the affine model `dx = f(x̄, ū) + A (x − x̄) + B (u − ū)`,
+`y = h(x̄, ū) + C (x − x̄) + D (u − ū)` in the plant's own coordinates, ports, labels and
+units, its `params` the Jacobians and the point (`x_bar`, `u_bar`, `y_bar`, and the drift
+`dx_bar = f(x̄, ū)`, zero at an equilibrium), its nominal state `x̄` and input `ū`, so
+`lqr(lin, Q, R) @ lin` regulates to `x̄`; `lin.deviation_model()` is the pure `LTISystem` in
+`Δx`, `Δu`, `Δy` (labels with a Δ). `LinearizedStepSystem` is its twin on a step or sampled
+system (`x_next_bar = F(x̄, ū)`), its deviation model a `DiscreteLTISystem`. The analysis
+verbs read only `A, B, C, D` and warn on a linearization off an equilibrium; a design verb
+reads the point from the linearization's `params` (the origin of an `LTISystem`), and a point
+given with a linear model linearizes it there. The matrices are methods, `lin.A()`;
+a method passed where its matrix goes is refused with the call to write; `Manipulator` (`MechanicalSystem` plus the
 task ports `p`, `pdot`; `forward_kinematics`, `J`, `inverse_kinematics`) is the base of the
 serial arms, read straight by the robotic laws (`ctl @ plant` on `y = [q; dq]`). Mixed
 inputs are named ports with concrete allocation hooks, never inheritance branches. The
@@ -288,8 +300,10 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   the point lives: on a system, the nominal value of its signals; in a block whose law
   reads it (`OutputReference`, `StateObserver`), its `params`; in a tool, the
   `x_bar` / `u_bar` arguments, defaulting to the nominal (the target of
-  `QuadraticCost.from_system` included); on a linear model, `x_bar`, `u_bar` and `y_bar`,
-  where its deviations are measured from.
+  `QuadraticCost.from_system` included); on a linearization, its `params` `x_bar`, `u_bar`,
+  `y_bar` (read as `lin.x_bar`), where its deviations are measured from; an `LTISystem`
+  sits at the origin. The input ports' nominal values, stacked, are `sys.u_nominal`
+  (read-only).
 - **Ports:** explicit, ID-first; infer `dim` from metadata or default 1. Extract
   slices with `ports(u, "r", "y")`.
 - **Constructor shortcuts:** `System(state_dim=0, *, input_dim=, output_dim=, expose_state=,

@@ -393,7 +393,9 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(D, _Affine.D, atol=1e-6)
         lti = plant.linearize([0.1, 0.2], [0.3, 0.4])
         np.testing.assert_allclose(lti.A(), A)
-        self.assertEqual(lti.state.labels[0], "Delta x[0]")
+        # the plant's own labels; the deviation model's carry a Δ
+        self.assertEqual(lti.state.labels[0], "x[0]")
+        self.assertEqual(lti.deviation_model().state.labels[0], "Δx[0]")
 
     def test_the_linear_model_carries_its_operating_point(self):
         plant = _Affine()
@@ -409,12 +411,13 @@ class TestFamilyPattern(unittest.TestCase):
         # the nominal state is the default point; a model from arrays sits at the origin
         plant.state.nominal_value = np.array(x_bar, dtype=float)
         np.testing.assert_allclose(plant.linearize().x_bar, x_bar)
+        from minilink.analysis.linearization import design_point
         from minilink.dynamics.abstraction.state_space import LTISystem
 
         origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
-        np.testing.assert_allclose(origin.x_bar, 0.0)
-        np.testing.assert_allclose(origin.u_bar, 0.0)
-        np.testing.assert_allclose(origin.y_bar, 0.0)
+        self.assertFalse(hasattr(origin, "x_bar"))
+        for component in design_point(origin):
+            np.testing.assert_allclose(component, 0.0)
 
     def test_linearize_selects_rows_and_columns(self):
         plant = _Affine()
@@ -477,23 +480,23 @@ class TestFamilyPattern(unittest.TestCase):
             plant.find_equilibrium([0.3, 0.0]), [0.0, 0.0], atol=1e-6
         )
 
-    def test_a_point_given_with_a_linear_model_is_refused(self):
+    def test_a_point_given_with_a_linearization_reads_it_there(self):
         from minilink.analysis.derivatives import jacobian
         from minilink.analysis.modal import modal_analysis
 
-        lti = InvertedPendulum().linearize([0.0, 0.0])
-        for name, call in (
-            ("linearize", lambda: linearize(lti, [0.0, 0.0])),
-            ("bode", lambda: bode(lti, u_bar=[0.0], w=[1.0])),
-            ("modal_analysis", lambda: modal_analysis(lti, [0.0, 0.0])),
-            ("lqr", lambda: lqr(lti, np.eye(2), [[1.0]], x_bar=[0.0, 0.0])),
-            ("shortcut", lambda: lti.linearize([0.0, 0.0])),
-        ):
-            with self.subTest(name):
-                with self.assertRaisesRegex(ValueError, "carries its operating point"):
-                    call()
+        lin = InvertedPendulum().linearize([0.0, 0.0])
+        moved = linearize(lin, [0.1, 0.0])
+        # the same Jacobians, about the new point: f there is the model's drift
+        np.testing.assert_allclose(moved.A(), lin.A())
+        np.testing.assert_allclose(moved.x_bar, [0.1, 0.0])
+        np.testing.assert_allclose(
+            moved.params["dx_bar"], lin.A() @ np.array([0.1, 0.0])
+        )
+        np.testing.assert_allclose(lin.linearize([0.1, 0.0]).A(), lin.A())
+        poles, _ = modal_analysis(lin, [0.1, 0.0])
+        np.testing.assert_allclose(np.sort(poles), np.sort(np.linalg.eigvals(lin.A())))
         # the raw derivative evaluates where it is told: trajectory_lqr reads it along x(t)
-        np.testing.assert_allclose(jacobian(lti, "f", "x", [0.1, 0.0]), lti.A())
+        np.testing.assert_allclose(jacobian(lin, "f", "x", [0.1, 0.0]), lin.A())
 
     def test_the_operating_point_size_is_checked_by_name(self):
         plant = Pendulum()

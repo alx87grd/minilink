@@ -72,10 +72,12 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ### A linear model's matrices are methods
 - **Symptom:** `plant.linearize().A` is a bound method; the matrix is `plant.linearize().A()`.
-  A student who writes `np.linalg.eigvals(lin.A)` gets "0-dimensional array given".
+  A student who writes `np.linalg.eigvals(lin.A)` gets NumPy's "0-dimensional array given";
+  the library's own verbs (`lqr_gain(lin.A, …)`, `controllability_matrix`, the linear
+  analysis on arrays) refuse it with the call to write, `sys.A()`.
 - **Workaround:** call it: `lin.A()`, `lin.B()`.
-- **Fix:** **[ask]** a public-API choice, not a defect by itself (the matrices are functions
-  of `params`): keep the call, or read `A` as an attribute at the block's own `params`.
+- **Fix:** none: the matrices stay methods `A(t, params)` on every linear model (the
+  maintainer's ruling 11 of 2026-11-10), and NumPy's own message cannot name the call.
 
 ## Tooling
 

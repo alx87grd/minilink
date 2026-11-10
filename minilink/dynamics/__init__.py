@@ -29,6 +29,14 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "minilink.dynamics.abstraction.state_space",
         "DiscreteLTISystem",
     ),
+    "LinearizedSystem": (
+        "minilink.dynamics.abstraction.state_space",
+        "LinearizedSystem",
+    ),
+    "LinearizedStepSystem": (
+        "minilink.dynamics.abstraction.state_space",
+        "LinearizedStepSystem",
+    ),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

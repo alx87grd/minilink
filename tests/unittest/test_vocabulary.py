@@ -328,6 +328,16 @@ RETIRED_KEYWORDS = {
         "input_port_id": "port"
     },
     "minilink.blocks.sources.TrajectorySource.__init__": {"interpolation": "hold"},
+    "minilink.dynamics.abstraction.state_space.LTISystem.__init__": {
+        "x_bar": "linearize(sys, x_bar), a LinearizedSystem",
+        "u_bar": "linearize(sys, x_bar, u_bar), a LinearizedSystem",
+        "y_bar": "a LinearizedSystem's params['y_bar']",
+    },
+    "minilink.dynamics.abstraction.state_space.DiscreteLTISystem.__init__": {
+        "x_bar": "linearize(step_sys, x_bar), a LinearizedStepSystem",
+        "u_bar": "linearize(step_sys, x_bar, u_bar), a LinearizedStepSystem",
+        "y_bar": "a LinearizedStepSystem's params['y_bar']",
+    },
     "minilink.blocks.sources.TrajectorySource.from_trajectory": {
         "interpolation": "hold"
     },

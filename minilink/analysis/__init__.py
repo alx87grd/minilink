@@ -12,8 +12,8 @@ from minilink.core.exports import lazy_facade
 # ``sensitivity(plant=H, controller=C, filter=F)``. A ``System`` carries the common
 # ones as methods: ``linearize``, ``find_equilibrium``, ``transfer_function``,
 # ``plot_bode``, ``plot_pzmap``, ``plot_root_locus``, ``plot_step_response`` and
-# ``animate_modal``. The band is linear analysis at an operating point: an
-# ``LTISystem`` is read as is, anything else is linearized first, the step response
+# ``animate_modal``. The band is linear analysis at an operating point: a
+# linear model is read as is, anything else is linearized first, the step response
 # included (its figure says "Linear" or "Linearized").
 #
 # Each exported name maps to its (module path, attribute).

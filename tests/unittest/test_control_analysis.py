@@ -329,8 +329,27 @@ class TestLQR(unittest.TestCase):
         Q, R = np.eye(2), np.eye(1)
         with self.assertRaisesRegex(TypeError, r"lqr_gain\(A, B, Q, R\)"):
             lqr(lti.A(), Q, R)  # arrays go to the gain
-        with self.assertRaisesRegex(ValueError, "carries its operating point"):
-            lqr(lti, Q, R, x_bar=[0.1, 0.0])
+        with self.assertRaisesRegex(TypeError, r"call it, sys\.A\(\)"):
+            lqr_gain(lti.A, lti.B(), Q, R)  # the method, not its matrix
+
+    def test_a_design_on_a_linearization_regulates_to_its_point(self):
+        """lqr(lin) @ lin holds x̄, and near x̄ it is the plant loop's linear prediction."""
+        plant = Pendulum()
+        x_up = np.array([np.pi, 0.0])
+        lin = linearize(plant, x_bar=x_up)
+        Q, R = np.diag([10.0, 1.0]), np.array([[1.0]])
+        law = lqr(lin, Q, R)
+        x0 = x_up + np.array([-0.01, 0.0])
+
+        on_model = (law @ lin).compute_trajectory(x0=x0, tf=6.0, n_samples=61)
+        on_plant = (law @ plant).compute_trajectory(x0=x0, tf=6.0, n_samples=61)
+
+        np.testing.assert_allclose(on_model.x[:, -1], x_up, atol=1e-6)
+        np.testing.assert_allclose(on_model.x, on_plant.x, atol=1e-4)
+        # a point given re-linearizes the model there: the same gain, the new target
+        moved = lqr(lin, Q, R, x_bar=[np.pi + 0.1, 0.0])
+        np.testing.assert_allclose(moved.params["K"], law.params["K"])
+        np.testing.assert_allclose(moved.inputs["r"].nominal_value, [np.pi + 0.1, 0])
 
     def test_lqr_closed_loop_stabilizes_inverted_pendulum(self):
         plant = InvertedPendulum()
@@ -2144,3 +2163,89 @@ def test_a_structural_test_returns_its_matrix_rank_and_dimension():
     np.testing.assert_allclose(result.matrix, [[1.0, 1.0], [0.0, 0.0]])
     assert (result.rank, result.n, result.is_full_rank) == (1, 2, False)
     assert "rank 1 of n = 2" in str(result)
+
+
+class TestLinearizedSystem(unittest.TestCase):
+    """A linearization is the plant's first-order model in the plant's own coordinates."""
+
+    def setUp(self):
+        self.plant = Pendulum()
+        self.plant.x0 = np.array([0.3, 0.0])
+        self.x_up = np.array([np.pi, 0.0])
+        self.lin = linearize(self.plant, x_bar=self.x_up)
+
+    def test_it_carries_the_plants_signals_and_its_point(self):
+        from minilink.dynamics.abstraction.state_space import LinearizedSystem
+
+        lin, plant = self.lin, self.plant
+        self.assertIsInstance(lin, LinearizedSystem)
+        self.assertNotIsInstance(lin, LTISystem)
+        self.assertEqual(lin.state.labels, plant.state.labels)
+        self.assertEqual(lin.state.units, plant.state.units)
+        self.assertEqual(list(lin.inputs), list(plant.inputs))
+        self.assertEqual(lin.inputs["u"].labels, plant.inputs["u"].labels)
+        self.assertEqual(lin.outputs["y"].labels, plant.outputs["y"].labels)
+        np.testing.assert_allclose(lin.x0, plant.x0)
+        np.testing.assert_allclose(lin.state.nominal_value, self.x_up)
+        np.testing.assert_allclose(lin.u_nominal, [0.0])
+        self.assertEqual(
+            set(lin.params),
+            {"A", "B", "C", "D", "x_bar", "u_bar", "y_bar", "dx_bar"},
+        )
+        np.testing.assert_allclose(lin.x_bar, self.x_up)
+        np.testing.assert_allclose(lin.y_bar, plant.h(self.x_up, np.zeros(1)))
+        np.testing.assert_allclose(lin.params["dx_bar"], 0.0, atol=1e-12)
+        text = str(lin)
+        self.assertIn("x_bar = [3.1416 0.    ]", text)
+        self.assertIn("dx_bar", text)
+
+    def test_a_run_of_it_is_the_plants_linear_prediction(self):
+        lin = self.lin
+        dx0 = np.array([0.05, 0.0])
+        run = lin.compute_trajectory(x0=self.x_up + dx0, tf=1.0, n_samples=11)
+        deviations = lin.deviation_model().compute_trajectory(
+            x0=dx0, tf=1.0, n_samples=11
+        )
+        plant_run = self.plant.compute_trajectory(
+            x0=self.x_up + dx0, tf=1.0, n_samples=11
+        )
+        np.testing.assert_allclose(run.x, deviations.x + self.x_up[:, None], atol=1e-6)
+        np.testing.assert_allclose(run.x, plant_run.x, atol=5e-3)
+
+    def test_the_deviation_model_is_the_pure_lti_system(self):
+        model = self.lin.deviation_model()
+        self.assertIs(type(model), LTISystem)
+        np.testing.assert_allclose(model.A(), self.lin.A())
+        self.assertEqual(model.state.labels, ["Δtheta", "Δdtheta"])
+        self.assertEqual(model.inputs["u"].labels, ["Δtau"])
+        np.testing.assert_allclose(model.f(np.zeros(2), np.zeros(1)), 0.0)
+
+    def test_the_analysis_off_an_equilibrium_warns_once(self):
+        from minilink.analysis.frequency import bode, pzmap
+
+        off = linearize(self.plant, x_bar=[np.pi / 4, 0.0])
+        with pytest.warns(UserWarning, match="does not rest at the design point"):
+            pzmap(off)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            bode(self.lin)
+            pzmap(self.lin)
+
+    def test_a_step_or_sampled_system_gives_the_step_twin(self):
+        from minilink.dynamics.abstraction.state_space import (
+            DiscreteLTISystem,
+            LinearizedStepSystem,
+        )
+
+        sampled = self.plant % 0.1
+        lin = linearize(sampled, x_bar=self.x_up)
+        self.assertIsInstance(lin, LinearizedStepSystem)
+        self.assertEqual(lin.period, 0.1)
+        np.testing.assert_allclose(lin.params["x_next_bar"], self.x_up, atol=1e-12)
+        np.testing.assert_allclose(
+            lin.step(self.x_up, np.zeros(1)), self.x_up, atol=1e-12
+        )
+        model = lin.deviation_model()
+        self.assertIs(type(model), DiscreteLTISystem)
+        self.assertEqual(model.period, 0.1)
+        np.testing.assert_allclose(model.A(), lin.A())

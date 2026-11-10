@@ -24,6 +24,7 @@ REAL_LABEL = "Real Axis (seconds⁻¹)"
 IMAG_LABEL = "Imaginary Axis (seconds⁻¹)"
 TIME_LABEL = "Time (seconds)"
 AMPLITUDE_LABEL = "Amplitude"
+DEVIATION_LABEL = "Deviation Δy"  # A linearization's response, from its operating point
 
 
 ###############################################################################

@@ -58,7 +58,8 @@ def step_response(
     """Return ``(time, y)``: the unit-step response of the selected channel from rest.
 
     The response of the linear model, in deviation variables: ``sys`` as is
-    when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)``. Same
+    when it is an ``LTISystem``, else linearized at ``(x_bar, u_bar)`` (a
+    ``LinearizedSystem``'s own ``A, B, C, D``), ``Δy`` from ``ȳ``. Same
     channel arguments as :func:`~minilink.analysis.frequency.bode`; ``tf``
     defaults to eight times the slowest stable time constant, and ``n_samples``
     samples span ``[0, tf]``. A step or sampled system's response is its
@@ -177,7 +178,8 @@ def plot_step_response(
 
     The linear model's response, as :func:`step_response`; the title reads
     "Linear Step Response" for an ``LTISystem`` and "Linearized Step
-    Response" for a system linearized here. A step or sampled system's
+    Response", the response a deviation ``Δy``, for any other system and a
+    ``LinearizedSystem``. A step or sampled system's
     response is drawn as its samples ``y_k``.
     """
     time, y = step_response(
@@ -233,13 +235,16 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
     )
     span = float(np.ptp(y)) or 1.0
 
-    # The title says whether the model is linear or was linearized here
+    # The title says whether the model is linear or a linearization, whose
+    # response is the deviation Δy from the operating point
     linear_model = isinstance(sys, (LTISystem, DiscreteLTISystem))
     title = style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE
+    y_label = style.AMPLITUDE_LABEL if linear_model else style.DEVIATION_LABEL
+    output = "y" if linear_model else "Δy"
     subtitle = channel_subtitle(sys, of, wrt)
 
     # The response, hovered sample by sample, and its peak; in z, the samples y_k
-    hover = tuple(f"t = {tk:.3g} s<br>y = {yk:.3g}" for tk, yk in zip(time, y))
+    hover = tuple(f"t = {tk:.3g} s<br>{output} = {yk:.3g}" for tk, yk in zip(time, y))
     if period is None:
         response = Trace(time, y, style.SYSTEM_COLOR, hover=hover)
     else:
@@ -264,7 +269,7 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
         lines=lines,
         notes=notes,
         x_label=style.TIME_LABEL,
-        y_label=style.AMPLITUDE_LABEL,
+        y_label=y_label,
         y_lim=y_lim,
     )
 

@@ -22,7 +22,10 @@ from minilink.blocks.step import UnitDelay
 from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
-from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
+from minilink.dynamics.abstraction.state_space import (
+    LinearizedStepSystem,
+    LinearizedSystem,
+)
 from minilink.planning.step_model import step_model_of
 
 
@@ -64,7 +67,7 @@ def test_a_continuous_loop_runs_and_linearizes_in_s():
     loop = pid() @ pendulum()
     run = loop.compute_trajectory(tf=1.0, dt=0.01)
     assert run.t[-1] == pytest.approx(1.0)
-    assert isinstance(linearize(loop, x_bar=np.zeros(loop.n)), LTISystem)
+    assert isinstance(linearize(loop, x_bar=np.zeros(loop.n)), LinearizedSystem)
 
 
 def test_a_pure_step_chain_rolls_out_and_linearizes_in_z_per_tick():
@@ -72,7 +75,7 @@ def test_a_pure_step_chain_rolls_out_and_linearizes_in_z_per_tick():
     run = chain.compute_rollout(5, u=np.ones(1))
     np.testing.assert_allclose(run.t, np.arange(6))
     model = linearize(chain)
-    assert isinstance(model, DiscreteLTISystem) and model.period is None
+    assert isinstance(model, LinearizedStepSystem) and model.period is None
     np.testing.assert_allclose(np.sort(np.abs(poles(model.A()))), [0.0, 0.5])
 
 

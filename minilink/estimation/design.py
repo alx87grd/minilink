@@ -4,10 +4,15 @@ import re
 
 import numpy as np
 
-from minilink.analysis.linearization import design_model, require_continuous_model
+from minilink.analysis.linearization import (
+    design_model,
+    design_point,
+    require_continuous_model,
+)
 from minilink.analysis.riccati import care, require_weight
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
+from minilink.dynamics.abstraction.state_space import require_arrays
 from minilink.estimation.observer import StateObserver
 
 ###############################################################################
@@ -17,6 +22,7 @@ from minilink.estimation.observer import StateObserver
 
 def luenberger_gain(A, C, poles):
     """Return the observer gain ``L`` that puts the eigenvalues of ``A − L C`` at ``poles``."""
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
 
@@ -32,6 +38,7 @@ def luenberger_gain(A, C, poles):
 
 def kalman_gain(A, C, Q_n, R_n):
     """Return the Kalman gain ``L`` of the stationary filter for process noise ``Q_n`` and measurement noise ``R_n``."""
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     Q_n = np.asarray(Q_n, dtype=float)
@@ -53,9 +60,10 @@ def luenberger(
 ):
     """Design an observer for ``sys`` by pole placement and return a ``StateObserver``.
 
-    ``sys`` is a linear model, used as is with the operating point it carries,
-    or any plant, linearized first about its command port at ``(x_bar, u_bar)``,
-    the nominal state and inputs when omitted. The block runs the model about
+    ``sys`` is a linear model, used as is with the operating point it carries
+    (the origin of an ``LTISystem``), or any plant, linearized first about its
+    command port at ``(x_bar, u_bar)``, the nominal state and inputs when
+    omitted. The block runs the model about
     that point and corrects it with ``L (y − ŷ)``, so the estimation error has
     the requested poles. Arguments as in :func:`~minilink.control.design.lqr`,
     with ``poles`` in place of ``Q, R``. On arrays the gain is
@@ -129,6 +137,7 @@ def require_observable(obsv, n):
 def build_observer(model, L, name):
     """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
     labels = [hat(label) for label in model.state.labels]
+    x_bar, u_bar, y_bar = design_point(model)
 
     observer = StateObserver(
         model.A(),
@@ -136,9 +145,9 @@ def build_observer(model, L, name):
         model.C(),
         L,
         model.D(),
-        x_bar=model.x_bar,
-        u_bar=model.u_bar,
-        y_bar=model.y_bar,
+        x_bar=x_bar,
+        u_bar=u_bar,
+        y_bar=y_bar,
         labels=labels,
     )
     observer.name = name
@@ -147,8 +156,7 @@ def build_observer(model, L, name):
 
 
 def hat(label):
-    """``θ`` -> ``θ̂``, ``x[0]`` -> ``x̂[0]``, ``theta`` -> ``theta_hat``; a linearized model's ``Delta θ`` reads as its plant's label."""
-    label = label.removeprefix("Delta ")
+    """``θ`` -> ``θ̂``, ``x[0]`` -> ``x̂[0]``, ``theta`` -> ``theta_hat``."""
     component = re.fullmatch(r"(.)\[(\d+)\]", label)
     if component:
         return f"{component[1]}̂[{component[2]}]"

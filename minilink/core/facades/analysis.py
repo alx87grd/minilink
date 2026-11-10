@@ -54,10 +54,11 @@ class DynamicAnalysis:
         method="auto",
         eps=1e-6,
     ):
-        """Linearize about ``(x_bar, u_bar)`` and return an ``LTISystem``.
+        """Linearize about ``(x_bar, u_bar)`` and return a ``LinearizedSystem``.
 
         ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
-        ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearization.linearize`.
+        ``lin.C()``, ``lin.D()``, the point ``lin.x_bar``, and the pure
+        deviation model ``lin.deviation_model()``. See :func:`minilink.analysis.linearization.linearize`.
         """
         # A real cycle through minilink.core.system
         from minilink.analysis.linearization import linearize

@@ -4,7 +4,11 @@ import numpy as np
 from scipy.signal import place_poles
 
 from minilink.analysis.derivatives import jacobian
-from minilink.analysis.linearization import design_model, require_continuous_model
+from minilink.analysis.linearization import (
+    design_model,
+    design_point,
+    require_continuous_model,
+)
 from minilink.analysis.riccati import (
     care,
     hamiltonian_matrix,
@@ -21,6 +25,7 @@ from minilink.control.state import (
     TrajectoryFeedback,
 )
 from minilink.core.diagram import DiagramSystem
+from minilink.dynamics.abstraction.state_space import require_arrays
 
 ###############################################################################
 # Public API
@@ -29,6 +34,7 @@ from minilink.core.diagram import DiagramSystem
 
 def lqr_gain(A, B, Q, R):
     """Return the optimal feedback gain ``K`` of the law ``u = -K x`` minimizing ``∫ xᵀQx + uᵀRu dt``."""
+    require_arrays(A=A, B=B)
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     Q = np.asarray(Q, dtype=float)
@@ -47,6 +53,7 @@ def lqr_gain(A, B, Q, R):
 
 def place_gain(A, B, poles):
     """Return the gain ``K`` of the law ``u = -K x`` that puts the eigenvalues of ``A − B K`` at ``poles``."""
+    require_arrays(A=A, B=B)
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
 
@@ -83,12 +90,13 @@ def lqr(
 ):
     """Design an LQR on ``sys`` and return a ``StateFeedback``.
 
-    ``sys`` is a linear model (an ``LTISystem``, used as is with the operating
-    point it carries) or any plant, linearized first about its command port at
-    ``(x_bar, u_bar)``, the nominal state and inputs when omitted. The block
-    implements ``u = u_bar - K (x - r)`` with ``r`` defaulting to ``x_bar``, the
-    operating point of the model; wire the plant state into its ``x`` port. On
-    arrays the gain is :func:`lqr_gain`, and the model ``LTISystem(A, B)``.
+    ``sys`` is a linear model (a ``LinearizedSystem``, used as is with the
+    operating point it carries, or an ``LTISystem``, about the origin) or any
+    plant, linearized first about its command port at ``(x_bar, u_bar)``, the
+    nominal state and inputs when omitted. The block implements
+    ``u = u_bar - K (x - r)`` with ``r`` defaulting to ``x_bar``, the operating
+    point of the model; wire the plant state into its ``x`` port. On arrays
+    the gain is :func:`lqr_gain`, and the model ``LTISystem(A, B)``.
     Only the command port enters ``B`` (``u``, else the one input that is not a
     disturbance ``d`` or a noise ``n``); every other input is held at its
     nominal value.
@@ -101,7 +109,7 @@ def lqr(
         State and input weights of ``∫ xᵀQx + uᵀRu dt``.
     x_bar, u_bar : array-like, optional
         Operating point to linearize a plant about, the nominal by default; a
-        linear model carries its own.
+        linear model is read about its own unless one is given.
     t, params, method, eps : optional
         Linearization time, parameter set, differentiation backend and
         central-difference step, as in :func:`~minilink.analysis.linearize`.
@@ -110,10 +118,11 @@ def lqr(
     require_continuous_model(model, "lqr")
     A = model.A()
     B = model.B()
+    x_bar, u_bar, _ = design_point(model)
 
     K = lqr_gain(A, B, Q, R)
 
-    return StateFeedback(K, x_bar=model.x_bar, u_bar=model.u_bar)
+    return StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
 
 
 def place(
@@ -130,10 +139,11 @@ def place(
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
     A = model.A()
     B = model.B()
+    x_bar, u_bar, _ = design_point(model)
 
     K = place_gain(A, B, poles)
 
-    return StateFeedback(K, x_bar=model.x_bar, u_bar=model.u_bar)
+    return StateFeedback(K, x_bar=x_bar, u_bar=u_bar)
 
 
 def lqg(
@@ -196,6 +206,7 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_samples=1001):
     ``(n_samples, n, n)``. ``S_f`` is the boundary condition ``S(T) = S_f`` of the
     Riccati equation, the cost's terminal weight ``S``.
     """
+    require_arrays(A=A, B=B)
     A = np.asarray(A, dtype=float)
     B = np.atleast_2d(np.asarray(B, dtype=float))
     Q = np.asarray(Q, dtype=float)
@@ -263,15 +274,14 @@ def lqr_finite_horizon(
     require_continuous_model(model, "lqr_finite_horizon")
     A = model.A()
     B = model.B()
+    x_bar, u_bar, _ = design_point(model)
 
     t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=n_samples)
 
     # Past the horizon: K(t_f) held, or the stationary gain
     K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
 
-    return TimeVaryingFeedback(
-        t_schedule, K, x_bar=model.x_bar, u_bar=model.u_bar, K_after=K_after
-    )
+    return TimeVaryingFeedback(t_schedule, K, x_bar=x_bar, u_bar=u_bar, K_after=K_after)
 
 
 def trajectory_lqr(

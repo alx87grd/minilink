@@ -55,7 +55,6 @@ the maintainer would and logged in the run's record.
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The README's two headline examples | — | v0.4 (with the demo rebuild) | the planner comparison's numbers so each planner reaches the goal, and bounds on the co-design example (KNOWN_ISSUES, "The README's examples") |
-| A linear model's matrices | — | before the v0.9 freeze | `lin.A()` kept as a call, or `lin.A` an attribute at the block's own `params` (KNOWN_ISSUES) |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
 | The Stable-Baselines3 notebooks | S49 | v1.0 | retire two, decide two |
 | The realtime band's review | — | v1.0 | frozen surface or provisional |

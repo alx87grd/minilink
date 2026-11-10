@@ -374,6 +374,10 @@ class TestPlots(unittest.TestCase):
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
         r = self.plant.plot_step_response(self.x_bar, show=False)
         self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        # a linearization's response is the deviation Δy, never titled "Linear"
+        r = self.plant.linearize(self.x_bar).plot_step_response(show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        self.assertEqual(r.axes.get_ylabel(), "Deviation Δy")
 
     def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
         stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100

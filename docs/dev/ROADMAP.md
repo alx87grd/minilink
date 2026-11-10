@@ -272,8 +272,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     formula reads `e^{−ρ horizon} h(x(t_end), t_end)` with `t_end = t0 + horizon` (the
     internal `score_run(horizon=)`, `planner_evidence(episode_length=)`, `steps_of(horizon,
     dt)` with it).
-  - *Exported.* `DiscreteLTISystem`, the linear model `linearize` returns on a step or sampled
-    system, is on `minilink.dynamics` beside `LTISystem`; its `period=` keeps its name (renaming
+  - *Exported.* `DiscreteLTISystem`, the pure difference equation (a step linearization's
+    deviation model), is on `minilink.dynamics` beside `LTISystem`; its `period=` keeps its name (renaming
     it `sample_period` would put the model on a clock, an open question).
   - *One signature order, the model's `(x, u, t; p)`.* `RolloutEnvironment.step(x, t, u, key,
     params)` → `step(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *,
@@ -339,6 +339,23 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `Impedance(10.0)` is a stiffness of 10, no longer a 10-axis block; `dof=` → `dim=` and the
     attribute `.dof` → `.dim`, as `PD(Kp, Kd, *, dim=1)`. `JointImpedance` and
     `TaskImpedance` take the plant and keep its `dof` (a manipulator's joints).
+  - *The linear models* (the maintainer's ruling 11). `linearize(plant, x_bar)` returns a
+    `LinearizedSystem`, `ẋ = f(x̄, ū) + A (x − x̄) + B (u − ū)`, `y = h(x̄, ū) + C (x − x̄) +
+    D (u − ū)`, in the plant's own coordinates, ports, labels and units (it returned an
+    `LTISystem` in the deviations whose `f` ignored the `x_bar` it stored, so
+    `lqr(lin, Q, R) @ lin` settled the upright pendulum at 6.27 rad); its `params` hold
+    `A, B, C, D` and the point (`x_bar`, `u_bar`, `y_bar`, the drift `dx_bar = f(x̄, ū)`),
+    read as `lin.x_bar`; its nominal state is `x̄`, its `x0` the plant's; `lin.deviation_model()`
+    is the pure `LTISystem` with Δ labels (they read `Delta θ`). A step or sampled system gives
+    `LinearizedStepSystem` (`x_next_bar = F(x̄, ū)`), its deviation model a `DiscreteLTISystem`.
+    `LTISystem(A, B, C, D)` and `DiscreteLTISystem` are pure: `x_bar=`, `u_bar=`, `y_bar=` and
+    their attributes are gone (a model from arrays sits at the origin). The analysis verbs read
+    `A, B, C, D` only, no number moved, and warn on a linearization off an equilibrium; a
+    design verb reads the point from the linearization, and a point given with a linear model
+    linearizes it there (it was refused). A linearization's step response is titled
+    "Linearized" and drawn as the deviation `Δy`. The matrices stay methods, `lin.A()`; a
+    method passed where its matrix goes (`lqr_gain(lin.A, …)`) is refused with the call to
+    write. `sys.get_u_from_input_ports()` → the read-only `sys.u_nominal`.
 
 ## 3. Maturity (TRL)
 
