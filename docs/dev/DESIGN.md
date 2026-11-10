@@ -58,8 +58,12 @@ when a lesson uses it: `StepPlanningProblem` (`minilink.planning`), `StepCost` a
 `SampledCost` (`minilink.core`) stay on their bands until one does; `StepSystem` is
 on the root. The core band facade exports the core's mathematical types, the composites
 included (`MarginField`, `GridField`, `CallableSet`, `IntersectionSet`, `SumCost`,
-`ScaledCost`, `SampledSystem`, `SampledDiagramSystem`); of the fields, the concrete
-`QuadraticField` and `GridField` are also on the root.
+`ScaledCost`, `SampledSystem`, `SampledDiagramSystem`) and the shaping functions
+(`quadratic_hinge`, `quadratic_excess`, `inverse_barrier`, `occupancy`); of the fields, the
+concrete `QuadraticField` and `GridField` are also on the root. The model families a design
+verb names are on the root too (`LTISystem`, `LinearizedSystem`, `MechanicalSystem`), with
+`step_info` and `poles`; the analysis band exports the records its verbs return (`Margins`,
+`StepInfo`).
 
 ## 3. Package Map
 
@@ -850,7 +854,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `as_cost(weight=, shaping=)` (the running cost `g = weight · shaping(V)`) and
   `as_terminal_cost` (the terminal cost `h`). Time goes by keyword, `V(x, t=t)`: the
   second positional argument is `u`. The shaping functions (`quadratic_hinge`,
-  `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`.
+  `quadratic_excess`, `inverse_barrier`, `occupancy`) are in `core/shaping.py`, exported on
+  `minilink.core`.
   `Set.as_cost(weight=, shaping=)` is `Field.as_cost` on the set's least margin
   `V(x) = minᵢ mᵢ(x)`, its default shaping the quadratic hinge `max(−V, 0)²` (zero inside:
   the soft form of the constraint). The workspace fields subclass it (`planning/spatial/`).

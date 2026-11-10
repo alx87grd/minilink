@@ -50,6 +50,11 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Gaussian": ("minilink.core.distributions", "Gaussian"),
     "Uniform": ("minilink.core.distributions", "Uniform"),
     "Particles": ("minilink.core.distributions", "Particles"),
+    # Shaping: the penalty of a field value, for field.as_cost(shaping=...)
+    "quadratic_hinge": ("minilink.core.shaping", "quadratic_hinge"),
+    "quadratic_excess": ("minilink.core.shaping", "quadratic_excess"),
+    "inverse_barrier": ("minilink.core.shaping", "inverse_barrier"),
+    "occupancy": ("minilink.core.shaping", "occupancy"),
 }
 
 __all__, __getattr__, __dir__ = lazy_facade(globals(), _EXPORTS)

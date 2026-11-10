@@ -19,6 +19,8 @@ from minilink.core.exports import lazy_facade
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
     "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
+    "Margins": ("minilink.analysis.linear", "Margins"),
+    "StepInfo": ("minilink.analysis.time_response", "StepInfo"),
     "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
     "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),

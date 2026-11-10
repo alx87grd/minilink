@@ -109,12 +109,23 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "root_locus": ("minilink.analysis.frequency", "root_locus"),
     "plot_root_locus": ("minilink.analysis.frequency", "plot_root_locus"),
     "step_response": ("minilink.analysis.time_response", "step_response"),
+    "step_info": ("minilink.analysis.time_response", "step_info"),
     "plot_step_response": ("minilink.analysis.time_response", "plot_step_response"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
     "poles": ("minilink.analysis.modal", "poles"),
     "controllability": ("minilink.analysis.structural", "controllability"),
     "observability": ("minilink.analysis.structural", "observability"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),
+    # Dynamics: the model families a student builds on
+    "LTISystem": ("minilink.dynamics.abstraction.state_space", "LTISystem"),
+    "LinearizedSystem": (
+        "minilink.dynamics.abstraction.state_space",
+        "LinearizedSystem",
+    ),
+    "MechanicalSystem": (
+        "minilink.dynamics.abstraction.mechanical",
+        "MechanicalSystem",
+    ),
     # Simulation
     "Simulator": ("minilink.simulation.simulator", "Simulator"),
     "StaticSimulator": ("minilink.simulation.static_simulator", "StaticSimulator"),

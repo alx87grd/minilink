@@ -407,7 +407,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `Optimizer.solve`, `params=` on value iteration's `solve_steps`, `show=` on
     `plot_signal` and the learning curves; `sensitivity(plant, controller, …)` (and its three
     siblings) positional, the plant read on `bode`'s channel with `of=` / `wrt=` (a plant of
-    several channels was refused).
+    several channels was refused); on the facades: `LTISystem`, `LinearizedSystem`,
+    `MechanicalSystem`, `step_info` and `poles` on the root, `Margins` and `StepInfo` on
+    `minilink.analysis`, the shaping functions on `minilink.core`.
 
 ## 3. Maturity (TRL)
 
