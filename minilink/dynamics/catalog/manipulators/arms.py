@@ -786,10 +786,10 @@ class KinematicManipulator(DynamicSystem):
     a torque-controlled :class:`Manipulator`.
     """
 
-    def __init__(self, dof, effector_dim):
+    def __init__(self, dof, task_dim):
         # The dimensions; the arm lending its kinematics comes from from_manipulator
         self.dof = int(dof)
-        self.effector_dim = int(effector_dim)
+        self.task_dim = int(task_dim)
         self._kin_arm = None
         super().__init__(
             state_dim=self.dof,
@@ -807,14 +807,14 @@ class KinematicManipulator(DynamicSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Ports: the effector position
-        p_labels = [f"p{i}" for i in range(self.effector_dim)]
+        p_labels = [f"p{i}" for i in range(self.task_dim)]
         self.add_output_port(
             "p",
-            dim=self.effector_dim,
+            dim=self.task_dim,
             function=self.h_p,
             dependencies=(),
             labels=p_labels,
-            units=["[m]"] * self.effector_dim,
+            units=["[m]"] * self.task_dim,
         )
 
         # Graphics: the camera frames the arm's full reach
@@ -861,10 +861,10 @@ class KinematicManipulator(DynamicSystem):
 
         xp = array_module(q)
 
-        effector_dim = self.effector_dim
+        task_dim = self.task_dim
 
         # No arm: the effector stays at the origin
-        p = xp.zeros(effector_dim)
+        p = xp.zeros(task_dim)
 
         return p
 
@@ -875,21 +875,13 @@ class KinematicManipulator(DynamicSystem):
 
         xp = array_module(q)
 
-        effector_dim = self.effector_dim
+        task_dim = self.task_dim
         dof = self.dof
 
         # No arm: the joints do not move the effector
-        J = xp.zeros((effector_dim, dof))
+        J = xp.zeros((task_dim, dof))
 
         return J
-
-    def forward_differential_kinematic_effector(self, q, dq):
-        J = self.J(q)
-
-        # ṗ = J(q) q̇
-        pdot = J @ dq
-
-        return pdot
 
     def link_lengths(self, params=None):
         """The drawn link lengths: the arm's, read from ``params`` when they are given."""

@@ -697,7 +697,7 @@ class TestRoboticWrappers(unittest.TestCase):
         np.testing.assert_allclose(dq, expected)
 
     def test_task_kinematic_builds_from_a_plant_with_a_task_dim(self):
-        arm = TwoLinkManipulator()  # task_dim, no effector_dim
+        arm = TwoLinkManipulator()
         for law in (TaskKinematic, TaskKinematicNullspace):
             with self.subTest(law=law.__name__):
                 ctl = law(arm)
