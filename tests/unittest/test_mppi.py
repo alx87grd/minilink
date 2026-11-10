@@ -99,6 +99,7 @@ def test_the_first_input_points_the_way_lqr_does():
 def test_the_solution_is_a_held_schedule_with_its_record():
     solution = swing_up_planner().solve()
     assert isinstance(solution.record, MPPIRecord) and solution.family == "mppi"
+    assert solution.record.solve_time_s > 0.0 and "solved in" in str(solution.record)
     assert solution.trajectory.t.size == 41
     source = solution.controller
     u_mid = source.h(np.zeros(0), np.zeros(0), 0.5 * DT)

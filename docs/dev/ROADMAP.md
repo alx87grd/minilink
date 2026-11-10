@@ -437,6 +437,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     and terminal cost, before the failure charge; `J`, the score every statistic reads, is
     unchanged (the raw cost plus the failure cost of a failed or missed run). Its one-run
     `str` reads `raw cost = …`.
+  - *Every record times its solve.* `solve_time_s` on every planner's record, as trajectory
+    optimization's already had: value iteration's (`solve` and `solve_steps`), the LQR's
+    Riccati record, RRT's and RRT*'s, MPPI's, the tabular and the neural learners'; the wall
+    time of the user's verb without the evidence's scoring, `None` on a compiled face's solve.
+    Each record's one-line `str` ends with "solved in … s". The neural learner's
+    `train_time_s` stays beside it: it counts every training of the planner, its collections
+    and updates only.
 
 ## 3. Maturity (TRL)
 

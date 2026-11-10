@@ -204,6 +204,7 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     solution = planner.solve(n_timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
     assert solution.record.n_timesteps == 256 and solution.record.method == "PPO"
+    assert 0.0 < solution.record.solve_time_s and "solved in" in str(solution.record)
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.n_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller

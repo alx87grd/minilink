@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -140,6 +141,7 @@ class RRTStarPlanner(RRTPlanner):
 
         metric = self.metric
         self.require_nearest_method()
+        started = time.perf_counter()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -224,7 +226,9 @@ class RRTStarPlanner(RRTPlanner):
             self.tree.extract_trajectory(self.solution_node, self.problem.t0),
             evaluate,
             n_trials,
-            self.search_record(reached_goal, n_iterations),
+            self.search_record(
+                reached_goal, n_iterations, time.perf_counter() - started
+            ),
             verbose=verbose,
         )
 
@@ -240,9 +244,9 @@ class RRTStarPlanner(RRTPlanner):
 
         return kwargs
 
-    def search_record(self, reached_goal, n_iterations):
+    def search_record(self, reached_goal, n_iterations, solve_time_s=None):
         """The RRT* record: the best goal cost, and whether patience declared convergence."""
-        record = super().search_record(reached_goal, n_iterations)
+        record = super().search_record(reached_goal, n_iterations, solve_time_s)
         path_cost = (
             record.path_cost
             if self.best_goal_cost is None

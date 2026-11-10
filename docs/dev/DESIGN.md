@@ -1300,8 +1300,12 @@ source (trajectory optimization, MPPI, RRT) is a `TrajectorySource` `u = pi(t)`,
 plant; the `record` (one
 frozen dataclass per planner with `success` and a one-line `str`, its cost named by its
 quantity: RRT's `path_cost`, the learners' `episode_cost`, the objective `cost` at the
-solution of trajectory optimization and MPPI, as on the `Optimizer`'s result; the solution's
-`family` names the method; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
+solution of trajectory optimization and MPPI, as on the `Optimizer`'s result; and the
+solve's wall time, `solve_time_s`, measured at the user's verb and without the evidence's
+scoring (the sweeps, the Riccati design, the search, the path-integral solve, the
+optimizer's backend solve, the training; `None` on a compiled face's solve, which has no wall
+clock; the neural learner's `train_time_s` beside it counts every training of the planner);
+the solution's `family` names the method; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
 bounds the command, since the Riccati law never reads `U` (LQR never
 warns)); the
 `trajectory`, one meaning: the plan an open-loop planner computed, `None` for a

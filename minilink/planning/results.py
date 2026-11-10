@@ -357,3 +357,11 @@ def solution_text(solution):
     ]
 
     return format_inspect(headline, body)
+
+
+def solve_time_text(solve_time_s) -> str:
+    """A record's printed solve time, ``"; solved in 0.123 s"``, or nothing when the solve has no wall clock (``None``)."""
+    if solve_time_s is None:
+        return ""
+
+    return f"; solved in {solve_time_s:.3g} s"

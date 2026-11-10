@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import time
 from dataclasses import dataclass, replace
 
 import numpy as np
@@ -25,7 +26,7 @@ from minilink.planning.problems import (
     require_cost,
     require_finite_horizon,
 )
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 
 # A solve between two knots folds its offset in, in this many parts of dt
 SUB_TICKS = 1_000_000
@@ -158,11 +159,15 @@ class MPPIPlanner(Planner):
         the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``;
         ``verbose`` prints the record.
         """
+        started = time.perf_counter()
         pv = self.compile()
         z0 = pv.initial(params) if guess is None else pv.pack(guess, params)
 
+        # The solve, timed until its plan is on the host
         z, status = pv.solve(params, z0)
         solution = pv.solution(z, params, status)
+        record = replace(solution.record, solve_time_s=time.perf_counter() - started)
+        solution = replace(solution, record=record)
 
         if evaluate:
             evaluation = planner_evidence(
@@ -182,7 +187,9 @@ class MPPIRecord:
 
     ``effective_rollouts`` is ``1 / Σ (w^k)²``: a few means ``λ`` is too small
     (one sample decides), close to ``K`` too large (an unweighted average).
-    ``success`` is "the nominal rollout of the plan stays in ``X``".
+    ``success`` is "the nominal rollout of the plan stays in ``X``";
+    ``solve_time_s`` the solve's wall time (``None`` on the compiled face's
+    solves, which have no wall clock).
     """
 
     cost: float
@@ -192,6 +199,7 @@ class MPPIRecord:
     exit_rate: float
     n_iterations: int
     success: bool
+    solve_time_s: float | None = None
 
     def __str__(self) -> str:
         return (
@@ -199,6 +207,7 @@ class MPPIRecord:
             f"weighted {self.S_weighted:.6g}, effective rollouts "
             f"{self.effective_rollouts:.1f}, exit rate {self.exit_rate:.0%}, "
             f"{'stays in X' if self.success else 'leaves X'}"
+            f"{solve_time_text(self.solve_time_s)}"
         )
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -22,7 +23,7 @@ from minilink.planning.planner import (
 )
 from minilink.planning.policies import policy_from_block
 from minilink.planning.problems import PlanningProblem, require_cost
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
 from minilink.planning.step_problems import (
     require_no_period_on_ticks,
@@ -199,10 +200,11 @@ class DynamicProgrammingPlanner(Planner):
             return self.store_solution(solution)
 
         N = self.grid.model.n_steps
+        started = time.perf_counter()
 
         # Infinite horizon: backward sweeps until the cost-to-go stops changing
         if N is None:
-            result = self.value_iteration(
+            tables = self.value_iteration(
                 self.max_iterations,
                 stop_on_tol=True,
                 verbose=verbose,
@@ -213,7 +215,7 @@ class DynamicProgrammingPlanner(Planner):
         # Finite horizon: exactly N backward sweeps, every stage kept
         else:
             require_stage_memory(N, self.grid)
-            result = self.value_iteration(
+            tables = self.value_iteration(
                 N,
                 stop_on_tol=False,
                 keep_stages=True,
@@ -224,7 +226,11 @@ class DynamicProgrammingPlanner(Planner):
 
         # The cost-to-go and policy tables as a planning solution
         return self.tables_to_planning_solution(
-            result, mode=mode, evaluate=evaluate, n_trials=n_trials
+            tables,
+            mode=mode,
+            evaluate=evaluate,
+            n_trials=n_trials,
+            solve_time_s=time.perf_counter() - started,
         )
 
     def solve_steps(
@@ -258,7 +264,8 @@ class DynamicProgrammingPlanner(Planner):
             return self.store_solution(solution)
 
         # Exactly n_steps backward sweeps from the terminal cost
-        result = self.value_iteration(
+        started = time.perf_counter()
+        tables = self.value_iteration(
             int(n_steps),
             stop_on_tol=False,
             verbose=verbose,
@@ -267,7 +274,11 @@ class DynamicProgrammingPlanner(Planner):
 
         # The cost-to-go and policy tables as a planning solution
         return self.tables_to_planning_solution(
-            result, mode="receding", evaluate=evaluate, n_trials=n_trials
+            tables,
+            mode="receding",
+            evaluate=evaluate,
+            n_trials=n_trials,
+            solve_time_s=time.perf_counter() - started,
         )
 
     def evaluate_policy(self, controller) -> GridField:
@@ -791,14 +802,15 @@ class DynamicProgrammingPlanner(Planner):
     ###########################################################################
 
     def tables_to_planning_solution(
-        self, tables: ValueTables, *, mode, evaluate, n_trials
+        self, tables: ValueTables, *, mode, evaluate, n_trials, solve_time_s=None
     ) -> PlanningSolution:
         """
         Turn the value-iteration tables into the planner's :class:`PlanningSolution`.
 
         Cleans the infeasible cells, builds the greedy lookup law (per stage in
         the ``"finite"`` mode), records how the sweeps ended with the tables
-        themselves, optionally scores the law, and stores the solution.
+        themselves and the sweeps' wall time ``solve_time_s``, optionally scores
+        the law, and stores the solution.
         """
         tol = float(self.tol)
 
@@ -826,6 +838,7 @@ class DynamicProgrammingPlanner(Planner):
             mode=mode,
             discount_rate=self.discount_rate,
             frozen_at=self.tf if mode == "finite" and frozen else None,
+            solve_time_s=solve_time_s,
             tables=tables,
         )
 
@@ -927,7 +940,8 @@ class ValueIterationRecord:
     follows. ``discount_rate`` is the planner's own rate when ``gamma``
     overrode the problem's (``None``: the problem's); ``frozen_at`` the time a
     finite horizon's running-cost and transition tables were built at, when
-    one table served every sweep (a precomputed grid, the JAX engine).
+    one table served every sweep (a precomputed grid, the JAX engine);
+    ``solve_time_s`` the sweeps' wall time (``None``: not timed).
     """
 
     n_iterations: int
@@ -937,6 +951,7 @@ class ValueIterationRecord:
     mode: str
     discount_rate: float | None = None
     frozen_at: float | None = None
+    solve_time_s: float | None = None
     tables: ValueTables | None = field(default=None, repr=False, compare=False)
 
     @property
@@ -950,18 +965,19 @@ class ValueIterationRecord:
             if self.discount_rate is None
             else f"; planned at rho={self.discount_rate:.4g}/s (gamma), scored at the problem's"
         )
+        notes = rate + solve_time_text(self.solve_time_s)
         if self.mode == "finite":
-            return f"{self.n_iterations} backward sweeps (finite horizon, a law per stage){rate}"
+            return f"{self.n_iterations} backward sweeps (finite horizon, a law per stage){notes}"
 
         if self.mode == "receding":
-            return f"{self.n_iterations} backward sweeps (receding horizon){rate}"
+            return f"{self.n_iterations} backward sweeps (receding horizon){notes}"
 
         if self.converged:
-            return f"converged in {self.n_iterations} sweeps (delta={self.delta:.3g}){rate}"
+            return f"converged in {self.n_iterations} sweeps (delta={self.delta:.3g}){notes}"
 
         return (
             f"max_iterations={self.n_iterations} reached before tol={self.tol:g} "
-            f"(delta={self.delta:.3g}){rate}"
+            f"(delta={self.delta:.3g}){notes}"
         )
 
 

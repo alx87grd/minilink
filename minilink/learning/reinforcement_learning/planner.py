@@ -38,7 +38,7 @@ from minilink.learning.reinforcement_learning.policy import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import Planner, planner_at, planner_evidence
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
 
 #: The update rule of each name ``method=`` accepts.
@@ -337,9 +337,11 @@ class ReinforcementLearningPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        # Train, then store the learned law as the planner's solution
+        # Train, timed, then store the learned law as the planner's solution
+        started = time.perf_counter()
         self.learn(n_timesteps, verbose=verbose)
-        solution = self.solution(evaluate, n_trials)
+        solve_time_s = time.perf_counter() - started
+        solution = self.solution(evaluate, n_trials, solve_time_s)
 
         return self.store_solution(solution)
 
@@ -677,14 +679,15 @@ class ReinforcementLearningPlanner(Planner):
             f"{shown} | fps {record['fps']:7.0f} | {record['elapsed']:.0f}s"
         )
 
-    def solution(self, evaluate, n_trials) -> PlanningSolution:
+    def solution(self, evaluate, n_trials, solve_time_s=None) -> PlanningSolution:
         """
         The learned law as a solution: a copy of the law at its weights when solved, its training record, the critic's cost-to-go.
 
         Training again moves only the planner's own law. With ``evaluate``, the
-        copy handed out is scored, as it is, by Monte Carlo over the problem's draws.
+        copy handed out is scored, as it is, by Monte Carlo over the problem's draws;
+        ``solve_time_s`` is the solve's training wall time (``None``: not timed).
         """
-        record = self.training_record()
+        record = self.training_record(solve_time_s)
         cost_to_go = self.critic_cost_to_go()
         controller = snapshot_of(self.actor)
 
@@ -708,7 +711,7 @@ class ReinforcementLearningPlanner(Planner):
             evaluation=evaluation,
         )
 
-    def training_record(self) -> "ReinforcementLearningRecord":
+    def training_record(self, solve_time_s=None) -> "ReinforcementLearningRecord":
         """The solver record: the training facts, episode returns turned into costs."""
         jax = require_jax()
 
@@ -732,6 +735,7 @@ class ReinforcementLearningPlanner(Planner):
             method=type(self.algorithm).__name__,
             n_timesteps=self.n_timesteps,
             train_time_s=self.train_time_s,
+            solve_time_s=solve_time_s,
             episode_cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,
@@ -759,6 +763,10 @@ class ReinforcementLearningRecord:
     """
     The training facts of a learned law: plant steps, training time, and the last mean episode cost.
 
+    ``n_timesteps`` and ``train_time_s`` count every training of the planner so
+    far, the collections and the updates only; ``solve_time_s`` is this solve's
+    wall time, its whole training (``None``: not timed).
+
     ``episode_cost`` is the mean episode cost ``J`` of the last collection,
     positive and falling. ``history`` holds one dict per learning iteration
     (``n_timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
@@ -771,6 +779,7 @@ class ReinforcementLearningRecord:
     method: str
     n_timesteps: int
     train_time_s: float
+    solve_time_s: float | None
     episode_cost: float
     weights_finite: bool
     history: list
@@ -799,6 +808,7 @@ class ReinforcementLearningRecord:
             f"{self.method}: {self.n_timesteps} plant steps in "
             f"{self.train_time_s:.1f} s, mean episode cost {self.episode_cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
+            f"{solve_time_text(self.solve_time_s)}"
         )
         if self.discount_differs:
             line += (

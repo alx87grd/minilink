@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from typing import Callable
 
@@ -16,7 +17,7 @@ from minilink.planning.planner import (
     planner_evidence,
 )
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.metric import euclidean
 from minilink.planning.search.tree import (
@@ -143,6 +144,7 @@ class RRTPlanner(Planner):
 
         metric = self.metric
         self.require_nearest_method()
+        started = time.perf_counter()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -181,7 +183,9 @@ class RRTPlanner(Planner):
                     self.tree.extract_trajectory(node, self.problem.t0),
                     evaluate,
                     n_trials,
-                    self.search_record(reached_goal, n_iterations),
+                    self.search_record(
+                        reached_goal, n_iterations, time.perf_counter() - started
+                    ),
                     verbose=verbose,
                 )
 
@@ -198,7 +202,9 @@ class RRTPlanner(Planner):
             self.tree.extract_trajectory(closest, self.problem.t0),
             evaluate,
             n_trials,
-            self.search_record(reached_goal, n_iterations),
+            self.search_record(
+                reached_goal, n_iterations, time.perf_counter() - started
+            ),
             verbose=verbose,
         )
 
@@ -215,8 +221,10 @@ class RRTPlanner(Planner):
 
         return kwargs
 
-    def search_record(self, reached_goal, n_iterations) -> TreeSearchRecord:
-        """The search's account: goal reached or not, the budget it took (``n_iterations`` extensions), the path's cost-to-come."""
+    def search_record(
+        self, reached_goal, n_iterations, solve_time_s=None
+    ) -> TreeSearchRecord:
+        """The search's account: goal reached or not, the budget it took (``n_iterations`` extensions, ``solve_time_s`` seconds), the path's cost-to-come."""
         node = self.solution_node
 
         return TreeSearchRecord(
@@ -226,6 +234,7 @@ class RRTPlanner(Planner):
             path_cost=float("nan") if node is None else float(node.cost),
             converged=False,
             history=[],
+            solve_time_s=solve_time_s,
         )
 
     def plot_tree(self, **kwargs):
@@ -470,7 +479,7 @@ class RRTPlanner(Planner):
 
 @dataclass(frozen=True)
 class TreeSearchRecord:
-    """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come, ``path_cost``."""
+    """Whether the goal was reached, how much of the budget and of the wall clock (``solve_time_s``) the search took, and the path's cost-to-come, ``path_cost``."""
 
     reached_goal: bool
     n_iterations: int
@@ -478,6 +487,7 @@ class TreeSearchRecord:
     path_cost: float
     converged: bool
     history: list
+    solve_time_s: float | None = None
 
     @property
     def success(self) -> bool:
@@ -494,7 +504,7 @@ class TreeSearchRecord:
         )
         if self.converged:
             text += ", converged"
-        return text
+        return text + solve_time_text(self.solve_time_s)
 
 
 ###############################################################################

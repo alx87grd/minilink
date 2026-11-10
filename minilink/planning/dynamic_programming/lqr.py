@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import warnings
 from dataclasses import dataclass
 
@@ -30,7 +31,7 @@ from minilink.planning.problems import (
     require_cost,
     require_finite_horizon,
 )
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 
 ###############################################################################
 # Public API
@@ -167,6 +168,7 @@ class LQRPlanner(Planner):
         n_samples = self.n_samples
         dt = self.dt
         rho = problem.discount_rate
+        started = time.perf_counter()
 
         # The problem lowered at the operating point: A = ∂f/∂x, B = ∂f/∂u, the
         # weights over the command port
@@ -210,6 +212,7 @@ class LQRPlanner(Planner):
                 horizon=T,
                 schedule=(t, K, S),
                 U_ignored=has_finite_face(problem.U.bounding_box()),
+                solve_time_s=time.perf_counter() - started,
             )
             cost_to_go = QuadraticField(x_bar, S, t)
         else:
@@ -232,6 +235,7 @@ class LQRPlanner(Planner):
                 poles=poles,
                 horizon=np.inf,
                 U_ignored=has_finite_face(problem.U.bounding_box()),
+                solve_time_s=time.perf_counter() - started,
             )
             cost_to_go = QuadraticField(x_bar, P)
 
@@ -301,6 +305,7 @@ class RiccatiRecord:
     half-plane) on the infinite horizon, a finite sweep otherwise.
     ``U_ignored`` is the problem declaring an input set that bounds the
     command: the Riccati law never reads it, and the printout says so.
+    ``solve_time_s`` is the design's wall time (``None``: not timed).
     """
 
     K: np.ndarray
@@ -309,6 +314,7 @@ class RiccatiRecord:
     horizon: float
     schedule: tuple | None = None
     U_ignored: bool = False
+    solve_time_s: float | None = None
 
     @property
     def success(self) -> bool:
@@ -324,12 +330,11 @@ class RiccatiRecord:
         K = np.array2string(np.round(self.K, 3), separator=", ").replace("\n", "")
         poles = ", ".join(f"{p:.3g}" for p in np.round(self.poles, 3))
         ignored = "; U ignored" if self.U_ignored else ""
+        notes = solve_time_text(self.solve_time_s) + ignored
         if np.isfinite(self.horizon):
-            return (
-                f"K(0) = {K} over {self.horizon:g} s, poles at t = 0: {poles}{ignored}"
-            )
+            return f"K(0) = {K} over {self.horizon:g} s, poles at t = 0: {poles}{notes}"
 
-        return f"K = {K}, closed-loop poles {poles}{ignored}"
+        return f"K = {K}, closed-loop poles {poles}{notes}"
 
 
 def stationary_gain(A, B, Q, R):

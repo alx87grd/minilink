@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -21,7 +22,7 @@ from minilink.planning.planner import (
     planner_evidence,
 )
 from minilink.planning.problems import require_cost
-from minilink.planning.results import PlanningSolution
+from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
 
 ###############################################################################
@@ -237,12 +238,14 @@ class TabularLearningPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        # Episodes of interaction, learning as they go
+        # Episodes of interaction, learning as they go, timed
+        started = time.perf_counter()
         self.learn(n_episodes, verbose=verbose)
 
         # The greedy law of the learned table
         tables = self.greedy_tables
         controller = LookupPolicy(tables.grid, tables.pi)
+        solve_time_s = time.perf_counter() - started
 
         # Optionally, the law, as it is, scored over the problem's draws
         evaluation = None
@@ -258,7 +261,7 @@ class TabularLearningPlanner(Planner):
 
         # The solution: the law, the record, the score, and the cost-to-go as a field
         # on the grid, the failure cost past it (the price of leaving the grid)
-        record = self.learning_record(tables)
+        record = self.learning_record(tables, solve_time_s)
         cost_to_go = tables.grid.field(
             tables.J, method="linear", outside=self.env.failure_cost
         )
@@ -364,8 +367,8 @@ class TabularLearningPlanner(Planner):
 
         return self
 
-    def learning_record(self, tables=None) -> TabularLearningRecord:
-        """The solver record: episodes, coverage of the grid, and the cost of the last episodes."""
+    def learning_record(self, tables=None, solve_time_s=None) -> TabularLearningRecord:
+        """The solver record: episodes, coverage of the grid, the cost of the last episodes, and the solve's wall time."""
         history = self.history
         visits = self.visits
         Q = self.Q
@@ -387,6 +390,7 @@ class TabularLearningPlanner(Planner):
             episode_cost=episode_cost,
             table_finite=table_finite,
             history=list(history),
+            solve_time_s=solve_time_s,
             tables=tables,
         )
 
@@ -488,7 +492,8 @@ class TabularLearningRecord:
     Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``).
 
     ``episode_cost`` is the mean cost of the last tenth of the episodes (the
-    last one at least); ``history`` holds each episode's ``cost``.
+    last one at least); ``history`` holds each episode's ``cost``;
+    ``solve_time_s`` is the solve's wall time, its episodes.
     """
 
     method: str
@@ -497,6 +502,7 @@ class TabularLearningRecord:
     episode_cost: float
     table_finite: bool
     history: list
+    solve_time_s: float | None = None
     tables: ValueTables | None = field(default=None, repr=False, compare=False)
 
     @property
@@ -510,6 +516,7 @@ class TabularLearningRecord:
         return (
             f"{self.method}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
             f"the grid visited, mean episode cost {self.episode_cost:.2f} at the end"
+            f"{solve_time_text(self.solve_time_s)}"
         )
 
 

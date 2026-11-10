@@ -140,6 +140,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
+  | A solve's wall time, on every planner's record (`None` where the solve has no wall clock) | `solve_time_s` | `train_time_s` for a solve's time (the neural learner's `train_time_s` counts every training of the planner) |
   | A record's cost, named by its quantity: a search's path cost-to-come; a learner's mean episode cost at the end of training; the objective at the solution (the `Optimizer`, trajectory optimization, MPPI); a scored run's cost before the failure charge, beside its score `J` (`Evaluation`) | `path_cost`; `episode_cost`; `cost`; `raw_cost` | `cost` for a path's, an episode's or a run's raw cost |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
   | A block's channel count (sources, white noise, routing, saturation, delay, the PID family, the impedance laws) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
