@@ -31,7 +31,7 @@ the maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| The API settled before the demo rebuild | — | v0.4 (before the rebuild) | your go on [api-stabilization.md](api-stabilization.md): its defects section in review (2026-11-10); your go on the two other sections that need no decision, then its 24 decisions one at a time (the "API sweep's judgment calls" row of §1.11 is folded into them) |
+| The API settled before the demo rebuild | — | v0.4 (before the rebuild) | your go on [api-stabilization.md](api-stabilization.md): its defects section landed (2026-11-10); your go on the two other sections that need no decision, then its 24 decisions one at a time (the "API sweep's judgment calls" row of §1.11 is folded into them) |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
@@ -54,6 +54,7 @@ the maintainer would and logged in the run's record.
 | The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
+| The fork PR from August, Simon's `place-modules` | — | now | close [alx87grd/minilink#99](https://github.com/alx87grd/minilink/pull/99) as superseded (recommended): its LOS guidance and motor map live in `examples/projects/pathtracking/`, `LineOfSight` and the PID family in the library, its curve speed scaler is the "later" row below; merging it would bring 2 900 lines on the pre-rewrite history into `dev-alex` |
 | The README's two headline examples | — | v0.4 (with the demo rebuild) | the planner comparison's numbers so each planner reaches the goal, and bounds on the co-design example (KNOWN_ISSUES, "The README's examples") |
 | A linear model's matrices | — | before the v0.9 freeze | `lin.A()` kept as a call, or `lin.A` an attribute at the block's own `params` (KNOWN_ISSUES) |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
@@ -69,7 +70,7 @@ the maintainer would and logged in the run's record.
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-08). One rule orders v0.4: what changes a public name or a
+**Next, in order** (as of 2026-11-10). One rule orders v0.4: what changes a public name or a
 behaviour lands first, so the demos, notebooks and tests are redrafted once, on the settled
 surface, and the student-facing numbers are re-pinned once, at the release. Additive work that
 breaks nothing goes last and may follow the tag.
@@ -77,9 +78,14 @@ breaks nothing goes last and may follow the tag.
 Phases 1 to 4 landed on `dev` (2026-11-08): the planners' math and fields and value
 iteration's finite horizon (plans as policies, its first two changes), the core API proposals
 and the later round of API sweeps as ruled, the core's small leftovers, and the maintainer's
-rulings of 2026-11-07. Their contracts are DESIGN's; the release's status is ROADMAP §5.4's.
-What is left:
+rulings of 2026-11-07; then the API naming sweep (PR #138) and the API review's defects
+(2026-11-10). Their contracts are DESIGN's; the release's status is ROADMAP §5.4's. Every
+feature branch is merged into `dev`. What is left:
 
+4b. **The API settled before the demo rebuild** (§1.11, [api-stabilization.md](api-stabilization.md)
+   §2 to §5) **[ask]**: on the maintainer's go, the names a rule already decides and the
+   additions that break nothing, then its 24 decisions one at a time, then the planned renames
+   pulled forward, so the rebuilt demos are written once.
 5. **The surface redrafted on the settled names** (§1.12): the maintainer's demo rebuild, then
    the tests' clean slate and the course notebooks on the new names; beside it the clean-up lane
    (§2: the catalog clean-up K8, the experimental tier K9, the car family's time constant), and
@@ -236,57 +242,16 @@ naming sweep, §1.11).
 
 ### 1.11 The core API proposals
 
-- [ ] **The API naming sweep's rulings** (ruled 2026-11-08 on an independent reviewer's sweep of
-  the public API; built on the branch `api-naming`, stacked on the docs sweep #137, in review:
-  the library, the tests and every caller, examples, notebooks, docs and benchmarks, on the
-  new names; the renames listed in ROADMAP §2's breaking changes). No alias; every caller in the same change:
-  1. `n_steps` counts transitions (the textbook N); a count of time samples is `n_samples`
-     (`compute_trajectory`, `Simulator`, `step_response`/`bode`/`nyquist`/`frequency_response`,
-     `lqr_finite_horizon`/`lqr_gain_schedule`, `LQRPlanner`, `animate_modal`,
-     `Source.plot_signal`). Trajectory optimization's `n_steps` counts intervals: knots =
-     `n_steps` + 1 (callers keep their numbers; their plans gain one knot, an intended change,
-     its regression baselines re-pinned).
-  2. `backend=` is the array module only; `renderer=` names the drawing library on every
-     drawing verb (`plot_renderer=` on `game` and the realtime simulator); value iteration's
-     engine is `method="loop"`; RRT's nearest-neighbour search `nearest_method=`.
-  3. Every DP cost-to-go is a `GridField` (its table in `params["values"]`); `value_at` goes;
-     policy evaluation is `DynamicProgrammingPlanner.evaluate_policy(controller)`, returning a
-     `GridField` on the planner's own grid and numbers; the `PolicyEvaluator` class goes.
-  4. `StepPlanningProblem.rollout(controller)` returns a `Trajectory` with its running cost
-     (`J` its last value); `run` goes.
-  5. Records: `n_iterations` (value iteration, RRT, MPPI, trajectory optimization); `method`
-     for `algorithm`; `**method_numbers` on `Optimizer`, trajectory optimization and the RL
-     planner; `PlanningSolution.family` for the property `method` (MPPI's name fixed); one name
-     per quantity in the trajectory-optimization and RRT records (`n_nodes`,
-     `TreeSearchIteration`).
-  6. `evaluate(..., trajectories=True)` for `record=True`.
-  7. `ReinforcementLearningPlanner.solve(params=)`, as every planner.
-  8. `StateSpaceGrid(x_grid=, u_grid=)`; `KinodynamicExtender(horizon, n_steps)`.
-  9. `S` on `QuadraticCost` and `S_f` (the boundary condition `S(T) = S_f`) in the Riccati
-     design functions: both kept, one line in DESIGN.
-  10. `dim=` on the one-size blocks (sources, white noise, routing, saturation, delay, the
-      PID family).
-  11. `Sys2Gym(episode_length=)` for `tf=`.
-  12. `is_3d`, `file_name`, `x_axis`/`y_axis`, `bounds`; `Source.plot_signal`;
-      `show_live_search` goes; `step_info(t, y)`, `discretize(sys, dt)`; `animate(speed=)`;
-      `region_of_attraction(n_samples=)`.
-  Done when the library, tests, examples, notebooks and docs read the new names, the gates pass,
-  and the PR is merged.
-- [ ] **The API sweep's judgment calls** **[ask]**, to decide one at a time after the rulings
-  above land: `tf` both a final time and the body-pose map; three spellings of bounds
-  (`lower`/`upper`, `lower_bound`/`upper_bound`, `u_min`/`u_max`); `traj` against
-  `trajectory`; `n_trials` against `n_rollouts`; `evaluate=True` beside `evaluate()`; the four
-  roles of `of`; keyword-only rules between sibling verbs and between the two problem classes;
-  trajectory optimization's `live_plot=` beside RRT's callback object; the RL planner's
-  `n_steps` (SB3's periods per collection); `eta` against `learning_rate`; `Evaluation`'s
-  `cost` beside `J`; display keywords in constructors (`NeuralPolicy`, `TaskImpedance`,
-  `game(plot=)`); minor names (`PlanFollower.compute_u`, `ModelPredictiveController` a
-  factory, `nyquist`/`frequency_response` both `(w, G)`, `SlidingMode(nab)`, `PD(y_filt0)`,
-  `StateSpaceGrid.load`, the extender's public `rng`); the catalog's constructor words and
-  abbreviated class names; `MathematicalProgram(h=, g=)` (kept, the textbook NLP).
+- [ ] **The API settled before the demo rebuild** **[ask]** (design and status:
+  [api-stabilization.md](api-stabilization.md), the review of 2026-11-10): its defects section
+  (AS-1 to AS-15) landed on `dev`; left, on the maintainer's go, the names a rule already
+  decides (§2, AS-20 to AS-32), the additions that break nothing (§3, AS-40 to AS-49), the 24
+  decisions one at a time (§4; the API naming sweep's judgment calls of 2026-11-08 are folded
+  in there), and the planned rows pulled forward (§5: K8-0, K8-1, S64's and S32's names). Done
+  when every row has landed or been dropped and the plan doc is deleted.
 
-The proposals and the later round of API sweeps landed in v0.4 as ruled (contracts: DESIGN §4
-to §6, RULES 2.7). Left:
+The proposals, the later round of API sweeps and the API naming sweep (PR #138) landed in
+v0.4 as ruled (contracts: DESIGN §4 to §6, RULES 2.7). Left:
 
 - [ ] **The parameters model's last follow-up** (the model's contract: DESIGN §4,
   "Parameters"): the problem's internal helpers (`parts_view`, `sample_params`,

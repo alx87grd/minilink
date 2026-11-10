@@ -1442,7 +1442,9 @@ params=)` exports the tuning `MathematicalProgram` over the leaves `wrt` (dotted
 `"controller.Kp"`): the objective `pe.evaluate(...).objective`, its reverse-mode gradient on
 JAX, the per-trial feasibility margin as a row when `X` or `U` is bounded and the
 reachability margin when `Xf` is set; `pe.pack` / `pe.unpack` move between the tree and
-`z`. `evaluate(problem, controller, dt=None, ...)` is the facade: a sampled controller runs on
+`z`; `pe.live_plot(wrt, *, params=, signals=, every=, pause=, renderer=)` is a progress
+callback `callback(z, J, t)` for `Optimizer.solve(callback=)`, the closed loop at the iterate
+`z` redrawn on one live figure. `evaluate(problem, controller, dt=None, ...)` is the facade: a sampled controller runs on
 its clock with `dt` omitted, a continuous one on `dt`, and with `dt` omitted on the
 loop's automatic step, the continuous simulator's `Δt = 0.1 τ_min` (§5) shortened to
 divide the run, `dt = tf / ⌈tf / Δt⌉`. No backend clips the law:

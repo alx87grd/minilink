@@ -28,8 +28,9 @@ Steps are numbered `AS-n` (this doc's own prefix).
 
 No public name changes here; numbers move only where noted.
 
-**Status (2026-11-10): in review**, on the branch `claude/zen-noether-sj2n6c`, one commit per
-step, on the maintainer's go for this section. Three steps came out smaller than written, each
+**Status (2026-11-10): landed on `dev`** (built on the branch `claude/zen-noether-sj2n6c`, one
+commit per step, on the maintainer's go for this section; merged into `dev` on his
+instruction the same day; the changes a user meets are in ROADMAP §2's breaking changes). Three steps came out smaller than written, each
 because a recorded contract or a shape decision stood in the way, and their rest is a decision
 of section 4:
 - AS-6: the plan now starts at `t0` and its evidence runs the plan's own length; **the replay
