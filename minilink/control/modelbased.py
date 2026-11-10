@@ -66,7 +66,7 @@ class ComputedTorque(System):
             "y",
             dim=2 * n,
             nominal_value=np.zeros(2 * n),
-            labels=[f"q{i}" for i in range(n)] + [f"dq{i}" for i in range(n)],
+            labels=[f"q{i + 1}" for i in range(n)] + [f"dq{i + 1}" for i in range(n)],
         )
         ctl_fn = self.ctl_tracking if tracking_ref else self.ctl_regulation
         self.add_output_port(

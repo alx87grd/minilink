@@ -1584,7 +1584,9 @@ class TestPlotlySignalPlot(unittest.TestCase):
     def test_plotly_ylabels_bracket_units_once(self):
         pytest.importorskip("plotly")
         sys = Integrator_plotly_renderer()
-        sys.state.units = ["[m]"]  # already bracketed, as the manipulator ports declare
+        sys.state.units = [
+            "[m]"
+        ]  # a unit written with its brackets is not bracketed twice
         sys.inputs["u"].units = ["N"]
         traj = Trajectory(
             t=np.array([0.0, 1.0]), x=np.array([[0.0, 1.0]]), u=np.array([[1.0, 1.0]])
@@ -1798,8 +1800,8 @@ class TestPlotControlLaw(unittest.TestCase):
     def test_modelbased_default_axes_are_qdq(self):
         ct = ComputedTorque(Pendulum())
         res = ct.plot_control_law(grid_shape=(5, 5), show=False)
-        self.assertEqual(res.axes.get_xlabel(), "q0")
-        self.assertEqual(res.axes.get_ylabel(), "dq0")
+        self.assertEqual(res.axes.get_xlabel(), "q1")
+        self.assertEqual(res.axes.get_ylabel(), "dq1")
         plt.close(res.figure)
 
     def test_dynamic_law_pins_internal_state_at_x0(self):

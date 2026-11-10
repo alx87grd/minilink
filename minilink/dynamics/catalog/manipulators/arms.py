@@ -807,14 +807,14 @@ class KinematicManipulator(DynamicSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Ports: the effector position
-        p_labels = [f"p{i}" for i in range(self.task_dim)]
+        p_labels = [f"p{i + 1}" for i in range(self.task_dim)]
         self.add_output_port(
             "p",
             dim=self.task_dim,
             function=self.h_p,
             dependencies=(),
             labels=p_labels,
-            units=["[m]"] * self.task_dim,
+            units=["m"] * self.task_dim,
         )
 
         # Graphics: the camera frames the arm's full reach

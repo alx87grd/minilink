@@ -143,9 +143,9 @@ class TestCatalogSmoke(unittest.TestCase):
         # force b (y' - z') grows linearly with the forward speed vx.
         car = QuarterCar()
         b, mass = car.params["b"], car.params["mass"]
-        x = np.array([0.0, 0.0, 2.0])
+        x = np.array([2.0, 0.0, 0.0])  # [x, y, ẏ]: positions, then the rate
         u = np.zeros(1)
-        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[0] for vx in (0.0, 3.0))
+        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[2] for vx in (0.0, 3.0))
         np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
         np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
 

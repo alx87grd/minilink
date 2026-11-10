@@ -38,15 +38,15 @@ class Manipulator(MechanicalSystem):
         self.force_arrow_scale = 0.02
 
         # Ports: the task position p and the task velocity ṗ
-        p_labels = [f"p{i}" for i in range(self.task_dim)]
-        pdot_labels = [f"pdot{i}" for i in range(self.task_dim)]
+        p_labels = [f"p{i + 1}" for i in range(self.task_dim)]
+        pdot_labels = [f"dp{i + 1}" for i in range(self.task_dim)]
         self.add_output_port(
             "p",
             dim=self.task_dim,
             function=self.h_p,
             dependencies=(),
             labels=p_labels,
-            units=["[m]"] * self.task_dim,
+            units=["m"] * self.task_dim,
         )
         self.add_output_port(
             "pdot",
@@ -54,7 +54,7 @@ class Manipulator(MechanicalSystem):
             function=self.h_pdot,
             dependencies=(),
             labels=pdot_labels,
-            units=["[m/s]"] * self.task_dim,
+            units=["m/s"] * self.task_dim,
         )
 
     def forward_kinematics(self, q, params=None):

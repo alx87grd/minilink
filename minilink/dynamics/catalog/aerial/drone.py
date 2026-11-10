@@ -276,8 +276,8 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         }
 
         # Signal labels and units
-        self.state.labels = ["dy", "y", "x"]
-        self.state.units = ["m/s", "m", "m"]
+        self.state.labels = ["x", "y", "dy"]
+        self.state.units = ["m", "m", "m/s"]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = list(self.state.labels)
@@ -294,11 +294,11 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         mass = params["mass"]
         vx = params["vx"]
 
-        dy = x[0]
+        dy = x[2]
         force = u[0]
 
-        # ÿ = F / m drives the altitude, and the cruise speed ẋ = v_x stays constant
-        dx = xp.array([force / mass, dy, vx])
+        # The cruise speed ẋ = v_x stays constant, and ÿ = F / m drives the altitude
+        dx = xp.array([vx, dy, force / mass])
 
         return dx
 
@@ -317,7 +317,7 @@ class ConstantSpeedHelicopterTunnel(DynamicSystem):
         }
 
     def tf(self, x, u, t=0, params=None):
-        return {"body": translation(x[2], x[1], 0.0)}
+        return {"body": translation(x[0], x[1], 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         # The vertical force, drawn just ahead of the body at 0.2 m per newton

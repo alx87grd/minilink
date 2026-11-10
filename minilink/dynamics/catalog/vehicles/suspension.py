@@ -37,8 +37,8 @@ class QuarterCar(DynamicSystem):
         }
 
         # Signal labels and units
-        self.state.labels = ["dy", "y", "x"]
-        self.state.units = ["m/s", "m", "m"]
+        self.state.labels = ["x", "y", "dy"]
+        self.state.units = ["m", "m", "m/s"]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = list(self.state.labels)
@@ -85,7 +85,7 @@ class QuarterCar(DynamicSystem):
         k = params["k"]
         vx = params["vx"]
 
-        dy, y, x_pos = x
+        x_pos, y, dy = x
         ground = self.z(x_pos, params)
         ground_slope = self.dz(x_pos, params)
         force = u[0]
@@ -96,8 +96,8 @@ class QuarterCar(DynamicSystem):
         # The sprung mass over the road: m ÿ = u − k (y − z) − b (ẏ − ż)
         acceleration = (force - k * (y - ground) - b * (dy - ground_velocity)) / mass
 
-        # The state [ẏ, y, x] moves at [ÿ, ẏ, vx]
-        dx = xp.array([acceleration, dy, vx])
+        # The state [x, y, ẏ] moves at [vx, ẏ, ÿ]
+        dx = xp.array([vx, dy, acceleration])
 
         return dx
 
@@ -121,17 +121,17 @@ class QuarterCar(DynamicSystem):
     def tf(self, x, u, t=0, params=None):
         mass_y = x[1]
 
-        return {"body": translation(x[2], mass_y, 0.0)}
+        return {"body": translation(x[0], mass_y, 0.0)}
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
-        ground = self.z(x[2], params)
+        ground = self.z(x[0], params)
         mass_y = x[1]
 
         return {
             "world": [
-                spring_between([x[2], ground], [x[2], mass_y - 0.2]),
+                spring_between([x[0], ground], [x[0], mass_y - 0.2]),
             ],
             "body": [
                 Arrow(

@@ -362,6 +362,15 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     unit step at `t = 1 s` (it was zero) and `Step(1.0)` steps up (it stepped down); a scalar
     level takes the other level's size. The positional callers were flipped; a bare `Step()`'s
     numbers move once (no test asserted them).
+  - *A plant's signals* (the maintainer's ruling 7): positions, then their rates; a rate
+    `d<position>` unless the textbook names it; bare units, the plot adds the brackets; default
+    labels counted from 1. `QuarterCar` and `ConstantSpeedHelicopterTunnel` were rates first,
+    `[dy, y, x]`: their state is `[x, y, dy]` (`x[0]` the forward position, `x[2]` the vertical
+    rate). `MechanicalSystem`'s default labels `"Angle 0"`, `"Velocity 0"`, `"Torque 0"` →
+    `q1`, `dq1`, `u1` (units `"rad"`, `"rad/s"`, `"Nm"`, they read `"[rad]"`, `"[rad/sec]"`,
+    `"[Nm]"`), `GeneralizedMechanicalSystem`'s → `q1`, `v1`, `u1`; a manipulator's task ports
+    read `p1…`, `dp1…` in `"m"`, `"m/s"`, and the robotic and model-based laws' inputs
+    `q1…`, `dq1…`.
 
 ## 3. Maturity (TRL)
 
