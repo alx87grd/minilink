@@ -65,15 +65,19 @@ Each breaks a name, with no decision to take: RULES 2.4, 2.5, 2.7, 3.4, 4.3 or a
 ruling says what the word is. One commit per row, every call site in the same commit (RULES
 3.4), no alias.
 
+**Status (2026-11-10): AS-20 to AS-26 landed on `api-settle`**, one commit per row, the seeded
+baseline byte-identical after each (but for two renamed keys); AS-24 came out smaller: the
+export landed, `period` keeps its name (see the decisions below).
+
 | Step | Today → proposed | The rule | Uses |
 | --- | --- | --- | --- |
-| AS-20 | `DirectCollocationTranscription(DirectCollocationOptions(n_steps=20))` → `DirectCollocationTranscription(n_steps=20)`; the same for shooting and multiple shooting; the four option records deleted | 2.5, 2.7; the 2026-11-04 sweep removed the other option records | 37 calls |
-| AS-21 | The compiled planner's status key `"iterations"` → `"n_iterations"`; `MPPIRecord.effective_samples` → `effective_rollouts`; `StateSpaceGrid.nodes_n`, `actions_n` → `n_nodes`, `n_actions`; `LyapunovCertificate.verify(n=)` → `n_rollouts=`, its plots' `n=` → `n_samples=` | 2.7, every count is `n_<thing>` | 12; 10; 72; few |
-| AS-22 | `plot_sampled_futures(axes=)` → `x_axis=`, `y_axis=`; value iteration's `plot_control_law(axis=)` → `u_axis=`; the animations' `save=` (RRT) and `save_path=` (value iteration) → `file_name=`; the plot title "Policy u[0]" and `plot_policy_field` → control law; `StateSpaceGrid.plot_value` → `plot_cost_to_go` | 2.7 | small |
-| AS-23 | `tf` as a length in `score_run(tf=)`, `planner_evidence(tf=)`, `steps_of(tf, dt)`, `RolloutEnvironment.tf`, DESIGN's scoring formula → `horizon` or `episode_length`; `DynamicProgrammingPlanner.final_time` → `tf` | 2.7, `tf` is absolute | internal; 24 |
-| AS-24 | `DiscreteLTISystem(period=)`, `.period` → `sample_period`; the class exported on `minilink.dynamics` | 2.7 | 11 |
-| AS-25 | `RolloutEnvironment.step(x, t, u, key, params)` → `(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *, t=0.0)` and `NeuralPolicy.action` → `action(x, t=0.0, params=None)` | CONSTITUTION, one signature | about 15 |
-| AS-26 | `MPPIPlanner.method` (a dict of numbers) → `method_numbers`; `TabularLearningPlanner(eta=)` → `learning_rate=` (TODO's judgment-calls row names it); `planner.train_time` → `train_time_s`; `TrajectoryOptimizationRecord.solver_success` → `optimizer_success` | 2.7 | 8 examples |
+| AS-20 | `DirectCollocationTranscription(DirectCollocationOptions(n_steps=20))` → `DirectCollocationTranscription(n_steps=20)`; the same for shooting and multiple shooting; the four option records deleted. Landed on `api-settle`. | 2.5, 2.7; the 2026-11-04 sweep removed the other option records | 37 calls |
+| AS-21 | The compiled planner's status key `"iterations"` → `"n_iterations"`; `MPPIRecord.effective_samples` → `effective_rollouts`; `StateSpaceGrid.nodes_n`, `actions_n` → `n_nodes`, `n_actions`; `LyapunovCertificate.verify(n=)` → `n_rollouts=`, its plots' `n=` → `n_samples=`. Landed on `api-settle`. | 2.7, every count is `n_<thing>` | 12; 10; 72; few |
+| AS-22 | `plot_sampled_futures(axes=)` → `x_axis=`, `y_axis=`; value iteration's `plot_control_law(axis=)` → `u_axis=`; the animations' `save=` (RRT) and `save_path=` (value iteration) → `file_name=`; the plot title "Policy u[0]" and `plot_policy_field` → control law; `StateSpaceGrid.plot_value` → `plot_cost_to_go`. Landed on `api-settle`. | 2.7 | small |
+| AS-23 | `tf` as a length in `score_run(tf=)`, `planner_evidence(tf=)`, `steps_of(tf, dt)`, `RolloutEnvironment.tf`, DESIGN's scoring formula → `horizon` or `episode_length`; `DynamicProgrammingPlanner.final_time` → `tf`. Landed on `api-settle`. | 2.7, `tf` is absolute | internal; 24 |
+| AS-24 | `DiscreteLTISystem(period=)`, `.period` → `sample_period`; the class exported on `minilink.dynamics`. The export landed on `api-settle`; `period` stays (a question, below). | 2.7 | 11 |
+| AS-25 | `RolloutEnvironment.step(x, t, u, key, params)` → `(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *, t=0.0)` and `NeuralPolicy.action` → `action(x, t=0.0, params=None)`. Landed on `api-settle`. | CONSTITUTION, one signature | about 15 |
+| AS-26 | `MPPIPlanner.method` (a dict of numbers) → `method_numbers`; `TabularLearningPlanner(eta=)` → `learning_rate=` (TODO's judgment-calls row names it); `planner.train_time` → `train_time_s`; `TrajectoryOptimizationRecord.solver_success` → `optimizer_success`. Landed on `api-settle`. | 2.7 | 8 examples |
 | AS-27 | The optimizer's native numbers: `options={"maxiter": 5}` on `gd` / `adam` → `max_iterations=5`, `gtol` → `tol`; `options=` refused for a native method; `OptimizationResult.n_iterations` added beside `stats["nit"]`, `stats["algorithm"]` → `stats["method"]` | 2.7 | few |
 | AS-28 | `plot_rollout(rollout=)` → `traj=`; `input_port_id=` → `port=` (blocks already say `port=`); `TrajectorySource(interpolation="previous")` and `ev.rollout(hold="foh")` → `hold="zoh"` / `"linear"` on the three tools | one word per idea | 5; 25; 14 |
 | AS-29 | Keyword-only where every sibling already is: `PlanningProblem(sys, *, x0, cost, …)` (0 callers pass a second positional); `compile(*, backend=, verbose=)`; `animate(traj=None, *, …)`, `render(x, u, t, *, …)`; `MLP(input_dim, output_dim, *, …)`; `Sys2Gym(sys, cost, *, …)`; `NativeSampledSystem(state_dim=0, *, sample_period, …)` with the port shortcuts. And the reverse: `evaluate(problem, controller, dt=None, *, …)`, as DESIGN §6 writes it and `problem.compile` takes it | DESIGN §4, sibling verbs agree | positional callers only |
@@ -224,3 +228,67 @@ The run of rulings 1 to 4a on the branch `api-settle` (2026-11-10), one commit p
   the options: another name for the port defaults (`sys.u_nominal`, the word the input port
   already uses, `port.nominal_value`, and the evaluator's `nominal_input`); or `u_bar`, with
   the linear models' operating point moved under decision 11 first.
+
+The run of AS-20 to AS-26 on the branch `api-settle` (2026-11-10), one commit per row. The
+seeded baseline (value iteration, finite and infinite; tabular learning; a trajectory
+optimization per transcription, planner and compiled face; MPPI, planner and compiled face;
+an `evaluate`; a rollout-environment step; a Lyapunov `verify`; a `DiscreteLTISystem` step,
+timings out) was run twice and compared byte for byte, then after each row: identical, the
+only change two keys renamed by AS-21 (`status["n_iterations"]`, `effective_rollouts`).
+
+- **The vocabulary test reaches the deep modules.** The facade scan of `test_vocabulary.py`
+  does not see a class of a deep module (the transcriptions, the grid plots, the
+  environment), so three small tables join `RETIRED`: `RETIRED_NAMES` (a name, or a record's
+  field, at its full path), `RETIRED_KEYWORDS` (a function's retired keyword) and
+  `ONE_SIGNATURE` (a method's leading parameters in the model's order); and the compiled
+  face's status keys are read off `STANDARD_STATUS`. An instance attribute set in
+  `__init__` (`planner.train_time`, `env.tf`, `mppi.method`) has a `RETIRED` row but no
+  check: none can be read without building the object.
+- **AS-20, the grid on the transcription.** `n_steps` is keyword-only
+  (`DirectCollocationTranscription(n_steps=20)`); the three share a `FixedGridTranscription`
+  base that holds it with the grid the record carried, under its names (`t(problem)`,
+  `dt(problem)`, `offsets(problem)`, `n_knots`). `TrajectoryOptimizationPlanner.
+  transcription_options()` (the verbose print's line) now returns the transcription's own
+  numbers, `{"n_steps": N}`, the same text as before; **a question**: its name names the
+  record that is gone (rename it, fold it into the print, or keep it).
+- **AS-21.** The MPC's verbose line prints `n_iterations=`, and `MPPIRecord`'s text
+  "effective rollouts"; the local variable of `experimental/mppi/pendulum_mppi.py` followed.
+- **AS-22.** The helper `plot_policy_field` is `plot_control_law_field` (internal), the title
+  "Control law u[0]". Kept, not listed: **`animate_control_law(axis=)`** (and the internal
+  `animate(axis=)`), the same idea as `u_axis` (a question: rename it with `plot_control_law`'s);
+  the module helpers `plotting.plot_value` and `plot_value_3d`, which a GRO860 notebook
+  imports; `System.animate(save=True)`, a flag beside `file_name`, not a path. Left as the
+  maintainer wrote it: the commented-out line of `examples/demos/value_iteration/
+  vi_cartpole_swingup.py` (`# planner.plot_control_law(axis=0, axes=(1, 3), …)`, already
+  stale since the 2026-11-08 sweep) and the call table of `examples/tutorial/core/
+  08_planners.ipynb`, which still lists `axes=(0, 1)` for `plot_cost_to_go` (student-facing:
+  for the maintainer).
+- **AS-23, `final_time` checked.** It is the problem's `t0 + horizon` (the test reads 3.0 for
+  `t0 = 1`, `horizon = 2`), an absolute end time, so it is `planner.tf`; the vocabulary row
+  that already retired `final_time` now names `tf`. `RolloutEnvironment.tf` is
+  `episode_length`, as its constructor's keyword. The internal `failure_cost_of` and
+  `diverged_cost_of` take `horizon` with `score_run`. **Two more lengths named `tf`, not
+  listed, left as questions:** `ProblemEvaluator.tf` (the run's length, a public attribute of
+  an exported class) and `LyapunovCertificate.verify(tf=)` (how long each state is
+  integrated); both read `horizon` under the rule. The GRO860 gymnasium notebook's own
+  environment class keeps its `self.tf` (the notebook's code, not the library's).
+- **AS-24, `period` not renamed: a question.** On a `StepSystem`, `sample_period` is the
+  clock contract (`StepSystem.sample_period = None`: a bare tick law; a number: on a clock),
+  read by the step diagram, the compile plan, the simulation facade and the evaluator. A
+  `DiscreteLTISystem` describes a period and puts the model on no clock (its
+  docstring). Measured with `sample_period = 0.1` set on one: its `compute_rollout(n_steps=3)`
+  runs `t = [0, 0.1, 0.2, 0.3]` instead of `[0, 1, 2, 3]`, and `model >> other` is refused
+  ("is on a clock of 0.1 s"). The options: `sample_period`, the model then clocked (what
+  `linearize(sampled_loop)` returns would roll out in seconds and compose only as a sampled
+  diagram); another word for a period that is not a clock (`model_period`, or `Δ`'s name in
+  the docs); or `period` kept, recorded as an exception in RULES 2.7. The export landed:
+  `from minilink.dynamics import DiscreteLTISystem`, in the teaching surface's list.
+- **AS-25.** `NeuralPolicy.action` gains `t` (unread: a time-invariant law). The three
+  callers that passed `params` positionally (`ctl`, `setpoint_position`, the RL planner's
+  jitted action, one test) now name it. The Gym bridge's `action(x)`
+  (`interfaces/gymnasium.py`) reads `x` only and is unchanged.
+- **AS-26.** The learner's update keeps the textbook's `η` (`eta` in `update(…, eta, gamma)`
+  and the moving-average line), as the first-order optimizers read
+  `eta = params["learning_rate"]`; the planner's keyword, attribute and `params["method"]`
+  key are `learning_rate`. `TrajectoryOptimizationRecord`'s printed text keeps "solver ok"
+  (display only).
