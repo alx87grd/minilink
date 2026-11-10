@@ -4,7 +4,7 @@ Defects and surprising behaviour a user can hit in the code today, each reproduc
 names the symptom, a minimal reproduction, a workaround, and the workboard row that fixes it
 (or the design question it waits on, in [QUESTIONS.md](QUESTIONS.md)). The fix is planned work
 in [TODO.md](../plans/TODO.md); this list is the index, and an entry leaves it when its fix
-lands. Last checked against the code: 2026-11-09.
+lands. Last checked against the code: 2026-11-10.
 
 ## Composition and control
 
@@ -52,20 +52,23 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 - **Workaround:** optimize the gains only, or a cost that prices the parameters.
 - **Fix:** **[ask]** with the entry above: bounds on the decision variables, or another pair.
 
+## Planning
+
+### A tree-search plan replayed by its own controller drifts from the plan
+- **Symptom:** `RRTPlanner(problem, seed=0).solve(evaluate=True)` on the pendulum swing-up
+  (`Xf = BallSet([π, 0], 0.3)`): the record says "goal reached", the evaluation "goal missed".
+  The plan ends at `[3.31, −0.15]`; the handed-out controller, a `TrajectorySource` holding
+  each edge's input, replayed on the plan's own `dt = 0.05`, misses the ball, and still at
+  `dt = 0.01`; at `dt = 0.002` it reaches it. The same samples given as a held input,
+  `plant.compute_trajectory(u=plan.u, dt=0.05, solver="rk4_fixedsteps")`, reproduce the plan
+  exactly. The source is read at each RK4 stage like any block, so the last stage of a step
+  reads the next edge's input (first order at each switch, large for a bang-bang plan).
+- **Workaround:** score the plan itself, `evaluate_trajectory(problem, solution.trajectory)`,
+  or the controller on a finer step, `evaluate(problem, solution.controller, dt=0.002)`.
+- **Fix:** **[ask]** how a held open-loop plan is replayed, in
+  [api-stabilization.md](../plans/api-stabilization.md), section 4.
+
 ## Messages and small surprises
-
-### An unknown solver name is refused without the list of valid ones
-- **Symptom:** `Pendulum().compute_trajectory(tf=1.0, solver="rk45")` raises
-  `ValueError: Unknown solver 'rk45'` (`simulation/simulator.py`, two raises); the sampled
-  system's own message does list its solvers.
-- **Workaround:** the solver names are in `Simulator`'s docstring.
-- **Fix:** agent-managed, any run: name the valid solvers in the message.
-
-### The Jacobian's error message lists `'u'` twice
-- **Symptom:** `Pendulum().jacobian("f", "z", x)` raises "wrt must be 'x' or 'u' or 't' or
-  'params' or 'u'; got 'z'" (`core/compile/evaluators/jacobian.py`, the `choices` list).
-- **Workaround:** none needed; the valid names are the first four.
-- **Fix:** agent-managed, any run: the list without the repeat.
 
 ### A linear model's matrices are methods
 - **Symptom:** `plant.linearize().A` is a bound method; the matrix is `plant.linearize().A()`.

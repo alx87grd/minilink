@@ -28,6 +28,18 @@ Steps are numbered `AS-n` (this doc's own prefix).
 
 No public name changes here; numbers move only where noted.
 
+**Status (2026-11-10): in review**, on the branch `claude/zen-noether-sj2n6c`, one commit per
+step, on the maintainer's go for this section. Three steps came out smaller than written, each
+because a recorded contract or a shape decision stood in the way, and their rest is a decision
+of section 4:
+- AS-6: the plan now starts at `t0` and its evidence runs the plan's own length; **the replay
+  that misses the goal is decision 23**.
+- AS-7: the refusal of a plan with signals is DESIGN §6's contract (a loop's state of the
+  plant's size must not be read as the plant's), so it stays; its message now gives the line
+  that works, `Trajectory(traj.t, traj.x, traj.u)`.
+- AS-10: a solution that stores the planner's whole tree changes the shape of
+  `PlanningSolution.params`, a core record: **decision 24**.
+
 | Step | What happens today | Fix |
 | --- | --- | --- |
 | AS-1 | `lqr`, `lqr_finite_horizon`, `kalman`, `lqg` on a step or sampled model solve the continuous Riccati equation: `lqr(discretize(Pendulum(), 0.1), I, I, x_bar=[π, 0])` returns `K = [816.9, 40.7]`, closed-loop `|λ| = [1.25, 0.80]`, unstable, no message (`control/design.py`, `estimation/design.py`) | Refuse a discrete model with the line to write ("design on the continuous plant, then `% dt`"). The discrete equation is section 4, decision 14 |
@@ -112,6 +124,8 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | `lqr_trajectory`; `horizon`; `StateObserver(model, L)` |
 | 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first |
 | 21 | **The root list.** Names with no example use (`LinearApproximator`, `QuadraticFeatures`, `RadialBasisFeatures`, `StaticSimulator`, the `*_gain` four, `BoxInputSet`); half pairs (`lqr_gain` without `lqr_gain_schedule`) | maintainer-owned | Regenerated from what the rebuilt examples import (DESIGN §2's own rule) |
+| 23 | **How a held open-loop plan is replayed.** RRT's and MPPI's controller is a `TrajectorySource` holding each sample; read at every RK4 stage, it takes the next sample at a step's last stage, so RRT's replay on its own `dt = 0.05` misses the goal its plan reaches (it reaches it at `dt = 0.002`), while the same samples as a held input (`compute_trajectory(u=…)`) reproduce the plan exactly | KNOWN_ISSUES | The evidence of an open-loop held plan runs the simulator's held-input rule; the handed-out block unchanged |
+| 24 | **`solution.params`** is the problem's tree, so `planner.solve(params=solution.params)` is refused ("missing `method`, `seed`") | a core record's shape | The planner's complete tree on the solution, after the two-reviewer brief AGENTS asks for a core object's shape |
 | 22 | **Smaller ones:** `CallableSet(contains_fn=)` a set without a margin; `EllipsoidSet(field, …)` not buildable from `(center, P, level)`; `path.sample(s)` using the draw word (`path.at(s)`); a `dt` that does not divide the run overshoots `tf` (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); `LowPassFilter(cutoff_hz=)` beside `Sine(omega=)`; `Source.plot_signal`; `connection_verbose`; the program's start in `metadata["z0"]`; RRT's `max_nodes` (a cap on iterations) | small | In the row |
 
 ## 5. Planned work to pull forward
