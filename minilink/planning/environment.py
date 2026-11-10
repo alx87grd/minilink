@@ -18,6 +18,7 @@ from minilink.core.distributions import child_seed
 from minilink.core.params import flatten, merge_tree
 from minilink.core.roles import command_port
 from minilink.core.wiring import WiredDiagramMixin
+from minilink.planning.evaluator import EPISODE_LENGTH
 from minilink.planning.problems import require_cost
 from minilink.planning.step_model import is_continuous, step_model_of
 
@@ -31,9 +32,6 @@ MAX_SEED = 2**31 - 1
 
 # The control period of a continuous problem when none is given, in seconds
 DEFAULT_PERIOD = 0.05
-
-# The length of an episode on an infinite horizon when none is given, in the problem's time
-DEFAULT_EPISODE_LENGTH = 10.0
 
 
 class RolloutEnvironment:
@@ -348,11 +346,9 @@ class RolloutEnvironment:
 
 
 def episode_time_of(problem, model, dt, episode_length):
-    """An episode's length: a continuous problem's finite horizon, a step problem's ``N`` periods, else ``episode_length`` (default :data:`DEFAULT_EPISODE_LENGTH`)."""
+    """An episode's length: a continuous problem's finite horizon, a step problem's ``N`` periods, else ``episode_length`` (default :data:`EPISODE_LENGTH`)."""
     if model.n_steps is None:
-        return (
-            DEFAULT_EPISODE_LENGTH if episode_length is None else float(episode_length)
-        )
+        return EPISODE_LENGTH if episode_length is None else float(episode_length)
 
     if is_continuous(problem):
         return float(problem.horizon)

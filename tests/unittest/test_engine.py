@@ -1032,3 +1032,19 @@ def test_a_run_made_with_record_none_is_refused_by_name_when_scored():
     # The default run records the plant's input: it scores as it is
     recorded = loop.compute_trajectory(tf=0.5, dt=0.01)
     assert np.isfinite(evaluate_trajectory(problem, recorded).J).all()
+
+
+def test_scoring_a_problem_with_no_horizon_announces_the_length_it_runs():
+    """A default that sets what is scored is announced, and silent once the caller names it."""
+    import warnings
+
+    from minilink.planning.evaluator import evaluate
+
+    problem = upright_problem(horizon=None)
+
+    with pytest.warns(UserWarning, match="scored over 10 s"):
+        evaluate(problem, pid(), dt=0.05)
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        evaluate(problem, pid(), dt=0.05, episode_length=2.0)

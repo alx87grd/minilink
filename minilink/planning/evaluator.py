@@ -46,7 +46,9 @@ from minilink.planning.evaluation import (
 from minilink.planning.problems import require_cost, seeds_of, source_id, stack_leaves
 
 BACKENDS = ("auto", BACKEND_JAX, BACKEND_NUMPY)
-EPISODE_LENGTH = 10.0  # s, the run of an infinite-horizon problem when none is named
+EPISODE_LENGTH = (
+    10.0  # s, the run of a problem with no finite horizon when none is named
+)
 
 
 ###############################################################################
@@ -1056,7 +1058,17 @@ def horizon_of(problem, episode_length):
     if problem.horizon_kind() == "finite":
         return float(problem.horizon)
 
-    return EPISODE_LENGTH if episode_length is None else float(episode_length)
+    # A default that sets what is scored is announced
+    if episode_length is None:
+        warnings.warn(
+            f"the problem has no finite horizon, so the run is scored over "
+            f"{EPISODE_LENGTH:g} s: pass episode_length= to choose it, or give the "
+            "problem a horizon",
+            stacklevel=4,
+        )
+        return EPISODE_LENGTH
+
+    return float(episode_length)
 
 
 def steps_of(tf, dt):
