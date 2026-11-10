@@ -21,8 +21,8 @@ FAN_SAMPLES = 64  # samples drawn in the fan
 
 # Plant: theta = 0 hanging, theta = pi upright, torque limited
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 
 # Cost: the wrapped angle error to upright, a rate term, a small effort term; no

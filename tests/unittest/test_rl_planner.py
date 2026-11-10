@@ -43,10 +43,10 @@ class HangCost(CostFunction):
 
 def bounded_pendulum(plant=None):
     plant = Pendulum() if plant is None else plant
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
-    plant.state.lower_bound = np.array([-np.pi, -8.0])
-    plant.state.upper_bound = np.array([np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    plant.state.lower = np.array([-np.pi, -8.0])
+    plant.state.upper = np.array([np.pi, 8.0])
     return plant
 
 
@@ -468,10 +468,10 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
 
         def __init__(self):
             super().__init__(state_dim=3, input_dim=3, output_dim=3)
-            self.state.lower_bound = -2.0 * np.ones(3)
-            self.state.upper_bound = 2.0 * np.ones(3)
-            self.inputs["u"].lower_bound = -np.ones(3)
-            self.inputs["u"].upper_bound = np.ones(3)
+            self.state.lower = -2.0 * np.ones(3)
+            self.state.upper = 2.0 * np.ones(3)
+            self.inputs["u"].lower = -np.ones(3)
+            self.inputs["u"].upper = np.ones(3)
 
         def f(self, x, u, t=0.0, params=None):
             return 1.0 * u
@@ -607,10 +607,10 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
 
     plant = bounded_pendulum()
     inner = StateFeedback(K=[[20.0, 4.0]], x_bar=[0.0, 0.0]) @ plant
-    inner.inputs["r"].lower_bound = np.array([-1.0, -2.0])
-    inner.inputs["r"].upper_bound = np.array([1.0, 2.0])
-    inner.state.lower_bound = plant.state.lower_bound
-    inner.state.upper_bound = plant.state.upper_bound
+    inner.inputs["r"].lower = np.array([-1.0, -2.0])
+    inner.inputs["r"].upper = np.array([1.0, 2.0])
+    inner.state.lower = plant.state.lower
+    inner.state.upper = plant.state.upper
     assert "u" not in inner.inputs and list(inner.inputs) == ["r"]
 
     prob = PlanningProblem(
@@ -649,10 +649,10 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
     class Explosive(DynamicSystem):
         def __init__(self):
             super().__init__(state_dim=1, input_dim=1, output_dim=1)
-            self.inputs["u"].lower_bound = np.array([-1.0])
-            self.inputs["u"].upper_bound = np.array([1.0])
-            self.state.lower_bound = np.array([-10.0])
-            self.state.upper_bound = np.array([10.0])
+            self.inputs["u"].lower = np.array([-1.0])
+            self.inputs["u"].upper = np.array([1.0])
+            self.state.lower = np.array([-10.0])
+            self.state.upper = np.array([10.0])
 
         def f(self, x, u, t=0.0, params=None):
             return 1e6 * x  # stiff enough to overflow an RK4 step of 1 s
@@ -961,10 +961,10 @@ class GridWalker(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=2, output_dim=2)
-        self.state.lower_bound[:] = [0.0, 0.0]
-        self.state.upper_bound[:] = [6.0, 6.0]
-        self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-        self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+        self.state.lower[:] = [0.0, 0.0]
+        self.state.upper[:] = [6.0, 6.0]
+        self.inputs["u"].lower[:] = [-1.0, -1.0]
+        self.inputs["u"].upper[:] = [1.0, 1.0]
 
     def step(self, x, u, k=0, params=None):
         xp = array_module(x)

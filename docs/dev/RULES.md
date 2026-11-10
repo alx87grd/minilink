@@ -132,6 +132,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A per-call draw | `key` | |
   | A seed stored at construction (`0` by default where a run draws; `None` is a random block's mean, never fresh entropy) | `seed` | `rng` (internal only) |
   | The verb's algorithm (value iteration's `method="loop"`, RRT's `nearest_method`) | `method` | `algorithm`, `backend="loop"`, `nearest_backend` |
+  | A bound on an object (a port, the state, a set, `Saturation`, the program; `add_input_port(lower=, upper=)`, `port.lower`, `state.upper`); a limit a law applies to a named signal carries that signal's name (`u_min`, `u_max`, `delta_max`, `e_int_min`) | `lower`, `upper` | `lower_bound`, `upper_bound` |
   | The optimizer's algorithm, and the implementation it runs (one table keyed `(method, backend)`, `backend=` the array module) | `method="slsqp"`, `"trust-constr"` (SciPy's spellings), `"l-bfgs"`, `"gd"`, `"adam"`, `"ipopt"` | `"scipy_slsqp"`, `"scipy_trust_constr"`, a library in the method's name |
   | The drawing library of a plot or an animation | `renderer` (`plot_renderer` on `game`) | `backend`, `plot_backend` |
   | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |

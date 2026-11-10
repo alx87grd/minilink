@@ -17,10 +17,10 @@ TRAINING_TIMESTEPS = 120_000
 
 # The task: swing up and stay up, learned by PPO from starts all around the circle
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
-plant.state.lower_bound = np.array([-4 * np.pi, -20.0])
-plant.state.upper_bound = np.array([4 * np.pi, 20.0])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
+plant.state.lower = np.array([-4 * np.pi, -20.0])
+plant.state.upper = np.array([4 * np.pi, 20.0])
 
 
 class SwingUpCost(CostFunction):

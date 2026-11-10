@@ -29,10 +29,10 @@ class DoubleIntegrator(DynamicSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
-        self.state.lower_bound = np.array([-3.0, -3.0])
-        self.state.upper_bound = np.array([3.0, 3.0])
-        self.inputs["u"].lower_bound = np.array([-1.0])
-        self.inputs["u"].upper_bound = np.array([1.0])
+        self.state.lower = np.array([-3.0, -3.0])
+        self.state.upper = np.array([3.0, 3.0])
+        self.inputs["u"].lower = np.array([-1.0])
+        self.inputs["u"].upper = np.array([1.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([x[1], u[0]])
@@ -48,10 +48,10 @@ def make_pendulum_problem():
     from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
     sys = Pendulum()
-    sys.state.lower_bound = np.array([-2.0, -2.0])
-    sys.state.upper_bound = np.array([2.0, 2.0])
-    sys.inputs["u"].lower_bound = np.array([-1.0])
-    sys.inputs["u"].upper_bound = np.array([1.0])
+    sys.state.lower = np.array([-2.0, -2.0])
+    sys.state.upper = np.array([2.0, 2.0])
+    sys.inputs["u"].lower = np.array([-1.0])
+    sys.inputs["u"].upper = np.array([1.0])
     return PlanningProblem(sys, cost=QuadraticCost.from_system(sys), U=sys.input_box)
 
 
@@ -99,10 +99,10 @@ class TestStateSpaceGrid(unittest.TestCase):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         sys = Pendulum()
-        sys.state.lower_bound = np.array([-2.0, -2.0])
-        sys.state.upper_bound = np.array([2.0, 2.0])
-        sys.inputs["u"].lower_bound = np.array([-1.0])
-        sys.inputs["u"].upper_bound = np.array([1.0])
+        sys.state.lower = np.array([-2.0, -2.0])
+        sys.state.upper = np.array([2.0, 2.0])
+        sys.inputs["u"].lower = np.array([-1.0])
+        sys.inputs["u"].upper = np.array([1.0])
         problem = PlanningProblem(
             sys,
             cost=QuadraticCost.from_system(sys),
@@ -137,7 +137,7 @@ class TestStateSpaceGrid(unittest.TestCase):
 
     def test_infinite_bounds_raise(self):
         sys = DoubleIntegrator()
-        sys.state.upper_bound = np.array([np.inf, 3.0])
+        sys.state.upper = np.array([np.inf, 3.0])
         problem = PlanningProblem(sys, U=sys.input_box)
         with self.assertRaises(ValueError):
             StateSpaceGrid(problem, x_grid=(5, 5), u_grid=(3,), dt=0.1)
@@ -326,10 +326,10 @@ class TestJaxPrecompute(unittest.TestCase):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         sys = Pendulum()
-        sys.state.lower_bound = np.array([-2.0, -2.0])
-        sys.state.upper_bound = np.array([2.0, 2.0])
-        sys.inputs["u"].lower_bound = np.array([-1.0])
-        sys.inputs["u"].upper_bound = np.array([1.0])
+        sys.state.lower = np.array([-2.0, -2.0])
+        sys.state.upper = np.array([2.0, 2.0])
+        sys.inputs["u"].lower = np.array([-1.0])
+        sys.inputs["u"].upper = np.array([1.0])
         problem = PlanningProblem(
             sys,
             cost=TimeCost.from_system(sys, radius=0.1),
@@ -1065,10 +1065,10 @@ def test_grid_exposes_the_boxes_it_spans():
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(state_dim=2, input_dim=1, output_dim=2)
-            self.state.lower_bound = np.array([-2.0, -3.0])
-            self.state.upper_bound = np.array([2.0, 3.0])
-            self.inputs["u"].lower_bound = np.array([-1.0])
-            self.inputs["u"].upper_bound = np.array([1.0])
+            self.state.lower = np.array([-2.0, -3.0])
+            self.state.upper = np.array([2.0, 3.0])
+            self.inputs["u"].lower = np.array([-1.0])
+            self.inputs["u"].upper = np.array([1.0])
 
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])
@@ -1121,8 +1121,8 @@ def test_the_lookup_policys_command_never_leaves_the_grids_input_box():
     )
 
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-2.0])
-    plant.inputs["u"].upper_bound = np.array([2.0])
+    plant.inputs["u"].lower = np.array([-2.0])
+    plant.inputs["u"].upper = np.array([2.0])
     problem = PlanningProblem(
         plant,
         cost=QuadraticCost.from_system(plant, R=0.01 * np.eye(1)),

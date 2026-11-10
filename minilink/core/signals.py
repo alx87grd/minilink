@@ -26,9 +26,9 @@ class VectorSignal:
         The display string label for each component of the signal.
     units : list of str
         The physical units for each component of the signal.
-    upper_bound : np.ndarray
+    upper : np.ndarray
         The upper numerical bound of each component.
-    lower_bound : np.ndarray
+    lower : np.ndarray
         The lower numerical bound of each component.
     nominal_value : np.ndarray
         The default or operating point value of the signal.
@@ -42,8 +42,8 @@ class VectorSignal:
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         # Dimension: the explicit dim, else the length the metadata implies
         self.id = id
@@ -53,15 +53,15 @@ class VectorSignal:
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
         # Default metadata: indexed labels, no units, no bounds
         self.labels = [f"{id}[{i}]" for i in range(self.dim)]
         self.units = [""] * self.dim
-        self.upper_bound = np.inf * np.ones(self.dim)
-        self.lower_bound = -np.inf * np.ones(self.dim)
+        self.upper = np.inf * np.ones(self.dim)
+        self.lower = -np.inf * np.ones(self.dim)
 
         # Nominal value: the given one, checked against dim, else zeros
         self.nominal_value = nominal_of(nominal_value, self.dim)
@@ -76,20 +76,20 @@ class VectorSignal:
                 units, dim=self.dim, field_name="units", signal_id=id
             )
         lower = as_optional_vector(
-            lower_bound, dim=self.dim, field_name="lower_bound", signal_id=id
+            lower, dim=self.dim, field_name="lower", signal_id=id
         )
         if lower is not None:
-            self.lower_bound = lower
+            self.lower = lower
         upper = as_optional_vector(
-            upper_bound, dim=self.dim, field_name="upper_bound", signal_id=id
+            upper, dim=self.dim, field_name="upper", signal_id=id
         )
         if upper is not None:
-            self.upper_bound = upper
+            self.upper = upper
 
     @property
     def box(self) -> BoxSet:
-        """The bounds as a set, ``lower_bound <= z <= upper_bound``, derived on each read."""
-        return BoxSet(self.lower_bound, self.upper_bound)
+        """The bounds as a set, ``lower <= z <= upper``, derived on each read."""
+        return BoxSet(self.lower, self.upper)
 
     def __repr__(self):
         return f"VectorSignal: dim={self.dim}, nominal={self.nominal_value}"
@@ -136,8 +136,8 @@ class OutputPort(VectorSignal):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         # The signal and its metadata
         VectorSignal.__init__(
@@ -147,8 +147,8 @@ class OutputPort(VectorSignal):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
         # Compute function: the given one, else the nominal value
@@ -177,8 +177,8 @@ def infer_signal_dim(
     nominal_value=None,
     labels=None,
     units=None,
-    lower_bound=None,
-    upper_bound=None,
+    lower=None,
+    upper=None,
 ):
     """Determine a signal's dimension from whatever the user provided.
 
@@ -204,8 +204,8 @@ def infer_signal_dim(
         ("nominal_value", nominal_value),
         ("labels", labels),
         ("units", units),
-        ("lower_bound", lower_bound),
-        ("upper_bound", upper_bound),
+        ("lower", lower),
+        ("upper", upper),
     ]
     inferred = []
     for field_name, value in candidates:

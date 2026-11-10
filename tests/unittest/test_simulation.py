@@ -896,10 +896,10 @@ class TestRealtimeSimulator(unittest.TestCase):
         from minilink.simulation.realtime import PygameInput
 
         sys = TwoPortLinearSystem()
-        sys.inputs["left"].lower_bound[0] = -10.0
-        sys.inputs["left"].upper_bound[0] = 10.0
-        sys.inputs["right"].lower_bound[0] = -5.0
-        sys.inputs["right"].upper_bound[0] = 5.0
+        sys.inputs["left"].lower[0] = -10.0
+        sys.inputs["left"].upper[0] = 10.0
+        sys.inputs["right"].lower[0] = -5.0
+        sys.inputs["right"].upper[0] = 5.0
 
         fake_joy = MagicMock()
         fake_joy.get_numaxes.return_value = 6

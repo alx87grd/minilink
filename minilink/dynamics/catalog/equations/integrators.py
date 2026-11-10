@@ -21,8 +21,8 @@ class DoubleIntegrator(DynamicSystem):
         # Signal labels, units and bounds
         self.state.labels = ["position", "speed"]
         self.state.units = ["m", "m/s"]
-        self.state.lower_bound[:] = [-10.0, -10.0]
-        self.state.upper_bound[:] = [10.0, 10.0]
+        self.state.lower[:] = [-10.0, -10.0]
+        self.state.upper[:] = [10.0, 10.0]
         self.inputs["u"].labels = ["force"]
         self.inputs["u"].units = ["N"]
         self.outputs["y"].labels = ["position"]
@@ -72,8 +72,8 @@ class TripleIntegrator(DynamicSystem):
         # Signal labels, units and bounds
         self.state.labels = ["position", "speed", "force"]
         self.state.units = ["m", "m/s", "N"]
-        self.state.lower_bound[:] = [-10.0, -10.0, -10.0]
-        self.state.upper_bound[:] = [10.0, 10.0, 10.0]
+        self.state.lower[:] = [-10.0, -10.0, -10.0]
+        self.state.upper[:] = [10.0, 10.0, 10.0]
         self.inputs["u"].labels = ["force_rate"]
         self.inputs["u"].units = ["N/s"]
         self.outputs["y"].labels = ["position"]

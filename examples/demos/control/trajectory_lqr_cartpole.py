@@ -21,8 +21,8 @@ X0 = X_START + np.array([0.5, 0.3, 0.0, 0.0])  # where the real cart-pole starts
 OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "slsqp"
 
 plant = CartPole()
-plant.inputs["u"].lower_bound[0] = -10.0
-plant.inputs["u"].upper_bound[0] = 10.0
+plant.inputs["u"].lower[0] = -10.0
+plant.inputs["u"].upper[0] = 10.0
 
 # 1. The reference: a swing-up planned by direct collocation
 cost = QuadraticCost.from_system(

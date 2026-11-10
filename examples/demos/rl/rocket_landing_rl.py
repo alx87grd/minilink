@@ -22,10 +22,10 @@ THRUST_TO_WEIGHT = 2.0
 plant = Rocket()
 plant.params["inertia"] = 1000.0  # catalog: 100, which tumbles at a 0.05 rad gimbal
 weight = plant.params["mass"] * plant.params["gravity"]
-plant.inputs["u"].lower_bound = np.array([0.0, -GIMBAL])
-plant.inputs["u"].upper_bound = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
-plant.state.lower_bound = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
-plant.state.upper_bound = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
+plant.inputs["u"].lower = np.array([0.0, -GIMBAL])
+plant.inputs["u"].upper = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
+plant.state.lower = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
+plant.state.upper = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
 
 X_LANDED = np.array([0.0, 1.0, 0.0, 0.0, 0.0, 0.0])  # upright on the pad, at rest
 

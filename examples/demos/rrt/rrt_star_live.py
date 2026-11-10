@@ -30,10 +30,10 @@ REPLAY_HISTORY = False
 HISTORY_STRIDE = 30
 
 sys = HolonomicMobileRobot()  # dx = u
-sys.state.lower_bound = np.array([-6.0, -6.0])
-sys.state.upper_bound = np.array([6.0, 6.0])
-sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+sys.state.lower = np.array([-6.0, -6.0])
+sys.state.upper = np.array([6.0, 6.0])
+sys.inputs["u"].lower = np.array([-1.0, -1.0])
+sys.inputs["u"].upper = np.array([1.0, 1.0])
 
 scene = Scene(
     obstacles=(

@@ -19,10 +19,10 @@ DT = 0.05
 # The state bounds are the training box; leaving it truncates the episode.
 # The angle is unbounded: the policy sees it through periodic features.
 plant = CartPole()
-plant.inputs["u"].lower_bound = np.array([-10.0])
-plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -5.0, -20.0, -30.0])
-plant.state.upper_bound = np.array([5.0, 5.0, 20.0, 30.0])
+plant.inputs["u"].lower = np.array([-10.0])
+plant.inputs["u"].upper = np.array([10.0])
+plant.state.lower = np.array([-5.0, -5.0, -20.0, -30.0])
+plant.state.upper = np.array([5.0, 5.0, 20.0, 30.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the

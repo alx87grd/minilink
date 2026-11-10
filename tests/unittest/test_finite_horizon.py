@@ -25,10 +25,10 @@ def finite(verbose=False, **kwargs):
 
 def double_integrator(horizon=1.0, S=np.eye(2)):
     sys = DoubleIntegrator()
-    sys.state.lower_bound = np.array([-2.0, -2.0])
-    sys.state.upper_bound = np.array([2.0, 2.0])
-    sys.inputs["u"].lower_bound = np.array([-4.0])
-    sys.inputs["u"].upper_bound = np.array([4.0])
+    sys.state.lower = np.array([-2.0, -2.0])
+    sys.state.upper = np.array([2.0, 2.0])
+    sys.inputs["u"].lower = np.array([-4.0])
+    sys.inputs["u"].upper = np.array([4.0])
     cost = QuadraticCost.from_system(sys, Q=np.eye(2), R=np.eye(1), S=S)
 
     return PlanningProblem(

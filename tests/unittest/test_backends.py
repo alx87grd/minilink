@@ -234,7 +234,7 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.planner import TrajectoryOptimizationPlanner
 p = Pendulum()
-p.inputs["u"].lower_bound = np.array([-20.0]); p.inputs["u"].upper_bound = np.array([20.0])
+p.inputs["u"].lower = np.array([-20.0]); p.inputs["u"].upper = np.array([20.0])
 goal = np.array([np.pi, 0.0])
 problem = PlanningProblem(p, x0=np.zeros(2), horizon=3.0,
     cost=QuadraticCost.from_system(p, Q=np.eye(2), R=np.eye(1), x_bar=goal))

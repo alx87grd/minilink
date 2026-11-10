@@ -6,10 +6,10 @@ from minilink import BallSet, Pendulum, PlanningProblem, RRTPlanner
 from minilink.planning.search.extenders import KinodynamicExtender
 
 sys = Pendulum()  # state [theta, dtheta]; theta=0 hangs down, theta=pi inverted
-sys.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-sys.state.upper_bound = np.array([2.0 * np.pi, 12.0])
-sys.inputs["u"].lower_bound = np.array([-5.0])
-sys.inputs["u"].upper_bound = np.array([5.0])
+sys.state.lower = np.array([-2.0 * np.pi, -12.0])
+sys.state.upper = np.array([2.0 * np.pi, 12.0])
+sys.inputs["u"].lower = np.array([-5.0])
+sys.inputs["u"].upper = np.array([5.0])
 
 x0 = np.array([0.0, 0.0])  # hanging down, at rest
 x_goal = np.array([np.pi, 0.0])  # inverted, at rest

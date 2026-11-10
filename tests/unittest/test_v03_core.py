@@ -419,12 +419,12 @@ def bicycle_planner(mu=1.0, target_y=0.0, *, method="slsqp", backend="jax"):
 
     sys = BicycleDynRate(named_ports=True)
     sys.params["mu"] = mu
-    sys.state.lower_bound[6], sys.state.upper_bound[6] = 0.0, 40.0
-    sys.state.lower_bound[7], sys.state.upper_bound[7] = -0.5, 0.5
-    sys.inputs["w_rear_dot"].lower_bound[0] = -60.0
-    sys.inputs["w_rear_dot"].upper_bound[0] = 60.0
-    sys.inputs["delta_dot"].lower_bound[0] = -1.5
-    sys.inputs["delta_dot"].upper_bound[0] = 1.5
+    sys.state.lower[6], sys.state.upper[6] = 0.0, 40.0
+    sys.state.lower[7], sys.state.upper[7] = -0.5, 0.5
+    sys.inputs["w_rear_dot"].lower[0] = -60.0
+    sys.inputs["w_rear_dot"].upper[0] = 60.0
+    sys.inputs["delta_dot"].lower[0] = -1.5
+    sys.inputs["delta_dot"].upper[0] = 1.5
     r_r = float(sys.params["r_r"])
     speed = 6.0
     target = np.array([0.0, target_y, 0.0, speed, 0.0, 0.0, speed / r_r, 0.0])

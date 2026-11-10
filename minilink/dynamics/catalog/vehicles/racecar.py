@@ -162,16 +162,16 @@ class UdeSRacecarDyn(DynamicBicycle):
                 nominal_value=0.0,
                 labels=["P_cmd"],
                 units=["W"],
-                lower_bound=-P_max,
-                upper_bound=P_max,
+                lower=-P_max,
+                upper=P_max,
             )
             self.add_input_port(
                 "delta_cmd",
                 nominal_value=0.0,
                 labels=["delta_cmd"],
                 units=["rad"],
-                lower_bound=-delta_max,
-                upper_bound=delta_max,
+                lower=-delta_max,
+                upper=delta_max,
             )
         else:
             self.add_input_port(
@@ -180,8 +180,8 @@ class UdeSRacecarDyn(DynamicBicycle):
                 nominal_value=np.zeros(2),
                 labels=["P_cmd", "delta_cmd"],
                 units=["W", "rad"],
-                lower_bound=np.array([-P_max, -delta_max]),
-                upper_bound=np.array([P_max, delta_max]),
+                lower=np.array([-P_max, -delta_max]),
+                upper=np.array([P_max, delta_max]),
             )
         self.outputs = {}
         self.add_output_port("y", dim=self.n, function=self.h, dependencies=())

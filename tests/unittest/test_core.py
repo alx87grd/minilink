@@ -52,8 +52,8 @@ class TestCoreComponents(unittest.TestCase):
         np.testing.assert_array_equal(sys.inputs["y"].nominal_value, np.zeros(2))
         self.assertEqual(sys.inputs["y"].labels, ["y[0]", "y[1]"])
         self.assertEqual(sys.inputs["y"].units, ["", ""])
-        np.testing.assert_array_equal(sys.inputs["y"].lower_bound, [-np.inf, -np.inf])
-        np.testing.assert_array_equal(sys.inputs["y"].upper_bound, [np.inf, np.inf])
+        np.testing.assert_array_equal(sys.inputs["y"].lower, [-np.inf, -np.inf])
+        np.testing.assert_array_equal(sys.inputs["y"].upper, [np.inf, np.inf])
 
     def test_port_dimension_inference_and_metadata_validation(self):
         sys = System()
@@ -507,15 +507,15 @@ class TestForgottenSuperInit(unittest.TestCase):
 
 def test_signal_box_is_derived_from_the_bounds():
 
-    signal = VectorSignal("x", dim=2, lower_bound=[-1.0, -2.0], upper_bound=[1.0, 2.0])
+    signal = VectorSignal("x", dim=2, lower=[-1.0, -2.0], upper=[1.0, 2.0])
     np.testing.assert_allclose(signal.box.lower, [-1.0, -2.0])
-    signal.upper_bound = np.array([3.0, 4.0])
+    signal.upper = np.array([3.0, 4.0])
     np.testing.assert_allclose(signal.box.upper, [3.0, 4.0])  # read anew each time
 
     sys = DynamicSystem(state_dim=2, input_dim=1)
-    sys.add_input_port("w", dim=2, lower_bound=[-0.5, -0.5], upper_bound=[0.5, 0.5])
-    sys.inputs["u"].lower_bound = np.array([-5.0])
-    sys.inputs["u"].upper_bound = np.array([5.0])
+    sys.add_input_port("w", dim=2, lower=[-0.5, -0.5], upper=[0.5, 0.5])
+    sys.inputs["u"].lower = np.array([-5.0])
+    sys.inputs["u"].upper = np.array([5.0])
     U = sys.input_box
     np.testing.assert_allclose(U.box.lower, [-5.0, -0.5, -0.5])
     np.testing.assert_allclose(U.box.upper, [5.0, 0.5, 0.5])

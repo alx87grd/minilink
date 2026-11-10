@@ -225,12 +225,8 @@ class SampledDiagramSystem(StepDiagramSystem):
         state.dim = start
         state.labels = list(state.labels) + labels
         state.units = list(state.units) + [""] * self.hold_dim
-        state.lower_bound = np.concatenate(
-            [state.lower_bound, np.full(self.hold_dim, -np.inf)]
-        )
-        state.upper_bound = np.concatenate(
-            [state.upper_bound, np.full(self.hold_dim, np.inf)]
-        )
+        state.lower = np.concatenate([state.lower, np.full(self.hold_dim, -np.inf)])
+        state.upper = np.concatenate([state.upper, np.full(self.hold_dim, np.inf)])
         state.nominal_value = np.concatenate(
             [state.nominal_value, np.zeros(self.hold_dim)]
         )
@@ -284,8 +280,8 @@ def diagram_on_clock(diagram, dt):
             nominal_value=port.nominal_value,
             labels=port.labels,
             units=port.units,
-            lower_bound=port.lower_bound,
-            upper_bound=port.upper_bound,
+            lower=port.lower,
+            upper=port.upper,
         )
     clocked.name = f"{diagram.name} % {float(dt):g}"
 

@@ -204,6 +204,8 @@ RETIRED = {
     "solver_success": ("optimizer_success", None),
     "input_port_id": ("port", None),
     "interpolation": ("hold", ("TrajectorySource",)),
+    "lower_bound": ("lower", None),
+    "upper_bound": ("upper", None),
     "options": (
         "n_steps",
         (
@@ -281,6 +283,10 @@ def owner_of(path):
     raise ImportError(path)
 
 
+# A port and the box it builds say the same word (the ruling 5 of 2026-11-10): a bound on an
+# object is lower / upper; a limit a law applies to a named signal keeps that signal's name
+BOUND_WORDS = {"lower_bound": "lower", "upper_bound": "upper"}
+
 # A retired keyword of a function the facade scan does not reach, at the function's full path:
 # the keyword and what replaced it
 RETIRED_KEYWORDS = {
@@ -344,6 +350,12 @@ RETIRED_KEYWORDS = {
     "minilink.blocks.sources.TrajectorySource.from_trajectory": {
         "interpolation": "hold"
     },
+    "minilink.core.system.System.add_input_port": BOUND_WORDS,
+    "minilink.core.system.System.add_output_port": BOUND_WORDS,
+    "minilink.core.signals.VectorSignal.__init__": BOUND_WORDS,
+    "minilink.core.signals.OutputPort.__init__": BOUND_WORDS,
+    "minilink.core.wiring.WiredDiagramMixin.connect_new_output_port": BOUND_WORDS,
+    "minilink.core.wiring.DiagramOutputPort.__init__": BOUND_WORDS,
 }
 
 
@@ -540,6 +552,24 @@ def test_a_missing_method_backend_pair_is_refused_with_the_valid_list():
 
     with pytest.raises(ValueError, match="the methods on 'torch' are"):
         preset_of("slsqp", "torch")
+
+
+def test_a_port_and_the_state_carry_lower_and_upper():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.add_input_port("w", lower=[-1.0], upper=[2.0])
+    for signal in (
+        plant.state,
+        plant.inputs["u"],
+        plant.inputs["w"],
+        plant.outputs["y"],
+    ):
+        assert signal.box.lower.tolist() == signal.lower.tolist()
+        assert signal.box.upper.tolist() == signal.upper.tolist()
+        for retired in BOUND_WORDS:
+            assert not hasattr(signal, retired), f"{signal.id}.{retired} is retired"
+    assert plant.inputs["w"].lower.tolist() == [-1.0]
 
 
 def public_objects():

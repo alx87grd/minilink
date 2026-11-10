@@ -16,8 +16,8 @@ from tests.unittest.planning_helpers import edited
 
 def pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2 * np.pi, -10.0])
-    plant.state.upper_bound = np.array([2 * np.pi, 10.0])
+    plant.state.lower = np.array([-2 * np.pi, -10.0])
+    plant.state.upper = np.array([2 * np.pi, 10.0])
     return plant
 
 
@@ -305,8 +305,8 @@ def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
     from minilink.planning import evaluate_trajectory
 
     plant = pendulum()
-    plant.state.lower_bound = np.array([-1.0, -10.0])
-    plant.state.upper_bound = np.array([1.0, 10.0])
+    plant.state.lower = np.array([-1.0, -10.0])
+    plant.state.upper = np.array([1.0, 10.0])
 
     class Unit(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -401,8 +401,8 @@ def test_the_backends_share_the_score_on_identical_starts():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
 
     class Discounted(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -443,8 +443,8 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-0.5])
-    plant.inputs["u"].upper_bound = np.array([0.5])
+    plant.inputs["u"].lower = np.array([-0.5])
+    plant.inputs["u"].upper = np.array([0.5])
     ctl = StateFeedback(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
 
     class Effort(CostFunction):
@@ -519,8 +519,8 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
     task = dict(cost=quadratic(plant), horizon=np.inf, x0=start)
@@ -544,8 +544,8 @@ def test_the_default_backend_scores_a_lookup_table_law_on_jax_when_it_traces():
     from minilink.planning import ProblemEvaluator
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     problem = PlanningProblem(
         plant,
         x0=[0.5, 0.0],
@@ -682,8 +682,8 @@ def test_gymnasium_view_of_a_stochastic_problem():
     from minilink.interfaces.gymnasium import Sys2Gym
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),

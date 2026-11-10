@@ -637,10 +637,10 @@ if __name__ == "__main__":
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(state_dim=2, input_dim=1, output_dim=2)
-            self.state.lower_bound = np.array([-2.0, -2.0])
-            self.state.upper_bound = np.array([2.0, 2.0])
-            self.inputs["u"].lower_bound = np.array([-1.0])
-            self.inputs["u"].upper_bound = np.array([1.0])
+            self.state.lower = np.array([-2.0, -2.0])
+            self.state.upper = np.array([2.0, 2.0])
+            self.inputs["u"].lower = np.array([-1.0])
+            self.inputs["u"].upper = np.array([1.0])
 
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])

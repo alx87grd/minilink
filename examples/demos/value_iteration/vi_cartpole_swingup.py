@@ -20,10 +20,10 @@ UPRIGHT = np.array([0.0, np.pi, 0.0, 0.0])
 # The state bounds are the grid box; leaving it is charged INF.
 # Theta is a finite mesh (VI has no periodic features), denser on the pole.
 plant = CartPole()
-plant.inputs["u"].lower_bound = np.array([-10.0])
-plant.inputs["u"].upper_bound = np.array([10.0])
-plant.state.lower_bound = np.array([-5.0, -1.0 * np.pi, -5.0, -10.0])
-plant.state.upper_bound = np.array([5.0, +3.0 * np.pi, 5.0, 10.0])
+plant.inputs["u"].lower = np.array([-10.0])
+plant.inputs["u"].upper = np.array([10.0])
+plant.state.lower = np.array([-5.0, -1.0 * np.pi, -5.0, -10.0])
+plant.state.upper = np.array([5.0, +3.0 * np.pi, 5.0, 10.0])
 
 
 # Cost: periodic angle term, small cart, velocity and effort penalties (the

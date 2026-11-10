@@ -23,8 +23,8 @@ class StableLinear(DynamicSystem):
     def __init__(self, a=-1.0, b=-2.0):
         super().__init__(state_dim=2, input_dim=1, output_dim=2)
         self.params = {"a": float(a), "b": float(b)}
-        self.state.lower_bound = np.array([-10.0, -10.0])
-        self.state.upper_bound = np.array([10.0, 10.0])
+        self.state.lower = np.array([-10.0, -10.0])
+        self.state.upper = np.array([10.0, 10.0])
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -40,8 +40,8 @@ class UntraceableSpring(DynamicSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=2)
-        self.state.lower_bound = np.array([-5.0, -5.0])
-        self.state.upper_bound = np.array([5.0, 5.0])
+        self.state.lower = np.array([-5.0, -5.0])
+        self.state.upper = np.array([5.0, 5.0])
 
     def f(self, x, u, t=0.0, params=None):
         stiffness = 2.0 if float(x[0]) > 0.0 else 1.0  # float() breaks tracing
@@ -61,8 +61,8 @@ class ReverseVanderPol(VanderPol):
 def saturated_pendulum(torque=2.0):
     """Inverted pendulum whose actuator cannot hold it far from upright."""
     plant = InvertedPendulum()
-    plant.inputs["u"].lower_bound = np.array([-torque])
-    plant.inputs["u"].upper_bound = np.array([torque])
+    plant.inputs["u"].lower = np.array([-torque])
+    plant.inputs["u"].upper = np.array([torque])
     return plant
 
 
@@ -99,8 +99,8 @@ class TestQuadraticCertificate(unittest.TestCase):
         # The textbook case: the region of attraction is bounded by the
         # unstable limit cycle, which for mu = 1 passes about |x| = 2.
         sys = ReverseVanderPol()
-        sys.state.lower_bound = np.array([-4.0, -4.0])
-        sys.state.upper_bound = np.array([4.0, 4.0])
+        sys.state.lower = np.array([-4.0, -4.0])
+        sys.state.upper = np.array([4.0, 4.0])
         roa = region_of_attraction(sys)
 
         self.assertLess(roa.extent.max(), 2.5)
@@ -157,10 +157,10 @@ class TestQuadraticCertificate(unittest.TestCase):
         # slice through the equilibrium, which coupling makes smaller than the
         # shadow the certified set casts on the two axes.
         arm = CartPole()
-        arm.inputs["u"].lower_bound = np.array([-20.0])
-        arm.inputs["u"].upper_bound = np.array([20.0])
-        arm.state.lower_bound = np.array([-3.0, -4 * np.pi, -10.0, -10.0])
-        arm.state.upper_bound = -arm.state.lower_bound
+        arm.inputs["u"].lower = np.array([-20.0])
+        arm.inputs["u"].upper = np.array([20.0])
+        arm.state.lower = np.array([-3.0, -4 * np.pi, -10.0, -10.0])
+        arm.state.upper = -arm.state.lower
         x_up = np.array([0.0, np.pi, 0.0, 0.0])
         loop = lqr(arm, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.eye(1), x_bar=x_up) @ arm
         roa = region_of_attraction(loop, x_up)

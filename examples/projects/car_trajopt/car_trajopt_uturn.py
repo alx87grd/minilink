@@ -19,10 +19,10 @@ W_REAR_MAX = 30.0
 DELTA_MAX = 0.8
 
 sys = DynamicBicycle()
-sys.inputs["w_rear"].lower_bound[0] = W_REAR_MAX
-sys.inputs["w_rear"].upper_bound[0] = W_REAR_MAX
-sys.inputs["delta"].lower_bound[0] = -DELTA_MAX
-sys.inputs["delta"].upper_bound[0] = DELTA_MAX
+sys.inputs["w_rear"].lower[0] = W_REAR_MAX
+sys.inputs["w_rear"].upper[0] = W_REAR_MAX
+sys.inputs["delta"].lower[0] = -DELTA_MAX
+sys.inputs["delta"].upper[0] = DELTA_MAX
 
 x0 = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0])
 x_ref = np.array([-0.0, Y_GOAL, np.pi, U_TARGET, 0.0, 0.0])

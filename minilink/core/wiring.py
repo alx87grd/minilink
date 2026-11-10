@@ -201,8 +201,8 @@ class WiredDiagramMixin:
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Expose a subsystem output port as a new diagram boundary output.
@@ -227,8 +227,8 @@ class WiredDiagramMixin:
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
         # Wired from the subsystem port it exposes
@@ -275,8 +275,8 @@ class WiredDiagramMixin:
                     nominal_value=port.nominal_value,
                     labels=port.labels,
                     units=port.units,
-                    lower_bound=port.lower_bound,
-                    upper_bound=port.upper_bound,
+                    lower=port.lower,
+                    upper=port.upper,
                 )
             else:
                 self.add_output_port(
@@ -564,8 +564,8 @@ class WiredDiagramMixin:
             nominal_value=first.nominal_value,
             labels=first.labels,
             units=first.units,
-            lower_bound=first.lower_bound,
-            upper_bound=first.upper_bound,
+            lower=first.lower,
+            upper=first.upper,
         )
 
         # It feeds every open input of that name
@@ -630,8 +630,8 @@ class DiagramOutputPort(OutputPort):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         # The diagram and the subsystem port it exposes; set before
         # OutputPort.__init__, whose dependencies go through the property below
@@ -649,8 +649,8 @@ class DiagramOutputPort(OutputPort):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     @property
@@ -842,8 +842,8 @@ def state_layout(subsystems):
         substates = [sub.state for sub in subsystems.values()]
         state.labels = labels
         state.units = [unit for s in substates for unit in s.units]
-        state.upper_bound = np.concatenate([s.upper_bound for s in substates])
-        state.lower_bound = np.concatenate([s.lower_bound for s in substates])
+        state.upper = np.concatenate([s.upper for s in substates])
+        state.lower = np.concatenate([s.lower for s in substates])
         state.nominal_value = np.concatenate([s.nominal_value for s in substates])
 
     return n, state_index, state

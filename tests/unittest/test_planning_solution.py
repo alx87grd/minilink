@@ -29,8 +29,8 @@ from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
 
 def pendulum_problem(stochastic=False):
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(
         plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), x_bar=np.array([np.pi, 0.0])
     )
@@ -55,8 +55,8 @@ def pendulum_problem(stochastic=False):
 def move_problem(stochastic=False):
     """A double integrator brought to rest at the origin in two seconds."""
     plant = DoubleIntegrator()
-    plant.inputs["u"].lower_bound = np.array([-2.0])
-    plant.inputs["u"].upper_bound = np.array([2.0])
+    plant.inputs["u"].lower = np.array([-2.0])
+    plant.inputs["u"].upper = np.array([2.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     if stochastic:
         return PlanningProblem(
@@ -203,10 +203,10 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
 
 def double_integrator_problem():
     plant = DoubleIntegrator()
-    plant.state.lower_bound = np.array([-2.0, -2.0])
-    plant.state.upper_bound = np.array([2.0, 2.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.state.lower = np.array([-2.0, -2.0])
+    plant.state.upper = np.array([2.0, 2.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     return PlanningProblem(
         plant,
@@ -305,10 +305,10 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
     from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
 
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
-    plant.state.lower_bound = np.array([-np.pi, -8.0])
-    plant.state.upper_bound = np.array([np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    plant.state.lower = np.array([-np.pi, -8.0])
+    plant.state.upper = np.array([np.pi, 8.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1))
     problem = PlanningProblem(
         plant,
@@ -355,10 +355,10 @@ def solved_pendulum():
     from minilink import LQRPlanner
 
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2.0 * np.pi, -8.0])
-    plant.state.upper_bound = np.array([2.0 * np.pi, 8.0])
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.state.lower = np.array([-2.0 * np.pi, -8.0])
+    plant.state.upper = np.array([2.0 * np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=[np.pi, 0])
     problem = PlanningProblem(
         plant,

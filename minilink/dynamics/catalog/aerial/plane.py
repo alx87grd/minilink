@@ -29,10 +29,10 @@ class Plane2D(MechanicalSystem):
         super().__init__(dof=3, actuators=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -430,10 +430,10 @@ class Plane3D(GeneralizedMechanicalSystem):
         super().__init__(dof=6, pos=6, actuators=4)
 
         # The plant's own range: positions and velocities within ±10, forces within ±5
-        self.state.lower_bound = np.full(self.n, -10.0)
-        self.state.upper_bound = np.full(self.n, 10.0)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -10.0)
+        self.state.upper = np.full(self.n, 10.0)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -805,8 +805,8 @@ if __name__ == "__main__":
     # Absolute (hold) commands: pressed key → port bound, release → 0.
     # W/S thrust, UP/DOWN elevator, LEFT/RIGHT aileron, A/D rudder. ESC quits.
     u = sys.inputs["u"]
-    u.lower_bound[:] = [0.0, -0.12, -0.12, -0.12]
-    u.upper_bound[:] = [T_max, 0.12, 0.12, 0.12]
+    u.lower[:] = [0.0, -0.12, -0.12, -0.12]
+    u.upper[:] = [T_max, 0.12, 0.12, 0.12]
     u.nominal_value = np.array([T_trim, 0.0, 0.0, 0.0])
 
     # sys.compute_trajectory()

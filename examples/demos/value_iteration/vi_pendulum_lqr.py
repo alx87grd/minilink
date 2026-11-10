@@ -20,10 +20,10 @@ X0 = np.array([-0.1, 0.0])
 LO, HI = -2.0 * np.pi, 2.0 * np.pi
 
 plant = Pendulum()
-plant.state.lower_bound = np.array([LO, LO])
-plant.state.upper_bound = np.array([HI, HI])
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.state.lower = np.array([LO, LO])
+plant.state.upper = np.array([HI, HI])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(plant, x_bar=UPRIGHT, Q=Q, R=R)
 problem = PlanningProblem(plant, x0=X0, cost=cost, U=plant.input_box)

@@ -34,8 +34,8 @@ jax.monitoring.register_event_duration_secs_listener(count_compile)
 
 def swing_problem():
     plant = Pendulum()
-    plant.inputs["u"].lower_bound[0] = -20.0
-    plant.inputs["u"].upper_bound[0] = 20.0
+    plant.inputs["u"].lower[0] = -20.0
+    plant.inputs["u"].upper[0] = 20.0
     goal = np.array([np.pi, 0.0])
     return PlanningProblem(
         sys=plant,

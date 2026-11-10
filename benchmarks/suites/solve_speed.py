@@ -105,8 +105,8 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     n_runs = 1 if cfg.tiny else cfg.n_runs
 
     sys = Pendulum()
-    sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
-    sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
+    sys.inputs["u"].lower[0] = -PENDULUM_TAU_MAX
+    sys.inputs["u"].upper[0] = PENDULUM_TAU_MAX
 
     x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])

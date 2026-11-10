@@ -22,8 +22,8 @@ class VanderPol(DynamicSystem):
         # Signal labels, units and bounds
         self.state.labels = ["y", "dy"]
         self.state.units = ["", "1/s"]
-        self.state.lower_bound[:] = [-3.0, -3.0]
-        self.state.upper_bound[:] = [3.0, 3.0]
+        self.state.lower[:] = [-3.0, -3.0]
+        self.state.upper[:] = [3.0, 3.0]
         self.inputs["u"].labels = ["unused"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)

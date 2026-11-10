@@ -65,12 +65,12 @@ scene = Scene(obstacles=[Sphere(c, CONE_RADIUS + CONE_MARGIN) for c in cones])
 # what the plan gets wrong at the limit is the plant's own behaviour, not other physics.
 design = UdeSRacecarDyn(named_ports=False)
 design.params["mu"] = PLANNER_MU
-design.state.lower_bound[6] = 0.0
-design.state.upper_bound[6] = 3.0 * V_TARGET / design.params["r_r"]
-design.state.lower_bound[7] = -design.params["delta_max"]
-design.state.upper_bound[7] = design.params["delta_max"]
-design.state.lower_bound[8] = -design.params["P_max"]
-design.state.upper_bound[8] = design.params["P_max"]
+design.state.lower[6] = 0.0
+design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
+design.state.lower[7] = -design.params["delta_max"]
+design.state.upper[7] = design.params["delta_max"]
+design.state.lower[8] = -design.params["P_max"]
+design.state.upper[8] = design.params["P_max"]
 
 # What the car is asked for: hold the target speed, keep its centre on the line, keep
 # its whole footprint inside the lane and clear of the cones. The quadratic part says

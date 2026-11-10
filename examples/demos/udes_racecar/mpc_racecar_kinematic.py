@@ -37,8 +37,8 @@ car = UdeSRacecar()
 # car.skin = racecar_skin_3d
 car.camera_follow_frame = None
 car.camera_scale = 4.0
-car.inputs["u"].lower_bound = np.array([0.0, -0.52])
-car.inputs["u"].upper_bound = np.array([5.0, 0.52])
+car.inputs["u"].lower = np.array([0.0, -0.52])
+car.inputs["u"].upper = np.array([5.0, 0.52])
 
 # start a little off the line: path distance has no derivative on it
 start = path[0]

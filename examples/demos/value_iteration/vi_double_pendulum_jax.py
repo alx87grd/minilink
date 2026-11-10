@@ -48,10 +48,10 @@ else:
     n_steps = 50
 
 plant = DoublePendulum()
-plant.state.lower_bound = np.array([-5.0, -1.5, -4.0, -4.0])
-plant.state.upper_bound = np.array([0.5, 4.0, 5.5, 7.0])
-plant.inputs["u"].lower_bound = np.array([-12.0, -12.0])
-plant.inputs["u"].upper_bound = np.array([12.0, 12.0])
+plant.state.lower = np.array([-5.0, -1.5, -4.0, -4.0])
+plant.state.upper = np.array([0.5, 4.0, 5.5, 7.0])
+plant.inputs["u"].lower = np.array([-12.0, -12.0])
+plant.inputs["u"].upper = np.array([12.0, 12.0])
 plant.x0 = HANGING
 
 Q = np.diag([1.0, 0.5, 0.1, 0.05])

@@ -44,10 +44,10 @@ class TestPlanningArchitecture(unittest.TestCase):
                 super().__init__(
                     state_dim=2, input_dim=1, output_dim=2, y_dependencies=()
                 )
-                self.state.lower_bound = np.array([-1.0, -2.0])
-                self.state.upper_bound = np.array([1.0, 2.0])
-                self.inputs["u"].lower_bound = np.array([-3.0])
-                self.inputs["u"].upper_bound = np.array([4.0])
+                self.state.lower = np.array([-1.0, -2.0])
+                self.state.upper = np.array([1.0, 2.0])
+                self.inputs["u"].lower = np.array([-3.0])
+                self.inputs["u"].upper = np.array([4.0])
                 self.x0 = np.array([0.1, -0.2])
 
             def f(self, x, u, t=0, params=None):
@@ -65,10 +65,10 @@ class TestPlanningArchitecture(unittest.TestCase):
                 super().__init__(
                     state_dim=1, input_dim=1, output_dim=1, y_dependencies=()
                 )
-                self.state.lower_bound = np.array([-10.0])
-                self.state.upper_bound = np.array([10.0])
-                self.inputs["u"].lower_bound = np.array([-10.0])
-                self.inputs["u"].upper_bound = np.array([10.0])
+                self.state.lower = np.array([-10.0])
+                self.state.upper = np.array([10.0])
+                self.inputs["u"].lower = np.array([-10.0])
+                self.inputs["u"].upper = np.array([10.0])
 
             def f(self, x, u, t=0, params=None):
                 return np.array([u[0]])
@@ -580,10 +580,10 @@ from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
 class _SingleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
+        self.state.lower = np.array([-10.0])
+        self.state.upper = np.array([10.0])
+        self.inputs["u"].lower = np.array([-10.0])
+        self.inputs["u"].upper = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([u[0]])
@@ -595,10 +595,10 @@ class _SingleIntegrator(DynamicSystem):
 class _DoubleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=2, expose_state=True)
-        self.state.lower_bound = np.array([-3.0, -3.0])
-        self.state.upper_bound = np.array([3.0, 3.0])
-        self.inputs["u"].lower_bound = np.array([-1.0])
-        self.inputs["u"].upper_bound = np.array([1.0])
+        self.state.lower = np.array([-3.0, -3.0])
+        self.state.upper = np.array([3.0, 3.0])
+        self.inputs["u"].lower = np.array([-1.0])
+        self.inputs["u"].upper = np.array([1.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([x[1], u[0]])
@@ -926,10 +926,10 @@ def test_steering_edge_is_dynamically_feasible():
 
 def make_dubins_problem():
     sys = KinematicBicycle()
-    sys.state.lower_bound = np.array([-6.0, -6.0, -np.pi])
-    sys.state.upper_bound = np.array([6.0, 6.0, np.pi])
-    sys.inputs["u"].lower_bound = np.array([0.0, -0.5])
-    sys.inputs["u"].upper_bound = np.array([1.5, 0.5])
+    sys.state.lower = np.array([-6.0, -6.0, -np.pi])
+    sys.state.upper = np.array([6.0, 6.0, np.pi])
+    sys.inputs["u"].lower = np.array([0.0, -0.5])
+    sys.inputs["u"].upper = np.array([1.5, 0.5])
     return sys
 
 
@@ -1091,8 +1091,8 @@ def edge_inputs_problem(params=None):
     from minilink.dynamics.catalog.vehicles.steering import HolonomicMobileRobot
 
     sys = HolonomicMobileRobot()
-    sys.state.lower_bound = np.array([-6.0, -6.0])
-    sys.state.upper_bound = np.array([6.0, 6.0])
+    sys.state.lower = np.array([-6.0, -6.0])
+    sys.state.upper = np.array([6.0, 6.0])
     return PlanningProblem(
         sys=sys,
         x0=np.zeros(2),
@@ -2053,8 +2053,8 @@ class TestTrajoptSuccessSemantics(unittest.TestCase):
         from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
         plant = Pendulum()
-        plant.inputs["u"].lower_bound = np.array([-u_max])
-        plant.inputs["u"].upper_bound = np.array([u_max])
+        plant.inputs["u"].lower = np.array([-u_max])
+        plant.inputs["u"].upper = np.array([u_max])
         goal = np.array([np.pi, 0.0])
         return PlanningProblem(
             plant,
@@ -2257,10 +2257,10 @@ def test_collocation_bounds_survive_an_intersection():
     class DoubleIntegrator(DynamicSystem):
         def __init__(self):
             super().__init__(state_dim=2, input_dim=1, output_dim=2)
-            self.state.lower_bound = np.array([-2.0, -3.0])
-            self.state.upper_bound = np.array([2.0, 3.0])
-            self.inputs["u"].lower_bound = np.array([-1.0])
-            self.inputs["u"].upper_bound = np.array([1.0])
+            self.state.lower = np.array([-2.0, -3.0])
+            self.state.upper = np.array([2.0, 3.0])
+            self.inputs["u"].lower = np.array([-1.0])
+            self.inputs["u"].upper = np.array([1.0])
 
         def f(self, x, u, t=0, params=None):
             return np.array([x[1], u[0]])

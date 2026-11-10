@@ -96,8 +96,8 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
 
     configure_jax(enable_x64=True)
     sys = Pendulum()
-    sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
-    sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
+    sys.inputs["u"].lower[0] = -PENDULUM_TAU_MAX
+    sys.inputs["u"].upper[0] = PENDULUM_TAU_MAX
 
     x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])
@@ -183,14 +183,14 @@ def run_bicycle_parametric(
 
     configure_jax(enable_x64=True)
     sys = BicycleDynRate(named_ports=True)
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = BICYCLE_W_REAR_MAX
-    sys.state.lower_bound[7] = -BICYCLE_DELTA_MAX
-    sys.state.upper_bound[7] = BICYCLE_DELTA_MAX
-    sys.inputs["w_rear_dot"].lower_bound[0] = -BICYCLE_W_REAR_DOT_MAX
-    sys.inputs["w_rear_dot"].upper_bound[0] = BICYCLE_W_REAR_DOT_MAX
-    sys.inputs["delta_dot"].lower_bound[0] = -BICYCLE_DELTA_DOT_MAX
-    sys.inputs["delta_dot"].upper_bound[0] = BICYCLE_DELTA_DOT_MAX
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = BICYCLE_W_REAR_MAX
+    sys.state.lower[7] = -BICYCLE_DELTA_MAX
+    sys.state.upper[7] = BICYCLE_DELTA_MAX
+    sys.inputs["w_rear_dot"].lower[0] = -BICYCLE_W_REAR_DOT_MAX
+    sys.inputs["w_rear_dot"].upper[0] = BICYCLE_W_REAR_DOT_MAX
+    sys.inputs["delta_dot"].lower[0] = -BICYCLE_DELTA_DOT_MAX
+    sys.inputs["delta_dot"].upper[0] = BICYCLE_DELTA_DOT_MAX
 
     r_r = float(sys.params["r_r"])
     w_rear_ref = BICYCLE_U_TARGET / r_r

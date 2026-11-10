@@ -24,10 +24,10 @@ GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
 
 def double_integrator_problem(stochastic=False):
     plant = DoubleIntegrator()
-    plant.state.lower_bound = np.array([-2.0, -2.0])
-    plant.state.upper_bound = np.array([2.0, 2.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.state.lower = np.array([-2.0, -2.0])
+    plant.state.upper = np.array([2.0, 2.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     exit_rule = dict(
         penalize_failure=True, failure_cost=20.0

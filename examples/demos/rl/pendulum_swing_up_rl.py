@@ -18,10 +18,10 @@ TORQUE = 4.0  # Nm, below m g l = 9.81 Nm: the pendulum must pump energy
 
 # Plant: catalog pendulum, theta = 0 hanging, theta = pi upright, torque limited
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
-plant.state.lower_bound = np.array([-4 * np.pi, -20.0])
-plant.state.upper_bound = np.array([4 * np.pi, 20.0])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
+plant.state.lower = np.array([-4 * np.pi, -20.0])
+plant.state.upper = np.array([4 * np.pi, 20.0])
 
 
 # Cost: J = int g dt with g zero upright, two hanging, periodic in the angle

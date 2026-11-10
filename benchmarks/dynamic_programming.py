@@ -43,10 +43,10 @@ class DPBenchmarkRow:
 def pendulum_problem():
     """Pendulum swing-up problem (pyro SinglePendulum defaults)."""
     sys = Pendulum()
-    sys.state.lower_bound = np.array([-2.0 * np.pi, -2.0 * np.pi])
-    sys.state.upper_bound = np.array([2.0 * np.pi, 2.0 * np.pi])
-    sys.inputs["u"].lower_bound = np.array([-5.0])
-    sys.inputs["u"].upper_bound = np.array([5.0])
+    sys.state.lower = np.array([-2.0 * np.pi, -2.0 * np.pi])
+    sys.state.upper = np.array([2.0 * np.pi, 2.0 * np.pi])
+    sys.inputs["u"].lower = np.array([-5.0])
+    sys.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(sys, x_bar=UPRIGHT, R=np.eye(1))
     return PlanningProblem(sys, cost=cost, X=sys.state.box, U=sys.input_box)
 

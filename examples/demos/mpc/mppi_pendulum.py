@@ -19,8 +19,8 @@ FAN_TICKS = (0, 24, 48)  # ticks whose sampled futures the figure shows
 FAN_SAMPLES = 64  # samples drawn in each fan
 
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 
 # The wrapped angle to upright: 1 + cos(theta) gives the sampler no signal at the bottom

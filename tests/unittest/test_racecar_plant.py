@@ -35,10 +35,8 @@ def test_ports_and_state_layout():
 
     assert car.n == 9
     assert list(car.inputs) == ["P_cmd", "delta_cmd"]
-    assert car.inputs["P_cmd"].upper_bound == pytest.approx(car.params["P_max"])
-    assert car.inputs["delta_cmd"].lower_bound == pytest.approx(
-        -car.params["delta_max"]
-    )
+    assert car.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
+    assert car.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
     assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power"}
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 

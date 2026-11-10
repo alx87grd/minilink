@@ -57,12 +57,12 @@ vehicle = create_vehicle(Y=0.0, vx=0.0, theta=np.pi, tire_slip_mode=None)
 x_mpc0 = plant_y_to_mpc_x(vehicle.x0)
 
 sys_mpc = BicycleDynRate()
-sys_mpc.state.lower_bound[6] = 0.0
-sys_mpc.state.upper_bound[6] = 90.0
-sys_mpc.state.lower_bound[7] = -0.55
-sys_mpc.state.upper_bound[7] = 0.55
-sys_mpc.inputs["u"].lower_bound = np.array([-80.0, -2.0])
-sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
+sys_mpc.state.lower[6] = 0.0
+sys_mpc.state.upper[6] = 90.0
+sys_mpc.state.lower[7] = -0.55
+sys_mpc.state.upper[7] = 0.55
+sys_mpc.inputs["u"].lower = np.array([-80.0, -2.0])
+sys_mpc.inputs["u"].upper = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])

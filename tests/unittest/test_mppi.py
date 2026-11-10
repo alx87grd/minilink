@@ -40,8 +40,8 @@ class SwingUpCost(CostFunction):
 
 def swing_up_planner(**options):
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     problem = PlanningProblem(
         plant, cost=SwingUpCost(), horizon=2.0, x0=[0.0, 0.0], U=plant.input_box
     )
@@ -51,8 +51,8 @@ def swing_up_planner(**options):
 
 def double_integrator_planner():
     plant = DoubleIntegrator()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     problem = PlanningProblem(
         plant, cost=cost, horizon=1.0, x0=[1.0, 0.0], U=plant.input_box
@@ -153,8 +153,8 @@ def test_mppi_refuses_an_unboxed_input_and_a_ragged_horizon():
     boxed = PlanningProblem(
         plant, cost=cost, horizon=2.02, x0=[0.0, 0.0], U=plant.input_box
     )
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     with pytest.raises(ValueError, match="whole number of periods"):
         MPPIPlanner(boxed, dt=0.05)
 
@@ -257,8 +257,8 @@ def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
 
 def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     cost = QuadraticCost.from_system(plant, R=0.01 * np.eye(1))
     problem = PlanningProblem(
         plant, cost=cost, horizon=0.5, x0=[1.0, 0.0], U=plant.input_box

@@ -341,8 +341,8 @@ def test_a_verb_refuses_a_partial_tree_and_takes_its_tools_tree_edited():
     from minilink import DynamicProgrammingPlanner
 
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-np.pi, -6.0])
-    plant.state.upper_bound = np.array([np.pi, 6.0])
+    plant.state.lower = np.array([-np.pi, -6.0])
+    plant.state.upper = np.array([np.pi, 6.0])
     problem = regulation_problem(plant).replace(X=plant.state.box, U=plant.input_box)
     planner = DynamicProgrammingPlanner(
         problem, max_iterations=5, x_grid=(5, 5), u_grid=(3,), dt=0.1

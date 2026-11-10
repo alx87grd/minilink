@@ -384,6 +384,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `"slsqp"`) and the MPC presets; the old strings are refused. `backend=` (the array module)
     and the method select the implementation through one table keyed `(method, backend)`;
     every method runs as before on NumPy and JAX.
+  - *A port and the box it builds say the same word* (the maintainer's ruling 5):
+    `add_input_port(…, lower_bound=, upper_bound=)` → `add_input_port(…, lower=, upper=)`,
+    `add_output_port` and `connect_new_output_port` with it; the attributes
+    `port.lower_bound`, `state.upper_bound` → `port.lower`, `state.upper`, as the box
+    (`port.box.lower`), the sets, `Saturation` and the program already said. A limit a law
+    applies to a named signal keeps that signal's name (`u_min`, `u_max`, `delta_max`).
 
 ## 3. Maturity (TRL)
 

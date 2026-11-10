@@ -395,8 +395,8 @@ def require_axis(axis, dim, name) -> int:
 
 def component_bounds(signal, i, fallback=_DEFAULT_BOUNDS) -> tuple[float, float]:
     """The bounds of component ``i`` when finite and ordered, else ``fallback``."""
-    lo = float(signal.lower_bound[i])
-    hi = float(signal.upper_bound[i])
+    lo = float(signal.lower[i])
+    hi = float(signal.upper[i])
     if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
         return lo, hi
     return fallback
@@ -472,10 +472,10 @@ def build_spec(
     )
 
     # The color limits: the output's finite bounds, unless given
-    if vmin is None and np.isfinite(output.lower_bound[out_axis]):
-        vmin = float(output.lower_bound[out_axis])
-    if vmax is None and np.isfinite(output.upper_bound[out_axis]):
-        vmax = float(output.upper_bound[out_axis])
+    if vmin is None and np.isfinite(output.lower[out_axis]):
+        vmin = float(output.lower[out_axis])
+    if vmax is None and np.isfinite(output.upper[out_axis]):
+        vmax = float(output.upper[out_axis])
 
     # The second axis' label and unit, on a two-axis sweep only
     y_axis = axes[1] if len(axes) == 2 else None
@@ -697,8 +697,8 @@ def indexed_label(stem, i, dim) -> str:
 
 def error_bounds(port, i, base, fallback=_DEFAULT_BOUNDS) -> tuple[float, float]:
     """Error range implied by the measurement bounds: e = base - y."""
-    lo = float(port.lower_bound[i])
-    hi = float(port.upper_bound[i])
+    lo = float(port.lower[i])
+    hi = float(port.upper[i])
     if np.isfinite(lo) and np.isfinite(hi) and lo < hi:
         return base - hi, base - lo
     return fallback

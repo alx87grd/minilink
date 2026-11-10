@@ -1090,8 +1090,8 @@ class PhasePlaneTestSystem(DynamicSystem):
         self.name = "PhasePlaneTestSystem"
         self.state.labels = ["position", "velocity"]
         self.state.units = ["m", "m/s"]
-        self.state.lower_bound = np.array([-2.0, -3.0])
-        self.state.upper_bound = np.array([2.0, 3.0])
+        self.state.lower = np.array([-2.0, -3.0])
+        self.state.upper = np.array([2.0, 3.0])
         self.inputs["u"].nominal_value = np.array([0.5])
 
     def f(self, x, u, t=0, params=None):
@@ -1102,8 +1102,8 @@ class OneStateSystem(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=1, output_dim=1, y_dependencies=())
         self.name = "OneStateSystem"
-        self.state.lower_bound = np.array([-1.0])
-        self.state.upper_bound = np.array([1.0])
+        self.state.lower = np.array([-1.0])
+        self.state.upper = np.array([1.0])
 
     def f(self, x, u, t=0, params=None):
         return np.array([2.0 * x[0]])
@@ -1397,14 +1397,14 @@ class TestDiscretize(unittest.TestCase):
 
     def test_discretize_keeps_the_y_metadata(self):
         plant = Pendulum()
-        plant.outputs["y"].lower_bound = np.array([-np.pi, -8.0])
-        plant.outputs["y"].upper_bound = np.array([np.pi, 8.0])
+        plant.outputs["y"].lower = np.array([-np.pi, -8.0])
+        plant.outputs["y"].upper = np.array([np.pi, 8.0])
         step_leaf = discretize(plant, 0.05)
         y_port, plant_y = step_leaf.outputs["y"], plant.outputs["y"]
         self.assertEqual(y_port.labels, plant_y.labels)
         self.assertEqual(y_port.units, plant_y.units)
-        np.testing.assert_array_equal(y_port.lower_bound, [-np.pi, -8.0])
-        np.testing.assert_array_equal(y_port.upper_bound, [np.pi, 8.0])
+        np.testing.assert_array_equal(y_port.lower, [-np.pi, -8.0])
+        np.testing.assert_array_equal(y_port.upper, [np.pi, 8.0])
 
     def test_discretize_keeps_source_x0_and_signal_metadata(self):
         plant = Pendulum()
@@ -1414,24 +1414,22 @@ class TestDiscretize(unittest.TestCase):
         np.testing.assert_array_equal(step_leaf.x0, plant.x0)
         self.assertEqual(step_leaf.state.labels, plant.state.labels)
         self.assertEqual(step_leaf.state.units, plant.state.units)
-        np.testing.assert_array_equal(
-            step_leaf.state.upper_bound, plant.state.upper_bound
-        )
+        np.testing.assert_array_equal(step_leaf.state.upper, plant.state.upper)
         u_port, plant_u = step_leaf.inputs["u"], plant.inputs["u"]
         self.assertEqual(u_port.labels, plant_u.labels)
         self.assertEqual(u_port.units, plant_u.units)
-        np.testing.assert_array_equal(u_port.lower_bound, plant_u.lower_bound)
+        np.testing.assert_array_equal(u_port.lower, plant_u.lower)
         np.testing.assert_array_equal(u_port.nominal_value, [0.3])
         rollout = step_leaf.compute_rollout(n_steps=3, u=np.zeros((1, 3)))
         self.assertGreater(np.abs(rollout.x[0, -1]), 0.4)
 
     def test_discretize_keeps_each_input_port_of_its_source(self):
         plant = _GainIntegrator()
-        plant.add_input_port("w", labels=["disturbance"], upper_bound=[1.0])
+        plant.add_input_port("w", labels=["disturbance"], upper=[1.0])
         step_leaf = discretize(plant, 0.1)
         self.assertEqual(list(step_leaf.inputs), ["u", "w"])
         self.assertEqual(step_leaf.inputs["w"].labels, ["disturbance"])
-        np.testing.assert_array_equal(step_leaf.inputs["w"].upper_bound, [1.0])
+        np.testing.assert_array_equal(step_leaf.inputs["w"].upper, [1.0])
 
     def test_discretize_rejects_unknown_integrator(self):
         plant = DoubleIntegrator()

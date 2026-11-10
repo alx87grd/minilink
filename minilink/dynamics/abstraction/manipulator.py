@@ -223,8 +223,8 @@ def joint_bounds_of(sys, bounds):
             np.asarray(bounds[1], dtype=float).reshape(-1),
         )
 
-    lower = np.asarray(sys.state.lower_bound[: sys.dof], dtype=float)
-    upper = np.asarray(sys.state.upper_bound[: sys.dof], dtype=float)
+    lower = np.asarray(sys.state.lower[: sys.dof], dtype=float)
+    upper = np.asarray(sys.state.upper[: sys.dof], dtype=float)
     if np.all(np.isfinite(lower)) and np.all(np.isfinite(upper)):
         return (lower, upper)
 

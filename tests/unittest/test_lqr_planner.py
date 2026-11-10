@@ -28,8 +28,8 @@ R = np.array([[0.5]])
 
 def pendulum_problem(tf=np.inf, S=None):
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-20.0])
-    plant.inputs["u"].upper_bound = np.array([20.0])
+    plant.inputs["u"].lower = np.array([-20.0])
+    plant.inputs["u"].upper = np.array([20.0])
     cost = QuadraticCost.from_system(plant, Q=Q, R=R, S=S, x_bar=UPRIGHT)
     return PlanningProblem(
         plant,

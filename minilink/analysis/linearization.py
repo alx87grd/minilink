@@ -356,8 +356,8 @@ def selected_input_ports(sys, inputs, u_bar):
                 nominal_value=u_bar[start:stop],
                 labels=[source.labels[i] for i in components],
                 units=[source.units[i] for i in components],
-                lower_bound=source.lower_bound[components],
-                upper_bound=source.upper_bound[components],
+                lower=source.lower[components],
+                upper=source.upper[components],
             )
         )
         start = stop

@@ -151,8 +151,8 @@ class NeuralPolicy(System):
             dim=n,
             labels=list(sys.state.labels),
             units=list(sys.state.units),
-            lower_bound=x_lb,
-            upper_bound=x_ub,
+            lower=x_lb,
+            upper=x_ub,
         )
         self.add_output_port(
             "u",
@@ -161,8 +161,8 @@ class NeuralPolicy(System):
             dependencies=("x",),
             labels=list(port.labels),
             units=list(port.units),
-            lower_bound=u_lb,
-            upper_bound=u_ub,
+            lower=u_lb,
+            upper=u_ub,
         )
 
     def observe(self, x):

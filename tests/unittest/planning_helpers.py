@@ -22,10 +22,10 @@ GOAL_TOLERANCE = 0.5  # The goal region's radius
 def make_holonomic_obstacle_problem():
     """Small holonomic robot with one spherical obstacle (RRT contract fixture)."""
     sys = HolonomicMobileRobot()  # dx = u
-    sys.state.lower_bound = np.array([-6.0, -6.0])
-    sys.state.upper_bound = np.array([6.0, 6.0])
-    sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-    sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+    sys.state.lower = np.array([-6.0, -6.0])
+    sys.state.upper = np.array([6.0, 6.0])
+    sys.inputs["u"].lower = np.array([-1.0, -1.0])
+    sys.inputs["u"].upper = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=(Sphere([0.0, 0.0], 1.0),))
     body = mount(disc(0.2), on=sys)

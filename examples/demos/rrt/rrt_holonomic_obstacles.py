@@ -59,10 +59,10 @@ HOLONOMIC_OBSTACLES = (
 def make_holonomic_problem(*, robot_radius=0.25):
     """18-sphere holonomic obstacle scene shared by sections A and B."""
     sys = HolonomicMobileRobot()
-    sys.state.lower_bound = np.array([-6.0, -6.0])
-    sys.state.upper_bound = np.array([6.0, 6.0])
-    sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-    sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+    sys.state.lower = np.array([-6.0, -6.0])
+    sys.state.upper = np.array([6.0, 6.0])
+    sys.inputs["u"].lower = np.array([-1.0, -1.0])
+    sys.inputs["u"].upper = np.array([1.0, 1.0])
 
     scene = Scene(obstacles=HOLONOMIC_OBSTACLES)
     body = mount(disc(robot_radius), on=sys)

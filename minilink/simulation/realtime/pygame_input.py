@@ -42,7 +42,7 @@ class PygameInput(RealtimeInput):
     Keyboard and joystick → ``u`` through the input-port bounds.
 
     Maps held keys onto the system's flat boundary input vector using each
-    input port's ``lower_bound`` / ``upper_bound``: the positive key of an
+    input port's ``lower`` / ``upper``: the positive key of an
     axis commands the component's upper bound, the negative key its lower
     bound. Components with non-finite bounds fall back to ``gain``. The first
     connected joystick (if any) overrides the matching key axis with an
@@ -425,9 +425,9 @@ def input_port_bounds(sys):
     if sys.m == 0:
         return np.zeros(0), np.zeros(0)
     lower = np.concatenate(
-        [np.asarray(port.lower_bound, dtype=float) for port in sys.inputs.values()]
+        [np.asarray(port.lower, dtype=float) for port in sys.inputs.values()]
     )
     upper = np.concatenate(
-        [np.asarray(port.upper_bound, dtype=float) for port in sys.inputs.values()]
+        [np.asarray(port.upper, dtype=float) for port in sys.inputs.values()]
     )
     return lower, upper

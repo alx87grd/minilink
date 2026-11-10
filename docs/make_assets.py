@@ -188,8 +188,8 @@ def gif_cartpole() -> None:
     from minilink.graphical.catalog import camera_matrix
 
     plant = CartPole()
-    plant.inputs["u"].lower_bound[0] = -10.0
-    plant.inputs["u"].upper_bound[0] = 10.0
+    plant.inputs["u"].lower[0] = -10.0
+    plant.inputs["u"].upper[0] = 10.0
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
     problem = PlanningProblem(
         sys=plant,
@@ -311,12 +311,12 @@ def racecar_mpc() -> None:
 
     design = UdeSRacecarDyn(named_ports=False)
     design.params["mu"] = PLANNER_MU
-    design.state.lower_bound[6] = 0.0
-    design.state.upper_bound[6] = 3.0 * V_TARGET / design.params["r_r"]
-    design.state.lower_bound[7] = -design.params["delta_max"]
-    design.state.upper_bound[7] = design.params["delta_max"]
-    design.state.lower_bound[8] = -design.params["P_max"]
-    design.state.upper_bound[8] = design.params["P_max"]
+    design.state.lower[6] = 0.0
+    design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
+    design.state.lower[7] = -design.params["delta_max"]
+    design.state.upper[7] = design.params["delta_max"]
+    design.state.lower[8] = -design.params["P_max"]
+    design.state.upper[8] = design.params["P_max"]
 
     centre = mount(point_probe(), on=design)
     body = mount(
@@ -427,10 +427,10 @@ def gif_rocket() -> None:
     plant = Rocket()
     plant.params["inertia"] = 1000.0
     weight = plant.params["mass"] * plant.params["gravity"]
-    plant.inputs["u"].lower_bound = np.array([0.0, -GIMBAL])
-    plant.inputs["u"].upper_bound = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
-    plant.state.lower_bound = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
-    plant.state.upper_bound = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
+    plant.inputs["u"].lower = np.array([0.0, -GIMBAL])
+    plant.inputs["u"].upper = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
+    plant.state.lower = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
+    plant.state.upper = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
 
     class LandingCost(CostFunction):
         Q = 0.1 * np.diag([1.0, 1.0, 10.0, 0.1, 0.1, 1.0])

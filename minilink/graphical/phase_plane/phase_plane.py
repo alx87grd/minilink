@@ -538,8 +538,8 @@ def phase_bounds_of(
         y_bounds = require_ordered_bounds(arr[1], "y bounds")
         return x_bounds, y_bounds
 
-    lower = sys.state.lower_bound
-    upper = sys.state.upper_bound
+    lower = sys.state.lower
+    upper = sys.state.upper
 
     x_bounds = bounds_from_state_or_overlay(
         lower,

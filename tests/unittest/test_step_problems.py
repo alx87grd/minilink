@@ -110,10 +110,10 @@ class Walk(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=1, input_dim=1, output_dim=1)
-        self.state.lower_bound[:] = [0.0]
-        self.state.upper_bound[:] = [5.0]
-        self.inputs["u"].lower_bound[:] = [-1.0]
-        self.inputs["u"].upper_bound[:] = [1.0]
+        self.state.lower[:] = [0.0]
+        self.state.upper[:] = [5.0]
+        self.inputs["u"].lower[:] = [-1.0]
+        self.inputs["u"].upper[:] = [1.0]
 
     def step(self, x, u, k=0, params=None):
         return np.clip(x + u, 0.0, 5.0)
@@ -180,10 +180,10 @@ def grid_world(**fields):
     class Walker(StepSystem):
         def __init__(self):
             super().__init__(state_dim=2, input_dim=2, output_dim=2)
-            self.state.lower_bound[:] = [0.0, 0.0]
-            self.state.upper_bound[:] = [6.0, 6.0]
-            self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-            self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+            self.state.lower[:] = [0.0, 0.0]
+            self.state.upper[:] = [6.0, 6.0]
+            self.inputs["u"].lower[:] = [-1.0, -1.0]
+            self.inputs["u"].upper[:] = [1.0, 1.0]
 
         def step(self, x, u, k=0, params=None):
             return np.clip(x + u, 0.0, 6.0)

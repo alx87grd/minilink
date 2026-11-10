@@ -83,14 +83,14 @@ class LookupPolicy(System):
         # Ports: their bounds mirror the grid's domain (plot sweeps and color limits)
         X = grid.X
         U = grid.U
-        self.add_input_port("x", dim=n, lower_bound=X.lower, upper_bound=X.upper)
+        self.add_input_port("x", dim=n, lower=X.lower, upper=X.upper)
         self.add_output_port(
             "u",
             dim=m,
             function=self.ctl,
             dependencies=("x",),
-            lower_bound=U.box.lower,
-            upper_bound=U.box.upper,
+            lower=U.box.lower,
+            upper=U.box.upper,
         )
 
     def action(self, x, t=0.0, params=None) -> np.ndarray:

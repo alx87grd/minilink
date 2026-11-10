@@ -17,10 +17,10 @@ class Walker(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=2, output_dim=2)
-        self.state.lower_bound[:] = [0.0, 0.0]
-        self.state.upper_bound[:] = [SIZE - 1.0, SIZE - 1.0]
-        self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-        self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+        self.state.lower[:] = [0.0, 0.0]
+        self.state.upper[:] = [SIZE - 1.0, SIZE - 1.0]
+        self.inputs["u"].lower[:] = [-1.0, -1.0]
+        self.inputs["u"].upper[:] = [1.0, 1.0]
         self.params = {"wall": np.array(WALL)}
 
     def step(self, x, u, k=0, params=None):

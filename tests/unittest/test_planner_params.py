@@ -24,8 +24,8 @@ X_UP = np.array([np.pi, 0.0])
 
 def bounded_pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-np.pi, -6.0])
-    plant.state.upper_bound = np.array([np.pi, 6.0])
+    plant.state.lower = np.array([-np.pi, -6.0])
+    plant.state.upper = np.array([np.pi, 6.0])
     return plant
 
 

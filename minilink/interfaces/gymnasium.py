@@ -297,20 +297,20 @@ class SB3Controller(System):
         if sys is not None:
             x_labels = list(sys.state.labels)
             x_units = list(sys.state.units)
-            x_lb, x_ub = sys.state.lower_bound, sys.state.upper_bound
+            x_lb, x_ub = sys.state.lower, sys.state.upper
             if "u" in sys.inputs:
                 u_labels = list(sys.inputs["u"].labels)
                 u_units = list(sys.inputs["u"].units)
-                u_lb = sys.inputs["u"].lower_bound
-                u_ub = sys.inputs["u"].upper_bound
+                u_lb = sys.inputs["u"].lower
+                u_ub = sys.inputs["u"].upper
 
         self.add_input_port(
             "x",
             dim=n,
             labels=x_labels,
             units=x_units,
-            lower_bound=x_lb,
-            upper_bound=x_ub,
+            lower=x_lb,
+            upper=x_ub,
         )
         self.add_output_port(
             "u",
@@ -319,8 +319,8 @@ class SB3Controller(System):
             dependencies=("x",),
             labels=u_labels,
             units=u_units,
-            lower_bound=u_lb,
-            upper_bound=u_ub,
+            lower=u_lb,
+            upper=u_ub,
         )
 
     def action(self, x) -> np.ndarray:

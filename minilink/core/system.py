@@ -237,8 +237,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new input port to the system.
@@ -260,8 +260,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def add_output_port(
@@ -274,8 +274,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new output port to the system.
@@ -304,8 +304,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def rename_ports(self, **names):
