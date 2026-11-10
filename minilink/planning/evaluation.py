@@ -284,8 +284,10 @@ def plant_run_of(problem, traj):
     sizes = (int(traj.x.shape[0]), int(traj.u.shape[0]))
     if traj.signals:
         raise ValueError(
-            "a trajectory with recorded signals and no 'plant' role: score the loop's "
-            "run from problem.compile(...).trajectory(), or pass traj.of('plant')"
+            "a trajectory with recorded signals and no 'plant' role: score a loop's "
+            "run as its diagram returned it (it names its plant), and the plant's own "
+            "run, a planner's plan included, without its signals: "
+            "Trajectory(traj.t, traj.x, traj.u)"
         )
     if sizes != (int(plant.n), int(plant.m)):
         raise ValueError(

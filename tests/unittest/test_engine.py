@@ -377,6 +377,13 @@ def test_evaluate_trajectory_scores_the_plant_run_of_a_loop_or_a_logged_run():
     with pytest.raises(ValueError, match="plant's"):
         evaluate_trajectory(problem, Trajectory(traj.t, traj.x, traj.u))
 
+    # A plan that carries its own cost signals is scored by the line the refusal names
+    plan = traj.of("plant").with_cost(problem.cost)
+    with pytest.raises(ValueError, match=r"Trajectory\(traj.t, traj.x, traj.u\)"):
+        evaluate_trajectory(problem, plan)
+    bare = evaluate_trajectory(problem, Trajectory(plan.t, plan.x, plan.u)).J
+    np.testing.assert_array_equal(bare, logged)
+
 
 @pytest.mark.jax
 def test_evaluate_trajectory_agrees_on_numpy_and_jax_with_an_exit_and_a_divergence():
