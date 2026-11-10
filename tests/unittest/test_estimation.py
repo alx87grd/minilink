@@ -361,3 +361,26 @@ def test_what_closed_loop_refuses_with_an_observer():
         closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, observer=LowPassFilter())
     with pytest.raises(ValueError, match="pass it as observer="):
         closed_loop(lqr(plant, np.eye(2), np.eye(1)), plant, filter=observer())
+
+
+@pytest.mark.parametrize("design", ["lqr", "lqr_finite_horizon", "kalman", "lqg"])
+def test_a_riccati_design_refuses_a_discrete_time_model(design):
+    """The continuous Riccati equation on a discretized plant gives an unstable gain: each design refuses it."""
+    from minilink.analysis.discretization import discretize
+    from minilink.control.design import lqr_finite_horizon, place
+
+    plant = discretize(Pendulum(), 0.1)
+    I2 = np.eye(2)
+    I1 = np.eye(1)
+    calls = {
+        "lqr": lambda: lqr(plant, I2, I1),
+        "lqr_finite_horizon": lambda: lqr_finite_horizon(plant, I2, I1, I2, 1.0),
+        "kalman": lambda: kalman(plant, I2, I2),
+        "lqg": lambda: lqg(plant, I2, I1, I2, I2),
+    }
+
+    with pytest.raises(ValueError, match="discrete-time model"):
+        calls[design]()
+
+    # The poles of a discrete-time model are placed in z, as before
+    assert place(plant, [0.5, 0.6]) is not None

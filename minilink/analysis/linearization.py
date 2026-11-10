@@ -394,6 +394,17 @@ def require_design_system(sys):
         )
 
 
+def require_continuous_model(model, verb):
+    """Refuse a Riccati design on a discrete-time model, naming the design that runs on a clock."""
+    if isinstance(model, (StepSystem, DiscreteLTISystem)):
+        raise ValueError(
+            f"{verb} solves the continuous-time Riccati equation, and {model.name!r} is "
+            "a discrete-time model: design on the continuous plant, and put the law on "
+            "a clock (law % dt). place and luenberger read their poles in z on a "
+            "discrete-time model"
+        )
+
+
 def require_measured_output(sys):
     """Refuse an observer design on a plant without a measured output ``y``."""
     if "y" not in sys.outputs:

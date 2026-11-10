@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.analysis.linearization import design_model
+from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import care
 from minilink.control.design import lqr_gain_schedule
 from minilink.control.state import (
@@ -55,6 +55,7 @@ def lqr_matrices(
     """
     # A = ∂f/∂x and B = ∂f/∂u at (x̄, ū, t), B over the command port alone
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    require_continuous_model(model, "LQRPlanner")
     A = model.A()
     B = model.B()
 

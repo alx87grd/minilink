@@ -4,7 +4,7 @@ import re
 
 import numpy as np
 
-from minilink.analysis.linearization import design_model
+from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import care
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
@@ -100,6 +100,7 @@ def kalman(
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
+    require_continuous_model(model, "kalman")
     A = model.A()
     C = model.C()
 

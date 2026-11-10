@@ -4,7 +4,7 @@ import numpy as np
 from scipy.signal import place_poles
 
 from minilink.analysis.derivatives import jacobian
-from minilink.analysis.linearization import design_model
+from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import (
     care,
     hamiltonian_matrix,
@@ -104,6 +104,7 @@ def lqr(
         central-difference step, as in :func:`~minilink.analysis.linearize`.
     """
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    require_continuous_model(model, "lqr")
     A = model.A()
     B = model.B()
 
@@ -256,6 +257,7 @@ def lqr_finite_horizon(
     require_after(after)
 
     model = design_model(sys, x_bar, u_bar, t, params, method=method, eps=eps)
+    require_continuous_model(model, "lqr_finite_horizon")
     A = model.A()
     B = model.B()
 
@@ -300,6 +302,8 @@ def trajectory_lqr(
     eps : float, optional
         Central-difference step.
     """
+    require_continuous_model(sys, "trajectory_lqr")
+
     t = np.asarray(trajectory.t, dtype=float).reshape(-1)
     X = np.asarray(trajectory.x, dtype=float).T
     U = np.asarray(trajectory.u, dtype=float).T
