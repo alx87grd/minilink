@@ -732,7 +732,7 @@ class ReinforcementLearningPlanner(Planner):
             method=type(self.algorithm).__name__,
             n_timesteps=self.n_timesteps,
             train_time_s=self.train_time_s,
-            cost=-self.last_ep_return_mean,
+            episode_cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,
             gamma=float(self.gamma),
@@ -759,8 +759,8 @@ class ReinforcementLearningRecord:
     """
     The training facts of a learned law: plant steps, training time, and the last mean episode cost.
 
-    ``cost`` is the mean episode cost ``J`` of the last collection, positive
-    and falling. ``history`` holds one dict per learning iteration
+    ``episode_cost`` is the mean episode cost ``J`` of the last collection,
+    positive and falling. ``history`` holds one dict per learning iteration
     (``n_timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
     training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
@@ -771,7 +771,7 @@ class ReinforcementLearningRecord:
     method: str
     n_timesteps: int
     train_time_s: float
-    cost: float
+    episode_cost: float
     weights_finite: bool
     history: list
     gamma: float | None = None
@@ -797,7 +797,7 @@ class ReinforcementLearningRecord:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
             f"{self.method}: {self.n_timesteps} plant steps in "
-            f"{self.train_time_s:.1f} s, mean episode cost {self.cost:.2f}; trained on "
+            f"{self.train_time_s:.1f} s, mean episode cost {self.episode_cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
         )
         if self.discount_differs:

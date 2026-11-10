@@ -273,6 +273,13 @@ RETIRED_NAMES = {
     "minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.result": (
         "planner.tables, the latest solution's"
     ),
+    "minilink.planning.search.rrt.TreeSearchRecord.cost": "path_cost",
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.cost": (
+        "episode_cost"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningRecord.cost": (
+        "episode_cost"
+    ),
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
         "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
     ),

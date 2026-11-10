@@ -428,6 +428,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     value iteration and on the tabular learner, one meaning on both, the latest solution's
     (`None` before a solve). The tabular learner's `result` was the table as it stands: that is
     `planner.greedy_tables` (`J = min Q`, `pi = argmin Q` of the live `planner.Q`).
+  - *A record's cost, named by its quantity.* RRT's (and RRT*'s) `record.cost` →
+    `record.path_cost`; the tabular and the neural learners' `record.cost` →
+    `record.episode_cost` (the mean episode cost at the end of training). The objective at
+    the solution keeps `cost`: the `Optimizer`'s result, trajectory optimization's and MPPI's
+    records.
 
 ## 3. Maturity (TRL)
 

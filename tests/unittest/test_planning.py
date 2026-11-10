@@ -1197,7 +1197,7 @@ def test_rrt_star_reaches_goal():
     solution = planner.solve()
     traj = solution.trajectory
     assert solution.record.reached_goal and solution.success
-    assert solution.record.cost == planner.best_goal_cost
+    assert solution.record.path_cost == planner.best_goal_cost
     assert solution.record.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))

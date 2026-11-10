@@ -223,7 +223,7 @@ class RRTPlanner(Planner):
             reached_goal=bool(reached_goal),
             n_iterations=int(n_iterations),
             n_nodes=len(self.tree.nodes),
-            cost=float("nan") if node is None else float(node.cost),
+            path_cost=float("nan") if node is None else float(node.cost),
             converged=False,
             history=[],
         )
@@ -470,12 +470,12 @@ class RRTPlanner(Planner):
 
 @dataclass(frozen=True)
 class TreeSearchRecord:
-    """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come."""
+    """Whether the goal was reached, how much of the budget the search took, and the path's cost-to-come, ``path_cost``."""
 
     reached_goal: bool
     n_iterations: int
     n_nodes: int
-    cost: float
+    path_cost: float
     converged: bool
     history: list
 
@@ -490,7 +490,7 @@ class TreeSearchRecord:
         outcome = "goal reached" if self.reached_goal else "goal not reached"
         text = (
             f"{outcome} after {self.n_iterations} extensions ({self.n_nodes} nodes), "
-            f"path cost {self.cost:.4g}"
+            f"path cost {self.path_cost:.4g}"
         )
         if self.converged:
             text += ", converged"

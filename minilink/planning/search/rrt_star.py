@@ -243,13 +243,15 @@ class RRTStarPlanner(RRTPlanner):
     def search_record(self, reached_goal, n_iterations):
         """The RRT* record: the best goal cost, and whether patience declared convergence."""
         record = super().search_record(reached_goal, n_iterations)
-        cost = (
-            record.cost if self.best_goal_cost is None else float(self.best_goal_cost)
+        path_cost = (
+            record.path_cost
+            if self.best_goal_cost is None
+            else float(self.best_goal_cost)
         )
 
         return replace(
             record,
-            cost=cost,
+            path_cost=path_cost,
             converged=bool(self.converged),
             history=list(self.history),
         )

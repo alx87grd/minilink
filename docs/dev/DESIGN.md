@@ -1298,7 +1298,9 @@ plant`, and a finite-horizon law reads the time (`u = pi(x, t)`); an open-loop p
 source (trajectory optimization, MPPI, RRT) is a `TrajectorySource` `u = pi(t)`,
 `controller >> plant` (`solution.open_loop`); on a step problem the law ticks with the
 plant; the `record` (one
-frozen dataclass per planner with `success` and a one-line `str`; the solution's
+frozen dataclass per planner with `success` and a one-line `str`, its cost named by its
+quantity: RRT's `path_cost`, the learners' `episode_cost`, the objective `cost` at the
+solution of trajectory optimization and MPPI, as on the `Optimizer`'s result; the solution's
 `family` names the method; the LQR's `RiccatiRecord` ends its `str` with "U ignored" when the problem's `U`
 bounds the command, since the Riccati law never reads `U` (LQR never
 warns)); the

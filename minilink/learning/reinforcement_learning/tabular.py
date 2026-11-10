@@ -376,7 +376,7 @@ class TabularLearningPlanner(Planner):
 
         # The mean cost of the last tenth of the episodes, the last one at least
         last = [record["cost"] for record in history[-max(len(history) // 10, 1) :]]
-        cost = float(np.mean(last)) if last else float("nan")
+        episode_cost = float(np.mean(last)) if last else float("nan")
 
         table_finite = bool(np.all(np.isfinite(Q)))
 
@@ -384,7 +384,7 @@ class TabularLearningPlanner(Planner):
             method=method,
             n_episodes=len(history),
             visited_fraction=visited_fraction,
-            cost=cost,
+            episode_cost=episode_cost,
             table_finite=table_finite,
             history=list(history),
             tables=tables,
@@ -484,12 +484,17 @@ class TabularLearningPlanner(Planner):
 
 @dataclass(frozen=True)
 class TabularLearningRecord:
-    """Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``)."""
+    """
+    Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``).
+
+    ``episode_cost`` is the mean cost of the last tenth of the episodes (the
+    last one at least); ``history`` holds each episode's ``cost``.
+    """
 
     method: str
     n_episodes: int
     visited_fraction: float
-    cost: float
+    episode_cost: float
     table_finite: bool
     history: list
     tables: ValueTables | None = field(default=None, repr=False, compare=False)
@@ -504,7 +509,7 @@ class TabularLearningRecord:
     def __str__(self) -> str:
         return (
             f"{self.method}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
-            f"the grid visited, mean episode cost {self.cost:.2f} at the end"
+            f"the grid visited, mean episode cost {self.episode_cost:.2f} at the end"
         )
 
 
