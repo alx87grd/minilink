@@ -375,7 +375,7 @@ def validate_equation_shapes(system, label=None):
         raise ValueError(
             f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
         )
-    u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
+    u0 = np.asarray(system.u_nominal, dtype=float).reshape(-1)
 
     if isinstance(system, DynamicSystem) and n > 0:
         require_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")

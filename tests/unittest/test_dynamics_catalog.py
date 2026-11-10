@@ -1078,7 +1078,7 @@ def method_args(plant, method):
     """A state and input off the nominal ones; the joint angles for the kinematics."""
     rng = np.random.default_rng(0)
     x0 = np.asarray(plant.x0, dtype=float)
-    u0 = np.asarray(plant.get_u_from_input_ports(), dtype=float)
+    u0 = np.asarray(plant.u_nominal, dtype=float)
     x = x0 + 0.3 * rng.standard_normal(x0.shape)
     u = u0 + 0.5 + 0.3 * rng.standard_normal(u0.shape)
     if method in ("forward_kinematics", "J", "forward_kinematic_effector"):

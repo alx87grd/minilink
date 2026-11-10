@@ -144,7 +144,7 @@ def boundary_point(set_: object | None) -> np.ndarray | None:
 
 def nominal_input(sys, n_samples: int) -> np.ndarray:
     """Return the system nominal input repeated on a time grid."""
-    u0 = sys.get_u_from_input_ports()
+    u0 = sys.u_nominal
     u0_column = np.asarray(u0, dtype=float).reshape(sys.m, 1)
     U = np.repeat(u0_column, n_samples, axis=1)
 

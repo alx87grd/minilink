@@ -697,7 +697,7 @@ class DynamicProgrammingPlanner(Planner):
             return result
 
         # The action nearest the system's nominal input
-        u_nominal = self.problem.sys.get_u_from_input_ports()
+        u_nominal = self.problem.sys.u_nominal
         default_action = self.grid.nearest_action(u_nominal)
 
         # Nodes from which leaving the admissible set is unavoidable

@@ -204,7 +204,7 @@ def plot_control_law(
     # The command component, with every input at its nominal value and r pinned
     output = block.outputs[roles.control]
     u_axis = require_axis(u_axis, output.dim, "u_axis")
-    u_base = block.get_u_from_input_ports().astype(float)
+    u_base = block.u_nominal.astype(float)
     if roles.ref is not None:
         u_base[block.get_input_port_slice(roles.ref)] = rbar
 
@@ -456,7 +456,7 @@ def build_spec(
 ) -> PortMapSpec:
     """The spec of ``output[out_axis]`` swept over ``axes``, with its labels and limits."""
     # The pinned point: the nominal inputs (or u_base) and the block's x0
-    u_base = block.get_u_from_input_ports().astype(float) if u_base is None else u_base
+    u_base = block.u_nominal.astype(float) if u_base is None else u_base
     x_base = np.asarray(block.x0, dtype=float).copy()
 
     x_values, y_values, U = evaluate_axes(

@@ -197,7 +197,7 @@ class Plane2D(MechanicalSystem):
         l_t = params["l_t"]
 
         # Without u, the control surfaces read the input port's nominal value
-        u = self.get_u_from_input_ports() if u is None else u
+        u = self.u_nominal if u is None else u
         speed, gamma, alpha = self.velocity_vector(q, dq)
         delta = u[1]
         L_w, D_w, M_w, L_t, D_t, M_t = self.aerodynamic_forces(
@@ -737,7 +737,7 @@ class Plane3D(GeneralizedMechanicalSystem):
         xp = array_module(v)
 
         # Without u, the control surfaces read the input port's nominal value
-        u = self.get_u_from_input_ports() if u is None else u
+        u = self.u_nominal if u is None else u
         speed, alpha, beta = self.velocity_angles(v)
         delta_e = u[1]
         delta_a = u[2]

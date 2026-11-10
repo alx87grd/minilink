@@ -140,7 +140,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
   | A block's channel count (sources, white noise, routing, saturation, delay, the PID family, the impedance laws) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
   | The fixed-step time integration of `solver=` (the simulator, as `discretize` and the evaluators) | `"rk4"`, `"euler"` | `"rk4_fixedsteps"`, `"euler_fixedsteps"` |
-  | An author's reads: the input ports' values in `u`, by name; a recorded signal of a run | `sys.ports(u, "r", "y")`; `traj.signal(name)` | `get_port_values_from_u`, `get_signal` |
+  | An author's reads: the input ports' values in `u`, by name; their nominal values, stacked; a recorded signal of a run | `sys.ports(u, "r", "y")`; `sys.u_nominal`; `traj.signal(name)` | `get_port_values_from_u`, `get_u_from_input_ports`, `get_signal` |
   | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |
   | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
   | A port a keyword names (a source's output, a run's prescribed input); the run a plot draws | `port=`; `traj=` | `input_port_id=`; `rollout=` |

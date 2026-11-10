@@ -21,7 +21,7 @@ def policy_from_block(block):
 
     output = block.outputs[roles.command]
     measurement = block.get_input_port_slice(roles.measurement)
-    u_base = block.get_u_from_input_ports().astype(float)
+    u_base = block.u_nominal.astype(float)
     x_ctrl = np.asarray(block.x0, dtype=float)
 
     # The command of the block at t, the state on its measurement port

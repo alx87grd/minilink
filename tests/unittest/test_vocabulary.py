@@ -224,6 +224,9 @@ RETIRED_NAMES = {
         'backend="auto" (minilink.core.backends.BACKEND_AUTO)'
     ),
     "minilink.core.signals.InputPort.get_default_value": "port.nominal_value",
+    "minilink.core.system.System.get_u_from_input_ports": (
+        "sys.u_nominal (each input port's nominal_value, concatenated)"
+    ),
     "minilink.core.signals.VectorSignal.set_nominal_value": (
         "signal.nominal_value = value"
     ),

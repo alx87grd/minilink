@@ -1194,7 +1194,7 @@ class TestRolloutBatch(unittest.TestCase):
         self.x0s = self.rng.standard_normal((4, 2))
         self.dt = 0.02
         self.n_steps = 15
-        self.u_nominal = np.tile(self.sys.get_u_from_input_ports(), (self.n_steps, 1))
+        self.u_nominal = np.tile(self.sys.u_nominal, (self.n_steps, 1))
 
     def test_family_of_initial_states_under_the_nominal_input(self):
         xs = np.asarray(

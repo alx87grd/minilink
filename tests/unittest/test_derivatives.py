@@ -133,7 +133,7 @@ class TestJacobianValues(unittest.TestCase):
         plant.x0 = np.array([-3.0, 4.0])  # the simulation start plays no part
         plant.inputs["bias"].nominal_value = np.array([0.7])
         expected = plant.jacobian(
-            "f", "params", plant.state.nominal_value, plant.get_u_from_input_ports()
+            "f", "params", plant.state.nominal_value, plant.u_nominal
         )
         np.testing.assert_allclose(
             plant.jacobian("f", "params")["gain"], expected["gain"]

@@ -96,9 +96,7 @@ def region_of_attraction(
     # The equilibrium is found near the guess, not assumed; the held input defaults
     # to the nominal one
     x_bar = find_equilibrium(sys, x_bar, u_bar, t, params)
-    u_bar = np.asarray(
-        sys.get_u_from_input_ports() if u_bar is None else u_bar, dtype=float
-    )
+    u_bar = np.asarray(sys.u_nominal if u_bar is None else u_bar, dtype=float)
 
     # A = ∂f/∂x at the equilibrium, which must be Hurwitz
     A = np.asarray(jacobian(sys, "f", "x", x_bar, u_bar, t, params), dtype=float)

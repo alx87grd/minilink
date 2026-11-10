@@ -153,7 +153,7 @@ class RolloutEnvironment:
         # Input vector: the action fills its port, disturbances fill theirs
         self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
-        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
+        u_nominal = np.asarray(self.sys.u_nominal, dtype=float)
         self.nominal_inputs = self.sys.ports(u_nominal)
 
         # The cost a failure is charged: declared on the problem, else the model's cost

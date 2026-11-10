@@ -123,7 +123,7 @@ class LiveSignalPlotOutput(RealtimeOutput):
             dtype=float,
         ).reshape(sys.n)
         u_init = np.asarray(
-            sys.get_u_from_input_ports() if u0 is None else u0,
+            sys.u_nominal if u0 is None else u0,
             dtype=float,
         ).reshape(sys.m)
         t_init = float(t0)

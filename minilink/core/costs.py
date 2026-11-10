@@ -207,7 +207,7 @@ class QuadraticCost(CostFunction):
         if x_bar is None:
             x_bar = sys.state.nominal_value
         if u_bar is None:
-            u_bar = sys.get_u_from_input_ports()
+            u_bar = sys.u_nominal
 
         return cls(
             Q=np.eye(n) if Q is None else Q,

@@ -494,7 +494,7 @@ def x_ref_of(sys, x_ref) -> np.ndarray:
 def u_of(sys, u) -> np.ndarray:
     """The held input: ``u``, else the input ports' values."""
     if u is None:
-        value = sys.get_u_from_input_ports()
+        value = sys.u_nominal
     else:
         value = u
     arr = np.asarray(value, dtype=float).reshape(-1)

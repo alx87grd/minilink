@@ -39,7 +39,7 @@ def coerce_forced_input(sys, times, u, port=None):
     port_slice = sys.get_input_port_slice(port_id)
 
     # The other ports held at their nominal values, the forced port's rows replaced
-    u_nominal = sys.get_u_from_input_ports().reshape(sys.m, 1)
+    u_nominal = sys.u_nominal.reshape(sys.m, 1)
     u_traj = np.repeat(u_nominal, n_pts, axis=1)
     u_traj[port_slice, :] = coerce_forced_signal(
         u,

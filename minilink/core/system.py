@@ -345,12 +345,14 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return self
 
-    def get_u_from_input_ports(self):
+    @property
+    def u_nominal(self):
         """
-        Concatenated default values of all input ports.
+        The input ports' nominal values, concatenated in port order (read-only).
 
-        This is the disconnected / nominal fallback used for standalone
-        systems and for the evaluator IVP tier.
+        This is what an unconnected port reads: the input of a standalone
+        system and of the evaluator's IVP tier. It is not an operating point
+        (``u_bar``, which a linearization carries in its ``params``).
         """
         u = np.zeros(self.m)
 

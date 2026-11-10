@@ -36,9 +36,7 @@ class DiagramEvaluator(ContinuousEvaluator):
 
     def __init__(self, plan: ExecutionPlan, diagram, backend="numpy", verbose=False):
         p = sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
-        super().__init__(
-            plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
-        )
+        super().__init__(plan.state_dim, diagram.m, p, backend, diagram.u_nominal)
         self.plan = plan
         self._frozen_params = every_subsystem(
             {

@@ -254,7 +254,7 @@ class PygameInput(RealtimeInput):
             except Exception:
                 self._font = None
 
-        u0 = np.asarray(sys.get_u_from_input_ports(), dtype=float)
+        u0 = np.asarray(sys.u_nominal, dtype=float)
         self._u_cmd = np.clip(u0, self._clip_lower, self._clip_upper)
         self._last_poll_s = None
         self.draw_overlay(self._u_cmd, force=True)

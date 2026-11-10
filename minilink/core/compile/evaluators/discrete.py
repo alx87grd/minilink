@@ -157,9 +157,7 @@ class StepEvaluator(DiscreteEvaluator):
     def __init__(self, system: StepSystem, backend="numpy", verbose=False):
         if not isinstance(system, StepSystem):
             raise TypeError("StepEvaluator requires a StepSystem")
-        super().__init__(
-            system.n, system.m, system.p, backend, system.get_u_from_input_ports()
-        )
+        super().__init__(system.n, system.m, system.p, backend, system.u_nominal)
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params
@@ -232,9 +230,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         self, plan: StepExecutionPlan, diagram, backend="numpy", verbose=False
     ):
         p = sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
-        super().__init__(
-            plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
-        )
+        super().__init__(plan.state_dim, diagram.m, p, backend, diagram.u_nominal)
         self.plan = plan
         self.dtype = self.xp.float64
         self._frozen_params = every_subsystem(
@@ -425,7 +421,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             diagram.m,
             p,
             backend,
-            diagram.get_u_from_input_ports(),
+            diagram.u_nominal,
         )
         self.plan = plan
         self.dtype = self.xp.float64

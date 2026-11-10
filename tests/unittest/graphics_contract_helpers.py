@@ -11,7 +11,7 @@ def resolve_draw_frame(system, x=None, u=None, t=0.0):
     x = np.asarray(system.x0 if x is None else x, dtype=float)
     if x.shape != (system.n,):
         x = np.zeros(system.n)
-    u = system.get_u_from_input_ports() if u is None else np.asarray(u, dtype=float)
+    u = system.u_nominal if u is None else np.asarray(u, dtype=float)
     animator = Animator(system)
     kinematic = system.get_kinematic_geometry()
     return animator.resolve_frame(x, u, t, kinematic=kinematic)

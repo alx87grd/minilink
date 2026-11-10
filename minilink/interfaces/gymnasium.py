@@ -138,7 +138,7 @@ class Sys2Gym(gym.Env):
 
         # Memory
         self.x = np.asarray(sys.x0, dtype=float).copy()
-        self.u = sys.get_u_from_input_ports()
+        self.u = sys.u_nominal
         self.t = t0
 
         if self.render_mode == "human":
@@ -174,7 +174,7 @@ class Sys2Gym(gym.Env):
         else:
             self.x = np.asarray(self.x0.sample(self.np_random), dtype=float)
 
-        self.u = self.sys.get_u_from_input_ports()
+        self.u = self.sys.u_nominal
         self.t = self.t0
 
         y = np.asarray(
@@ -356,7 +356,7 @@ class ProblemEnv(Sys2Gym):
     def reset(self, seed=None, options=None):
         gym.Env.reset(self, seed=seed)  # seeds np_random; the problem draws the start
         self.x = np.asarray(self.problem.sample_x0(self.np_random), dtype=float)
-        self.u = self.sys.get_u_from_input_ports()
+        self.u = self.sys.u_nominal
         self.t = self.t0
         y = np.asarray(
             self.sys.h(self.x, self.u, self.t), dtype=self.observation_space.dtype
