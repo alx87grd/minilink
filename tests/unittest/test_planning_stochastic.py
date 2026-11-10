@@ -760,7 +760,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
         z = step_body(f_aug, z, u[:, k], u[:, k + 1], t[k], dt, "rk4", 1)
     J_hand = z[2] + cost.h(z[:2], t[-1])
     evaluator = plant.compile(backend="numpy", verbose=False)
-    xs = evaluator.rollout(problem.x0, u.T, 0.0, dt, hold="foh")
+    xs = evaluator.rollout(problem.x0, u.T, 0.0, dt, hold="linear")
     np.testing.assert_allclose(xs[-1], z[:2], rtol=1e-12)
     trapezoid = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
     np.testing.assert_allclose(trapezoid, J_hand, rtol=2e-2)
@@ -777,12 +777,12 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     np.testing.assert_allclose(reports["numpy", "scipy"].J, J_hand, rtol=1e-3)
 
     # a held (zero-order) replay keeps each sample until the next
-    held = TrajectorySource(t, u, interpolation="previous")
+    held = TrajectorySource(t, u, hold="zoh")
     empty = np.zeros(0)
     np.testing.assert_allclose(held.h(empty, empty, 0.15), u[:, 1])
     np.testing.assert_allclose(source.h(empty, empty, 0.15), 0.5 * (u[:, 1] + u[:, 2]))
     with pytest.raises(ValueError):
-        TrajectorySource(t, u, interpolation="cubic")
+        TrajectorySource(t, u, hold="cubic")
 
 
 def jax_available():

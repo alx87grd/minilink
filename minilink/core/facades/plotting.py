@@ -408,7 +408,7 @@ class StepPlotting(LinearPlotting):
 
     def plot_rollout(
         self,
-        rollout=None,
+        traj=None,
         *,
         signals=None,
         renderer="matplotlib",
@@ -417,8 +417,8 @@ class StepPlotting(LinearPlotting):
         """
         Convenience shortcut to plot sampled step signals.
 
-        If the rollout is not computed yet, it must be provided or available on
-        :attr:`traj` (the last :meth:`compute_rollout`).
+        ``traj`` is the rollout to plot; ``None`` reads :attr:`traj`, the last
+        :meth:`compute_rollout`.
         """
         # A real cycle through minilink.core.system
         from minilink.graphical.signals import (
@@ -432,13 +432,13 @@ class StepPlotting(LinearPlotting):
             signals = resolve_plot_signals(self)
 
         # The rollout passed, else the last one computed
-        if rollout is None:
-            rollout = self.traj
-        require_rollout(rollout)
+        if traj is None:
+            traj = self.traj
+        require_rollout(traj)
 
         return plot_time_signals(
             self,
-            rollout,
+            traj,
             signals=signals,
             abscissa_label=(
                 STEP_ABSCISSA_LABEL
@@ -459,5 +459,5 @@ def require_rollout(rollout):
     """Refuse a missing rollout: none was passed and none was computed."""
     if rollout is None:
         raise ValueError(
-            "No rollout available; pass rollout=... or call compute_rollout first."
+            "No rollout available; pass traj=... or call compute_rollout first."
         )

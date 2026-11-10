@@ -1292,7 +1292,7 @@ def test_the_two_backends_agree_on_every_knob():
         us = held_inputs_of(ev_np)
         for solver in ("rk4", "euler"):
             for substeps in (1, 3):
-                for hold in ("zoh", "foh"):
+                for hold in ("zoh", "linear"):
                     seq = us if hold == "zoh" else np.vstack([us, us[-1:]])
                     a = ev_np.rollout(
                         x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold

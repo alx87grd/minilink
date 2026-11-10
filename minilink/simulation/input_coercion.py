@@ -7,7 +7,7 @@ import numpy as np
 ###############################################################################
 
 
-def coerce_forced_input(sys, times, u, input_port_id=None):
+def coerce_forced_input(sys, times, u, port=None):
     """Return the sampled ``(m, n_pts)`` input matrix for a forced simulation.
 
     A run's ``u=`` accepts a callable ``u(t)``, a constant scalar or
@@ -23,19 +23,20 @@ def coerce_forced_input(sys, times, u, input_port_id=None):
         Time samples; callables are evaluated at each entry.
     u : callable, scalar, or array_like
         Full input ``u(t)`` / constant / ``(dim, n_pts)`` matrix — for the
-        whole input vector, or for one port when ``input_port_id`` is given.
-    input_port_id : str, optional
+        whole input vector, or for one port when ``port`` is given.
+    port : str, optional
         Name of the single forced input port.
     """
     n_pts = len(times)
 
     # The whole input vector forced
-    if input_port_id is None:
+    if port is None:
         return coerce_forced_signal(u, sys.m, times, "u")
 
     # One port forced
-    port = sys.inputs[input_port_id]
-    port_slice = sys.get_input_port_slice(input_port_id)
+    port_id = port
+    port = sys.inputs[port_id]
+    port_slice = sys.get_input_port_slice(port_id)
 
     # The other ports held at their nominal values, the forced port's rows replaced
     u_nominal = sys.get_u_from_input_ports().reshape(sys.m, 1)
@@ -44,7 +45,7 @@ def coerce_forced_input(sys, times, u, input_port_id=None):
         u,
         port.dim,
         times,
-        f"u for input port '{input_port_id}'",
+        f"u for input port '{port_id}'",
     )
 
     return validate_forced_u_traj(u_traj, sys.m, n_pts)

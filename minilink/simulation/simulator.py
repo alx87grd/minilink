@@ -220,7 +220,7 @@ class Simulator:
     def __str__(self):
         return simulator_text(self)
 
-    def solve(self, *, u=None, input_port_id=None, params=None, record=()):
+    def solve(self, *, u=None, port=None, params=None, record=()):
         """
         Run the simulation over ``self.t``: the nominal input, or ``u`` prescribed.
 
@@ -228,7 +228,7 @@ class Simulator:
         evaluator; else a sampled matrix ``(m, n_samples)``, a function ``u(t)``, a
         constant vector, or a scalar for a one-input system. A sampled input is
         held over each sample period and a function of time is read where the
-        solver evaluates ``f``, on every solver; ``input_port_id`` prescribes one
+        solver evaluates ``f``, on every solver; ``port`` prescribes one
         port and keeps the others at their nominal values. ``params=None`` runs
         on the numbers taken when the simulator was built (the compiled form); a
         tree, the system's complete tree at other numbers (``p = sim.params``, a
@@ -277,7 +277,7 @@ class Simulator:
             sys = self.sys
 
             def u_of_t(t):
-                return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
+                return coerce_forced_input(sys, np.array([t]), u, port)[:, 0]
 
             x_traj = self.solver_backend.integrate_input(
                 self.evaluator,
@@ -287,14 +287,10 @@ class Simulator:
                 args=self.solver_backend_options,
                 params=params,
             )
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
         else:
             # A sampled input, each sample held over its period
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
             x_traj = self.solver_backend.integrate_forced(
                 self.evaluator,
                 self.t,

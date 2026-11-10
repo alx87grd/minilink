@@ -289,7 +289,7 @@ class ContinuousEvaluator(Evaluator):
         """``[x_0, …, x_N]``, shape ``(N + 1, n)``: the step model run over ``u_seq``.
 
         ``hold="zoh"`` holds each row of ``u_seq`` (shape ``(N, m)``) over its
-        period; ``hold="foh"`` reads ``u_seq`` as ``N + 1`` knots, linear between
+        period; ``hold="linear"`` reads ``u_seq`` as ``N + 1`` knots, linear between
         them. ``u_seq=None`` holds the nominal input for ``n_steps`` periods.
         ``record`` (a diagram's) names signals kept from each step's own first
         stage, ``"block:port"`` or a block's input ``"block:u"``: the run then
@@ -394,7 +394,7 @@ class ContinuousEvaluator(Evaluator):
         """The input sequence as a ``(rows, m)`` array; the nominal input repeated when None."""
         xp = self.xp
         if u_seq is None:
-            rows = int(n_steps) + (1 if hold == "foh" else 0)
+            rows = int(n_steps) + (1 if hold == "linear" else 0)
             return xp.tile(xp.asarray(self._u_nominal, dtype=float), (rows, 1))
 
         u_seq = xp.asarray(u_seq, dtype=float)

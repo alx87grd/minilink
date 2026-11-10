@@ -413,9 +413,7 @@ class RRTPlanner(Planner):
         self, trajectory: Trajectory, evaluate, n_trials
     ) -> PlanningSolution:
         """The path as a solution: its input held by a source block, the search's record, scored when asked."""
-        controller = open_loop_controller_of(
-            trajectory, self.problem.sys, interpolation="previous"
-        )
+        controller = open_loop_controller_of(trajectory, self.problem.sys, hold="zoh")
 
         # Scored over the problem's draws, on the path's median time step
         evaluation = None

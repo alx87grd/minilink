@@ -101,7 +101,7 @@ n_samples = 400
 ts = dt * jnp.arange(n_samples)
 rs = 1.2 * jnp.sin(0.8 * ts).reshape(-1, 1)
 x0 = jnp.array([0.5, 0.0])
-xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="foh")
+xs = true_evaluator.rollout(x0, rs, 0.0, dt, hold="linear")
 
 # "Measured" state derivatives (in practice: numerical differentiation of
 # logged states; here taken from the true model).

@@ -463,7 +463,7 @@ class CompiledMPPIPlanner:
             success=bool(status.get("success", True)),
         )
         controller = open_loop_controller_of(
-            trajectory, self.planner.problem.sys, interpolation="previous"
+            trajectory, self.planner.problem.sys, hold="zoh"
         )
 
         return PlanningSolution(

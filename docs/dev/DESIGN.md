@@ -1048,7 +1048,7 @@ host SLSQP) calls jitted `f`, Jacobian, objective and gradient.
 **The step model.** Every sampled consumer steps a continuous plant through `step` and
 `rollout`, written once (`core/compile/evaluators/stepping.py`) for both backends.
 `solver` is `"rk4"` or `"euler"`, `substeps` splits each period, `hold="zoh"` holds each
-row of `u_seq` (shape `(N, m)`) and `hold="foh"` reads `N + 1` knots, linear between
+row of `u_seq` (shape `(N, m)`) and `hold="linear"` reads `N + 1` knots, linear between
 them; `u_seq=None` holds the nominal input for `n_steps` periods; `rollout` returns
 `[x_0, …, x_N]`, `t_k = t₀ + k dt`. `discretize`, the RL environment, the gym bridge,
 value iteration (`StateSpaceGrid.successor`), shooting, the fixed-step solvers, RRT,
@@ -1813,7 +1813,7 @@ best-effort fallback (`return_best_effort`). The two swappable pieces are an inj
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly
 via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callable
 (nearest-neighbour distance). Every system is an ODE, so an `Edge` always carries real
-`(t,x,u)`; `solve() → PlanningSolution` with a held (`interpolation="previous"`)
+`(t,x,u)`; `solve() → PlanningSolution` with a held (`hold="zoh"`)
 `TrajectorySource` as its controller and a `TreeSearchRecord`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With

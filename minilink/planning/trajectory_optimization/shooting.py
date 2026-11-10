@@ -358,7 +358,7 @@ class ShootingTranscription(FixedGridTranscription):
                 dt = self.dt(problem)
 
                 # x_{k+1} = RK4(x_k, u_k, u_{k+1}), one row per knot, turned to columns
-                x_samples = evaluator.rollout(x0, u.T, t0, dt, params, hold="foh")
+                x_samples = evaluator.rollout(x0, u.T, t0, dt, params, hold="linear")
                 x = x_samples.T
 
                 return x

@@ -291,6 +291,14 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     takes `max_iterations=` and `tol=` on a native method the same way.
     `OptimizationResult.n_iterations` reads `stats["nit"]`; `stats["algorithm"]` →
     `stats["method"]`.
+  - *One word per idea, on the runs and the sources.* `step_sys.plot_rollout(rollout=)` →
+    `plot_rollout(traj=)`; `compute_trajectory(u=…, input_port_id="left")` and
+    `Simulator.solve(input_port_id=)` → `port="left"`, as the blocks say; the hold between
+    samples is one keyword and two words on the three tools that read it:
+    `TrajectorySource(t, u, interpolation="previous")` → `TrajectorySource(t, u, hold="zoh")`
+    (`"linear"` the default, `from_trajectory(hold=)` with it, `source.hold` the attribute),
+    and the step model's `evaluator.rollout(…, hold="foh")` → `hold="linear"`, as the noise
+    sources already said.
 
 ## 3. Maturity (TRL)
 

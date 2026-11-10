@@ -187,7 +187,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
     )
     solution = planner.solve()
     assert solution.success and solution.record.reached_goal
-    assert solution.open_loop and solution.controller.interpolation == "previous"
+    assert solution.open_loop and solution.controller.hold == "zoh"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
 

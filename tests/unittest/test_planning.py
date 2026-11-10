@@ -481,7 +481,9 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_evaluator_forced_rk4_rollout_matches_integrator(self):
         sys = self.make_single_integrator()
         evaluator = sys.compile(backend="numpy", verbose=False)
-        x = evaluator.rollout(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh")
+        x = evaluator.rollout(
+            np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="linear"
+        )
         np.testing.assert_allclose(x.reshape(-1), np.linspace(0.0, 1.0, 5))
 
     def test_live_trajectory_plot_callback_reuses_artists(self):

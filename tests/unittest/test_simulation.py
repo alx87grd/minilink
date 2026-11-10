@@ -291,7 +291,7 @@ class TestNewSimulator(unittest.TestCase):
         sim = Simulator(
             TwoPortLinearSystem(), tf=0.2, n_samples=3, solver="euler", verbose=False
         )
-        traj = sim.solve(u=5.0, input_port_id="left")
+        traj = sim.solve(u=5.0, port="left")
         np.testing.assert_allclose(traj.u[0, :], np.array([5.0, 5.0, 5.0]))
         np.testing.assert_allclose(traj.u[1, :], np.array([2.0, 2.0, 2.0]))
 
@@ -333,7 +333,7 @@ class TestNewSimulator(unittest.TestCase):
         sys = TwoPortLinearSystem()
         traj = sys.compute_trajectory(
             u=lambda t: 10.0 * t,
-            input_port_id="left",
+            port="left",
             tf=0.2,
             n_samples=3,
             solver="euler",

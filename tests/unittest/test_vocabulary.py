@@ -199,6 +199,8 @@ RETIRED = {
     "eta": ("learning_rate", ("TabularLearningPlanner",)),
     "train_time": ("train_time_s", None),
     "solver_success": ("optimizer_success", None),
+    "input_port_id": ("port", None),
+    "interpolation": ("hold", ("TrajectorySource",)),
     "options": (
         "n_steps",
         (
@@ -274,6 +276,21 @@ RETIRED_KEYWORDS = {
     "minilink.planning.trajectory_optimization.path_integral.steps_of": {
         "tf": "horizon"
     },
+    "minilink.core.facades.plotting.StepPlotting.plot_rollout": {"rollout": "traj"},
+    "minilink.core.facades.simulation.SystemSimulation.compute_trajectory": {
+        "input_port_id": "port"
+    },
+    "minilink.core.facades.simulation.DynamicSimulation.compute_trajectory": {
+        "input_port_id": "port"
+    },
+    "minilink.simulation.simulator.Simulator.solve": {"input_port_id": "port"},
+    "minilink.simulation.static_simulator.StaticSimulator.solve": {
+        "input_port_id": "port"
+    },
+    "minilink.blocks.sources.TrajectorySource.__init__": {"interpolation": "hold"},
+    "minilink.blocks.sources.TrajectorySource.from_trajectory": {
+        "interpolation": "hold"
+    },
 }
 
 
@@ -331,6 +348,25 @@ def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
     )
 
     assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
+
+
+# One hold vocabulary on the three tools that read samples between their times (AS-28): the
+# step model's rollout, the noise sources and the replay of a trajectory say "zoh" / "linear"
+RETIRED_HOLDS = {"foh": "linear", "previous": "zoh"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_HOLDS))
+def test_no_retired_hold(retired):
+    from minilink import Pendulum
+    from minilink.blocks import TrajectorySource
+
+    evaluator = Pendulum().compile(backend="numpy")
+    for refused in (
+        lambda: evaluator.rollout([0.0, 0.0], [[0.0], [0.0]], 0.0, 0.1, hold=retired),
+        lambda: TrajectorySource([0.0, 1.0], [0.0, 1.0], hold=retired),
+    ):
+        with pytest.raises(ValueError, match=RETIRED_HOLDS[retired]):
+            refused()
 
 
 # The optimizer's native numbers are keywords (api-stabilization AS-27): options= is the

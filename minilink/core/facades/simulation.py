@@ -35,7 +35,7 @@ class SystemSimulation:
         tf=10,
         u=None,
         *,
-        input_port_id=None,
+        port=None,
         t0=0,
         n_samples=None,
         dt=None,
@@ -58,7 +58,7 @@ class SystemSimulation:
             The prescribed input: a sampled matrix ``(m, N)`` (a column per
             sample, the layout of ``traj.u``), a function ``u(t)`` of the full
             input, a constant vector, or a scalar on a one-input system; ``None``
-            is the nominal input. With ``input_port_id`` it describes that one
+            is the nominal input. With ``port`` it describes that one
             port, the others at their nominal values.
         n_samples : int, optional
             Number of time samples on ``[t0, tf]``, endpoints included.
@@ -89,7 +89,7 @@ class SystemSimulation:
             backend=backend,
             verbose=verbose,
         )
-        traj = sim.solve(u=u, input_port_id=input_port_id)
+        traj = sim.solve(u=u, port=port)
 
         if show:
             # A real cycle through minilink.core.system
@@ -146,7 +146,7 @@ class DynamicSimulation:
         tf=10,
         u=None,
         *,
-        input_port_id=None,
+        port=None,
         t0=0,
         n_samples=None,
         dt=None,
@@ -174,7 +174,7 @@ class DynamicSimulation:
             vector, or a scalar on a one-input system; ``None`` is the nominal
             input. A sampled input is held over each sample period and a function
             of time is read where the solver evaluates ``f``, on every solver.
-        input_port_id : str, optional
+        port : str, optional
             The one input port ``u`` describes, the others kept at their nominal
             values.
         n_samples : int, optional
@@ -223,9 +223,7 @@ class DynamicSimulation:
             verbose=verbose,
             solver_warnings=solver_warnings,
         )
-        traj = sim.solve(
-            u=u, input_port_id=input_port_id, record=recorded_names_of(self, record)
-        )
+        traj = sim.solve(u=u, port=port, record=recorded_names_of(self, record))
         if hasattr(self, "state_index"):
             # A diagram's run: every block's state slice, the inputs recorded
             traj = Trajectory(

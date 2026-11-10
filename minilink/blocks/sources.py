@@ -379,40 +379,41 @@ class TrajectorySource(Source):
 
     The open-loop policy ``u = pi(t)``: feed a planned input trajectory into a
     diagram, ``source >> plant``. Between samples the signal is interpolated
-    linearly (``interpolation="linear"``, what a collocation or shooting
+    linearly (``hold="linear"``, what a collocation or shooting
     transcription assumes) or held at the previous sample
-    (``"previous"``, the zero-order hold of a sampled controller). Values
+    (``hold="zoh"``, the zero-order hold of a sampled controller), the two
+    holds of :class:`NoiseSource` and of the step model. Values
     outside ``[t[0], t[-1]]`` hold the nearest endpoint. ``values`` has shape
     ``(p, N)`` (or ``(N,)`` for a scalar signal) aligned with the ``N``
     sample times in ``t``. The times and the values are the block's ``params``
     (``{"t": ..., "values": ...}``), so a planned input is a leaf of a problem's
-    tree (``controller.values``); the rule is its structure.
+    tree (``controller.values``); the hold is its structure.
     """
 
-    INTERPOLATIONS = ("linear", "previous")
+    HOLDS = ("zoh", "linear")
 
-    def __init__(self, t, values, *, interpolation="linear", port="y"):
+    def __init__(self, t, values, *, hold="linear", port="y"):
         # The samples: N times, and a (p, N) array of values
         t = np.asarray(t, dtype=float).reshape(-1)
         values = np.asarray(values, dtype=float)
         if values.ndim == 1:
             values = values.reshape(1, -1)
         require_sample_shape(values, t)
-        require_one_of("interpolation", interpolation, self.INTERPOLATIONS)
+        require_one_of("hold", hold, self.HOLDS)
 
         Source.__init__(self, values.shape[0], port=port)
 
-        # The samples: the rule is structure, the times and the values parameters
-        self.interpolation = interpolation
+        # The samples: the hold is structure, the times and the values parameters
+        self.hold = hold
         self.params = {"t": t, "values": values}
 
     @classmethod
-    def from_trajectory(cls, traj, signal="u", *, interpolation="linear"):
+    def from_trajectory(cls, traj, signal="u", *, hold="linear"):
         """Build a source that replays a :class:`Trajectory` signal (``u`` or ``x``)."""
-        return cls(traj.t, getattr(traj, signal), interpolation=interpolation)
+        return cls(traj.t, getattr(traj, signal), hold=hold)
 
     def h(self, x, u, t=0, params=None):
-        """The sample at ``t``: linear between samples, or the previous one; endpoints held (traces on JAX)."""
+        """The sample at ``t``: linear between samples, or the previous one held; endpoints held (traces on JAX)."""
         params = self.params if params is None else params
         xp = array_module(x, u, t, params["values"])
 
@@ -420,10 +421,10 @@ class TrajectorySource(Source):
         y_k = xp.asarray(params["values"])
 
         # Linear: y(t) = y_k + (t − t_k) (y_{k+1} − y_k) / (t_{k+1} − t_k), clamped at the ends
-        if self.interpolation == "linear":
+        if self.hold == "linear":
             y = xp.stack([xp.interp(t, t_k, y_k[i]) for i in range(self.dim)])
 
-        # Previous: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
+        # Zero-order hold: y(t) = y_k for t_k ≤ t < t_{k+1}, clamped at the ends
         else:
             k = xp.clip(xp.searchsorted(t_k, t, side="right") - 1, 0, t_k.size - 1)
             y = y_k[:, k]

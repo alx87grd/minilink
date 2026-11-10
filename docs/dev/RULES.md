@@ -143,6 +143,8 @@ concrete formatting, ordered by the cost of being wrong:
   | An author's reads: the input ports' values in `u`, by name; a recorded signal of a run | `sys.ports(u, "r", "y")`; `traj.signal(name)` | `get_port_values_from_u`, `get_signal` |
   | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |
   | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
+  | A port a keyword names (a source's output, a run's prescribed input); the run a plot draws | `port=`; `traj=` | `input_port_id=`; `rollout=` |
+  | How samples are read between their times (the step model's rollout, the noise sources, `TrajectorySource`) | `hold="zoh"`, `hold="linear"` | `interpolation=`, `"previous"`, `"foh"` |
   | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`, `save_path`, a path in `save=`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
   | Playback rate of an animation (simulated seconds per wall second) | `speed` | `time_factor_video` |
   | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |

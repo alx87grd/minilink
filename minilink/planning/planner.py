@@ -187,9 +187,7 @@ def require_cost_to_go(planner, solution):
     return solution.cost_to_go
 
 
-def open_loop_controller_of(
-    trajectory, sys, *, interpolation="linear"
-) -> TrajectorySource:
+def open_loop_controller_of(trajectory, sys, *, hold="linear") -> TrajectorySource:
     """
     The trajectory's input as a source block ``u = pi(t)`` for the plant ``sys``: ``controller >> sys``.
 
@@ -204,7 +202,7 @@ def open_loop_controller_of(
     if "u" in sys.inputs or len(sys.inputs) == 1:
         u = sys.ports(u, command_port(sys))
 
-    return TrajectorySource(trajectory.t, u, interpolation=interpolation)
+    return TrajectorySource(trajectory.t, u, hold=hold)
 
 
 def planner_evidence(

@@ -66,14 +66,12 @@ class StaticSimulator:
         # The compiled system, on backend or, for "auto", JAX then NumPy
         self.backend, self.evaluator = self.resolve_and_build_evaluator(sys, backend)
 
-    def solve(self, *, u=None, input_port_id=None):
+    def solve(self, *, u=None, port=None):
         """Sample the outputs on the grid: under the nominal input, or ``u`` prescribed as for ``Simulator.solve``."""
         if u is None:
             u_traj = self.nominal_u_traj()
         else:
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
 
         return self.build_trajectory(u_traj)
 
