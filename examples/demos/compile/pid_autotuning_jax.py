@@ -5,8 +5,13 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import DiagramSystem, IntegralImpedance, Pendulum, Trajectory
-from minilink.graphical.signals import open_time_signal_plot, resolve_plot_signals
+from minilink import (
+    DiagramSystem,
+    IntegralImpedance,
+    Pendulum,
+    PlanningProblem,
+    QuadraticCost,
+)
 
 # Rollout horizon (JAX loss and NumPy plot share dt and tf).
 TF = 10.0
@@ -36,31 +41,24 @@ diagram.connect("controller", "u", "plant", "u")
 diagram.inputs["r"].nominal_value = np.array([1.0])
 
 evaluator = diagram.compile(backend="jax")
-np_evaluator = diagram.compile(backend="numpy")
 theta_idx = diagram.state_index["plant"][0]
 x0 = jnp.array(diagram.x0)
 u_ref = jnp.array([1.0])
 plant_params = plant.params
 t_span = jnp.arange(N_STEPS) * DT
 
-plot_steps = int(TF / DT) + 1
-plot_t = np.arange(plot_steps) * DT
-plot_u_knots = np.broadcast_to(diagram.inputs["r"].nominal_value, (plot_steps, 1))
-plot_signals = resolve_plot_signals(diagram)
-
-
-def simulate_traj(pid):
-    params = {
-        "controller": {
-            **ctl.params,
-            "Kp": float(pid[0]) * np.eye(1),
-            "Ki": np.array([float(pid[1])]),
-            "Kd": float(pid[2]) * np.eye(1),
-        },
-        "plant": plant_params,
-    }
-    xs = np_evaluator.rollout(diagram.x0, plot_u_knots, 0.0, DT, params, hold="foh")
-    return Trajectory(t=plot_t, x=xs.T, u=plot_u_knots.T)
+# The live plot: the closed loop at the current gains, run by the problem's evaluator
+# (its cost the tracking error, Q on θ − r, as the loss below)
+cost = QuadraticCost.from_system(
+    plant, Q=np.diag([1.0, 0.0]), R=np.zeros((1, 1)), x_bar=np.array([1.0, 0.0])
+)
+pe = PlanningProblem(plant, cost=cost, horizon=TF).compile(diagram, DT)
+live_plot = pe.live_plot(
+    ["controller.Kp", "controller.Ki", "controller.Kd"],
+    every=PLOT_EVERY,
+    pause=PLOT_PAUSE,
+    renderer=PLOT_BACKEND,
+)
 
 
 def rollout_loss(pid):
@@ -86,7 +84,6 @@ def rollout_loss(pid):
 loss_and_grad = jax.jit(jax.value_and_grad(rollout_loss))
 pid_params = jnp.array([1.0, 0.0, 1.0])
 
-plot_handle = None
 if PLOT_BACKEND == "matplotlib":
     plt.ion()
 
@@ -99,25 +96,7 @@ for i in range(N_LEARN_STEPS):
             f"{float(pid_params[1]):>8.3f} {float(pid_params[2]):>8.3f}"
         )
 
-    if i % PLOT_EVERY == 0:
-        traj = simulate_traj(pid_params)
-        title = (
-            f"iteration {i}  cost {float(loss):.4g}  "
-            f"Kp={float(pid_params[0]):.3f}  Ki={float(pid_params[1]):.3f}  "
-            f"Kd={float(pid_params[2]):.3f}"
-        )
-        if plot_handle is None:
-            plot_handle = open_time_signal_plot(
-                diagram,
-                traj,
-                signals=plot_signals,
-                renderer=PLOT_BACKEND,
-                show=True,
-                pause=PLOT_PAUSE,
-            )
-        plot_handle.update(traj, title=title)
-        if PLOT_BACKEND == "matplotlib":
-            plt.pause(PLOT_PAUSE)
+    live_plot(np.asarray(pid_params), loss, None)
 
     pid_params = pid_params - LR * grad
 
