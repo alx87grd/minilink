@@ -44,23 +44,24 @@ class LiveTrajectoryPlotCallback:
         if iteration.iteration % self.every != 0:
             return
 
-        title = self.iteration_title(iteration)
+        self.draw(iteration.trajectory, self.iteration_title(iteration))
 
-        # The plot opens at the first drawn iterate, then each draw updates it
+    def draw(self, trajectory, title: str) -> None:
+        """Open the plot on the first drawn iterate, then update its lines and title."""
         if self.handle is None:
             # Lazy import: the graphics load on first use, not with the core
             from minilink.graphical.signals import open_time_signal_plot
 
             self.handle = open_time_signal_plot(
                 self.sys,
-                iteration.trajectory,
+                trajectory,
                 signals=self.signals,
                 renderer=self.renderer,
                 show=True,
                 pause=self.pause,
             )
 
-        self.handle.update(iteration.trajectory, title=title)
+        self.handle.update(trajectory, title=title)
 
         # A short pause lets the matplotlib window redraw while the solver runs
         if self.pause > 0.0 and self.renderer == "matplotlib":

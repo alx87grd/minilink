@@ -375,6 +375,54 @@ class ProblemEvaluator:
 
         return tree
 
+    def live_plot(
+        self,
+        wrt,
+        *,
+        params=None,
+        signals=("x", "u"),
+        every=1,
+        pause=0.01,
+        renderer="matplotlib",
+    ):
+        """
+        A progress callback ``callback(z, J, t)`` for :meth:`Optimizer.solve` that redraws the closed-loop trajectory every ``every``-th iterate.
+
+        At each drawn step it unpacks ``z`` into ``wrt`` on ``params``, runs
+        :meth:`trajectory`, and updates the live figure of ``self.problem.sys``.
+        """
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.planning.trajectory_optimization.live_plot import (
+            LiveTrajectoryPlotCallback,
+        )
+
+        wrt = paths_of(wrt)
+        base = self.merged(params)
+        plotter = LiveTrajectoryPlotCallback(
+            self.problem.sys,
+            signals=signals,
+            every=every,
+            pause=pause,
+            renderer=renderer,
+        )
+        step = 0
+
+        def callback(z, J, _t):
+            nonlocal step
+            if step % plotter.every == 0:
+                tree = self.unpack(z, wrt, base)
+                traj = self.trajectory(tree).of("plant")
+                gains = ", ".join(
+                    f"{path.split('.')[-1]}={float(val):.3f}"
+                    for path, val in zip(wrt, np.asarray(z).reshape(-1))
+                )
+                title = f"iteration {step}  cost {float(J):.4g}  ({gains})"
+                plotter.draw(traj, title)
+            step += 1
+
+        callback.plotter = plotter
+        return callback
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
