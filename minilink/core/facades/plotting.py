@@ -88,7 +88,26 @@ class SystemPlotting:
             scored, signals=("cost_rate", "cost"), renderer=renderer, show=show
         )
 
-    def plot_input_output_map(self, **kwargs):
+    def plot_input_output_map(
+        self,
+        *,
+        in_port=None,
+        out_port=None,
+        x_axis=0,
+        y_axis=None,
+        out_axis=0,
+        bounds=None,
+        grid_shape=(101, 101),
+        is_3d=False,
+        params=None,
+        t=0.0,
+        title=None,
+        cmap="bwr",
+        vmin=None,
+        vmax=None,
+        ax=None,
+        show=True,
+    ):
         """
         Convenience shortcut plotting one output component over swept inputs.
 
@@ -100,9 +119,46 @@ class SystemPlotting:
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.port_map import plot_input_output_map
 
-        return plot_input_output_map(self, **kwargs)
+        return plot_input_output_map(
+            self,
+            in_port=in_port,
+            out_port=out_port,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            out_axis=out_axis,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            is_3d=is_3d,
+            params=params,
+            t=t,
+            title=title,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            ax=ax,
+            show=show,
+        )
 
-    def plot_control_law(self, **kwargs):
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        r=None,
+        space=None,
+        bounds=None,
+        grid_shape=(101, 101),
+        is_3d=False,
+        params=None,
+        t=0.0,
+        title=None,
+        cmap="bwr",
+        vmin=None,
+        vmax=None,
+        ax=None,
+        show=True,
+    ):
         """
         Convenience shortcut plotting the textbook slice of this block's control law.
 
@@ -118,7 +174,25 @@ class SystemPlotting:
         # Lazy import: the graphics load on first use, not with the core
         from minilink.graphical.port_map import plot_control_law
 
-        return plot_control_law(self, **kwargs)
+        return plot_control_law(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            u_axis=u_axis,
+            r=r,
+            space=space,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            is_3d=is_3d,
+            params=params,
+            t=t,
+            title=title,
+            cmap=cmap,
+            vmin=vmin,
+            vmax=vmax,
+            ax=ax,
+            show=show,
+        )
 
     def get_diagram(self, *, expand=True):
         """
@@ -153,15 +227,7 @@ class SystemPlotting:
 
         return bundle
 
-    def plot_diagram(
-        self,
-        file_name=None,
-        show=True,
-        show_inline=None,
-        show_pdf=None,
-        *,
-        expand=True,
-    ):
+    def plot_diagram(self, file_name=None, show=True, *, expand=True):
         """
         Convenience shortcut to render the system diagram.
 
@@ -170,27 +236,21 @@ class SystemPlotting:
         inner ports. Pass ``expand=False`` to draw each nested diagram as one
         block with its boundary ports.
 
-        Jupyter / Colab get inline SVG by default (the returned Graphviz
-        object is the cell output; this method does not also call
-        ``display()``, which would draw the figure twice). Bare scripts
-        and IPython REPLs open a Matplotlib window with the Graphviz PNG
-        (same blocking policy as trajectory plots). Pass ``show_pdf=True``
-        for the legacy OS PDF viewer; pass ``file_name`` to write Graphviz
-        output to disk; pass ``show=False`` to build the Digraph only.
+        ``show`` is where the figure goes: ``True`` picks the place, inline
+        SVG in Jupyter / Colab (the returned Graphviz object is the cell
+        output; this method does not also call ``display()``, which would
+        draw the figure twice) and a Matplotlib window with the Graphviz PNG
+        in bare scripts and IPython REPLs (same blocking policy as trajectory
+        plots); ``"inline"``, ``"window"`` or ``"pdf"`` (the OS PDF viewer)
+        name it; ``False`` builds the Digraph only. Pass ``file_name`` to
+        write Graphviz output to disk.
         Without the Graphviz binary the figure is skipped with a warning and
         ``None`` is returned, so a notebook cell does not fail.
         """
         # A real cycle through minilink.core.system
         from minilink.graphical.diagrams import plot_diagram
 
-        return plot_diagram(
-            self,
-            show=show,
-            show_inline=show_inline,
-            show_pdf=show_pdf,
-            file_name=file_name,
-            expand=expand,
-        )
+        return plot_diagram(self, file_name=file_name, show=show, expand=expand)
 
 
 class LinearPlotting:

@@ -327,6 +327,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `coerce_n_steps`, beside `problem_leaves` and `coerce_horizon`. A sampled block's
     predicates read as questions: `SampledSystem.counts` → `is_tick_law`, `resolves` →
     `is_integrated`; `minilink.core.sets.is_bounded(box)` → `has_finite_face(box)`.
+  - *The drawing shortcuts write their keywords out.* `sys.plot_input_output_map(…)`,
+    `sys.plot_control_law(…)` and a sampled loop's `animate(…)` take the named keywords of the
+    function they draw with, so an editor shows them (a misspelt keyword is refused at the call);
+    `plot_diagram(show_inline=True)` → `plot_diagram(show="inline")`, `show_pdf=True` →
+    `show="pdf"`, `show="window"` the Matplotlib window; `show=True` still picks the place
+    (inline in a notebook, a window in a script) and `show=False` builds the graph only.
 
 ## 3. Maturity (TRL)
 

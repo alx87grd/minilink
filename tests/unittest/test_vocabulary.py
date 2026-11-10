@@ -292,6 +292,18 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluation.score_run": {"tf": "horizon"},
     "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
+    "minilink.core.facades.plotting.SystemPlotting.plot_diagram": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
+    "minilink.graphical.diagrams.dot.plot_diagram": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
+    "minilink.graphical.diagrams.dot.render_diagram_graph": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
     "minilink.core.closed_loop.feedback": {"validate": "the loop check always runs"},
     "minilink.core.closed_loop.closed_loop": {"validate": "the loop check always runs"},
     "minilink.core.operators.autowire": {"validate": "the loop check always runs"},
@@ -582,6 +594,32 @@ def test_the_helpers_are_module_functions_not_methods():
         if hasattr(owners[owner], name)
     )
     assert not hits, f"module functions, not methods: {hits}"
+
+
+# A drawing shortcut writes its keywords out (api-stabilization AS-32, DESIGN section 4: every
+# editor shows them), the same keywords as the function it hands them to
+SHORTCUTS = {
+    "minilink.core.facades.plotting.SystemPlotting.plot_input_output_map": (
+        "minilink.graphical.port_map.plot_input_output_map"
+    ),
+    "minilink.core.facades.plotting.SystemPlotting.plot_control_law": (
+        "minilink.graphical.port_map.plot_control_law"
+    ),
+    "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.animate": (
+        "minilink.core.facades.animation.SystemAnimation.animate"
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(SHORTCUTS))
+def test_a_drawing_shortcut_writes_its_keywords_out(path):
+    def keywords(dotted):
+        function = getattr(owner_of(dotted), dotted.rsplit(".", 1)[-1])
+        parameters = inspect.signature(function).parameters.values()
+        assert all(p.kind is not p.VAR_KEYWORD for p in parameters), dotted
+        return {p.name: p.default for p in parameters if p.kind is p.KEYWORD_ONLY}
+
+    assert keywords(path) == keywords(SHORTCUTS[path])
 
 
 # One helper per name (api-stabilization AS-31): a helper is defined once, every other module

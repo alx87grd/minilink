@@ -133,15 +133,45 @@ class SampledDiagramSystem(StepDiagramSystem):
 
         return compile_sampled_diagram(diagram, backend=backend, verbose=verbose)
 
-    def animate(self, traj=None, **options):
+    def animate(
+        self,
+        traj=None,
+        *,
+        speed=1.0,
+        is_3d=False,
+        html: bool | None = None,
+        renderer="matplotlib",
+        native: bool = True,
+        scene_title: str | None = None,
+        show: bool = True,
+        save: bool = False,
+        file_name: str = "Animation",
+        camera=None,
+        overlays=None,
+    ):
         """
         Animate the loop's plant on its own run: its states, and the input the loop held on it each period.
 
         The loop's blocks are evaluated once per tick to read the plant's input
         (a pure MPC solves once per tick), never once per frame. A loop with no
-        plant (a computer alone) animates as any diagram. ``options`` are
+        plant (a computer alone) animates as any diagram. The keywords are
         :meth:`~minilink.core.facades.animation.SystemAnimation.animate`'s.
         """
+        # The animation's keywords, handed on unchanged to the plant's animate
+        options = dict(
+            speed=speed,
+            is_3d=is_3d,
+            html=html,
+            renderer=renderer,
+            native=native,
+            scene_title=scene_title,
+            show=show,
+            save=save,
+            file_name=file_name,
+            camera=camera,
+            overlays=overlays,
+        )
+
         # The run passed, else the last one computed, else a fresh one
         if traj is None:
             traj = self.traj if self.traj is not None else self.compute_trajectory()

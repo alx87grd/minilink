@@ -111,9 +111,7 @@ class TestDiagrams(unittest.TestCase):
 
     def test_plot_diagram_no_display_returns_graph(self):
         pytest.importorskip("graphviz")
-        graph = plot_diagram(
-            Integrator(), show=False, show_inline=False, show_pdf=False
-        )
+        graph = plot_diagram(Integrator(), show=False)
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
@@ -126,7 +124,7 @@ class TestDiagrams(unittest.TestCase):
 
         override_env("script")
         try:
-            graph = plot_diagram(Integrator(), show=True, show_inline=False)
+            graph = plot_diagram(Integrator(), show="window")
         finally:
             override_env(None)
         self.assertIsNotNone(graph)
@@ -147,9 +145,7 @@ class TestDiagrams(unittest.TestCase):
             mock.patch.object(graphviz.Digraph, "pipe", return_value=b"<svg/>"),
             mock.patch("IPython.display.display") as display,
         ):
-            graph = plot_diagram(
-                Integrator(), show=True, show_inline=True, show_pdf=False
-            )
+            graph = plot_diagram(Integrator(), show="inline")
         display.assert_not_called()
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
@@ -167,11 +163,9 @@ class TestDiagrams(unittest.TestCase):
                 self.renders.append((filename, view))
 
         graph = RecordedGraph()
-        render_diagram_graph(graph, show=False, show_inline=False, show_pdf=True)
+        render_diagram_graph(graph, show=False)
         self.assertEqual(graph.renders, [])
-        render_diagram_graph(
-            graph, show=False, show_inline=False, show_pdf=True, file_name="out.gv"
-        )
+        render_diagram_graph(graph, show=False, file_name="out.gv")
         self.assertEqual(graph.renders, [("out.gv", False)])
 
     def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
@@ -925,7 +919,7 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         ):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                dot_module.render_diagram_graph(graph, show=True, show_inline=True)
+                dot_module.render_diagram_graph(graph, show="inline")
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
     def test_plot_diagram_returns_nothing_for_the_cell_to_render(self):
@@ -942,7 +936,7 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                graph = loop.plot_diagram(show=True, show_inline=True)
+                graph = loop.plot_diagram(show="inline")
         self.assertIsNone(graph)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 

@@ -7,6 +7,7 @@ import tempfile
 import warnings
 from dataclasses import replace
 
+from minilink.core.options import require_one_of
 from minilink.graphical.diagrams.export import (
     TopologyExporter,
     export_diagram_topology,
@@ -62,33 +63,21 @@ class GraphvizTopologyExporter(TopologyExporter):
         return graph
 
 
-# A system's diagram, drawn or returned
+# A system's diagram, drawn or returned; where it is shown: True picks the place
+DIAGRAM_SHOWS = (True, False, "inline", "window", "pdf")
 
 
-def plot_diagram(
-    sys_or_diagram,
-    file_name=None,
-    show=True,
-    show_inline=None,
-    show_pdf=None,
-    *,
-    expand=True,
-):
+def plot_diagram(sys_or_diagram, file_name=None, show=True, *, expand=True):
     """Render a system or assembled diagram.
 
     ``expand=True`` draws the blocks of every nested diagram inside a labelled
-    box; ``expand=False`` draws a nested diagram as one block. Returns the
+    box; ``expand=False`` draws a nested diagram as one block. ``show`` is
+    where the figure goes (:func:`render_diagram_graph`). Returns the
     Graphviz object, or ``None`` when the figure cannot be drawn, so that a
     notebook cell without the Graphviz binary shows the warning and no error.
     """
     graph = get_diagram(sys_or_diagram, expand=expand)
-    drawn = render_diagram_graph(
-        graph,
-        show=show,
-        show_inline=show_inline,
-        show_pdf=show_pdf,
-        file_name=file_name,
-    )
+    drawn = render_diagram_graph(graph, show=show, file_name=file_name)
 
     # Nothing for the notebook cell to render when the figure could not be drawn
     return graph if drawn else None
@@ -296,17 +285,15 @@ def escape_port_char(char):
     return "_"
 
 
-def render_diagram_graph(
-    graph, show=True, show_inline=None, show_pdf=None, file_name=None
-):
+def render_diagram_graph(graph, show=True, file_name=None):
     """
     Display a Graphviz object.
 
-    ``show_inline=None`` defaults to inline SVG in Jupyter / Colab.
-    Outside notebooks, ``show=True`` opens a Matplotlib window with the
-    Graphviz PNG (same blocking policy as trajectory plots). Pass
-    ``show_pdf=True`` for the legacy OS PDF viewer; pass ``file_name`` to
-    write Graphviz output to disk. ``show=False`` builds/returns only.
+    ``show=True`` draws it where it belongs: inline SVG in Jupyter / Colab,
+    else a Matplotlib window with the Graphviz PNG (same blocking policy as
+    trajectory plots). ``show="inline"``, ``"window"`` or ``"pdf"`` (the OS
+    PDF viewer) names the place; ``show=False`` builds/returns only. Pass
+    ``file_name`` to write Graphviz output to disk.
 
     Returns ``False`` when the figure cannot be drawn (no graphviz wrapper, or
     no ``dot`` binary for the inline SVG), ``True`` otherwise.
@@ -322,11 +309,12 @@ def render_diagram_graph(
     )
 
     # The channel: inline SVG in a notebook, else a Matplotlib window or the PDF viewer
-    inline_env = is_inline_capable()
-    if show_inline is None:
-        show_inline = inline_env
-    if show_pdf is None:
-        show_pdf = False
+    require_one_of("show", show, DIAGRAM_SHOWS)
+    if show is True:
+        show = "inline" if is_inline_capable() else "window"
+    show_inline = show == "inline"
+    show_pdf = show == "pdf"
+    show = bool(show)
 
     # Inline SVG in a notebook
     drawn = True

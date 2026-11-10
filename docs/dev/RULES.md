@@ -150,7 +150,7 @@ concrete formatting, ordered by the cost of being wrong:
   | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |
   | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native method's numbers (`max_iterations=`, `tol=`, `learning_rate=` are keywords) |
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
-  | Print text / draw a figure | `verbose` (default `False`) / `show` | |
+  | Print text / draw a figure (and where: `plot_diagram(show="inline" \| "window" \| "pdf")`) | `verbose` (default `False`) / `show` | `show_inline`, `show_pdf` |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
 
