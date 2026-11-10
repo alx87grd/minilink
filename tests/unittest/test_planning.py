@@ -2551,3 +2551,18 @@ def test_an_unseeded_search_is_reproducible():
         trees.append(np.array([node.x for node in planner.tree.nodes]))
 
     np.testing.assert_array_equal(trees[0], trees[1])
+
+
+def test_an_open_loop_plan_records_its_evidence_over_its_own_length():
+    # The trajectory-optimization and RRT plans hand planner_evidence their own length
+    plan = TrajectoryOptimizationPlanner(_trajopt_problem(), n_steps=4).solve(
+        evaluate=True
+    )
+    assert plan.evaluation is not None and np.isfinite(plan.evaluation.objective)
+
+    problem, _ = make_holonomic_obstacle_problem()
+    problem = problem.replace(cost=QuadraticCost.from_system(problem.sys))
+    planner = RRTPlanner(
+        problem, extender=KinodynamicExtender(controls=COMPASS), seed=0, max_nodes=300
+    )
+    assert planner.solve(evaluate=True).evaluation is not None

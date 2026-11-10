@@ -523,7 +523,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 controller,
                 dt=dt,
                 n_trials=n_trials,
-                tf=float(trajectory.tf - trajectory.t[0]),
+                episode_length=float(trajectory.tf - trajectory.t[0]),
                 problem=problem,
             )
 

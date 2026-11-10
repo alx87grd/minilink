@@ -426,7 +426,7 @@ class RRTPlanner(Planner):
                 controller,
                 dt=dt,
                 n_trials=n_trials,
-                tf=float(trajectory.tf - trajectory.t0),
+                episode_length=float(trajectory.tf - trajectory.t0),
             )
 
         solution = PlanningSolution(
