@@ -292,6 +292,33 @@ def test_a_quadratic_cost_targets_the_operating_point_by_default():
     np.testing.assert_allclose(cost.u_bar, [0.2])
 
 
+def test_a_quadratic_cost_of_two_weights_regulates_the_origin():
+    """``QuadraticCost(Q, R)``: ``S``, ``x_bar``, ``u_bar`` zero, sized by ``Q`` and ``R``."""
+    Q = np.diag([2.0, 1.0])
+    R = np.array([[0.5]])
+    cost = QuadraticCost(Q, R)
+    np.testing.assert_array_equal(cost.S, np.zeros((2, 2)))
+    np.testing.assert_array_equal(cost.x_bar, np.zeros(2))
+    np.testing.assert_array_equal(cost.u_bar, np.zeros(1))
+    x = np.array([1.0, -2.0])
+    u = np.array([3.0])
+    # g = xᵀ Q x + uᵀ R u = 2 + 4 + 4.5, h = 0
+    assert cost.g(x, u) == 10.5
+    assert cost.h(x) == 0.0
+    full = QuadraticCost(Q, R, np.zeros((2, 2)), np.zeros(2), np.zeros(1))
+    assert cost.g(x, u) == full.g(x, u)
+
+
+def test_a_quadratic_cost_of_two_weights_on_jax():
+    pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    cost = QuadraticCost(np.diag([2.0, 1.0]), np.array([[0.5]]))
+    g = cost.g(jnp.array([1.0, -2.0]), jnp.array([3.0]))
+    assert isinstance(g, jnp.ndarray)
+    assert float(g) == 10.5
+
+
 def test_compute_cost_needs_a_trajectory_and_a_diagram_for_of():
     from minilink import Pendulum
 

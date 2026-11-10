@@ -158,15 +158,29 @@ class QuadraticCost(CostFunction):
     ``"x_bar"``, ``"u_bar"``), the System pattern: ``params=None`` in :meth:`g`
     and :meth:`h` reads them, a dictionary replaces them, so ``jax.grad``
     reaches ``Q``. The attributes ``cost.Q`` … are views of the dictionary.
+
+    ``QuadraticCost(Q, R)`` is the regulator about the origin: ``S``, ``x_bar``
+    and ``u_bar`` default to zero, sized by ``Q`` (``n × n``) and ``R``
+    (``m × m``); :meth:`from_system` takes the plant's operating point instead.
     """
 
-    def __init__(self, Q, R, S, x_bar, u_bar):
-        # The weights and the targets as float copies, the targets flat
+    def __init__(self, Q, R, S=None, x_bar=None, u_bar=None):
+        # The weights as float copies; S, x̄, ū zero unless given, sized by Q and R
         Q = np.asarray(Q, dtype=float).copy()
         R = np.asarray(R, dtype=float).copy()
-        S = np.asarray(S, dtype=float).copy()
-        x_bar = np.asarray(x_bar, dtype=float).reshape(-1).copy()
-        u_bar = np.asarray(u_bar, dtype=float).reshape(-1).copy()
+        n = Q.shape[0] if Q.ndim == 2 else 0
+        m = R.shape[0] if R.ndim == 2 else 0
+        S = np.zeros((n, n)) if S is None else np.asarray(S, dtype=float).copy()
+        x_bar = (
+            np.zeros(n)
+            if x_bar is None
+            else np.asarray(x_bar, dtype=float).reshape(-1).copy()
+        )
+        u_bar = (
+            np.zeros(m)
+            if u_bar is None
+            else np.asarray(u_bar, dtype=float).reshape(-1).copy()
+        )
 
         # The weights sized by the targets: Q and S are n × n, R is m × m
         check_weights(Q, R, S, x_bar.size, u_bar.size)

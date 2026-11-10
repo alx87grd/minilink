@@ -390,6 +390,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `port.lower_bound`, `state.upper_bound` → `port.lower`, `state.upper`, as the box
     (`port.box.lower`), the sets, `Saturation` and the program already said. A limit a law
     applies to a named signal keeps that signal's name (`u_min`, `u_max`, `delta_max`).
+  - *Added, nothing breaks* ([api-stabilization.md](../plans/api-stabilization.md) §3):
+    `QuadraticCost(Q, R)` (`S`, `x_bar`, `u_bar` zero by default).
 
 ## 3. Maturity (TRL)
 

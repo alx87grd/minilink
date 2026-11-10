@@ -563,7 +563,8 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   Assigning the complete tree routes each entry to its part (a singleton `X0` moves with
   `x0`; a set's entry is written into the set, its one home). Library costs hold their
   parameters on the System pattern (`QuadraticCost.params` is `Q`, `R`, `S`, `x_bar`,
-  `u_bar`, its attributes views); a `SumCost` keys its terms by id like a diagram (the class
+  `u_bar`, its attributes views; `QuadraticCost(Q, R)` takes `S`, `x_bar`, `u_bar` zero,
+  sized by `Q` and `R`); a `SumCost` keys its terms by id like a diagram (the class
   name verbatim, `QuadraticCost2` for a repeat, a scaled term the id of the cost it scales).
   Anonymous `+` and `sum()` flatten into one level of terms; `SumCost.of(**named)` and a cost
   with an `id` stay nested. A sum holds each cost object once (`q + 10 * q` is refused;
