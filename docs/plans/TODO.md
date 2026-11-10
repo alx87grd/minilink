@@ -31,6 +31,7 @@ the maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
+| The API settled before the demo rebuild | — | v0.4 (before the rebuild) | your go on [api-stabilization.md](api-stabilization.md): its three sections that need no decision, then its 22 decisions one at a time (the "API sweep's judgment calls" row of §1.11 is folded into them) |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
