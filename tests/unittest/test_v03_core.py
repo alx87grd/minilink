@@ -812,5 +812,5 @@ def test_a_held_loops_run_scores_on_the_step_problems_own_sum():
     # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
     held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
     J_step = problem.discretize(0.1).rollout(policy).signals["cost"][0, -1]
-    J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
+    J = float(np.squeeze(evaluate_trajectory(problem, held).raw_cost))
     np.testing.assert_allclose(J, J_step, rtol=1e-12)

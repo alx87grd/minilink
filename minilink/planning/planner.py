@@ -341,12 +341,12 @@ def step_evaluation(
     for i in range(n):
         params = trial_of(draws, drawn, i)
 
-        # The model's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h, the
+        # The model's run: x_0 … x_N, u_0 … u_{N−1}, raw_cost = Σ γᵏ c_k + γᴺ h, the
         # running cost's last value
         traj = model.rollout(controller, params=params, n_steps=N)
         xs = traj.x.T
         us = traj.u[:, :N].T
-        cost = traj.signals["cost"][0, -1]
+        raw_cost = traj.signals["cost"][0, -1]
         t = [model.time_of(k, params) for k in range(N + 1)]
 
         # The judge's facts: finite, the least margin to X and U, the margin to Xf
@@ -362,20 +362,28 @@ def step_evaluation(
             reachability_margin = float(np.min(problem.Xf.margin(xs[-1], t[-1])))
         reached = reachability_margin >= 0.0
 
-        # J = cost, or with the failure charged cost + failure_cost · (failed or not
-        # reached), and the cost bound + failure_cost for a run not finite
-        cost = float(cost) if finite else np.inf
-        J = cost
+        # J = raw_cost, or with the failure charged raw_cost + failure_cost · (failed or
+        # not reached), and the cost bound + failure_cost for a run not finite
+        raw_cost = float(raw_cost) if finite else np.inf
+        J = raw_cost
         if problem.penalize_failure:
             charged = failure_cost if failed or not reached else 0.0
-            J = (cost if finite else bound) + charged
+            J = (raw_cost if finite else bound) + charged
 
         rows.append(
-            (cost, J, feasibility_margin, failed, reachability_margin, reached, xs[0])
+            (
+                raw_cost,
+                J,
+                feasibility_margin,
+                failed,
+                reachability_margin,
+                reached,
+                xs[0],
+            )
         )
 
     return Evaluation(
-        cost=np.array([row[0] for row in rows]),
+        raw_cost=np.array([row[0] for row in rows]),
         J=np.array([row[1] for row in rows]),
         feasibility_margin=np.array([row[2] for row in rows]),
         failed=np.array([row[3] for row in rows]),

@@ -101,7 +101,7 @@ def test_the_score_is_the_integral_plus_the_terminal_cost():
     row = score_run(problem, Trajectory(t, x, u))
 
     # ∫₀¹ x₁² dt = 1, plus h = x₁(1)² = 1
-    assert row["cost"] == pytest.approx(2.0)
+    assert row["raw_cost"] == pytest.approx(2.0)
     assert row["J"] == pytest.approx(2.0)
     assert not row["failed"] and row["reached"]
 
@@ -118,7 +118,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
         PlanningProblem(sys, cost=cost, horizon=1.0, Xf=goal, U=sys.input_box), run
     )
     assert off["failed"] and not off["reached"]
-    assert off["J"] == pytest.approx(off["cost"])
+    assert off["J"] == pytest.approx(off["raw_cost"])
     assert off["feasibility_margin"] == pytest.approx(-5.0)
     assert off["reachability_margin"] == pytest.approx(0.1 - np.pi)
 
@@ -135,7 +135,7 @@ def test_the_failure_switch_charges_a_failed_or_missed_run():
         ),
         run,
     )
-    assert on["J"] == pytest.approx(off["cost"] + 1000.0)
+    assert on["J"] == pytest.approx(off["raw_cost"] + 1000.0)
 
 
 def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
@@ -147,7 +147,7 @@ def test_a_run_that_is_not_finite_costs_inf_or_the_failure_cost():
     run = Trajectory(t, x, np.zeros((1, t.size)))
 
     off = score_run(PlanningProblem(sys, cost=cost, horizon=1.0, U=sys.input_box), run)
-    assert off["failed"] and off["J"] == np.inf and off["cost"] == np.inf
+    assert off["failed"] and off["J"] == np.inf and off["raw_cost"] == np.inf
 
     problem = PlanningProblem(
         sys,
@@ -187,7 +187,7 @@ def test_a_run_not_finite_scores_above_a_finite_run_that_leaves_x():
     assert nan_row["failed"] and out_row["failed"]
     assert np.isfinite(nan_row["J"])
     assert nan_row["J"] == pytest.approx(problem.cost_bound(1.0) + 50.0)
-    assert out_row["J"] == pytest.approx(out_row["cost"] + 50.0)
+    assert out_row["J"] == pytest.approx(out_row["raw_cost"] + 50.0)
     assert nan_row["J"] > out_row["J"]
 
 

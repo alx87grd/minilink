@@ -35,9 +35,9 @@ class Evaluation:
     A pytree record (traceable inside a trace, plain arrays outside), each field
     of shape ``(n_runs,)``:
 
-    - ``cost``: ``∫_{t0}^{tf} e^{−ρ(t − t0)} g dt + e^{−ρ(tf − t0)} h(x(tf))``, ``tf``
-      the run's end, ``+inf`` for a run that is not finite;
-    - ``J``: the cost, plus the problem's failure cost when the run failed or
+    - ``raw_cost``: ``∫_{t0}^{tf} e^{−ρ(t − t0)} g dt + e^{−ρ(tf − t0)} h(x(tf))``,
+      ``tf`` the run's end, ``+inf`` for a run that is not finite;
+    - ``J``: the raw cost, plus the problem's failure cost when the run failed or
       missed the goal (with ``penalize_failure`` on);
     - ``feasibility_margin``: the least margin of ``x`` to ``X`` and of ``u`` to
       ``U`` along the run, and ``failed`` (not finite, or a negative margin);
@@ -49,7 +49,7 @@ class Evaluation:
     program minimizes.
     """
 
-    cost: object
+    raw_cost: object
     J: object
     feasibility_margin: object
     failed: object
@@ -114,7 +114,7 @@ class Evaluation:
                 notes.append("goal missed")
             note = f" ({', '.join(notes)})" if notes else ""
             return (
-                f"J = {float(self.J[0]):.4g}{note}, cost = {float(self.cost[0]):.4g}, "
+                f"J = {float(self.J[0]):.4g}{note}, raw cost = {float(self.raw_cost[0]):.4g}, "
                 f"feasibility margin = {float(self.feasibility_margin[0]):.3g}"
             )
 
@@ -146,10 +146,10 @@ def score_run(
         feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
         failed              = not finite, or feasibility_margin < 0
         reachability_margin = Xf.margin(x(t_end), t_end)   reached = margin ≥ 0  (no Xf: reached)
-        cost                = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end)
+        raw_cost            = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end)
                               (+inf when not finite), t_end = t0 + horizon
-        J                   = cost, or with penalize_failure on
-                              cost + failure_cost · (failed or not reached)   finite
+        J                   = raw_cost, or with penalize_failure on
+                              raw_cost + failure_cost · (failed or not reached)   finite
                               cost_bound + failure_cost                       not finite
 
     A run that is not finite is scored on zeros (a safe ``where``), and with
@@ -209,7 +209,7 @@ def score_run(
         reachability_margin = xp.min(problem.Xf.margin(x[-1], t_end, Xf_params))
     reached = reachability_margin >= 0.0
 
-    # cost = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end): the
+    # raw_cost = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ horizon} h(x(t_end), t_end): the
     # integral the run carried, or the trapezoid on a logged run's samples
     if running_cost is None:
         safe_run = Trajectory(t=t, x=x.T, u=u.T)
@@ -218,21 +218,23 @@ def score_run(
         )
     else:
         running = xp.where(finite, running_cost, 0.0)
-    cost = running[-1]
+    raw_cost = running[-1]
     if finite_horizon:
-        cost = cost + xp.exp(-rho * horizon) * cost_fn.h(x[-1], t_end, cost_params)
-    cost = xp.where(finite, cost, xp.inf)  # A run not finite costs +inf
+        raw_cost = raw_cost + xp.exp(-rho * horizon) * cost_fn.h(
+            x[-1], t_end, cost_params
+        )
+    raw_cost = xp.where(finite, raw_cost, xp.inf)  # A run not finite costs +inf
 
-    # J = cost, or with the failure charged cost + failure_cost · (failed or not
-    # reached), and cost_bound + failure_cost for a run not finite
+    # J = raw_cost, or with the failure charged raw_cost + failure_cost · (failed or
+    # not reached), and cost_bound + failure_cost for a run not finite
     if failure_cost is None:
-        J = cost
+        J = raw_cost
     else:
         charged = xp.where(failed | ~reached, failure_cost, 0.0)
-        J = xp.where(finite, cost, cost_bound) + charged
+        J = xp.where(finite, raw_cost, cost_bound) + charged
 
     return {
-        "cost": cost,
+        "raw_cost": raw_cost,
         "J": J,
         "feasibility_margin": feasibility_margin,
         "failed": failed,
@@ -404,7 +406,7 @@ def register_evaluation_pytree():
     jax = ensure_jax_x64()
 
     fields = (
-        "cost",
+        "raw_cost",
         "J",
         "feasibility_margin",
         "failed",

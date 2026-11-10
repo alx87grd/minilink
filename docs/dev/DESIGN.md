@@ -1481,7 +1481,8 @@ the sets' parameters, `"x0"`, `"discount_rate"`) and each free input at its nomi
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block
 output recorded (`"id:port"`, the plant's input `"plant:u"`, the role `plant`);
 `pe.evaluate(params, key, n_trials)` the `Evaluation` (a pytree record, one row per run:
-`cost`, `J`, the margins, `failed`, `reached`, `x0`; `objective` the criterion over `J`,
+`raw_cost`, `J` (the raw cost plus the failure cost of a failed or missed run), the margins,
+`failed`, `reached`, `x0`; `objective` the criterion over `J`,
 `mean` / `std` / `worst` / `cvar(alpha)` and the three rates), the draws of a stochastic
 problem `vmap`ped on JAX, so `jax.grad(lambda p: pe.evaluate(p).objective)(pe.params)`
 reaches every gain, plant parameter, cost weight and the start; a tree holding an integer leaf (a

@@ -274,6 +274,9 @@ RETIRED_NAMES = {
         "planner.tables, the latest solution's"
     ),
     "minilink.planning.search.rrt.TreeSearchRecord.cost": "path_cost",
+    "minilink.planning.evaluation.Evaluation.cost": (
+        "raw_cost (J is the raw cost plus the failure cost of a failed or missed run)"
+    ),
     "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.cost": (
         "episode_cost"
     ),

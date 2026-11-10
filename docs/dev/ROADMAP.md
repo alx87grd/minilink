@@ -433,6 +433,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `record.episode_cost` (the mean episode cost at the end of training). The objective at
     the solution keeps `cost`: the `Optimizer`'s result, trajectory optimization's and MPPI's
     records.
+  - *An evaluation's two costs.* `Evaluation.cost` → `raw_cost`: the run's discounted integral
+    and terminal cost, before the failure charge; `J`, the score every statistic reads, is
+    unchanged (the raw cost plus the failure cost of a failed or missed run). Its one-run
+    `str` reads `raw cost = …`.
 
 ## 3. Maturity (TRL)
 
