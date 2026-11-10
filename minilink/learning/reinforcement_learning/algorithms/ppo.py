@@ -187,4 +187,6 @@ class PPO(Algorithm):
 def require_whole_minibatches(size, batch_size):
     """Refuse a batch that does not split into whole minibatches."""
     if size % batch_size != 0:
-        raise ValueError("n_steps * n_envs must be a multiple of batch_size")
+        raise ValueError(
+            "n_steps_per_update * n_rollouts must be a multiple of batch_size"
+        )

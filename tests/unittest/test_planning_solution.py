@@ -321,8 +321,8 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
         problem,
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=16,
+        n_rollouts=4,
+        n_steps_per_update=16,
         batch_size=32,
         gamma=0.9,
     )

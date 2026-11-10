@@ -2552,7 +2552,9 @@ def test_every_planner_has_one_tree_shape():
     planners = [
         TrajectoryOptimizationPlanner(problem, n_steps=10, method="adam"),
         MPPIPlanner(problem, dt=0.1, n_rollouts=16),
-        ReinforcementLearningPlanner(problem, dt=0.1, n_envs=2, n_steps=8, hidden=(4,)),
+        ReinforcementLearningPlanner(
+            problem, dt=0.1, n_rollouts=2, n_steps_per_update=8, hidden=(4,)
+        ),
     ]
     for planner in planners:
         tree = planner.params

@@ -1607,8 +1607,9 @@ of the table as it stands (`J = min Q`, `pi = argmin Q`), and
 are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 
-`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=)`
-learns a neural law in pure JAX: `solve(n_timesteps=)` → `PlanningSolution`
+`ReinforcementLearningPlanner(problem, dt=, hidden=, features=, method=, n_rollouts=,
+n_steps_per_update=)` learns a neural law in pure JAX, each update on `n_steps_per_update`
+control periods of `n_rollouts` parallel rollouts: `solve(n_timesteps=)` → `PlanningSolution`
 (a copy of the trained block as `controller`, a `ReinforcementLearningRecord`, the critic as
 `cost_to_go`, a `CriticField`, when the discounts match), `planner.controller` →
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,

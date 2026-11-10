@@ -120,8 +120,9 @@ concrete formatting, ordered by the cost of being wrong:
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps, the transitions (a transcription's intervals: `N + 1` knots) | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
+  | The RL planner's control periods of each rollout per collection, the data of one update | `n_steps_per_update` | `n_steps` (a horizon's transitions) |
   | Number of time samples on a horizon, endpoints included (`Simulator`, `compute_trajectory`, the frequency and step responses, the LQR gain schedule) | `n_samples` | `n_steps`, `n`, `n_pts` |
-  | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
+  | Number of sampled rollouts (MPPI, a certificate's `verify`, the RL planner's parallel rollouts) | `n_rollouts` | `n_samples` (time samples only), `n_envs` |
   | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
   | A training budget, episodes / plant steps (the RL planners' `solve`, their records) | `n_episodes` / `n_timesteps` | `episodes`, `timesteps` |

@@ -67,7 +67,12 @@ problem = PlanningProblem(
 )
 
 planner = ReinforcementLearningPlanner(
-    problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
+    problem,
+    dt=DT,
+    normalize=False,
+    n_rollouts=1,
+    n_steps_per_update=2048,
+    batch_size=64,
 )
 solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)

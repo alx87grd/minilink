@@ -444,6 +444,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     Each record's one-line `str` ends with "solved in … s". The neural learner's
     `train_time_s` stays beside it: it counts every training of the planner, its collections
     and updates only.
+  - *The RL planner speaks minilink's words* (the maintainer's ruling 18):
+    `ReinforcementLearningPlanner(n_envs=)` → `n_rollouts=` (the rollouts simulated in
+    parallel, as MPPI says), its `n_steps=` → `n_steps_per_update=` (each rollout's control
+    periods per collection, the data of one update; `n_steps` keeps one meaning, a horizon's
+    transitions), read back as `planner.n_rollouts` and `planner.n_steps_per_update`.
 
 ## 3. Maturity (TRL)
 

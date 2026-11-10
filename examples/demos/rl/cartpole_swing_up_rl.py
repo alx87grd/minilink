@@ -61,8 +61,8 @@ planner = ReinforcementLearningPlanner(
     features=features,
     hidden=(64, 64),
     method="ppo",
-    n_envs=16,
-    n_steps=256,
+    n_rollouts=16,
+    n_steps_per_update=256,
     batch_size=512,
     gamma=0.99,
 )

@@ -99,9 +99,10 @@ class ReinforcementLearningPlanner(Planner):
         ``"sac"`` (off-policy), or an :class:`Algorithm` instance; its numbers,
         ``**method_numbers``, are the keywords not listed here
         (``learning_rate``, ``n_epochs``, ``tau``, ...).
-    n_envs, n_steps : int
-        Plants simulated in parallel and control periods per collection (an
-        episodic method collects one episode length instead of ``n_steps``).
+    n_rollouts, n_steps_per_update : int
+        Rollouts simulated in parallel, and control periods of each per
+        collection, the update's data (an episodic method collects one episode
+        length instead of ``n_steps_per_update``).
     training_zone : Set, optional
         Where episodes run (the plant's state box by default); leaving it truncates
         the episode. A training choice, not a constraint: the constraint is ``problem.X``.
@@ -148,8 +149,8 @@ class ReinforcementLearningPlanner(Planner):
         activation="tanh",
         normalize=True,
         method="ppo",
-        n_envs=16,
-        n_steps=128,
+        n_rollouts=16,
+        n_steps_per_update=128,
         episode_length=None,
         gamma=None,
         log_std_init=0.0,
@@ -173,8 +174,8 @@ class ReinforcementLearningPlanner(Planner):
             activation=activation,
             normalize=normalize,
             method=copy.deepcopy(method),
-            n_envs=n_envs,
-            n_steps=n_steps,
+            n_rollouts=n_rollouts,
+            n_steps_per_update=n_steps_per_update,
             episode_length=episode_length,
             gamma=gamma,
             log_std_init=log_std_init,
@@ -187,7 +188,7 @@ class ReinforcementLearningPlanner(Planner):
         )
 
         # Training settings
-        self.n_envs = int(n_envs)
+        self.n_rollouts = int(n_rollouts)
         self.seed = int(seed)
 
         # Training progress: plant steps, wall-clock time, the latest mean episode
@@ -212,8 +213,10 @@ class ReinforcementLearningPlanner(Planner):
         # The update rule, and its collection length: one whole episode for an
         # episodic method
         self.algorithm = self.build_algorithm(method, method_numbers)
-        self.n_steps = (
-            self.env.n_steps_per_episode if self.algorithm.episodic else int(n_steps)
+        self.n_steps_per_update = (
+            self.env.n_steps_per_episode
+            if self.algorithm.episodic
+            else int(n_steps_per_update)
         )
 
         # The law, the exploration head and the critic of the algorithm's family,
@@ -251,11 +254,11 @@ class ReinforcementLearningPlanner(Planner):
                 reward=reward,
             )
 
-        # Train state and the parallel plants, from the seed's keys
+        # Train state and the parallel rollouts, from the seed's keys
         self.key = jax.random.PRNGKey(seed)
         self.key, k_init, k_reset = jax.random.split(self.key, 3)
         self.train_state = self.algorithm.init(k_init)
-        self.carry = reset_carry(self.env, k_reset, self.n_envs)
+        self.carry = reset_carry(self.env, k_reset, self.n_rollouts)
 
         # One jitted call per collection, update and action; an off-policy method
         # updates from a replay of its transitions
@@ -264,8 +267,8 @@ class ReinforcementLearningPlanner(Planner):
                 rollout,
                 self.env,
                 self.exploration_policy,
-                n_steps=self.n_steps,
-                n_envs=self.n_envs,
+                n_steps=self.n_steps_per_update,
+                n_rollouts=self.n_rollouts,
             )
         )
         self.replay = None
@@ -356,7 +359,7 @@ class ReinforcementLearningPlanner(Planner):
         """
         jax = require_jax()
 
-        steps_per_iteration = self.n_steps * self.n_envs
+        steps_per_iteration = self.n_steps_per_update * self.n_rollouts
         n_iterations = math.ceil(n_timesteps / steps_per_iteration)
 
         # What the training reads, when asked to report
@@ -591,11 +594,11 @@ class ReinforcementLearningPlanner(Planner):
         jnp = require_jax_numpy()
 
         algorithm = self.algorithm
-        n_steps = self.n_steps
-        n_envs = self.n_envs
+        n_steps_per_update = self.n_steps_per_update
+        n_rollouts = self.n_rollouts
 
         # The algorithm's count of gradient steps, else one per collected transition
-        gradient_steps = algorithm.gradient_steps or n_steps * n_envs
+        gradient_steps = algorithm.gradient_steps or n_steps_per_update * n_rollouts
 
         def gradient_step(state, key):
             # A minibatch drawn uniformly from the filled part of the replay
@@ -620,13 +623,13 @@ class ReinforcementLearningPlanner(Planner):
 
         theta = self.algorithm.params(self.train_state)["policy"]
 
-        # An episodic method learns from complete episodes: every plant restarts, then
-        # runs one
+        # An episodic method learns from complete episodes: every rollout restarts,
+        # then runs one
         if self.algorithm.episodic:
             k_collect, k_reset = jax.random.split(k_collect)
-            self.carry = reset_carry(self.env, k_reset, self.n_envs)
+            self.carry = reset_carry(self.env, k_reset, self.n_rollouts)
 
-        # Collect: n_steps control periods of the n_envs plants
+        # Collect: n_steps_per_update control periods of the n_rollouts rollouts
         batch, self.carry = self.rollout_jit(theta, self.carry, k_collect)
 
         # On-policy: one update on the fresh batch
@@ -662,7 +665,9 @@ class ReinforcementLearningPlanner(Planner):
             "n_timesteps": self.n_timesteps,
             "ep_return_mean": self.last_ep_return_mean,
             "n_episodes": int(ep_returns.size),
-            "fps": self.n_steps * self.n_envs / max(time.time() - t0, 1e-9),
+            "fps": self.n_steps_per_update
+            * self.n_rollouts
+            / max(time.time() - t0, 1e-9),
             "elapsed": self.train_time_s,
             **{k: float(v) for k, v in stats.items()},
         }

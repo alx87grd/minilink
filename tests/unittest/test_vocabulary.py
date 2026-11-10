@@ -376,6 +376,11 @@ RETIRED_KEYWORDS = {
     "minilink.core.signals.OutputPort.__init__": BOUND_WORDS,
     "minilink.core.wiring.WiredDiagramMixin.connect_new_output_port": BOUND_WORDS,
     "minilink.core.wiring.DiagramOutputPort.__init__": BOUND_WORDS,
+    # The RL planner speaks minilink's words (the maintainer's ruling 18 of 2026-11-10)
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.__init__": {
+        "n_envs": "n_rollouts",
+        "n_steps": "n_steps_per_update (n_steps is a horizon's transitions)",
+    },
 }
 
 
@@ -489,6 +494,39 @@ def test_a_search_keeps_its_counts_on_its_record_only():
         assert record.n_iterations >= 0 and not record.reached_goal
         for retired in ("reached_goal", "iterations"):
             assert not hasattr(planner, retired), f"{planner_class.__name__}.{retired}"
+
+
+def rl_planner():
+    """A small RL planner on a bounded pendulum, built without training."""
+    pytest.importorskip("jax")
+    import numpy as np
+
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.learning import ReinforcementLearningPlanner
+
+    plant = Pendulum()
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    problem = PlanningProblem(
+        plant,
+        x0=[0.1, 0.0],
+        cost=QuadraticCost.from_system(plant),
+        U=plant.input_box,
+        horizon=np.inf,
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the default discount's notice
+        return ReinforcementLearningPlanner(
+            problem, dt=0.1, hidden=(4,), n_rollouts=2, n_steps_per_update=8
+        )
+
+
+def test_the_rl_planner_reads_back_its_sizes_in_its_own_words():
+    """Ruling 18: the parallel rollouts and each one's periods per update, never n_envs or n_steps."""
+    planner = rl_planner()
+    assert (planner.n_rollouts, planner.n_steps_per_update) == (2, 8)
+    for retired in ("n_envs", "n_steps"):
+        assert not hasattr(planner, retired), f"ReinforcementLearningPlanner.{retired}"
 
 
 def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
