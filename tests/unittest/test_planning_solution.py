@@ -725,3 +725,26 @@ def test_the_planners_cost_to_go_reads_the_time_on_a_finite_horizon():
 
     assert planner.cost_to_go(x, t=1.0) == float(solution.cost_to_go(x, t=1.0))
     assert planner.cost_to_go(x, t=1.0) != planner.cost_to_go(x, t=0.0)
+
+
+def test_a_tree_search_plan_starts_at_the_problem_start_time():
+    """The path's times run from the problem's ``t0``, and its evidence over the path's own length."""
+    from minilink import BallSet, Pendulum, PlanningProblem, QuadraticCost, RRTPlanner
+
+    plant = Pendulum()
+    x_up = np.array([np.pi, 0.0])
+    problem = PlanningProblem(
+        plant,
+        x0=np.zeros(2),
+        Xf=BallSet(x_up, 0.3),
+        cost=QuadraticCost.from_system(plant, x_bar=x_up),
+        X=plant.state.box,
+        U=plant.input_box,
+        t0=2.0,
+    )
+
+    solution = RRTPlanner(problem, seed=0).solve()
+    plan = solution.trajectory
+
+    assert plan.t0 == pytest.approx(2.0)
+    np.testing.assert_allclose(solution.controller.params["t"], plan.t)

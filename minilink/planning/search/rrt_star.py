@@ -219,7 +219,9 @@ class RRTStarPlanner(RRTPlanner):
                 raise RuntimeError("RRT* failed to reach goal within max_nodes")
 
         return self.finish_trajectory(
-            self.tree.extract_trajectory(self.solution_node), evaluate, n_trials
+            self.tree.extract_trajectory(self.solution_node, self.problem.t0),
+            evaluate,
+            n_trials,
         )
 
     def build_kwargs(self) -> dict:

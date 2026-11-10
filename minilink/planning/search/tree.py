@@ -114,8 +114,8 @@ class Tree:
             child.cost = node.cost + child.edge.cost
             self.propagate_cost(child)
 
-    def extract_trajectory(self, node: Node) -> Trajectory:
-        """Concatenate edges from the root to ``node`` into a `Trajectory`."""
+    def extract_trajectory(self, node: Node, t0: float = 0.0) -> Trajectory:
+        """Concatenate edges from the root to ``node`` into a `Trajectory` that starts at ``t0``."""
         # The parent chain, from the root's child down to the node
         chain = []
         current = node
@@ -127,15 +127,15 @@ class Tree:
         # Each edge's knots after its first (the parent's state), on one time axis
         states = [np.asarray(self.root.x, dtype=float)]
         inputs: list[np.ndarray] = []
-        times = [0.0]
-        t0 = 0.0
+        times = [float(t0)]
+        t_edge = float(t0)
         for nd in chain:
             edge = nd.edge
             for k in range(1, len(edge.states)):
                 states.append(np.asarray(edge.states[k], dtype=float))
-                times.append(t0 + float(edge.times[k]))
+                times.append(t_edge + float(edge.times[k]))
             inputs.extend(np.asarray(u, dtype=float) for u in edge.inputs)
-            t0 += float(edge.times[-1])
+            t_edge += float(edge.times[-1])
 
         # The control is piecewise constant: hold the last sample at the final knot
         inputs.append(inputs[-1] if inputs else np.zeros(0))

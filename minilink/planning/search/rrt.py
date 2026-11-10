@@ -179,7 +179,9 @@ class RRTPlanner(Planner):
                 self.solution_node = node
                 report("explore")
                 return self.finish_trajectory(
-                    self.tree.extract_trajectory(node), evaluate, n_trials
+                    self.tree.extract_trajectory(node, self.problem.t0),
+                    evaluate,
+                    n_trials,
                 )
 
             report("explore")
@@ -192,7 +194,7 @@ class RRTPlanner(Planner):
             raise RuntimeError("RRT failed to reach goal within max_nodes")
 
         return self.finish_trajectory(
-            self.tree.extract_trajectory(closest), evaluate, n_trials
+            self.tree.extract_trajectory(closest, self.problem.t0), evaluate, n_trials
         )
 
     def build_kwargs(self) -> dict:
@@ -420,7 +422,11 @@ class RRTPlanner(Planner):
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
             evaluation = planner_evidence(
-                self, controller, dt=dt, n_trials=n_trials, tf=float(trajectory.tf)
+                self,
+                controller,
+                dt=dt,
+                n_trials=n_trials,
+                tf=float(trajectory.tf - trajectory.t0),
             )
 
         solution = PlanningSolution(
