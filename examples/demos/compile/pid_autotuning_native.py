@@ -14,13 +14,13 @@ from minilink import (
 # Rollout horizon and live-plot rate
 TF = 10.0
 DT = 0.05
-PLOT_EVERY = 5
+PLOT_EVERY = 1
 
 # Gradient descent on PID gains
 n_steps = int(TF / DT)
-n_learn_steps = 1000
+n_learn_steps = 100
 lr = 1.0
-plot_pause = 0.05
+plot_pause = 0.01
 
 # The tuning cost: the mean over the run of the squared tracking error and of the
 # effort above the torque that holds the setpoint,
@@ -80,4 +80,12 @@ print(best)
 # The tuned loop, judged and drawn by the problem's evaluator
 tuned = pe.unpack(best.z, wrt, start)
 print(pe.evaluate(tuned))
-plant.plot_trajectory(pe.trajectory(tuned).of("plant"))
+# plant.plot_trajectory(pe.trajectory(tuned).of("plant"))
+
+diagram.params["controller"]["Kp"] = tuned["controller"]["Kp"]
+diagram.params["controller"]["Kd"] = tuned["controller"]["Kd"]
+diagram.params["controller"]["Ki"] = tuned["controller"]["Ki"]
+
+diagram.compute_trajectory()
+diagram.plot_trajectory()
+diagram.animate()
