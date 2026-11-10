@@ -13,6 +13,7 @@ from minilink.core.params import checked
 from minilink.core.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
+    one_callback,
     preview_vector,
 )
 from minilink.core.trajectory import Trajectory
@@ -185,7 +186,7 @@ class TrajectoryOptimizationPlanner(Planner):
         evaluate: bool = False,
         n_trials: int = 50,
         verbose: bool = False,
-        callback: Callable | None = None,
+        callback: Callable | list[Callable] | None = None,
         live_plot: bool = False,
         record_history: bool = False,
     ) -> PlanningSolution:
@@ -203,7 +204,8 @@ class TrajectoryOptimizationPlanner(Planner):
         input as a source block, ``controller >> plant``; ``evaluate=True`` also
         replays it over the problem's draws (one trial when nothing is random).
         The workflow: ``verbose`` prints the preamble and the report,
-        ``callback(iteration)`` sees every iterate, ``live_plot`` redraws the
+        ``callback(iteration)`` (a callable or a list of callables) sees every
+        iterate, ``live_plot`` redraws the
         plan beside it, and ``record_history`` keeps a full :class:`Trajectory`
         per iterate in the record (one rollout each: leave it off for
         production solves).
@@ -435,11 +437,13 @@ class TrajectoryOptimizationPlanner(Planner):
         history: list,
         dynamics,
         *,
-        callback: Callable | None = None,
+        callback: Callable | list[Callable] | None = None,
         live_plot: bool = False,
         record_history: bool = False,
     ) -> OptimizationProgressCallback | None:
         """The optimizer's progress hook (``history`` appended to, live plot, user callback) on the solve's compiled ``dynamics``, or ``None``."""
+        callback = one_callback(callback)
+
         # The live figure, beside the user's callback when there is one
         if live_plot:
             # Lazy import: the graphics load on first use, not with the core

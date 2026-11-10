@@ -1691,9 +1691,12 @@ taken per call by `solve(params=…)`, the complete tree edited (a method number
 leaves at its value is derived again on the solve's problem, one it changes is given); **an external solver's knobs** (SciPy `maxiter`,
 `ftol`; Ipopt's), the dict `options=` passed through untouched, never in `params`; and
 **workflow** (`verbose`, `callback`, trajectory optimization's `live_plot`, `record_history`
-and RRT*'s `history_stride`), keywords that change what is shown, never what is computed. The constructor
-takes the first three kinds; the workflow is a keyword of the verb, `solve` (and `solve_steps`
-where it exists), as on `Optimizer.solve` and `compute_trajectory`, and travels as arguments
+and RRT*'s `history_stride`), keywords that change what is shown, never what is computed:
+`verbose=False` on every planner's `solve` (where a method has no progress of its own to show,
+`verbose=True` prints the record), `callback` a callable or a list of callables wherever
+there is one (`Optimizer.solve` included), `show=` on every plot. The constructor
+takes the first three kinds; the workflow is a keyword of the verb, `solve` (and `solve_steps`,
+with its `params=`, where it exists), as on `Optimizer.solve` and `compute_trajectory`, and travels as arguments
 down to where it is read, never as planner state. A planner rebuilt for a sweep (`planner_at`,
 `build_kwargs`, `rebuilt_on`) inherits no display: `solve(params=…)` hands its own workflow keywords to the
 rebuilt planner's `solve`. Value iteration rebuilds its grid with the grid's own options

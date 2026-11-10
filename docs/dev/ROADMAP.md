@@ -402,7 +402,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `step_sys.transfer_function(…)` as on a continuous system; `diagram.add_subsystem(sys)`
     without an id (the operators' default, returned); `StepPlanningProblem.replace`; a scalar
     `u` on a one-input `compute_rollout`; a sampled `u` off the run's grid refused naming
-    `n_samples=` and `dt=`.
+    `n_samples=` and `dt=`; `verbose=False` on the LQR, RRT, RRT* and MPPI planners' `solve`
+    (the record printed), `callback` a list of callables on trajectory optimization and
+    `Optimizer.solve`, `params=` on value iteration's `solve_steps`, `show=` on
+    `plot_signal` and the learning curves.
 
 ## 3. Maturity (TRL)
 

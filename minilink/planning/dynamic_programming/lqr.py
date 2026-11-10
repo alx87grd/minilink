@@ -141,7 +141,9 @@ class LQRPlanner(Planner):
         self.method = method
         self.eps = float(eps)
 
-    def solve(self, *, params=None, evaluate=False, n_trials=50) -> PlanningSolution:
+    def solve(
+        self, *, params=None, evaluate=False, n_trials=50, verbose=False
+    ) -> PlanningSolution:
         """
         Solve the Riccati equation of the linearized problem.
 
@@ -151,11 +153,12 @@ class LQRPlanner(Planner):
         continuous loop on the grid of ``dt``).
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
+        ``verbose`` prints the record (the gain, the closed-loop poles).
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials
+                evaluate=evaluate, n_trials=n_trials, verbose=verbose
             )
             return self.store_solution(solution)
 
@@ -245,6 +248,8 @@ class LQRPlanner(Planner):
             cost_to_go=cost_to_go,
             evaluation=evaluation,
         )
+        if verbose:
+            print(record)
 
         return self.store_solution(solution)
 

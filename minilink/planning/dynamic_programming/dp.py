@@ -231,6 +231,7 @@ class DynamicProgrammingPlanner(Planner):
         self,
         n_steps: int,
         *,
+        params=None,
         evaluate=False,
         n_trials=50,
         verbose: bool = False,
@@ -242,8 +243,20 @@ class DynamicProgrammingPlanner(Planner):
         Bertsekas' receding horizon: the stage-0 law of an ``n_steps``-step problem
         applied as a stationary law, whatever the problem's own horizon. Its
         record says ``mode="receding"``; :meth:`solve` on a finite problem keeps
-        every stage instead. ``verbose`` and ``record_history`` as for :meth:`solve`.
+        every stage instead. ``params``, ``verbose`` and ``record_history`` as for
+        :meth:`solve`.
         """
+        # At another tree: the planner there, its solution kept here
+        if params is not None:
+            solution = planner_at(self, params).solve_steps(
+                n_steps,
+                evaluate=evaluate,
+                n_trials=n_trials,
+                verbose=verbose,
+                record_history=record_history,
+            )
+            return self.store_solution(solution)
+
         # Exactly n_steps backward sweeps from the terminal cost
         result = self.value_iteration(
             int(n_steps),

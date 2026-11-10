@@ -14,6 +14,19 @@ DISP_RULE_DIV = "-" * DISP_LINE_WIDTH
 ###############################################################################
 
 
+def one_callback(callback):
+    """``callback`` as one callable: ``None``, a callable, or a list of callables called in turn with the same arguments."""
+    if callback is None or callable(callback):
+        return callback
+    hooks = list(callback)
+
+    def every_hook(*args):
+        for hook in hooks:
+            hook(*args)
+
+    return every_hook
+
+
 def preview_vector(value) -> str | None:
     """Compact one-line preview of a vector (head + length for long ones)."""
     if value is None:

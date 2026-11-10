@@ -112,6 +112,7 @@ class RRTStarPlanner(RRTPlanner):
         params=None,
         evaluate=False,
         n_trials=50,
+        verbose=False,
         callback: Callable | list[Callable] | None = None,
         record_history: bool = False,
         history_stride: int = 1,
@@ -130,6 +131,7 @@ class RRTStarPlanner(RRTPlanner):
             solution = planner_at(self, params).solve(
                 evaluate=evaluate,
                 n_trials=n_trials,
+                verbose=verbose,
                 record_history=record_history,
                 history_stride=history_stride,
                 callback=callback,
@@ -223,6 +225,7 @@ class RRTStarPlanner(RRTPlanner):
             evaluate,
             n_trials,
             self.search_record(reached_goal, n_iterations),
+            verbose=verbose,
         )
 
     def build_kwargs(self) -> dict:

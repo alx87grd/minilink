@@ -146,14 +146,17 @@ class MPPIPlanner(Planner):
 
         return CompiledMPPIPlanner(self)
 
-    def solve(self, *, params=None, guess=None, evaluate=False, n_trials=50):
+    def solve(
+        self, *, params=None, guess=None, evaluate=False, n_trials=50, verbose=False
+    ):
         """
         One path-integral solve from the problem's start: a :class:`~minilink.planning.results.PlanningSolution`.
 
         ``params`` is ``None`` (the problem as it is) or the complete tree of
         :attr:`params`, edited; ``guess`` (a trajectory or
         a solution) seeds ``U``, else the ports' nominal input. The controller is
-        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``.
+        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``;
+        ``verbose`` prints the record.
         """
         pv = self.compile()
         z0 = pv.initial(params) if guess is None else pv.pack(guess, params)
@@ -166,6 +169,8 @@ class MPPIPlanner(Planner):
                 self, solution.controller, dt=self.dt, n_trials=n_trials
             )
             solution = replace(solution, evaluation=evaluation)
+        if verbose:
+            print(solution.record)
 
         return self.store_solution(solution)
 

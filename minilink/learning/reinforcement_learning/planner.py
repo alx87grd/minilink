@@ -461,11 +461,19 @@ class ReinforcementLearningPlanner(Planner):
 
     # Plots
 
-    def plot_learning_curve(self, ax=None):
-        """Mean return of the exploration episodes against training steps."""
+    def plot_learning_curve(self, ax=None, *, show=True):
+        """Mean return of the exploration episodes against training steps.
+
+        A figure made here is shown when ``show`` (``False`` builds it only); a
+        passed ``ax`` leaves display to the caller. Returns the axis.
+        """
         import matplotlib.pyplot as plt
 
-        if ax is None:
+        # Lazy import: the graphics load on first use, not with the learner
+        from minilink.graphical.common.environment import is_blocking_needed
+
+        created = ax is None
+        if created:
             _, ax = plt.subplots(figsize=(8, 3))
 
         # Mean episode return against plant steps, one point per iteration
@@ -475,6 +483,8 @@ class ReinforcementLearningPlanner(Planner):
         ax.set_xlabel("timesteps")
         ax.set_ylabel("mean episode return")
         ax.grid(True, alpha=0.3)
+        if created and show:
+            plt.show(block=is_blocking_needed())
 
         return ax
 

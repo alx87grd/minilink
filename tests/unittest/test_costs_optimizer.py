@@ -416,6 +416,21 @@ def test_scipy_minimize_progress_callback_z_J_t():
     assert times == sorted(times)
 
 
+def test_the_optimizer_takes_a_list_of_callbacks():
+    opt = Optimizer(
+        _quadratic_program(),
+        z0=np.array([1.0]),
+        method="slsqp",
+        options={"disp": False, "maxiter": 50},
+    )
+    first, second = [], []
+    opt.solve(
+        callback=[lambda z, J, t: first.append(J), lambda z, J, t: second.append(J)]
+    )
+    assert len(first) >= 1
+    assert first == second
+
+
 def test_solve_accepts_one_off_initial_guess_without_recompiling():
     prog = _quadratic_program()
     opt = Optimizer(

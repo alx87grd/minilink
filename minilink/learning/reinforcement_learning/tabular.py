@@ -395,11 +395,19 @@ class TabularLearningPlanner(Planner):
         """The latest solution's greedy policy table on the grid itself, as value iteration draws it."""
         return plotting.plot_control_law(require_solution(self).record.tables, **kwargs)
 
-    def plot_learning_curve(self, ax=None, window=20):
-        """Episode cost against episodes, smoothed by a moving average of ``window`` episodes."""
+    def plot_learning_curve(self, ax=None, window=20, *, show=True):
+        """Episode cost against episodes, smoothed by a moving average of ``window`` episodes.
+
+        A figure made here is shown when ``show`` (``False`` builds it only); a
+        passed ``ax`` leaves display to the caller. Returns the axis.
+        """
         import matplotlib.pyplot as plt
 
-        if ax is None:
+        # Lazy import: the graphics load on first use, not with the learner
+        from minilink.graphical.common.environment import is_blocking_needed
+
+        created = ax is None
+        if created:
             _, ax = plt.subplots(figsize=(8, 3))
 
         # The episode costs, and the averaging kernel over the window
@@ -415,6 +423,8 @@ class TabularLearningPlanner(Planner):
         ax.set_xlabel("episode")
         ax.set_ylabel("episode cost")
         ax.grid(True, alpha=0.3)
+        if created and show:
+            plt.show(block=is_blocking_needed())
 
         return ax
 

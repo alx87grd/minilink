@@ -48,7 +48,7 @@ class Source(System):
 
         return value
 
-    def plot_signal(self, t0=None, tf=None, n_samples=1000, ax=None):
+    def plot_signal(self, t0=None, tf=None, n_samples=1000, ax=None, *, show=True):
         """
         Plot the source output signal over a time range.
 
@@ -65,6 +65,8 @@ class Source(System):
             (same policy as
             :func:`minilink.graphical.signals.plot_time_signals`);
             if an axis is passed, the caller controls display.
+        show : bool, optional
+            Show a figure made here (default); ``False`` builds it only.
         """
         import matplotlib.pyplot as plt
 
@@ -128,7 +130,7 @@ class Source(System):
         ax.set_title(f"{self.name} signal", fontsize=FONT_SIZE)
 
         # A figure made here is shown here; a passed axis leaves display to the caller
-        if created:
+        if created and show:
             plt.show(block=is_blocking_needed())
 
         return fig, ax

@@ -2187,6 +2187,27 @@ class TestTextbookOptions(unittest.TestCase):
         self.assertEqual(seen, ["iteration"])
         live.assert_called_once_with("iteration")
 
+    def test_trajopt_takes_a_list_of_callbacks(self):
+        from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
+
+        plant = Pendulum()
+        goal = np.array([np.pi, 0.0])
+        problem = PlanningProblem(
+            plant,
+            x0=np.zeros(2),
+            Xf=SingletonSet(goal),
+            horizon=1.0,
+            cost=QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=goal),
+            U=plant.input_box,
+        )
+        planner = TrajectoryOptimizationPlanner(
+            problem, n_steps=5, transcription="direct_collocation"
+        )
+        first, second = [], []
+        planner.solve(callback=[first.append, second.append])
+        self.assertGreater(len(first), 0)
+        self.assertEqual(first, second)
+
     def test_problem_evaluator_live_plot_callback_updates_figure(self):
         import matplotlib
 

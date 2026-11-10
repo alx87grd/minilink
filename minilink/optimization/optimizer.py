@@ -21,6 +21,7 @@ from minilink.core.params import require_complete
 from minilink.core.reporting import (
     DISP_RULE_DIV,
     DISP_RULE_MAIN,
+    one_callback,
     preview_vector,
 )
 from minilink.optimization.evaluators.compiler import compile_program_evaluator
@@ -219,7 +220,9 @@ class Optimizer:
         *,
         params=None,
         z0=None,
-        callback: OptimizationProgressCallback | None = None,
+        callback: OptimizationProgressCallback
+        | list[OptimizationProgressCallback]
+        | None = None,
         verbose: bool = False,
     ) -> OptimizationResult:
         """
@@ -236,8 +239,8 @@ class Optimizer:
         z0 : array_like, optional
             One-off initial decision vector, the warm start. If omitted, use
             the default ``z0`` supplied to :class:`Optimizer`.
-        callback : callable, optional
-            If not ``None``, called during the solve as ``callback(z, J, t)``:
+        callback : callable or list of callables, optional
+            If not ``None``, each called during the solve as ``callback(z, J, t)``:
             current decision ``z`` (1-D :class:`~numpy.ndarray`), objective
             :math:`J(z)`, and ``t`` elapsed wall time (seconds) since the
             backend solve started. Each invocation evaluates ``J(z)`` again
@@ -246,6 +249,8 @@ class Optimizer:
         verbose : bool, optional
             If True, print the framed solve panel (preamble and report).
         """
+        callback = one_callback(callback)
+
         # The program's values and the method's numbers of this solve, one complete tree
         if params is not None:
             require_tree_of(self, params)

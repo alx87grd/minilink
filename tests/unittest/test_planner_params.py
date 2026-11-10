@@ -221,3 +221,77 @@ def test_the_grids_table_options_survive_a_discount_and_a_tree():
     rebuilt = built.call_args.args[0]
     assert rebuilt.grid.precompute is False and rebuilt.grid.precomputed is False
     assert rebuilt.gamma == 0.8
+
+
+def test_every_planner_takes_verbose_off_by_default():
+    """``verbose=False`` on every planner's solve (AS-47: LQR, RRT, RRT* and MPPI added)."""
+    import inspect
+
+    from minilink import ReinforcementLearningPlanner, TrajectoryOptimizationPlanner
+    from minilink.planning import MPPIPlanner
+
+    planners = (
+        DynamicProgrammingPlanner,
+        LQRPlanner,
+        RRTPlanner,
+        RRTStarPlanner,
+        TabularLearningPlanner,
+        TrajectoryOptimizationPlanner,
+        MPPIPlanner,
+        ReinforcementLearningPlanner,
+    )
+    for planner in planners:
+        parameter = inspect.signature(planner.solve).parameters["verbose"]
+        assert parameter.default is False, planner.__name__
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+@pytest.mark.parametrize("name", ["LQR", "RRT", "RRT*"])
+def test_a_verbose_solve_prints_its_record_once(name, capsys):
+    build, numbers = PLANNERS[name]
+    planner = build()
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"
+    planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+    assert (
+        capsys.readouterr().out.count("\n")
+        == str(planner.last_solution.record).count("\n") + 1
+    )
+    planner.solve()
+    assert capsys.readouterr().out == ""
+
+
+def test_solve_steps_takes_a_tree_as_solve_does():
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    at_tree = planner.solve_steps(5, params=edited(planner.params, {"method": numbers}))
+    built_there = build(**numbers).solve_steps(5)
+    np.testing.assert_allclose(fingerprint(at_tree), fingerprint(built_there))
+    assert at_tree is planner.last_solution
+
+
+def test_the_learning_curve_and_a_sources_signal_take_show():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from minilink import Step
+
+    build, _ = PLANNERS["tabular"]
+    planner = build()
+    solve_of(planner)
+    with mock.patch("matplotlib.pyplot.show") as shown:
+        ax = planner.plot_learning_curve(show=False)
+        Step().plot_signal(show=False)
+        assert not shown.called
+        planner.plot_learning_curve()
+        assert shown.call_count == 1
+    assert ax.get_xlabel() == "episode"
+
+
+def test_an_mppi_solve_prints_its_record_when_verbose(capsys):
+    from minilink.planning import MPPIPlanner
+
+    problem = reach().replace(Xf=None, horizon=0.5)
+    planner = MPPIPlanner(problem, dt=0.1, n_rollouts=8, n_iterations=1)
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"

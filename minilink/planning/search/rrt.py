@@ -114,6 +114,7 @@ class RRTPlanner(Planner):
         params=None,
         evaluate=False,
         n_trials=50,
+        verbose=False,
         callback: Callable | list[Callable] | None = None,
     ) -> PlanningSolution:
         """
@@ -130,12 +131,13 @@ class RRTPlanner(Planner):
         :class:`~minilink.planning.search.live_plot.TreeSearchIteration`; each
         hook filters for itself. The live figure is one such hook,
         ``callback=LiveSearchPlot(every=10)``
-        (:class:`~minilink.planning.search.live_plot.LiveSearchPlot`).
+        (:class:`~minilink.planning.search.live_plot.LiveSearchPlot`);
+        ``verbose`` prints the record at the end.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
-                evaluate=evaluate, n_trials=n_trials, callback=callback
+                evaluate=evaluate, n_trials=n_trials, verbose=verbose, callback=callback
             )
             return self.store_solution(solution)
 
@@ -180,6 +182,7 @@ class RRTPlanner(Planner):
                     evaluate,
                     n_trials,
                     self.search_record(reached_goal, n_iterations),
+                    verbose=verbose,
                 )
 
             report("explore", n_iterations, reached_goal)
@@ -196,6 +199,7 @@ class RRTPlanner(Planner):
             evaluate,
             n_trials,
             self.search_record(reached_goal, n_iterations),
+            verbose=verbose,
         )
 
     def build_kwargs(self) -> dict:
@@ -411,9 +415,9 @@ class RRTPlanner(Planner):
         )
 
     def finish_trajectory(
-        self, trajectory: Trajectory, evaluate, n_trials, record
+        self, trajectory: Trajectory, evaluate, n_trials, record, *, verbose=False
     ) -> PlanningSolution:
-        """The path as a solution: its input held by a source block, the search's ``record``, scored when asked."""
+        """The path as a solution: its input held by a source block, the search's ``record`` (printed when ``verbose``), scored when asked."""
         controller = open_loop_controller_of(trajectory, self.problem.sys, hold="zoh")
 
         # Scored over the problem's draws, on the path's median time step
@@ -435,6 +439,8 @@ class RRTPlanner(Planner):
             trajectory=trajectory,
             evaluation=evaluation,
         )
+        if verbose:
+            print(record)
 
         return self.store_solution(solution)
 
