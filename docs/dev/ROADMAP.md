@@ -405,7 +405,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `n_samples=` and `dt=`; `verbose=False` on the LQR, RRT, RRT* and MPPI planners' `solve`
     (the record printed), `callback` a list of callables on trajectory optimization and
     `Optimizer.solve`, `params=` on value iteration's `solve_steps`, `show=` on
-    `plot_signal` and the learning curves.
+    `plot_signal` and the learning curves; `sensitivity(plant, controller, …)` (and its three
+    siblings) positional, the plant read on `bode`'s channel with `of=` / `wrt=` (a plant of
+    several channels was refused).
 
 ## 3. Maturity (TRL)
 

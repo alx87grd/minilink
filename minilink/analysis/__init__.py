@@ -9,7 +9,7 @@ from minilink.core.exports import lazy_facade
 #
 # Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``; the
 # sensitivity functions take the loop's pieces instead,
-# ``sensitivity(plant=H, controller=C, filter=F)``. A ``System`` carries the common
+# ``sensitivity(plant, controller, x_bar, …, *, filter=F, of=, wrt=)``. A ``System`` carries the common
 # ones as methods: ``linearize``, ``find_equilibrium``, ``transfer_function``,
 # ``plot_bode``, ``plot_pzmap``, ``plot_root_locus``, ``plot_nyquist``,
 # ``plot_step_response`` and ``animate_modal``. The band is linear analysis at an operating point: a

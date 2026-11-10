@@ -2188,14 +2188,49 @@ class TestSensitivity(unittest.TestCase):
                     atol=1e-9,
                 )
 
-    def test_a_piece_with_several_channels_is_refused(self):
-        from minilink.analysis import sensitivity, transfer_function
+    def test_the_plant_is_read_on_bodes_channel_and_positional(self):
+        """``sensitivity(plant, controller)`` reads the plant's channel as ``bode`` does (AS-48)."""
+        from minilink.analysis import (
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+            sensitivity,
+            transfer_function,
+        )
 
         plant, C = Pendulum(), PID(4.0, 2.0, 0.5)
-        with self.assertRaisesRegex(ValueError, "plant 'Pendulum' must be SISO"):
-            sensitivity(plant=plant, controller=C)
         H = transfer_function(plant, of=("y", 0))
-        self.assertEqual(sensitivity(plant=H, controller=C).n, 4)
+        for verb in (
+            sensitivity,
+            complementary_sensitivity,
+            load_sensitivity,
+            noise_sensitivity,
+        ):
+            with self.subTest(verb.__name__):
+                np.testing.assert_allclose(
+                    self.response(verb(plant, C)),
+                    self.response(verb(plant=H, controller=C)),
+                    atol=1e-9,
+                )
+        self.assertEqual(sensitivity(plant, C).n, 4)
+        pytest.importorskip("jax")
+        np.testing.assert_allclose(
+            self.response(sensitivity(plant, C, method="jax")),
+            self.response(sensitivity(plant, C, method="fd")),
+            atol=1e-6,
+        )
+        rate = sensitivity(plant, C, of=("y", 1))
+        np.testing.assert_allclose(
+            self.response(rate),
+            self.response(sensitivity(transfer_function(plant, of=("y", 1)), C)),
+            atol=1e-9,
+        )
+
+    def test_a_filter_with_several_channels_is_refused(self):
+        from minilink.analysis import sensitivity
+
+        with self.assertRaisesRegex(ValueError, "filter 'Pendulum' must be SISO"):
+            sensitivity(Pendulum(), PID(4.0, 2.0, 0.5), filter=Pendulum())
 
     def test_a_reference_form_controller_is_refused_with_its_fix(self):
         from minilink.analysis import sensitivity, transfer_function
