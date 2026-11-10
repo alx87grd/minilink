@@ -125,7 +125,7 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 15 | **MPC's name and place.** `ModelPredictiveController` is a function returning a `PredictiveController`, on no facade; examples import the deep path 12 times | 7 tests | **Ruled 2026-11-10: option 1** — `ModelPredictiveController` is the class (`PredictiveController` renamed, the factory's signature its constructor); the deep imports move to `minilink.control`. Landed on `api-settle`. |
 | 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | **Ruled 2026-11-10: option 1** — the planning plots take one keyword set, written out (`sol.plot_cost_to_go(*, x_axis=, y_axis=, is_3d=, ax=, renderer=, show=)`, `plot_control_law` alike); the planner's method a thin call to the solution's, keeping only its extra `field=`; every plot returns `PlotResult`; scoped to the planning plots, the rest of S67 its own row. Landed on `api-settle`. |
 | 17 | **Records.** `DynamicProgrammingResult` / `record.tables` / `planner.result` (which means two things between value iteration and tabular learning); `cost` is five different quantities across records; timings on two records only | 60 | **Ruled 2026-11-10: option 1** — `DynamicProgrammingResult` → `ValueTables` (`sol.record.tables`); `planner.result` → `planner.tables` on both grid planners, one meaning (the latest solution's tables), tabular learning's live table its own name (`planner.q_table`); a record's `cost` named by its quantity (RRT's `path_cost`, the learners' `episode_cost`; the `Optimizer`'s `cost` stays `J(z*)`; `Evaluation` keeps one of `cost` / `J` after a count); `solve_time_s` on every record. Landed on `api-settle`. |
-| 18 | **The learners' words.** `n_envs`, `n_steps` (periods per update, where `n_steps` is the horizon everywhere else), `policy=` that becomes `planner.actor`, `learn` and `predict` beside `solve`; `Sys2Gym` | 67; 45 | **Ruled 2026-11-10: option 1** — `n_envs` → `n_rollouts`; the RL planner's `n_steps` → `n_steps_per_update`; `policy=` → `actor=` (the block's role in actor-critic, read back as `planner.actor`; the handed-out snapshot stays `solution.controller`); `learn` folds into `solve`; `predict` moves to the SB3 bridge; `Sys2Gym` kept. The blocks named `…Policy` go to decision 20 |
+| 18 | **The learners' words.** `n_envs`, `n_steps` (periods per update, where `n_steps` is the horizon everywhere else), `policy=` that becomes `planner.actor`, `learn` and `predict` beside `solve`; `Sys2Gym` | 67; 45 | **Ruled 2026-11-10: option 1** — `n_envs` → `n_rollouts`; the RL planner's `n_steps` → `n_steps_per_update`; `policy=` → `actor=` (the block's role in actor-critic, read back as `planner.actor`; the handed-out snapshot stays `solution.controller`); `learn` folds into `solve`; `predict` moves to the SB3 bridge; `Sys2Gym` kept. The blocks named `…Policy` go to decision 20. Landed on `api-settle`. |
 | 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | `lqr_trajectory`; `horizon`; `StateObserver(model, L)` |
 | 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first |
 | 21 | **The root list.** Names with no example use (`LinearApproximator`, `QuadraticFeatures`, `RadialBasisFeatures`, `StaticSimulator`, the `*_gain` four, `BoxInputSet`); half pairs (`lqr_gain` without `lqr_gain_schedule`) | maintainer-owned | Regenerated from what the rebuilt examples import (DESIGN §2's own rule) |
@@ -600,3 +600,30 @@ byte-identical.
   counts every training of the planner, collections and updates only, with `n_timesteps`.
   Each record's `str` ends with "; solved in … s" (the LQR's before "; U ignored").
 
+The run of ruling 18 on the branch `api-settle` (2026-11-10), one commit per step. A new seeded
+baseline (PPO, REINFORCE, actor-critic and SAC on the bounded pendulum, two solves each with an
+evaluation, the records, weights and laws; a given actor and its rebuild at another tree; a
+tabular run, twice), name-agnostic, run twice and compared, then after each step:
+byte-identical.
+
+- **Ruling 18, the collector's words.** The internal `rollout(…, n_steps, n_envs)` and
+  `reset_carry(…, n_envs)` take `n_rollouts`; the collector's `n_steps` stays, since there it is
+  the rollout's own length, a horizon's transitions. PPO's refusal reads "n_steps_per_update *
+  n_rollouts must be a multiple of batch_size". The algorithms' parameter tree keeps its
+  `"policy"` key: it is the exploration policy's `theta` (`mlp` and `head`), not the actor.
+- **Ruling 18, `learn` into `solve`.** `learn` trained without handing out a solution; `solve`
+  already trained through it, continuing where the last training stopped. The loop moved into
+  `solve`, with no private `learn` left (a renamed helper would keep two verbs);
+  `learn(n)` → `solve(n_timesteps=n)`, its one cost a copy of the law per call. Checked on the
+  base: `learn(64)` then `solve(64)` and the new `solve(64)` twice give the same weights,
+  records and evaluation (PPO and SAC). A test asserts that a second solve continues the count.
+- **Ruling 18, `predict`.** Nothing native called it but the tests. Its deterministic branch
+  is `solution.controller` or `planner.actor.action(x)`; its `deterministic=False` branch, an
+  exploration draw, is reachable as `planner.exploration_policy.sample(theta, x, key)` then
+  `.input(a)` (the test now says so). The bridge needed no change: `SB3Controller` already
+  reads an SB3 model's `predict`. The jitted `action_jit` it alone used is gone.
+- **Ruling 18, scope.** The tabular learner's own `learn(n_episodes)` was left, the ruling
+  naming the RL planner; a question for the maintainer whether it folds into `solve` the same
+  way. Course notebooks: the code cells only (`drone_ppo.ipynb`'s constructor and two training
+  cells, `pendulum_value_iteration_vs_lqr_vs_rl.ipynb`'s constructor); SB3's own `learn` and
+  `predict` in the SB3 notebooks are SB3's and stay.
