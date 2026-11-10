@@ -79,7 +79,7 @@ def run_cartpole_rebuild(
     return _metrics_from_result(
         prefix="e4.cartpole_rebuild",
         result=result,
-        notes="CartPole TOP.solve, scipy_slsqp, backend=jax",
+        notes="CartPole TOP.solve, slsqp, backend=jax",
     )
 
 
@@ -121,7 +121,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         problem,
         transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": PENDULUM_FTOL,
@@ -227,7 +227,7 @@ def run_bicycle_parametric(
         problem,
         transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": BICYCLE_FTOL,

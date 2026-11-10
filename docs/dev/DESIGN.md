@@ -1207,9 +1207,15 @@ is a sampled loop: `(ctl % dt) @ plant` holds the torque between ticks, the inte
 ## 6. Optimization And Planning
 
 **NLP:** `minimize J(z)` s.t. `h=0`, `g≥0`, bounds. Pure `MathematicalProgram`;
-`Optimizer(program, z0=None, method=)` binds a method preset named by algorithm: `gd`
-and `adam` (the first-order backend, projected on the box), `l-bfgs`, `scipy_slsqp`,
-`scipy_trust_constr`, `ipopt`; the default is `method="auto"`. The program's class is read from its
+`Optimizer(program, z0=None, method=, backend=)` binds a method: `method=` names the
+algorithm, `gd` and `adam` (the first-order backend, projected on the box), `l-bfgs`,
+`slsqp`, `trust-constr` (SciPy's spellings), `ipopt`; the default is `method="auto"`.
+`backend=` is the array module the program is evaluated on (`"numpy"`, `"jax"`, default the
+program's), and the pair selects the implementation through one table keyed
+`(method, backend)` (`optimizer.METHODS`); a pair the table lacks is refused with the methods
+that run on that backend. Each algorithm has one implementation today on either backend
+(SciPy and Ipopt on the host, the first-order loop on the program's array module); a
+`library=` keyword may come later without a break. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
 constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may

@@ -206,7 +206,7 @@ def gif_cartpole() -> None:
         n_steps=40,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
     camera = camera_matrix(
@@ -377,7 +377,7 @@ def racecar_mpc() -> None:
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 60, "ftol": 1.0},
     )
     mpc = ModelPredictiveController(planner, delay=True)

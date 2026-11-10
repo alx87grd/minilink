@@ -90,12 +90,12 @@ def default_optimizer_variants(
     variants: list[OptimizerBenchmarkVariant] = [
         OptimizerBenchmarkVariant(
             name="scipy-SLSQP",
-            method="scipy_slsqp",
+            method="slsqp",
             options={"maxiter": int(maxiter), "ftol": float(ftol), "disp": False},
         ),
         OptimizerBenchmarkVariant(
             name="scipy-trust-constr",
-            method="scipy_trust_constr",
+            method="trust-constr",
             options={"maxiter": int(maxiter), "xtol": float(ftol), "disp": False},
         ),
     ]

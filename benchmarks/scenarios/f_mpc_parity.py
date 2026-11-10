@@ -79,7 +79,7 @@ def _bicycle_planner():
         ),
         transcription=DirectCollocationTranscription(n_steps=N_STEPS),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": MAXITER, "ftol": FTOL, "disp": False},
     )
     return planner, sys, x0

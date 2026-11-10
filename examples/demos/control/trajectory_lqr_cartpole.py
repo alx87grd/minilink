@@ -18,7 +18,7 @@ TF = 4.0
 X_START = np.array([0.0, 0.0, 0.0, 0.0])  # hanging, at rest
 X_GOAL = np.array([0.0, np.pi, 0.0, 0.0])  # upright
 X0 = X_START + np.array([0.5, 0.3, 0.0, 0.0])  # where the real cart-pole starts
-OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "scipy_slsqp"
+OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "slsqp"
 
 plant = CartPole()
 plant.inputs["u"].lower_bound[0] = -10.0

@@ -76,7 +76,7 @@ def run_showcase_cartpole_trajopt(
         problem,
         transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": SHOWCASE_TRAJOPT_FTOL,

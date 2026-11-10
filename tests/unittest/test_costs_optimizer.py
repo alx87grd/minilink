@@ -337,7 +337,7 @@ def test_a_solve_always_records_the_backend_solves_wall_time():
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     out = opt.solve()
@@ -351,7 +351,7 @@ def test_scipy_minimize_disp_prints_report(capsys):
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     out = opt.solve(verbose=True)
@@ -371,7 +371,7 @@ def test_scipy_minimize_progress_callback_z_J_t():
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
 
@@ -394,7 +394,7 @@ def test_solve_accepts_one_off_initial_guess_without_recompiling():
     opt = Optimizer(
         prog,
         z0=np.array([1.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={"disp": False, "maxiter": 50},
     )
     program_evaluator = opt.program_evaluator
@@ -580,7 +580,7 @@ def test_auto_picks_by_class_and_a_method_the_class_refuses_is_refused():
         Optimizer(quadratic_program(), z0=np.zeros(2), method="auto").method == "l-bfgs"
     )
     constrained = quadratic_program(g=lambda z: z)
-    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "scipy_slsqp"
+    assert Optimizer(constrained, z0=np.zeros(2), method="auto").method == "slsqp"
     with pytest.raises(ValueError, match="constrained"):
         Optimizer(constrained, z0=np.zeros(2), method="gd")
     with pytest.raises(ValueError, match="Unknown optimizer method"):
@@ -697,7 +697,7 @@ def test_one_method_table_builds_every_solve_paths_adapter():
     from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
     from minilink.optimization.optimizers.scipy_minimize import ScipyMinimizeOptimizer
 
-    slsqp = make_optimizer_backend("scipy_slsqp", options={"maxiter": 7})
+    slsqp = make_optimizer_backend("slsqp", options={"maxiter": 7})
     assert isinstance(slsqp, ScipyMinimizeOptimizer)
     assert slsqp.options == {
         "disp": False,

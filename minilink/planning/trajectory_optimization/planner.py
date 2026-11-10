@@ -75,7 +75,7 @@ class TrajectoryOptimizationPlanner(Planner):
         *,
         transcription: Transcription | str | None = None,
         n_steps: int | None = None,
-        method: str = "scipy_slsqp",
+        method: str = "slsqp",
         backend: str = BACKEND_NUMPY,
         n_iterations: int | None = None,
         use_hessian: bool = False,

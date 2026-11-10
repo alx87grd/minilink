@@ -691,7 +691,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         n_steps=CORNER_N_STEPS,
         transcription="direct_collocation",
         backend=backend,
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 150, "ftol": 0.1},
     )
     t0 = time.perf_counter()

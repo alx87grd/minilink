@@ -378,6 +378,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `PredictiveController` is gone. Import it from the teaching facade,
     `from minilink.control import ModelPredictiveController` (the
     `minilink.planning.trajectory_optimization.mpc` export stays).
+  - *The optimizer's method names the algorithm* (the maintainer's ruling 12):
+    `method="scipy_slsqp"` → `method="slsqp"`, `"scipy_trust_constr"` → `"trust-constr"`
+    (SciPy's own spellings), on `Optimizer`, trajectory optimization (its default is
+    `"slsqp"`) and the MPC presets; the old strings are refused. `backend=` (the array module)
+    and the method select the implementation through one table keyed `(method, backend)`;
+    every method runs as before on NumPy and JAX.
 
 ## 3. Maturity (TRL)
 

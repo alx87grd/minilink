@@ -412,7 +412,7 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
     assert late.record.cost == pytest.approx(early.record.cost, rel=1e-6)
 
 
-def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"):
+def bicycle_planner(mu=1.0, target_y=0.0, *, method="slsqp", backend="jax"):
     """The rate bicycle's lane-keeping MPC (the e4 parity scenario), its friction and its lane given."""
     from minilink import BicycleDynRate
     from minilink.planning import TrajectoryOptimizationPlanner
@@ -490,7 +490,7 @@ def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
         pv.solve(edited(pv.params, {"plant": {"nu": 1.0}}))
 
 
-def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
+def pendulum_planner(m=1.0, *, method="slsqp"):
     """The pendulum brought back from 0.5 rad on 11 collocation knots, its mass given."""
     from minilink.planning import TrajectoryOptimizationPlanner
 

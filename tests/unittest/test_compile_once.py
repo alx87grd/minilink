@@ -122,7 +122,7 @@ def test_a_repeated_compiled_solve_compiles_nothing():
         n_steps=20,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 20},
     ).compile()
     native = TrajectoryOptimizationPlanner(
@@ -390,7 +390,7 @@ def test_a_new_horizon_before_a_solve_is_a_new_program():
         n_steps=10,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 10},
     )
     assert planner.solve(evaluate=False).trajectory.t[-1] == pytest.approx(1.0)

@@ -516,6 +516,32 @@ def test_no_retired_solver_name(retired):
         Simulator(Pendulum(), tf=0.1, n_samples=3, solver=retired)
 
 
+# The optimizer's method names the algorithm (the ruling 12 of 2026-11-10): SciPy's spellings,
+# the library left to backend= and the (method, backend) table
+RETIRED_METHODS = {"scipy_slsqp": "slsqp", "scipy_trust_constr": "trust-constr"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_METHODS))
+def test_no_retired_optimizer_method(retired):
+    from minilink.optimization import MathematicalProgram, Optimizer
+    from minilink.optimization.optimizer import METHODS
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, grad_J=lambda z: 2 * z)
+    with pytest.raises(
+        ValueError, match=f"Unknown optimizer method.*{RETIRED_METHODS[retired]}"
+    ):
+        Optimizer(program, z0=[1.0], method=retired)
+    assert {method for method, _ in METHODS} >= set(RETIRED_METHODS.values())
+    assert not any(retired == method for method, _ in METHODS)
+
+
+def test_a_missing_method_backend_pair_is_refused_with_the_valid_list():
+    from minilink.optimization.optimizer import preset_of
+
+    with pytest.raises(ValueError, match="the methods on 'torch' are"):
+        preset_of("slsqp", "torch")
+
+
 def public_objects():
     """Every exported class and function of the facades, once, plants aside."""
     found = {}

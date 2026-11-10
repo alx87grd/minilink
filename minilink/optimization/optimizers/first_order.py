@@ -481,7 +481,7 @@ def require_no_constraints(program_evaluator):
     if program_evaluator.n_g or program_evaluator.n_h:
         raise ValueError(
             "gd and adam take an unconstrained or box-bounded program; this one has "
-            "constraint rows (use 'scipy_slsqp', 'scipy_trust_constr' or 'ipopt')"
+            "constraint rows (use 'slsqp', 'trust-constr' or 'ipopt')"
         )
 
 

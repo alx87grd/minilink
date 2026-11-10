@@ -817,7 +817,7 @@ pe = problem.<span class="token-fn">compile</span>(ctrl)
 program = pe.<span class="token-fn">program</span>(wrt=[<span class="token-str">"controller.Kp"</span>, <span class="token-str">"controller.Kd"</span>])
 
 <span class="token-com"># Switch solvers with a single keyword:</span>
-<span class="token-com"># "auto", "adam", "l-bfgs", "scipy_slsqp", "ipopt"</span>
+<span class="token-com"># "auto", "adam", "l-bfgs", "slsqp", "ipopt"</span>
 opt = <span class="token-cls">Optimizer</span>(program, method=<span class="token-str">"auto"</span>)
 result = opt.<span class="token-fn">solve</span>()
 

@@ -89,7 +89,7 @@ def require_no_callback(callback):
         raise NotImplementedError(
             "IpoptOptimizer does not support solve(callback=...): cyipopt's "
             "native Ipopt path does not run a Python callback each iteration. "
-            "Use a SciPy optimizer method (e.g. 'scipy_slsqp') or omit callback."
+            "Use a SciPy optimizer method (e.g. 'slsqp') or omit callback."
         )
 
 

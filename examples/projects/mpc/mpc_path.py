@@ -116,7 +116,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend=BACKEND,
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 100, "ftol": 0.1},
 )
 pv = planner.compile()  # the planner's pure face: solve, shift, command, prediction

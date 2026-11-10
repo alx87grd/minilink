@@ -619,7 +619,7 @@ class TestTheClockOperator(unittest.TestCase):
             ),
             transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
-            method="scipy_slsqp",
+            method="slsqp",
             options={"maxiter": 5, "ftol": 0.1},
         )
         computer = ModelPredictiveController(planner) % 0.2

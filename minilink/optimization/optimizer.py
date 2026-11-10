@@ -7,7 +7,7 @@ from dataclasses import replace
 
 import numpy as np
 
-from minilink.core.backends import array_module
+from minilink.core.backends import BACKEND_NUMPY, COMPILE_BACKENDS, array_module
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.inspect import (
     body_line,
@@ -38,23 +38,33 @@ from minilink.optimization.optimizers.optimizer_backend import (
 # User progress hook: current ``z``, objective ``J``, elapsed wall time ``t`` (seconds since solve start).
 OptimizationProgressCallback = Callable[[np.ndarray, float, float], None]
 
-# User-facing optimizer methods mapped to (backend_key, default_constructor_kwargs).
-_USER_OPTIMIZER_METHODS: dict[str, tuple[str, dict]] = {
+# The algorithms a method names, each mapped to (adapter_key, default_constructor_kwargs)
+PRESETS: dict[str, tuple[str, dict]] = {
     "gd": ("first_order", {"algorithm": "gd", "options": {}}),
     "adam": ("first_order", {"algorithm": "adam", "options": {}}),
     "l-bfgs": (
         "scipy_minimize",
         {"scipy_method": "L-BFGS-B", "options": {}},
     ),
-    "scipy_slsqp": (
+    "slsqp": (
         "scipy_minimize",
         {"scipy_method": "SLSQP", "options": {"disp": False}},
     ),
-    "scipy_trust_constr": (
+    "trust-constr": (
         "scipy_minimize",
         {"scipy_method": "trust-constr", "options": {}},
     ),
     "ipopt": ("ipopt", {"options": {}, "tol": 1e-8}),
+}
+
+# The one method table, keyed (method, backend): the algorithm and the array module of the
+# program it runs on select the implementation. Each algorithm has one implementation today,
+# on either backend: SciPy and Ipopt solve on the host, the first-order loop runs on the
+# program's own array module
+METHODS: dict[tuple[str, str], tuple[str, dict]] = {
+    (method, backend): preset
+    for method, preset in PRESETS.items()
+    for backend in COMPILE_BACKENDS
 }
 
 # The native methods: a pure law run by the optimizer, with a fixed count or to tolerance
@@ -67,19 +77,19 @@ PROGRAM_CLASSES: dict[str, tuple[str, ...]] = {
         "l-bfgs",
         "gd",
         "adam",
-        "scipy_slsqp",
-        "scipy_trust_constr",
+        "slsqp",
+        "trust-constr",
         "ipopt",
     ),
     "bounded": (
         "l-bfgs",
         "gd",
         "adam",
-        "scipy_slsqp",
-        "scipy_trust_constr",
+        "slsqp",
+        "trust-constr",
         "ipopt",
     ),
-    "constrained": ("scipy_slsqp", "scipy_trust_constr", "ipopt"),
+    "constrained": ("slsqp", "trust-constr", "ipopt"),
 }
 
 
@@ -97,7 +107,7 @@ class Optimizer:
     program from ``z0`` or a one-off override::
 
         program = MathematicalProgram(n_z=2, J=J, grad_J=grad_J)
-        opt = Optimizer(program, z0=[0.0, 0.0], method="scipy_slsqp")
+        opt = Optimizer(program, z0=[0.0, 0.0], method="slsqp")
         result = opt.solve(verbose=True)
 
     An optional progress hook ``callback(z, J, t)`` on :meth:`solve` receives
@@ -111,18 +121,20 @@ class Optimizer:
         Default initial decision vector for :meth:`solve`; unset, the program's
         own start (``program.metadata["z0"]``, set by an exported program).
     method : str, optional
-        Optimizer method preset, named by algorithm: ``"gd"`` and ``"adam"``
-        (first-order, projected on the box), ``"l-bfgs"``, ``"scipy_slsqp"``,
-        ``"scipy_trust_constr"``, ``"ipopt"``; or ``"auto"``, the default of the
+        The algorithm: ``"gd"`` and ``"adam"`` (first-order, projected on the
+        box), ``"l-bfgs"``, ``"slsqp"``, ``"trust-constr"`` (SciPy's
+        spellings), ``"ipopt"``; or ``"auto"``, the default of the
         program's class (see
         :func:`~minilink.optimization.mathematical_program.program_class`):
         L-BFGS for an unconstrained or box-bounded program, SLSQP for a
         constrained one. A method the class does not admit is refused (``gd``
         on a program with constraint rows).
     backend : str, optional
-        Mathematical-program evaluator backend, ``"numpy"`` or ``"jax"``.
-        Defaults to ``program.backend`` (the native backend of the program's
-        callables).
+        The array module the program is evaluated on, ``"numpy"`` or
+        ``"jax"``; with ``method`` it selects the implementation (one table
+        keyed ``(method, backend)``, a missing pair refused with the methods
+        that run on that backend). Defaults to ``program.backend`` (the native
+        backend of the program's callables).
     use_hessian : bool, optional
         For JAX program evaluators, auto-generate a dense objective Hessian
         when no ``hess_J`` is supplied.
@@ -179,7 +191,12 @@ class Optimizer:
         # The solver adapter: the method's preset, the caller's keywords and options
         # over it; a native method's numbers come as keywords (max_iterations=, learning_rate=)
         options, method_numbers = method_options_of(method, options, method_numbers)
-        self.adapter = make_optimizer_backend(method, options=options, **method_numbers)
+        self.adapter = make_optimizer_backend(
+            method,
+            backend=self.program_evaluator.backend,
+            options=options,
+            **method_numbers,
+        )
 
     def __str__(self):
         return optimizer_text(self)
@@ -316,13 +333,21 @@ class Optimizer:
         )
 
 
-def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs):
+def make_optimizer_backend(
+    method: str,
+    *,
+    backend: str = BACKEND_NUMPY,
+    options: dict | None = None,
+    **kwargs,
+):
     """
-    The solver adapter of a method preset: the one method table of every solve path.
+    The solver adapter of a method on a backend: the one method table of every solve path.
 
-    ``method`` names a preset of :class:`Optimizer` (``"scipy_slsqp"``,
+    ``method`` names an algorithm of :class:`Optimizer` (``"slsqp"``,
     ``"ipopt"``, ``"adam"``, …; not ``"auto"``, which needs the program's
-    class); ``options`` are merged over the preset's solver options and
+    class) and ``backend`` the array module of the program it solves; the
+    pair selects the implementation, and a pair the table lacks is refused.
+    ``options`` are merged over the preset's solver options and
     ``kwargs`` over its constructor keywords. The adapter solves any program
     evaluator from a start, ``adapter.solve(evaluator, z0)``, whether the
     evaluator came from one transcription or a compiled program with
@@ -330,7 +355,7 @@ def make_optimizer_backend(method: str, *, options: dict | None = None, **kwargs
     """
     require_method(method)
     require_named_method(method)
-    adapter_key, preset = _USER_OPTIMIZER_METHODS[method]
+    adapter_key, preset = preset_of(method, backend)
     backend_kwargs = backend_kwargs_of(preset, kwargs, options)
 
     return adapter_of(adapter_key, backend_kwargs)
@@ -588,10 +613,23 @@ def require_gradient(program_evaluator, method):
         )
 
 
+def preset_of(method, backend):
+    """The adapter key and preset of ``(method, backend)``; refuse a pair the table lacks, naming the methods that run on that backend."""
+    preset = METHODS.get((method, backend))
+    if preset is None:
+        valid = ", ".join(sorted(m for m, b in METHODS if b == backend))
+        raise ValueError(
+            f"method {method!r} has no implementation on the {backend!r} backend; "
+            f"the methods on {backend!r} are: {valid or 'none'}."
+        )
+
+    return preset
+
+
 def require_method(method):
-    """Refuse a method that names no preset."""
-    if method != "auto" and method not in _USER_OPTIMIZER_METHODS:
-        valid = ", ".join(["auto", *sorted(_USER_OPTIMIZER_METHODS)])
+    """Refuse a method that names no algorithm."""
+    if method != "auto" and method not in PRESETS:
+        valid = ", ".join(["auto", *sorted(PRESETS)])
         raise ValueError(
             f"Unknown optimizer method {method!r}. Expected one of: {valid}."
         )
@@ -695,7 +733,7 @@ if __name__ == "__main__":
     opt = Optimizer(
         prog,
         z0=np.array([0.0]),
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "disp": False,
             "maxiter": 200,

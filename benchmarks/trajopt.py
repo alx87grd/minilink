@@ -67,7 +67,7 @@ class TrajectoryOptimizationBenchmarkVariant:
     precision: str = "n/a"
     start: str = "cold"
     optimizer_backend: str = "scipy"
-    optimizer_method: str = "scipy_slsqp"
+    optimizer_method: str = "slsqp"
     optimizer_options: Mapping[str, object] = field(default_factory=dict)
     use_hessian: bool = False
 
@@ -272,7 +272,7 @@ def default_trajectory_optimization_solver_variants(
             backend="numpy",
             derivative="finite-diff",
             optimizer_backend="scipy",
-            optimizer_method="scipy_slsqp",
+            optimizer_method="slsqp",
         ),
     ]
 
@@ -285,7 +285,7 @@ def default_trajectory_optimization_solver_variants(
                 derivative="jax",
                 precision="x64",
                 optimizer_backend="scipy",
-                optimizer_method="scipy_slsqp",
+                optimizer_method="slsqp",
             )
         )
         if include_trust_constr:
@@ -297,7 +297,7 @@ def default_trajectory_optimization_solver_variants(
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="scipy",
-                    optimizer_method="scipy_trust_constr",
+                    optimizer_method="trust-constr",
                     use_hessian=True,
                 )
             )
@@ -604,7 +604,7 @@ def _optimizer_options(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> dict[str, object]:
-    if variant.optimizer_method == "scipy_trust_constr":
+    if variant.optimizer_method == "trust-constr":
         return {
             "maxiter": int(config.maxiter),
             "xtol": float(config.ftol),
@@ -622,7 +622,7 @@ def _optimizer_options(
             **dict(variant.optimizer_options),
         }
 
-    if variant.optimizer_method != "scipy_slsqp":
+    if variant.optimizer_method != "slsqp":
         raise NotImplementedError(
             f"Unknown optimizer method {variant.optimizer_method!r}"
         )

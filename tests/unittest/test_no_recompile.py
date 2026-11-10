@@ -70,7 +70,7 @@ def test_the_compiled_trajectory_planner_at_new_numbers_compiles_nothing():
         swing_problem(),
         transcription=DirectCollocationTranscription(n_steps=8),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 20, "disp": False},
     )
 
@@ -131,7 +131,7 @@ def test_one_planner_solve_compiles_the_plant_once():
         problem,
         transcription=DirectCollocationTranscription(n_steps=8),
         backend="numpy",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 5, "disp": False},
     )
     compile_system = problem.sys.compile

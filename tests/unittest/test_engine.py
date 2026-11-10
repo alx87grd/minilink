@@ -527,7 +527,7 @@ def test_a_tuning_that_leaves_X_comes_back_inside_through_the_margin_row():
     bounds = {"controller.Kp": (1.0, 200.0), "controller.Kd": (0.0, 50.0)}
     program = pe.program(wrt, bounds=bounds, params=upright(pe))
     assert program.metadata["rows"] == ["feasibility_margin"]
-    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 100}).solve()
+    result = Optimizer(program, method="slsqp", options={"maxiter": 100}).solve()
 
     tuned = pe.evaluate(pe.unpack(result.z, wrt, pe.merged(upright(pe))))
     assert not tuned.failed[0] and float(tuned.feasibility_margin[0]) >= 0.0
@@ -851,7 +851,7 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
     wrt = ["controller.values"]
     program = pe.program(wrt)
     assert program.n_z == 11 and program.metadata["rows"] == ["reachability_margin"]
-    result = Optimizer(program, method="scipy_slsqp", options={"maxiter": 200}).solve()
+    result = Optimizer(program, method="slsqp", options={"maxiter": 200}).solve()
 
     # The goal reached to the solver's tolerance: the optimum sits on its boundary
     planned = pe.evaluate(pe.unpack(result.z, wrt, pe.params))

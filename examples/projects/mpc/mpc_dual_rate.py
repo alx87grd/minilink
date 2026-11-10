@@ -61,7 +61,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=20,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 50, "ftol": 1.0},
 )
 

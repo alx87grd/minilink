@@ -382,7 +382,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         report = stdout.getvalue()
         self.assertIn("Trajectory Optimization Program", report)
         self.assertIn("transcription: DirectCollocationTranscription", report)
-        self.assertIn("method='scipy_slsqp'", report)
+        self.assertIn("method='slsqp'", report)
         self.assertNotIn("===               Optimization Program", report)
         self.assertIn("terminal_error_inf:", report)
 
