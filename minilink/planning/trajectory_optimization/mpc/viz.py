@@ -327,7 +327,7 @@ def tick_solves_of(rollout, mpc, loop):
 
     require_loop(loop, "<the MPC's solve inputs>")
     ev = loop.compile()
-    path, block = solving_block_of(loop, mpc.pv)
+    path, block = solving_subsystem_of(loop, mpc.pv)
     divisor = ev.operation_of(path).divisor
     x_slice, _ = nested_layout(loop)[path]
     base = loop.sample_period
@@ -347,14 +347,14 @@ def tick_solves_of(rollout, mpc, loop):
     return solves
 
 
-def solving_block_of(loop, pv):
+def solving_subsystem_of(loop, pv):
     """``(path, block)`` of the block of ``loop`` that solves on ``pv``: the MPC's solve."""
     found = []
-    for path, sys in blocks_of(loop):
+    for path, sys in subsystems_of(loop):
         own = getattr(sys, "source", None) or sys
         if hasattr(own, "solve_inputs") and getattr(own, "pv", None) is pv:
             found.append((path, own))
-    require_one_block([path for path, _ in found])
+    require_one_subsystem([path for path, _ in found])
 
     return found[0]
 
@@ -403,7 +403,7 @@ def plan_history_of(rollout, mpc, loop, block):
     # Lazy import: the sampled plan's layout loads with the first plan read
     from minilink.core.compile.plan import nested_layout
 
-    path = block_path_of(rollout, mpc, loop, block)
+    path = subsystem_path_of(rollout, mpc, loop, block)
     name = f"{'/'.join(path)}:z"
     if rollout.has_signal(name):
         return rollout.get_signal(name)
@@ -415,29 +415,31 @@ def plan_history_of(rollout, mpc, loop, block):
     return rollout.x[x_slice]
 
 
-def block_path_of(rollout, mpc, loop, block):
+def subsystem_path_of(rollout, mpc, loop, block):
     """The MPC block's path: as given, else the block of ``loop`` holding ``mpc``'s face, else the run's one plan signal."""
     if block is not None:
         return tuple(block.split("/"))
     if loop is not None:
-        paths = [path for path, sys in blocks_of(loop) if holds_plan_of(sys, mpc.pv)]
-        require_one_block(paths)
+        paths = [
+            path for path, sys in subsystems_of(loop) if holds_plan_of(sys, mpc.pv)
+        ]
+        require_one_subsystem(paths)
         return paths[0]
 
     names = [name[: -len(":z")] for name in rollout.signals if name.endswith(":z")]
     if not names:
         require_loop(loop, "<block>:z")
-    require_one_block(names)
+    require_one_subsystem(names)
 
     return tuple(names[0].split("/"))
 
 
-def blocks_of(diagram, prefix=()):
+def subsystems_of(diagram, prefix=()):
     """Every leaf block of a diagram with its path, its nested boxes walked."""
     for sys_id, sys in diagram.subsystems.items():
         path = (*prefix, sys_id)
         if hasattr(sys, "subsystems"):
-            yield from blocks_of(sys, path)
+            yield from subsystems_of(sys, path)
         else:
             yield path, sys
 
@@ -449,7 +451,7 @@ def holds_plan_of(block, pv) -> bool:
     return getattr(own, "pv", None) is pv and int(block.n) == pv.n_z
 
 
-def require_one_block(found):
+def require_one_subsystem(found):
     """Refuse a search for the MPC block that finds none, or several."""
     if len(found) != 1:
         raise ValueError(

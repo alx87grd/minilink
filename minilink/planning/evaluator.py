@@ -144,11 +144,11 @@ class ProblemEvaluator:
         # input, the recorded signals and the free inputs
         self.plant_slice = self.loop.state_index["plant"]
         self.plant_input = plant_input_sources(self.loop, self.evaluator, self.sampled)
-        self.block_ids = tuple(self.loop.subsystems)
-        self.start_ids = stateful_blocks_of(self.loop)
+        self.subsystem_ids = tuple(self.loop.subsystems)
+        self.start_ids = stateful_subsystems_of(self.loop)
         self.draws = problem.is_stochastic or self.loop.is_random
         self.free_inputs = tuple(self.loop.inputs)
-        require_free_names(self.free_inputs, self.block_ids)
+        require_free_names(self.free_inputs, self.subsystem_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
         # The forms generated once: the run and the batched trial, jitted on JAX
@@ -194,7 +194,7 @@ class ProblemEvaluator:
         loop = self.loop
         problem = self.problem
 
-        tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.block_ids}
+        tree = {sys_id: loop.subsystems[sys_id].params for sys_id in self.subsystem_ids}
         for sys_id in self.start_ids:
             block = loop.subsystems[sys_id]
             tree[sys_id] = {**(block.params or {}), "x0": block.x0}
@@ -514,7 +514,7 @@ class ProblemEvaluator:
     def loop_start(self, params, x0, xp):
         """The loop's start ``x(0)``: the plant at ``x0``, every other stateful block at its ``x0`` leaf, the held outputs at the ``hold_x0`` leaf."""
         pieces = []
-        for sys_id in self.block_ids:
+        for sys_id in self.subsystem_ids:
             if sys_id == "plant":
                 pieces.append(xp.reshape(xp.asarray(x0, dtype=float), (-1,)))
             elif sys_id in self.start_ids:
@@ -545,7 +545,8 @@ class ProblemEvaluator:
         # plant's stage cost integrated beside the state; or the adaptive
         # integral reported on that grid
         loop_params = {
-            sys_id: block_params_of(loop, params, sys_id) for sys_id in self.block_ids
+            sys_id: subsystem_params_of(loop, params, sys_id)
+            for sys_id in self.subsystem_ids
         }
         loop_params = integer_seeds(loop, loop_params)
         t0 = params["t0"]
@@ -764,7 +765,7 @@ def closed_loop_of(problem, controller):
     require_continuous_or_clocked(controller)
     is_loop = isinstance(controller, (DiagramSystem, StepDiagramSystem))
     if is_loop and "plant" in controller.subsystems:
-        require_plant_block(controller, plant)
+        require_plant_subsystem(controller, plant)
         require_no_problem_sources(problem)
         return controller
     if isinstance(plant, StepSystem):
@@ -956,7 +957,7 @@ def automatic_dt_of(loop, tf):
     return dt
 
 
-def require_plant_block(loop, plant):
+def require_plant_subsystem(loop, plant):
     """Refuse a built loop whose ``plant`` block is not the problem's plant."""
     block = loop.subsystems["plant"]
     if block is not plant and int(block.n) != int(plant.n):
@@ -1127,7 +1128,7 @@ def numbers_key(tree):
     return tuple(entries)
 
 
-def stateful_blocks_of(loop):
+def stateful_subsystems_of(loop):
     """The ids of the loop's blocks other than the plant that hold a state: each has an ``x0`` leaf."""
     return tuple(
         sys_id
@@ -1146,7 +1147,7 @@ def require_no_x0_key(loop, start_ids):
             )
 
 
-def block_params_of(loop, params, sys_id):
+def subsystem_params_of(loop, params, sys_id):
     """A block's entry of the run's tree as the block reads it: its ``x0`` leaf taken out."""
     entry = params[sys_id]
     if not isinstance(entry, dict) or "x0" not in entry:
@@ -1159,7 +1160,7 @@ def block_params_of(loop, params, sys_id):
     return rest
 
 
-def require_free_names(free_inputs, block_ids):
+def require_free_names(free_inputs, subsystem_ids):
     """Refuse a free input or a block named like another key of the tree (or a problem leaf)."""
     reserved = {
         "cost",
@@ -1172,8 +1173,8 @@ def require_free_names(free_inputs, block_ids):
         "hold_x0",
     }
     clash = sorted(
-        (set(free_inputs) & set(block_ids))
-        | ((set(free_inputs) | set(block_ids)) & reserved)
+        (set(free_inputs) & set(subsystem_ids))
+        | ((set(free_inputs) | set(subsystem_ids)) & reserved)
     )
     if clash:
         raise ValueError(

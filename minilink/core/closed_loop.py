@@ -21,9 +21,9 @@ from minilink.core.diagram import DiagramSystem
 from minilink.core.discrete.sampled_diagram import base_period_of
 from minilink.core.discrete.sampled_system import SampledSystem, sampled_substeps
 from minilink.core.roles import (
-    block_roles,
     command_port,
     require_command,
+    subsystem_roles,
 )
 from minilink.core.system import System
 
@@ -91,7 +91,7 @@ def closed_loop(
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
 
-    One rule, read from the port names (:func:`~minilink.core.roles.block_roles`):
+    One rule, read from the port names (:func:`~minilink.core.roles.subsystem_roles`):
     every controller input named ``y`` or ``x`` is wired to the plant output of
     the same name; a controller with neither (an error-driven block: a
     compensator, a transfer function, a plant, a series diagram) gets an
@@ -156,7 +156,7 @@ def closed_loop(
     # A plant on the right; an error-driven controller takes the junction, any
     # other reads a measurement; the loop's inputs are flags or source blocks
     require_plant_on_right(plant)
-    roles = block_roles(controller)
+    roles = subsystem_roles(controller)
     if not roles.error_driven:
         require_measurement(controller, roles, "controller")
     require_loop_inputs(reference, disturbance, noise)
@@ -169,9 +169,9 @@ def closed_loop(
     # its own x; under a sampled controller, the plant on its base clock
     reads_plant_state = "x" in roles.measurements and observer is None
     plant_box = plant_box_with_state(plant) if reads_plant_state else plant
-    loop_blocks = (controller, observer, filter, reference, disturbance, noise)
-    require_clock_on_the_computer(loop_blocks, plant)
-    plant_box = on_the_loop_clock(loop_blocks, plant_box)
+    loop_subsystems = (controller, observer, filter, reference, disturbance, noise)
+    require_clock_on_the_computer(loop_subsystems, plant)
+    plant_box = on_the_loop_clock(loop_subsystems, plant_box)
 
     # The controller and the plant, each under its role name, in their algebra
     diagram = algebra_of(controller, plant_box)()
@@ -252,14 +252,14 @@ def resolve_standard_feedback(
 ) -> StandardFeedbackWiring:
     """Choose the feedback port names shared by ``closed_loop`` and the sampled loop.
 
-    The controller's port names decide (:func:`minilink.core.roles.block_roles`):
+    The controller's port names decide (:func:`minilink.core.roles.subsystem_roles`):
     a block that reads ``y`` closes on the plant's ``y``, one that reads ``x`` on
     its ``x``, and one that reads both on the first the plant can serve. The
     command leaves on ``u`` (``u_ff`` for a solver, else the one output) and
     enters the plant on ``u`` (else its one input). Dimensions are a check,
     never a choice: a mechanical plant's ``y`` is its state ``[q; dq]``.
     """
-    roles = block_roles(controller)
+    roles = subsystem_roles(controller)
     require_measurement(controller, roles, controller_id)
 
     # The first measurement the plant serves
@@ -290,7 +290,7 @@ class StandardFeedbackWiring:
 
 def default_computer_boundary_ports(controller) -> tuple[str, str]:
     """Return ``(measurement_in, control_out)`` for step-diagram boundary expose."""
-    roles = block_roles(controller)
+    roles = subsystem_roles(controller)
 
     # The measurement y or x, else the error entry, else the default input
     measurement_in = roles.measurement or roles.entry or default_input_port(controller)
@@ -337,7 +337,7 @@ def command_entry(sys) -> str:
     its first input would leave the measurement open and feed ``e = r - y``
     into ``r``; it is closed on its plant with ``@``.
     """
-    roles = block_roles(sys)
+    roles = subsystem_roles(sys)
     if roles.measurements:
         raise ValueError(
             f"{sys.name} reads its measurement on {roles.measurement!r}"

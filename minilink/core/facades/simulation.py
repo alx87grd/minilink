@@ -207,7 +207,7 @@ class DynamicSimulation:
             The simulated trajectory, also stored in :attr:`traj`.
         """
         # A real cycle through minilink.core.system
-        from minilink.core.diagram import block_roles
+        from minilink.core.diagram import subsystem_roles
         from minilink.core.trajectory import Trajectory
         from minilink.simulation.simulator import Simulator
 
@@ -233,7 +233,7 @@ class DynamicSimulation:
                 x=traj.x,
                 u=traj.u,
                 signals=traj.signals,
-                roles=block_roles(self, traj.signal_names),
+                roles=subsystem_roles(self, traj.signal_names),
             )
 
         if show:
@@ -366,7 +366,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_block_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_roles(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -475,7 +475,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_block_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_roles(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -667,7 +667,7 @@ def dense_points_of(system, ev):
 def scored_trajectory(system, of, traj):
     """The trajectory a cost shortcut scores: the system's own, or one block's inside it (its recorded run, else reconstructed)."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import DiagramSystem, block_run
+    from minilink.core.diagram import DiagramSystem, subsystem_run
 
     traj = system.traj if traj is None else traj
     if traj is None:
@@ -692,16 +692,16 @@ def scored_trajectory(system, of, traj):
             f"this run records no input for {path!r}: record=({path + ':u'!r},)"
         )
 
-    return block_run(system, path, traj)
+    return subsystem_run(system, path, traj)
 
 
-def plant_block_roles(plant_op, offset):
+def plant_subsystem_roles(plant_op, offset):
     """The blocks inside a loop's plant when it is itself a diagram, by path ``"plant/<id>"``, their slices offset into the loop's state."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import block_roles
+    from minilink.core.diagram import subsystem_roles
 
     plant = getattr(plant_op.system, "source", plant_op.system)
     if not hasattr(plant, "state_index"):
         return {}
 
-    return block_roles(plant, (), offset, "plant/")
+    return subsystem_roles(plant, (), offset, "plant/")

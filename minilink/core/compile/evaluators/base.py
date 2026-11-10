@@ -404,12 +404,12 @@ class ContinuousEvaluator(Evaluator):
         return u_seq
 
 
-def blocks_params(diagram, frozen):
+def subsystems_params(diagram, frozen):
     """A diagram's parameters now, by the block ids its compiled tree holds."""
     return {sys_id: diagram.subsystems[sys_id].params for sys_id in frozen}
 
 
-def every_block(frozen, diagram):
+def every_subsystem(frozen, diagram):
     """``frozen`` naming every block of ``diagram``: one with no operation (a sink) its parameters copied."""
     for sys_id, sub in diagram.subsystems.items():
         if sys_id not in frozen:

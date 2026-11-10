@@ -56,7 +56,7 @@ concrete formatting, ordered by the cost of being wrong:
   `interpolation`) are fixed at `__init__` (for example by binding a port's compute function
   to `ctl` vs. `ctl_with_gravity`), never stored in `params`.
   A `params` argument, on an equation or on a tool's verb, is `None` or the complete tree
-  (every key, every block); nothing merges, and a one-off tree is a copy of the tool's own,
+  (every key, every subsystem); nothing merges, and a one-off tree is a copy of the tool's own,
   edited. Live mutation of one number stays `sys.params["m"] = 4`.
   The same holds for every core math object: a cost, a set, a distribution, a field
   hold a `params` dict (`{}` when they have none), read when the call passes `None`, their
@@ -139,6 +139,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
   | A block's channel count (sources, white noise, routing, saturation, delay, the PID family) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
+  | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |
   | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
   | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
   | Playback rate of an animation (simulated seconds per wall second) | `speed` | `time_factor_video` |
@@ -241,7 +242,7 @@ concrete formatting, ordered by the cost of being wrong:
   names drive the operators. Contract: DESIGN §4, 'Control laws'.
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit
-  error messages naming the mismatched ports and blocks; a connected input is rewired only
+  error messages naming the mismatched ports and subsystems; a connected input is rewired only
   through `disconnect`, and an output seen at the compile probe to move with an undeclared
   input is refused. This rule
   covers wiring, not `f`/`h` return-shape checks at ODE time.

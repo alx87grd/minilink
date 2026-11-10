@@ -141,7 +141,7 @@ class TestStepDiagram(unittest.TestCase):
         diagram.add_input_port("u")
         diagram.connect("input", "u", "blk", "u")
         diagram.connect_new_output_port("blk", "y", "y")
-        y = diagram.compute_subsys_output_port(
+        y = diagram.compute_subsystem_output_port(
             np.array([]), np.array([2.0]), 3, "blk", "y"
         )
         self.assertAlmostEqual(float(y[0]), 5.0)

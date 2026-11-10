@@ -257,7 +257,7 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("n=1", text)
         self.assertIn("inputs: r (1)", text)
         self.assertIn("outputs: y_meas (1)", text)
-        self.assertIn("blocks: controller, plant", text)
+        self.assertIn("subsystems: controller, plant", text)
 
     @staticmethod
     def _make_case_diagrams():
@@ -597,8 +597,8 @@ class TestWiringMixin(unittest.TestCase):
         x = np.array([0.25])
         u = np.array([1.0])
         t = 0.5
-        plant_y = diagram.compute_subsys_output_port(x, u, t, "plant", "y")
-        ctl_u = diagram.compute_subsys_output_port(x, u, t, "controller", "u")
+        plant_y = diagram.compute_subsystem_output_port(x, u, t, "plant", "y")
+        ctl_u = diagram.compute_subsystem_output_port(x, u, t, "controller", "u")
         np.testing.assert_allclose(plant_y, np.array([0.25]))
         np.testing.assert_allclose(ctl_u, np.array([2.5 * (1.0 - 0.25)]))
         local_u = diagram.get_local_input(x, u, t, "controller")
@@ -1032,6 +1032,6 @@ def test_a_sampled_loops_nested_block_is_selected_by_the_id_it_was_added_under()
 
 
 def _inner_run(outer, traj):
-    from minilink.core.diagram import block_run
+    from minilink.core.diagram import subsystem_run
 
-    return block_run(outer, "plant", traj)
+    return subsystem_run(outer, "plant", traj)

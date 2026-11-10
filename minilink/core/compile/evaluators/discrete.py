@@ -12,11 +12,11 @@ from minilink.core.compile.evaluators.base import (
     Evaluator,
     added,
     assigned,
-    blocks_params,
-    every_block,
+    every_subsystem,
     gather_u,
     outputs_from_ports,
     require_jax_traceable,
+    subsystems_params,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
@@ -237,7 +237,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         )
         self.plan = plan
         self.dtype = self.xp.float64
-        self._frozen_params = every_block(
+        self._frozen_params = every_subsystem(
             {
                 op.sys_id: op.bound_params
                 for op in (*plan.port_ops, *plan.step_ops)
@@ -245,7 +245,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
             },
             diagram,
         )
-        self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
+        self.params_reader = lambda: subsystems_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:

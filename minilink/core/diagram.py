@@ -193,7 +193,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             inner = self.subsystems[sys_id]
             inner_params = None if params is None else params[sys_id]
             return inner.port_samples(
-                block_run(self, outer, traj, params), f"{rest}:{port_id}", inner_params
+                subsystem_run(self, outer, traj, params),
+                f"{rest}:{port_id}",
+                inner_params,
             )
 
         sys_id, port_id = signal_port_of(self, name)
@@ -202,7 +204,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # An output port's value; else the block's whole input, or one input port
         if port_id in block.outputs:
             values = [
-                self.compute_subsys_output_port(
+                self.compute_subsystem_output_port(
                     traj.x[:, i], traj.u[:, i], t, sys_id, port_id, params=params
                 )
                 for i, t in enumerate(traj.t)
@@ -237,7 +239,7 @@ def require_flow_subsystem(sys, sys_id):
         )
 
 
-def block_run(diagram, path, traj, params=None) -> Trajectory:
+def subsystem_run(diagram, path, traj, params=None) -> Trajectory:
     """
     The run of one block of ``diagram`` as the block saw it, reconstructed from the diagram's run.
 
@@ -263,10 +265,10 @@ def block_run(diagram, path, traj, params=None) -> Trajectory:
     run = Trajectory(t=traj.t, x=x, u=u)
     inner_params = None if params is None else params[sys_id]
 
-    return run if not rest else block_run(subsystem, rest, run, inner_params)
+    return run if not rest else subsystem_run(subsystem, rest, run, inner_params)
 
 
-def block_roles(diagram, recorded=(), offset=0, prefix=""):
+def subsystem_roles(diagram, recorded=(), offset=0, prefix=""):
     """
     Every block's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
 
@@ -284,7 +286,7 @@ def block_roles(diagram, recorded=(), offset=0, prefix=""):
             "u": u_name if u_name in recorded else None,
         }
         if hasattr(block, "state_index"):
-            roles.update(block_roles(block, recorded, offset + start, f"{path}/"))
+            roles.update(subsystem_roles(block, recorded, offset + start, f"{path}/"))
 
     return roles
 

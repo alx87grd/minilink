@@ -453,7 +453,7 @@ One model for every object, in seven rules:
    reference (`held_params`); a wrapper is what it wraps (`delegated_params`: an input box its
    box, a uniform law its box, a margin field its set, a sampled view its source); a diagram
    and a sum, with no numbers of their own, assemble the view from their parts at each read.
-   A block is added to a diagram once, a cost to a sum once.
+   A subsystem is added to a diagram once, a cost to a sum once.
 3. **Structure is the constructor's**: sizes, ports, a method, a clock, a part's key, a
    leaf's name, which spread a Gaussian takes (`std` or `cov`), which bounds a field set has.
    A value is written by item, `plant.params["m"] = 2.0`; a named attribute is a view of its
@@ -527,9 +527,9 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
   two: the period above, the integration step `dt / 4` underneath. A noise block's period is
   never a `dt`: its physics does not change with the tool's step.
 - **Diagram params are nested by subsystem id**: `{"plant": {…}, "controller": {…}}`,
-  each the block's own dict (rule 2); nested diagrams nest recursively. A tree passed to `f`
-  / `outputs` / `step`, or assigned to `diagram.params`, names every block and every key.
-- Compile: a diagram's compile copies every block's params into the plan, as a leaf's does.
+  each the subsystem's own dict (rule 2); nested diagrams nest recursively. A tree passed to `f`
+  / `outputs` / `step`, or assigned to `diagram.params`, names every subsystem and every key.
+- Compile: a diagram's compile copies every subsystem's params into the plan, as a leaf's does.
   The evaluator's `params` is that snapshot; `params=None` reads it (rule 6). On JAX the dict is a pytree argument
   (numeric leaves required): values vary without retracing, and
   `evaluator.jacobian("f", "params")` / `jax.grad` differentiate dynamics
@@ -574,32 +574,32 @@ the port-dependency graph is `topology.py`: `check_algebraic_loops` (raises on a
 returns nothing; also a diagram method) and `evaluation_order_of` (the port order the
 compilers read); `DiagramSystem` adds flow-only `f`,
 `compile` and `reconstruct_internal_signals`; the wiring methods reach `DiagramSystem` through
-the mixin, `diagram.of("plant")` the block by its id or role (a path, `"inner/plant"`, inside a
-nested diagram) and `subsystem_id` a block or its id. **One block selector on every run:** a
-diagram's run carries `roles`, every block's state slice by id (a nested block by its path), so
+the mixin, `diagram.of("plant")` the subsystem by its id or role (a path, `"inner/plant"`, inside a
+nested diagram) and `subsystem_id` a subsystem or its id. **One subsystem selector on every run:** a
+diagram's run carries `roles`, every subsystem's state slice by id (a nested subsystem by its path), so
 `traj.of("plant")` is the plant's own `(t, x, u)` by static indexing on a continuous loop as on
-a sampled one; the input is the recorded signal `"<block>:u"`, else empty, `(0, N)`.
+a sampled one; the input is the recorded signal `"<subsystem>:u"`, else empty, `(0, N)`.
 **What a diagram run records**, one rule on every solver and both kinds of
 loop: `record="plant"`, the default, the plant's whole input `"plant:u"` when the diagram has a
-`plant` block, so `traj.of("plant")` is complete on every default run; `record=None` nothing
+`plant` subsystem, so `traj.of("plant")` is complete on every default run; `record=None` nothing
 (the fastest run: hand sweeps, benchmarks, library loops); a tuple of names (`"block:port"` an
-output port, `"block:u"` a block's whole input when it has no output port named `u`, a nested
-block by its path, `"plant/arm:u"`); `record="all"` every output port. A lone block records
+output port, `"block:u"` a subsystem's whole input when it has no output port named `u`, a nested
+subsystem by its path, `"plant/arm:u"`); `record="all"` every output port. A lone system records
 nothing and refuses names. A fixed-step run reads the record off each step's own first stage
 (`rollout(record=)`: `k₁` and the record from one signal pass, the states bit for bit the
 unrecorded run's, its program the same when the record is empty); an adaptive run, the
 variable-step Euler and a run forced by a function of time take one signal pass per saved
 sample after the run, inside the `Simulator`, on the numbers the run was made with. A cost
 written for the plant alone scores the plant inside any loop, `loop.compute_cost(cost,
-of="plant")` (the block or its id): the recorded run, else the plant's input rebuilt from the
-stored states (`block_run`, which, with `reconstruct_internal_signals` and `port_samples`,
-takes `params=`, the run's tree, and reads the blocks' current numbers without it). Scoring a
+of="plant")` (the subsystem or its id): the recorded run, else the plant's input rebuilt from the
+stored states (`subsystem_run`, which, with `reconstruct_internal_signals` and `port_samples`,
+takes `params=`, the run's tree, and reads the subsystems' current numbers without it). Scoring a
 run whose plant input was not recorded (`evaluate_trajectory`, the MPC overlays) is refused,
 naming `record=("plant:u",)`.
 Every `System` has the two cost shortcuts over that path:
 `sys.compute_cost(cost, of=None, traj=None)` returns `J` as a number and
 `sys.plot_cost(...)` plots the running cost and `J(t)`; `of=None` scores the
-whole system in its own `(x, u)`, `of=block` one block of a diagram, and `traj`
+whole system in its own `(x, u)`, `of=subsystem` one subsystem of a diagram, and `traj`
 defaults to the last trajectory computed (a user shortcut; library code passes
 it).
 `connect()` validates port existence and dimensions at wiring time and is
@@ -634,16 +634,16 @@ silently. It never inserts a block.
 Sources name their signal at creation (`Step(port="r")`), blocks their ports
 with `rename_ports` (the renames of one call apply at once; a collision with an
 untouched port is refused). `+` and `>>` lay a diagram operand out flat; only
-`@` nests, a box on either side under its role name as one block.
+`@` nests, a box on either side under its role name as one subsystem.
 Explicit `add_subsystem` / `connect` remains canonical for general topology.
 
 **No operator modifies its operands.** `+`, `>>` and `@` (the continuous loop
 `ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return
-a new diagram that shares the operands' blocks: a diagram operand is laid out
+a new diagram that shares the operands' subsystems: a diagram operand is laid out
 flat in the result with its ids, wiring and boundary ports, and the left operand
-keeps its blocks, wiring, ports, name and camera settings, which `+` and `>>`
-carry into the result (its `x0` comes with the shared blocks, which own it); a `>>` chain is named after every operand
-(`"Step >> PID >> Pendulum"`). Blocks are shared, never copied, so `a >> b >> c`
+keeps its subsystems, wiring, ports, name and camera settings, which `+` and `>>`
+carry into the result (its `x0` comes with the shared subsystems, which own it); a `>>` chain is named after every operand
+(`"Step >> PID >> Pendulum"`). Subsystems are shared, never copied, so `a >> b >> c`
 chains stay cheap. `connect()`, `autowire()` and `expose()` are methods and
 change the diagram they are called on. Known gap (on the workboard): `step_diagram % dt`
 on a user-built `StepDiagramSystem` adds its boundary ports to that diagram.
@@ -665,12 +665,12 @@ one edge input feeding all of them, the one inside output of a name becomes an
 edge output, and `"x"` with no such port is the box's own state as an output.
 
 **Shortcut subsystem ids.** `@` names its two sides `controller` and `plant`,
-`feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each block's own
+`feedback(leaf)` names the leaf `plant`; `+` and `>>` keep each subsystem's own
 name (``System.id``, else the class name verbatim: `Step`, `PID`, `Integrator2` on a repeat).
 The reserved names `plant`, `controller` and `observer` are never suffixed: a
-second block under one of them is refused.
+second subsystem under one of them is refused.
 Block titles in ``plot_diagram()`` read ``name::id``.
-A diagram nested with ``add_subsystem`` is drawn expanded: its blocks sit in a
+A diagram nested with ``add_subsystem`` is drawn expanded: its subsystems sit in a
 box labelled ``name::id``, at every depth, and the wires go straight to the inner
 block ports, with no boundary nodes. ``plot_diagram(expand=False)`` draws each
 nested diagram as one block with its boundary ports.
@@ -693,7 +693,7 @@ calls. They are written once on the tracking error and take a port-layout switch
 form, `P`, `PI`, `PD`, `PID`, `Lead`, `TransferFunction(ports="error")`),
 `ports="reference"` declares `r` and `y` (the controller form the generic
 framework uses). A bare `TransferFunction` stays a plant (`u`, `y`). An
-error-driven block (`core.roles.block_roles`: an input `e`, or a single
+error-driven block (`core.roles.subsystem_roles`: an input `e`, or a single
 input with no measurement — a compensator, a transfer function, a plant, a
 series diagram `C >> G`) gets an `Error` block (`e = r - y`, ports `+`, `-`,
 `e`) inserted by `core.closed_loop` (`@`, `closed_loop` and `feedback` alike). `@` always means controller at
@@ -716,16 +716,16 @@ A controller is an ordinary `System`: explicit ports, and `ctl` as the port
 compute — `ctl` *is* the control law. **The port names are the declaration**,
 and `minilink/core/roles.py` reads them, never a class or an `isinstance`:
 
-- `block_roles(block)` says what a block measures (`y`, `x`, or both), its
+- `subsystem_roles(sys)` says what a subsystem measures (`y`, `x`, or both), its
   reference `r`, its command `u`, and whether an `Error` block drives it (an
   input `e`, or the one input of a plain compensator; a disturbance `d` or a
   noise `n` is never the entry);
 - `command_port(sys)` is the input a decision drives on a plant or a box: `u`,
   else the one input that is not `d` or `n`;
-- `roles(diagram)` returns the blocks under the reserved subsystem names
+- `roles(diagram)` returns the subsystems under the reserved names
   `plant`, `controller` and `observer` (the observer may sit inside the
   controller; a leaf is its own plant; a sampled loop answers from its two
-  sides). One of each per diagram level: a second block under a reserved
+  sides). One of each per diagram level: a second subsystem under a reserved
   name is refused, never suffixed, so two loops cannot be laid side by side
   (`loop >> loop`, `loop + loop`): run them separately and compare.
 
@@ -738,7 +738,7 @@ There is no profile table and no port override attribute.
 
 The port names drive three tools:
 
-- **`@` composition** reads `block_roles` (the sampled loop through
+- **`@` composition** reads `subsystem_roles` (the sampled loop through
   `resolve_standard_feedback` and `default_computer_boundary_ports`): every
   controller input named `y` or `x` is wired to the plant output of the same
   name (a mechanical plant's `y` is its state `[q; dq]`, read straight; a
@@ -802,7 +802,7 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   (JAX arrays kept) and a JAX pytree, its reporting verbs (`t0`, `tf`, `resample`, `save`,
   the plots) NumPy by contract; `traj.at(t, name="x")` reads one channel at a time, linear
   between the samples and held outside (`interpolate_schedule`, the one time-interpolation
-  the gain schedules read too); a diagram's run carries `roles`, every block's state slice by
+  the gain schedules read too); a diagram's run carries `roles`, every subsystem's state slice by
   id, so `traj.of("plant")` is the plant's run by static indexing (its input recorded by
   default, `DiagramSystem` below).
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
@@ -974,7 +974,7 @@ bad parameter) surfaces as it is, never hidden by a NumPy build.
 Diagrams → `ExecutionPlan` → diagram evaluator. Optional **compile-time flatten**
 (`compile_diagram(..., flatten=False)` by default): before the plan is built,
 :func:`~minilink.core.assembly.flatten_diagram` copies the diagram and inlines each
-nested :class:`~minilink.core.diagram.DiagramSystem` block so every leaf sits at the
+nested :class:`~minilink.core.diagram.DiagramSystem` subsystem so every leaf sits at the
 top level. Inlined ids join with ``__`` (``inner__plant``), the same convention as
 expanded topology (`controller__pi`); ``:`` stays ``block:port``, ``/`` stays the
 hierarchical plot path on the **unflattened** diagram. After flatten, diagram
@@ -985,10 +985,10 @@ is requested at compile. :func:`~minilink.core.assembly.flatten_diagram` preserv
 global state stacking order: inlined leaves replace each nested box at the same stack
 position as that box's inner states, so ``x``, ``x0``, and native
 :meth:`~minilink.core.diagram.DiagramSystem.f` agree with the unflattened diagram.
-Wires and diagram outputs that read a nested box are rewired to the inner block
+Wires and diagram outputs that read a nested box are rewired to the inner subsystem
 behind that port. The returned report's ``id_map`` keys each leaf by its nested path,
 ``/`` at every level (``"loop/inner/plant"``), to its flat id; the params remap reads it,
-so a renamed block (``loop__plant2`` when the name was taken) still gets its params.
+so a renamed subsystem (``loop__plant2`` when the name was taken) still gets its params.
 
 **`outputs()` are boundary outputs
 only** (dict keyed by port id, not diagram internals); a diagram's internal signals are
@@ -998,8 +998,8 @@ only** (dict keyed by port id, not diagram internals); a diagram's internal sign
 `h` *is* the `"y"` port on every block, plant and evaluator (`test_output_map.py`).
 
 **One body per method, compiled on JAX.** Every evaluator method takes `params=None`
-(`None` reads the parameters compiled in; a dict replaces them, a diagram's block by
-block):
+(`None` reads the parameters compiled in; a dict replaces them, a diagram's subsystem by
+subsystem):
 
     ev.f(x, u, t=0.0, params=None)                                            # dx; a continuous evaluator
     ev.outputs(x, u, t=0.0, params=None)                                      # the boundary ports
@@ -1149,20 +1149,20 @@ pendulum's `√((m l² + I)/(m g l))`, the cart-pole's unstable pole, the dynami
 modes at rest, the racecar's); a law with a time constant of its own declares it
 (`SlidingMode`'s `1/λ`). A custom plant that declares nothing keeps the 1 ms default; no
 plant is linearized automatically. A diagram's hint is the smallest over its stateful
-subsystems and any block that sets its own; a static block left at the default does not
-count. A diagram's hints are derived from its blocks at each read, and a block whose hint
+subsystems and any subsystem that sets its own; a static subsystem left at the default does not
+count. A diagram's hints are derived from its subsystems at each read, and a block whose hint
 follows its parameters reads them at each read too, so no tool refreshes before a run and a
-hint belongs on the block: one set by hand on the diagram is replaced, and so is one set on
-a block that computes its own (change its `params`, or pass `dt=`).
+hint belongs on the subsystem: one set by hand on the diagram is replaced, and so is one set on
+a subsystem that computes its own (change its `params`, or pass `dt=`).
 `StaticSimulator` shares the 10001-point default.
 
-**Three owners of a start.** A block owns its `x0`; a diagram's `x0` is a view
-stacked from its blocks' (a read-only array; assigning a whole vector writes each slice
-through to its block), a sampled loop's held outputs keep their own start (`hold_x0`), and a
+**Three owners of a start.** A system owns its `x0`; a diagram's `x0` is a view
+stacked from its subsystems' (a read-only array; assigning a whole vector writes each slice
+through to its subsystem), a sampled loop's held outputs keep their own start (`hold_x0`), and a
 `SampledSystem`'s `x0` is its source's. A block's state size is fixed once built, and a
-diagram's layout is computed as blocks are added. The problem owns the plant's start (`x0`), and the
-evaluator's tree gives every other stateful block its start as a leaf (`controller.x0`,
-`observer.x0`), read from the block at compile.
+diagram's layout is computed as subsystems are added. The problem owns the plant's start (`x0`), and the
+evaluator's tree gives every other stateful subsystem its start as a leaf (`controller.x0`,
+`observer.x0`), read from the subsystem at compile.
 
 Solver presets: `scipy`, `scipy_stiff` (Radau at `scipy`'s tolerances, `rtol=1e-4`,
 `atol=1e-7`, with `∂f/∂x` from the evaluator: forward mode on JAX, central differences on
@@ -1422,7 +1422,7 @@ grid of `dt` (omitted: the loop's automatic step, below); a sampled controller (
 refused, naming the period, `solver` and `substeps` its plant's integration per base period (`None`, the
 automatic step; a continuous loop's `substeps` is 1 by default); a tick law (an MPC box among
 them) with no clock is refused, naming the clock.
-`pe.params` is the run's tree: the loop's blocks by id (a stateful block other than the
+`pe.params` is the run's tree: the loop's subsystems by id (a stateful subsystem other than the
 plant with its `"x0"` leaf), the problem's own leaves (`"cost"`,
 the sets' parameters, `"x0"`, `"discount_rate"`) and each free input at its nominal
 value. `pe.trajectory(params)` is one run to the horizon on the step model, every block

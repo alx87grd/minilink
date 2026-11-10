@@ -451,7 +451,7 @@ class TestDefaultOutput(unittest.TestCase):
         plant = MassSpringDamper()
         diagram = Gain(np.array([[1.0, 0.5]])) @ plant
         x = np.array([1.0, 0.0])
-        u_ctl = diagram.compute_subsys_output_port(
+        u_ctl = diagram.compute_subsystem_output_port(
             x, np.zeros(diagram.m), 0.0, "controller", "y"
         )
         # r defaults to 0, so u = K (r - y) = -K x = -1.0

@@ -231,6 +231,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `forward_differential_kinematic_effector` is gone.
   - Also: a one-line `repr` on systems, sets, fields, costs, laws and the `Optimizer`;
     refusals that name what to pass; `SumCost.g_max` / `h_max` index their terms as `g` does.
+- 2026-11-10 (the API settled before the demo rebuild, branch `api-settle`, for `0.4.0`; every
+  notebook migrated in the same commits, no alias):
+  - *Subsystem, the one word for a system placed in a diagram.* `print(diagram)` lists
+    `subsystems:` (it said `blocks:`); `get_subsys_input_port` → `get_subsystem_input_port`,
+    `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning,
+    the standard components of `minilink.blocks`.
 
 ## 3. Maturity (TRL)
 

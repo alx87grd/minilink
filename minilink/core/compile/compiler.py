@@ -475,12 +475,12 @@ def input_rows(system):
 
 def warn_shared_seeds(diagram):
     """Warn when two random blocks hold one seed: they would draw the same signal."""
-    blocks_by_seed = {}
+    subsystems_by_seed = {}
     for path, subsystem in iter_subsystems(diagram):
         seed = subsystem.params.get("seed") if subsystem.is_random else None
         if seed is not None:
-            blocks_by_seed.setdefault(int(seed), []).append(".".join(path))
-    for seed, ids in blocks_by_seed.items():
+            subsystems_by_seed.setdefault(int(seed), []).append(".".join(path))
+    for seed, ids in subsystems_by_seed.items():
         if len(ids) > 1:
             warnings.warn(
                 f"random blocks {', '.join(ids)} share seed {seed} and draw the same "

@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from minilink.core.roles import block_roles
+from minilink.core.roles import subsystem_roles
 
 ###############################################################################
 # Public API
@@ -16,7 +16,7 @@ def policy_from_block(block):
     initial state ``x0``, with ``x`` on the measurement port, every other
     input (a reference) pinned at its port nominal, and the time ``t``.
     """
-    roles = block_roles(block)
+    roles = subsystem_roles(block)
     require_feedback_roles(block, roles)
 
     output = block.outputs[roles.command]

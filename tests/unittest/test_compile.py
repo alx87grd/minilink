@@ -1632,6 +1632,6 @@ def test_verbose_compile_reads_its_steps_in_order_on_every_path(capsys):
             "[compile] Building execution plan (6 ports, 1 states)",
         ]
         if backend == "jax":
-            expected.append("[compile] Checking JAX compatibility of 4 blocks")
+            expected.append("[compile] Checking JAX compatibility of 4 subsystems")
         assert steps[:-1] == expected
         assert lines[-1].startswith("[compile] Done.")

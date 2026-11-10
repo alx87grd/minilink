@@ -268,7 +268,7 @@ class DynamicProgrammingPlanner(Planner):
         (at most ``max_iterations`` sweeps). ``controller`` is a law
         ``u = π(x)``, a solution (its controller), or a controller block that
         reads the state on an input named ``x`` (or ``y``) and commands ``u``
-        (:func:`minilink.core.roles.block_roles`). The planner's grid,
+        (:func:`minilink.core.roles.subsystem_roles`). The planner's grid,
         discount, failure cost and interpolation, its stopping rules: the
         returned :class:`~minilink.core.fields.GridField` holds ``J^π`` in
         ``params["values"]``, its failure cost past the grid; draw it with

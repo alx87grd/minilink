@@ -145,7 +145,7 @@ class WiredDiagramMixin:
         """
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
-        require_new_block(sys, sys_id, self.subsystems)
+        require_new_subsystem(sys, sys_id, self.subsystems)
 
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
@@ -378,7 +378,7 @@ class WiredDiagramMixin:
             if dependencies != "all" and port_id not in dependencies:
                 port_u = port.get_default_value()
             else:
-                port_u = self.get_subsys_input_port(
+                port_u = self.get_subsystem_input_port(
                     x, u, t, sys_id, port_id, params=params
                 )
             pieces.append(port_u)
@@ -408,7 +408,7 @@ class WiredDiagramMixin:
 
         return params[sys_id]
 
-    def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
+    def compute_subsystem_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
         port = self.subsystems[sys_id].outputs[port_id]
         local_x = self.get_local_state(x, sys_id)
@@ -589,10 +589,10 @@ class WiredDiagramMixin:
         if not outputs and name != "x":
             raise ValueError(
                 f"{name!r} is neither an open input nor an output of a block in "
-                f"{self.name!r}; blocks: {', '.join(self.subsystems) or '(none)'}"
+                f"{self.name!r}; subsystems: {', '.join(self.subsystems) or '(none)'}"
             )
 
-    def get_subsys_input_port(self, x, u, t, sys_id, port_id, params=None):
+    def get_subsystem_input_port(self, x, u, t, sys_id, port_id, params=None):
         """Value of one subsystem input port: connected source or nominal fallback."""
         source = self.connections[sys_id][port_id]
 
@@ -603,7 +603,7 @@ class WiredDiagramMixin:
 
         if source_sys_id == "input":
             return self.get_port_values_from_u(u)[source_port_id]
-        return self.compute_subsys_output_port(
+        return self.compute_subsystem_output_port(
             x, u, t, source_sys_id, source_port_id, params=params
         )
 
@@ -667,7 +667,7 @@ class DiagramOutputPort(OutputPort):
     def source_output(self, x, u, t=0, params=None):
         """The exposed subsystem port, evaluated through the diagram."""
         source_sys_id, source_port_id = self.source
-        return self.diagram.compute_subsys_output_port(
+        return self.diagram.compute_subsystem_output_port(
             x, u, t, source_sys_id, source_port_id, params=params
         )
 
@@ -878,7 +878,7 @@ def require_plain_id(sys_id):
         )
 
 
-def require_new_block(sys, sys_id, subsystems):
+def require_new_subsystem(sys, sys_id, subsystems):
     """Refuse a block the diagram already holds: its numbers would have two paths in the diagram's tree."""
     held = [existing_id for existing_id, block in subsystems.items() if block is sys]
     if held:
