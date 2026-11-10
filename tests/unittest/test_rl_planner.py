@@ -223,6 +223,26 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     assert u.shape == (3, 1)
 
 
+def test_the_planner_trains_the_actor_it_is_given():
+    prob = problem(horizon=np.inf)
+    actor = NeuralPolicy(prob.sys, hidden=(4,), seed=5)
+    planner = ReinforcementLearningPlanner(
+        prob,
+        dt=0.1,
+        actor=actor,
+        hidden=(4,),
+        n_rollouts=2,
+        n_steps_per_update=8,
+        batch_size=16,
+    )
+    assert planner.actor is actor and planner.build_kwargs()["actor"] is not actor
+    solution = planner.solve(n_timesteps=16)
+    assert solution.controller is not actor  # the snapshot handed out
+    np.testing.assert_allclose(
+        solution.controller.params["mlp"]["W0"], actor.params["mlp"]["W0"]
+    )
+
+
 def test_predict_draws_unless_deterministic():
     planner = ReinforcementLearningPlanner(
         problem(horizon=np.inf),

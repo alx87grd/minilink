@@ -91,8 +91,9 @@ class ReinforcementLearningPlanner(Planner):
     dt : float, optional
         Control period of the learned law on a continuous problem (one RK4
         step per period; default 0.05 s); a step problem takes none.
-    policy : NeuralPolicy, optional
-        The law to train; default built from ``features``, ``hidden``,
+    actor : NeuralPolicy, optional
+        The block to train, the actor of actor-critic (read back as
+        :attr:`actor`); default built from ``features``, ``hidden``,
         ``activation`` and ``normalize`` on the problem's plant.
     method : str or Algorithm
         ``"reinforce"``, ``"actor_critic"``, ``"ppo"`` (on-policy) or
@@ -143,7 +144,7 @@ class ReinforcementLearningPlanner(Planner):
         problem,
         *,
         dt=None,
-        policy=None,
+        actor=None,
         features=None,
         hidden=(64, 64),
         activation="tanh",
@@ -164,11 +165,11 @@ class ReinforcementLearningPlanner(Planner):
         super().__init__(problem)
         jax = require_jax()
 
-        # The keywords as given, the law and the update rule as they were before any
+        # The keywords as given, the actor and the update rule as they were before any
         # learning: what rebuilds this planner on another tree (build_kwargs)
         self.keywords = dict(
             dt=dt,
-            policy=copy.deepcopy(policy),
+            actor=copy.deepcopy(actor),
             features=features,
             hidden=hidden,
             activation=activation,
@@ -221,7 +222,7 @@ class ReinforcementLearningPlanner(Planner):
 
         # The law, the exploration head and the critic of the algorithm's family,
         # bound to the algorithm with the one discount
-        self.actor = policy or NeuralPolicy(
+        self.actor = actor or NeuralPolicy(
             problem.sys,
             input_box=require_finite_input_box(problem),
             features=features,
@@ -388,9 +389,9 @@ class ReinforcementLearningPlanner(Planner):
         return self
 
     def build_kwargs(self) -> dict:
-        """The keywords that rebuild this planner on another tree: those it was given, its law and update rule as they were before learning."""
+        """The keywords that rebuild this planner on another tree: those it was given, its actor and update rule as they were before learning."""
         kwargs = {
-            name: copy.deepcopy(value) if name in ("policy", "method") else value
+            name: copy.deepcopy(value) if name in ("actor", "method") else value
             for name, value in self.keywords.items()
         }
 

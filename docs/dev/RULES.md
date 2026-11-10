@@ -138,6 +138,7 @@ concrete formatting, ordered by the cost of being wrong:
   | The drawing library of a plot or an animation | `renderer` (`plot_renderer` on `game`) | `backend`, `plot_backend` |
   | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |
   | A planner's record | `solution.record` | `solution.solver` |
+  | The block the RL planner trains, given and read back (the actor of actor-critic; the handed-out copy is `solution.controller`) | `actor=`, `planner.actor` | `policy=` |
   | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |

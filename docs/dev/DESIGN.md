@@ -1615,8 +1615,8 @@ control periods of `n_rollouts` parallel rollouts: `solve(n_timesteps=)` → `Pl
 `control.neural.NeuralPolicy` (`u = u_mid + u_half · squash(MLP(z(x)))`,
 weights in `params["mlp"]`, features normalized by the state box or a user
 map); the learned law's runs with draws are
-`evaluate(problem, solution.controller, trajectories=True)`. The block being trained, updated in
-place every learning iteration, is `planner.actor`; the plant steps trained so far,
+`evaluate(problem, solution.controller, trajectories=True)`. The block being trained (given as `actor=`, else built
+from `hidden=` and `features=`), updated in place every learning iteration, is `planner.actor`; the plant steps trained so far,
 `planner.n_timesteps`.
 What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy`): the actor's
 mean action (its `actor`, the planner's) with an exploration head around it (`GaussianHead` for the policy-gradient family,

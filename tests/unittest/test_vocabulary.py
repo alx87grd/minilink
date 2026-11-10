@@ -380,6 +380,7 @@ RETIRED_KEYWORDS = {
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.__init__": {
         "n_envs": "n_rollouts",
         "n_steps": "n_steps_per_update (n_steps is a horizon's transitions)",
+        "policy": "actor (read back as planner.actor)",
     },
 }
 

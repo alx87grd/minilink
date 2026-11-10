@@ -448,7 +448,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `ReinforcementLearningPlanner(n_envs=)` → `n_rollouts=` (the rollouts simulated in
     parallel, as MPPI says), its `n_steps=` → `n_steps_per_update=` (each rollout's control
     periods per collection, the data of one update; `n_steps` keeps one meaning, a horizon's
-    transitions), read back as `planner.n_rollouts` and `planner.n_steps_per_update`.
+    transitions), read back as `planner.n_rollouts` and `planner.n_steps_per_update`;
+    `policy=` → `actor=`, the block it trains, read back as `planner.actor` (the handed-out
+    copy stays `solution.controller`; the `…Policy` classes keep their names, an open question).
 
 ## 3. Maturity (TRL)
 
