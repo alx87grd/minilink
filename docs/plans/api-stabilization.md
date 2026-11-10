@@ -104,10 +104,10 @@ TODO's "API sweep's judgment calls" row is folded in here.
 
 | # | The question | Today | Recommendation |
 | --- | --- | --- | --- |
-| 1 | **Block or subsystem?** One idea, two words: `add_subsystem`, `.subsystems` beside `diagram.of(block)`, "blocks:" in the print, RULES and DESIGN | 22 / 206 / 114 calls | **Ruled 2026-11-10: `subsystem`**, the one word for a system placed in a diagram: the print (`subsystems:`), the internal helpers (`block_roles`, `block_run`, `blocks_params`, …) and DESIGN / RULES prose where "block" means that; `get_subsys_input_port` → `get_subsystem_input_port`, `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning, the standard components of `minilink.blocks` (the package keeps its name). No other public rename |
-| 2 | **The simulator's solver names.** `Simulator` takes `"rk4_fixedsteps"`, `"euler_fixedsteps"`, `"scipy"`…; `discretize`, the evaluators and the sampled loop take `"rk4"`, `"euler"`. `compute_trajectory(solver="rk4")` is refused | 83 uses | **Ruled 2026-11-10: `"rk4"`, `"euler"` everywhere**, both fixed-step (the step model's words); `rk4_fixedsteps` and `euler_fixedsteps` gone, no alias; the variable-step Euler dropped (a non-uniform grid on a fixed-step solver refused, naming `scipy` or a uniform `dt`), after a search confirms no caller; the SciPy presets unchanged |
-| 3 | **`InputSet.margin(u, x, t)`** reverses the model's order; `U.margin(x, u)` returns numbers, silently wrong | about 10 library calls | **Ruled 2026-11-10: the member first, for every set** (`X.margin(x, t)`, `U.margin(u, x, t)`), written into CONSTITUTION's one-signature paragraph ("a set's `margin` takes its member first, then the arguments it depends on"), plus a shape check that refuses a member of the wrong size; no call site changes |
-| 4 | **The `get_` methods a controller or plant author writes:** `get_port_values_from_u(u, "r", "y")`, `get_u_from_input_ports()`, `traj.get_signal(name)`, `get_kinematic_geometry`, `get_dynamic_geometry`; and `tf`, which is the pose map, a final time and almost a transfer function | 23; 36; 15; 93; 143 | **4a ruled 2026-11-10:** `get_port_values_from_u(u, …)` → `self.ports(u, …)` (the same three return forms), `get_u_from_input_ports()` → the read-only property `sys.u_bar` (each input port's default), `traj.get_signal(name)` → `traj.signal(name)`; no alias. **4b ruled 2026-11-10: no rename** — `tf`, `get_kinematic_geometry` and `get_dynamic_geometry` stay as they are (the drawing hooks keep their names; `tf` the pose map beside the final time `traj.tf` is a recorded exception of RULES 2.7); S44's one hook stays v0.9 |
+| 1 | **Block or subsystem?** One idea, two words: `add_subsystem`, `.subsystems` beside `diagram.of(block)`, "blocks:" in the print, RULES and DESIGN | 22 / 206 / 114 calls | **Ruled 2026-11-10: `subsystem`**, the one word for a system placed in a diagram: the print (`subsystems:`), the internal helpers (`block_roles`, `block_run`, `blocks_params`, …) and DESIGN / RULES prose where "block" means that; `get_subsys_input_port` → `get_subsystem_input_port`, `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning, the standard components of `minilink.blocks` (the package keeps its name). No other public rename. Landed on `api-settle`. |
+| 2 | **The simulator's solver names.** `Simulator` takes `"rk4_fixedsteps"`, `"euler_fixedsteps"`, `"scipy"`…; `discretize`, the evaluators and the sampled loop take `"rk4"`, `"euler"`. `compute_trajectory(solver="rk4")` is refused | 83 uses | **Ruled 2026-11-10: `"rk4"`, `"euler"` everywhere**, both fixed-step (the step model's words); `rk4_fixedsteps` and `euler_fixedsteps` gone, no alias; the variable-step Euler dropped (a non-uniform grid on a fixed-step solver refused, naming `scipy` or a uniform `dt`), after a search confirms no caller; the SciPy presets unchanged. Landed on `api-settle`. |
+| 3 | **`InputSet.margin(u, x, t)`** reverses the model's order; `U.margin(x, u)` returns numbers, silently wrong | about 10 library calls | **Ruled 2026-11-10: the member first, for every set** (`X.margin(x, t)`, `U.margin(u, x, t)`), written into CONSTITUTION's one-signature paragraph ("a set's `margin` takes its member first, then the arguments it depends on"), plus a shape check that refuses a member of the wrong size; no call site changes. Landed on `api-settle`. |
+| 4 | **The `get_` methods a controller or plant author writes:** `get_port_values_from_u(u, "r", "y")`, `get_u_from_input_ports()`, `traj.get_signal(name)`, `get_kinematic_geometry`, `get_dynamic_geometry`; and `tf`, which is the pose map, a final time and almost a transfer function | 23; 36; 15; 93; 143 | **4a ruled 2026-11-10:** `get_port_values_from_u(u, …)` → `self.ports(u, …)` (the same three return forms), `get_u_from_input_ports()` → the read-only property `sys.u_bar` (each input port's default), `traj.get_signal(name)` → `traj.signal(name)`; no alias. Landed on `api-settle`, but for `u_bar` (see the decisions below: `get_u_from_input_ports` stays until the question is answered). **4b ruled 2026-11-10: no rename** — `tf`, `get_kinematic_geometry` and `get_dynamic_geometry` stay as they are (the drawing hooks keep their names; `tf` the pose map beside the final time `traj.tf` is a recorded exception of RULES 2.7); S44's one hook stays v0.9 |
 | 5 | **Bounds: three spellings.** `lower` / `upper` (sets, `Saturation`, the program), `lower_bound` / `upper_bound` (ports), `u_min` / `u_max` (PID), `delta_max` (path tracking) | 833 for the ports | `lower` / `upper` on ports too, only if done now; otherwise record the exception |
 | 6 | **The catalog's vocabulary.** Mass is `"mass"` on 13 plants and `"m"` on 2; damping `d`, `b`, `damping`, `damping_coef`; drag `cda`, `CdA`, `cdA`; `Pendulum(length=, mass=)` writes keys `l`, `m`; `Pendulum()` has `I = 1` beside `m = l = 1` (ω = 2.21, not √(g/l) = 3.13) | every `params[…]` in a new example | One rule (constructor keyword = `params` key); the textbook letters `m`, `l`, `I`, `d`, with `gravity`; `Pendulum`'s `I = 0` |
 | 7 | **Labels and units.** `"Torque 0"`, `"[Nm]"` from the mechanical base against `"tau1"`, `"Nm"` on the plants; rates `dtheta`, `omega`, `yaw_rate`; two plants rate-first | plot axes | Bare units; positions then rates; `d<position>`; the base's defaults `q1`, `dq1` |
@@ -174,3 +174,53 @@ output_dim, …)`; the operators; `closed_loop` and `feedback`; `record=`; `disc
 design verbs' block-versus-`_gain` split; `of=` / `wrt=` on the analysis verbs; the gain keys
 `Kp`, `Ki`, `Kd`, `K`, `L`, `N`; `"gravity"` as the key on all 18 plants; `PlanningSolution` and
 `Evaluation`; the `…Planner` suffix; `x_grid`, `u_grid`, `dt` on the grid planners.
+
+## Decisions taken during the run
+
+The run of rulings 1 to 4a on the branch `api-settle` (2026-11-10), one commit per ruling.
+
+- **Ruling 1, which helpers say subsystem.** Renamed where "block" meant a system placed in a
+  diagram: `BlockRoles` / `block_roles` → `SubsystemRoles` / `subsystem_roles`, `block_run`,
+  `blocks_params`, `every_block`, `block_under`, `plant_block_roles`, `blocks_of`,
+  `solving_block_of`, `block_path_of`, `require_one_block`, `require_new_block`,
+  `require_plant_block`, `stateful_blocks_of`, `block_params_of`, `blocks_by_seed`,
+  `check_blocks_trace`, `f_and_block`, `loop_blocks`, the evaluator's `block_ids`
+  (an attribute no caller outside the class reads), and the verbose compile line ("Checking
+  JAX compatibility of 4 subsystems"). Kept: `command_block` and `jacobian_block` (a block of
+  a matrix), `block_until_ready` (JAX) and `block_when_needed` (Matplotlib), the diagram
+  drawing's `render_block`, `block_html`, `get_system_block_html` (a box of the drawn block
+  diagram, and the last one an export of `minilink.graphical.diagrams`), `policy_from_block`
+  (a controller read as its policy, not yet placed), the wire notation `"block:port"`, and
+  `SampledDiagramEvaluator.block_input` (a public method of the compiled evaluator, named in
+  DESIGN and a test: renaming it is a public rename the ruling did not list; a question if
+  the maintainer wants it). Library docstrings were left as they are; DESIGN and RULES prose
+  changed only where "block" plainly meant a diagram's member.
+- **Ruling 2, the variable-step Euler.** The search found no caller that runs `euler` on a
+  non-uniform grid (every call gives `dt=` or `n_samples=`), so the backend is gone. The
+  fixed-step runs are byte-identical under their new names (a seeded baseline of
+  PID @ Pendulum, a forced pendulum and a sliding-mode loop, NumPy and JAX). A run that used
+  the variable-step Euler moves at round-off only, its per-interval step read off the grid
+  now one `dt`: at most `1.2e-15` in the states and `1.2e-14` in `plant:u` (the sliding-mode
+  loop on its automatic grid); no test moved. The retired names are refused by
+  `test_vocabulary.py` (`RETIRED_SOLVERS`), since the word table there walks keywords, not
+  values.
+- **Ruling 3, which sets check.** The box (so the input box), the ball and the singleton
+  refuse a member of another size, read off static shapes (`z.shape[-1]` against the bound's),
+  so the check traces under `jit`; a scalar or a list member is left to broadcasting. Cost: a
+  NumPy grid-loop step (`f`, then `U.contains` and `X.contains`) measured 33.9 µs with the
+  check and 34.0 µs without (median of 10 alternated runs, the cloud VM). `FieldInputSet` has
+  no check: a field declares no input size to compare with (AS-41, `dim` where it is known,
+  is where it would come from).
+- **Ruling 4a, `u_bar` collides: a question for the maintainer.** A read-only `System.u_bar`
+  (each input port's default) would clash with the operating point `LTISystem` and
+  `DiscreteLTISystem` already store as the attribute `self.u_bar`
+  (`dynamics/abstraction/state_space.py`: the input the deviations are measured from, used
+  for `y_bar = C x_bar + D u_bar`), and the name means that operating point on every design
+  verb, `StateFeedback`'s `params["u_bar"]`, `QuadraticCost.u_bar` and `LQRPlanner.u_bar`
+  (RULES 2.7: "Operating point, target"). The two are different numbers on a linear model
+  (its port default is not its operating point), and assigning `self.u_bar` would fail under a
+  read-only property. Decision 11 (the operating point readable as `x_bar`, `u_bar`, `y_bar`
+  everywhere) touches the same word. So `get_u_from_input_ports()` stays, with its 40 callers;
+  the options: another name for the port defaults (`sys.u_nominal`, the word the input port
+  already uses, `port.nominal_value`, and the evaluator's `nominal_input`); or `u_bar`, with
+  the linear models' operating point moved under decision 11 first.
