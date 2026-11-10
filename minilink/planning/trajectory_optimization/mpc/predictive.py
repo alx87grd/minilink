@@ -17,7 +17,7 @@ from minilink.core.system import System
 DEFAULT_INPUTS = {"x0": "y"}
 
 # The status keys every face's solve reports; a planner's own account comes after them
-STANDARD_STATUS = ("success", "iterations", "cost")
+STANDARD_STATUS = ("success", "n_iterations", "cost")
 
 ###############################################################################
 # Public API
@@ -354,10 +354,10 @@ def warm_guess(pv, z, x, params, z_default):
 
 def report_solve(block, t, status, started):
     """
-    One line for a verbose block's solve: its tick's time, success, iterations, cost and wall time (host runs only).
+    One line for a verbose block's solve: its tick's time, success, iteration count, cost and wall time (host runs only).
 
     The planner's own account follows, any other number its status carries
-    (MPPI: ``S_min``, ``S_weighted``, ``effective_samples`` of ``K``, ``exit_rate``).
+    (MPPI: ``S_min``, ``S_weighted``, ``effective_rollouts`` of ``K``, ``exit_rate``).
     """
     values = [t, *(value for value in status.values() if value is not None)]
     if not block.verbose or not all(is_concrete(value) for value in values):
@@ -366,19 +366,19 @@ def report_solve(block, t, status, started):
     cost = status["cost"]
     cost_text = "n/a" if cost is None else f"{float(cost):.6g}"
 
-    # The planner's account beyond the four the face promises, the effective samples
+    # The planner's account beyond the four the face promises, the effective rollouts
     # out of the K drawn
     samples = getattr(block.pv, "K", None)
     extras = []
     for name, value in status.items():
         if name in STANDARD_STATUS or value is None:
             continue
-        of_K = f"/{samples}" if name == "effective_samples" and samples else ""
+        of_K = f"/{samples}" if name == "effective_rollouts" and samples else ""
         extras.append(f"{name}={float(value):.4g}{of_K}")
 
     print(
         f"MPC @ t={float(t):.2f}s  success={bool(status['success'])}  "
-        f"iterations={status['iterations']}  J={cost_text}  solve={elapsed:.3f}s"
+        f"n_iterations={status['n_iterations']}  J={cost_text}  solve={elapsed:.3f}s"
         + "".join(f"  {extra}" for extra in extras)
     )
 

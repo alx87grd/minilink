@@ -147,7 +147,7 @@ class CompiledTrajectoryPlanner:
 
         ``params`` is ``None`` (the defaults) or :attr:`params` edited, checked once; the
         solution records its origin ``params["t0"]``. ``status`` is
-        ``{"success", "iterations", "cost"}``. A NumPy program has no
+        ``{"success", "n_iterations", "cost"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
@@ -171,7 +171,7 @@ class CompiledTrajectoryPlanner:
         z = xp.concatenate([result.z, t0])
         status = {
             "success": result.success,
-            "iterations": result.stats.get("nit"),
+            "n_iterations": result.stats.get("nit"),
             "cost": result.cost,
         }
 
@@ -282,8 +282,8 @@ class CompiledTrajectoryPlanner:
             success=bool(status.get("success", True)),
             cost=None if cost is None else float(cost),
             stats={}
-            if status.get("iterations") is None
-            else {"nit": status["iterations"]},
+            if status.get("n_iterations") is None
+            else {"nit": status["n_iterations"]},
         )
         trajectory = self.transcription.reconstruct_result(
             result, problem=problem, backend=self.backend
@@ -308,7 +308,7 @@ class CompiledTrajectoryPlanner:
             cost=result.cost,
             solver_success=result.success,
             message="",
-            n_iterations=status.get("iterations"),
+            n_iterations=status.get("n_iterations"),
             solve_time_s=None,
             feasibility_tol=tol,
             max_equality_violation=float(max_eq),

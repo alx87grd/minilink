@@ -79,7 +79,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         # Nothing in the plane stops V; the state box does, at |x| = 10
         self.assertLessEqual(roa.extent.max(), 10.0 + 1e-6)
         self.assertTrue(roa.contains(np.zeros(2)))
-        self.assertTrue(roa.verify(n=50).holds)
+        self.assertTrue(roa.verify(n_rollouts=50).holds)
 
     def test_saturated_pendulum_certificate_sits_inside_the_true_basin(self):
         plant = saturated_pendulum()
@@ -89,7 +89,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         self.assertGreater(roa.level, 0.0)
         self.assertTrue(roa.contains(roa.x_bar))
         # Simulation agrees with the theory, which is the whole point
-        report = roa.verify(n=100)
+        report = roa.verify(n_rollouts=100)
         self.assertTrue(report.holds, msg=str(report))
         self.assertIsNone(report.counterexample)
         # The limiting sample is on the boundary of the claim, not inside it
@@ -104,7 +104,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         roa = region_of_attraction(sys)
 
         self.assertLess(roa.extent.max(), 2.5)
-        self.assertTrue(roa.verify(n=100).holds)
+        self.assertTrue(roa.verify(n_rollouts=100).holds)
         # A state well outside the cycle diverges, so it must not be certified
         self.assertFalse(roa.contains(np.array([3.0, 3.0])))
 
@@ -150,7 +150,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         roa = region_of_attraction(sys)  # finite-difference Jacobian, looped sweep
         self.assertTrue(np.all(roa.poles.real < 0))
         self.assertGreater(roa.level, 0.0)
-        self.assertTrue(roa.verify(n=20).holds)
+        self.assertTrue(roa.verify(n_rollouts=20).holds)
 
     def test_four_state_loop_certifies_and_its_slice_is_not_its_shadow(self):
         # n > 2: the sweep goes quasi-random, and a phase-plane plot draws the
@@ -166,7 +166,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         roa = region_of_attraction(loop, x_up)
 
         self.assertEqual(roa.extent.size, 4)
-        self.assertTrue(roa.verify(n=50).holds)
+        self.assertTrue(roa.verify(n_rollouts=50).holds)
 
         shadow = roa.extent[[0, 1]]
         sliced = roa.slice_extent(0, 1)
@@ -258,13 +258,13 @@ def test_plot_draws_the_slice_and_the_basin():
     loop = lqr(plant, Q=np.eye(2), R=np.eye(1), x_bar=np.zeros(2)) @ plant
     roa = region_of_attraction(loop)
 
-    fig, ax = roa.plot(basin=True, n=41, show=False)
+    fig, ax = roa.plot(basin=True, n_samples=41, show=False)
     self_titled = " ".join(ax.get_title().split())
     assert "region of attraction" in self_titled
     assert len(ax.collections) >= 1  # the shaded basin
     assert ax.get_xlabel() == loop.state.labels[0]
 
-    fig_band, _ = plot_region_of_attraction(roa, n=21, show=False)
+    fig_band, _ = plot_region_of_attraction(roa, n_samples=21, show=False)
     assert fig_band is not None
 
 
@@ -278,7 +278,7 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
     roa = region_of_attraction(sys)
     traj = sys.compute_trajectory(tf=0.5, verbose=False)
 
-    _, ax = roa.plot(trajectories=[[2.0, 1.0], [-3.0, 0.5]], n=11, show=False)
+    _, ax = roa.plot(trajectories=[[2.0, 1.0], [-3.0, 0.5]], n_samples=11, show=False)
     assert len(ax.lines) >= 4  # each overlay: its path and its start
     assert sys.traj is traj
     np.testing.assert_array_equal(sys.x0, [1.0, -1.0])
@@ -287,7 +287,7 @@ def test_plot_overlays_leave_the_system_run_and_start_untouched():
 def test_a_verification_reports_every_trial_and_no_counterexample_when_it_holds():
     from minilink.analysis import VerificationReport
 
-    report = region_of_attraction(StableLinear()).verify(n=20)
+    report = region_of_attraction(StableLinear()).verify(n_rollouts=20)
 
     # One verdict and one final distance per trial; a counterexample only on failure
     assert isinstance(report, VerificationReport)

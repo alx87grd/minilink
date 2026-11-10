@@ -65,9 +65,9 @@ class StateSpaceGrid:
     Attributes
     ----------
     states : np.ndarray
-        Grid states, shape ``(nodes_n, n)``.
+        Grid states, shape ``(n_nodes, n)``.
     inputs : np.ndarray
-        Grid inputs, shape ``(actions_n, m)``.
+        Grid inputs, shape ``(n_actions, m)``.
     x_next, action_ok, x_next_ok : np.ndarray or None
         Successor and validity tables, built at construction when ``precompute``
         is set (or by :meth:`ensure_jax_transition` and :meth:`load`); ``None``
@@ -121,8 +121,8 @@ class StateSpaceGrid:
         # The nodes and the actions: every combination of levels, one per row
         self.states = self.grid_points(self.x_levels)
         self.inputs = self.grid_points(self.u_levels)
-        self.nodes_n = self.states.shape[0]
-        self.actions_n = self.inputs.shape[0]
+        self.n_nodes = self.states.shape[0]
+        self.n_actions = self.inputs.shape[0]
 
         # Table build options, as given (a rebuilt grid keeps them)
         self.precompute = bool(precompute)
@@ -183,7 +183,7 @@ class StateSpaceGrid:
         return self.build_transition(t)
 
     def successors(self, t: float = 0.0) -> np.ndarray:
-        """Return the successor states ``x_next`` of shape ``(nodes_n, actions_n, n)``."""
+        """Return the successor states ``x_next`` of shape ``(n_nodes, n_actions, n)``."""
         if self.precomputed:
             return self.x_next
 
@@ -251,8 +251,8 @@ class StateSpaceGrid:
         set_params = None
         states = self.states
         inputs = self.inputs
-        N = self.nodes_n
-        A = self.actions_n
+        N = self.n_nodes
+        A = self.n_actions
         n = self.n
         verbose = self.verbose
 
@@ -290,8 +290,8 @@ class StateSpaceGrid:
         jax = ensure_jax_x64()
         jnp = jax.numpy
 
-        N = self.nodes_n
-        A = self.actions_n
+        N = self.n_nodes
+        A = self.n_actions
         n = self.n
         sys_params = self.model.params["plant"]
         X = self.problem.X
@@ -363,9 +363,9 @@ class StateSpaceGrid:
 
     def field(self, values, t=None, *, method="linear", outside=None) -> GridField:
         """
-        A node-indexed table ``(nodes_n,)`` as a :class:`~minilink.core.fields.GridField` on this grid's levels.
+        A node-indexed table ``(n_nodes,)`` as a :class:`~minilink.core.fields.GridField` on this grid's levels.
 
-        With times ``t`` ``(T,)``, ``values`` is ``(T, nodes_n)``, one table per
+        With times ``t`` ``(T,)``, ``values`` is ``(T, n_nodes)``, one table per
         time. ``method`` is the reading rule, one of
         :attr:`~minilink.core.fields.GridField.METHODS`; ``outside`` the value
         past the grid (the edge held for ``None``).
@@ -379,11 +379,11 @@ class StateSpaceGrid:
         )
 
     def grid_from_array(self, values) -> np.ndarray:
-        """Reshape a node-indexed array ``(nodes_n,)`` into the state grid shape."""
+        """Reshape a node-indexed array ``(n_nodes,)`` into the state grid shape."""
         return np.asarray(values).reshape(self.x_grid_shape)
 
     def input_from_policy(self, pi) -> np.ndarray:
-        """Map a policy of action ids ``(nodes_n,)`` to inputs ``(nodes_n, m)``."""
+        """Map a policy of action ids ``(n_nodes,)`` to inputs ``(n_nodes, m)``."""
         return self.inputs[np.asarray(pi, dtype=int)]
 
     # Grid lookups
@@ -435,7 +435,7 @@ class StateSpaceGrid:
         """
         Draw a node-indexed field on this grid: a heatmap, or a surface with ``is_3d``.
 
-        ``values`` has shape ``(nodes_n,)`` — a cost-to-go, a policy's value, a
+        ``values`` has shape ``(n_nodes,)`` — a cost-to-go, a policy's value, a
         fitted approximation. Options (``x_axis``, ``y_axis``, ``anchor``, ``vmin``, ``vmax``,
         ``title``, ``show``) are those of
         :func:`~minilink.planning.dynamic_programming.plotting.plot_value`.
@@ -545,8 +545,8 @@ class StateSpaceGrid:
         print(f"\nGenerating mesh for: {name}")
         print("---------------------------------------------------")
         print(f"State space dimensions: {self.n}  Input space dimension: {self.m}")
-        print(f"Number of nodes: {self.nodes_n}  Number of actions: {self.actions_n}")
-        print(f"Number of node-action pairs: {self.nodes_n * self.actions_n}")
+        print(f"Number of nodes: {self.n_nodes}  Number of actions: {self.n_actions}")
+        print(f"Number of node-action pairs: {self.n_nodes * self.n_actions}")
         print("---------------------------------------------------")
 
     def build_transition(self, t):
@@ -648,5 +648,5 @@ if __name__ == "__main__":
     plant = DoubleIntegrator()
     problem = PlanningProblem(plant, U=plant.input_box)
     grid = StateSpaceGrid(problem, x_grid=(11, 11), u_grid=(3,), dt=0.1)
-    print("nodes:", grid.nodes_n, "actions:", grid.actions_n)
+    print("nodes:", grid.n_nodes, "actions:", grid.n_actions)
     print("x_next shape:", grid.successors().shape)

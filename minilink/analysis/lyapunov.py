@@ -310,9 +310,9 @@ class LyapunovCertificate:
 
     # The two questions asked of it
 
-    def verify(self, n: int = 200, tf: float = None, tol: float = None):
+    def verify(self, n_rollouts: int = 200, tf: float = None, tol: float = None):
         """
-        Integrate ``n`` states drawn inside the certified region: all must converge.
+        Integrate ``n_rollouts`` states drawn inside the certified region: all must converge.
 
         States are drawn uniformly in the ellipsoid ``{V <= level}``. ``tf``
         defaults to ten time constants of the slowest linearized mode and
@@ -328,7 +328,7 @@ class LyapunovCertificate:
         tol = 0.01 * float(np.max(self.extent)) if tol is None else float(tol)
 
         # Initial states drawn uniformly in {V ≤ c}, each integrated for tf
-        x0 = region.sample(CERTIFICATE_SEED, n)
+        x0 = region.sample(CERTIFICATE_SEED, n_rollouts)
         x_final = self.rollout(tf)(x0)
 
         # Every trial must end within tol of the equilibrium
@@ -347,7 +347,7 @@ class LyapunovCertificate:
         detail: bool = True,
         verified: int = 0,
         trajectories=(),
-        n: int = 201,
+        n_samples: int = 201,
         bounds=None,
         ax=None,
         show: bool = True,
@@ -361,7 +361,7 @@ class LyapunovCertificate:
             detail=detail,
             verified=verified,
             trajectories=trajectories,
-            n=n,
+            n_samples=n_samples,
             bounds=bounds,
             ax=ax,
             show=show,
@@ -417,7 +417,7 @@ def plot_region_of_attraction(
     detail: bool = True,
     verified: int = 0,
     trajectories=(),
-    n: int = 201,
+    n_samples: int = 201,
     bounds=None,
     ax=None,
     show: bool = True,
@@ -470,7 +470,7 @@ def plot_region_of_attraction(
         detail=detail,
         verified=verified,
         trajectories=trajectories,
-        n=n,
+        n_samples=n_samples,
     )
     ax.figure.tight_layout()
     if show:
@@ -727,7 +727,7 @@ def draw_region(
     detail,
     verified,
     trajectories,
-    n,
+    n_samples,
 ):
     """Draw one certificate on one axis, and label every layer it drew."""
     # Lazy import: matplotlib loads on first use, not with the analysis
@@ -738,8 +738,8 @@ def draw_region(
     from minilink.simulation.simulator import Simulator
 
     # The slice: the two swept states over the window, the others at the equilibrium
-    grid_x = np.linspace(bounds[0][0], bounds[0][1], n)
-    grid_y = np.linspace(bounds[1][0], bounds[1][1], n)
+    grid_x = np.linspace(bounds[0][0], bounds[0][1], n_samples)
+    grid_y = np.linspace(bounds[1][0], bounds[1][1], n_samples)
     GX, GY = np.meshgrid(grid_x, grid_y)
     states = np.tile(cert.x_bar, (GX.size, 1))
     states[:, x_axis] = GX.ravel()

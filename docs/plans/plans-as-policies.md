@@ -96,7 +96,7 @@ numbers) and closes in the follower only; an infinite one is refused above a siz
   (never action `0`, the corner of the input box).
 - **`pv.command(z, x, t)`:** the lookup law's arithmetic on `z`'s table at `x` (finite: at the
   stage of `t`, the stage rule of `LookupPolicy`).
-- **`status`:** `{"success", "iterations", "delta", "cost"}`, `cost = J(x0)`.
+- **`status`:** `{"success", "n_iterations", "delta", "cost"}`, `cost = J(x0)`.
 - **A fixed number of sweeps per solve,** in the infinite mode only: truncated, warm-started
   value iteration (not "real-time dynamic programming", which backs up states asynchronously
   along simulated paths). Its spelling is `PP-Q8`.

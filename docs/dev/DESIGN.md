@@ -332,7 +332,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   (`SampledDiagramEvaluator.block_input`: the block's ancestors alone, the solve not run);
   `mpc_animation_overlays(..., samples=n)` draws them and `plot_sampled_futures` gives the
   static figure. Each face reads its plan as a trajectory (`planned_trajectory`), and the MPC's
-  verbose line appends a planner's own account (MPPI's `S_min`, `effective_samples` of `K`).
+  verbose line appends a planner's own account (MPPI's `S_min`, `effective_rollouts` of `K`).
 - **MPC on the planner's face:** `ModelPredictiveController(planner, *, inputs=None,
   delay=False, warm_start=True, backend=None, verbose=False)` closes a planner's compiled face
   `pv = planner.compile()` on the loop, one solve per tick, `(mpc % dt) @ plant`. Every

@@ -236,7 +236,7 @@ def test_verbose_prints_mppis_account():
         zero_delay_run(tf=0.1, verbose=True)
     line = out.getvalue().splitlines()[0]
     assert line.startswith("MPC @ t=0.00s") and "S_min=" in line
-    assert "effective_samples=" in line and "/512" in line and "exit_rate=" in line
+    assert "effective_rollouts=" in line and "/512" in line and "exit_rate=" in line
 
 
 def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():

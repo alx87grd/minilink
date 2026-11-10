@@ -253,6 +253,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `DirectCollocationTranscription(n_steps=20)`, the same for `ShootingTranscription` and
     `MultipleShootingTranscription`; the option records are gone, and the grid
     (`t(problem)`, `dt(problem)`, `n_knots`) is read on the transcription.
+  - *Every count is `n_<thing>`.* A compiled planner's `status["iterations"]` →
+    `status["n_iterations"]` (trajectory optimization, MPPI, the MPC's verbose line);
+    `MPPIRecord.effective_samples` → `effective_rollouts`; `StateSpaceGrid.nodes_n`,
+    `actions_n` → `n_nodes`, `n_actions`; `LyapunovCertificate.verify(n=)` →
+    `verify(n_rollouts=)`, and its plots' `n=` (`certificate.plot`,
+    `plot_region_of_attraction`) → `n_samples=`.
 
 ## 3. Maturity (TRL)
 

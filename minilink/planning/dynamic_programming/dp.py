@@ -399,7 +399,7 @@ class DynamicProgrammingPlanner(Planner):
             if self.grid.precomputed:
                 G = self.running_cost_table(tf, verbose=verbose)
             J = self.terminal_cost(tf, verbose=verbose)
-            pi = np.zeros(self.grid.nodes_n, dtype=int)
+            pi = np.zeros(self.grid.n_nodes, dtype=int)
         log.start(tf, J, pi)
 
         # The tables of every stage, from the final one back (a finite horizon's)
@@ -473,17 +473,17 @@ class DynamicProgrammingPlanner(Planner):
         J_interpol = grid.build_interpolator(J_next, self.interpolation)
 
         # New cost-to-go and policy to be computed
-        J = np.zeros(grid.nodes_n)
-        pi = np.zeros(grid.nodes_n, dtype=int)
+        J = np.zeros(grid.n_nodes)
+        pi = np.zeros(grid.n_nodes, dtype=int)
 
         # For all state nodes
-        for s in range(grid.nodes_n):
+        for s in range(grid.n_nodes):
             x = grid.states[s]
 
-            Q = np.zeros(grid.actions_n)
+            Q = np.zeros(grid.n_actions)
 
             # For all control actions
-            for a in range(grid.actions_n):
+            for a in range(grid.n_actions):
                 u = grid.inputs[a]
 
                 # x_{k+1}, c = transition(x_k, u, t): the step model's tick
@@ -520,8 +520,8 @@ class DynamicProgrammingPlanner(Planner):
         gamma = self.gamma
         method = self.interpolation
         n = grid.n  # State dimension
-        N = grid.nodes_n  # Number of nodes
-        A = grid.actions_n  # Number of actions
+        N = grid.n_nodes  # Number of nodes
+        A = grid.n_actions  # Number of actions
 
         # Euler successors x_next = x + f(x, u, t) dt of every (node, action) pair,
         # shape (N, A, n), and which pairs are admissible
@@ -547,13 +547,13 @@ class DynamicProgrammingPlanner(Planner):
         return J, pi
 
     def policy_transition(self, policy, t):
-        """Per-node successor ``(nodes_n, n)`` and running cost ``(nodes_n,)`` under the fixed law ``u = policy(x)``."""
+        """Per-node successor ``(n_nodes, n)`` and running cost ``(n_nodes,)`` under the fixed law ``u = policy(x)``."""
         grid = self.grid
         X = self.problem.X
         U = self.problem.U
         tree = grid.model.params
         sys_params = tree["plant"]
-        N = grid.nodes_n  # Number of nodes
+        N = grid.n_nodes  # Number of nodes
         n = grid.n  # State dimension
         INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
@@ -595,7 +595,7 @@ class DynamicProgrammingPlanner(Planner):
         """The terminal cost ``h`` at time ``t`` of every grid node, by node id (``verbose``: the build's progress)."""
         grid = self.grid
         model = grid.model
-        N = grid.nodes_n
+        N = grid.n_nodes
 
         J = np.empty(N, dtype=float)
         nodes = progress(range(N), "Computing h(x,t) terminal cost", verbose)
@@ -613,7 +613,7 @@ class DynamicProgrammingPlanner(Planner):
         self, t, admissible=None, x_next=None, *, verbose: bool = False
     ) -> np.ndarray:
         """
-        Stage cost of every (node, action) pair over one step, shape ``(nodes_n, actions_n)``: the step model's ``c`` (``g dt`` under Euler).
+        Stage cost of every (node, action) pair over one step, shape ``(n_nodes, n_actions)``: the step model's ``c`` (``g dt`` under Euler).
 
         Pairs that are not ``admissible`` (action outside the input set, or a
         successor outside the state set or the grid) cost ``out_of_bound_cost``:
@@ -629,8 +629,8 @@ class DynamicProgrammingPlanner(Planner):
         """
         grid = self.grid
         params = grid.model.params
-        N = grid.nodes_n
-        A = grid.actions_n
+        N = grid.n_nodes
+        A = grid.n_actions
         INF = self.out_of_bound_cost  # The finite failure cost (pyro's cf.INF)
 
         # The grid's mask, and its successors when a callable cost needs them
@@ -828,9 +828,9 @@ class DynamicProgrammingResult:
     grid : StateSpaceGrid
         Grid the result is defined on.
     J : np.ndarray
-        Cost-to-go by node id, shape ``(nodes_n,)`` (a finite horizon's: stage 0).
+        Cost-to-go by node id, shape ``(n_nodes,)`` (a finite horizon's: stage 0).
     pi : np.ndarray
-        Greedy policy as action ids by node id, shape ``(nodes_n,)`` (stage 0).
+        Greedy policy as action ids by node id, shape ``(n_nodes,)`` (stage 0).
     n_iterations : int
         Number of backward sweeps performed (a tabular learner's tables: the
         episodes it learned from).
@@ -841,8 +841,8 @@ class DynamicProgrammingResult:
     schedule : tuple, optional
         A finite horizon's stages forward in time, ``(t, J, pi)``: the stage
         times ``t_0 … t_N`` ``(N + 1,)``, the cost-to-go ``J_0 … J_N``
-        ``(N + 1, nodes_n)`` with ``J_N = h``, and the laws ``π_0 … π_{N−1}``
-        ``(N, nodes_n)``.
+        ``(N + 1, n_nodes)`` with ``J_N = h``, and the laws ``π_0 … π_{N−1}``
+        ``(N, n_nodes)``.
     """
 
     grid: StateSpaceGrid
@@ -1040,7 +1040,7 @@ STAGE_MEMORY_LIMIT = 2**30
 
 def require_stage_memory(N, grid):
     """Refuse a finite horizon whose stacks pass :data:`STAGE_MEMORY_LIMIT`: ``N + 1`` cost-to-go tables, ``N`` policies and ``N`` command tables."""
-    nodes = grid.nodes_n
+    nodes = grid.n_nodes
     m = grid.m
 
     # 8 bytes a number: J_0 … J_N, π_0 … π_{N−1}, and the m inputs of every node per stage

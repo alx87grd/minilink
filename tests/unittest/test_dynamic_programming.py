@@ -122,10 +122,10 @@ class TestStateSpaceGrid(unittest.TestCase):
 
     def test_dimensions_and_meshgrid_order(self):
         grid = StateSpaceGrid(make_problem(), x_grid=(5, 4), u_grid=(3,), dt=0.1)
-        self.assertEqual(grid.nodes_n, 20)
-        self.assertEqual(grid.actions_n, 3)
+        self.assertEqual(grid.n_nodes, 20)
+        self.assertEqual(grid.n_actions, 3)
         self.assertEqual(grid.states.shape, (20, 2))
-        values = np.arange(grid.nodes_n, dtype=float)
+        values = np.arange(grid.n_nodes, dtype=float)
         self.assertTrue(np.array_equal(grid.grid_from_array(values).ravel(), values))
 
     def test_nearest_lookups(self):
@@ -782,7 +782,7 @@ class TestCostToGoInterpolation(unittest.TestCase):
         planner = DynamicProgrammingPlanner(
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1, interpolation="spline"
         )
-        J = np.zeros(planner.grid.nodes_n)
+        J = np.zeros(planner.grid.n_nodes)
         x = np.zeros((1, 2))
         with self.assertRaisesRegex(ValueError, '"cubic"'):
             planner.solve()
@@ -968,7 +968,7 @@ class TestInfeasibleCostPrice(unittest.TestCase):
                 x_next = grid.transition(0.0)[0]
 
                 # Only the first pair is inadmissible, whatever the grid's own mask
-                admissible = np.ones((grid.nodes_n, grid.actions_n), bool)
+                admissible = np.ones((grid.n_nodes, grid.n_actions), bool)
                 admissible[0, 0] = False
                 G = planner.running_cost_table(0.0, admissible)
 

@@ -79,7 +79,7 @@ def device_step(planner, verbose=False):
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner, verbose)
     J0 = jnp.asarray(terminal_cost(planner, planner.final_time, verbose))
-    pi0 = jnp.zeros(planner.grid.nodes_n, dtype=jnp.int32)
+    pi0 = jnp.zeros(planner.grid.n_nodes, dtype=jnp.int32)
 
     gamma = float(planner.gamma)
     step = jitted_step(planner)
@@ -98,7 +98,7 @@ def terminal_cost(planner, t, verbose=False) -> np.ndarray:
 
     grid = planner.grid
     model = grid.model
-    N = grid.nodes_n
+    N = grid.n_nodes
 
     states = jnp.asarray(grid.states)
 
@@ -135,8 +135,8 @@ def running_cost_table(planner, t, verbose=False) -> np.ndarray:
     grid = planner.grid
     model = grid.model
     params = model.params
-    N = grid.nodes_n
-    A = grid.actions_n
+    N = grid.n_nodes
+    A = grid.n_actions
     failure_cost = planner.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
@@ -306,7 +306,7 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
-    N = planner.grid.nodes_n
+    N = planner.grid.n_nodes
     step = jitted_step(planner)
 
     def run(J0, G, coords, in_bounds, gamma, tol):
@@ -350,8 +350,8 @@ def jitted_step(planner):
     map_coordinates = jax.scipy.ndimage.map_coordinates
 
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
-    N = planner.grid.nodes_n
-    A = planner.grid.actions_n
+    N = planner.grid.n_nodes
+    A = planner.grid.n_actions
     order = 0 if planner.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds, gamma):

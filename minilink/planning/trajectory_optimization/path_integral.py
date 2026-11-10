@@ -174,7 +174,7 @@ class MPPIRecord:
     """
     The account of one path-integral solve: what a user tunes ``λ`` and ``Σ`` against.
 
-    ``effective_samples`` is ``1 / Σ (w^k)²``: a few means ``λ`` is too small
+    ``effective_rollouts`` is ``1 / Σ (w^k)²``: a few means ``λ`` is too small
     (one sample decides), close to ``K`` too large (an unweighted average).
     ``success`` is "the nominal rollout of the plan stays in ``X``".
     """
@@ -182,7 +182,7 @@ class MPPIRecord:
     cost: float
     S_min: float
     S_weighted: float
-    effective_samples: float
+    effective_rollouts: float
     exit_rate: float
     n_iterations: int
     success: bool
@@ -190,8 +190,8 @@ class MPPIRecord:
     def __str__(self) -> str:
         return (
             f"MPPI: cost {self.cost:.6g} (nominal plan), S_min {self.S_min:.6g}, "
-            f"weighted {self.S_weighted:.6g}, effective samples "
-            f"{self.effective_samples:.1f}, exit rate {self.exit_rate:.0%}, "
+            f"weighted {self.S_weighted:.6g}, effective rollouts "
+            f"{self.effective_rollouts:.1f}, exit rate {self.exit_rate:.0%}, "
             f"{'stays in X' if self.success else 'leaves X'}"
         )
 
@@ -268,8 +268,8 @@ class CompiledMPPIPlanner:
         """
         The solve as a function: ``(z, status)`` from the plan ``z0`` (``None``: :meth:`initial`) on ``params``.
 
-        ``status`` is ``{"success", "iterations", "cost"}`` plus the softmin's
-        account (``S_min``, ``S_weighted``, ``effective_samples``, ``exit_rate``).
+        ``status`` is ``{"success", "n_iterations", "cost"}`` plus the softmin's
+        account (``S_min``, ``S_weighted``, ``effective_rollouts``, ``exit_rate``).
         """
         P = self.merged(params)
         z0 = self.initial(P) if z0 is None else z0
@@ -293,11 +293,11 @@ class CompiledMPPIPlanner:
         w = last["w"]
         status = {
             "success": ~left,
-            "iterations": self.n_iterations,
+            "n_iterations": self.n_iterations,
             "cost": cost,
             "S_min": jnp.min(S),
             "S_weighted": w @ S,
-            "effective_samples": 1.0 / jnp.sum(w**2),
+            "effective_rollouts": 1.0 / jnp.sum(w**2),
             "exit_rate": jnp.mean(last["left_X"]),
         }
         z = jnp.concatenate([jnp.reshape(U, (-1,)), jnp.reshape(t0, (1,))])
@@ -457,9 +457,9 @@ class CompiledMPPIPlanner:
             cost=float(status.get("cost", np.nan)),
             S_min=float(status.get("S_min", np.nan)),
             S_weighted=float(status.get("S_weighted", np.nan)),
-            effective_samples=float(status.get("effective_samples", np.nan)),
+            effective_rollouts=float(status.get("effective_rollouts", np.nan)),
             exit_rate=float(status.get("exit_rate", np.nan)),
-            n_iterations=int(status.get("iterations", self.n_iterations)),
+            n_iterations=int(status.get("n_iterations", self.n_iterations)),
             success=bool(status.get("success", True)),
         )
         controller = open_loop_controller_of(

@@ -68,7 +68,16 @@ RETIRED = {
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
     "sample": ("at", ("Trajectory",)),
-    "n": ("state_dim", ("System", "DynamicSystem", "StepSystem")),
+    "n": (
+        "state_dim on a system; n_rollouts (verify) or n_samples (the plots) on a certificate",
+        (
+            "System",
+            "DynamicSystem",
+            "StepSystem",
+            "LyapunovCertificate",
+            "plot_region_of_attraction",
+        ),
+    ),
     "episodes": ("n_episodes", None),
     "timesteps": ("n_timesteps", None),
     "with_signal": ("with_signals", ("Trajectory",)),
@@ -175,6 +184,9 @@ RETIRED = {
     "compute_subsys_output_port": ("compute_subsystem_output_port", None),
     "get_port_values_from_u": ("ports", None),
     "get_signal": ("signal", None),
+    "nodes_n": ("n_nodes", None),
+    "actions_n": ("n_actions", None),
+    "effective_samples": ("effective_rollouts", None),
     "options": (
         "n_steps",
         (
@@ -224,6 +236,14 @@ def test_no_retired_name_at_its_path(path):
     assert not hasattr(owner_of(path), name), (
         f"{path} is retired, write {RETIRED_NAMES[path]!r}"
     )
+
+
+def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        STANDARD_STATUS,
+    )
+
+    assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
 
 
 # A retired value of a keyword: the value that replaced it. The simulator's solver names are the

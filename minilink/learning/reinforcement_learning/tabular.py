@@ -95,9 +95,9 @@ class TabularLearningPlanner(Planner):
 
     Attributes
     ----------
-    Q : ndarray, shape (nodes_n, actions_n)
+    Q : ndarray, shape (n_nodes, n_actions)
         The cost-to-go table, updated in place.
-    visits : ndarray of int, shape (nodes_n, actions_n)
+    visits : ndarray of int, shape (n_nodes, n_actions)
         How often each cell was updated.
     history : list of dict
         One record per episode: its cost, length and exploration rate.
@@ -169,8 +169,8 @@ class TabularLearningPlanner(Planner):
         self.substeps = int(substeps)
 
         # Memory: the table, its visit counts, one record per episode
-        self.Q = np.zeros((grid.nodes_n, grid.actions_n))
-        self.visits = np.zeros((grid.nodes_n, grid.actions_n), dtype=int)
+        self.Q = np.zeros((grid.n_nodes, grid.n_actions))
+        self.visits = np.zeros((grid.n_nodes, grid.n_actions), dtype=int)
         self.history = []
 
     @property
