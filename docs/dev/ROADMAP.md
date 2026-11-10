@@ -272,6 +272,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     formula reads `e^{−ρ horizon} h(x(t_end), t_end)` with `t_end = t0 + horizon` (the
     internal `score_run(horizon=)`, `planner_evidence(episode_length=)`, `steps_of(horizon,
     dt)` with it).
+  - *Exported.* `DiscreteLTISystem`, the linear model `linearize` returns on a step or sampled
+    system, is on `minilink.dynamics` beside `LTISystem`; its `period=` keeps its name (renaming
+    it `sample_period` would put the model on a clock, an open question).
 
 ## 3. Maturity (TRL)
 

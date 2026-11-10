@@ -170,6 +170,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "Manipulator",
         "StateSpaceSystem",
         "LTISystem",
+        "DiscreteLTISystem",
     ),
     "minilink.learning": (
         "ReinforcementLearningPlanner",
