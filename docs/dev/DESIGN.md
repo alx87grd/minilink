@@ -919,7 +919,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   covariance keeps each sample when `Δ` is edited (a datasheet sensor,
   `NoiseSource(Gaussian(0, cov=R_d), sample_period=Tₛ)`). `WhiteNoise` is its subclass whose
   per-sample law, `N(0, psd / Δ)`, is derived in `h`; both are in `minilink.blocks`.
-- Costs: `g(x,u,t,params=None)`, `h(x,t,params=None)` on `CostFunction` in `core`; attach
+- Costs: `g(x,u,t,params=None)`, `h(x,t,params=None)` on `CostFunction` in `core` (`h` zero
+  unless a subclass writes one, a 0-d array on `x`'s array module, so a running cost writes
+  `g` only); attach
   to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
   discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
   and `h_max(X)` its upper bounds over boxes (exact for a quadratic, sampled otherwise),

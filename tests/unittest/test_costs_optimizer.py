@@ -917,3 +917,28 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
         assert np.all(np.isfinite(np.asarray(jacobian)))
     with pytest.raises(ValueError, match="shape"):
         opt.solve(z0=[0.0, 0.0, 0.0])
+
+
+class _RunningOnly(CostFunction):
+    """A running cost that writes ``g`` only: ``h`` is the base's zero."""
+
+    def g(self, x, u, t=0.0, params=None):
+        return x @ x + u @ u
+
+
+def test_a_running_cost_alone_charges_no_terminal_cost():
+    cost = _RunningOnly()
+    h = cost.h(np.array([1.0, 2.0]))
+    assert isinstance(h, np.ndarray) and h.shape == () and h == 0.0
+    assert cost.g(np.array([1.0, 2.0]), np.array([1.0])) == 6.0
+
+
+def test_the_default_terminal_cost_traces_on_jax():
+    jax = pytest.importorskip("jax")
+    import jax.numpy as jnp
+
+    cost = _RunningOnly()
+    h = jax.jit(cost.h)(jnp.array([1.0, 2.0]))
+    assert isinstance(h, jnp.ndarray) and float(h) == 0.0
+    grad = jax.grad(lambda x: cost.g(x, jnp.zeros(1)) + cost.h(x))(jnp.ones(2))
+    np.testing.assert_allclose(np.asarray(grad), [2.0, 2.0])

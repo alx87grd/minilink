@@ -23,8 +23,9 @@ class CostFunction(ABC):
     """
     Mother class for deterministic planning cost functions.
 
-    Subclasses define a running cost ``g(x, u, t)`` and a terminal cost
-    ``h(x, t)`` of the objective ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
+    Subclasses define a running cost ``g(x, u, t)`` and, when there is one, a
+    terminal cost ``h(x, t)`` (zero by default) of the objective
+    ``J = ∫ e^{−ρt} g dt + e^{−ρ tf} h(x(tf), tf)``.
     The horizon is the planning problem's: a finite ``horizon`` ends the integral
     and charges ``h`` there, an infinite one never does. Leaving the allowed
     set is charged by the problem (``failure_cost``), not by the cost.
@@ -52,10 +53,18 @@ class CostFunction(ABC):
         """Return the native scalar running cost density ``g(x, u, t)``."""
         ...
 
-    @abstractmethod
     def h(self, x, t=0.0, params=None):
-        """Return the native scalar terminal cost ``h(x, t)``."""
-        ...
+        """Return the native scalar terminal cost ``h(x, t)``: zero unless a subclass charges one.
+
+        A running cost alone writes :meth:`g` only. The zero is a 0-d array on
+        ``x``'s array module, so it traces under JAX like a written ``h``.
+        """
+        xp = array_module(x)
+
+        # h(x, t) = 0: no terminal charge
+        h = xp.zeros(())
+
+        return h
 
     def g_max(self, X, U, params=None):
         """
