@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from minilink.planning.dynamic_programming import plotting
 from minilink.planning.dynamic_programming.dp import (
     DynamicProgrammingResult,
     grid_failure_cost,
@@ -20,7 +19,6 @@ from minilink.planning.planner import (
     given_numbers,
     planner_at,
     planner_evidence,
-    require_solution,
 )
 from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution
@@ -385,15 +383,6 @@ class TabularLearningPlanner(Planner):
         )
 
     # Plots
-
-    def plot_cost_to_go(self, **kwargs):
-        """The latest solution's cost-to-go table on the grid itself, as value iteration draws it."""
-        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.env.failure_cost))
-        return plotting.plot_cost_to_go(require_solution(self).record.tables, **kwargs)
-
-    def plot_control_law(self, **kwargs):
-        """The latest solution's greedy policy table on the grid itself, as value iteration draws it."""
-        return plotting.plot_control_law(require_solution(self).record.tables, **kwargs)
 
     def plot_learning_curve(self, ax=None, window=20, *, show=True):
         """Episode cost against episodes, smoothed by a moving average of ``window`` episodes.

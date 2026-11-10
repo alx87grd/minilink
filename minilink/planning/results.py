@@ -150,35 +150,107 @@ class PlanningSolution:
             show=show,
         )
 
-    def plot_control_law(self, **kwargs):
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        anchor=None,
+        bounds=None,
+        grid_shape=(101, 101),
+        t=0.0,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
         """
-        Draw the feedback law over the problem's state box.
+        Draw the feedback law, input ``u_axis`` over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
-        The controller's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
-        with ``bounds`` filled from the problem's constraint set (or the
-        plant's state box) and the colour limits from its input set, so that
-        laws of one problem share one scale. Every keyword passes through
-        (``x_axis``, ``y_axis``, ``u_axis``, ``ax``, ``show``, ...).
+        A grid planner's law (value iteration, tabular learning) is its table
+        on the grid's own nodes; any other law is the controller's own
+        :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`
+        swept over ``bounds``, the problem's constraint set (or the plant's
+        state box) by default, on a ``grid_shape`` mesh at the time ``t``,
+        its colour limits from the input set, so laws of one problem share one
+        scale (``bounds``, ``grid_shape``, ``t`` or ``is_3d`` given, a grid
+        law is swept the same way); ``anchor`` pins a grid law's other axes
+        (a controller's are at their nominal values). ``trajectory`` overlays a run, ``title``
+        replaces the title, ``ax`` draws into existing axes, ``show=False``
+        builds only; ``renderer`` is ``"matplotlib"``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import control_law_kwargs
+        from minilink.planning.comparison import plot_control_law
 
-        self.require_feedback_law()
+        return plot_control_law(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            u_axis=u_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
-        return self.controller.plot_control_law(**control_law_kwargs(self, kwargs))
-
-    def plot_cost_to_go(self, **kwargs):
+    def plot_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
         """
-        Draw the method's cost-to-go over two state axes, the others pinned at the goal.
+        Draw the method's cost-to-go over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
-        A heatmap of ``cost_to_go`` sampled on the problem's state box; see
-        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``x_axis``, ``y_axis``,
-        ``anchor``, ``bounds``, ``jmax``, ``ax`` and ``show``.
+        A grid planner's table is drawn on the grid's own nodes; any other
+        field is sampled on a ``grid_shape`` mesh over ``bounds`` (the
+        problem's state box) at the time ``t``, the other axes pinned at
+        ``anchor`` (the goal, else the start). ``jmax`` tops the colour scale,
+        by default the field's value past its grid (the failure cost) when it
+        has one, ``np.inf`` for Matplotlib's own scale; ``is_3d`` adds the
+        surface, ``trajectory`` overlays a run, ``title`` replaces the title,
+        ``ax`` draws into existing axes, ``show=False`` builds only;
+        ``renderer`` is ``"matplotlib"``.
         """
         # A real cycle: comparison imports PlanningSolution from this module
         from minilink.planning.comparison import plot_cost_to_go
 
-        return plot_cost_to_go(self, **kwargs)
+        return plot_cost_to_go(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            jmax=jmax,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
     # Display
 

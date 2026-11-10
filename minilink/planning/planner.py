@@ -145,13 +145,73 @@ class Planner(ABC):
         """The running cost along the latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_cost`)."""
         return require_solution(self).plot_cost(**{"dt": self.dt, **kwargs})
 
-    def plot_control_law(self, **kwargs):
-        """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
-        return require_solution(self).plot_control_law(**kwargs)
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        anchor=None,
+        bounds=None,
+        grid_shape=(101, 101),
+        t=0.0,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """The latest solution's law (:meth:`PlanningSolution.plot_control_law`, the same keywords): a ``PlotResult``."""
+        return require_solution(self).plot_control_law(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            u_axis=u_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
-    def plot_cost_to_go(self, **kwargs):
-        """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`)."""
-        return require_solution(self).plot_cost_to_go(**kwargs)
+    def plot_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``."""
+        return require_solution(self).plot_cost_to_go(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            jmax=jmax,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
     ###########################################################################
     # Internal machinery

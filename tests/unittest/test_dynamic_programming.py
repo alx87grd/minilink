@@ -567,8 +567,8 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
         matplotlib.use("Agg")
         problem = make_problem()
         planner, _ = solve(problem)
-        fig, ax = planner.plot_cost_to_go(show=False)
-        self.assertIsNotNone(fig)
+        result = planner.plot_cost_to_go(show=False)
+        self.assertIsNotNone(result.figure)
         controller = planner.controller
         self.assertTrue(hasattr(controller, "action"))
 
@@ -577,13 +577,13 @@ class TestDynamicProgrammingPlotting(unittest.TestCase):
 
         matplotlib.use("Agg")
         planner, _ = solve(make_problem(), out_of_bound_cost=50.0)
-        _, ax = planner.plot_cost_to_go(show=False)
+        ax = planner.plot_cost_to_go(show=False).axes
         self.assertEqual(ax.collections[0].get_clim()[1], 50.0)
 
-        # An explicit jmax wins, and jmax=None hands the scale back to Matplotlib
-        _, ax = planner.plot_cost_to_go(jmax=10.0, show=False)
+        # An explicit jmax wins, and an infinite one hands the scale back to Matplotlib
+        ax = planner.plot_cost_to_go(jmax=10.0, show=False).axes
         self.assertEqual(ax.collections[0].get_clim()[1], 10.0)
-        _, ax = planner.plot_cost_to_go(jmax=None, show=False)
+        ax = planner.plot_cost_to_go(jmax=np.inf, show=False).axes
         self.assertEqual(
             ax.collections[0].get_clim()[1], float(np.max(planner.result.J))
         )
@@ -749,8 +749,8 @@ class TestPolicyEvaluationField(unittest.TestCase):
         )
         # Past the grid, the failure cost, as on the solution's cost-to-go
         self.assertEqual(float(J_pi(np.array([1e3, 0.0]))), planner.out_of_bound_cost)
-        fig, _ = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
-        self.assertIsNotNone(fig)
+        drawn = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
+        self.assertIsNotNone(drawn.figure)
         J = J_pi.params["values"].reshape(-1)
         fig, _ = result.grid.plot_cost_to_go(J, is_3d=True, show=False)
         self.assertIsNotNone(fig)

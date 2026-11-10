@@ -395,8 +395,8 @@ def test_solution_verbs_draw_what_the_planner_produced():
 
     problem, vi, lqr = solved_pendulum()
     for solution in (vi, lqr):
-        fig, ax = solution.plot_cost_to_go(show=False, grid_shape=(11, 11))
-        assert ax.get_title().startswith("cost-to-go")
+        drawn = solution.plot_cost_to_go(show=False, grid_shape=(11, 11))
+        assert drawn.axes.get_title().startswith("cost-to-go")
         result = solution.plot_control_law(show=False)
         # the sweep is the problem's state box and the colour scale its input box
         x_lim, y_lim = result.axes.get_xlim(), result.axes.get_ylim()
@@ -436,7 +436,7 @@ def test_planner_shortcuts_draw_the_latest_solution():
         planner.plot_control_law()
     planner.solve()
     assert planner.plot_control_law(show=False).figure is not None
-    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9))[0] is not None
+    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9)).figure is not None
 
 
 def test_value_iteration_plots_its_own_tables_under_the_solution_names():
@@ -448,8 +448,8 @@ def test_value_iteration_plots_its_own_tables_under_the_solution_names():
     with pytest.raises(ValueError):
         planner.plot_control_law()
     planner.solve()
-    assert planner.plot_cost_to_go(show=False)[0] is not None
-    assert planner.plot_control_law(show=False)[0] is not None
+    assert planner.plot_cost_to_go(show=False).figure is not None
+    assert planner.plot_control_law(show=False).figure is not None
 
 
 def test_compare_reads_the_solutions_side_by_side():
@@ -462,12 +462,12 @@ def test_compare_reads_the_solutions_side_by_side():
     assert table.splitlines()[0].split() == ["success", "record", "evaluation"]
     assert "converged" in table and "closed-loop poles" in table and "J = " in table
 
-    fig, axes = race.plot_control_law(show=False)
+    axes = race.plot_control_law(show=False).axes
     assert [ax.get_title() for ax in axes] == ["VI", "LQR"]
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
-    fig, axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9))
+    axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9)).axes
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
-    fig, axes = race.plot_trajectory(show=False)
+    axes = race.plot_trajectory(show=False).axes
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
     # one evaluation scores every policy on the same draws; a solution stands for its policy
@@ -746,3 +746,81 @@ def test_a_tree_search_plan_starts_at_the_problem_start_time():
 
     assert plan.t0 == pytest.approx(2.0)
     np.testing.assert_allclose(solution.controller.params["t"], plan.t)
+
+
+def test_the_planning_plots_take_one_keyword_set_and_return_a_plot_result():
+    """Ruling 16: one written-out keyword set on the solution and every planner, a PlotResult back."""
+    import inspect
+
+    from minilink import LQRPlanner
+    from minilink.graphical.common.plot_result import PlotResult
+    from minilink.planning import PlanningSolution
+    from minilink.planning.planner import Planner
+
+    for name in ("plot_cost_to_go", "plot_control_law"):
+        solution_set = inspect.signature(getattr(PlanningSolution, name)).parameters
+        assert not any(p.kind is p.VAR_KEYWORD for p in solution_set.values()), name
+        assert {"x_axis", "y_axis", "is_3d", "ax", "renderer", "show"} <= set(
+            solution_set
+        )
+        for planner in (
+            Planner,
+            LQRPlanner,
+            DynamicProgrammingPlanner,
+            TabularLearningPlanner,
+        ):
+            planner_set = dict(inspect.signature(getattr(planner, name)).parameters)
+            planner_set.pop("field", None)  # value iteration's one extra
+            assert [(p.name, p.default) for p in planner_set.values()] == [
+                (p.name, p.default) for p in solution_set.values()
+            ], (planner.__name__, name)
+
+    problem, vi, lqr = solved_pendulum()
+    for solution in (vi, lqr):
+        for drawn in (
+            solution.plot_cost_to_go(show=False),
+            solution.plot_cost_to_go(is_3d=True, show=False),
+            solution.plot_control_law(show=False),
+        ):
+            assert isinstance(drawn, PlotResult) and drawn.figure is not None
+
+
+def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
+    problem, vi, lqr = solved_pendulum()
+    grid = vi.record.tables.grid
+
+    # On the nodes: the table's own extent and the failure cost atop the scale
+    table = vi.plot_cost_to_go(show=False)
+    assert table.axes.get_title() == "Cost-to-go"
+    assert table.axes.collections[0].get_clim()[1] == 500.0
+    np.testing.assert_allclose(
+        table.axes.collections[0].get_array().max(),
+        min(500.0, float(np.max(vi.record.tables.J))),
+    )
+    # Another mesh, or a time: the field sampled
+    sampled = vi.plot_cost_to_go(bounds=((-1.0, 1.0), (-1.0, 1.0)), show=False)
+    assert sampled.axes.get_title() == "cost-to-go (value iteration)"
+    assert sampled.axes.get_xlim() == (-1.0, 1.0)
+    assert grid.n_nodes == 21 * 21
+
+    # A title replaced on the law's table
+    law = vi.plot_control_law(title="π", show=False)
+    assert law.axes.get_title() == "π"
+
+
+def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
+    problem, vi, lqr = solved_pendulum()
+    loop = lqr.controller @ problem.sys
+    traj = loop.compute_trajectory(tf=1.0, verbose=False).of("plant")
+    for solution in (vi, lqr):
+        drawn = solution.plot_cost_to_go(trajectory=traj, show=False)
+        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        drawn = solution.plot_control_law(trajectory=traj, show=False)
+        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        with pytest.raises(ValueError, match="renderer='matplotlib'"):
+            solution.plot_cost_to_go(renderer="plotly", show=False)
+        with pytest.raises(ValueError, match="cannot be used together"):
+            solution.plot_cost_to_go(is_3d=True, trajectory=traj, show=False)
+    with pytest.raises(ValueError, match="anchor"):
+        lqr.plot_control_law(anchor=[np.pi, 0.0], show=False)
+    assert vi.plot_control_law(anchor=[np.pi, 0.0], show=False).figure is not None

@@ -1324,7 +1324,14 @@ mirrors its latest solution: `planner.controller` (a read-only property),
 planner's its plan; the script closes the loop itself** (`solution.controller @ plant`):
 the solution's views run on demand, nothing stored — `plot_control_law` (the law over
 the problem's box, one colour scale from its inputs), `plot_cost_to_go` (the field over
-the box, anchored at the goal), and `plot_trajectory`, `animate` and `plot_cost`: the
+the box, anchored at the goal; its colour scale topped by the field's value past its grid,
+the failure cost, when it has one), both on one written-out keyword set
+(`*, x_axis=, y_axis=, [u_axis=,] anchor=, bounds=, grid_shape=, t=, [jmax=,] is_3d=,
+trajectory=, title=, ax=, renderer=, show=`) that the planners repeat as a thin call to
+their latest solution (value iteration adds only `field=`, another table of its grid), a
+grid planner's table drawn on the grid's own nodes unless the call asks for another mesh;
+every planning plot, the comparison's included, returns a `PlotResult` (`.figure`,
+`.axes`), and `plot_trajectory`, `animate` and `plot_cost`: the
 plan when there is one, else the controller run once from the problem's start through
 the problem's evaluator (`problem.compile(controller, dt)`, the loop the score runs: a
 continuous law integrated on the views' optional `dt`, `None` the evaluator's automatic
@@ -1587,7 +1594,8 @@ Exploration is an object, `EpsilonGreedy` (annealed) or `UCB`. `solve()`
 returns a `PlanningSolution` (the greedy `LookupPolicy` as `controller`,
 `J = min Q` as `cost_to_go`, the tables in `record.tables`); `planner.result` is the
 table as it stands, a `DynamicProgrammingResult` (`J = min Q`, `pi = argmin Q`), and
-`plot_cost_to_go`, `plot_control_law`, `cost_to_go` and `controller` (a `LookupPolicy`)
+`plot_cost_to_go`, `plot_control_law` (the solution's, through the planner's thin calls),
+`cost_to_go` and `controller` (a `LookupPolicy`)
 are those of value iteration on the latest solution's tables (RULES 2.4), and the same grid solved by
 `DynamicProgrammingPlanner` is the exact answer the learner approaches.
 

@@ -410,6 +410,19 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     several channels was refused); on the facades: `LTISystem`, `LinearizedSystem`,
     `MechanicalSystem`, `step_info` and `poles` on the root, `Margins` and `StepInfo` on
     `minilink.analysis`, the shaping functions on `minilink.core`.
+  - *The planning plots take one keyword set and return a `PlotResult`* (the maintainer's
+    ruling 16): `sol.plot_cost_to_go(*, x_axis=0, y_axis=1, anchor=None, bounds=None,
+    grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None, ax=None,
+    renderer="matplotlib", show=True)` and `sol.plot_control_law` alike (with `u_axis=`, no
+    `jmax=`), written out instead of `**kwargs`, on `PlanningSolution` and every planner (a thin
+    call to the latest solution; value iteration keeps `field=`), a grid planner's table drawn
+    on its own nodes. Value iteration's and the tabular learner's plots returned `(fig, ax)`
+    and the comparison's `(fig, axes)`: every planning plot returns a `PlotResult`, read
+    `.figure` and `.axes` (`fig, ax = planner.plot_cost_to_go()` →
+    `result = planner.plot_cost_to_go(); result.axes`). `jmax=None` is now the failure cost on
+    a grid planner, as its default was; `jmax=np.inf` gives Matplotlib's own scale (it was
+    `jmax=None`). Keywords outside the set (`cmap=`, `vmin=`, `overlay_labels=`) are the grid's
+    and the controller's own plots'. The tutorial's call table follows.
 
 ## 3. Maturity (TRL)
 

@@ -728,25 +728,56 @@ class DynamicProgrammingPlanner(Planner):
 
         return result
 
-    def plot_cost_to_go(self, field=None, **kwargs):
+    def plot_cost_to_go(
+        self,
+        field=None,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
         """
-        The cost-to-go table ``J`` on the grid itself (``jmax``, ``x_axis``, ``y_axis``, ``is_3d``, ``title``, ...).
+        The latest solution's cost-to-go table on the grid (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``.
 
-        ``field`` draws another table of this grid instead: a policy's
-        ``J^π`` from :meth:`evaluate_policy`.
+        ``field`` draws another table of this grid instead, a policy's ``J^π``
+        from :meth:`evaluate_policy` (no solve needed), read as the
+        solution's own.
         """
-        kwargs.setdefault("jmax", plotting.cost_scale_limit(self.out_of_bound_cost))
-        if field is not None:
-            J = np.asarray(field.params["values"], dtype=float).reshape(-1)
-            return plotting.plot_cost_to_go(self.grid, J, **kwargs)
+        drawn = dict(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            jmax=jmax,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
+        if field is None:
+            return require_solution(self).plot_cost_to_go(**drawn)
 
-        require_solution(self)
-        return plotting.plot_cost_to_go(self.result, **kwargs)
+        # Another table of this grid, drawn as the solution's own
+        # A real cycle: the comparison imports the planners' solutions
+        from minilink.planning.comparison import cost_to_go_figure
 
-    def plot_control_law(self, **kwargs):
-        """The policy table ``π`` on the grid itself (``trajectory``, ``u_axis``, ``x_axis``, ``y_axis``, ...)."""
-        require_solution(self)
-        return plotting.plot_control_law(self.result, **kwargs)
+        return cost_to_go_figure(
+            self.problem, field, grid=self.grid, family="value iteration", **drawn
+        )
 
     def animate_cost_to_go(self, **kwargs):
         require_solution(self)
