@@ -384,3 +384,17 @@ def test_a_riccati_design_refuses_a_discrete_time_model(design):
 
     # The poles of a discrete-time model are placed in z, as before
     assert place(plant, [0.5, 0.6]) is not None
+
+
+def test_a_design_at_a_point_the_plant_does_not_rest_at_is_announced():
+    """The linear model drops f(x̄, ū): a design away from an equilibrium warns, one at an equilibrium is silent."""
+    import warnings
+
+    plant = Pendulum()
+
+    with pytest.warns(UserWarning, match="does not rest at the design point"):
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi / 4, 0.0])
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        lqr(plant, np.eye(2), np.eye(1), x_bar=[np.pi, 0.0])

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 
 from minilink.analysis.derivatives import compiled, jacobian, operating_point
@@ -173,6 +175,9 @@ def design_model(
     # An observer design reads the measured output y, never the state
     if measured:
         require_measured_output(sys)
+
+    # The linear model drops f(x̄, ū): a point the plant does not rest at is announced
+    warn_off_equilibrium(sys, x_bar, u_bar, t, params)
 
     # B over the command port: "u" alone names every input stacked, so a plant
     # with several inputs picks the components of the port named u
@@ -391,6 +396,30 @@ def require_design_system(sys):
             f"not {type(sys).__name__}; on arrays the gains are lqr_gain(A, B, Q, R), "
             "place_gain(A, B, poles), kalman_gain(A, C, Q_n, R_n) and "
             "luenberger_gain(A, C, poles)"
+        )
+
+
+# ‖f(x̄, ū)‖ above this, relative to 1 + ‖x̄‖, is not an equilibrium
+EQUILIBRIUM_TOL = 1e-6
+
+
+def warn_off_equilibrium(sys, x_bar, u_bar, t, params):
+    """Warn when a continuous plant does not rest at the design point ``(x̄, ū)``."""
+    if isinstance(sys, StepSystem) or sys.n == 0:
+        return
+    x_bar, u_bar, params = operating_point(sys, x_bar, u_bar, params)
+
+    # ẋ = f(x̄, ū), zero at an equilibrium
+    dx = np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
+    rate = float(np.linalg.norm(dx))
+
+    if rate > EQUILIBRIUM_TOL * (1.0 + float(np.linalg.norm(x_bar))):
+        warnings.warn(
+            f"{sys.name!r} does not rest at the design point: |f(x_bar, u_bar)| = "
+            f"{rate:.3g}. The linear model drops that term, so the loop will not hold "
+            "x_bar: pass the input that holds it (u_bar=), or find the point with "
+            "find_equilibrium(sys, x_guess)",
+            stacklevel=4,
         )
 
 
