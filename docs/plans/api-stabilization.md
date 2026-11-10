@@ -65,9 +65,9 @@ Each breaks a name, with no decision to take: RULES 2.4, 2.5, 2.7, 3.4, 4.3 or a
 ruling says what the word is. One commit per row, every call site in the same commit (RULES
 3.4), no alias.
 
-**Status (2026-11-10): AS-20 to AS-26 landed on `api-settle`**, one commit per row, the seeded
-baseline byte-identical after each (but for two renamed keys); AS-24 came out smaller: the
-export landed, `period` keeps its name (see the decisions below).
+**Status (2026-11-10): AS-20 to AS-32 landed on `api-settle`**, one commit per row, the seeded
+baseline byte-identical after each (but for two renamed keys of AS-21); AS-24 came out smaller:
+the export landed, `period` keeps its name (see the decisions below).
 
 | Step | Today → proposed | The rule | Uses |
 | --- | --- | --- | --- |
@@ -78,12 +78,12 @@ export landed, `period` keeps its name (see the decisions below).
 | AS-24 | `DiscreteLTISystem(period=)`, `.period` → `sample_period`; the class exported on `minilink.dynamics`. The export landed on `api-settle`; `period` stays (a question, below). | 2.7 | 11 |
 | AS-25 | `RolloutEnvironment.step(x, t, u, key, params)` → `(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *, t=0.0)` and `NeuralPolicy.action` → `action(x, t=0.0, params=None)`. Landed on `api-settle`. | CONSTITUTION, one signature | about 15 |
 | AS-26 | `MPPIPlanner.method` (a dict of numbers) → `method_numbers`; `TabularLearningPlanner(eta=)` → `learning_rate=` (TODO's judgment-calls row names it); `planner.train_time` → `train_time_s`; `TrajectoryOptimizationRecord.solver_success` → `optimizer_success`. Landed on `api-settle`. | 2.7 | 8 examples |
-| AS-27 | The optimizer's native numbers: `options={"maxiter": 5}` on `gd` / `adam` → `max_iterations=5`, `gtol` → `tol`; `options=` refused for a native method; `OptimizationResult.n_iterations` added beside `stats["nit"]`, `stats["algorithm"]` → `stats["method"]` | 2.7 | few |
-| AS-28 | `plot_rollout(rollout=)` → `traj=`; `input_port_id=` → `port=` (blocks already say `port=`); `TrajectorySource(interpolation="previous")` and `ev.rollout(hold="foh")` → `hold="zoh"` / `"linear"` on the three tools | one word per idea | 5; 25; 14 |
-| AS-29 | Keyword-only where every sibling already is: `PlanningProblem(sys, *, x0, cost, …)` (0 callers pass a second positional); `compile(*, backend=, verbose=)`; `animate(traj=None, *, …)`, `render(x, u, t, *, …)`; `MLP(input_dim, output_dim, *, …)`; `Sys2Gym(sys, cost, *, …)`; `NativeSampledSystem(state_dim=0, *, sample_period, …)` with the port shortcuts. And the reverse: `evaluate(problem, controller, dt=None, *, …)`, as DESIGN §6 writes it and `problem.compile` takes it | DESIGN §4, sibling verbs agree | positional callers only |
-| AS-30 | Removed, with no caller or against a rule: `validate=` on `feedback`, `closed_loop`, `autowire` (0 uses; it switches off the algebraic-loop check); `PlanningProblem.has_goal`, `has_cost` (0 library uses); the `COMPILE_BACKEND_AUTO` re-export "so legacy callers keep working" (3.4); `InputPort.get_default_value`, `set_nominal_value` (duplicates of `nominal_value`); `RRTPlanner.reached_goal`, `iterations` (copies of the record, RULES 2.4; 31 / 24 / 5); `GivenPolicy` → `GivenController` | 2.4, 3.4, 4.10 | as noted |
-| AS-31 | The problem's five static helpers and the `Optimizer`'s four machinery methods → module functions; the duplicate helper names with different bodies (`require_cost_to_go`, `planner_parts`, `steps_of`, `problem_leaves`) → one each; `SampledSystem.counts`, `resolves` → `is_tick_law`, `is_integrated`; `is_bounded(box)` → `has_finite_face` | ROADMAP 2026-11-07; readable predicates | library only |
-| AS-32 | The explicit-wiring drawings written out: `plot_input_output_map(**kwargs)`, `plot_control_law(**kwargs)`, `SampledDiagramSystem.animate(**options)` → their keywords; `plot_diagram(show_inline=, show_pdf=)` folded into `show` | DESIGN §4, "written out so every editor shows them" | 27 |
+| AS-27 | The optimizer's native numbers: `options={"maxiter": 5}` on `gd` / `adam` → `max_iterations=5`, `gtol` → `tol`; `options=` refused for a native method; `OptimizationResult.n_iterations` added beside `stats["nit"]`, `stats["algorithm"]` → `stats["method"]`. Landed on `api-settle`. | 2.7 | few |
+| AS-28 | `plot_rollout(rollout=)` → `traj=`; `input_port_id=` → `port=` (blocks already say `port=`); `TrajectorySource(interpolation="previous")` and `ev.rollout(hold="foh")` → `hold="zoh"` / `"linear"` on the three tools. Landed on `api-settle`. | one word per idea | 5; 25; 14 |
+| AS-29 | Keyword-only where every sibling already is: `PlanningProblem(sys, *, x0, cost, …)` (0 callers pass a second positional); `compile(*, backend=, verbose=)`; `animate(traj=None, *, …)`, `render(x, u, t, *, …)`; `MLP(input_dim, output_dim, *, …)`; `Sys2Gym(sys, cost, *, …)`; `NativeSampledSystem(state_dim=0, *, sample_period, …)` with the port shortcuts. And the reverse: `evaluate(problem, controller, dt=None, *, …)`, as DESIGN §6 writes it and `problem.compile` takes it. Landed on `api-settle`. | DESIGN §4, sibling verbs agree | positional callers only |
+| AS-30 | Removed, with no caller or against a rule: `validate=` on `feedback`, `closed_loop`, `autowire` (0 uses; it switches off the algebraic-loop check); `PlanningProblem.has_goal`, `has_cost` (0 library uses); the `COMPILE_BACKEND_AUTO` re-export "so legacy callers keep working" (3.4); `InputPort.get_default_value`, `set_nominal_value` (duplicates of `nominal_value`); `RRTPlanner.reached_goal`, `iterations` (copies of the record, RULES 2.4; 31 / 24 / 5); `GivenPolicy` → `GivenController`. Landed on `api-settle`. | 2.4, 3.4, 4.10 | as noted |
+| AS-31 | The problem's five static helpers and the `Optimizer`'s four machinery methods → module functions; the duplicate helper names with different bodies (`require_cost_to_go`, `planner_parts`, `steps_of`, `problem_leaves`) → one each; `SampledSystem.counts`, `resolves` → `is_tick_law`, `is_integrated`; `is_bounded(box)` → `has_finite_face`. Landed on `api-settle`. | ROADMAP 2026-11-07; readable predicates | library only |
+| AS-32 | The explicit-wiring drawings written out: `plot_input_output_map(**kwargs)`, `plot_control_law(**kwargs)`, `SampledDiagramSystem.animate(**options)` → their keywords; `plot_diagram(show_inline=, show_pdf=)` folded into `show`. Landed on `api-settle`. | DESIGN §4, "written out so every editor shows them" | 27 |
 
 ## 3. Additions that remove friction (nothing breaks)
 
@@ -116,7 +116,7 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 6 | **The catalog's vocabulary.** Mass is `"mass"` on 13 plants and `"m"` on 2; damping `d`, `b`, `damping`, `damping_coef`; drag `cda`, `CdA`, `cdA`; `Pendulum(length=, mass=)` writes keys `l`, `m`; `Pendulum()` has `I = 1` beside `m = l = 1` (ω = 2.21, not √(g/l) = 3.13) | every `params[…]` in a new example | **6a ruled 2026-11-10 — by judgment, not a hard rule:** a single textbook letter where it is clear in context (`m`, `l`, `k`, `d`); capital letters reserved for matrices in `params`; a short or full word when one letter is not enough (`CdA`) or clashes with a core name (`gravity`, `g` being the running cost); one spelling per quantity across the catalog; the constructor keyword writes the same key. `Pendulum`'s scalar inertia `I` (a capital, not a matrix) is the builder's judgment. **6b** (`Pendulum`'s default `I = 0`, numbers move): open, with the release's re-pin |
 | 7 | **Labels and units.** `"Torque 0"`, `"[Nm]"` from the mechanical base against `"tau1"`, `"Nm"` on the plants; rates `dtheta`, `omega`, `yaw_rate`; two plants rate-first | plot axes | **Ruled 2026-11-10: option 1** — units bare (`"Nm"`, the plot adds brackets); positions then rates; a rate `d<position>` unless the textbook names it (`omega`, `yaw_rate`); the base's defaults `q1…`, `dq1…`, `u1…` from 1; the two rates-first plants reordered; the rule written in RULES |
 | 8 | **The mechanical base's names** (S32's renames, pulled forward): `C(q, v)` on the base against `C(q, dq)` on 26 plants; `actuators=` a count; the mass matrix's one name | every plant | **Ruled 2026-11-10: none now** — `C(q, v)` against `C(q, dq)`, `actuators=` and the mass matrix's one name wait for the one-mechanical-family work (S32) and the maintainer's review of the hierarchy |
-| 9 | **`Impedance(dof=1, *, Kp, Kd)`** against `PD(Kp, Kd, *, dim=1)`: `Impedance(10)` is a 10-axis block | 8 tests | **Ruled 2026-11-10: option 1** — `Impedance(Kp=10.0, Kd=1.0, *, dim=1, tracking_ref=False, …)`, `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`: the PID family's signature, `dof=` → `dim=`, no alias |
+| 9 | **`Impedance(dof=1, *, Kp, Kd)`** against `PD(Kp, Kd, *, dim=1)`: `Impedance(10)` is a 10-axis block | 8 tests | **Ruled 2026-11-10: option 1** — `Impedance(Kp=10.0, Kd=1.0, *, dim=1, tracking_ref=False, …)`, `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`: the PID family's signature, `dof=` → `dim=`, no alias. Landed on `api-settle`. |
 | 10 | **The path-tracking laws** default to the UdeS racecar (`wheelbase=0.34`, `state_dim=9`) and close on no catalog car with `@` | 60 calls | **Ruled 2026-11-10: the laws take the plant** — `PurePursuit(plant, path, *, lookahead=…)` and its siblings read the wheelbase, the steering limit, the measurement size and the pose and heading states from the plant, so `PurePursuit(car, path) @ car` closes on every car; built with K8-0 (the car family to three models), not in the `api-settle` run |
 | 11 | **The linear model.** `lin.A` is a method (`lin.A()`); the operating point lives in three places (`LTISystem` attributes, `StateFeedback`'s port, `params["x_bar"]` elsewhere) | KNOWN_ISSUES | `x_bar`, `u_bar`, `y_bar` readable as properties everywhere; `A` kept a call, or a property at the block's own `params` |
 | 12 | **The optimizer's method names:** `"scipy_slsqp"`, `"scipy_trust_constr"` beside `"l-bfgs"`, `"gd"`, `"ipopt"` | 55; 7 | `"slsqp"`, `"trust-constr"`: named by algorithm, as DESIGN says |
@@ -292,3 +292,69 @@ only change two keys renamed by AS-21 (`status["n_iterations"]`, `effective_roll
   `eta = params["learning_rate"]`; the planner's keyword, attribute and `params["method"]`
   key are `learning_rate`. `TrajectoryOptimizationRecord`'s printed text keeps "solver ok"
   (display only).
+
+The run of AS-27 to AS-32 and ruling 9 on the branch `api-settle` (2026-11-10), one commit per
+row. The seeded baseline grew by the paths these rows touch (an `Optimizer` solve per method,
+`gd` and `adam` with an iteration cap and a tolerance, a fixed-count Adam; an RRT solve and its
+held controller; a PID on a clock closed on the pendulum; `Impedance` and `IntegralImpedance`
+loops; a `TrajectorySource` held and linear; a forced port; the step model's rollout held and
+linear; an `evaluate` of a sampled and of a continuous PID), each call written in the old
+words before its row and in the new ones after: run twice and compared byte for byte, then
+after each row: identical.
+
+- **AS-27, the cap on trajectory optimization.** The planner passed `options=` through to the
+  `Optimizer`, so a native method there took `options={"maxiter": …}` too; with `options=`
+  refused on a native method, `TrajectoryOptimizationPlanner(…, method="adam",
+  max_iterations=…, tol=…)` takes the two keywords the same way (structure, kept beside the
+  law's numbers as `planner.method_limits`, never in `params["method"]`), and refuses
+  `options=` on a native method at construction. Adam's `max_grad_norm` (it was given in
+  `options=`) is a keyword too. The first-order backend's own option keys are `max_iterations`
+  and `tol`; its constructor keeps `algorithm=` (internal, beside the presets' table). Nothing
+  outside one demo (`examples/demos/compile/pid_autotuning_native.py`) and four tests used the
+  old words.
+- **AS-28, the hold's spelling.** The noise sources already said `hold="zoh"` / `"linear"`,
+  so the two others follow them: `TrajectorySource(hold=)` (default `"linear"`, the attribute
+  `source.hold`, `from_trajectory(hold=)`) and the step model's `rollout(hold="linear")`.
+  Kept, another idea: the grid interpolation of value iteration and `LookupPolicy`
+  (`interpolation="linear"` / `"nearest"`, a spatial interpolation of a table, not a hold in
+  time). The compile plan's local loop variable `input_port_id` is internal and kept.
+- **AS-29, the port shortcuts of a native law.** `NativeSampledSystem` takes
+  `input_dim=` and `expose_state=`; **`output_dim=` is not added: a question.** The `y`
+  shortcut wires the output to `h`, and a native law's tick face `h(x, u, k)` reads its first
+  output port, so the shortcut would read itself; a native law declares its outputs in seconds
+  with `add_output_port`. The options: leave it so (the docstring says it), or a seconds
+  output map the subclass writes (`h_seconds`) that the shortcut wires. The planner's
+  `compile(backend=None)` (trajectory optimization, MPPI) keeps `backend` positional: not
+  listed, and the MPC calls it so; a question if the maintainer wants it keyword-only with
+  the system's. The positional callers were found by an AST scan of every `.py` file and
+  notebook code cell: about 15 `plant.compile("numpy")` in the tests and the four `MLP(…)`
+  calls of the RL code.
+- **AS-30, `set_nominal_value`.** It was the one checked way to set a nominal value (a flat
+  float copy of `dim` entries); the constructor's check is now the module function
+  `nominal_of`, and an assignment `signal.nominal_value = v` is not checked, as the direct
+  assignments in the catalog and the demos already were. **A question:** a checked
+  `nominal_value` property would restore the check on every assignment (a scalar assigned to a
+  one-entry port, as `racecar.py`'s `__main__` does, would then become a vector). RRT*'s other
+  run-state copies of its record, `converged`, `best_goal_cost` and `history`, stay (not
+  listed; the history is what `animate_convergence` replays); **a question** with RULES 2.4.
+  `solution_node` stays (the plotting hooks read it during the search).
+- **AS-31, the names.** The optimizer's panel functions are `print_program_preamble` and
+  `print_program_report`, not `print_solve_…`, which are the trajectory planner's own methods
+  with other bodies (a fifth duplicate the row's rule would refuse). `require_cost_to_go`
+  keeps the planner's message, which a test reads ("ReinforcementLearningPlanner's solution
+  carries no cost-to-go field"); the comparison's refusal now reads "this value iteration
+  solution carries no cost-to-go field (its cost_to_go is None)". MPPI's refusal of a `dt` that
+  does not divide the horizon is the evaluator's sentence ("dt=… must divide the horizon …
+  into a whole number of periods"). The program evaluator's own `decision_vector` method stays
+  (a method of another class, the same body).
+- **AS-32, `show` on `plot_diagram`.** `show=True` keeps today's choice (inline in a notebook, a
+  Matplotlib window elsewhere), `False` builds only, and `"inline"`, `"window"`, `"pdf"` name the
+  place; any other value is refused. The commented call in
+  `experimental/compile/diagram_flatten.py` (`# flat.plot_diagram(…, show_pdf=True)`) is left as
+  the maintainer wrote it. `PlanningSolution.plot_control_law(**kwargs)` and the planners' own
+  plots keep their `**kwargs`: decision 16 (the planner's plots) decides their keyword set.
+- **Ruling 9.** `Impedance(Kp=10.0, Kd=1.0, *, dim=1, tracking_ref=False, u_min, u_max, …)`
+  and `IntegralImpedance(Kp=10.0, Ki=1.0, Kd=1.0, *, dim=1, …)`, the defaults kept; the
+  attribute `.dof` → `.dim`, as on the PID family. `JointImpedance` and `TaskImpedance` take the
+  plant and have no `dof=` keyword; their attribute `.dof` is the plant's joints, the meaning
+  RULES 2.7 keeps, so they are unchanged. Eight test calls passed `dof=`; no example did.
