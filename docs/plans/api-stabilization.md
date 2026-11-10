@@ -114,13 +114,13 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 4 | **The `get_` methods a controller or plant author writes:** `get_port_values_from_u(u, "r", "y")`, `get_u_from_input_ports()`, `traj.get_signal(name)`, `get_kinematic_geometry`, `get_dynamic_geometry`; and `tf`, which is the pose map, a final time and almost a transfer function | 23; 36; 15; 93; 143 | **4a ruled 2026-11-10:** `get_port_values_from_u(u, …)` → `self.ports(u, …)` (the same three return forms), `get_u_from_input_ports()` → the read-only property `sys.u_bar` (each input port's default), `traj.get_signal(name)` → `traj.signal(name)`; no alias. Landed on `api-settle`, but for `u_bar` (see the decisions below: `get_u_from_input_ports` stays until the question is answered). **4b ruled 2026-11-10: no rename** — `tf`, `get_kinematic_geometry` and `get_dynamic_geometry` stay as they are (the drawing hooks keep their names; `tf` the pose map beside the final time `traj.tf` is a recorded exception of RULES 2.7); S44's one hook stays v0.9 |
 | 5 | **Bounds: three spellings.** `lower` / `upper` (sets, `Saturation`, the program), `lower_bound` / `upper_bound` (ports), `u_min` / `u_max` (PID), `delta_max` (path tracking) | 833 for the ports | `lower` / `upper` on ports too, only if done now; otherwise record the exception |
 | 6 | **The catalog's vocabulary.** Mass is `"mass"` on 13 plants and `"m"` on 2; damping `d`, `b`, `damping`, `damping_coef`; drag `cda`, `CdA`, `cdA`; `Pendulum(length=, mass=)` writes keys `l`, `m`; `Pendulum()` has `I = 1` beside `m = l = 1` (ω = 2.21, not √(g/l) = 3.13) | every `params[…]` in a new example | **6a ruled 2026-11-10 — by judgment, not a hard rule:** a single textbook letter where it is clear in context (`m`, `l`, `k`, `d`); capital letters reserved for matrices in `params`; a short or full word when one letter is not enough (`CdA`) or clashes with a core name (`gravity`, `g` being the running cost); one spelling per quantity across the catalog; the constructor keyword writes the same key. `Pendulum`'s scalar inertia `I` (a capital, not a matrix) is the builder's judgment. **6b** (`Pendulum`'s default `I = 0`, numbers move): open, with the release's re-pin |
-| 7 | **Labels and units.** `"Torque 0"`, `"[Nm]"` from the mechanical base against `"tau1"`, `"Nm"` on the plants; rates `dtheta`, `omega`, `yaw_rate`; two plants rate-first | plot axes | **Ruled 2026-11-10: option 1** — units bare (`"Nm"`, the plot adds brackets); positions then rates; a rate `d<position>` unless the textbook names it (`omega`, `yaw_rate`); the base's defaults `q1…`, `dq1…`, `u1…` from 1; the two rates-first plants reordered; the rule written in RULES |
+| 7 | **Labels and units.** `"Torque 0"`, `"[Nm]"` from the mechanical base against `"tau1"`, `"Nm"` on the plants; rates `dtheta`, `omega`, `yaw_rate`; two plants rate-first | plot axes | **Ruled 2026-11-10: option 1** — units bare (`"Nm"`, the plot adds brackets); positions then rates; a rate `d<position>` unless the textbook names it (`omega`, `yaw_rate`); the base's defaults `q1…`, `dq1…`, `u1…` from 1; the two rates-first plants reordered; the rule written in RULES. Landed on `api-settle`. |
 | 8 | **The mechanical base's names** (S32's renames, pulled forward): `C(q, v)` on the base against `C(q, dq)` on 26 plants; `actuators=` a count; the mass matrix's one name | every plant | **Ruled 2026-11-10: none now** — `C(q, v)` against `C(q, dq)`, `actuators=` and the mass matrix's one name wait for the one-mechanical-family work (S32) and the maintainer's review of the hierarchy |
 | 9 | **`Impedance(dof=1, *, Kp, Kd)`** against `PD(Kp, Kd, *, dim=1)`: `Impedance(10)` is a 10-axis block | 8 tests | **Ruled 2026-11-10: option 1** — `Impedance(Kp=10.0, Kd=1.0, *, dim=1, tracking_ref=False, …)`, `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`: the PID family's signature, `dof=` → `dim=`, no alias. Landed on `api-settle`. |
 | 10 | **The path-tracking laws** default to the UdeS racecar (`wheelbase=0.34`, `state_dim=9`) and close on no catalog car with `@` | 60 calls | **Ruled 2026-11-10: the laws take the plant** — `PurePursuit(plant, path, *, lookahead=…)` and its siblings read the wheelbase, the steering limit, the measurement size and the pose and heading states from the plant, so `PurePursuit(car, path) @ car` closes on every car; built with K8-0 (the car family to three models), not in the `api-settle` run |
-| 11 | **The linear model.** `lin.A` is a method (`lin.A()`); the operating point lives in three places (`LTISystem` attributes, `StateFeedback`'s port, `params["x_bar"]` elsewhere) | KNOWN_ISSUES | **Ruled 2026-11-10** (after two independent design reviews; reproduced bug: `lqr(lin) @ lin` settled at 6.27 instead of 0): five linear classes — `StateSpaceSystem` unchanged; `LTISystem` and `DiscreteLTISystem` pure `ẋ = Ax + Bu` (`x_bar`, `u_bar`, `y_bar` removed; `TransferFunction` stops carrying zeros); **`LinearizedSystem`** (under `StateSpaceSystem`), returned only by `linearize`: `ẋ = f(x̄, ū) + A(x − x̄) + B(u − ū)`, `y = h(x̄, ū) + C(x − x̄) + D(u − ū)` in the plant's own coordinates, ports, labels and units, `params` `{A, B, C, D, x_bar, u_bar, y_bar, dx_bar}` (`dx_bar = f(x̄, ū)`, zero at an equilibrium), its nominal `x̄` / `ū`; **`LinearizedStepSystem`** its z twin; `lin.deviation_model()` the pure δ view, an `LTISystem` with Δ labels. The drift is kept and the analysis verbs warn off an equilibrium. The matrices stay methods `A(t, params)` on every class (`lin.A` without `()` gets a sentence). `sys.u_nominal` (read-only) replaces `get_u_from_input_ports()`; `u_bar` keeps one meaning. The design verbs read the point from the model; `require_own_point` goes; the hand subtraction in `cartpole_dynamic_controller` and the step response's "linear" title fixed. No gain, pole or Bode number moves |
+| 11 | **The linear model.** `lin.A` is a method (`lin.A()`); the operating point lives in three places (`LTISystem` attributes, `StateFeedback`'s port, `params["x_bar"]` elsewhere) | KNOWN_ISSUES | **Ruled 2026-11-10** (after two independent design reviews; reproduced bug: `lqr(lin) @ lin` settled at 6.27 instead of 0): five linear classes — `StateSpaceSystem` unchanged; `LTISystem` and `DiscreteLTISystem` pure `ẋ = Ax + Bu` (`x_bar`, `u_bar`, `y_bar` removed; `TransferFunction` stops carrying zeros); **`LinearizedSystem`** (under `StateSpaceSystem`), returned only by `linearize`: `ẋ = f(x̄, ū) + A(x − x̄) + B(u − ū)`, `y = h(x̄, ū) + C(x − x̄) + D(u − ū)` in the plant's own coordinates, ports, labels and units, `params` `{A, B, C, D, x_bar, u_bar, y_bar, dx_bar}` (`dx_bar = f(x̄, ū)`, zero at an equilibrium), its nominal `x̄` / `ū`; **`LinearizedStepSystem`** its z twin; `lin.deviation_model()` the pure δ view, an `LTISystem` with Δ labels. The drift is kept and the analysis verbs warn off an equilibrium. The matrices stay methods `A(t, params)` on every class (`lin.A` without `()` gets a sentence). `sys.u_nominal` (read-only) replaces `get_u_from_input_ports()`; `u_bar` keeps one meaning. The design verbs read the point from the model; `require_own_point` goes; the hand subtraction in `cartpole_dynamic_controller` and the step response's "linear" title fixed. No gain, pole or Bode number moves. Landed on `api-settle`, but for the hand subtraction in `cartpole_dynamic_controller` (see the decisions below) |
 | 12 | **The optimizer's method names:** `"scipy_slsqp"`, `"scipy_trust_constr"` beside `"l-bfgs"`, `"gd"`, `"ipopt"` | 55; 7 | `"slsqp"`, `"trust-constr"`: named by algorithm, as DESIGN says |
-| 13 | **`Step(1.0)` steps down** (`initial_value` first) and `Step()` is zero | 9 positional, 16 bare | **Ruled 2026-11-10: option 1** — `Step(final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y")`: `Step()` the unit step at `t = 1 s`; positional callers migrated; a bare `Step()`'s numbers move once |
+| 13 | **`Step(1.0)` steps down** (`initial_value` first) and `Step()` is zero | 9 positional, 16 bare | **Ruled 2026-11-10: option 1** — `Step(final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y")`: `Step()` the unit step at `t = 1 s`; positional callers migrated; a bare `Step()`'s numbers move once. Landed on `api-settle`. |
 | 14 | **Riccati on a discrete model:** refuse (AS-1) or solve the discrete equation | none | **Ruled 2026-11-10: refuse** (landed with AS-1); the discrete Riccati designs come with the sampled filters in v0.9 — not the time for new discrete-time tools |
 | 15 | **MPC's name and place.** `ModelPredictiveController` is a function returning a `PredictiveController`, on no facade; examples import the deep path 12 times | 7 tests | The class itself; on `minilink.planning` if the rebuilt examples show MPC |
 | 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | One keyword set and `PlotResult` everywhere |
@@ -358,3 +358,74 @@ after each row: identical.
   attribute `.dof` → `.dim`, as on the PID family. `JointImpedance` and `TaskImpedance` take the
   plant and have no `dof=` keyword; their attribute `.dof` is the plant's joints, the meaning
   RULES 2.7 keeps, so they are unchanged. Eight test calls passed `dof=`; no example did.
+
+The run of rulings 11, 13 and 7 on the branch `api-settle` (2026-11-10), one commit per step.
+A new seeded baseline (`linearize` on the pendulum, the cart-pole and a sampled pendulum;
+`lqr`, `place`, `lqr_finite_horizon`, `kalman`, `luenberger` and `lqg` on the plant and on its
+linearization; `controllability`, `observability`, `trajectory_lqr`; `bode`, `margins`,
+`pzmap`, `step_response`, `transfer_function`, `root_locus` and `nyquist` on the plant, the
+linearization and the step linearization; the loops `lqr(plant) @ plant` and `lqr(lin) @
+plant`), and one of the catalog (each plant's `f`, `h`, `tf` and a short run), each run twice
+and compared, then after each step: byte-identical, with the earlier run's baseline.
+
+- **Ruling 11, the analysis numbers.** A linearization at its own point is read as stored
+  (`stored_matrices`), not differentiated again, so its numbers are exact on every
+  `method`: with `method="fd"` a Jacobian about `x̄ = π` would move the Bode numbers by
+  `1e-9` against the deviation model's about the origin. A point given (`bode(lin, x_bar)`)
+  or a diagram wire selected takes the Jacobian path.
+- **Ruling 11, a point given with a linear model.** `require_own_point` refused it; with it
+  gone, the point linearizes the model there (`lqr(lin, Q, R, x_bar=x1)` is the same gain
+  about `x1`, the drift `f(x1, ū)` warned when it is not zero), as for any system; no point
+  reads the model as it is.
+- **Ruling 11, the step twin's drift.** `LinearizedStepSystem` keeps `x_next_bar = F(x̄, ū)`
+  in its `params` (not `dx_bar`, a rate), and warns off an equilibrium when
+  `F(x̄, ū) ≠ x̄`; a plain step system's design is not warned, as before.
+- **Ruling 11, the ports.** The linearization declares the plant's input ports selected by
+  `wrt` (a port, its components, every input), each at its share of `ū`; a diagram wire, or a
+  port named `x` or `y`, keeps the one port `u`. The output is always `y` (the selected rows,
+  with their labels and units) and the state is always exposed as `x`, as `LTISystem` did, so
+  `lqr(lin) @ lin` closes on a plant without an `x` port too. The state's bounds are not
+  copied (the model is valid near `x̄`); the input ports' are.
+- **Ruling 11, the warning's text.** One message for the designs and the analysis: "does not
+  rest at the design point: |f(x_bar, u_bar)| = …. The linear model (A, B, C, D) drops that
+  term: its poles and responses are those of the deviations, and a loop designed on it will
+  not hold x_bar …". Warned once per calling line (Python's default filter, the caller's
+  stack level).
+- **Ruling 11, a forgotten `()`.** The library's own array verbs (`lqr_gain`, `place_gain`,
+  `lqr_gain_schedule`, `kalman_gain`, `luenberger_gain`, `controllability_matrix`,
+  `observability_matrix`, `analysis.linear`, the `LTISystem` constructors) refuse a method
+  given for its matrix ("A is a method of the model, not its matrix: call it, sys.A()").
+  NumPy's own `np.linalg.eigvals(lin.A)` cannot be reached; KNOWN_ISSUES keeps that entry,
+  its fix "none", and TODO's row on the matrices left.
+- **Ruling 11, the names.** The deviation model is named `"<name> (deviations)"`, its labels
+  `Δθ` (they read `Delta θ` on the old model); an observer's labels drop no prefix any more.
+  `LinearizedSystem` and `LinearizedStepSystem` are on `minilink.dynamics` beside
+  `LTISystem`. The step response of a linearization reads "Linearized Step Response", its
+  axis "Deviation Δy", its hover `Δy`.
+- **Ruling 11, the GRO501 cart-pole notebook: a question.**
+  `udes_gro501/cartpole_dynamic_controller.ipynb` uses no removed name (`linearize`, `ss.A()`
+  … still work), so it is left as the maintainer wrote it: its observer subtracts
+  `[0, π, 0, 0]` from `y` by hand and plots the deviation estimate beside the absolute plant
+  state. With the new model the cell could design on `linearize(sys, x_bar)` and read
+  `ss.x_bar`; that is a change of the teaching code, the maintainer's call.
+- **Ruling 13.** A scalar level is broadcast to the other's size (`Step([1.0, 2.0])` starts
+  at `[0, 0]`). Nine positional calls flipped (two demos, two tutorial notebooks, five
+  tests). The bare `Step()` calls whose numbers move (a unit step at 1 s, was zero): the
+  tests `test_diagrams` (the controller box's loop), `test_graphics` (a signal-recording
+  loop), `test_simulation` (a static simulator's grid), `test_compile`, `test_core` and
+  `test_feedback_composition` (a refusal or a name), and the demos `diagram_compiling.py`
+  (its params overwritten, unchanged) and `diagram_shortcuts.py` (`Step()` and
+  `Step(port="r")`, drawn only). None asserted a value, so no expected number changed.
+- **Ruling 7, the order of the two plants.** `[dy, y, x]` → `[x, y, dy]` (the planar
+  position in the drawing's order, then the rate) on `QuarterCar` and
+  `ConstantSpeedHelicopterTunnel`; no demo or notebook uses either; one test's state and
+  index followed. `ThreeBodyProblem` keeps its per-body `[r1, v1, r2, v2, r3, v3]` (not one of
+  the two; **a question** whether the rule reads per body or for the whole state).
+- **Ruling 7, the labels.** `GeneralizedMechanicalSystem`'s velocities read `v1…` (its `v`
+  is not `dq`); the manipulator's task ports `p1…`, `dp1…` (they read `pdot0…`); the robotic
+  and model-based laws' `q1…`, `dq1…`. Left: `DoublePendulum` inherits the base's `u1`, `u2`
+  (its siblings say `tau1`, `tau2`, a catalog-hygiene row); the laws' own internal state labels
+  (`e_int0`, `pos0`, `rate0`, `u0` in the PID and impedance families) are counted from 0, not a
+  plant's signals; `DoubleIntegrator`'s `speed` and other plant-chosen rate names were not
+  renamed (the rule allows the textbook's word; a catalog-hygiene pass decides). The
+  plots already bracket a bare unit and leave a bracketed one alone.
