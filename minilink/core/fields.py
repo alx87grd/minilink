@@ -32,6 +32,9 @@ from minilink.core.shaping import shaping_of
 # The step of the central difference that a NumPy gradient takes
 GRADIENT_EPS = 1e-6
 
+# A bound the caller did not give (None is a bound deliberately left out)
+UNSET = object()
+
 
 ###############################################################################
 # Public API
@@ -75,14 +78,18 @@ class Field(ABC):
 
         return dV_dx.reshape(-1)
 
-    def as_set(self, *, lower: float | None = 0.0, upper: float | None = None) -> Set:
-        """The set of states where ``lower ≤ V(x) ≤ upper``."""
+    def as_set(self, *, lower: float | None = UNSET, upper: float | None = None) -> Set:
+        """The set of states where ``lower ≤ V(x) ≤ upper``, each bound when it is given: ``upper`` alone is the sublevel set, and no bound at all ``V(x) ≥ 0``."""
+        lower = level_bounds(lower, upper)
+
         return FieldSet(self, lower, upper)
 
     def as_input_set(
-        self, *, lower: float | None = 0.0, upper: float | None = None
+        self, *, lower: float | None = UNSET, upper: float | None = None
     ) -> InputSet:
-        """The inputs where ``lower ≤ V(x, u) ≤ upper`` at the state ``x``."""
+        """The inputs where ``lower ≤ V(x, u) ≤ upper`` at the state ``x``, each bound when it is given: ``upper`` alone is ``V ≤ upper``, and no bound at all ``V ≥ 0``."""
+        lower = level_bounds(lower, upper)
+
         return FieldInputSet(self, lower, upper)
 
     def as_cost(
@@ -402,8 +409,9 @@ class QuadraticField(Field):
 
         return P_t
 
-    def as_set(self, *, lower: float | None = 0.0, upper: float | None = None) -> Set:
+    def as_set(self, *, lower: float | None = UNSET, upper: float | None = None) -> Set:
         """``{x : lower ≤ V(x) ≤ upper}``; the sublevel set of a constant ``P`` (``upper`` alone, ``lower`` 0 or ``None``) is an :class:`EllipsoidSet`."""
+        lower = level_bounds(lower, upper)
         sublevel = upper is not None and lower in (None, 0.0) and self.t is None
         if sublevel:
             return EllipsoidSet(self, None, upper)
@@ -811,6 +819,14 @@ def require_grid_method(method, supported):
     if method not in supported:
         hint = ': the cubic spline is "cubic"' if method == "spline" else ""
         raise ValueError(f"method must be one of {supported}, got {method!r}{hint}")
+
+
+def level_bounds(lower, upper):
+    """The lower bound of a field's set: the one given; left unset, ``0`` alone (``V ≥ 0``) and none beside an ``upper``."""
+    if lower is not UNSET:
+        return lower
+
+    return 0.0 if upper is None else None
 
 
 def require_a_bound(lower, upper):
