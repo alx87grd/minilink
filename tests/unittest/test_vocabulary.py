@@ -29,7 +29,10 @@ PLANT_PACKAGE = "minilink.dynamics"
 RETIRED = {
     "gamma": ("radius_constant", ("RRTStarPlanner",)),
     "settings": ("params", None),
-    "final_time": ("the problem's t0 + horizon", ("DynamicProgrammingPlanner",)),
+    "final_time": (
+        "tf, the problem's t0 + horizon",
+        ("DynamicProgrammingPlanner",),
+    ),
     "x_start": ("x0", None),
     "t_start": ("t0", None),
     "iterations": (
@@ -46,7 +49,10 @@ RETIRED = {
         ),
     ),
     "optimizer_options": ("options", None),
-    "tf": ("horizon, or episode_length", ("PlanningProblem", "Sys2Gym")),
+    "tf": (
+        "horizon, or episode_length",
+        ("PlanningProblem", "Sys2Gym", "RolloutEnvironment"),
+    ),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
@@ -256,6 +262,12 @@ RETIRED_KEYWORDS = {
     },
     "minilink.planning.search.plotting.animate_search": {"save": "file_name"},
     "minilink.planning.search.plotting.animate_convergence": {"save": "file_name"},
+    "minilink.planning.evaluation.score_run": {"tf": "horizon"},
+    "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
+    "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
+    "minilink.planning.trajectory_optimization.path_integral.steps_of": {
+        "tf": "horizon"
+    },
 }
 
 

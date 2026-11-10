@@ -61,7 +61,7 @@ class MPPIPlanner(Planner):
     problem : PlanningProblem
         A finite horizon, a cost, an input box ``U``.
     dt : float
-        Control period: ``N = tf / dt`` held inputs.
+        Control period: ``N = horizon / dt`` held inputs.
     n_rollouts : int
         ``K``, the sampled sequences per pass.
     temperature : float
@@ -94,11 +94,11 @@ class MPPIPlanner(Planner):
     ):
         require_jax()
         super().__init__(problem)
-        tf = require_finite_horizon(problem)
+        horizon = require_finite_horizon(problem)
 
         # The structure: the grid, the sample count, the passes, the scheme
         self.dt = float(dt)
-        self.n_steps = steps_of(tf, self.dt)
+        self.n_steps = steps_of(horizon, self.dt)
         self.n_rollouts = int(n_rollouts)
         self.n_iterations = int(n_iterations)
         self.solver = solver
@@ -583,12 +583,12 @@ def problem_leaves(P):
     return leaves
 
 
-def steps_of(tf, dt) -> int:
-    """``N = tf / dt``, refused unless whole."""
-    N = int(round(tf / dt))
-    if N < 1 or abs(N * dt - tf) > 1e-9 * max(1.0, tf):
+def steps_of(horizon, dt) -> int:
+    """``N = horizon / dt``, refused unless whole."""
+    N = int(round(horizon / dt))
+    if N < 1 or abs(N * dt - horizon) > 1e-9 * max(1.0, horizon):
         raise ValueError(
-            f"the horizon tf = {tf:g} s is not a whole number of periods dt = {dt:g} s"
+            f"the horizon {horizon:g} s is not a whole number of periods dt = {dt:g} s"
         )
 
     return N

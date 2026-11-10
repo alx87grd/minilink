@@ -69,7 +69,7 @@ def test_the_last_stage_is_the_terminal_cost_and_the_first_the_full_horizon_tabl
     solution = planner.solve()
     t, J, pi = solution.record.tables.schedule
 
-    np.testing.assert_array_equal(J[-1], planner.terminal_cost(planner.final_time))
+    np.testing.assert_array_equal(J[-1], planner.terminal_cost(planner.tf))
     np.testing.assert_array_equal(J[0], solution.record.tables.J)
     np.testing.assert_array_equal(pi[0], solution.record.tables.pi)
 

@@ -368,7 +368,7 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
         n_trials=4,
         key=0,
         backend="jax",
-        episode_length=planner.env.tf,
+        episode_length=planner.env.episode_length,
     )
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     assert np.isfinite(solution.record.cost) and "plant steps" in str(solution.record)

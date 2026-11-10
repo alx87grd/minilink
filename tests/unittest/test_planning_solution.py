@@ -338,7 +338,7 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
         n_trials=3,
         key=0,
         backend="jax",
-        episode_length=planner.env.tf,
+        episode_length=planner.env.episode_length,
     )
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     assert isinstance(solution.plot_trajectory(show=False).figure, object)

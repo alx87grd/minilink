@@ -516,10 +516,10 @@ class TestBackends(unittest.TestCase):
         sys = DrivenIntegrator()
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
 
-        def receding(backend, final_time):
+        def receding(backend, tf):
             # The sweeps end at the problem's t0 + horizon
             problem = PlanningProblem(
-                sys, cost=cost, U=sys.input_box, horizon=1.0, t0=final_time - 1.0
+                sys, cost=cost, U=sys.input_box, horizon=1.0, t0=tf - 1.0
             )
             grid = StateSpaceGrid(
                 problem,
@@ -532,13 +532,13 @@ class TestBackends(unittest.TestCase):
             planner.solve_steps(6)
             return planner.result
 
-        loop = receding("loop", final_time=1.0)
-        table = receding("numpy", final_time=1.0)
+        loop = receding("loop", tf=1.0)
+        table = receding("numpy", tf=1.0)
         np.testing.assert_allclose(loop.J, table.J)
         np.testing.assert_array_equal(loop.pi, table.pi)
 
         # The sweeps read the time: another horizon gives another cost-to-go
-        shifted = receding("numpy", final_time=0.0)
+        shifted = receding("numpy", tf=0.0)
         self.assertFalse(np.allclose(shifted.J, table.J))
 
 
@@ -852,22 +852,22 @@ class TestDpOneObjectSetup(unittest.TestCase):
         )  # a deterministic problem: one trial
         self.assertIsNone(fixed.trajectory)  # a feedback law: no plan
 
-    def test_final_time_reads_the_problem_horizon(self):
+    def test_tf_is_the_problem_horizon_end(self):
         from minilink.planning.dynamic_programming.dp import DynamicProgrammingPlanner
 
         sys = DoubleIntegrator()
         cost = QuadraticCost.from_system(sys, x_bar=np.zeros(2))
         timed = PlanningProblem(sys, cost=cost, horizon=2.0, U=sys.input_box)
         planner = DynamicProgrammingPlanner(timed, x_grid=(5, 5), u_grid=(3,), dt=0.1)
-        self.assertEqual(planner.final_time, 2.0)
+        self.assertEqual(planner.tf, 2.0)
         later = DynamicProgrammingPlanner(
             timed.replace(t0=1.0), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
-        self.assertEqual(later.final_time, 3.0)  # t0 + horizon
+        self.assertEqual(later.tf, 3.0)  # t0 + horizon
         untimed = DynamicProgrammingPlanner(
             make_problem(), x_grid=(5, 5), u_grid=(3,), dt=0.1
         )
-        self.assertEqual(untimed.final_time, 0.0)
+        self.assertEqual(untimed.tf, 0.0)
 
     def test_grid_and_shapes_are_exclusive(self):
         from minilink.planning.dynamic_programming.discretizer import StateSpaceGrid

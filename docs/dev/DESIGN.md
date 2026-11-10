@@ -1343,14 +1343,15 @@ terminating without cost would reward escaping under a cost. `h` keeps its one
 job: the end of a finite horizon.
 
 **One scoring formula** (`planning.evaluation.score_run`, every evaluation's): a run is
-integrated from `t0` to `t_end = t0 + tf` (no event, no cut), then
+integrated from `t0` to `t_end = t0 + horizon` (no event, no cut; `horizon` the problem's, or the
+episode's length on an infinite one), then
 
 ```
 finite              = every x_k and u_k finite
 feasibility_margin  = min over the run of X.margin(x_k, t_k), U.margin(u_k, x_k, t_k)
 failed              = not finite, or feasibility_margin < 0
 reachability_margin = Xf.margin(x(t_end), t_end)  reached = margin ≥ 0   (Xf = None: reached)
-cost                = C_N + e^{−ρ tf} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t0)} g dt  (+inf when not finite; no h on an infinite horizon)
+cost                = C_N + e^{−ρ horizon} h(x(t_end), t_end),  C_N = Σ_k γᵏ c_k = ∫ e^{−ρ(t − t0)} g dt  (+inf when not finite; no h on an infinite horizon)
 J                   = cost, or with penalize_failure on cost + failure_cost · (failed or not reached),
                       and cost_bound + failure_cost for a run not finite
 ```
@@ -1363,7 +1364,7 @@ the signal `"plant:running_cost"`; its last value is the run's running cost, the
 `c_k` of the step problem summed with their discount. `evaluate_trajectory` reads that signal when
 the run carries it (one score) and scores a logged run, which has none, by the trapezoid on its
 samples. A run that is not finite is scored on zeros behind a safe `where`, and with the failure
-charged its cost term is the problem's `cost_bound(tf)`, the largest cost a finite run can reach
+charged its cost term is the problem's `cost_bound(horizon)`, the largest cost a finite run can reach
 (its `1e6` fallback, unannounced, when the boxes bound no cost and the failure cost is a number): its `J` stays
 finite and above that of any finite run, failed or not. Its gradient is not defined (the rollout
 overflowed before the `where`). A run whose

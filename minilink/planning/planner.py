@@ -208,7 +208,14 @@ def open_loop_controller_of(
 
 
 def planner_evidence(
-    planner, controller, *, dt=None, n_trials=50, tf=None, backend="numpy", problem=None
+    planner,
+    controller,
+    *,
+    dt=None,
+    n_trials=50,
+    episode_length=None,
+    backend="numpy",
+    problem=None,
 ) -> Evaluation | None:
     """
     The evidence a planner's ``solve(evaluate=True)`` records: its controller, as it is, scored on the real plant.
@@ -220,8 +227,8 @@ def planner_evidence(
     planner's own step (ruled 2026-11-08: the grid's for value iteration and
     tabular learning, the environment's for deep learning, the LQR's, an
     open-loop plan's own grid), the law continuous, ``dt`` only how finely its
-    loop is integrated; a clocked one on its own clock; ``tf`` is the run of an
-    infinite horizon. On a step problem, the model's rollouts
+    loop is integrated; a clocked one on its own clock; ``episode_length`` is the
+    run of an infinite horizon. On a step problem, the model's rollouts
     (:func:`step_evaluation`).
     """
     problem = planner.problem if problem is None else problem
@@ -235,7 +242,9 @@ def planner_evidence(
 
     # A step problem is scored on its model
     if not is_continuous(problem):
-        return step_evaluation(problem, controller, trials, episode_length=tf)
+        return step_evaluation(
+            problem, controller, trials, episode_length=episode_length
+        )
 
     return evaluate(
         problem,
@@ -244,7 +253,7 @@ def planner_evidence(
         n_trials=trials,
         key=0,
         backend=backend,
-        episode_length=tf,
+        episode_length=episode_length,
     )
 
 

@@ -99,7 +99,7 @@ class DynamicProgrammingPlanner(Planner):
 
     Notes
     -----
-    The sweeps' terminal time, :attr:`final_time`, is the problem's horizon
+    The sweeps' terminal time, :attr:`tf`, is the problem's horizon
     end (``t0 + horizon``, or a step problem's last tick); ``0`` without one.
     The workflow, ``verbose`` and ``record_history``, are keywords of
     :meth:`solve` and :meth:`solve_steps`. A grid built here keeps its build
@@ -145,7 +145,7 @@ class DynamicProgrammingPlanner(Planner):
         self.clean_infeasible = bool(clean_infeasible)
 
         # The numbers, the problem's unless given, and the sweeps' terminal time
-        self.gamma, self.out_of_bound_cost, self.final_time = grid_numbers_of(
+        self.gamma, self.out_of_bound_cost, self.tf = grid_numbers_of(
             self.grid, gamma, out_of_bound_cost
         )
         self.given = given_numbers(gamma=gamma, out_of_bound_cost=out_of_bound_cost)
@@ -156,7 +156,7 @@ class DynamicProgrammingPlanner(Planner):
 
         # The JAX engine builds the grid's transition tables with JAX
         if self.backend == BACKEND_JAX:
-            self.grid.ensure_jax_transition(self.final_time)
+            self.grid.ensure_jax_transition(self.tf)
 
     def solve(
         self,
@@ -275,7 +275,7 @@ class DynamicProgrammingPlanner(Planner):
         ``plot_cost_to_go(field=...)``.
         """
         grid = self.grid
-        tf = self.final_time
+        tf = self.tf
         gamma = self.gamma
         method = self.interpolation
         tol = self.tol
@@ -368,7 +368,7 @@ class DynamicProgrammingPlanner(Planner):
         the raw tables; :meth:`solve` and :meth:`solve_steps` wrap them in a
         solution.
         """
-        tf = self.final_time
+        tf = self.tf
         dt = self.grid.dt
         tol = self.tol
         method = self.method
@@ -783,7 +783,7 @@ class DynamicProgrammingPlanner(Planner):
             converged=mode != "infinite" or result.delta <= tol,
             mode=mode,
             discount_rate=self.discount_rate,
-            frozen_at=self.final_time if mode == "finite" and frozen else None,
+            frozen_at=self.tf if mode == "finite" and frozen else None,
             tables=result,
         )
 
@@ -1002,7 +1002,7 @@ def require_dp_engine(method, backend):
 
 
 def grid_numbers_of(grid, gamma, out_of_bound_cost):
-    """``(gamma, out_of_bound_cost, final_time)``: the given numbers, else the model's discount and failure cost; the model's horizon end."""
+    """``(gamma, out_of_bound_cost, tf)``: the given numbers, else the model's discount and failure cost; the model's horizon end."""
     model = grid.model
 
     # The model's discount per step (e^{−ρ dt}, or a step problem's γ), unless gamma is given
@@ -1016,9 +1016,9 @@ def grid_numbers_of(grid, gamma, out_of_bound_cost):
 
     # The horizon's end (t0 + horizon, or a step problem's last tick), 0 without one
     end = model.horizon_end()
-    final_time = 0.0 if end is None else float(end)
+    tf = 0.0 if end is None else float(end)
 
-    return gamma, out_of_bound_cost, final_time
+    return gamma, out_of_bound_cost, tf
 
 
 def grid_failure_cost(grid, gamma):

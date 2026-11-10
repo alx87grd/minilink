@@ -686,7 +686,7 @@ class ReinforcementLearningPlanner(Planner):
                 controller,
                 dt=self.dt,
                 n_trials=n_trials,
-                tf=self.env.tf,
+                episode_length=self.env.episode_length,
                 backend="jax",
             )
 

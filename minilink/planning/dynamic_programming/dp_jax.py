@@ -33,7 +33,7 @@ def value_iteration(
     stage stacked). A reported or recorded solve runs the planner's own loop
     instead, one jitted step at a time (:func:`device_step`).
 
-    Warning: a solve builds the device tables once, at ``final_time``, and reuses
+    Warning: a solve builds the device tables once, at ``tf``, and reuses
     them for every sweep, so the dynamics ``f``, the running cost ``g`` and a
     callable ``out_of_bound_cost`` must not depend on time. Use the ``"numpy"`` backend on
     a grid with ``precompute=False`` for a time-varying problem.
@@ -42,7 +42,7 @@ def value_iteration(
 
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner)
-    J0 = jax.numpy.asarray(terminal_cost(planner, planner.final_time))
+    J0 = jax.numpy.asarray(terminal_cost(planner, planner.tf))
 
     # A finite horizon: its N sweeps in one compiled scan, every stage kept
     if keep_stages:
@@ -78,7 +78,7 @@ def device_step(planner, verbose=False):
 
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner, verbose)
-    J0 = jnp.asarray(terminal_cost(planner, planner.final_time, verbose))
+    J0 = jnp.asarray(terminal_cost(planner, planner.tf, verbose))
     pi0 = jnp.zeros(planner.grid.n_nodes, dtype=jnp.int32)
 
     gamma = float(planner.gamma)
@@ -208,7 +208,7 @@ def device_tables(planner, verbose=False):
     jnp = ensure_jax_x64().numpy
 
     grid = planner.grid
-    tf = planner.final_time
+    tf = planner.tf
     interpolation = planner.interpolation
     n = grid.n
 
@@ -241,7 +241,7 @@ def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingRes
     """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
     jax = ensure_jax_x64()
 
-    tf = planner.final_time
+    tf = planner.tf
     dt = planner.grid.dt
     gamma = float(planner.gamma)
 

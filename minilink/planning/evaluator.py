@@ -648,7 +648,7 @@ class ProblemEvaluator:
         row = score_run(
             self.problem,
             plant_run,
-            tf=self.tf,
+            horizon=self.tf,
             params=params,
             failure_cost=failure_cost,
             cost_bound=bound,
@@ -1072,15 +1072,15 @@ def horizon_of(problem, episode_length):
     return float(episode_length)
 
 
-def steps_of(tf, dt):
-    """The number of periods of ``dt`` in ``tf``; refuse a ``dt`` that does not divide it."""
+def steps_of(horizon, dt):
+    """The number of periods of ``dt`` in ``horizon``; refuse a ``dt`` that does not divide it."""
     if not dt > 0.0:
         raise ValueError(f"dt must be positive, got {dt!r}")
 
-    n_steps = int(round(tf / dt))
-    if n_steps < 1 or abs(n_steps * dt - tf) > 1e-9 * max(1.0, tf):
+    n_steps = int(round(horizon / dt))
+    if n_steps < 1 or abs(n_steps * dt - horizon) > 1e-9 * max(1.0, horizon):
         raise ValueError(
-            f"dt={dt!r} must divide the horizon tf={tf!r} into a whole number of periods"
+            f"dt={dt!r} must divide the horizon {horizon!r} into a whole number of periods"
         )
 
     return n_steps
