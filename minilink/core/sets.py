@@ -265,6 +265,21 @@ class BoxInputSet(InputSet):
     def __init__(self, box: BoxSet):
         self.box = box
 
+    @property
+    def lower(self):
+        """The lower bound ``(m,)``, its box's."""
+        return self.box.lower
+
+    @property
+    def upper(self):
+        """The upper bound ``(m,)``, its box's."""
+        return self.box.upper
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the input vector."""
+        return self.box.dim
+
     def margin(self, u, x=None, t=0.0, params=None):
         """Return the margins to the input box faces, shape ``(2m,)``."""
         return self.box.margin(u, t=t, params=params)
@@ -321,6 +336,19 @@ class SingletonSet(Set):
 
         return residual
 
+    def sample(self, key, n=None, params=None):
+        """The point itself, whatever the key: ``(dim,)``, or ``(n, dim)`` with ``n``."""
+        params = self.params if params is None else params
+        require_sample_count(n)
+
+        # A real cycle: the distributions build on the sets
+        from minilink.core.distributions import tiled_mean
+
+        # Every draw of {p} is p
+        point = params["point"]
+
+        return tiled_mean(point, n)
+
     def bounding_box(self):
         """The degenerate box ``point <= z <= point``."""
         return BoxSet(self.point, self.point)
@@ -361,6 +389,44 @@ class BallSet(Set):
         margin = xp.reshape(signed_distance, (1,))
 
         return margin
+
+    def sample(self, key, n=None, params=None):
+        """Draw uniformly inside the ball: ``(dim,)`` for one point, ``(n, dim)`` with ``n``; the center with no key.
+
+        ``key`` is a NumPy generator, an integer seed or a JAX key (JAX arrays
+        out, traceable), as an ellipsoid draws; a counter key is refused.
+        """
+        params = self.params if params is None else params
+
+        center = params["center"]
+        radius = params["radius"]
+        dim = self.dim
+        require_sample_count(n)
+        count = 1 if n is None else int(n)
+
+        # A real cycle: the fields and the distributions build on the sets
+        from minilink.core.distributions import tiled_mean
+        from minilink.core.fields import (
+            gaussian_and_uniform,
+            require_ellipsoid_key,
+            triangular_solver_of,
+        )
+
+        # No key, no draw: the ball's center
+        if key is None:
+            return tiled_mean(center, n)
+
+        require_ellipsoid_key(key)
+        xp, _ = triangular_solver_of(key)
+        g, s = gaussian_and_uniform(key, count, dim)
+
+        # z = c + r s^(1/n) g/‖g‖: a Gaussian direction, a radius whose n-th power is uniform
+        direction = g / xp.linalg.norm(g, axis=1, keepdims=True)
+        points = center + radius * s ** (1.0 / dim) * direction
+
+        sample = points[0] if n is None else points
+
+        return sample
 
     def bounding_box(self):
         """The box of half-width ``radius`` about the center."""
@@ -449,6 +515,14 @@ class IntersectionSet(Set):
     def param_parts(self) -> dict:
         """The members by key: the parts an assignment routes to."""
         return dict(zip(member_keys(self.sets), self.sets))
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the members' vector, read off the first member that states one."""
+        for set_ in self.sets:
+            if hasattr(set_, "dim"):
+                return set_.dim
+        raise AttributeError("no member of this intersection states its dimension")
 
     @classmethod
     def of(cls, *sets: Set) -> "IntersectionSet":

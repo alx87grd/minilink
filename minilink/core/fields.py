@@ -142,6 +142,11 @@ class FieldSet(Set):
         return {"field": self.field}
 
     @property
+    def dim(self) -> int:
+        """Dimension of the state, its field's (when the field states one)."""
+        return self.field.dim
+
+    @property
     def lower(self):
         """The lower bound on ``V``, ``None`` when it is not set."""
         return self.params.get("lower")
@@ -318,6 +323,11 @@ class MarginField(Field):
     def __init__(self, set_: Set):
         self.set_ = set_
 
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, its set's (when the set states one)."""
+        return self.set_.dim
+
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
@@ -358,6 +368,11 @@ class QuadraticField(Field):
 
     center = param_view("center")
     P = param_view("P")
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, the center's size."""
+        return int(np.size(self.center))
 
     @property
     def t(self):
@@ -581,6 +596,11 @@ class GridField(Field):
     def n(self) -> int:
         """The dimension of the grid."""
         return len(self.params["levels"])
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, the grid's number of axes (:attr:`n`)."""
+        return self.n
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -889,11 +909,11 @@ def require_sublevel(lower, upper):
 
 
 def require_ellipsoid_key(key):
-    """Refuse a counter key: an ellipsoid's draw takes many numbers per point."""
+    """Refuse a counter key: an ellipsoid's (or a ball's) draw takes many numbers per point."""
     if is_counter_key(key):
         raise TypeError(
-            "an ellipsoid draws from a NumPy generator, an integer seed or a JAX key, "
-            "not a counter key"
+            "an ellipsoid or a ball draws from a NumPy generator, an integer seed or a "
+            "JAX key, not a counter key"
         )
 
 

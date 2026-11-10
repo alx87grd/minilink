@@ -853,7 +853,8 @@ def require_samplable_start(set_, box):
     """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
     if type(set_).sample is Set.sample:
         raise ValueError(
-            f"x0 {type(set_).__name__} cannot draw a start (only a box samples): "
+            f"x0 {type(set_).__name__} cannot draw a start (a box, a ball, an ellipsoid "
+            "and a singleton sample): "
             "give a law (a Distribution), or a box"
         )
     if not is_finite_box(box):

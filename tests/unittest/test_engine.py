@@ -930,7 +930,8 @@ def test_a_point_start_reads_the_start_the_params_give():
 
 def test_a_start_set_that_cannot_draw_is_refused():
     with pytest.raises(ValueError, match="cannot draw a start"):
-        PlanningProblem(plant(), x0=BallSet(np.zeros(2), 1.0), horizon=1.0)
+        start = BallSet(np.zeros(2), 1.0) & BoxSet(-np.ones(2), np.ones(2))
+        PlanningProblem(plant(), x0=start, horizon=1.0)
 
 
 def test_the_failure_cost_follows_the_overridden_weights():

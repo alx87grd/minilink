@@ -823,7 +823,10 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `print(traj)` is `N`, the time span, and the array shapes, not the sample dump.
 - Sets: `margin ≥ 0` feasible; `contains` is that test on the array module (a traceable
   boolean under JAX); `sample(key, n=None, params=None)` follows the distributions' draw
-  convention below (a set that has a design point gives it for `key=None`) (`BoxSet.sample` traces);
+  convention below (a set that has a design point gives it for `key=None`) (`BoxSet.sample` traces;
+  `BallSet.sample` draws uniformly inside, a singleton gives its point); `dim` on every set and
+  field that knows its vector's size (not a callable set); an input box and `Uniform` read
+  `lower`, `upper`, `dim` as a box does;
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
