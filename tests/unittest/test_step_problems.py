@@ -567,3 +567,32 @@ def test_a_step_problem_prints_its_horizon_its_discount_and_its_parts():
     assert "n_steps=None, gamma=1, criterion=expectation" in lawful
     assert "  x0: Uniform" in lawful
     assert str(grid_world().cost) == "Moves"
+
+
+def test_a_step_problem_replaces_a_field_and_keeps_what_it_samples():
+    problem = swing_problem()
+    sampled = problem.discretize(0.1)
+    moved = sampled.replace(x0=[0.2, 0.0])
+    assert type(moved) is StepPlanningProblem
+    np.testing.assert_array_equal(moved.x0, [0.2, 0.0])
+    np.testing.assert_array_equal(sampled.x0, [0.3, 0.0])
+    assert (moved.n_steps, moved.dt, moved.gamma) == (
+        sampled.n_steps,
+        0.1,
+        sampled.gamma,
+    )
+    assert moved.cost is sampled.cost and moved.sys is sampled.sys
+    # Only the start moved: the continuous problem it samples, and its bound, are kept
+    assert moved.origin is problem
+    assert moved.cost_bound() == sampled.cost_bound()
+    # Another task: a native step problem
+    assert sampled.replace(gamma=0.9).origin is None
+    with pytest.raises(TypeError, match="no field"):
+        sampled.replace(horizon=1.0)
+
+
+def test_a_native_step_problem_replaces_its_horizon():
+    problem = StepPlanningProblem(Walk(), n_steps=5, cost=Moves([5.0]), x0=[0.0])
+    longer = problem.replace(n_steps=8)
+    assert (longer.n_steps, problem.n_steps) == (8, 5)
+    assert longer.rollout(lambda x, t: np.array([1.0])).x.shape[1] == 9

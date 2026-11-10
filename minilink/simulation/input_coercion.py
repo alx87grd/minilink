@@ -132,10 +132,29 @@ def coerce_forced_array(data, expected_dim, n_pts, label):
             column = arr.reshape(expected_dim, 1)
             signal = np.repeat(column, n_pts, axis=1)
             return signal
-        raise ValueError(f"{label} must have shape {expected_shape}")
+        raise ValueError(sampled_shape_error(label, expected_shape, arr.shape))
 
     # A matrix: the samples themselves
     if arr.ndim == 2 and arr.shape == expected_shape:
         return arr
 
-    raise ValueError(f"{label} must have shape {expected_shape}")
+    raise ValueError(sampled_shape_error(label, expected_shape, arr.shape))
+
+
+def sampled_shape_error(label, expected_shape, shape) -> str:
+    """The refusal of a sampled input off the run's grid, naming the grid's keywords."""
+    text = f"{label} must have shape {expected_shape}, got {shape}"
+    dim, n_pts = expected_shape
+    n_given = shape[-1]
+
+    # The right rows (or the one input's vector of samples), the wrong sample count
+    samples = (len(shape) == 2 and shape[0] == dim) or (len(shape) == 1 and dim == 1)
+    if not samples or n_given == n_pts:
+        return text
+
+    # A sample count off the grid: the run's grid is the caller's to choose
+    return (
+        f"{text}: a sampled input has one column per time of the run's grid ({n_pts} "
+        f"here); run on a grid of {n_given} samples (n_samples={n_given}, or the dt "
+        "that gives it), or give u as a function u(t)"
+    )

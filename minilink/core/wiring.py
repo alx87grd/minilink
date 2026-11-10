@@ -137,12 +137,15 @@ class WiredDiagramMixin:
 
     # Building the diagram
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a subsystem under a unique id, with all its inputs unconnected.
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a subsystem under a unique id, with all its inputs unconnected, and return the id.
 
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
         tool reads (:func:`minilink.core.roles.roles`); one of each per level.
+        ``sys_id=None`` takes the operators' default: the block's ``id``, else
+        its class name, numbered on a repeat (``Pendulum``, ``Pendulum2``).
         """
+        sys_id = self.new_subsystem_id(sys, sys_id)
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
         require_new_subsystem(sys, sys_id, self.subsystems)
@@ -152,6 +155,22 @@ class WiredDiagramMixin:
 
         # The stacked state, with the new block
         self.n, self.state_index, self.state = state_layout(self.subsystems)
+
+        return sys_id
+
+    def new_subsystem_id(self, sys, sys_id=None) -> str:
+        """``sys_id`` as given, else the operators' default id of ``sys`` not yet taken here."""
+        if sys_id is not None:
+            return sys_id
+
+        # A real cycle: the assembly imports the diagrams built on this mixin
+        from minilink.core.assembly import default_subsystem_id, unique_id
+
+        # A role (plant, controller, observer) once per level, as the operators place it
+        base = default_subsystem_id(sys)
+        check_reserved_id(base, self.subsystems)
+
+        return unique_id(base, self.subsystems)
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         """

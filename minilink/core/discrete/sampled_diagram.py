@@ -54,10 +54,12 @@ class SampledDiagramSystem(StepDiagramSystem):
         """The base period ``Δ`` in seconds: the greatest common divisor of the clocked blocks' periods."""
         return base_period_of(clock_periods(self))
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a step, static or clocked block (or a box of them) under a unique id."""
-        super().add_subsystem(sys, sys_id)
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a step, static or clocked block (or a box of them) under a unique id, and return the id."""
+        sys_id = super().add_subsystem(sys, sys_id)
         self.add_hold_slots()
+
+        return sys_id
 
     @property
     def x0(self):

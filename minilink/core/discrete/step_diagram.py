@@ -46,15 +46,17 @@ class StepDiagramSystem(WiredDiagramMixin, StepSystem):
         # Wiring tables and the stacked-state layout
         self.init_wiring()
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a step or static subsystem under a unique id.
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a step or static subsystem under a unique id, and return the id.
 
-        A :class:`DynamicSystem` with states has no ``step`` to stack, so it is
+        ``sys_id=None`` takes the operators' default, as on a flow diagram. A
+        :class:`DynamicSystem` with states has no ``step`` to stack, so it is
         refused here rather than left frozen by :meth:`step`.
         """
+        sys_id = self.new_subsystem_id(sys, sys_id)
         self.require_subsystem(sys, sys_id)
 
-        super().add_subsystem(sys, sys_id)
+        return super().add_subsystem(sys, sys_id)
 
     def step(self, x, u, k=0, params=None):
         """

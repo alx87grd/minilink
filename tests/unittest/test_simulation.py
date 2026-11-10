@@ -1693,3 +1693,15 @@ def test_a_simulators_solver_options_are_its_own_copy_of_the_preset():
         fresh.solver_backend_options["rtol"],
         fresh.solver_backend_options["atol"],
     ) == (1e-4, 1e-7)
+
+
+def test_a_sampled_input_off_the_runs_grid_names_the_grids_keywords():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    with pytest.raises(ValueError, match=r"got \(1, 7\).*n_samples=7"):
+        plant.compute_trajectory(tf=1.0, u=np.ones((1, 7)))
+    traj = plant.compute_trajectory(tf=1.0, u=np.ones((1, 7)), n_samples=7)
+    assert traj.u.shape == (1, 7)
+    with pytest.raises(ValueError, match=r"got \(2, 7\)$"):
+        plant.compute_trajectory(tf=1.0, u=np.ones((2, 7)))

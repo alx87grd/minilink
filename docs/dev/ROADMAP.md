@@ -399,7 +399,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `poles(sys, x_bar)` on `minilink.analysis` and the root (the linear model's eigenvalues, in
     `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`;
     `sys.plot_nyquist(…)` beside the other one-channel plots; `step_sys.linearize(…)` and
-    `step_sys.transfer_function(…)` as on a continuous system.
+    `step_sys.transfer_function(…)` as on a continuous system; `diagram.add_subsystem(sys)`
+    without an id (the operators' default, returned); `StepPlanningProblem.replace`; a scalar
+    `u` on a one-input `compute_rollout`; a sampled `u` off the run's grid refused naming
+    `n_samples=` and `dt=`.
 
 ## 3. Maturity (TRL)
 

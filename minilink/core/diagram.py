@@ -55,15 +55,17 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # Wiring tables and the stacked-state layout
         self.init_wiring()
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a continuous or static subsystem under a unique id.
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a continuous or static subsystem under a unique id, and return the id.
 
-        A :class:`StepSystem` has no ``f`` to stack, so it is refused here
-        rather than left out of the state derivative.
+        ``sys_id=None`` takes the operators' default (the block's class name,
+        numbered on a repeat). A :class:`StepSystem` has no ``f`` to stack, so it
+        is refused here rather than left out of the state derivative.
         """
+        sys_id = self.new_subsystem_id(sys, sys_id)
         require_flow_subsystem(sys, sys_id)
 
-        super().add_subsystem(sys, sys_id)
+        return super().add_subsystem(sys, sys_id)
 
     def f(self, x, u, t=0, params=None):
         """

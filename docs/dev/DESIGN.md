@@ -653,7 +653,9 @@ Sources name their signal at creation (`Step(port="r")`), blocks their ports
 with `rename_ports` (the renames of one call apply at once; a collision with an
 untouched port is refused). `+` and `>>` lay a diagram operand out flat; only
 `@` nests, a box on either side under its role name as one subsystem.
-Explicit `add_subsystem` / `connect` remains canonical for general topology.
+Explicit `add_subsystem` / `connect` remains canonical for general topology;
+`add_subsystem(sys)` without an id takes the operators' default (the block's `id`, else its
+class name, numbered on a repeat, a role once per level) and returns the id it gave.
 
 **No operator modifies its operands.** `+`, `>>` and `@` (the continuous loop
 `ctl @ plant` and the sampled loop `ctl % dt @ plant`), like `feedback()`, return
@@ -1116,7 +1118,8 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
 - static :class:`System` leaf (`n=0`) →
   :class:`~minilink.simulation.static_simulator.StaticSimulator` (time grid +
   boundary outputs in `Trajectory.signals`; not state evolution)
-- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t0=0.0)`, a
+- :class:`StepSystem` → `compute_rollout(n_steps, u=None, *, x0=None, t0=0.0)` (`u` a scalar
+  on a one-input system, a constant vector, `(m, n_steps)` or `u(k)`), a
   :class:`~minilink.core.trajectory.Trajectory` of the ticks (`t = k` on a tick law,
   `t = t0 + k·Δ` on a system on a clock); its compiled evaluator's
   `rollout(x0, u_seq=None, params=None, *, n_steps=None, t0=0.0)` returns the states
@@ -1195,7 +1198,8 @@ NumPy), `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 and the two fixed-step solvers, the step model's words on every tool: `euler` (the step
 model's Euler rollout) and `rk4` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator, naming `solver="scipy"` or a uniform `dt`.
 **One input rule on every solver** (`Simulator.solve(u=)`, `compute_trajectory(u=)`): a sampled
-input `(m, N)` is held over each sample period (`u(t) = u_k` on `[t_k, t_{k+1})`), and a function
+input `(m, N)` is held over each sample period (`u(t) = u_k` on `[t_k, t_{k+1})`; one off the
+run's grid is refused, naming `n_samples=` and `dt=`), and a function
 of time is read where the method evaluates `f`: the stage times of RK4, the adaptive solver's own
 points, the grid times of Euler (where the held sample is the same read). The automatic solver
 choice never changes the input model.
@@ -1535,7 +1539,9 @@ discount). `compile` is the controller's verb only: `problem.compile(controller,
 takes the controller as a required argument, and a step problem has no `compile` (`rollout`
 scores a controller). A `StepPlanningProblem(sys, *, n_steps, cost, gamma, ...)` is the
 native form on a `StepSystem` with a `StepCost` (`c(x, u, k)`, `h(x, k)`), its start and
-sets a `PlanningProblem`'s by composition, the same methods. Its laws are over its own tree,
+sets a `PlanningProblem`'s by composition, the same methods (`replace(**changes)` among
+them; a discretized problem keeps the continuous problem it samples when only its start,
+its failure's price or its criterion change). Its laws are over its own tree,
 `params = {"plant", "cost", the sets', "x0", "t0", "gamma"}` (the cost's numbers among
 them), and `realize(key, n)` draws them into that tree as a continuous problem's does (the
 start from the stream `"x0"`, each law from its path's; `sample_params(key)` one draw); its

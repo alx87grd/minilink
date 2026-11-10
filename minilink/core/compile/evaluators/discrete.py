@@ -111,7 +111,7 @@ class DiscreteEvaluator(Evaluator):
         return u_seq
 
     def rollout_inputs_of(self, n_steps, u):
-        """The rollout's inputs ``(m, n_steps + 1)``: the nominal one, a constant, an ``(m, n_steps)`` sequence or ``u(k)``."""
+        """The rollout's inputs ``(m, n_steps + 1)``: the nominal one, a constant (a scalar on one input), an ``(m, n_steps)`` sequence or ``u(k)``."""
         if n_steps < 0:
             raise ValueError("n_steps must be nonnegative")
 
@@ -125,6 +125,11 @@ class DiscreteEvaluator(Evaluator):
             )
         else:
             u_arr = np.asarray(u, dtype=float)
+
+            # A scalar is the constant input of a one-input system
+            if u_arr.ndim == 0 and self.m == 1:
+                u_arr = u_arr.reshape(1)
+
             if u_arr.ndim == 1:
                 if u_arr.shape != (self.m,):
                     raise ValueError(f"Constant u must have shape ({self.m},)")
