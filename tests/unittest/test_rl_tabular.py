@@ -174,12 +174,12 @@ def test_numpy_environment_steps_like_the_problem():
     x, t = env.reset(rng), 0.0
     assert x.shape == (2,)
     for k in range(3):
-        x, t, r, terminated, truncated = env.step(x, t, np.array([0.5]), rng)
+        x, t, r, terminated, truncated = env.step(x, np.array([0.5]), t, rng)
         assert np.isfinite(r) and not terminated
         assert bool(truncated) == (k == 2)
     # a state pushed out of the box pays the problem's exit failure_cost and terminates
     _, _, r, terminated, truncated = env.step(
-        np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
+        np.array([1.99, 1.99]), np.array([1.0]), 0.0, rng
     )
     assert bool(terminated) and not bool(truncated) and float(r) < -19.0
 

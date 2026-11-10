@@ -277,7 +277,7 @@ class ReinforcementLearningPlanner(Planner):
             )
             self.update_jit = jax.jit(self.replay_updates)
         self.action_jit = jax.jit(
-            lambda theta, x: self.actor.action(x, {"mlp": theta["mlp"]})
+            lambda theta, x: self.actor.action(x, params={"mlp": theta["mlp"]})
         )
 
     @property

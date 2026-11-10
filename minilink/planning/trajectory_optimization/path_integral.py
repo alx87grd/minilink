@@ -529,7 +529,7 @@ class CompiledMPPIPlanner:
         def period(carry, v):
             x, t, S, alive, discount = carry
             x_next, t_next, reward, terminated, _ = env.step(
-                x, t, v, None, episode, t_origin=t0
+                x, v, t, None, episode, t_origin=t0
             )
             # S += γ^t c_t while alive; a failure is charged once, its state then frozen
             S = S - jnp.where(alive, discount * reward, 0.0)
@@ -560,7 +560,7 @@ class CompiledMPPIPlanner:
 
         def period(carry, u):
             x, t = carry
-            x_next, t_next, _, _, _ = env.step(x, t, u, None, episode, t_origin=P["t0"])
+            x_next, t_next, _, _, _ = env.step(x, u, t, None, episode, t_origin=P["t0"])
             return (x_next, t_next), x_next
 
         x0 = jnp.asarray(P["x0"], dtype=float)

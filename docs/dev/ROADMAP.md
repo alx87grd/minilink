@@ -275,6 +275,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *Exported.* `DiscreteLTISystem`, the linear model `linearize` returns on a step or sampled
     system, is on `minilink.dynamics` beside `LTISystem`; its `period=` keeps its name (renaming
     it `sample_period` would put the model on a clock, an open question).
+  - *One signature order, the model's `(x, u, t; p)`.* `RolloutEnvironment.step(x, t, u, key,
+    params)` → `step(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *,
+    t=0.0)` and `NeuralPolicy.action(x, params=None)` → `action(x, t=0.0, params=None)`
+    (pass `params=` by keyword).
 
 ## 3. Maturity (TRL)
 

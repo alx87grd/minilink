@@ -40,7 +40,7 @@ def rollout(env, policy, theta, carry, key, *, n_steps, n_envs):
 
         # Plant: one control period, and the return of the running episode
         x_next, t_next, reward, terminated, truncated = env.step(
-            x, t, u, k_step, params
+            x, u, t, k_step, params
         )
         done = terminated | truncated
         ep_return = ep_return + reward

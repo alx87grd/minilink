@@ -198,7 +198,7 @@ class RolloutEnvironment:
             if block.is_random
         }
 
-    def step(self, x, t, u, key, params=None, *, t_origin=None):
+    def step(self, x, u, t, key, params=None, *, t_origin=None):
         """
         One control period: ``(x_next, t_next, reward, terminated, truncated)``.
 

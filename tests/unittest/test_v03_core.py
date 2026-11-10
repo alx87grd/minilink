@@ -599,7 +599,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     env = RolloutEnvironment(problem, dt=dt, backend="numpy", reward="stage")
     x, t, J_env = problem.x0, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
-        x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
+        x, t, reward, terminated, _ = env.step(x, policy(x, t), t, None)
         J_env += step_problem.gamma**k * -float(reward)
     assert bool(terminated)
 

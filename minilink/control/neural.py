@@ -189,8 +189,8 @@ class NeuralPolicy(System):
 
         return a
 
-    def action(self, x, params=None):
-        """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh."""
+    def action(self, x, t=0.0, params=None):
+        """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh; a time-invariant law, ``t`` unread."""
         xp = array_module(x)
 
         squash = self.squash
@@ -208,11 +208,11 @@ class NeuralPolicy(System):
 
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""
-        return self.action(u, params)
+        return self.action(u, t, params)
 
     def setpoint_position(self, x, params=None):
         """Cartesian point for the commanded set-point, or ``None``."""
-        r = self.action(x, params)
+        r = self.action(x, params=params)
         plant = setpoint_plant_of(self)
 
         # A joint reference, mapped through the arm's forward kinematics

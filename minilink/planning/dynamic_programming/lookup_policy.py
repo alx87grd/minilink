@@ -93,7 +93,7 @@ class LookupPolicy(System):
             upper_bound=U.box.upper,
         )
 
-    def action(self, x, params=None, *, t=0.0) -> np.ndarray:
+    def action(self, x, t=0.0, params=None) -> np.ndarray:
         """Return the interpolated command ``u`` at a single state ``x`` (on a schedule, the stage of ``t``)."""
         params = self.params if params is None else params
         xp = array_module(x, params["u_table"])
@@ -122,7 +122,7 @@ class LookupPolicy(System):
 
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""
-        return self.action(u, params, t=t)
+        return self.action(u, t, params)
 
 
 ###############################################################################

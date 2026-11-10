@@ -474,7 +474,7 @@ def episode_return(env, law):
     x, t = env.reset(0), env.t0
     total, k = 0.0, 0
     while True:
-        x, t, r, terminated, truncated = env.step(x, t, law(x), None)
+        x, t, r, terminated, truncated = env.step(x, law(x), t, None)
         total += env.model.gamma**k * float(r)
         k += 1
         if terminated or truncated:
@@ -494,7 +494,7 @@ def test_the_rollout_environment_steps_a_native_step_problem_on_its_model():
 
     # One step is the model's transition, rewarded −c_k
     x_next, t_next, r, terminated, truncated = env.step(
-        np.array([1.0]), 3.0, np.array([1.0]), None
+        np.array([1.0]), np.array([1.0]), 3.0, None
     )
     assert (
         x_next[0] == 2.0

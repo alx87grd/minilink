@@ -80,14 +80,14 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
     x, t = jnp.zeros(2), 0.0
     for _ in range(2):
         x, t, r, terminated, truncated = env.step(
-            x, t, jnp.zeros(1), jax.random.PRNGKey(0)
+            x, jnp.zeros(1), t, jax.random.PRNGKey(0)
         )
         assert not bool(terminated) and not bool(truncated)
-    x, t, r, terminated, truncated = env.step(x, t, jnp.zeros(1), jax.random.PRNGKey(0))
+    x, t, r, terminated, truncated = env.step(x, jnp.zeros(1), t, jax.random.PRNGKey(0))
     assert bool(truncated) and not bool(terminated)  # episode length reached
     # leaving the training zone: truncated (bootstrap), no charge
     _, _, r_exit, terminated, truncated = env.step(
-        jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
+        jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0, jax.random.PRNGKey(0)
     )
     assert bool(truncated) and not bool(terminated)
     expected = -0.1 * float(env.cost.g(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0))
@@ -120,11 +120,11 @@ def test_environment_finite_horizon_charges_h_and_the_failure_cost():
     )
     assert env.finite_horizon and env.failure_cost == 50.0
     x, t, r1, terminated, _ = env.step(
-        jnp.zeros(2), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
+        jnp.zeros(2), jnp.zeros(1), 0.0, jax.random.PRNGKey(0)
     )
     assert not bool(terminated)
     x, t, r2, terminated, truncated = env.step(
-        x, t, jnp.zeros(1), jax.random.PRNGKey(0)
+        x, jnp.zeros(1), t, jax.random.PRNGKey(0)
     )
     assert bool(terminated) and not bool(truncated)
     np.testing.assert_allclose(
@@ -132,7 +132,7 @@ def test_environment_finite_horizon_charges_h_and_the_failure_cost():
     )  # the terminal cost h = 1
     # a charged exit: terminated, reward carries the -50 penalty
     _, _, r_exit, terminated, truncated = env.step(
-        jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
+        jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0, jax.random.PRNGKey(0)
     )
     assert bool(terminated) and float(r_exit) < -49.0
 
@@ -148,7 +148,7 @@ def test_neural_policy_controller_normalizes_and_composes():
     u = ctl.action(np.zeros(2))
     assert u.shape == (1,) and -4.0 <= u[0] <= 4.0
     # traces under JAX with an explicit params pytree
-    u_jax = jax.jit(lambda p, x: ctl.action(x, p))(ctl.params, jnp.zeros(2))
+    u_jax = jax.jit(lambda p, x: ctl.action(x, params=p))(ctl.params, jnp.zeros(2))
     np.testing.assert_allclose(np.asarray(u_jax), u, atol=1e-6)
     cl_sys = ctl @ plant
     traj = cl_sys.compute_trajectory(tf=0.2, dt=0.1, verbose=False)
@@ -274,8 +274,8 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
     g0 = float(planner.env.cost.g(x, u, 0.0))
-    _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
-    _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
+    _, _, r0, _, _ = planner.env.step(x, u, 0.0, jax.random.PRNGKey(0))
+    _, _, r_later, _, _ = planner.env.step(x, u, 5.0, jax.random.PRNGKey(0))
     np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
@@ -672,7 +672,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
     )
     env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
     x_next, t, r, terminated, truncated = env.step(
-        jnp.array([1.0]), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
+        jnp.array([1.0]), jnp.zeros(1), 0.0, jax.random.PRNGKey(0)
     )
     assert (
         bool(jnp.all(jnp.isfinite(x_next)))
@@ -775,10 +775,10 @@ def test_numpy_and_jax_environments_take_the_same_step():
     env_np = RolloutEnvironment(prob, dt=0.1, episode_length=1.0, backend="numpy")
     x, u = np.array([0.3, -0.2]), np.array([1.5])
     x_jax, t_jax, r_jax, term_jax, trunc_jax = env_jax.step(
-        jnp.asarray(x), 0.0, jnp.asarray(u), jax.random.PRNGKey(0)
+        jnp.asarray(x), jnp.asarray(u), 0.0, jax.random.PRNGKey(0)
     )
     x_np, t_np, r_np, term_np, trunc_np = env_np.step(
-        x, 0.0, u, np.random.default_rng(0)
+        x, u, 0.0, np.random.default_rng(0)
     )
     np.testing.assert_allclose(np.asarray(x_jax), x_np, atol=1e-12)
     np.testing.assert_allclose(float(r_jax), float(r_np), atol=1e-12)
@@ -927,7 +927,7 @@ def test_environment_reward_stays_finite_when_a_step_blows_up():
     )
     env.model.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
     x = np.array([0.1, 0.0])
-    x_next, _, reward, terminated, _ = env.step(x, 0.0, np.array([0.0]), None)
+    x_next, _, reward, terminated, _ = env.step(x, np.array([0.0]), 0.0, None)
     assert np.all(np.isfinite(x_next)) and np.isfinite(reward) and bool(terminated)
 
 

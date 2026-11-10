@@ -321,7 +321,7 @@ class TabularLearningPlanner(Planner):
                 # One control period of the plant under the grid input of action a
                 u = grid.inputs[a]
                 x_next, t_next, reward, terminated, truncated = env.step(
-                    x, t, u, rng, params
+                    x, u, t, rng, params
                 )
 
                 # What the learner sees: the stage cost c_k (plus a charged exit or a

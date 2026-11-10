@@ -283,6 +283,28 @@ def test_no_retired_keyword_at_its_path(path):
     assert not hits, f"{path}: retired keywords {hits}"
 
 
+# The model's order, (x, u, t; p) or the subset read (CONSTITUTION, one signature): a method's
+# leading parameters, at its full path
+ONE_SIGNATURE = {
+    "minilink.planning.environment.RolloutEnvironment.step": ("x", "u", "t", "key"),
+    "minilink.planning.dynamic_programming.lookup_policy.LookupPolicy.action": (
+        "x",
+        "t",
+        "params",
+    ),
+    "minilink.control.neural.NeuralPolicy.action": ("x", "t", "params"),
+}
+
+
+@pytest.mark.parametrize("path", sorted(ONE_SIGNATURE))
+def test_a_method_takes_the_model_order(path):
+    method = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    leading = tuple(inspect.signature(method).parameters)[
+        1 : 1 + len(ONE_SIGNATURE[path])
+    ]
+    assert leading == ONE_SIGNATURE[path], f"{path} takes {leading}"
+
+
 @pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
 def test_no_retired_name_at_its_path(path):
     name = path.rsplit(".", 1)[-1]
