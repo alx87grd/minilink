@@ -47,6 +47,6 @@ loop.plot_trajectory()
 
 # The fan of sampled futures at three ticks: the angle against time, the plan in black
 plot_sampled_futures(
-    run, mpc, loop=loop, ticks=FAN_TICKS, axes=("t", 0), n_shown=FAN_SAMPLES
+    run, mpc, loop=loop, ticks=FAN_TICKS, x_axis="t", y_axis=0, n_shown=FAN_SAMPLES
 )
 loop.animate(run)

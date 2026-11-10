@@ -752,7 +752,7 @@ class TestPolicyEvaluationField(unittest.TestCase):
         fig, _ = planner.plot_cost_to_go(field=J_pi, jmax=10.0, show=False)
         self.assertIsNotNone(fig)
         J = J_pi.params["values"].reshape(-1)
-        fig, _ = result.grid.plot_value(J, is_3d=True, show=False)
+        fig, _ = result.grid.plot_cost_to_go(J, is_3d=True, show=False)
         self.assertIsNotNone(fig)
 
 

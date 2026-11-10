@@ -431,7 +431,7 @@ class StateSpaceGrid:
 
     # Plotting
 
-    def plot_value(self, values, *, is_3d=False, **kwargs):
+    def plot_cost_to_go(self, values, *, is_3d=False, **kwargs):
         """
         Draw a node-indexed field on this grid: a heatmap, or a surface with ``is_3d``.
 

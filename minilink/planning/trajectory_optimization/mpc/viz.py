@@ -200,7 +200,8 @@ def plot_sampled_futures(
     *,
     loop,
     ticks,
-    axes=(0, 1),
+    x_axis=0,
+    y_axis=1,
     n_shown: int = 32,
     ax=None,
     show: bool = True,
@@ -208,9 +209,9 @@ def plot_sampled_futures(
     """
     The fans of a sampling MPC at the solves of ``ticks``: the heaviest futures shaded by weight, the plan in black, the closed loop.
 
-    ``axes`` names what is drawn against what: two state indices (``(0, 1)``,
-    the car's plane), or ``("t", i)`` for the state ``i`` against time (the
-    pendulum's angle). ``ticks`` index the solves of the run. Returns
+    ``x_axis`` and ``y_axis`` name what is drawn against what: two state
+    indices (``0`` and ``1``, the car's plane), or ``x_axis="t"`` for the state
+    ``y_axis`` against time (the pendulum's angle). ``ticks`` index the solves of the run. Returns
     ``(fig, ax)``.
     """
     # Lazy import: matplotlib loads with the first figure
@@ -226,7 +227,7 @@ def plot_sampled_futures(
 
     def coordinates(t, x_path):
         """The drawn pair of a path: time or a state on each axis."""
-        return [t if axis == "t" else x_path[:, axis] for axis in axes]
+        return [t if axis == "t" else x_path[:, axis] for axis in (x_axis, y_axis)]
 
     # Each fan: its futures shaded by weight, the plan they moved to
     for tick in ticks:
@@ -246,8 +247,8 @@ def plot_sampled_futures(
     ax.plot(
         *coordinates(plant.t, plant.x.T), color="tab:grey", lw=2, label="closed loop"
     )
-    ax.set_xlabel("t [s]" if axes[0] == "t" else f"x[{axes[0]}]")
-    ax.set_ylabel("t [s]" if axes[1] == "t" else f"x[{axes[1]}]")
+    ax.set_xlabel("t [s]" if x_axis == "t" else f"x[{x_axis}]")
+    ax.set_ylabel("t [s]" if y_axis == "t" else f"x[{y_axis}]")
     ax.set_title(f"MPPI: {n_shown} of {pv.K} sampled futures, shaded by weight")
     ax.legend(loc="best", fontsize=8)
     if show:

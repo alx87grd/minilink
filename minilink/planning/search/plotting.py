@@ -101,7 +101,7 @@ def animate_search(
     step: int = 5,
     interval: int = 30,
     show: bool = True,
-    save: str | None = None,
+    file_name: str | None = None,
     figsize=(6.0, 5.0),
     tree_color="0.6",
     path_color="tab:blue",
@@ -112,7 +112,7 @@ def animate_search(
     ``step`` edges are revealed per frame, in node insertion order; the solution
     path is drawn at the end. Returns the
     :class:`~matplotlib.animation.FuncAnimation` (keep a reference). Pass
-    ``save="tree.gif"`` to write it, or ``show=True`` to play it.
+    ``file_name="tree.gif"`` to write it, or ``show=True`` to play it.
     """
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
@@ -157,8 +157,8 @@ def animate_search(
     anim = FuncAnimation(
         fig, update, frames=n_frames, interval=interval, blit=False, repeat=False
     )
-    if save is not None:
-        anim.save(save)
+    if file_name is not None:
+        anim.save(file_name)
 
     maybe_show(plt, show, block_when_needed=True)
 
@@ -173,7 +173,7 @@ def animate_convergence(
     ax=None,
     interval: int = 50,
     show: bool = True,
-    save: str | None = None,
+    file_name: str | None = None,
     figsize=(7.0, 6.0),
     tree_color="0.75",
     path_color="tab:blue",
@@ -257,8 +257,8 @@ def animate_convergence(
         blit=False,
         repeat=True,
     )
-    if save is not None:
-        anim.save(save)
+    if file_name is not None:
+        anim.save(file_name)
 
     maybe_show(plt, show, block_when_needed=True)
 

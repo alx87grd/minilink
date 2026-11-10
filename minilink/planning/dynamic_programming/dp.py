@@ -731,7 +731,7 @@ class DynamicProgrammingPlanner(Planner):
         return plotting.plot_cost_to_go(self.result, **kwargs)
 
     def plot_control_law(self, **kwargs):
-        """The policy table ``π`` on the grid itself (``trajectory``, ``axis``, ``x_axis``, ``y_axis``, ...)."""
+        """The policy table ``π`` on the grid itself (``trajectory``, ``u_axis``, ``x_axis``, ``y_axis``, ...)."""
         require_solution(self)
         return plotting.plot_control_law(self.result, **kwargs)
 

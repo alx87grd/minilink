@@ -259,6 +259,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `actions_n` → `n_nodes`, `n_actions`; `LyapunovCertificate.verify(n=)` →
     `verify(n_rollouts=)`, and its plots' `n=` (`certificate.plot`,
     `plot_region_of_attraction`) → `n_samples=`.
+  - *The plots' keywords.* `plot_sampled_futures(axes=("t", 0))` →
+    `plot_sampled_futures(x_axis="t", y_axis=0)`; value iteration's
+    `plot_control_law(axis=)` → `u_axis=`, as every other control-law plot, and its title
+    reads "Control law u[0]"; the animations write a file with `file_name=` (RRT's
+    `animate_search` and `animate_convergence` took `save=`, value iteration's
+    `animate_cost_to_go` and `animate_control_law` took `save_path=`);
+    `StateSpaceGrid.plot_value` → `plot_cost_to_go`.
 
 ## 3. Maturity (TRL)
 

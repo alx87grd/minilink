@@ -100,7 +100,7 @@ planner.plot_cost_to_go(
     y_axis=[1, 2, 3],
     anchor=GOAL,
 )
-planner.plot_control_law(axis=[0, 1], x_axis=[0, 0], y_axis=[1, 1], anchor=GOAL)
+planner.plot_control_law(u_axis=[0, 1], x_axis=[0, 0], y_axis=[1, 1], anchor=GOAL)
 
 controller = planner.controller
 diagram = DiagramSystem()

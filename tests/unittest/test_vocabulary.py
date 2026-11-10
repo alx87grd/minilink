@@ -187,6 +187,9 @@ RETIRED = {
     "nodes_n": ("n_nodes", None),
     "actions_n": ("n_actions", None),
     "effective_samples": ("effective_rollouts", None),
+    "save_path": ("file_name", None),
+    "plot_policy_field": ("plot_control_law_field", None),
+    "plot_value": ("plot_cost_to_go", ("StateSpaceGrid",)),
     "options": (
         "n_steps",
         (
@@ -213,6 +216,12 @@ RETIRED_NAMES = {
     "minilink.planning.trajectory_optimization.multiple_shooting.MultipleShootingOptions": (
         "MultipleShootingTranscription(n_steps=)"
     ),
+    "minilink.planning.dynamic_programming.plotting.plot_policy_field": (
+        "plot_control_law_field"
+    ),
+    "minilink.planning.dynamic_programming.discretizer.StateSpaceGrid.plot_value": (
+        "plot_cost_to_go"
+    ),
 }
 
 
@@ -228,6 +237,38 @@ def owner_of(path):
             owner = getattr(owner, name)
         return owner
     raise ImportError(path)
+
+
+# A retired keyword of a function the facade scan does not reach, at the function's full path:
+# the keyword and what replaced it
+RETIRED_KEYWORDS = {
+    "minilink.planning.trajectory_optimization.mpc.viz.plot_sampled_futures": {
+        "axes": "x_axis, y_axis"
+    },
+    "minilink.planning.dynamic_programming.plotting.plot_control_law": {
+        "axis": "u_axis"
+    },
+    "minilink.planning.dynamic_programming.plotting.animate_cost_to_go": {
+        "save_path": "file_name"
+    },
+    "minilink.planning.dynamic_programming.plotting.animate_control_law": {
+        "save_path": "file_name"
+    },
+    "minilink.planning.search.plotting.animate_search": {"save": "file_name"},
+    "minilink.planning.search.plotting.animate_convergence": {"save": "file_name"},
+}
+
+
+@pytest.mark.parametrize("path", sorted(RETIRED_KEYWORDS))
+def test_no_retired_keyword_at_its_path(path):
+    function = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    taken = set(inspect.signature(function).parameters)
+    hits = {
+        word: replaced
+        for word, replaced in RETIRED_KEYWORDS[path].items()
+        if word in taken
+    }
+    assert not hits, f"{path}: retired keywords {hits}"
 
 
 @pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
