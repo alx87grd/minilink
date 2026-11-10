@@ -242,6 +242,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `"rk4"`, `"euler_fixedsteps"` → `"euler"`, both fixed-step; the variable-step Euler is
     gone, and a non-uniform grid on a fixed-step solver is refused, naming `solver="scipy"`
     or a uniform `dt`. The SciPy presets are unchanged.
+  - *A set's `margin` takes its member first, on every set* (`X.margin(x, t)`,
+    `U.margin(u, x, t)`), now written in CONSTITUTION §2; a box, a ball or a singleton refuses
+    a member of another size (`Pendulum().input_box.margin(x, u)` returned four numbers).
 
 ## 3. Maturity (TRL)
 

@@ -206,6 +206,7 @@ class BoxSet(Set):
 
         lower = params["lower"]
         upper = params["upper"]
+        require_member_size(z, lower, "the box holds vectors")
 
         # lower ≤ z ≤ upper ⇔ [z − lower; upper − z] ≥ 0
         margin = xp.concatenate((z - lower, upper - z))
@@ -314,6 +315,7 @@ class SingletonSet(Set):
         params = self.params if params is None else params
 
         point = params["point"]
+        require_member_size(z, point, "the singleton holds a vector")
 
         residual = z - point
 
@@ -352,6 +354,7 @@ class BallSet(Set):
 
         center = params["center"]
         radius = params["radius"]
+        require_member_size(z, center, "the ball holds vectors")
 
         # r − ‖z − c‖ ≥ 0 inside the ball, as a margin vector of one entry
         signed_distance = radius - xp.linalg.norm(z - center)
@@ -516,6 +519,24 @@ def is_bounded(box) -> bool:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_member_size(z, bound, what):
+    """Refuse a member whose size is not its bound's: a set's ``margin`` takes its member first.
+
+    The sizes are static shapes, so the check costs nothing under ``jit``; a
+    scalar or a list member is left to broadcasting.
+    """
+    try:
+        size, dim = z.shape[-1], bound.shape[-1]
+    except (AttributeError, IndexError):
+        return
+    if size != dim:
+        raise ValueError(
+            f"{what}, of size {dim}; got a vector of size {size}: a set's margin "
+            "takes its member first, margin(u, x, t) on an input set, margin(x, t) on "
+            "a state set"
+        )
 
 
 def require_box_bounds(lower, upper):

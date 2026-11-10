@@ -87,8 +87,9 @@ there, once.
 `(x, u, t; p)`, or the subset it reads; `t` is the time of the diagram the object sits in,
 seconds under a clock and the count without one, and a tick law's `k` is its own count. The
 methods: `f`, `h`, `tf` on a system; `g`, `h` on a cost;
-`margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution. It
-is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
+`margin` on a set; `value` on a field; `sdf` on a shape; `sample(key)` on a distribution; and
+a set's `margin` takes its member first, then the arguments it depends on (`X.margin(x, t)`,
+`U.margin(u, x, t)`). It is stateless, takes and returns native arrays on NumPy or JAX through one equation path, and
 traces under JAX in every argument, `params` included — so `jit`, `grad`, `vmap` and a
 parameter family reach any object the way they reach `f`. An object that does not yet read
 `params` is a gap to close, not a design.

@@ -812,7 +812,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `bounding_box()` is the tightest box containing the set, or `None` — tools that need a
   box (decision bounds, a grid's extent, a sampler's box) ask for it and never probe the
   set's type. Compose with
-  `&` → `IntersectionSet`. `margin(z, t, params=None)`: a set's numbers are its `params`
+  `&` → `IntersectionSet`. `margin(z, t, params=None)`, the member first on every set (an
+  input set's `margin(u, x, t, params=None)`; a box, a ball or a singleton refuses a member of
+  another size, a static shape check that traces): a set's numbers are its `params`
   (`{"lower", "upper"}` on a box, `{"center", "radius"}` on a ball, `{"point"}` on a
   singleton, the members' by class name `{"BoxSet", "BallSet", …}` on an intersection, `{}` for a set with
   none), read when `params` is `None`, so they enter the problem's tree by role (`X.upper`);
