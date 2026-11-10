@@ -57,6 +57,14 @@ class StateFeedback(System):
 
         return u_cmd
 
+    @property
+    def K(self) -> np.ndarray:
+        """The gain ``K`` ``(m, n)``, read-only: ``params["K"]`` is where it is tuned."""
+        return self.params["K"]
+
+    def __str__(self):
+        return f"{super().__str__()}\n{gain_text(self.K)}"
+
 
 class OutputReference(System):
     """Full-state feedback ``u = u_bar - K (x - x_bar) + N r`` on an output reference.
@@ -103,6 +111,14 @@ class OutputReference(System):
         u_cmd = u_bar - K @ (x_meas - x_bar) + N @ r
 
         return u_cmd
+
+    @property
+    def K(self) -> np.ndarray:
+        """The gain ``K`` ``(m, n)``, read-only: ``params["K"]`` is where it is tuned."""
+        return self.params["K"]
+
+    def __str__(self):
+        return f"{super().__str__()}\n{gain_text(self.K)}"
 
 
 class TimeVaryingFeedback(System):
@@ -258,6 +274,14 @@ def plot_gain_schedule(t, K, *, title="Gain schedule", ax=None, show=True):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def gain_text(K) -> str:
+    """The gain as a printed line, ``  K = [[…]]``, as an observer prints its ``L``."""
+    prefix = "  K = "
+    text = np.array2string(K, precision=4, suppress_small=True, prefix=prefix)
+
+    return f"{prefix}{text}"
 
 
 def reference_gain(N, m):

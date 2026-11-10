@@ -395,7 +395,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `BoxInputSet` and `Uniform`, `dim` on every set and field that knows its size,
     `BallSet.sample` and `SingletonSet.sample` (so a ball is a start a problem draws from);
     `CostFunction.h` zero by default (a running cost writes `g` only); `Gain(2.0)` one channel
-    (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel.
+    (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel;
+    `poles(sys, x_bar)` on `minilink.analysis` and the root (the linear model's eigenvalues, in
+    `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`.
 
 ## 3. Maturity (TRL)
 

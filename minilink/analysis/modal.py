@@ -2,12 +2,51 @@
 
 import numpy as np
 
+from minilink.analysis import linear
 from minilink.analysis.derivatives import jacobian, operating_point
+from minilink.analysis.linearization import linearize_matrices
 from minilink.core.trajectory import Trajectory
 
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+def poles(
+    sys,
+    x_bar=None,
+    u_bar=None,
+    t=0.0,
+    params=None,
+    *,
+    method="auto",
+    eps=1e-6,
+):
+    """
+    The poles of ``sys`` at an operating point: the eigenvalues of its linear model's ``A``.
+
+    A linearization at its own point is read as stored; any other system is
+    linearized at ``(x_bar, u_bar)``, the nominal state and inputs by default,
+    as :func:`~minilink.analysis.frequency.bode` and
+    :func:`~minilink.analysis.frequency.pzmap` read it (a point the plant does
+    not rest at is warned). On a step or sampled system, the poles in ``z`` of
+    its difference equation, ``A_d = ∂step/∂x``: stable inside the unit circle.
+    Every mode of the state, not one channel's (:func:`pzmap` reduces a
+    channel to its minimal realization).
+
+    Returns
+    -------
+    poles : ndarray of shape (n,)
+        The roots of ``det(λ I − A) = 0``, complex.
+    """
+    A, _, _, _ = linearize_matrices(
+        sys, x_bar, u_bar, t, params, method=method, eps=eps
+    )
+
+    # det(λ I − A) = 0
+    p = linear.poles(A)
+
+    return p
 
 
 def modal_analysis(

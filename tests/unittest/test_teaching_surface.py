@@ -133,6 +133,7 @@ TEACHING_SURFACE: dict[str, tuple[str, ...]] = {
         "step_response",
         "plot_step_response",
         "modal_analysis",
+        "poles",
         "controllability",
         "observability",
         "find_equilibrium",

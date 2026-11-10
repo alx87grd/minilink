@@ -46,6 +46,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "noise_sensitivity",
     ),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),
+    "poles": ("minilink.analysis.modal", "poles"),
     "observability": ("minilink.analysis.structural", "observability"),
     "observability_matrix": (
         "minilink.analysis.structural",

@@ -111,6 +111,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "step_response": ("minilink.analysis.time_response", "step_response"),
     "plot_step_response": ("minilink.analysis.time_response", "plot_step_response"),
     "modal_analysis": ("minilink.analysis.modal", "modal_analysis"),
+    "poles": ("minilink.analysis.modal", "poles"),
     "controllability": ("minilink.analysis.structural", "controllability"),
     "observability": ("minilink.analysis.structural", "observability"),
     "find_equilibrium": ("minilink.analysis.equilibria", "find_equilibrium"),

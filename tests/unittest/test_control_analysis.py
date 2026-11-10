@@ -590,6 +590,21 @@ class TestStateFeedbackController(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"x_bar must have shape \(2,\)"):
             TimeVaryingFeedback([0.0, 1.0], [K, K], x_bar=[0.0])
 
+    def test_a_state_feedback_prints_and_reads_its_gain(self):
+        K = np.array([[1.0, 2.0]])
+        ctl = StateFeedback(K)
+        np.testing.assert_array_equal(ctl.K, K)
+        self.assertIn("K = [[1. 2.]]", str(ctl))
+        with self.assertRaises(AttributeError):
+            ctl.K = np.zeros((1, 2))
+        designed = lqr(Pendulum(), np.eye(2), np.eye(1), x_bar=np.array([np.pi, 0.0]))
+        np.testing.assert_array_equal(designed.K, designed.params["K"])
+        self.assertIn("K = [[", str(designed))
+        from minilink.control.state import OutputReference
+
+        reference = OutputReference(K, N=[[1.0]])
+        self.assertIn("K = [[1. 2.]]", str(reference))
+
     def test_state_feedback_law(self):
         K = np.array([[1.0, 2.0]])
         ctl = StateFeedback(K, x_bar=[0.0, 0.0], u_bar=[0.5])
@@ -762,6 +777,57 @@ class TestModalAnalysis(unittest.TestCase):
         poles, modes = modal_analysis(LTISystem(A, np.zeros((2, 1))))
         np.testing.assert_allclose(
             np.sort(poles), np.sort([1j * w, -1j * w]), atol=1e-10
+        )
+
+
+class TestPoles(unittest.TestCase):
+    """``poles(sys, x_bar)``: the eigenvalues of the linear model's ``A`` (AS-44)."""
+
+    def test_the_pendulums_poles_hang_and_stand(self):
+        from minilink import poles
+
+        hanging = poles(Pendulum())
+        upright = poles(Pendulum(), np.array([np.pi, 0.0]))
+        # Undamped: a pair ±jω hanging, a pair ±ω upright, the same ω
+        np.testing.assert_allclose(hanging.real, 0.0, atol=1e-9)
+        np.testing.assert_allclose(upright.imag, 0.0, atol=1e-9)
+        omega = np.max(hanging.imag)
+        np.testing.assert_allclose(np.sort(upright.real), [-omega, omega])
+        A = linearize(Pendulum(), np.array([np.pi, 0.0])).A()
+        np.testing.assert_allclose(
+            np.sort(upright.real), np.sort(np.linalg.eigvals(A).real)
+        )
+
+    def test_a_linear_model_and_a_linearization_read_their_own_A(self):
+        from minilink.analysis import poles
+
+        A = np.array([[0.0, 1.0], [-2.0, -3.0]])
+        model = LTISystem(A, np.array([[0.0], [1.0]]))
+        np.testing.assert_allclose(np.sort(poles(model).real), [-2.0, -1.0])
+        lin = linearize(Pendulum(), np.array([np.pi, 0.0]))
+        np.testing.assert_array_equal(poles(lin), np.linalg.eigvals(lin.A()))
+
+    def test_a_step_system_has_its_poles_in_z(self):
+        from minilink.analysis import discretize, poles
+
+        dt = 0.1
+        stepped = discretize(Pendulum(), dt)
+        z = poles(stepped)
+        s = poles(Pendulum())
+        # A sampled pole z ≈ e^{s dt}, inside the unit circle for a damped plant
+        np.testing.assert_allclose(
+            np.sort_complex(z), np.sort_complex(np.exp(s * dt)), atol=1e-3
+        )
+
+    def test_the_poles_are_the_same_by_finite_differences_and_by_jax(self):
+        pytest.importorskip("jax")
+        from minilink.analysis import poles
+
+        plant = _JAXFriendlyOscillator()
+        np.testing.assert_allclose(
+            np.sort_complex(poles(plant, method="fd")),
+            np.sort_complex(poles(plant, method="jax")),
+            atol=1e-6,
         )
 
 
