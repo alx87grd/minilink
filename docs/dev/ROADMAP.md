@@ -284,6 +284,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `learning_rate` (the `params["method"]` key with them), as the `Optimizer`'s;
     `ReinforcementLearningPlanner.train_time` → `train_time_s`, as its record;
     `TrajectoryOptimizationRecord.solver_success` → `optimizer_success`.
+  - *The optimizer's native numbers are keywords.* `Optimizer(program, method="gd",
+    options={"maxiter": 5, "gtol": 1e-6})` → `Optimizer(program, method="gd",
+    max_iterations=5, tol=1e-6)` (Adam's `max_grad_norm` too); `options=` is refused on `gd`
+    and `adam` and stays the external solver's dict (SciPy, Ipopt); trajectory optimization
+    takes `max_iterations=` and `tol=` on a native method the same way.
+    `OptimizationResult.n_iterations` reads `stats["nit"]`; `stats["algorithm"]` →
+    `stats["method"]`.
 
 ## 3. Maturity (TRL)
 

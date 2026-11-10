@@ -171,7 +171,7 @@ class CompiledTrajectoryPlanner:
         z = xp.concatenate([result.z, t0])
         status = {
             "success": result.success,
-            "n_iterations": result.stats.get("nit"),
+            "n_iterations": result.n_iterations,
             "cost": result.cost,
         }
 

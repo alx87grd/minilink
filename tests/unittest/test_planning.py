@@ -2206,7 +2206,7 @@ class TestTextbookOptions(unittest.TestCase):
             program,
             method="gd",
             learning_rate=0.1,
-            options={"maxiter": 2},
+            max_iterations=2,
         ).solve(callback=cb)
         self.assertIsNotNone(cb.plotter.fig)
         self.assertGreater(len(cb.plotter.lines), 0)
@@ -2566,3 +2566,31 @@ def test_an_open_loop_plan_records_its_evidence_over_its_own_length():
         problem, extender=KinodynamicExtender(controls=COMPASS), seed=0, max_nodes=300
     )
     assert planner.solve(evaluate=True).evaluation is not None
+
+
+@pytest.mark.jax
+def test_a_native_planner_takes_its_cap_as_a_keyword_and_refuses_options():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    problem = PlanningProblem(
+        plant,
+        horizon=1.0,
+        x0=np.array([0.3, 0.0]),
+        cost=QuadraticCost.from_system(plant, R=0.1 * np.eye(1)),
+        U=plant.input_box,
+    )
+    planner = TrajectoryOptimizationPlanner(
+        problem,
+        transcription=ShootingTranscription(n_steps=5),
+        backend="jax",
+        method="gd",
+        max_iterations=3,
+        learning_rate=0.01,
+    )
+    assert planner.solve().record.n_iterations == 3
+    assert planner.params["method"] == {"learning_rate": 0.01}  # the cap is structure
+    with pytest.raises(ValueError, match="max_iterations="):
+        TrajectoryOptimizationPlanner(
+            problem, n_steps=5, method="adam", options={"maxiter": 3}
+        )

@@ -1220,8 +1220,11 @@ gradient oracle beside it, the box projection in the step). `Optimizer(program, 
 n_iterations=K)` takes exactly `K` steps: one `lax.scan` on a JAX program, so
 `solve(params=, z0=)` traces under `jit`, `vmap` and `grad` (the result then holds JAX arrays,
 `success=True`, `cost` the final `J`), and a loop of the same steps on NumPy; no callback.
-`n_iterations=None` runs to the method's tolerance on the host (`maxiter` its cap, Adam's update
-jitted when JAX is at hand, plain NumPy without it). `optimizer.as_step_system(params=None)` is
+`n_iterations=None` runs to the method's tolerance `tol` on the host (`max_iterations` its cap,
+Adam's update jitted when JAX is at hand, plain NumPy without it). A native method's numbers are
+keywords (`Optimizer(program, method="gd", max_iterations=50, tol=1e-6, learning_rate=0.1)`);
+`options=`, an external solver's dict, is refused on it. The result counts its iterations,
+`result.n_iterations` (`stats["nit"]`), and `stats["method"]` names the native method. `optimizer.as_step_system(params=None)` is
 the solve as a `StepSystem`: the law's state flattened (`z` first), `compute_rollout(K)` the
 iterates. The failure cost of
 an evaluation follows its cost's numbers: the bound of the build at the compile's numbers, one

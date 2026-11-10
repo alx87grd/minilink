@@ -25,6 +25,8 @@ from minilink.optimization.optimizer import (
     OptimizationProgressCallback,
     Optimizer,
     method_params_of,
+    native_numbers,
+    require_no_options,
 )
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import (
@@ -104,10 +106,12 @@ class TrajectoryOptimizationPlanner(Planner):
             limit), and the default initial guess.
         options : dict, optional
             An external solver's own knobs (SciPy's ``maxiter``, ``ftol``;
-            Ipopt's), passed through untouched.
+            Ipopt's), passed through untouched; refused for a native method.
         **method_numbers
             A native method's own numbers (``learning_rate``, ``b1``, ``b2``,
-            ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``.
+            ``eps`` for ``"adam"``): held in :attr:`params` ``["method"]``;
+            and its cap and tolerance, ``max_iterations`` and ``tol``
+            (structure, as ``n_iterations``).
         """
         super().__init__(problem)
         require_cost(self.problem)
@@ -126,9 +130,10 @@ class TrajectoryOptimizationPlanner(Planner):
         # The numbers: a native law's, complete over its preset, the one home of
         # params["method"]; options= the external solver's knobs
         self.options = dict(options or {})
-        self.method_numbers = method_params_of(
-            method, method_numbers_of(method, self.options, method_numbers)
+        numbers, self.method_limits = method_numbers_of(
+            method, self.options, method_numbers
         )
+        self.method_numbers = method_params_of(method, numbers)
 
         # Diagnostics: the machinery of the latest offline solve, never read by a tool
         # (its answer, timings and history are in solution.record)
@@ -315,7 +320,7 @@ class TrajectoryOptimizationPlanner(Planner):
             cost=optimization_result.cost,
             optimizer_success=bool(optimization_result.success),
             message=str(optimization_result.message),
-            n_iterations=dict(optimization_result.stats).get("nit"),
+            n_iterations=optimization_result.n_iterations,
             solve_time_s=optimization_result.solve_time_s,
             feasibility_tol=float(self.feasibility_tol),
             max_equality_violation=float(max_eq),
@@ -371,6 +376,7 @@ class TrajectoryOptimizationPlanner(Planner):
             use_hessian=self.use_hessian,
             options=dict(self.options),
             n_iterations=self.n_iterations,
+            **self.method_limits,
             **self.method_numbers,
         )
 
@@ -733,15 +739,10 @@ def resolve_transcription(
 
 
 def method_numbers_of(method, options, numbers):
-    """Refuse a native law's number in ``options`` or a keyword the method does not take; return the numbers."""
-    own = method_params_of(method) if method in NATIVE_METHODS else {}
-    hidden = sorted(key for key in options if key in own)
-    if hidden:
-        raise ValueError(
-            f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
-            f"(TrajectoryOptimizationPlanner(..., {hidden[0]}=...)); options= holds an "
-            "external solver's knobs"
-        )
+    """``(numbers, limits)``: a native law's numbers and its cap and tolerance (``max_iterations``, ``tol``); refuse ``options`` on a native method or a keyword the method does not take."""
+    own = native_numbers() if method in NATIVE_METHODS else ()
+    if own:
+        require_no_options(method, options)
     unknown = sorted(key for key in numbers if key not in own)
     if unknown:
         raise TypeError(
@@ -753,8 +754,14 @@ def method_numbers_of(method, options, numbers):
                 "solver's knobs go in options= (options={'maxiter': 50})"
             )
         )
+    limits = {key: numbers[key] for key in LIMITS if key in numbers}
+    law = {key: value for key, value in numbers.items() if key not in LIMITS}
 
-    return dict(numbers)
+    return law, limits
+
+
+# A native method's stopping numbers: structure, never in params["method"]
+LIMITS = ("max_iterations", "tol")
 
 
 def type_name(value: object | None) -> str | None:

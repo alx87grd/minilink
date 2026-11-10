@@ -146,7 +146,7 @@ concrete formatting, ordered by the cost of being wrong:
   | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`, `save_path`, a path in `save=`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
   | Playback rate of an animation (simulated seconds per wall second) | `speed` | `time_factor_video` |
   | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |
-  | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native law's numbers |
+  | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native method's numbers (`max_iterations=`, `tol=`, `learning_rate=` are keywords) |
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
   | Print text / draw a figure | `verbose` (default `False`) / `show` | |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |

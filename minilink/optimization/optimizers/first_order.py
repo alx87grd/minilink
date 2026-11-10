@@ -25,8 +25,8 @@ class FirstOrderOptimizer(OptimizerBackend):
 
     Each iteration reads ``J(z)`` and ``∇J(z)`` and steps, then projects on the
     box: ``z ← Π(z − η ∇J)`` for ``"gd"``, the bias-corrected moment step of
-    :class:`Adam` for ``"adam"``. :meth:`solve` stops after ``maxiter`` steps,
-    or when ``‖∇J‖ ≤ gtol``; :meth:`run` takes exactly ``K`` steps, one
+    :class:`Adam` for ``"adam"``. :meth:`solve` stops after ``max_iterations``
+    steps, or when ``‖∇J‖ ≤ tol``; :meth:`run` takes exactly ``K`` steps, one
     ``lax.scan`` on JAX, pure and differentiable. Both run the method's
     pure law (:meth:`law`): ``init(z0) -> state`` and
     ``update(grad, state) -> state``, the gradient oracle beside it.
@@ -36,15 +36,15 @@ class FirstOrderOptimizer(OptimizerBackend):
     algorithm : {"gd", "adam"}
         The step rule.
     options : dict, optional
-        ``learning_rate`` (η, default ``1e-2``), ``maxiter`` (default 1000),
-        ``gtol`` (default ``0``: run every step), and for Adam ``b1``, ``b2``,
+        ``learning_rate`` (η, default ``1e-2``), ``max_iterations`` (default
+        1000), ``tol`` (default ``0``: run every step), and for Adam ``b1``, ``b2``,
         ``eps`` and ``max_grad_norm`` (a global gradient clip, ``None`` for none).
     """
 
     DEFAULTS = {
         "learning_rate": 1e-2,
-        "maxiter": 1000,
-        "gtol": 0.0,
+        "max_iterations": 1000,
+        "tol": 0.0,
         "b1": 0.9,
         "b2": 0.999,
         "eps": 1e-8,
@@ -82,13 +82,13 @@ class FirstOrderOptimizer(OptimizerBackend):
         callback: BackendIterateCallback | None = None,
         method=None,
     ) -> OptimizationResult:
-        """Run the first-order loop from ``z0`` to its tolerance (``maxiter`` its cap) on the law's numbers ``method`` (``None``: its own) and return a backend-neutral result."""
+        """Run the first-order loop from ``z0`` to its tolerance (``max_iterations`` its cap) on the law's numbers ``method`` (``None``: its own) and return a backend-neutral result."""
         require_gradient(program_evaluator)
         require_no_constraints(program_evaluator)
         opts = self.options
 
-        maxiter = int(opts["maxiter"])
-        gtol = float(opts["gtol"])
+        max_iterations = int(opts["max_iterations"])
+        tol = float(opts["tol"])
         lower, upper = box_of(program_evaluator)
         method = self.numbers(method)
 
@@ -104,11 +104,11 @@ class FirstOrderOptimizer(OptimizerBackend):
 
         z = state["z"]
         converged = False
-        for k in range(maxiter):
-            # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ gtol (‖∇J‖ inside the box)
+        for k in range(max_iterations):
+            # Stationary on the box: ‖z − Π(z − ∇J)‖ ≤ tol (‖∇J‖ inside the box)
             grad = program_evaluator.grad_J(z)
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
-            if grad_norm <= gtol:
+            if grad_norm <= tol:
                 converged = True
                 break
 
@@ -126,7 +126,7 @@ class FirstOrderOptimizer(OptimizerBackend):
             if callback is not None:
                 callback(z.copy())
         else:
-            k = maxiter
+            k = max_iterations
             grad = program_evaluator.grad_J(z)
             grad_norm = float(np.linalg.norm(z - np.clip(z - grad, lower, upper)))
 
@@ -134,7 +134,7 @@ class FirstOrderOptimizer(OptimizerBackend):
         message = (
             f"stationary (projected gradient {grad_norm:.3g})"
             if converged
-            else f"{maxiter} steps taken"
+            else f"{max_iterations} steps taken"
         )
 
         return OptimizationResult(
@@ -142,7 +142,7 @@ class FirstOrderOptimizer(OptimizerBackend):
             success=bool(converged and np.isfinite(J)),
             cost=float(J),
             message=message,
-            stats={"nit": k, "grad_norm": grad_norm, "algorithm": self.algorithm},
+            stats={"nit": k, "grad_norm": grad_norm, "method": self.algorithm},
         )
 
     def run(self, program_evaluator, z0, params, iterations, method=None):

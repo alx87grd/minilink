@@ -333,6 +333,20 @@ def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
     assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
 
 
+# The optimizer's native numbers are keywords (api-stabilization AS-27): options= is the
+# external solver's dict, refused on gd and adam; the native method's statistics say method
+@pytest.mark.parametrize("retired", ["maxiter", "gtol"])
+def test_a_native_method_refuses_options(retired):
+    from minilink.optimization import MathematicalProgram, Optimizer
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, grad_J=lambda z: 2 * z)
+    with pytest.raises(ValueError, match="max_iterations="):
+        Optimizer(program, z0=[1.0], method="gd", options={retired: 5})
+    result = Optimizer(program, z0=[1.0], method="gd", max_iterations=3).solve()
+    assert result.n_iterations == result.stats["nit"] == 3
+    assert result.stats["method"] == "gd" and "algorithm" not in result.stats
+
+
 # A retired value of a keyword: the value that replaced it. The simulator's solver names are the
 # step model's words on every tool (the ruling of 2026-11-10)
 RETIRED_SOLVERS = {"rk4_fixedsteps": "rk4", "euler_fixedsteps": "euler"}

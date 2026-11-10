@@ -128,17 +128,20 @@ class Optimizer:
         when no ``hess_J`` is supplied.
     options : dict, optional
         An external solver's own knobs (SciPy's ``maxiter``, ``ftol``; Ipopt's),
-        merged into the preset's ``options`` dict (user keys win). A native
-        method's numbers (``learning_rate``, ...) are keywords instead.
+        merged into the preset's ``options`` dict (user keys win). Refused for
+        a native method, whose numbers are keywords.
     n_iterations : int, optional
         For the native methods (``"gd"``, ``"adam"``): exactly this many steps,
         no tolerance. On a JAX program the solve is one ``lax.scan``,
         pure: ``solve(params=, z0=)`` traces under ``jit``, ``vmap`` and
-        ``grad``. ``None`` (default) runs to the method's tolerance, its
-        ``maxiter`` the cap. A size, structural: never a parameter.
+        ``grad``. ``None`` (default) runs to the method's tolerance ``tol``,
+        ``max_iterations`` the cap. A size, structural: never a parameter.
     **method_numbers
-        Extra keyword arguments override the preset's top-level kwargs and are
-        forwarded to the backend constructor.
+        A native method's numbers, as keywords: ``max_iterations`` (the cap,
+        default 1000), ``tol`` (the projected gradient's tolerance, default
+        ``0``), ``learning_rate``, and Adam's ``b1``, ``b2``, ``eps``,
+        ``max_grad_norm``. For an external solver, keyword arguments that
+        override the preset's top-level kwargs of the backend constructor.
     """
 
     def __init__(
@@ -174,7 +177,7 @@ class Optimizer:
             require_gradient(self.program_evaluator, method)
 
         # The solver adapter: the method's preset, the caller's keywords and options
-        # over it; a native law's own numbers may come as keywords (learning_rate=)
+        # over it; a native method's numbers come as keywords (max_iterations=, learning_rate=)
         options, method_numbers = method_options_of(method, options, method_numbers)
         self.adapter = make_optimizer_backend(method, options=options, **method_numbers)
 
@@ -309,7 +312,7 @@ class Optimizer:
             success=True,
             cost=host_or_traced(J, float),
             message=f"{K} steps taken",
-            stats={"nit": K, "algorithm": self.method},
+            stats={"nit": K, "method": self.method},
         )
 
     ###########################################################################
@@ -605,22 +608,42 @@ def require_named_method(method):
 
 
 def method_options_of(method, options, method_numbers):
-    """``(options, rest)``: the keywords that are the native law's own numbers moved into its options, the others kept; refuse such a number given in ``options``."""
-    numbers = method_params_of(method) if method in NATIVE_METHODS else {}
-    hidden = sorted(key for key in (options or {}) if key in numbers)
-    if hidden:
+    """``(options, rest)``: a native method's keywords as its backend's options, nothing left; an external solver's ``options`` and keywords as given. Refuse ``options=`` for a native method, and a keyword it does not take."""
+    if method not in NATIVE_METHODS:
+        return options, method_numbers
+
+    require_no_options(method, options)
+    require_native_numbers(method, method_numbers)
+
+    return dict(method_numbers), {}
+
+
+def native_numbers():
+    """The keywords a native method takes: its cap, its tolerance and its law's numbers."""
+    # Lazy import: the first-order backend loads on first use
+    from minilink.optimization.optimizers.first_order import FirstOrderOptimizer
+
+    return tuple(FirstOrderOptimizer.DEFAULTS)
+
+
+def require_no_options(method, options):
+    """Refuse an external solver's options on a native method: its numbers are keywords."""
+    if options:
         raise ValueError(
-            f"{hidden} are the {method!r} method's own numbers: pass them as keywords "
-            f"(Optimizer(..., {hidden[0]}=...)); options= holds an external solver's knobs"
+            f"options= holds an external solver's knobs; the {method!r} method takes "
+            f"its numbers as keywords (max_iterations=, tol=, learning_rate=), not "
+            f"{sorted(options)} in options"
         )
-    own = {key: value for key, value in method_numbers.items() if key in numbers}
-    rest = {key: value for key, value in method_numbers.items() if key not in numbers}
-    if not own:
-        return options, rest
 
-    merged = {**(options or {}), **own}
 
-    return merged, rest
+def require_native_numbers(method, method_numbers):
+    """Refuse a keyword that is not a native method's number."""
+    unknown = sorted(set(method_numbers) - set(native_numbers()))
+    if unknown:
+        raise TypeError(
+            f"method {method!r} got unexpected keyword(s) {unknown}; it takes "
+            f"{list(native_numbers())}"
+        )
 
 
 def backend_kwargs_of(preset, method_numbers, options):

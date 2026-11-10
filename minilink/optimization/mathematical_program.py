@@ -172,6 +172,11 @@ class OptimizationResult:
         if self.solve_time_s is not None:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
 
+    @property
+    def n_iterations(self) -> int | None:
+        """The iterations the solve took, ``stats["nit"]`` (``None`` when the solver reports none)."""
+        return self.stats.get("nit")
+
     def __str__(self):
         return optimization_result_text(self)
 

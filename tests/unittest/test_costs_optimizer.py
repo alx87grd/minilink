@@ -594,10 +594,9 @@ def test_each_method_reaches_the_minimum(method):
     from minilink.optimization.optimizer import Optimizer
 
     native = method in ("gd", "adam")
-    options = {"maxiter": 2000} if native else {}
-    numbers = {"learning_rate": 0.1} if native else {}
+    numbers = {"max_iterations": 2000, "learning_rate": 0.1} if native else {}
     result = Optimizer(
-        quadratic_program(), z0=np.zeros(2), method=method, options=options, **numbers
+        quadratic_program(), z0=np.zeros(2), method=method, **numbers
     ).solve()
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-4)
 
@@ -608,7 +607,7 @@ def test_gradient_descent_is_projected_on_the_box():
     program = quadratic_program(lower=[-np.inf, 0.0])
     result = Optimizer(program, z0=np.ones(2), method="gd", learning_rate=0.1).solve()
     np.testing.assert_allclose(result.z, [1.0, 0.0], atol=1e-6)
-    assert result.stats["algorithm"] == "gd"
+    assert result.stats["method"] == "gd"
 
     # The optimum on the face z₂ = 0: stationary on the box, though ∇J ≠ 0 there
     assert result.success and result.stats["nit"] < 1000
@@ -621,10 +620,10 @@ def test_gradient_descent_at_its_floating_point_fixed_point_is_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 3000},
+        max_iterations=3000,
         learning_rate=0.1,
     ).solve()
-    assert result.success and result.stats["nit"] < 3000
+    assert result.success and result.n_iterations == result.stats["nit"] < 3000
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-12)
 
 
@@ -635,7 +634,7 @@ def test_gradient_descent_out_of_steps_is_not_a_success():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 5},
+        max_iterations=5,
         learning_rate=0.1,
     ).solve()
     assert not result.success
@@ -656,7 +655,7 @@ def test_gradient_descent_steps_like_the_hand_loop():
         quadratic_program(),
         z0=np.zeros(2),
         method="gd",
-        options={"maxiter": 5},
+        max_iterations=5,
         learning_rate=0.1,
     ).solve()
     np.testing.assert_allclose(result.z, z, rtol=1e-12)
@@ -842,17 +841,16 @@ def test_a_fixed_count_solve_on_numpy_takes_the_same_steps(method):
 
     program = parametric_quadratic("numpy")
     program = type(program)(**{**program.__dict__, "grad_J": grad})
-    options = {"maxiter": 25}
     fixed = Optimizer(
         program,
         z0=[0.0, 0.0],
         method=method,
-        options=options,
+        max_iterations=25,
         learning_rate=0.05,
         n_iterations=25,
     )
     loop = Optimizer(
-        program, z0=[0.0, 0.0], method=method, options=options, learning_rate=0.05
+        program, z0=[0.0, 0.0], method=method, max_iterations=25, learning_rate=0.05
     )
     np.testing.assert_allclose(fixed.solve().z, loop.solve().z, rtol=1e-12)
 
@@ -884,7 +882,7 @@ def test_adams_fixed_count_gradient_is_finite_at_a_zero_gradient_entry():
             z0=[0.0, 0.0],  # a list: the start is checked as on the host path
             method="adam",
             n_iterations=20,
-            options={"max_grad_norm": max_grad_norm},
+            max_grad_norm=max_grad_norm,
         )
         jacobian = jax.jacobian(
             lambda c: opt.solve(params=edited(opt.params, {"c": c})).z
