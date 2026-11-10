@@ -50,9 +50,10 @@ def test_require_jax_numpy_returns_module_when_jax_installed():
     assert jnp.zeros(2).shape == (2,)
 
 
-def test_simulator_re_exports_compile_backend_auto():
+def test_the_auto_backend_has_one_home():
     sim = importlib.import_module("minilink.simulation.simulator")
-    assert sim.COMPILE_BACKEND_AUTO == BACKEND_AUTO
+    assert not hasattr(sim, "COMPILE_BACKEND_AUTO")  # retired: core.backends holds it
+    assert BACKEND_AUTO == "auto"
 
 
 import numpy as np

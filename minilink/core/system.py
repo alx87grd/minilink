@@ -358,7 +358,7 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         # unconnected port contributes
         i = 0
         for port in self.inputs.values():
-            u[i : i + port.dim] = port.get_default_value()
+            u[i : i + port.dim] = port.nominal_value
             i += port.dim
 
         return u

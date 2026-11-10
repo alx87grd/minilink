@@ -290,7 +290,7 @@ class WiredDiagramMixin:
 
         return self
 
-    def autowire(self, *, strict: bool = False, validate: bool = True) -> DiagramSystem:
+    def autowire(self, *, strict: bool = False) -> DiagramSystem:
         """
         Connect unconnected inputs by name: each takes the one output with its name and size.
 
@@ -300,7 +300,7 @@ class WiredDiagramMixin:
         # A real cycle: the operators import DiagramSystem, built on this mixin
         from minilink.core.operators import autowire
 
-        return autowire(self, strict=strict, validate=validate)
+        return autowire(self, strict=strict)
 
     # Naming a block and its signals
 
@@ -376,7 +376,7 @@ class WiredDiagramMixin:
         pieces = []
         for port_id, port in subsystem.inputs.items():
             if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_default_value()
+                port_u = port.nominal_value
             else:
                 port_u = self.get_subsystem_input_port(
                     x, u, t, sys_id, port_id, params=params
@@ -597,7 +597,7 @@ class WiredDiagramMixin:
         source = self.connections[sys_id][port_id]
 
         if source is None:
-            return self.subsystems[sys_id].inputs[port_id].get_default_value()
+            return self.subsystems[sys_id].inputs[port_id].nominal_value
 
         source_sys_id, source_port_id = source
 

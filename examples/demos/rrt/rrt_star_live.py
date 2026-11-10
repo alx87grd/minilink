@@ -106,22 +106,23 @@ if LIVE_PLOT:
     )
 
 t0 = time.perf_counter()
-traj = planner.solve(
+solution = planner.solve(
     record_history=REPLAY_HISTORY,
     history_stride=HISTORY_STRIDE,
     callback=live_plot,
-).trajectory
+)
 elapsed = time.perf_counter() - t0
+traj, record = solution.trajectory, solution.record
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
 stop_reason = (
     "converged"
     if planner.converged
-    else ("max_nodes" if planner.iterations >= MAX_NODES else "first_goal")
+    else ("max_nodes" if record.n_iterations >= MAX_NODES else "first_goal")
 )
 
-print(f"  reached_goal={planner.reached_goal}  converged={planner.converged}")
-print(f"  extensions={planner.iterations}  tree nodes={len(planner.tree.nodes)}")
+print(f"  reached_goal={record.reached_goal}  converged={planner.converged}")
+print(f"  extensions={record.n_iterations}  tree nodes={len(planner.tree.nodes)}")
 print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3f} m")
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 

@@ -61,8 +61,6 @@ class RRTPlanner(Planner):
 
     Attributes
     ----------
-    reached_goal : bool
-        Set by :meth:`solve`; ``True`` only when the goal region is reached.
     solution_node : Node or None
         Tree node whose parent chain defines the returned trajectory.
     """
@@ -103,9 +101,7 @@ class RRTPlanner(Planner):
 
         # The search, refreshed by every solve
         self.tree: Tree | None = None
-        self.reached_goal: bool = False
         self.solution_node: Node | None = None
-        self.iterations: int = 0
 
         # The box free states are drawn from by rejection: the box of X, or the
         # state bounds when X has no finite one
@@ -155,11 +151,12 @@ class RRTPlanner(Planner):
             Node(x=x0, parent=None, edge=None, cost=0.0),
             nearest_method=self.nearest_method,
         )
-        self.reached_goal = False
         self.solution_node = None
-        self.iterations = 0
         report = self.build_search_report(callback)
 
+        # The extensions so far, and whether one reached the goal: the record's counts
+        n_iterations = 0
+        reached_goal = False
         for _ in range(self.max_nodes):
             # Sample a state, and extend the nearest node toward it
             x_rand = self.sample_state(rng)
@@ -171,20 +168,21 @@ class RRTPlanner(Planner):
             # The new node, with its cost-to-come
             cost = near.cost + edge.cost
             node = self.tree.add(Node(x=edge.x_end, parent=near, edge=edge, cost=cost))
-            self.iterations += 1
+            n_iterations += 1
 
             # Stop at the first node inside the goal region
             if goal_region.contains(node.x):
-                self.reached_goal = True
+                reached_goal = True
                 self.solution_node = node
-                report("explore")
+                report("explore", n_iterations, reached_goal)
                 return self.finish_trajectory(
                     self.tree.extract_trajectory(node, self.problem.t0),
                     evaluate,
                     n_trials,
+                    self.search_record(reached_goal, n_iterations),
                 )
 
-            report("explore")
+            report("explore", n_iterations, reached_goal)
 
         # The budget is spent: the node closest to the goal, when best effort is allowed
         goal_point = self.goal_point(goal_region)
@@ -194,7 +192,10 @@ class RRTPlanner(Planner):
             raise RuntimeError("RRT failed to reach goal within max_nodes")
 
         return self.finish_trajectory(
-            self.tree.extract_trajectory(closest, self.problem.t0), evaluate, n_trials
+            self.tree.extract_trajectory(closest, self.problem.t0),
+            evaluate,
+            n_trials,
+            self.search_record(reached_goal, n_iterations),
         )
 
     def build_kwargs(self) -> dict:
@@ -210,13 +211,13 @@ class RRTPlanner(Planner):
 
         return kwargs
 
-    def search_record(self) -> TreeSearchRecord:
-        """The search's account: goal reached or not, the budget it took, the path's cost-to-come."""
+    def search_record(self, reached_goal, n_iterations) -> TreeSearchRecord:
+        """The search's account: goal reached or not, the budget it took (``n_iterations`` extensions), the path's cost-to-come."""
         node = self.solution_node
 
         return TreeSearchRecord(
-            reached_goal=bool(self.reached_goal),
-            n_iterations=int(self.iterations),
+            reached_goal=bool(reached_goal),
+            n_iterations=int(n_iterations),
             n_nodes=len(self.tree.nodes),
             cost=float("nan") if node is None else float(node.cost),
             converged=False,
@@ -271,7 +272,7 @@ class RRTPlanner(Planner):
 
     def build_search_report(self, callback=None):
         """
-        The solve's report of one extension, ``report(phase)``: the search as it stands, handed to every hook.
+        The solve's report of one extension, ``report(phase, n_iterations, reached_goal)``: the search as it stands, handed to every hook.
 
         ``callback`` is a callable or a list of callables; each filters for
         itself. A no-op when the solve asks for none.
@@ -283,10 +284,10 @@ class RRTPlanner(Planner):
         else:
             hooks = [callback]
 
-        def report(phase):
+        def report(phase, n_iterations, reached_goal):
             if not hooks:
                 return
-            step = self.search_step(phase)
+            step = self.search_step(phase, n_iterations, reached_goal)
             for hook in hooks:
                 hook(step)
 
@@ -391,28 +392,28 @@ class RRTPlanner(Planner):
 
         return np.asarray(dense)
 
-    def search_step(self, phase: str):
-        """The search as it stands, one :class:`~minilink.planning.search.live_plot.TreeSearchIteration` for the solve's hooks."""
+    def search_step(self, phase: str, n_iterations: int, reached_goal: bool):
+        """The search as it stands after ``n_iterations`` extensions, one :class:`~minilink.planning.search.live_plot.TreeSearchIteration` for the solve's hooks."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import TreeSearchIteration
 
         best_cost = None
-        if self.reached_goal and self.solution_node is not None:
+        if reached_goal and self.solution_node is not None:
             best_cost = float(self.solution_node.cost)
 
         return TreeSearchIteration(
-            iteration=self.iterations,
+            iteration=n_iterations,
             phase=phase,
-            reached_goal=self.reached_goal,
+            reached_goal=reached_goal,
             best_cost=best_cost,
             n_nodes=len(self.tree.nodes),
             planner=self,
         )
 
     def finish_trajectory(
-        self, trajectory: Trajectory, evaluate, n_trials
+        self, trajectory: Trajectory, evaluate, n_trials, record
     ) -> PlanningSolution:
-        """The path as a solution: its input held by a source block, the search's record, scored when asked."""
+        """The path as a solution: its input held by a source block, the search's ``record``, scored when asked."""
         controller = open_loop_controller_of(trajectory, self.problem.sys, hold="zoh")
 
         # Scored over the problem's draws, on the path's median time step
@@ -430,7 +431,7 @@ class RRTPlanner(Planner):
         solution = PlanningSolution(
             problem=self.problem,
             controller=controller,
-            record=self.search_record(),
+            record=record,
             trajectory=trajectory,
             evaluation=evaluation,
         )

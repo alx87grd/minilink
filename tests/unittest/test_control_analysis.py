@@ -292,7 +292,7 @@ class TestLQR(unittest.TestCase):
         np.testing.assert_allclose(
             lqr(plant, Q=Q, R=R, x_bar=x_bar).params["K"], on_plant.params["K"]
         )
-        plant.state.set_nominal_value(x_bar)
+        plant.state.nominal_value = np.array(x_bar, dtype=float)
         np.testing.assert_allclose(lqr(plant, Q, R).params["K"], on_plant.params["K"])
 
     def test_a_plant_with_noise_ports_is_designed_about_its_command(self):
@@ -1073,7 +1073,7 @@ class PhasePlaneTestSystem(DynamicSystem):
         self.state.units = ["m", "m/s"]
         self.state.lower_bound = np.array([-2.0, -3.0])
         self.state.upper_bound = np.array([2.0, 3.0])
-        self.inputs["u"].set_nominal_value(np.array([0.5]))
+        self.inputs["u"].nominal_value = np.array([0.5])
 
     def f(self, x, u, t=0, params=None):
         return np.array([x[1] + u[0], -2.0 * x[0] + t])
@@ -1869,7 +1869,7 @@ class TestOutputReference(unittest.TestCase):
         self.assertEqual(ctl.inputs["r"].dim, 1)
 
         loop = ctl @ self.plant
-        loop.inputs["r"].set_nominal_value(np.array([0.5]))
+        loop.inputs["r"].nominal_value = np.array([0.5])
         self.plant.x0 = np.zeros(2)
         trajectory = loop.compute_trajectory(tf=8.0, verbose=False)
         np.testing.assert_allclose(C @ trajectory.x[:, -1], [0.5], atol=1e-4)

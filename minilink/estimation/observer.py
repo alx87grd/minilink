@@ -72,7 +72,7 @@ class StateObserver(DynamicSystem):
         )
 
         # Initial estimate: the operating point, where the model holds
-        self.state.set_nominal_value(x_bar)
+        self.state.nominal_value = np.array(x_bar, dtype=float).reshape(-1)
         self.x0 = x_bar.copy()
 
         # Ports: the command u and the measurement y in, the estimate x̂ out

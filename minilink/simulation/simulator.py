@@ -5,7 +5,6 @@ import time
 import numpy as np
 
 from minilink.core.backends import (
-    BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
@@ -88,12 +87,6 @@ FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
 
-# Pass ``backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
-# Re-exported from :mod:`minilink.core.backends` so legacy callers
-# importing it from the simulator keep working.
-COMPILE_BACKEND_AUTO = BACKEND_AUTO
-
-
 ###############################################################################
 # Public API
 ###############################################################################
@@ -133,8 +126,8 @@ class Simulator:
         Print setup information (default quiet).
     backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
-        Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
-        (the string ``auto``) to try JAX if importable, then fall back to NumPy.
+        Typical values are ``numpy`` (default) or ``jax``. Use ``"auto"``
+        (:data:`~minilink.core.backends.BACKEND_AUTO`) to try JAX if importable, then fall back to NumPy.
     solver_warnings : str
         ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
         :class:`UserWarning` messages from :mod:`minilink.simulation.solver_warnings`.
@@ -383,7 +376,7 @@ class Simulator:
     ###########################################################################
 
     def resolve_and_build_evaluator(self, sys, backend):
-        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
+        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on ``"auto"``."""
         return build_on_auto(
             lambda backend: self.build_evaluator(sys, backend), backend
         )

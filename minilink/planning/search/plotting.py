@@ -269,13 +269,14 @@ def draw_search_state(
     ax,
     planner,
     *,
+    reached_goal: bool = False,
     x_axis: int = 0,
     y_axis: int = 1,
     tree_color="0.75",
     path_color="tab:blue",
 ):
     """
-    Draw the current search tree and best path on ``ax``.
+    Draw the current search tree on ``ax``, and the best path once ``reached_goal``.
 
     Returns ``(tree_lines, path_line)`` artist handles for live updates.
     """
@@ -296,7 +297,7 @@ def draw_search_state(
 
     # The path to the goal node, once the goal is reached
     path_line = None
-    path_states = best_path_states(planner)
+    path_states = best_path_states(planner, reached_goal)
     if path_states is not None:
         (path_line,) = ax.plot(
             path_states[:, x_axis],
@@ -434,10 +435,10 @@ def clear_search_artists(tree_lines, path_line):
         path_line.remove()
 
 
-def best_path_states(planner):
+def best_path_states(planner, reached_goal):
     """The states along the path to the planner's goal node, or ``None`` before the goal."""
     node = getattr(planner, "solution_node", None)
-    if node is None or not getattr(planner, "reached_goal", False):
+    if node is None or not reached_goal:
         return None
 
     if hasattr(planner, "path_states"):

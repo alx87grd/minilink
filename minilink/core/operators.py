@@ -126,7 +126,6 @@ def autowire(
     diagram: DiagramSystem,
     *,
     strict: bool = False,
-    validate: bool = True,
 ) -> DiagramSystem:
     """Connect unconnected inputs by name: each takes the one output with its name and size.
 
@@ -138,8 +137,6 @@ def autowire(
         If ``True``, raise when an input stays open (no match, or several). No
         new connections are applied before that error is raised. If ``False``,
         the open inputs are left unconnected and a warning lists them.
-    validate : bool, optional
-        If ``True``, run algebraic-loop detection after wiring.
 
     Returns
     -------
@@ -201,8 +198,8 @@ def autowire(
     for source_id, source_port, target_id, input_id in decisions:
         diagram.connect(source_id, source_port, target_id, input_id)
 
-    if validate:
-        diagram.check_algebraic_loops()
+    # The algebraic-loop check, on the wired diagram
+    diagram.check_algebraic_loops()
 
     return diagram
 

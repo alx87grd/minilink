@@ -63,8 +63,8 @@ class VectorSignal:
         self.upper_bound = np.inf * np.ones(self.dim)
         self.lower_bound = -np.inf * np.ones(self.dim)
 
-        # Nominal value: the given one, else zeros
-        self.set_nominal_value(nominal_value)
+        # Nominal value: the given one, checked against dim, else zeros
+        self.nominal_value = nominal_of(nominal_value, self.dim)
 
         # The user's metadata over the defaults, each field checked against dim
         if labels is not None:
@@ -91,23 +91,6 @@ class VectorSignal:
         """The bounds as a set, ``lower_bound <= z <= upper_bound``, derived on each read."""
         return BoxSet(self.lower_bound, self.upper_bound)
 
-    def set_nominal_value(self, nominal_value=None):
-        """
-        Set the nominal (default) value of the vector signal.
-
-        Parameters
-        ----------
-        nominal_value : list or np.ndarray, optional
-            The nominal value to set. Must match the dimension `dim`.
-            If None, defaults to an array of zeros.
-        """
-        if nominal_value is not None:
-            value = np.asarray(nominal_value, dtype=float).reshape(-1)
-            require_nominal_shape(value, self.dim)
-            self.nominal_value = value.copy()
-        else:
-            self.nominal_value = np.zeros(self.dim)
-
     def __repr__(self):
         return f"VectorSignal: dim={self.dim}, nominal={self.nominal_value}"
 
@@ -119,10 +102,6 @@ class InputPort(VectorSignal):
     The nominal value doubles as the constant fallback used when the port is
     left unconnected in a diagram.
     """
-
-    def get_default_value(self):
-        """Return the constant fallback value (the nominal value)."""
-        return self.nominal_value
 
 
 class OutputPort(VectorSignal):
@@ -279,6 +258,16 @@ def length_or_none(value, *, field_name, signal_id):
         raise ValueError(
             f"Could not infer dimension from {field_name} for signal '{signal_id}'"
         ) from exc
+
+
+def nominal_of(nominal_value, dim):
+    """A nominal value as its own flat float copy of ``dim`` entries (zeros when ``None``)."""
+    if nominal_value is None:
+        return np.zeros(dim)
+    value = np.asarray(nominal_value, dtype=float).reshape(-1)
+    require_nominal_shape(value, dim)
+
+    return value.copy()
 
 
 def require_nominal_shape(value, dim):

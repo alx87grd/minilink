@@ -403,7 +403,7 @@ def control_law_kwargs(solution, kwargs) -> dict:
 
 
 @dataclass(frozen=True)
-class GivenPolicy:
+class GivenController:
     """The record of a controller compared as given: no planner solved it."""
 
     success: bool = True
@@ -462,7 +462,7 @@ def solution_of(problem, entry):
     if isinstance(entry, PlanningSolution):
         return entry
 
-    return PlanningSolution(problem=problem, controller=entry, record=GivenPolicy())
+    return PlanningSolution(problem=problem, controller=entry, record=GivenController())
 
 
 def require_no_scoring(dt, n_trials):

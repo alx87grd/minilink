@@ -285,8 +285,8 @@ def test_a_quadratic_cost_targets_the_operating_point_by_default():
     from minilink import Pendulum
 
     plant = Pendulum()
-    plant.state.set_nominal_value(np.array([np.pi, 0.0]))
-    plant.inputs["u"].set_nominal_value(np.array([0.2]))
+    plant.state.nominal_value = np.array([np.pi, 0.0])
+    plant.inputs["u"].nominal_value = np.array([0.2])
     cost = QuadraticCost.from_system(plant)
     np.testing.assert_allclose(cost.x_bar, [np.pi, 0.0])
     np.testing.assert_allclose(cost.u_bar, [0.2])

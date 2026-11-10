@@ -215,6 +215,16 @@ RETIRED = {
 # A retired name the facade scan does not reach (a class of a deep module, a member of one), at
 # its full path: what replaced it. Each sweep adds its own
 RETIRED_NAMES = {
+    "minilink.planning.problems.PlanningProblem.has_goal": "problem.Xf is not None",
+    "minilink.planning.problems.PlanningProblem.has_cost": "problem.cost is not None",
+    "minilink.simulation.simulator.COMPILE_BACKEND_AUTO": (
+        'backend="auto" (minilink.core.backends.BACKEND_AUTO)'
+    ),
+    "minilink.core.signals.InputPort.get_default_value": "port.nominal_value",
+    "minilink.core.signals.VectorSignal.set_nominal_value": (
+        "signal.nominal_value = value"
+    ),
+    "minilink.planning.comparison.GivenPolicy": "GivenController",
     "minilink.planning.trajectory_optimization.transcription.FixedGridOptions": (
         "FixedGridTranscription(n_steps=)"
     ),
@@ -275,6 +285,12 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
     "minilink.planning.trajectory_optimization.path_integral.steps_of": {
         "tf": "horizon"
+    },
+    "minilink.core.closed_loop.feedback": {"validate": "the loop check always runs"},
+    "minilink.core.closed_loop.closed_loop": {"validate": "the loop check always runs"},
+    "minilink.core.operators.autowire": {"validate": "the loop check always runs"},
+    "minilink.core.wiring.WiredDiagramMixin.autowire": {
+        "validate": "the loop check always runs"
     },
     "minilink.core.facades.plotting.StepPlotting.plot_rollout": {"rollout": "traj"},
     "minilink.core.facades.simulation.SystemSimulation.compute_trajectory": {
@@ -375,6 +391,23 @@ def test_no_retired_name_at_its_path(path):
     assert not hasattr(owner, name) and name not in fields, (
         f"{path} is retired, write {RETIRED_NAMES[path]!r}"
     )
+
+
+def test_a_search_keeps_its_counts_on_its_record_only():
+    """RRT's goal flag and extension count are the record's (RULES 2.4), not the planner's."""
+    from minilink.planning.search.extenders import KinodynamicExtender
+    from minilink.planning.search.rrt import RRTPlanner
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+    from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
+
+    problem, _ = make_holonomic_obstacle_problem()
+    extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
+    for planner_class in (RRTPlanner, RRTStarPlanner):
+        planner = planner_class(problem, extender=extender, max_nodes=5)
+        record = planner.solve().record
+        assert record.n_iterations >= 0 and not record.reached_goal
+        for retired in ("reached_goal", "iterations"):
+            assert not hasattr(planner, retired), f"{planner_class.__name__}.{retired}"
 
 
 def test_a_compiled_planner_counts_its_iterations_as_n_iterations():

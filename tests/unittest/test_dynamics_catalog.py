@@ -187,7 +187,7 @@ class TestCatalogSmoke(unittest.TestCase):
             acceleration = np.zeros(plane.dof)
             nominal = np.zeros(plane.m)
             nominal[1] = 0.05
-            plane.inputs["u"].set_nominal_value(nominal)
+            plane.inputs["u"].nominal_value = np.array(nominal, dtype=float)
             np.testing.assert_allclose(
                 plane.inverse_dynamics(q, v, acceleration),
                 plane.inverse_dynamics(q, v, acceleration, nominal),

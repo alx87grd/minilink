@@ -308,6 +308,15 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     port shortcuts of a `System` but the output, declared in seconds. The reverse:
     `evaluate(problem, controller, dt=None, *, …)` takes `dt` by position, as
     `problem.compile(controller, dt)` does.
+  - *Removed: no caller, or against a rule.* `validate=` on `feedback`, `closed_loop` and
+    `autowire` (it switched off the algebraic-loop check, which now always runs);
+    `PlanningProblem.has_goal` and `has_cost` (write `problem.Xf is not None`,
+    `problem.cost is not None`); the `COMPILE_BACKEND_AUTO` re-export of
+    `minilink.simulation.simulator` (`backend="auto"`); `InputPort.get_default_value()` and
+    `signal.set_nominal_value(v)` (read `port.nominal_value`, assign
+    `signal.nominal_value = v`); `RRTPlanner.reached_goal` and `.iterations`, and RRT*'s,
+    copies of the record (`solution.record.reached_goal`, `solution.record.n_iterations`);
+    the comparison's record `GivenPolicy` → `GivenController`.
 
 ## 3. Maturity (TRL)
 

@@ -10,10 +10,9 @@ from minilink.core.compile.evaluators.compiled import body_of
 from minilink.core.system import DynamicSystem
 from minilink.core.trajectory import Trajectory
 from minilink.simulation.input_coercion import coerce_forced_input
-from minilink.simulation.simulator import COMPILE_BACKEND_AUTO
 from minilink.simulation.time_grid import build_time_grid
 
-__all__ = ["StaticSimulator", "COMPILE_BACKEND_AUTO"]
+__all__ = ["StaticSimulator"]
 
 
 ###############################################################################

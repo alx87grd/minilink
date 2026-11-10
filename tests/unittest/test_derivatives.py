@@ -129,9 +129,9 @@ class TestJacobianValues(unittest.TestCase):
 
     def test_defaults_are_the_nominal_point(self):
         plant = self.plant
-        plant.state.set_nominal_value(np.array([1.0, 2.0]))
+        plant.state.nominal_value = np.array([1.0, 2.0])
         plant.x0 = np.array([-3.0, 4.0])  # the simulation start plays no part
-        plant.inputs["bias"].set_nominal_value(np.array([0.7]))
+        plant.inputs["bias"].nominal_value = np.array([0.7])
         expected = plant.jacobian(
             "f", "params", plant.state.nominal_value, plant.get_u_from_input_ports()
         )
@@ -407,7 +407,7 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(part.u_bar, [0.4])
         np.testing.assert_allclose(part.y_bar, [x_bar[0], plant.h(x_bar, u_bar)[0]])
         # the nominal state is the default point; a model from arrays sits at the origin
-        plant.state.set_nominal_value(x_bar)
+        plant.state.nominal_value = np.array(x_bar, dtype=float)
         np.testing.assert_allclose(plant.linearize().x_bar, x_bar)
         from minilink.dynamics.abstraction.state_space import LTISystem
 

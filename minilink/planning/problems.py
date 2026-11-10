@@ -525,16 +525,6 @@ class PlanningProblem:
         return type(self)(**fields)
 
     @property
-    def has_goal(self) -> bool:
-        """Return ``True`` when a terminal goal or boundary set is available."""
-        return self.Xf is not None
-
-    @property
-    def has_cost(self) -> bool:
-        """Return ``True`` when the problem has a cost function."""
-        return self.cost is not None
-
-    @property
     def is_stochastic(self) -> bool:
         """``True`` when a part is random: a law on the start or a parameter, a random source."""
         random_source = any(block.is_random for block in self.disturbances.values())

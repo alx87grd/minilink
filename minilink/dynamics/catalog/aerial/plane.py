@@ -807,7 +807,7 @@ if __name__ == "__main__":
     u = sys.inputs["u"]
     u.lower_bound[:] = [0.0, -0.12, -0.12, -0.12]
     u.upper_bound[:] = [T_max, 0.12, 0.12, 0.12]
-    u.set_nominal_value(np.array([T_trim, 0.0, 0.0, 0.0]))
+    u.nominal_value = np.array([T_trim, 0.0, 0.0, 0.0])
 
     # sys.compute_trajectory()
 

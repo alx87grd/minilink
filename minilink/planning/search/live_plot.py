@@ -144,6 +144,7 @@ class LiveSearchPlot:
         self._tree_lines, self._path_line = draw_search_state(
             self.ax,
             planner,
+            reached_goal=step.reached_goal,
             x_axis=self.x_axis,
             y_axis=self.y_axis,
             tree_color=self.tree_color,

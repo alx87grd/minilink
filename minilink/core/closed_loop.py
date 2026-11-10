@@ -32,7 +32,7 @@ from minilink.core.system import System
 ###############################################################################
 
 
-def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSystem:
+def feedback(sys, filter=1, *, of=None, sign=-1.0) -> DiagramSystem:
     """Close ``sys`` on itself with an :class:`~minilink.blocks.routing.Error` block: ``r -> e = r - y -> sys -> y``, the textbook ``T = L / (1 + L H)``.
 
     Negative feedback (the default) inserts ``Error``, so the diagram shows
@@ -62,8 +62,8 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
         mismatch is an error.
     sign : float
         ``-1.0`` for negative feedback (default), ``+1.0`` for positive.
-    validate : bool
-        Run algebraic-loop detection before returning.
+
+    The algebraic-loop check runs before the diagram is returned.
     """
     # The open loop: sys with its command entry free for the junction, and y out
     diagram, entries = open_loop(sys)
@@ -72,8 +72,7 @@ def feedback(sys, filter=1, *, of=None, sign=-1.0, validate=True) -> DiagramSyst
     close_on(diagram, entries, filter, of=of, sign=sign)
 
     diagram.name = f"feedback({sys.name})"
-    if validate:
-        diagram.check_algebraic_loops()
+    diagram.check_algebraic_loops()
 
     return diagram
 
@@ -87,7 +86,6 @@ def closed_loop(
     noise: bool | System = False,
     filter=None,
     observer: System | None = None,
-    validate: bool = True,
 ) -> DiagramSystem:
     """Build a controller/plant feedback diagram — the ``controller @ plant`` operator.
 
@@ -144,8 +142,6 @@ def closed_loop(
         ``x`` (the estimate) goes to the controller's ``x``, so the plant's
         own state is never read. A ``kalman`` or ``luenberger`` observer with a
         state-feedback gain is the LQG loop.
-    validate : bool, optional
-        If ``True``, run algebraic-loop detection before returning.
 
     Returns
     -------
@@ -237,8 +233,7 @@ def closed_loop(
     # The loop's name and camera, then the algebraic-loop check
     diagram.name = f"{controller.name} @ {plant.name}"
     propagate_animation_camera(diagram, plant_box)
-    if validate:
-        diagram.check_algebraic_loops()
+    diagram.check_algebraic_loops()
 
     return diagram
 

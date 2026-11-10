@@ -119,8 +119,8 @@ class TestPlanningArchitecture(unittest.TestCase):
         self.assertTrue(problem.X.contains(np.array([0.0, 0.0])))
         self.assertTrue(problem.U.contains(np.array([0.0])))
         self.assertFalse(problem.U.contains(np.array([10.0])))
-        self.assertTrue(problem.has_goal)
-        self.assertFalse(problem.has_cost)
+        self.assertIsNotNone(problem.Xf)
+        self.assertIsNone(problem.cost)
 
     def test_planning_problem_tf_validation_and_grid(self):
         sys = self.make_system()
@@ -795,7 +795,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     )
     solution = planner.solve()
     traj = solution.trajectory
-    assert planner.reached_goal and solution.success
+    assert solution.record.reached_goal and solution.success
     assert solution.record.reached_goal and solution.record.n_nodes == len(
         planner.tree.nodes
     )
@@ -847,8 +847,9 @@ def test_kinodynamic_reaches_goal_and_stays_free():
         seed=0,
         max_nodes=4000,
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert solution.record.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
     assert traj.x.shape[0] == 2
@@ -865,8 +866,9 @@ def test_kinodynamic_random_controls_reaches_goal():
         seed=1,
         max_nodes=6000,
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert solution.record.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.6
 
 
@@ -900,8 +902,9 @@ def test_steering_reaches_goal_and_stays_free():
         seed=0,
         max_nodes=4000,
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert solution.record.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -980,8 +983,9 @@ def test_dubins_rrt_reaches_goal_pose():
         goal_bias=0.2,
         max_nodes=8000,
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert solution.record.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - x_goal) < 0.6
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1018,8 +1022,7 @@ def test_reached_goal_false_on_budget_exhaustion():
         max_nodes=10,
         goal_bias=0.0,
     )
-    planner.solve()
-    assert not planner.reached_goal
+    assert not planner.solve().record.reached_goal
     assert planner.solution_node is not None
 
 
@@ -1193,7 +1196,7 @@ def test_rrt_star_reaches_goal():
     )
     solution = planner.solve()
     traj = solution.trajectory
-    assert planner.reached_goal and solution.success
+    assert solution.record.reached_goal and solution.success
     assert solution.record.cost == planner.best_goal_cost
     assert solution.record.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
@@ -1209,8 +1212,9 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
         max_nodes=4000,
         nearest_method="kd_tree",
     )
-    traj = planner.solve().trajectory
-    assert planner.reached_goal
+    solution = planner.solve()
+    traj = solution.trajectory
+    assert solution.record.reached_goal
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1223,10 +1227,10 @@ def test_rrt_star_improves_path_cost_over_rrt():
     for seed in range(12):
         options = dict(seed=seed, max_nodes=3000)
         rrt = RRTPlanner(problem, extender=extender, **options)
-        rrt.solve()
+        rrt_record = rrt.solve().record
         star = RRTStarPlanner(problem, extender=extender, **options)
-        star.solve()
-        if rrt.reached_goal and star.reached_goal:
+        star_record = star.solve().record
+        if rrt_record.reached_goal and star_record.reached_goal:
             rrt_costs.append(path_cost(rrt))
             star_costs.append(path_cost(star))
     assert len(star_costs) >= 8
@@ -1251,10 +1255,8 @@ def test_rewire_false_is_at_least_as_costly():
         max_nodes=2500,
         rewire=False,
     )
-    with_rewire.solve()
-    without_rewire.solve()
-    assert with_rewire.reached_goal
-    assert without_rewire.reached_goal
+    assert with_rewire.solve().record.reached_goal
+    assert without_rewire.solve().record.reached_goal
     assert path_cost(with_rewire) <= path_cost(without_rewire) + 1e-09
 
 
@@ -1311,8 +1313,8 @@ def test_search_callback_sees_every_extension():
         seed=0,
         max_nodes=200,
     )
-    planner.solve(callback=RecordingCallback())
-    assert [step.iteration for step in calls] == list(range(1, planner.iterations + 1))
+    record = planner.solve(callback=RecordingCallback()).record
+    assert [step.iteration for step in calls] == list(range(1, record.n_iterations + 1))
     assert calls[-1].phase == "explore"
 
 
@@ -1344,9 +1346,9 @@ def test_the_live_plot_filters_for_itself():
         convergence_patience=100,
     )
     live = LiveSearchPlot(every=25, pause=0.0, after_goal_only=True, ax=ax)
-    planner.solve(callback=[live, record])
-    assert planner.reached_goal
-    assert len(seen) == planner.iterations
+    solved = planner.solve(callback=[live, record]).record
+    assert solved.reached_goal
+    assert len(seen) == solved.n_iterations
     assert "explore" in seen and "optimize" in seen
     assert lines_before_goal and not any(lines_before_goal)
     assert ax.lines
@@ -1393,11 +1395,11 @@ def test_optimize_after_goal_runs_longer_and_refines_cost():
         cost_tol=0.05,
         convergence_patience=400,
     )
-    first_hit.solve()
-    optimized.solve()
-    assert first_hit.reached_goal
-    assert optimized.reached_goal
-    assert optimized.iterations > first_hit.iterations
+    first_record = first_hit.solve().record
+    optimized_record = optimized.solve().record
+    assert first_record.reached_goal
+    assert optimized_record.reached_goal
+    assert optimized_record.n_iterations > first_record.n_iterations
     assert path_cost(optimized) <= path_cost(first_hit) + 1e-09
 
 
@@ -1412,10 +1414,10 @@ def test_convergence_patience_stops_search():
         cost_tol=0.05,
         convergence_patience=50,
     )
-    planner.solve()
-    assert planner.reached_goal
+    record = planner.solve().record
+    assert record.reached_goal
     assert planner.converged
-    assert planner.iterations < 8000
+    assert record.n_iterations < 8000
 
 
 def test_record_history_for_animation():

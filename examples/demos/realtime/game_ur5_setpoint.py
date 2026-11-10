@@ -36,7 +36,9 @@ ctl = TaskImpedance(
 
 diagram = ctl @ arm  # boundary input r = desired tool position
 diagram.plot_diagram()
-diagram.inputs["r"].set_nominal_value(p0)  # rate-mode setpoint starts at the tool
+diagram.inputs["r"].nominal_value = np.array(
+    p0, dtype=float
+)  # rate-mode setpoint starts at the tool
 
 rt_sim = RealtimeSimulator(
     diagram,

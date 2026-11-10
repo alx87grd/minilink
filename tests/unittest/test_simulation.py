@@ -8,7 +8,8 @@ import numpy as np
 import pytest
 from minilink.core.backends import array_module
 from minilink.core.system import DEFAULT_SMALLEST_TIME_CONSTANT, DynamicSystem
-from minilink.simulation.simulator import COMPILE_BACKEND_AUTO, Simulator
+from minilink.core.backends import BACKEND_AUTO
+from minilink.simulation.simulator import Simulator
 from minilink.core.system import AUTO_DT_SCALE
 
 
@@ -108,7 +109,7 @@ class TestNewSimulator(unittest.TestCase):
             StableLinearSystem(),
             tf=1.0,
             n_samples=5,
-            backend=COMPILE_BACKEND_AUTO,
+            backend=BACKEND_AUTO,
             verbose=False,
         )
         self.assertEqual(sim.backend, "jax")

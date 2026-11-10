@@ -64,7 +64,7 @@ class SystemSimulation:
             Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to the simulator (default ``"numpy"``).
-            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.core.backends.BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print simulator setup (solver, ``dt``, compile backend). Default
@@ -181,7 +181,7 @@ class DynamicSimulation:
             Number of time samples on ``[t0, tf]``, endpoints included.
         backend : str
             Passed to :class:`~minilink.simulation.simulator.Simulator` (default ``"numpy"``).
-            Use ``backend="auto"`` (see :data:`~minilink.simulation.COMPILE_BACKEND_AUTO`)
+            Use ``backend="auto"`` (see :data:`~minilink.core.backends.BACKEND_AUTO`)
             to try JAX then fall back to NumPy.
         verbose : bool
             Print solver selection, time grid, and compile backend (default
