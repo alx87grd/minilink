@@ -450,8 +450,6 @@ reference are AGENTS'.
   instead of raising, with `link_lengths` the base contract (scan: dynamics#7).
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
-- [ ] **planning** (T5): `direct_collocation.py` / `shooting.py` / `multiple_shooting.py`
-  read `self.options.*` inside their bodies.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
 2026-09-15 foundations review, in git history). The demo rows apply to the demos the

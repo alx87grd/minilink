@@ -23,7 +23,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -129,9 +128,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=PENDULUM_N_STEPS),
         backend="numpy",
         method="scipy_slsqp",
         options={

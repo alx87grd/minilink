@@ -248,6 +248,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *The author's reads.* `sys.get_port_values_from_u(u, "r", "y")` → `sys.ports(u, "r", "y")`
     (the same three return forms: every port as a dict, one port, a tuple of several);
     `traj.get_signal(name)` → `traj.signal(name)`.
+  - *The transcriptions take their interval count.*
+    `DirectCollocationTranscription(DirectCollocationOptions(n_steps=20))` →
+    `DirectCollocationTranscription(n_steps=20)`, the same for `ShootingTranscription` and
+    `MultipleShootingTranscription`; the option records are gone, and the grid
+    (`t(problem)`, `dt(problem)`, `n_knots`) is read on the transcription.
 
 ## 3. Maturity (TRL)
 

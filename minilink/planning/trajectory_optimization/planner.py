@@ -418,12 +418,8 @@ class TrajectoryOptimizationPlanner(Planner):
         print("Running trajectory optimization...")
 
     def transcription_options(self) -> dict[str, object]:
-        """The transcription's options as a dictionary (empty when it has none)."""
-        options = getattr(self.transcription, "options", None)
-        if options is None:
-            return {}
-
-        return dict(vars(options))
+        """The transcription's numbers as a dictionary (``{"n_steps": N}`` on a fixed grid)."""
+        return dict(vars(self.transcription))
 
     def build_callback(
         self,
@@ -684,10 +680,10 @@ def resolve_transcription(
     """The transcription passed in, or a preset (direct collocation by default) on ``n_steps`` intervals."""
     if isinstance(transcription, Transcription):
         if n_steps is not None:
-            existing = getattr(getattr(transcription, "options", None), "n_steps", None)
+            existing = getattr(transcription, "n_steps", None)
             if existing is not None and int(existing) != int(n_steps):
                 raise ValueError(
-                    f"n_steps={n_steps} conflicts with transcription.options.n_steps="
+                    f"n_steps={n_steps} conflicts with transcription.n_steps="
                     f"{existing}."
                 )
         return transcription
@@ -705,31 +701,28 @@ def resolve_transcription(
         # Lazy import: a preset's transcription loads when it is chosen, not with
         # the planner
         from minilink.planning.trajectory_optimization.direct_collocation import (
-            DirectCollocationOptions,
             DirectCollocationTranscription,
         )
 
-        return DirectCollocationTranscription(DirectCollocationOptions(n_steps=n_steps))
+        return DirectCollocationTranscription(n_steps=n_steps)
 
     if name == "multiple_shooting":
         # Lazy import: a preset's transcription loads when it is chosen, not with
         # the planner
         from minilink.planning.trajectory_optimization.multiple_shooting import (
-            MultipleShootingOptions,
             MultipleShootingTranscription,
         )
 
-        return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
+        return MultipleShootingTranscription(n_steps=n_steps)
 
     if name == "single_shooting":
         # Lazy import: a preset's transcription loads when it is chosen, not with
         # the planner
         from minilink.planning.trajectory_optimization.shooting import (
-            ShootingOptions,
             ShootingTranscription,
         )
 
-        return ShootingTranscription(ShootingOptions(n_steps=n_steps))
+        return ShootingTranscription(n_steps=n_steps)
 
     raise ValueError(
         f"Unknown transcription {name!r}. Use one of {_TRANSCRIPTION_PRESETS}, "

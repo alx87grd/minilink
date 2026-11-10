@@ -18,14 +18,12 @@ from minilink.planning.initial_guess import (
 )
 from minilink.planning.problems import require_finite_horizon, PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.live_plot import (
     LiveTrajectoryPlotCallback,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -33,7 +31,6 @@ from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
-    ShootingOptions,
     ShootingTranscription,
 )
 from minilink.planning.planner import require_solution
@@ -150,15 +147,15 @@ class TestPlanningArchitecture(unittest.TestCase):
             horizon=2.0,
             U=sys.input_box,
         )
-        options = DirectCollocationOptions(n_steps=5)
-        np.testing.assert_allclose(options.t(problem), np.linspace(0.0, 2.0, 6))
-        self.assertAlmostEqual(options.dt(problem), 0.4)
-        self.assertNotIn("tf", options.__dataclass_fields__)
+        transcription = DirectCollocationTranscription(n_steps=5)
+        np.testing.assert_allclose(transcription.t(problem), np.linspace(0.0, 2.0, 6))
+        self.assertAlmostEqual(transcription.dt(problem), 0.4)
+        self.assertFalse(hasattr(transcription, "tf"))
         unset = PlanningProblem(
             sys=sys, Xf=SingletonSet(np.array([0.0, 0.0])), U=sys.input_box
         )
         with self.assertRaisesRegex(ValueError, "finite problem.horizon"):
-            options.t(unset)
+            transcription.t(unset)
 
     def test_planning_problem_open_boundary_sets_and_the_goal_point(self):
         sys = self.make_system()
@@ -294,9 +291,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
         )
         with self.assertRaises(ValueError):
             require_solution(planner)
@@ -338,12 +333,10 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         to = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="numpy",
         )
-        self.assertEqual(to.transcription.options.n_steps, 5)
+        self.assertEqual(to.transcription.n_steps, 5)
         self.assertEqual(to.backend, "numpy")
         guess = default_initial_trajectory(
             problem, to.transcription.initial_guess_time_grid(problem)
@@ -358,9 +351,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="numpy",
             options={"maxiter": 100, "ftol": 1e-09},
         )
@@ -381,9 +372,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="numpy",
             options={"maxiter": 100, "ftol": 1e-09},
         )
@@ -399,9 +388,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_generic_trajopt_planner_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=5)
-        )
+        transcription = DirectCollocationTranscription(n_steps=5)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -420,7 +407,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_shooting_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
-        transcription = ShootingTranscription(ShootingOptions(n_steps=5))
+        transcription = ShootingTranscription(n_steps=5)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -438,9 +425,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_multiple_shooting_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
-        transcription = MultipleShootingTranscription(
-            MultipleShootingOptions(n_steps=5)
-        )
+        transcription = MultipleShootingTranscription(n_steps=5)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -483,7 +468,7 @@ class TestPlanningArchitecture(unittest.TestCase):
 
     def test_shooting_packs_trajectory_guess_as_inputs_only(self):
         problem = self.make_single_integrator_problem()
-        transcription = ShootingTranscription(ShootingOptions(n_steps=5))
+        transcription = ShootingTranscription(n_steps=5)
         guess = default_initial_trajectory(
             problem, transcription.initial_guess_time_grid(problem)
         )
@@ -539,8 +524,8 @@ class TestPlanningArchitecture(unittest.TestCase):
     def test_trajopt_a_solution_as_guess_passes_its_trajectory(self):
 
         class RecordingTranscription(DirectCollocationTranscription):
-            def __init__(self, options):
-                super().__init__(options)
+            def __init__(self, *, n_steps):
+                super().__init__(n_steps=n_steps)
                 self.guesses = []
 
             def pack_initial_guess(self, problem, guess):
@@ -548,7 +533,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 return super().pack_initial_guess(problem, guess)
 
         problem = self.make_single_integrator_problem()
-        transcription = RecordingTranscription(DirectCollocationOptions(n_steps=5))
+        transcription = RecordingTranscription(n_steps=5)
         planner = TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -635,9 +620,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
         problem = _trajopt_problem()
         nested = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="numpy",
             options={"maxiter": 20, "ftol": 0.001},
         )
@@ -649,7 +632,7 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
             options={"maxiter": 20, "ftol": 0.001},
         )
         self.assertIsInstance(flat.transcription, DirectCollocationTranscription)
-        self.assertEqual(flat.transcription.options.n_steps, 5)
+        self.assertEqual(flat.transcription.n_steps, 5)
         self.assertEqual(flat.backend, nested.backend)
         self.assertEqual(flat.options, nested.options)
 
@@ -679,17 +662,15 @@ class TestTrajoptFlatConstructor(unittest.TestCase):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.jax)]
 )
 @pytest.mark.parametrize(
-    "transcription, options",
+    "transcription",
     [
-        (DirectCollocationTranscription, DirectCollocationOptions),
-        (ShootingTranscription, ShootingOptions),
-        (MultipleShootingTranscription, MultipleShootingOptions),
+        DirectCollocationTranscription,
+        ShootingTranscription,
+        MultipleShootingTranscription,
     ],
     ids=["direct_collocation", "shooting", "multiple_shooting"],
 )
-def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
-    transcription, options, backend
-):
+def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(transcription, backend):
     class MarginInputSet(InputSet):
         def __init__(self, margin_fn):
             self.margin_fn = margin_fn
@@ -708,7 +689,7 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(
             U=MarginInputSet(margin_fn),
             Xf=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
         )
-        program = transcription(options(n_steps=4)).transcribe(problem, backend=backend)
+        program = transcription(n_steps=4).transcribe(problem, backend=backend)
         z = np.linspace(0.1, 0.5, program.n_z)
         if backend == "jax":
             import jax.numpy as jnp
@@ -2266,7 +2247,6 @@ def test_collocation_bounds_survive_an_intersection():
     """``X = bounds & free`` keeps the box in the decision bounds; the rest stays a margin."""
     from minilink.core.sets import CallableSet
     from minilink.planning.trajectory_optimization.direct_collocation import (
-        DirectCollocationOptions,
         DirectCollocationTranscription,
     )
 
@@ -2302,7 +2282,7 @@ def test_collocation_bounds_survive_an_intersection():
         X=sys.state.box & free,
         U=sys.input_box,
     )
-    transcription = DirectCollocationTranscription(DirectCollocationOptions(n_steps=4))
+    transcription = DirectCollocationTranscription(n_steps=4)
     lower_boxed, upper_boxed = transcription.decision_bounds(boxed)
     lower_mixed, upper_mixed = transcription.decision_bounds(mixed)
     np.testing.assert_allclose(lower_mixed, lower_boxed)
@@ -2507,7 +2487,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        transcription=ShootingTranscription(n_steps=11),
         backend="jax",
         method="adam",
         n_iterations=200,

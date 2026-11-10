@@ -175,7 +175,55 @@ RETIRED = {
     "compute_subsys_output_port": ("compute_subsystem_output_port", None),
     "get_port_values_from_u": ("ports", None),
     "get_signal": ("signal", None),
+    "options": (
+        "n_steps",
+        (
+            "DirectCollocationTranscription",
+            "ShootingTranscription",
+            "MultipleShootingTranscription",
+        ),
+    ),
 }
+
+
+# A retired name the facade scan does not reach (a class of a deep module, a member of one), at
+# its full path: what replaced it. Each sweep adds its own
+RETIRED_NAMES = {
+    "minilink.planning.trajectory_optimization.transcription.FixedGridOptions": (
+        "FixedGridTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.direct_collocation.DirectCollocationOptions": (
+        "DirectCollocationTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.shooting.ShootingOptions": (
+        "ShootingTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.multiple_shooting.MultipleShootingOptions": (
+        "MultipleShootingTranscription(n_steps=)"
+    ),
+}
+
+
+def owner_of(path):
+    """The module or class a dotted path's last name would sit on: the longest importable module, then attributes."""
+    parts = path.split(".")[:-1]
+    for split in range(len(parts), 0, -1):
+        try:
+            owner = importlib.import_module(".".join(parts[:split]))
+        except ImportError:
+            continue
+        for name in parts[split:]:
+            owner = getattr(owner, name)
+        return owner
+    raise ImportError(path)
+
+
+@pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
+def test_no_retired_name_at_its_path(path):
+    name = path.rsplit(".", 1)[-1]
+    assert not hasattr(owner_of(path), name), (
+        f"{path} is retired, write {RETIRED_NAMES[path]!r}"
+    )
 
 
 # A retired value of a keyword: the value that replaced it. The simulator's solver names are the

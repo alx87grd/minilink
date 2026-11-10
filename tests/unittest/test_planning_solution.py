@@ -16,11 +16,9 @@ from minilink.planning import (
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -89,11 +87,11 @@ def trajopt(problem, transcription, n_steps=10):
 
 
 def collocation(n_steps):
-    return DirectCollocationTranscription(DirectCollocationOptions(n_steps=n_steps))
+    return DirectCollocationTranscription(n_steps=n_steps)
 
 
 def shooting(n_steps):
-    return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
+    return MultipleShootingTranscription(n_steps=n_steps)
 
 
 def replay(problem, solution, solver="rk4"):

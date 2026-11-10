@@ -601,7 +601,6 @@ class TestTheClockOperator(unittest.TestCase):
         from minilink import BicycleDynRate
         from minilink.planning.problems import PlanningProblem
         from minilink.planning.trajectory_optimization.direct_collocation import (
-            DirectCollocationOptions,
             DirectCollocationTranscription,
         )
         from minilink.planning.trajectory_optimization.planner import (
@@ -619,9 +618,7 @@ class TestTheClockOperator(unittest.TestCase):
                 cost=QuadraticCost.from_system(sys, x_bar=x0),
                 U=sys.input_box,
             ),
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
             method="scipy_slsqp",
             options={"maxiter": 5, "ftol": 0.1},

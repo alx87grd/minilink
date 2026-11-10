@@ -123,8 +123,8 @@ class PlanningProblem:
         Continuous planning horizon length in seconds, measured from
         ``t0``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
         infinite-horizon. Finite trajopt / MPC grids require a finite
-        ``horizon`` — demos should always set it explicitly. Knot count ``N``
-        lives on transcription options.
+        ``horizon`` — demos should always set it explicitly. The interval count
+        ``N`` lives on the transcription (``n_steps=``).
     t0 : float, optional
         The start time of the horizon, ``[t0, t0 + horizon]``: a run
         starts at ``t0``, its costs, sets and references read absolute

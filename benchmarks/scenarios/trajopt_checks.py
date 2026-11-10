@@ -18,7 +18,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -75,9 +74,7 @@ def run_showcase_cartpole_trajopt(
     problem = build_showcase_cartpole_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
         method="scipy_slsqp",
         options={

@@ -50,7 +50,7 @@ class CompiledTrajectoryPlanner:
         self.problem = problem
         self.transcription = transcription
         self.backend = backend
-        self.offsets = np.asarray(transcription.options.offsets(problem))
+        self.offsets = np.asarray(transcription.offsets(problem))
         self.n = int(problem.sys.n)
         self.m = int(problem.sys.m)
 

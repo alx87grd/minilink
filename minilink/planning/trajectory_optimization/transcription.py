@@ -2,7 +2,6 @@
 
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from dataclasses import dataclass
 
 import numpy as np
 
@@ -80,15 +79,12 @@ class Transcription(ABC):
         ...
 
 
-@dataclass
-class FixedGridOptions:
-    """Uniform fixed-grid options: ``n_steps`` intervals ``N`` on ``problem.horizon``, ``N + 1`` knots."""
+class FixedGridTranscription(Transcription):
+    """A transcription on a uniform grid: ``n_steps`` intervals ``N`` on ``problem.horizon``, ``N + 1`` knots."""
 
-    n_steps: int
-
-    def __post_init__(self) -> None:
-        require_interval_count(self.n_steps)
-        self.n_steps = int(self.n_steps)
+    def __init__(self, *, n_steps: int):
+        require_interval_count(n_steps)
+        self.n_steps = int(n_steps)
 
     @property
     def n_knots(self) -> int:

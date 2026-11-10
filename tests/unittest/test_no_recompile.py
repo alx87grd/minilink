@@ -9,7 +9,6 @@ from minilink import Pendulum, PlanningProblem, QuadraticCost  # noqa: E402
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.path_integral import (  # noqa: E402
@@ -69,9 +68,7 @@ def test_the_compiled_trajectory_planner_at_new_numbers_compiles_nothing():
     configure_jax(enable_x64=True)
     planner = TrajectoryOptimizationPlanner(
         swing_problem(),
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=8)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=8),
         backend="jax",
         method="scipy_slsqp",
         options={"maxiter": 20, "disp": False},
@@ -132,9 +129,7 @@ def test_one_planner_solve_compiles_the_plant_once():
     problem = swing_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=8)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=8),
         backend="numpy",
         method="scipy_slsqp",
         options={"maxiter": 5, "disp": False},

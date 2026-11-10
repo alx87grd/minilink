@@ -19,7 +19,6 @@ from minilink.core.system import DynamicSystem
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.mpc import (
@@ -83,9 +82,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         )
 
     def make_planner(self, problem):
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=5)
-        )
+        transcription = DirectCollocationTranscription(n_steps=5)
         return TrajectoryOptimizationPlanner(
             problem,
             transcription=transcription,
@@ -182,9 +179,7 @@ class TestTwoReplanningRoutes(unittest.TestCase):
         pytest.importorskip("cyipopt")
         planner = TrajectoryOptimizationPlanner(
             self.make_problem(0.0),
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
             method="ipopt",
             options={"max_iter": 100},
@@ -502,7 +497,6 @@ class TestTheWarmStartedMPC(unittest.TestCase):
 def test_the_zero_delay_form_traces_on_a_native_planner():
     jax = pytest.importorskip("jax")
     from minilink.planning.trajectory_optimization.shooting import (
-        ShootingOptions,
         ShootingTranscription,
     )
 
@@ -516,7 +510,7 @@ def test_the_zero_delay_form_traces_on_a_native_planner():
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=ShootingTranscription(ShootingOptions(n_steps=6)),
+        transcription=ShootingTranscription(n_steps=6),
         backend="jax",
         method="adam",
         n_iterations=20,

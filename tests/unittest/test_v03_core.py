@@ -629,7 +629,6 @@ def native_mpc_problem():
     """The pendulum regulated from 0.5 rad over 2 s, and a native fixed-iteration planner on it (single shooting, Adam)."""
     from minilink.planning import TrajectoryOptimizationPlanner
     from minilink.planning.trajectory_optimization.shooting import (
-        ShootingOptions,
         ShootingTranscription,
     )
 
@@ -643,7 +642,7 @@ def native_mpc_problem():
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        transcription=ShootingTranscription(n_steps=11),
         backend="jax",
         method="adam",
         n_iterations=30,

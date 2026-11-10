@@ -27,18 +27,15 @@ from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
-    ShootingOptions,
     ShootingTranscription,
 )
 
@@ -595,15 +592,11 @@ def _transcription(
     config: TrajectoryOptimizationBenchmarkConfig,
 ):
     if variant.transcription == "collocation":
-        return DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        return DirectCollocationTranscription(n_steps=config.n_steps)
     if variant.transcription == "shooting":
-        return ShootingTranscription(ShootingOptions(n_steps=config.n_steps))
+        return ShootingTranscription(n_steps=config.n_steps)
     if variant.transcription == "multiple_shooting":
-        return MultipleShootingTranscription(
-            MultipleShootingOptions(n_steps=config.n_steps)
-        )
+        return MultipleShootingTranscription(n_steps=config.n_steps)
     raise NotImplementedError(f"Unknown transcription {variant.transcription!r}")
 
 
@@ -653,15 +646,11 @@ def _warm_initial_trajectory(
     if jax_trajopt_available():
         configure_jax(enable_x64=True)
         problem = _cartpole_problem(CartPole(), tf=config.tf)
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        transcription = DirectCollocationTranscription(n_steps=config.n_steps)
         backend = "jax"
     else:
         problem = _cartpole_problem(CartPole(), tf=config.tf)
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        transcription = DirectCollocationTranscription(n_steps=config.n_steps)
         backend = "numpy"
 
     planner = TrajectoryOptimizationPlanner(

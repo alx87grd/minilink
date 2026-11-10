@@ -25,7 +25,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -120,9 +119,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
         method="scipy_slsqp",
         options={
@@ -228,9 +225,7 @@ def run_bicycle_parametric(
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
         method="scipy_slsqp",
         options={
