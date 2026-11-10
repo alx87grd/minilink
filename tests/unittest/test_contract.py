@@ -65,6 +65,12 @@ SYSTEM_FACTORIES = {
     "LookupPolicy": lambda: lookup_policy(),
     "NeuralPolicy": lambda: minilink.NeuralPolicy(minilink.Pendulum(), hidden=(4,)),
     "SampledSystem": lambda: core.SampledSystem(minilink.Pendulum(), 0.1),
+    "LTISystem": lambda: minilink.LTISystem(
+        np.array([[0.0, 1.0], [-2.0, -0.5]]), np.array([[0.0], [1.0]])
+    ),
+    "LinearizedSystem": lambda: minilink.linearize(
+        minilink.Pendulum(), np.array([np.pi, 0.0])
+    ),
 }
 SYSTEM_EXCEPTIONS = {
     # The abstract shells and the diagrams: their params are their blocks' (walked as blocks)
