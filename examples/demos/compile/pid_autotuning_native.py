@@ -21,7 +21,7 @@ N_LEARN_STEPS = 1000
 LR = 1.0
 
 # Live trajectory plot during tuning.
-PLOT_EVERY = 5
+PLOT_EVERY = 1
 PLOT_PAUSE = 0.05
 PLOT_BACKEND = "matplotlib"
 
