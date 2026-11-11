@@ -686,7 +686,13 @@ each plan states.
     the state or a slice of it read labels and units from the state (the 56 copy lines go);
     one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
     damping in `Drone2D.d` and `Rocket.d` named; `VanDerPol` with a real input or none;
-    constructor hygiene in the pendulum and mass-spring-damper families.
+    constructor hygiene in the pendulum and mass-spring-damper families. With it, the
+    parameter keys by the maintainer's ruling 6a (2026-11-10, judgment, not a hard rule): a
+    single textbook letter where it is clear in context (`m`, `l`, `k`, `d`), capitals for
+    matrices only, a word when one letter is not enough (`CdA`) or clashes with a core name
+    (`gravity`, `g` being the running cost), one spelling per quantity across the catalog, and
+    the constructor keyword writes the same key. Today mass is `"mass"` on 14 plants and `"m"`
+    on 2; damping `b`, `d`, `damping`, `damping_coef`; drag `cda`, `cdA`, `CdA`.
 - [ ] **Traceable linear analysis** (S73) **[idea to review — ask — core]**, proposed by the
   maintainer, not scheduled: `poles`, `frequency_response` and `margins` in
   `analysis/linear.py` through the array module, so the sensitivity of closed-loop poles,
