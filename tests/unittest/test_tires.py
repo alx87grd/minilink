@@ -64,6 +64,17 @@ def test_the_force_never_passes_the_friction_limit(law):
     assert np.max(np.abs(Fy_pure)) <= limit
 
 
+@pytest.mark.parametrize("law", SATURATING, ids=lambda law: law.__name__)
+def test_on_a_road_of_zero_friction_the_force_vanishes_and_stays_finite(law):
+    tire = make(law)
+
+    Fx, Fy = tire.forces(0.2, 0.1, FZ, friction=0.0)
+    grip = tire.friction_use(Fx, Fy, FZ, friction=0.0)
+
+    assert np.isfinite([Fx, Fy, grip]).all()
+    assert np.hypot(Fx, Fy) < 1.0e-6 * FZ
+
+
 def test_the_three_laws_agree_at_small_slip():
     """Up to a slip demand of 0.3 the laws differ by less than 5 % of ``mu Fz``."""
     z = np.linspace(0.0, 0.3, 61)

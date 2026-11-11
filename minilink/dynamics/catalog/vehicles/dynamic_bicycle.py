@@ -11,7 +11,7 @@ from minilink.core.params import held_params
 from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.dynamics.catalog.vehicles.terrain import Terrain
-from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
+from minilink.dynamics.catalog.vehicles.tires import LinearSaturation, wheel_parts
 from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d
 
@@ -740,28 +740,6 @@ class BicycleDynRate(DynamicBicycle):
     def wheel_rate_and_steer(self, x, u):
         """``[w_rear, delta]``: both are states on this rung."""
         return x[6:8]
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
-
-
-def wheel_parts(tire, wheels):
-    """Each wheel's own tire: a copy of the one given, or of the one given for it by name.
-
-    The car holds copies, so a tire passed in is a template: edit the car's through
-    ``car.params["tire"][wheel]``. A dict must name every wheel and no other.
-    """
-    if isinstance(tire, dict):
-        if set(tire) != set(wheels):
-            raise ValueError(
-                f"tire names the wheels {sorted(tire)}; this car's wheels are "
-                f"{list(wheels)}: pass one tire for all, or one per wheel by name"
-            )
-        return {wheel: copy.deepcopy(tire[wheel]) for wheel in wheels}
-
-    return {wheel: copy.deepcopy(tire) for wheel in wheels}
 
 
 if __name__ == "__main__":

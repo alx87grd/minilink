@@ -7,11 +7,11 @@ from minilink.core.kinematics import SE3, Rx, Ry, Rz
 from minilink.core.params import own_params
 from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import wheel_parts
 from minilink.dynamics.catalog.vehicles.tires import (
     BrushTire,
     smooth_floor,
     smooth_sign,
+    wheel_parts,
 )
 from minilink.graphical.animation.primitives import Arrow
 
