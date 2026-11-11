@@ -885,3 +885,58 @@ def test_a_rate_bicycle_on_a_tire_law_traces_under_jax(law):
         np.asarray(dx), np.asarray(car.f(np.asarray(x), np.asarray(u))), rtol=1e-12
     )
     assert np.isfinite(float(dmu))
+
+
+# The drivetrain bicycle: the full-size car launches, reaches its top speed, turns
+
+from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
+
+
+def test_the_drivetrain_bicycle_launches_from_rest():
+    car = DrivetrainBicycle(named_ports=False)
+
+    traj = car.compute_trajectory(tf=1.0, u=np.array([car.params["P_max"], 0.0]))
+
+    assert np.all(np.isfinite(traj.x))
+    assert traj.x[3, -1] > 3.0  # Faster than 3 m/s after one second
+    assert np.all(np.diff(traj.x[3]) >= -1e-9)
+
+
+def test_the_drivetrain_bicycle_tops_out_where_its_power_meets_the_drag():
+    from scipy.optimize import brentq
+
+    car = DrivetrainBicycle(named_ports=False)
+    p = car.params
+    u = np.array([p["P_max"], 0.0])
+
+    def cruise(v):
+        """The car's acceleration at speed ``v``, the wheel rate in balance."""
+
+        def wheel_acceleration(w):
+            return car.f(np.array([0, 0, 0, v, 0, 0, w, 0, p["P_max"]]), u)[6]
+
+        w = brentq(wheel_acceleration, v / p["r_r"], 1.2 * v / p["r_r"])
+        return car.f(np.array([0, 0, 0, v, 0, 0, w, 0, p["P_max"]]), u)[3]
+
+    v_top = brentq(cruise, 20.0, 90.0)
+
+    # P_max = ½ ρ CdA v³ + C_rr Fz_f v + the drivetrain's drag, at the rolling rate
+    drag = 0.5 * p["rho"] * p["CdA"]
+    Fz_f = p["mass"] * p["gravity"] * p["b"] / (p["a"] + p["b"])
+
+    def balance(v):
+        w = v / p["r_r"]
+        losses = (p["bw_drive"] * w + p["tau_fric"]) * w
+        return drag * v**3 + p["C_rr"] * Fz_f * v + losses - p["P_max"]
+
+    assert v_top == pytest.approx(brentq(balance, 10.0, 100.0), rel=0.02)
+
+
+def test_the_drivetrain_bicycle_turns_the_way_it_steers():
+    car = DrivetrainBicycle(named_ports=False)
+    r_r = car.params["r_r"]
+
+    for delta in (0.05, -0.05):
+        x = np.array([0.0, 0.0, 0.0, 15.0, 0.0, 0.0, 15.0 / r_r, delta, 0.0])
+        yaw_acceleration = car.f(x, np.array([0.0, delta]))[5]
+        assert np.sign(yaw_acceleration) == np.sign(delta)

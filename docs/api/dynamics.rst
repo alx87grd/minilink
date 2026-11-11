@@ -46,6 +46,9 @@ Catalog
 .. automodule:: minilink.dynamics.catalog.vehicles.dynamic_bicycle
    :members:
 
+.. automodule:: minilink.dynamics.catalog.vehicles.drivetrain_bicycle
+   :members:
+
 .. automodule:: minilink.dynamics.catalog.vehicles.racecar
    :members:
 

@@ -14,13 +14,13 @@ from typing import Any
 from minilink.blocks.transfer_function import TransferFunction
 from minilink.catalog import (
     DoublePendulum,
+    DrivetrainBicycle,
     DynamicBicycle,
     DynamicBicycleCar3D,
     NoisyPendulum,
     Plane3D,
     UdeSRacecar,
     UdeSRacecarDyn,
-    UdeSRacecarDyn3D,
 )
 from minilink.dynamics.catalog.aerial.drone import (
     ConstantSpeedHelicopterTunnel,
@@ -150,7 +150,11 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DynamicBicycle", DynamicBicycle),
     CatalogCheckEntry("UdeSRacecar", UdeSRacecar),
     CatalogCheckEntry("UdeSRacecarDyn", UdeSRacecarDyn),
-    CatalogCheckEntry("UdeSRacecarDyn3D", UdeSRacecarDyn3D),
+    CatalogCheckEntry("DrivetrainBicycle", DrivetrainBicycle),
+    CatalogCheckEntry(
+        "UdeSRacecarDyn(wheel_angles=True)",
+        lambda: UdeSRacecarDyn(wheel_angles=True),
+    ),
     CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),

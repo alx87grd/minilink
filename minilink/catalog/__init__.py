@@ -77,6 +77,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "Boat2DWithCurrent": ("minilink.dynamics.catalog.marine", "Boat2DWithCurrent"),
     # Vehicles
     "BicycleDynRate": ("minilink.dynamics.catalog.vehicles", "BicycleDynRate"),
+    "DrivetrainBicycle": (
+        "minilink.dynamics.catalog.vehicles",
+        "DrivetrainBicycle",
+    ),
     "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
     "DynamicBicycleCar3D": (
         "minilink.dynamics.catalog.vehicles",
@@ -90,10 +94,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "KinematicCar": ("minilink.dynamics.catalog.vehicles", "KinematicCar"),
     "UdeSRacecar": ("minilink.dynamics.catalog.vehicles", "UdeSRacecar"),
     "UdeSRacecarDyn": ("minilink.dynamics.catalog.vehicles", "UdeSRacecarDyn"),
-    "UdeSRacecarDyn3D": (
-        "minilink.dynamics.catalog.vehicles",
-        "UdeSRacecarDyn3D",
-    ),
     "LongitudinalTorqueCar": (
         "minilink.dynamics.catalog.vehicles",
         "LongitudinalTorqueCar",

@@ -165,6 +165,29 @@ Each entry: the step, the choice, the options it was taken over, and why.
   the bits are the same; for `a ≠ b` the hint may move by its last bit.
 - **VM-3, `linear_tire_forces` removed.** The rungs call `LinearSaturation` through
   `tire.forces`; the bit-for-bit test keeps the original function as its reference.
+- **VM-4, how the preset hands over its numbers.** `DrivetrainBicycle.__init__` writes its
+  own numbers as a dict literal (as `DynamicBicycle` does) and bounds the command ports
+  from `params` with an internal `bound_commands()`; `UdeSRacecarDyn` sets
+  `{**PUBLIC_RACECAR_PARAMS, **tire.params}` after it and calls `bound_commands()` again.
+  The other options needed a new public name (a `params=` keyword, a class-level preset
+  attribute, a module constant for the generic numbers), which §5 reserves for the
+  maintainer.
+- **VM-4, the wheel angles bound once.** `wheel_angles=True` binds `rolling_angle_rates`
+  (the two rates of the former `UdeSRacecarDyn3D.f`), `False` an empty block, and `f`
+  concatenates it after the nine; `tf` and the look read the plain `self.wheel_angles`
+  flag (graphics, not an equation path).
+- **VM-4, no contact arrows on `UdeSRacecarDyn(wheel_angles=True)`.** The former
+  `UdeSRacecarDyn3D` drew none (`get_dynamic_geometry` returned `{}`), so the racecar
+  keeps that when its wheel angles are states and the course notebook and the realtime
+  demo draw what they drew. Drawing the 2-D axle arrows on it was the other option.
+- **VM-4, `UdeSRacecarDyn(wheel_angles=True)` no longer brings the 3-D skin.** As the plan
+  writes it, the caller sets `car.skin = racecar_skin_3d`: the realtime demo does; the
+  course notebook already set its skin before each animation, so it needed only the
+  import and the constructor.
+- **VM-4, the readers of `UdeSRacecarDyn3D`.** `minilink.catalog`'s index and the
+  vehicles' `__all__` drop it and add `DrivetrainBicycle`; the check registry runs
+  `DrivetrainBicycle` and `UdeSRacecarDyn(wheel_angles=True)`; `docs/api/dynamics.rst`
+  documents the new module.
 
 ## 7. Ledger
 
@@ -184,3 +207,20 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   a compiled face 0.266, 0.309, 0.272 s before and 0.285, 0.305, 0.264 s after; the rate
   bicycle's 0.141, 0.127, 0.096 s before and 0.107, 0.131, 0.134 s after: within noise.
 - **VM-3:** none; byte-identical to VM-2's capture.
+- **VM-4:** none; byte-identical to VM-3's capture, `UdeSRacecarDyn(wheel_angles=True)` in
+  the former `UdeSRacecarDyn3D`'s place.
+- **`DrivetrainBicycle`'s default numbers** (new, unvalidated, for the maintainer's
+  review). Rung 3's car: `mass` 1500 kg, `inertia` 2500 kg m², `a = b` 1.0 m, `r_f = r_r`
+  0.3 m, `rho` 1.225 kg/m³, `CdA` 0.66 m², `gravity` 9.81, `mu` 1.0, `v_min_epsilon`
+  0.1 m/s; stiffnesses per unit load from its `Ca`, `Ck` at the static load 7357.5 N:
+  `c_alpha_f = c_alpha_r` 8.155 /rad, `c_kappa` 13.59. New for the drive and the
+  steering: `P_max` 100 kW, `tau_sat` 2500 N m (above the rear grip `μ Fz_r r_r` =
+  2207 N m, so a launch at full power spins the wheel, as on the racecar), `engine_tau`
+  0.2 s, `Jw_rear` 1.6 kg m² (rung 3b's), `bw_drive` 0.1 N m s, `bw_rear` 0, `tau_fric`
+  10 N m, `C_rr` 0.015, `delta_max` 0.6 rad, `steering_tau` 0.1 s, `steer_rate_max`
+  1.0 rad/s, `w_min_epsilon` 1.0 rad/s, `v_c` 0.1 m/s, `w_c` 1.0 rad/s; `z_floor` 10⁻⁶
+  from the brush tire. Measured (NumPy, one run): from rest at full power 20.8 m/s after
+  5 s; top speed 59.6 m/s (215 km/h), against 60.0 m/s from the power, the drag, the
+  rolling resistance and the drivetrain's drag alone (the rest is the rear tire's 1.7 %
+  slip); its fastest mode, the solver hint, 8.8 µs at rest (the wheel against the rear
+  tire's stiffness at the slip floor), so a 5 s run from rest takes 8 s of wall time.
