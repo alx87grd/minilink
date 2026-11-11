@@ -139,6 +139,16 @@ Each entry: the step, the choice, the options it was taken over, and why.
 - **VM-1, `linear_tire_forces` stays beside `LinearSaturation` for one step.** It moves
   into `tires.py` unchanged and the rungs still call it, so the step is a move; VM-3 makes
   the rungs call the law and removes the function.
+- **VM-2, `z_floor` leaves `PUBLIC_RACECAR_PARAMS`.** It is the brush law's own number, so
+  the tire copies it into the car's `params` at construction (`{**PUBLIC_RACECAR_PARAMS,
+  **tire.params}`) and the preset keeps the car's numbers only; the car's `params` keep the
+  same keys and values. Keeping it in the preset too was the other option (two homes for
+  one number).
+- **VM-2, `tire=None` means the rung's own default.** `UdeSRacecarDyn(tire=None)` binds
+  `BrushTire()`; a default argument holding an instance would be shared by every car.
+- **VM-2, the rolling-resistance test.** The brush law no longer knows the speed, so the
+  check that the front axle resists its rolling moves from the tire to the car's
+  `compute_tire_physics`.
 
 ## 7. Ledger
 
@@ -147,3 +157,13 @@ The numbers that moved, each with how it was measured (machine, median of N, war
 - **VM-1:** none; the baseline is byte-identical. The magic formula at its default shape
   (`c = 13/rad`, `μ = 1`, one NumPy run on 300 001 angles): peak 1.000 at 12.2°, 0.982 at
   20°, 0.943 at 40°, as the plan computed.
+- **VM-2** (the racecar on `BrushTire().forces`, its slips through `wheel_slip`): only the
+  three racecar keys move, within the bar. `f` and the outputs: 3.4·10⁻¹³ relative at most
+  (JAX `jit`, the stacked-port racecar), 7·10⁻¹⁵ on NumPy; the 5 s runs' final states:
+  7.8·10⁻¹⁴. The racecar's trajectory optimization: 65 iterations before and after, cost
+  1.96026131594 both, relative change 1.6·10⁻¹¹, decision vector 1.1·10⁻⁶; its ten MPC
+  ticks: the same iteration count on every tick, costs within 1.1·10⁻⁷, states within
+  1.7·10⁻⁶. The rate bicycle: byte-identical. Solve time (cloud container, 3 rounds
+  alternating the two trees, median of 5 warm solves each): the racecar's first solve on
+  a compiled face 0.266, 0.309, 0.272 s before and 0.285, 0.305, 0.264 s after; the rate
+  bicycle's 0.141, 0.127, 0.096 s before and 0.107, 0.131, 0.134 s after: within noise.

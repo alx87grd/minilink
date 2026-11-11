@@ -9,9 +9,10 @@ from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
 from minilink.dynamics.catalog.vehicles.tires import (
+    BrushTire,
     axle_slips,
-    brush_tire_forces,
     friction_use,
+    smooth_sign,
 )
 from minilink.graphical.catalog.skins import car_skin_2d
 
@@ -51,7 +52,6 @@ PUBLIC_RACECAR_PARAMS = {
     "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
     "v_c": 0.05,  # [m/s]   creep speed of the rolling resistance
     "w_c": 1.0,  # [rad/s]  creep rate of the drivetrain dry friction
-    "z_floor": 1.0e-6,  # [-] keeps d(slip demand)/d(slip) finite at zero slip
 }
 
 
@@ -111,6 +111,12 @@ class UdeSRacecarDyn(DynamicBicycle):
     ``named_ports=False`` stacks the two commands into one ``u`` port instead — the
     planning and trajectory-optimization convention of the minilink vehicle ladder.
 
+    Tires
+    -----
+    ``tire`` is the law of both axles, :class:`~minilink.dynamics.catalog.vehicles.tires.BrushTire`
+    by default; its own numbers join ``params`` at construction, while ``mu`` and the
+    stiffnesses per unit load (``c_kappa``, ``c_alpha_f``, ``c_alpha_r``) stay the car's.
+
     Propulsion
     ----------
     The drive is described by what it can deliver::
@@ -138,17 +144,18 @@ class UdeSRacecarDyn(DynamicBicycle):
     (the lagged power and the power actually reaching the wheel).
     """
 
-    def __init__(self, named_ports=True):
+    def __init__(self, named_ports=True, tire=None):
         super().__init__(named_ports=True)
         self.named_ports = bool(named_ports)
+        self.tire = BrushTire() if tire is None else tire
 
         # State: the body's six, the rear wheel rate, the steer angle and the power
         self.n = 9
         self.state = VectorSignal("x", dim=self.n)
         self.x0 = np.zeros(self.n)
 
-        # Parameters
-        self.params = dict(PUBLIC_RACECAR_PARAMS)
+        # Parameters: the car's numbers, then the tire law's own
+        self.params = {**PUBLIC_RACECAR_PARAMS, **self.tire.params}
 
         # Ports: the two commands within their limits, as two named ports or one
         # stacked port (the planning / trajectory-optimization convention); the state
@@ -439,8 +446,29 @@ class UdeSRacecarDyn(DynamicBicycle):
     # Tires (the only physics overridden from DynamicBicycle)
 
     def compute_tire_physics(self, v_body, u_inputs, params=None):
-        """Brush-tire axle forces, replacing the linear-slip pair of the base class."""
+        """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame.
+
+        Static axle loads carry the weight. The free-rolling front axle makes a
+        cornering force and pays rolling resistance; the driven rear axle shares one
+        friction ellipse between its traction and its cornering force.
+
+        ``C_rr`` is charged to the front axle only: what the rear wheels lose to rolling
+        is carried by the drivetrain terms (``bw_drive``, ``tau_fric``), which resist
+        the wheel rate itself rather than the contact patch.
+        """
         params = self.params if params is None else params
+
+        tire = self.tire
+        mass = params["mass"]
+        gravity = params["gravity"]
+        a = params["a"]
+        b = params["b"]
+        mu = params["mu"]
+        c_kappa = params["c_kappa"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+        C_rr = params["C_rr"]
+        v_c = params["v_c"]
 
         vx = v_body[0]
         vy = v_body[1]
@@ -448,11 +476,17 @@ class UdeSRacecarDyn(DynamicBicycle):
         w_rear = u_inputs[0]
         delta = u_inputs[1]
 
-        # The axle slips, then the brush-tire forces they produce
+        # Static axle loads
+        Fz_f = mass * gravity * b / (a + b)
+        Fz_r = mass * gravity * a / (a + b)
+
+        # The front axle rolls free (κ_f = 0); the rear one is driven
         kappa_r, alpha_f, alpha_r = axle_slips(vx, vy, yaw_rate, w_rear, delta, params)
-        Fx_f, Fy_f, Fx_r, Fy_r = brush_tire_forces(
-            kappa_r, alpha_f, alpha_r, vx, params
-        )
+        Fx_f, Fy_f = tire.forces(0.0, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+
+        # Rolling resistance of the free-rolling front axle: −C_rr Fz_f sign(vx)
+        Fx_f = Fx_f - C_rr * Fz_f * smooth_sign(vx, v_c)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
