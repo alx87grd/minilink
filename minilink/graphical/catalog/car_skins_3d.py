@@ -26,6 +26,7 @@ FORMULA_COLORS = {
     "tire": "#141414",
     "rim": "#c0c4cc",
     "hub": "#f97316",
+    "light": "#ef4444",
     "ground": "#9aa3ad",
 }
 
@@ -49,7 +50,7 @@ OFFROAD_COLORS = {
 
 
 def formula_car_skin_3d(plant, colors=None):
-    """An open-wheel formula car: a slim monocoque, sidepods, two wings, slick tires.
+    """An open-wheel formula car: a slim monocoque, an airbox, sidepods, two wings, slicks.
 
     A skin of the 3-D car: the body on its ``body`` frame (the centre of gravity at
     the origin, the ground ``h_cg`` below), each wheel on its own ``wheel_*`` frame
@@ -63,108 +64,205 @@ def formula_car_skin_3d(plant, colors=None):
     a, b, track, h, r_f, r_r = chassis(plant)
     g = -h  # The ground, in the body frame
 
-    # The monocoque: a nose rising to the cockpit, the engine cover, the tail
+    # The monocoque: a slim nose rising to the cockpit, the airbox over the driver's
+    # head, the engine cover falling to the gearbox
     # (x, half width, bottom, top), the heights above the ground
     tub = loft(
         [
-            (a + 1.05, 0.06, 0.13, 0.20),
-            (a + 0.55, 0.14, 0.11, 0.34),
-            (a + 0.05, 0.21, 0.09, 0.46),
-            (a - 0.60, 0.33, 0.07, 0.58),
-            (0.25, 0.40, 0.06, 0.64),
-            (-0.45, 0.33, 0.07, 0.86),
-            (-b + 0.35, 0.22, 0.10, 0.62),
-            (-b - 0.25, 0.10, 0.18, 0.38),
+            (a + 1.00, 0.05, 0.17, 0.24),
+            (a + 0.60, 0.10, 0.15, 0.32),
+            (a + 0.10, 0.16, 0.12, 0.42),
+            (a - 0.55, 0.24, 0.08, 0.52),
+            (0.60, 0.27, 0.06, 0.58),
+            (0.02, 0.27, 0.06, 0.60),
+            (-0.22, 0.20, 0.06, 0.93),
+            (-0.75, 0.17, 0.08, 0.78),
+            (-b + 0.30, 0.14, 0.10, 0.52),
+            (-b - 0.22, 0.09, 0.17, 0.36),
         ],
         z0=g,
     )
     stripe = loft(
         [
-            (a + 1.02, 0.025, 0.205, 0.215),
-            (a + 0.55, 0.05, 0.345, 0.355),
-            (a + 0.05, 0.07, 0.466, 0.476),
-            (a - 0.55, 0.08, 0.585, 0.595),
+            (a + 0.98, 0.022, 0.235, 0.245),
+            (a + 0.60, 0.045, 0.315, 0.325),
+            (a + 0.10, 0.065, 0.415, 0.425),
+            (a - 0.55, 0.080, 0.515, 0.525),
+            (0.66, 0.080, 0.570, 0.582),
         ],
         z0=g,
     )
 
-    # The sidepods, either side of the cockpit
+    # The engine cover's fin, and the airbox inlet above the driver
+    fin = loft(
+        [
+            (-0.30, 0.014, 0.60, 0.94),
+            (-0.90, 0.014, 0.55, 0.80),
+            (-b + 0.05, 0.014, 0.45, 0.62),
+        ],
+        z0=g,
+    )
+    inlet = box_mesh((0.04, 0.20, 0.13), (-0.10, 0.0, g + 0.83))
+
+    # The sidepods, clear of the tub's flanks at the front and drawn in to the rear:
+    # the bottle shape, their inlets dark
     pods = merge_meshes(
         *[
             loft(
                 [
-                    (a - 0.55, 0.10, 0.10, 0.34),
-                    (a - 0.95, 0.26, 0.08, 0.46),
-                    (-0.35, 0.24, 0.08, 0.42),
-                    (-b + 0.45, 0.10, 0.12, 0.26),
+                    (a - 0.90, 0.17, 0.16, 0.50),
+                    (0.50, 0.21, 0.10, 0.52),
+                    (-0.30, 0.19, 0.09, 0.44),
+                    (-0.85, 0.12, 0.09, 0.30),
+                    (-b + 0.40, 0.05, 0.10, 0.20),
                 ],
                 z0=g,
-                y0=side * 0.52,
+                y0=side * 0.50,
             )
             for side in (1.0, -1.0)
         ]
     )
+    pod_inlets = merge_meshes(
+        *[
+            box_mesh((0.03, 0.27, 0.24), (a - 0.905, side * 0.50, g + 0.33))
+            for side in (1.0, -1.0)
+        ]
+    )
 
-    # The floor, wider than the tub, and the cockpit opening
-    floor = box_mesh((a + b + 0.6, 1.25, 0.03), (0.5 * (a - b), 0.0, g + 0.055))
-    opening = box_mesh((0.80, 0.42, 0.04), (-0.05, 0.0, g + 0.645))
+    # The floor: narrow under the nose, wide between the wheels, drawn in at the
+    # rear tires, and the cockpit opening
+    floor = loft(
+        [
+            (a - 0.25, 0.22, 0.045, 0.075),
+            (a - 0.80, 0.74, 0.045, 0.075),
+            (-b + 0.50, 0.76, 0.045, 0.075),
+            (-b + 0.38, 0.42, 0.045, 0.075),
+            (-b - 0.30, 0.42, 0.045, 0.12),
+        ],
+        z0=g,
+    )
+    opening = loft(
+        [
+            (0.62, 0.11, 0.572, 0.592),
+            (0.35, 0.17, 0.585, 0.605),
+            (0.04, 0.16, 0.592, 0.612),
+        ],
+        z0=g,
+        power=2.5,
+    )
 
-    # The front wing: two planes, the endplates painted
+    # The front wing: a main plane under the nose and two flaps each side of it,
+    # each pitched more than the last, between painted endplates
     span = track + 0.30
+    flap_span = 0.5 * span - 0.14
+    flap_y = 0.14 + 0.5 * flap_span
     front_wing = merge_meshes(
-        box_mesh((0.36, span, 0.025), (a + 0.92, 0.0, g + 0.09)),
-        box_mesh((0.22, span - 0.10, 0.02), (a + 0.80, 0.0, g + 0.16)),
+        pitched(box_mesh((0.30, span, 0.02), (a + 0.92, 0.0, g + 0.085)), 0.05),
+        *[
+            pitched(
+                box_mesh((chord, flap_span, 0.016), (x, side * flap_y, g + z)), tilt
+            )
+            for chord, x, z, tilt in (
+                (0.20, a + 0.76, 0.15, 0.25),
+                (0.15, a + 0.64, 0.22, 0.45),
+            )
+            for side in (1.0, -1.0)
+        ],
+        *[
+            box_mesh((0.16, 0.02, 0.09), (a + 0.90, side * 0.05, g + 0.125))
+            for side in (1.0, -1.0)
+        ],
     )
     front_plates = merge_meshes(
         *[
-            box_mesh((0.48, 0.02, 0.18), (a + 0.86, side * 0.5 * span, g + 0.13))
+            box_mesh((0.50, 0.018, 0.22), (a + 0.82, side * 0.5 * span, g + 0.16))
             for side in (1.0, -1.0)
         ]
     )
 
-    # The rear wing on its pylon, the endplates painted
-    rear_x = -b - 0.40
+    # The rear wing over the rear axle: a main plane and a flap between painted
+    # endplates, on a central pylon, and a beam wing under them
+    rear_x = -b - 0.22
     rear_wing = merge_meshes(
-        box_mesh((0.34, 1.00, 0.03), (rear_x, 0.0, g + 0.86)),
-        box_mesh((0.20, 1.00, 0.025), (rear_x + 0.04, 0.0, g + 0.97)),
-        box_mesh((0.10, 0.04, 0.60), (rear_x + 0.10, 0.0, g + 0.56)),
+        pitched(box_mesh((0.32, 0.98, 0.025), (rear_x, 0.0, g + 0.88)), 0.18),
+        pitched(box_mesh((0.18, 0.98, 0.02), (rear_x - 0.17, 0.0, g + 0.96)), 0.55),
+        box_mesh((0.22, 0.90, 0.02), (rear_x + 0.02, 0.0, g + 0.50)),
+        box_mesh((0.09, 0.035, 0.52), (rear_x + 0.08, 0.0, g + 0.61)),
     )
     rear_plates = merge_meshes(
         *[
-            box_mesh((0.50, 0.025, 0.45), (rear_x, side * 0.51, g + 0.82))
+            box_mesh((0.46, 0.02, 0.40), (rear_x - 0.05, side * 0.50, g + 0.82))
             for side in (1.0, -1.0)
         ]
     )
+    rain_light = box_mesh((0.03, 0.07, 0.10), (-b - 0.235, 0.0, g + 0.27))
 
-    # The suspension arms, from the tub to each hub at rest, and the halo
+    # The wishbones, two a side at each hub at rest, a track rod, and the halo
     arms = merge_meshes(
         *[
             tube(
-                (x_body, side * 0.30, g + z), (x_hub, side * 0.5 * track, g + r), 0.022
+                (x_hub + dx, side * y_tub, g + z + 0.04),
+                (x_hub, side * (0.5 * track - 0.17), g + z),
+                0.014,
             )
-            for x_body, x_hub, r in ((a - 0.15, a, r_f), (-b + 0.15, -b, r_r))
+            for x_hub, y_tub, r in ((a, 0.15, r_f), (-b, 0.13, r_r))
             for side in (1.0, -1.0)
-            for z in (0.20, 0.36)
-        ]
+            for z in (r - 0.11, r + 0.10)
+            for dx in (0.30, -0.26)
+        ],
+        *[
+            tube(
+                (a + 0.20, side * 0.14, g + r_f + 0.02),
+                (a + 0.10, side * (0.5 * track - 0.17), g + r_f),
+                0.011,
+            )
+            for side in (1.0, -1.0)
+        ],
     )
     halo = merge_meshes(
-        tube((0.10, 0.20, g + 0.66), (0.35, 0.0, g + 0.86), 0.025),
-        tube((0.10, -0.20, g + 0.66), (0.35, 0.0, g + 0.86), 0.025),
-        tube((0.35, 0.0, g + 0.86), (0.62, 0.0, g + 0.62), 0.025),
+        tube((0.86, 0.0, g + 0.555), (0.70, 0.0, g + 0.78), 0.024),
+        *[
+            merge_meshes(
+                tube((0.70, 0.0, g + 0.78), (0.30, side * 0.25, g + 0.80), 0.024),
+                tube(
+                    (0.30, side * 0.25, g + 0.80), (-0.06, side * 0.22, g + 0.70), 0.024
+                ),
+            )
+            for side in (1.0, -1.0)
+        ],
+    )
+
+    # The mirrors on their stalks, and the camera pod on the airbox
+    details = merge_meshes(
+        *[
+            merge_meshes(
+                box_mesh((0.05, 0.13, 0.065), (0.86, side * 0.40, g + 0.62)),
+                tube(
+                    (0.86, side * 0.24, g + 0.52), (0.86, side * 0.36, g + 0.61), 0.008
+                ),
+            )
+            for side in (1.0, -1.0)
+        ],
+        box_mesh((0.14, 0.035, 0.035), (-0.20, 0.0, g + 0.955)),
     )
 
     body = [
         TriangleMesh(*tub, color=colors["body"], name="monocoque", max_edges=0),
         TriangleMesh(*stripe, color=colors["stripe"], name="stripe", max_edges=0),
+        TriangleMesh(*fin, color=colors["accent"], name="fin", max_edges=0),
+        TriangleMesh(*inlet, color=colors["cockpit"], name="airbox", max_edges=0),
         TriangleMesh(*pods, color=colors["body"], name="sidepods", max_edges=0),
+        TriangleMesh(*pod_inlets, color=colors["cockpit"], name="inlets", max_edges=0),
         TriangleMesh(*floor, color=colors["carbon"], name="floor", max_edges=0),
         TriangleMesh(*opening, color=colors["cockpit"], name="cockpit", max_edges=0),
         TriangleMesh(*front_wing, color=colors["carbon"], name="front_wing"),
         TriangleMesh(*front_plates, color=colors["accent"], name="front_plates"),
         TriangleMesh(*rear_wing, color=colors["carbon"], name="rear_wing"),
         TriangleMesh(*rear_plates, color=colors["accent"], name="rear_plates"),
+        TriangleMesh(*rain_light, color=colors["light"], name="rain_light"),
         TriangleMesh(*arms, color=colors["carbon"], name="arms", max_edges=0),
         TriangleMesh(*halo, color=colors["carbon"], name="halo", max_edges=0),
+        TriangleMesh(*details, color=colors["accent"], name="details", max_edges=0),
     ]
 
     # The wheels: wide slicks, the rear wider
@@ -464,6 +562,19 @@ def tube(p0, p1, radius, n=12):
         R = axis_angle_matrix((1.0, 0.0, 0.0), np.pi)
 
     return transform_mesh(mesh, translation_matrix(p0) @ R)
+
+
+def pitched(mesh, angle):
+    """A wing element pitched nose-down by ``angle`` [rad] about the spanwise axis through its centre."""
+    vertices, _ = mesh
+    centre = 0.5 * (vertices.min(axis=0) + vertices.max(axis=0))
+    turn = (
+        translation_matrix(centre)
+        @ axis_angle_matrix((0.0, 1.0, 0.0), -angle)
+        @ translation_matrix(-centre)
+    )
+
+    return transform_mesh(mesh, turn)
 
 
 def arc_band(center, radius, width, angle0, angle1, thickness=0.04, n=14):
