@@ -73,6 +73,29 @@ def test_the_operating_point_is_an_equilibrium_of_the_estimate():
         StateObserver(Pendulum(), L)
 
 
+def test_an_observer_is_continuous_and_its_gain_reads_z():
+    """Ruling Q4: the observer refuses a step model; the gain on its matrices has its poles in z."""
+    from minilink.control.design import place
+    from minilink.dynamics.abstraction.state_space import DiscreteLTISystem
+
+    tick_law = DiscreteLTISystem(np.eye(2) + 0.1 * A, 0.1 * B, C)
+    step_linearization = linearize(Pendulum() % 0.1, x_bar=np.zeros(2))
+    for model in (tick_law, step_linearization):
+        with pytest.raises(TypeError, match=r"a StateObserver is continuous"):
+            StateObserver(model, np.ones((2, 1)))
+    with pytest.raises(TypeError, match=r"observer % dt"):
+        luenberger(Pendulum() % 0.1, [0.5, 0.6])
+
+    # A gain is fine: its poles are read in z
+    z_poles = [0.5, 0.6]
+    L = luenberger_gain(tick_law.A(), tick_law.C(), z_poles)
+    error_poles = np.linalg.eigvals(tick_law.A() - L @ tick_law.C())
+    np.testing.assert_allclose(np.sort(error_poles.real), z_poles, atol=1e-10)
+    K = place(tick_law, z_poles).K
+    closed = np.linalg.eigvals(tick_law.A() - tick_law.B() @ K)
+    np.testing.assert_allclose(np.sort(closed.real), z_poles, atol=1e-10)
+
+
 def test_the_estimate_converges_on_the_plant():
     plant = LTISystem(A, B, C)
     obs = observer()

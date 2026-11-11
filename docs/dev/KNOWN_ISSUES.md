@@ -18,20 +18,6 @@ lands. Last checked against the code: 2026-11-10.
   reviews the mechanical hierarchy: a model-based law then refuses an underactuated plant at
   construction, with a clear message.
 
-### A step system's transfer function is a continuous block holding `G(z)`
-- **Symptom:** `discretize(Pendulum(), 0.1).transfer_function()` (and the band function
-  `transfer_function(stepped)`) returns a `TransferFunction` block whose numerator and
-  denominator are those of `G(z)` (`[0.00249, 0.00249] / [1, −1.951, 1.0]`, poles
-  `0.976 ± 0.220j`, inside the unit circle), printed `G(s) = …`; the block is a continuous
-  system, so simulating or wiring it reads those coefficients in `s` (poles in the right half
-  plane).
-- **Workaround:** read the channel's numbers (`G.numerator`, `G.denominator`, `G.poles`) as
-  `z`-domain coefficients, or analyse the step system with `pzmap`, `bode` and
-  `step_response`, which treat it in `z`; do not simulate the block.
-- **Fix:** a question for the maintainer (api-stabilization.md, decisions taken during the
-  run, AS-45): a discrete transfer-function block, or `transfer_function` refused on a step
-  system.
-
 ### A misspelled key in a block's `params` is ignored
 - **Symptom:** `plant.params["mass_typo"] = 3.0` is accepted; the block keeps reading its own
   keys, so the change has no effect and nothing says so.

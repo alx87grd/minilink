@@ -616,8 +616,8 @@ def require_continuous_model(model, verb):
         raise ValueError(
             f"{verb} solves the continuous-time Riccati equation, and {model.name!r} is "
             "a discrete-time model: design on the continuous plant, and put the law on "
-            "a clock (law % dt). place and luenberger read their poles in z on a "
-            "discrete-time model"
+            "a clock (law % dt). place reads its poles in z on a discrete-time "
+            "model, and luenberger_gain the observer's"
         )
 
 

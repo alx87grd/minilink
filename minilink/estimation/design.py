@@ -7,7 +7,7 @@ from minilink.analysis.riccati import care, require_weight
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
 from minilink.dynamics.abstraction.state_space import require_arrays
-from minilink.estimation.observer import StateObserver
+from minilink.estimation.observer import StateObserver, require_continuous_observer
 
 ###############################################################################
 # Public API
@@ -66,11 +66,13 @@ def luenberger(
     The observer reads the plant's output ``y``: a plant without one is
     refused (make the sensor part of the plant box, ``plant >> Gain(...)``),
     and a design on another output is made on ``linearize(plant, x_bar,
-    of=...)``.
+    of=...)``. The observer is continuous: a step or sampled system is refused
+    (``luenberger_gain`` on its matrices places the poles in ``z``).
     """
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
+    require_continuous_observer(model)
     A = model.A()
     C = model.C()
 

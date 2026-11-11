@@ -184,7 +184,9 @@ class TestSystemShortcuts(unittest.TestCase):
                     getattr(loop, name)()
                 self.assertIs(recorder.call_args.args[0], loop)
 
-    def test_a_step_systems_linear_model_and_channel_are_in_z(self):
+    def test_a_step_systems_linear_model_is_in_z_and_its_transfer_function_refused(
+        self,
+    ):
         from minilink.analysis import discretize, linearize, transfer_function
         from minilink.dynamics import LinearizedStepSystem
 
@@ -192,11 +194,13 @@ class TestSystemShortcuts(unittest.TestCase):
         lin = stepped.linearize()
         self.assertIsInstance(lin, LinearizedStepSystem)
         np.testing.assert_array_equal(lin.A(), linearize(stepped).A())
-        G = stepped.transfer_function()
-        np.testing.assert_array_equal(G.numerator, transfer_function(stepped).numerator)
-        np.testing.assert_array_equal(
-            G.denominator, transfer_function(stepped).denominator
-        )
+
+        # A transfer function is continuous (the maintainer's ruling Q4 of 2026-11-11)
+        for refused in (stepped, lin, Pendulum() % 0.1):
+            with self.assertRaisesRegex(TypeError, "a transfer function is continuous"):
+                transfer_function(refused)
+        with self.assertRaisesRegex(TypeError, r"then `% dt`"):
+            stepped.transfer_function()
 
     def test_the_nyquist_diagram_is_drawn_from_the_plant(self):
         import matplotlib

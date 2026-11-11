@@ -298,10 +298,14 @@ def transfer_function(
     The numerator and denominator come from the zeros, poles and gain of
     :func:`pzmap`; the block is their state-space realization and carries
     ``numerator``, ``denominator``, ``poles`` and ``zeros``, so it can be
-    plotted, simulated, or wired like any other block.
+    plotted, simulated, or wired like any other block. A transfer function
+    is continuous: a step or sampled system is refused (design on the
+    continuous plant, then put the design on a clock, ``% dt``).
     """
     # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
+
+    require_continuous_system(sys)
 
     z, p, k = pzmap(
         sys,
@@ -497,6 +501,15 @@ def plot_nyquist(
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_continuous_system(sys):
+    """Refuse a step or sampled system: a transfer function is continuous."""
+    if discrete_period(sys) is not None:
+        raise TypeError(
+            f"{sys.name!r} is a step or sampled system: a transfer function is "
+            "continuous; design on the continuous plant, then `% dt`"
+        )
 
 
 def frequency_grid(A, B, C, D, w, n_samples, period=None):

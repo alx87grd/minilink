@@ -5,6 +5,7 @@ import re
 import numpy as np
 
 from minilink.analysis.linearization import design_point
+from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.dynamics.abstraction.state_space import ConstantMatrices
 
@@ -24,6 +25,9 @@ class StateObserver(DynamicSystem):
     point read from it (``ȳ = h(x̄, ū)``), or an
     :class:`~minilink.dynamics.abstraction.state_space.LTISystem`, about the
     origin: the matrix form is ``StateObserver(LTISystem(A, B, C, D), L)``.
+    The observer is continuous: a step model (a ``DiscreteLTISystem``, a
+    ``LinearizedStepSystem``) is refused; design on the continuous plant,
+    then put the observer on a clock (``observer % dt``).
     The estimation error then follows ``A − L C``, so the gain sets its poles:
     :func:`~minilink.estimation.design.luenberger` places them and
     :func:`~minilink.estimation.design.kalman` makes them optimal for white noise.
@@ -41,6 +45,7 @@ class StateObserver(DynamicSystem):
         # The model (A, B, C, D) and its operating point (x̄, ū, ȳ), the origin
         # of a linear model; the gain L
         require_linear_model(model)
+        require_continuous_observer(model)
         A = np.asarray(model.A(), dtype=float)
         B = np.atleast_2d(np.asarray(model.B(), dtype=float))
         C = np.atleast_2d(np.asarray(model.C(), dtype=float))
@@ -160,6 +165,17 @@ def require_linear_model(model):
             f"StateObserver(model, L) runs a linear model, got {type(model).__name__}: "
             "pass LTISystem(A, B, C, D) or linearize(plant, x_bar), or design on the "
             "plant with luenberger(plant, poles) or kalman(plant, Q_n, R_n)"
+        )
+
+
+def require_continuous_observer(model):
+    """Refuse a step model: the observer runs its matrices as a continuous ``dx̂``."""
+    if isinstance(model, StepSystem):
+        raise TypeError(
+            f"{model.name!r} is a step model: a StateObserver is continuous, "
+            "dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ); design on the continuous plant, "
+            "then put the observer on a clock (observer % dt). On a step model, "
+            "luenberger_gain(A, C, poles) gives the gain, its poles in z"
         )
 
 

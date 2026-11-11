@@ -398,9 +398,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel;
     `poles(sys, x_bar)` on `minilink.analysis` and the root (the linear model's eigenvalues, in
     `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`;
-    `sys.plot_nyquist(…)` beside the other one-channel plots; `step_sys.linearize(…)` and
-    `step_sys.transfer_function(…)` as on a continuous system; `diagram.add_subsystem(sys)`
-    without an id (the operators' default, returned); `StepPlanningProblem.replace`; a scalar
+    `sys.plot_nyquist(…)` beside the other one-channel plots; `step_sys.linearize(…)` as on
+    a continuous system (`step_sys.transfer_function(…)` with it, then refused by ruling Q4);
+    `diagram.add_subsystem(sys)` without an id (the operators' default, returned); `StepPlanningProblem.replace`; a scalar
     `u` on a one-input `compute_rollout`; a sampled `u` off the run's grid refused naming
     `n_samples=` and `dt=`; `verbose=False` on the LQR, RRT, RRT* and MPPI planners' `solve`
     (the record printed), `callback` a list of callables on trajectory optimization and
@@ -524,6 +524,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *A length is a horizon* (the maintainer's ruling Q2 of 2026-11-11): the problem
     evaluator's `pe.tf` → `pe.horizon` (the run's length), `LyapunovCertificate.verify(tf=)` →
     `verify(horizon=)`.
+  - *A transfer function is continuous* (the maintainer's ruling Q4 of 2026-11-11):
+    `transfer_function` refuses a step or sampled system, "a transfer function is continuous;
+    design on the continuous plant, then `% dt`" (it returned a continuous block holding the
+    coefficients of `G(z)`); so do `StateObserver` on a step model (it ran the discrete
+    matrices as a continuous `dx̂`) and `luenberger` on a step or sampled system, which hands
+    out that observer. A gain stays fine on a discrete model, its poles read in `z`:
+    `place(model, poles)` and `luenberger_gain(A, C, poles)`.
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the
