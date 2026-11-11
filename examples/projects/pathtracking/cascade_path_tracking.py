@@ -396,7 +396,7 @@ def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
     plt.show()
 
 
-vehicle = DynamicBicycle()
+vehicle = DynamicBicycle(named_ports=True)
 vehicle.skin = car_skin_3d
 vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
 

@@ -24,8 +24,8 @@ class DynamicBicycle(DynamicSystem):
     Dynamic bicycle with rear wheel speed and steer inputs.
 
     State ``x = [x, y, psi, vx, vy, yaw_rate]``: the world pose and the body-frame
-    velocities. The two inputs come as two named ports, or as one stacked ``u`` port
-    with ``named_ports=False``. The research rungs live in
+    velocities. The two inputs come as one stacked ``u`` port, the convention of every
+    bicycle rung, or as two named ports with ``named_ports=True``. The research rungs live in
     ``examples/projects/car_trajopt/vehicles/ladder.py``.
 
     Tires
@@ -48,7 +48,7 @@ class DynamicBicycle(DynamicSystem):
     params = held_params()
     wheels = ("f", "r")
 
-    def __init__(self, named_ports=True, tire=None):
+    def __init__(self, named_ports=False, tire=None):
         super().__init__(state_dim=6)
         self.named_ports = bool(named_ports)
 

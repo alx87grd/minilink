@@ -100,7 +100,7 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     the state.
     """
 
-    def __init__(self, named_ports=True, tire=None, wheel_angles=False):
+    def __init__(self, named_ports=False, tire=None, wheel_angles=False):
         # The 1/10 car's tires: the rear stiffer than the front
         if tire is None:
             tire = {
@@ -205,8 +205,7 @@ if __name__ == "__main__":
     car = UdeSRacecarDyn(wheel_angles=True)
     car.skin = racecar_skin_3d
 
-    car.inputs["P_cmd"].nominal_value = 150.0
-    car.inputs["delta_cmd"].nominal_value = 0.2
+    car.inputs["u"].nominal_value = np.array([150.0, 0.2])
 
     car.compute_trajectory(tf=10.0)
 

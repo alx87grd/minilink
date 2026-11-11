@@ -34,11 +34,16 @@ def test_kinematic_scale_matches_the_public_params():
 def test_ports_and_state_layout():
     """Nine states, two bounded commands, and the sensor ports the demos read."""
     car = UdeSRacecarDyn()
+    named = UdeSRacecarDyn(named_ports=True)
 
     assert car.n == 9
-    assert list(car.inputs) == ["P_cmd", "delta_cmd"]
-    assert car.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
-    assert car.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
+    assert list(car.inputs) == ["u"]  # One stacked port, the bicycle rungs' convention
+    assert car.inputs["u"].upper == pytest.approx(
+        [car.params["P_max"], car.params["delta_max"]]
+    )
+    assert list(named.inputs) == ["P_cmd", "delta_cmd"]
+    assert named.inputs["P_cmd"].upper == pytest.approx(car.params["P_max"])
+    assert named.inputs["delta_cmd"].lower == pytest.approx(-car.params["delta_max"])
     assert set(car.outputs) == {"y", "speed", "slip", "grip", "imu", "power"}
     assert car.h(car.x0, np.zeros(car.m)).shape == (9,)
 

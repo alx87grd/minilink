@@ -26,8 +26,8 @@ class DrivetrainBicycle(DynamicBicycle):
     P_cmd : requested drive power [W], clipped to ``+- P_max`` (negative brakes).
     delta_cmd : requested steer angle [rad], clipped to ``+- delta_max``.
 
-    ``named_ports=False`` stacks the two commands into one ``u`` port instead — the
-    planning and trajectory-optimization convention of the minilink vehicle ladder.
+    The two commands come as one stacked ``u`` port, the convention of every bicycle
+    rung, or as two named ports with ``named_ports=True``.
 
     Tires
     -----
@@ -72,7 +72,7 @@ class DrivetrainBicycle(DynamicBicycle):
     floor of 0.5 m/s, so a fixed-step run takes about 1 ms steps (:meth:`fastest_mode`).
     """
 
-    def __init__(self, named_ports=True, tire=None, wheel_angles=False):
+    def __init__(self, named_ports=False, tire=None, wheel_angles=False):
         tire = BrushTire() if tire is None else tire
         super().__init__(named_ports=True, tire=tire)
         self.named_ports = bool(named_ports)

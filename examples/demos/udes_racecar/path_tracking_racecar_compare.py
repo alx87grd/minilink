@@ -26,7 +26,7 @@ path = from_waypoints(waypoints, closed=True)
 mu = 0.6
 p_cruise = 10.0  # [W] about 3 m/s, just under what a 2 m corner holds at μ = 0.6
 
-car = UdeSRacecarDyn()
+car = UdeSRacecarDyn(named_ports=True)
 car.params["road_friction"] = mu
 car.inputs["P_cmd"].nominal_value = np.array([p_cruise])
 a = car.params["a"]
