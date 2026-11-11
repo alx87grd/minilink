@@ -73,6 +73,19 @@ def test_the_operating_point_is_an_equilibrium_of_the_estimate():
         StateObserver(Pendulum(), L)
 
 
+def test_an_observer_off_an_equilibrium_copies_its_model_drift_included():
+    """With no correction (L = 0) the estimate moves as the model does, dx̄ = f(x̄, ū) kept."""
+    from minilink import Gain
+
+    plant = Pendulum() >> Gain([[1.0, 0.0]])
+    model = linearize(plant, np.array([np.pi / 2, 0.0]))
+    obs = StateObserver(model, np.zeros((2, 1)))
+    x_hat, u = np.array([1.4, 0.2]), np.array([0.3])
+    y = np.array([0.9])
+    np.testing.assert_allclose(obs.f(x_hat, np.concatenate([u, y])), model.f(x_hat, u))
+    assert model.f(model.x_bar, model.u_bar)[1] < -1.0
+
+
 def test_an_observer_is_continuous_and_its_gain_reads_z():
     """Ruling Q4: the observer refuses a step model; the gain on its matrices has its poles in z."""
     from minilink.control.design import place

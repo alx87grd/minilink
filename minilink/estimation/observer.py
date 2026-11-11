@@ -15,10 +15,11 @@ from minilink.dynamics.abstraction.state_space import ConstantMatrices
 
 
 class StateObserver(DynamicSystem):
-    """Linear state observer ``dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)``, the estimate on ``x``.
+    """Linear state observer ``dx̂ = dx̄ + A (x̂ − x̄) + B (u − ū) + L (y − ŷ)``, the estimate on ``x``.
 
     The observer runs ``model``, the plant's linear model ``(A, B, C, D)``
-    about its operating point ``(x̄, ū, ȳ)``, and corrects it with the
+    about its operating point ``(x̄, ū, ȳ)`` with its drift ``dx̄ = f(x̄, ū)``
+    (zero at an equilibrium), and corrects it with the
     innovation, the measured ``y`` minus the predicted ``ŷ = ȳ + C (x̂ − x̄) +
     D (u − ū)``, through the gain ``L``. ``model`` is a
     :class:`~minilink.dynamics.abstraction.state_space.LinearizedSystem`, its
@@ -36,14 +37,14 @@ class StateObserver(DynamicSystem):
     Ports: the plant's command ``u`` (dimension ``m``) and measurement ``y``
     (dimension ``p``) in; the estimate ``x`` (dimension ``n``, the model's
     state labels with a hat) out. The initial estimate ``x0`` starts at x̄.
-    The matrices, the gain and the operating point live in ``params``.
+    The matrices, the gain, the operating point and the drift live in ``params``.
     A box holding this block under the key ``observer`` and a state-feedback
     gain, with ``r``, ``y`` -> ``u`` on its edge, is a controller for ``@``.
     """
 
     def __init__(self, model, L):
-        # The model (A, B, C, D) and its operating point (x̄, ū, ȳ), the origin
-        # of a linear model; the gain L
+        # The model (A, B, C, D), its operating point (x̄, ū, ȳ), the origin of a
+        # linear model, and its drift there; the gain L
         require_linear_model(model)
         require_continuous_observer(model)
         A = np.asarray(model.A(), dtype=float)
@@ -58,6 +59,7 @@ class StateObserver(DynamicSystem):
             np.asarray(component, dtype=float).reshape(-1)
             for component in design_point(model)
         )
+        dx_bar = np.asarray(model.f(x_bar, u_bar), dtype=float).reshape(-1)
         labels = [hat(label) for label in model.state.labels]
 
         super().__init__(n)
@@ -73,6 +75,7 @@ class StateObserver(DynamicSystem):
             "x_bar": x_bar,
             "u_bar": u_bar,
             "y_bar": y_bar,
+            "dx_bar": dx_bar,
         }
 
         # Signal labels: the model's state, each entry with a hat
@@ -127,6 +130,7 @@ class StateObserver(DynamicSystem):
         x_bar = params["x_bar"]
         u_bar = params["u_bar"]
         y_bar = params["y_bar"]
+        dx_bar = params["dx_bar"]
 
         m = B.shape[1]
         x_hat = x
@@ -135,7 +139,7 @@ class StateObserver(DynamicSystem):
 
         # The predicted output ŷ, then the model corrected by the innovation y − ŷ
         y_hat = y_bar + C @ (x_hat - x_bar) + D @ (u_in - u_bar)
-        dx_hat = A @ (x_hat - x_bar) + B @ (u_in - u_bar) + L @ (y - y_hat)
+        dx_hat = dx_bar + A @ (x_hat - x_bar) + B @ (u_in - u_bar) + L @ (y - y_hat)
 
         return dx_hat
 
@@ -173,7 +177,7 @@ def require_continuous_observer(model):
     if isinstance(model, StepSystem):
         raise TypeError(
             f"{model.name!r} is a step model: a StateObserver is continuous, "
-            "dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ); design on the continuous plant, "
+            "dx̂ = dx̄ + A (x̂ − x̄) + B (u − ū) + L (y − ŷ); design on the continuous plant, "
             "then put the observer on a clock (observer % dt). On a step model, "
             "luenberger_gain(A, C, poles) gives the gain, its poles in z"
         )
