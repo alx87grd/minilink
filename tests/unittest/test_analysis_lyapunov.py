@@ -5,7 +5,7 @@ import unittest
 import numpy as np
 import pytest
 
-from minilink import CartPole, InvertedPendulum, VanderPol
+from minilink import CartPole, InvertedPendulum, VanDerPol
 from minilink.analysis.lyapunov import (
     LyapunovCertificate,
     plot_region_of_attraction,
@@ -51,7 +51,7 @@ class UntraceableSpring(DynamicSystem):
         return x
 
 
-class ReverseVanderPol(VanderPol):
+class ReverseVanderPol(VanDerPol):
     """Van der Pol run backwards: the origin is stable inside the limit cycle."""
 
     def f(self, x, u, t=0.0, params=None):
@@ -211,7 +211,7 @@ class TestQuadraticCertificate(unittest.TestCase):
         np.testing.assert_allclose(region.sample(0, 5), region.sample(0, 5))
 
     def test_the_certificate_speaks_the_field(self):
-        sys = VanderPol()
+        sys = VanDerPol()
         sys.params["mu"] = -1.0
         roa = region_of_attraction(sys)
         x = roa.x_bar + np.array([0.1, -0.2])

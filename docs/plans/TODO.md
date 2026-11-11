@@ -672,7 +672,7 @@ each plan states.
     bounds landed, each plant states its own): output ports that are
     the state or a slice of it read labels and units from the state (the 56 copy lines go);
     one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
-    damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
+    damping in `Drone2D.d` and `Rocket.d` named; `VanDerPol` with a real input or none;
     constructor hygiene in the pendulum and mass-spring-damper families.
 - [ ] **Traceable linear analysis** (S73) **[idea to review — ask — core]**, proposed by the
   maintainer, not scheduled: `poles`, `frequency_response` and `margins` in

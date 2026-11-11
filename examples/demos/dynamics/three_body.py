@@ -1,11 +1,11 @@
 """Three-body gravitational dynamics — nonlinear open-loop simulation."""
 
-from minilink import ThreeBodyProblem
+from minilink import ThreeBody
 
 TF = 30.0
 N_SAMPLES = 30000
 
-sys = ThreeBodyProblem(preset="figure_eight")
+sys = ThreeBody(preset="figure_eight")
 
 sys.x0[0] = 0.9
 

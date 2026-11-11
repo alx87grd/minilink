@@ -37,7 +37,7 @@ _FIGURE_EIGHT_X0 = np.array(
 ###############################################################################
 
 
-class ThreeBodyProblem(DynamicSystem):
+class ThreeBody(DynamicSystem):
     """Mutual Newtonian gravitation for three point masses in 3-D.
 
     State layout (18):
@@ -236,6 +236,6 @@ def initial_state_of(preset, n):
 
 
 if __name__ == "__main__":
-    sys = ThreeBodyProblem()
+    sys = ThreeBody()
     sys.compute_trajectory(tf=6.3, n_samples=630, show=False, verbose=False)
     sys.animate(show=False)

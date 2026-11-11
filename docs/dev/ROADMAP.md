@@ -486,6 +486,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `LinearizedSystem` (an `LTISystem` about the origin): the matrix form is
     `StateObserver(LTISystem(A, B, C, D), L)`, the estimate's labels the model's with a hat.
     No number moves.
+  - *Class names* (the maintainer's ruling 20b): `VanderPol` → `VanDerPol`, `ThreeBodyProblem`
+    → `ThreeBody`, `StructuralResult` → `StructuralProperties` (what `controllability` and
+    `observability` return; its printout says so). Their display names follow the class.
 
 ## 3. Maturity (TRL)
 

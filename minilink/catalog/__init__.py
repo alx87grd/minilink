@@ -51,10 +51,10 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Equations
     "DoubleIntegrator": ("minilink.dynamics.catalog.equations", "DoubleIntegrator"),
     "TripleIntegrator": ("minilink.dynamics.catalog.equations", "TripleIntegrator"),
-    "VanderPol": ("minilink.dynamics.catalog.equations", "VanderPol"),
+    "VanDerPol": ("minilink.dynamics.catalog.equations", "VanDerPol"),
     "Lorenz": ("minilink.dynamics.catalog.equations", "Lorenz"),
     # Astro
-    "ThreeBodyProblem": ("minilink.dynamics.catalog.astro", "ThreeBodyProblem"),
+    "ThreeBody": ("minilink.dynamics.catalog.astro", "ThreeBody"),
     # Aerial
     "ConstantSpeedHelicopterTunnel": (
         "minilink.dynamics.catalog.aerial",

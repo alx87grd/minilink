@@ -18,8 +18,8 @@ from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
-from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanDerPol
+from minilink.dynamics.catalog.astro.three_body import ThreeBody
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkManipulator,
     OneLinkManipulator,
@@ -70,7 +70,7 @@ class TestCatalogSmoke(unittest.TestCase):
             [4.0, 6.0, 3.0],
         )
         np.testing.assert_allclose(
-            VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
+            VanDerPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
         )
         np.testing.assert_allclose(
             Lorenz().f(np.array([0.0, 0.0, 0.0]), np.array([])), [0.0, 0.0, 0.0]
@@ -81,7 +81,7 @@ class TestCatalogSmoke(unittest.TestCase):
         )
 
     def test_three_body_energy_and_dynamics(self):
-        sys = ThreeBodyProblem(preset="figure_eight")
+        sys = ThreeBody(preset="figure_eight")
         x0 = sys.x0
         dx = sys.f(x0, np.array([]))
         self.assertEqual(dx.shape, (18,))

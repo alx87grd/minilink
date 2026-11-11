@@ -2011,11 +2011,11 @@ class TestPrint(unittest.TestCase):
         A = np.array([[0.0, 1.0], [0.0, 0.0]])
         self.assertEqual(
             str(controllability(LTISystem(A, np.array([[0.0], [1.0]])))),
-            "StructuralResult: rank 2 of n = 2, full rank",
+            "StructuralProperties: rank 2 of n = 2, full rank",
         )
         self.assertEqual(
             str(controllability(LTISystem(A, np.array([[1.0], [0.0]])))),
-            "StructuralResult: rank 1 of n = 2, rank deficient",
+            "StructuralProperties: rank 1 of n = 2, rank deficient",
         )
 
 
@@ -2257,14 +2257,14 @@ class TestSensitivity(unittest.TestCase):
 
 
 def test_a_structural_test_returns_its_matrix_rank_and_dimension():
-    from minilink.analysis import StructuralResult, controllability
+    from minilink.analysis import StructuralProperties, controllability
 
     A = np.array([[1.0, 0.0], [0.0, 2.0]])
     B = np.array([[1.0], [0.0]])
     result = controllability(LTISystem(A, B))
 
     # The record: 𝒞 = [B, A B], its rank and n; full rank when rank = n
-    assert isinstance(result, StructuralResult)
+    assert isinstance(result, StructuralProperties)
     np.testing.assert_allclose(result.matrix, [[1.0, 1.0], [0.0, 0.0]])
     assert (result.rank, result.n, result.is_full_rank) == (1, 2, False)
     assert "rank 1 of n = 2" in str(result)

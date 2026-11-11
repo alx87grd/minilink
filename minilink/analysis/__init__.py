@@ -21,7 +21,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
     "Margins": ("minilink.analysis.linear", "Margins"),
     "StepInfo": ("minilink.analysis.time_response", "StepInfo"),
-    "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
+    "StructuralProperties": ("minilink.analysis.structural", "StructuralProperties"),
     "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),

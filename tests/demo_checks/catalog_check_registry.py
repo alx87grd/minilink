@@ -30,12 +30,12 @@ from minilink.dynamics.catalog.aerial.drone import (
 )
 from minilink.dynamics.catalog.aerial.plane import Plane2D
 from minilink.dynamics.catalog.aerial.rocket import Rocket
-from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
+from minilink.dynamics.catalog.astro.three_body import ThreeBody
 from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanDerPol
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkManipulator,
     KinematicManipulator,
@@ -103,9 +103,9 @@ class KinematicRenderPlant:
 CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("DoubleIntegrator", DoubleIntegrator),
     CatalogCheckEntry("TripleIntegrator", TripleIntegrator),
-    CatalogCheckEntry("VanderPol", lambda: VanderPol(mu=0.5)),
+    CatalogCheckEntry("VanDerPol", lambda: VanDerPol(mu=0.5)),
     CatalogCheckEntry("Lorenz", Lorenz),
-    CatalogCheckEntry("ThreeBodyProblem", ThreeBodyProblem),
+    CatalogCheckEntry("ThreeBody", ThreeBody),
     CatalogCheckEntry(
         "TransferFunction",
         lambda: TransferFunction([1.0], [1.0, 1.0]),

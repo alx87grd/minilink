@@ -307,7 +307,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | ss2tf() | transfer_function() (2026-09-07) | `minilink/analysis/frequency.py` |
 | StateObserver | StateObserver; `kalman()` / `luenberger()` replace the `kalman` / `kalman_from_ss` classmethods, pyro's `G=` is the caller's `Q_n = B W Bᵀ` (2026-10-14) | `minilink/estimation/observer.py`, `minilink/estimation/design.py` |
 | ObservedSystem | `lqg(...) @ plant`, the observer + gain box (2026-10-14) | `minilink/control/design.py` |
-| VanderPol | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` |
+| VanderPol | VanDerPol | `minilink/dynamics/catalog/equations/oscillators.py` |
 | SimpleIntegrator | the `Integrator` block (the plant deleted 2026-10-24) | `minilink/blocks/basic.py` |
 | DoubleIntegrator | DoubleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
 | TripleIntegrator | TripleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |

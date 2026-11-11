@@ -179,7 +179,7 @@ Student-facing taxonomy: wiring from `blocks/`, plants from `minilink.catalog`
 (or `dynamics/catalog/…`), controllers from `control/`, analysis verbs from
 `analysis/` — everything is a `System`.
 `blocks/` holds plant-agnostic wiring primitives; `dynamics/catalog/equations/`
-holds canonical textbook ODEs (the double and triple integrators, `VanderPol`) with
+holds canonical textbook ODEs (the double and triple integrators, `VanDerPol`) with
 graphics, labels, and bounds for teaching demos; the single integrator is the `Integrator`
 block. The one-signal blocks are one channel unless told otherwise (`dim=1` on `Integrator`,
 `Gain(2.0)`, `Sum`, `Saturation`, `UnitDelay`); `Saturation` also takes one end stop per

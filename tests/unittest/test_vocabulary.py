@@ -59,7 +59,6 @@ RETIRED = {
             "lqr_gain_schedule",
         ),
     ),
-    "trajectory_lqr": ("lqr_trajectory", None),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
@@ -300,6 +299,19 @@ RETIRED_NAMES = {
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.predict": (
         "solution.controller or planner.actor.action(x); predict is SB3's, through SB3Controller"
     ),
+    # The design verbs (the maintainer's ruling 19 of 2026-11-11)
+    "minilink.control.design.trajectory_lqr": "lqr_trajectory",
+    "minilink.control.trajectory_lqr": "lqr_trajectory",
+    "minilink.trajectory_lqr": "lqr_trajectory",
+    # Class names (the maintainer's ruling 20b of 2026-11-11)
+    "minilink.dynamics.catalog.equations.oscillators.VanderPol": "VanDerPol",
+    "minilink.catalog.VanderPol": "VanDerPol",
+    "minilink.VanderPol": "VanDerPol",
+    "minilink.dynamics.catalog.astro.three_body.ThreeBodyProblem": "ThreeBody",
+    "minilink.catalog.ThreeBodyProblem": "ThreeBody",
+    "minilink.ThreeBodyProblem": "ThreeBody",
+    "minilink.analysis.structural.StructuralResult": "StructuralProperties",
+    "minilink.analysis.StructuralResult": "StructuralProperties",
     # One verb on both learners (the maintainer's ruling of 2026-11-11)
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.learn": (
         "solve(n_episodes=), which continues the learning from the table as it stands"

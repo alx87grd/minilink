@@ -91,7 +91,7 @@ def controllability(
     sigma = np.linalg.svd(ctrb, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralResult(matrix=ctrb, rank=r, n=n)
+    return StructuralProperties(matrix=ctrb, rank=r, n=n)
 
 
 def observability(
@@ -130,11 +130,11 @@ def observability(
     sigma = np.linalg.svd(obsv, compute_uv=False)
     r = int(np.sum(sigma > tol * sigma.max(initial=0.0)))
 
-    return StructuralResult(matrix=obsv, rank=r, n=n)
+    return StructuralProperties(matrix=obsv, rank=r, n=n)
 
 
 @dataclass(frozen=True)
-class StructuralResult:
+class StructuralProperties:
     """Result of a controllability or observability test."""
 
     matrix: np.ndarray  # The stacked Kalman matrix
@@ -149,7 +149,7 @@ class StructuralResult:
     def __str__(self):
         verdict = "full rank" if self.is_full_rank else "rank deficient"
 
-        return f"StructuralResult: rank {self.rank} of n = {self.n}, {verdict}"
+        return f"StructuralProperties: rank {self.rank} of n = {self.n}, {verdict}"
 
 
 ###############################################################################
