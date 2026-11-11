@@ -207,7 +207,7 @@ class DynamicSimulation:
             The simulated trajectory, also stored in :attr:`traj`.
         """
         # A real cycle through minilink.core.system
-        from minilink.core.diagram import subsystem_roles
+        from minilink.core.diagram import subsystem_layouts
         from minilink.core.trajectory import Trajectory
         from minilink.simulation.simulator import Simulator
 
@@ -231,7 +231,7 @@ class DynamicSimulation:
                 x=traj.x,
                 u=traj.u,
                 signals=traj.signals,
-                roles=subsystem_roles(self, traj.signal_names),
+                roles=subsystem_layouts(self, traj.signal_names),
             )
 
         if show:
@@ -364,7 +364,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_subsystem_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_layouts(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -473,7 +473,7 @@ class StepSimulation:
                 "x": (plant_slice.start, plant_slice.stop),
                 "u": PLANT_INPUT if PLANT_INPUT in signals else None,
             }
-            roles.update(plant_subsystem_roles(plant_op, plant_slice.start))
+            roles.update(plant_subsystem_layouts(plant_op, plant_slice.start))
 
         traj = Trajectory(
             t=t,
@@ -693,13 +693,13 @@ def scored_trajectory(system, of, traj):
     return subsystem_run(system, path, traj)
 
 
-def plant_subsystem_roles(plant_op, offset):
+def plant_subsystem_layouts(plant_op, offset):
     """The blocks inside a loop's plant when it is itself a diagram, by path ``"plant/<id>"``, their slices offset into the loop's state."""
     # A real cycle through minilink.core.system
-    from minilink.core.diagram import subsystem_roles
+    from minilink.core.diagram import subsystem_layouts
 
     plant = getattr(plant_op.system, "source", plant_op.system)
     if not hasattr(plant, "state_index"):
         return {}
 
-    return subsystem_roles(plant, (), offset, "plant/")
+    return subsystem_layouts(plant, (), offset, "plant/")

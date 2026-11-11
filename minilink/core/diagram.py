@@ -270,27 +270,29 @@ def subsystem_run(diagram, path, traj, params=None) -> Trajectory:
     return run if not rest else subsystem_run(subsystem, rest, run, inner_params)
 
 
-def subsystem_roles(diagram, recorded=(), offset=0, prefix=""):
+def subsystem_layouts(diagram, recorded=(), offset=0, prefix=""):
     """
-    Every block's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
+    Every subsystem's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
 
-    A block inside a nested diagram is keyed by its path (``"inner/plant"``),
+    A subsystem inside a nested diagram is keyed by its path (``"inner/plant"``),
     its slice offset into the outer state; ``recorded`` names the signals the
-    run kept, the block's input among them as ``"plant:u"``.
+    run kept, the subsystem's input among them as ``"plant:u"``.
     """
-    roles = {}
-    for sys_id, block in diagram.subsystems.items():
+    layouts = {}
+    for sys_id, subsystem in diagram.subsystems.items():
         start, end = diagram.state_index[sys_id]
         path = f"{prefix}{sys_id}"
         u_name = f"{path}:u"
-        roles[path] = {
+        layouts[path] = {
             "x": (offset + start, offset + end),
             "u": u_name if u_name in recorded else None,
         }
-        if hasattr(block, "state_index"):
-            roles.update(subsystem_roles(block, recorded, offset + start, f"{path}/"))
+        if hasattr(subsystem, "state_index"):
+            layouts.update(
+                subsystem_layouts(subsystem, recorded, offset + start, f"{path}/")
+            )
 
-    return roles
+    return layouts
 
 
 if __name__ == "__main__":
