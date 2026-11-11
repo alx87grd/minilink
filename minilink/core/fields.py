@@ -460,7 +460,7 @@ class EllipsoidSet(FieldSet):
         self.params = {"center": field.center, "P": field.P, "level": upper}
 
     @classmethod
-    def from_matrix(cls, center, P, level) -> "EllipsoidSet":
+    def from_matrix(cls, center, P, level) -> EllipsoidSet:
         """The ellipsoid ``{x : (x − c)ᵀ P (x − c) ≤ level}`` from its center ``c``, its matrix ``P`` and its level."""
         return cls(QuadraticField(center, P), None, level)
 
