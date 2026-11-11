@@ -306,7 +306,7 @@ touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
 feature (K4) became the maintainer's demo rebuild (§1.12).
 
 - [ ] **The catalog clean-up** (K8): two import layers and support by
-  test. Steps, one commit each: **K8-0** the car family to three models (`KinematicBicycle`,
+  test. Steps, one commit each: **K8-0** the car family to three models (a draft design that widens it, waiting for the maintainer: [vehicle-models.md](vehicle-models.md); `KinematicBicycle`,
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
   notebooks and demos migrated); **K8-1** the root prelude trimmed to the course set (the
