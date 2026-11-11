@@ -51,7 +51,7 @@ class UntraceableSpring(DynamicSystem):
         return x
 
 
-class ReverseVanderPol(VanDerPol):
+class ReverseVanDerPol(VanDerPol):
     """Van der Pol run backwards: the origin is stable inside the limit cycle."""
 
     def f(self, x, u, t=0.0, params=None):
@@ -98,7 +98,7 @@ class TestQuadraticCertificate(unittest.TestCase):
     def test_reverse_van_der_pol_stays_inside_its_limit_cycle(self):
         # The textbook case: the region of attraction is bounded by the
         # unstable limit cycle, which for mu = 1 passes about |x| = 2.
-        sys = ReverseVanderPol()
+        sys = ReverseVanDerPol()
         sys.state.lower = np.array([-4.0, -4.0])
         sys.state.upper = np.array([4.0, 4.0])
         roa = region_of_attraction(sys)
