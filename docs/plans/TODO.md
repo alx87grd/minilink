@@ -32,7 +32,7 @@ the maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
-| The car cut's two skins and the bicycles' port layout | K8-0 | v0.4 | `KinematicCar` and `DynamicBicycleCar3D` as skins: a name for the four-wheel 2-D skin, the corner arrows (a skin is static geometry), the pathtracking project's import ([vehicle-models-run.md](vehicle-models-run.md) §6, the pull request); the one port layout of the bicycle rungs ([vehicle-models.md](vehicle-models.md) §9) |
+| The car models' review: the 3-D car, its presets and looks | K8-0 | v0.4 | the decisions the run took on its own, listed in [vehicle-models-run.md](vehicle-models-run.md) §6 ("Run 1 continued") and the pull request: the presets' names and numbers, the suspension part, the locked axle, no downforce, the read-only projects' one-keyword edits |
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name, `C(q, v)` or `C(q, dq)`, `actuators=` a count |
 | The root list regenerated from the rebuilt demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
@@ -314,9 +314,10 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
   notebooks and demos migrated; in review on `vehicle-models-phase1`: the tire and terrain
   modules, `DrivetrainBicycle` with `UdeSRacecarDyn` its preset, `UdeSRacecarDyn3D` as
-  `UdeSRacecarDyn(wheel_angles=True)`, `psi`, the wheelbase owned by `a` and `b`; **[ask]** the
-  two skins, waiting on three questions, the brief's §6 and the pull request; **[ask]** the
-  one port layout of the bicycle rungs, the plan's §9); **K8-1** the root prelude trimmed to the course set (the
+  `UdeSRacecarDyn(wheel_angles=True)`, `psi`, the wheelbase owned by `a` and `b`, the tires as
+  per-wheel parts, one frame set (`KinematicCar` and `DynamicBicycleCar3D` retired), one
+  stacked `u`, `SuspensionCar3D` with `FormulaCar3D` and `OffRoadCar3D` and their looks;
+  **[ask]** the run's own decisions, the brief's §6 and the pull request); **K8-1** the root prelude trimmed to the course set (the
   course plants, 16, no cap; all 50 catalog plants today; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants moved to `minilink/experimental/catalog/` with their skins

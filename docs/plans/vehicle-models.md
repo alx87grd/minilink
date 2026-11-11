@@ -54,8 +54,13 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Phases | 1 the foundations; 2 the 3-D car; 2b one or two good-looking generic 3-D skins for the 3-D car, two extremes (an open-wheel formula car, an off-road side-by-side); 3 a generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
 | Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
-| Tire numbers (2026-11-11, run 1's review) | held like a diagram's subsystem: the tire keeps its own `params` (`z_floor`, `mf_C`, `mf_E`), and the car's `params` holds that dict at `"tire"` (`car.params["tire"] is car.tire.params`); the car's own numbers (`mu`, the stiffnesses) stay flat beside it. Supersedes "the defaults are copied into the car's `params`" (the Tire row above) |
-| Tire call (review) | the car hands the tire its per-wheel numbers: `tire.forces(kappa, alpha, Fz, mu, c_kappa, c_alpha, params)`. The car and its preset own `mu` and the stiffnesses; the tire adds only its shape numbers to `params` (§5.1) |
+| Tire parts (2026-11-11, after run 1's review) | each tire is a part with its own `params`, held by the car like a diagram's subsystem: the tire owns its grip `mu`, its stiffnesses per unit load `c_alpha`, `c_kappa`, its slip floor `v_eps` and its shape (`C`, `E` on the magic formula), and its slip computation. One tire per wheel, at `params["tire"][wheel]`, short wheel names (`f`, `r` on the bicycle; `fl`, `fr`, `rl`, `rr` on the 3-D car), so 4, 6 or 8 different tires fit later. A tire passed at construction is copied to every wheel and wins with its own numbers. The road's grip is one factor, `road_friction` (1 by default), on every rung; the terrain carries no friction number of its own. Supersedes the Tire, Tire numbers and Tire call rows |
+| Rungs 3 and 3b without a tire | keep their flat `Ca`, `Ck`, `mu`, `v_min_epsilon` (today's numbers) until phase 3; given a tire, they take the per-wheel parts like rung 4 |
+| Solver hint (run 1's review) | `DrivetrainBicycle`'s defaults are an easy car to simulate (slip floor 0.5 m/s, `Jw_rear` 10), and its step hint is about 1 ms: a hint for quick runs, not a property of the model |
+| Inputs | one stacked `u` on every car; `named_ports=True` keeps the named ports for the demos and diagrams that use them |
+| Frames | one frame set on every rung (`body`, `axle_front`, `wheel_fl`, `wheel_fr`, plus `wheel_rl`, `wheel_rr` on the 3-D car), so a 3-D skin's body fits the bicycle too; `KinematicCar` and `DynamicBicycleCar3D` retire; the contact-force and contact-velocity arrows are a display option on the 3-D car (`show_contact_vectors`) |
+| Demo bar | a demo passes when it completes its task as before |
+| Wheel radius and vertical stiffness | decided in phase 2's wheel-hop step (level ii), not before |
 | Phase 1's bar (review) | the same behaviour on the demos, not identical bytes: a rewrite that reorders the arithmetic is accepted (§7). Clarifies "no demo number moves" above |
 | Frame of the first nine (review) | on rung 6, `vx, vy` are the velocities in the heading frame (yawed, not rolled or pitched) and `r = ψ̇`, so they mean what they mean on rung 4 (§4) |
 | Differential (review) | the first 3-D plant has a locked rear axle (one `w_rear`); the design allows independent wheel speeds later (§4) |
@@ -555,12 +560,12 @@ class BrushTire:
 
 ### 10.3 Parameter keys
 
-- **A number shared by the two axles carries no suffix; one that differs carries `_f` or
-  `_r`.** That is today's racecar (`mu`, `c_kappa`, `c_alpha_f`, `c_alpha_r`), so phase 1
-  renames no key. Rung 6 adds `k_f`, `k_r`, `b_f`, `b_r` for the suspension.
-- **A piece's own numbers are flat keys with the piece's prefix** when the bare name would
-  collide or say nothing: `mf_C`, `mf_E`, `terrain_*`. `z_floor` keeps today's name.
-- **Rungs 3 and 3b keep `Ca`, `Ck`, `mu`** until phase 3, when they take rung 4's keys.
+- **A part's numbers live in the part's own `params`,** held by the car at a key per wheel:
+  `params["tire"]["fl"]["mu"]`, `params["suspension"]["rr"]["k"]`, `params["terrain"]`.
+  The keys inside a part carry no prefix (`mu`, `c_alpha`, `C`, `E`, `amplitude`).
+- **The car's own numbers stay flat:** `mass`, `a`, `b`, `track`, `h_cg`, `road_friction`.
+- **Rungs 3 and 3b keep `Ca`, `Ck`, `mu`, `v_min_epsilon`** when no tire is given, until
+  phase 3.
 
 ### 10.4 How a car calls its tire
 
@@ -581,10 +586,11 @@ def compute_tire_physics(self, v_body, u_inputs, params=None):
     Fz_f = mass * gravity * b / (a + b)
     Fz_r = mass * gravity * a / (a + b)
 
-    # The front axle rolls free (κ_f = 0); the rear one is driven
-    kappa_r, alpha_f, alpha_r = axle_slips(vx, vy, yaw_rate, w_rear, delta, params)
-    Fx_f, Fy_f = tire.forces(0.0, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
-    Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+    # Each wheel's tire computes its own slip and force, with its own numbers
+    kappa_f, alpha_f = tire_f.slip(vx_f, vy_f, w_f, R_f, params["tire"]["f"])
+    kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, R_r, params["tire"]["r"])
+    Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, road_friction, params["tire"]["f"])
+    Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, road_friction, params["tire"]["r"])
 
     # Rolling resistance of the free-rolling front axle: −C_rr Fz_f sign(vx)
     Fx_f = Fx_f - C_rr * Fz_f * smooth_sign(vx, v_c)
@@ -597,9 +603,7 @@ def compute_tire_physics(self, v_body, u_inputs, params=None):
 - `brush_tire_forces` leaves; the tests that call it move to `BrushTire().forces`.
 - **Rungs 3 and 3b get the same `tire=` slot.** With no tire given, they bind today's path:
   `LinearSaturation`, `tire_slip`, the keys `Ca`, `Ck`, `mu`. Given a module law, they bind
-  rung 4's path and take rung 4's keys, their defaults derived from today's numbers
-  (`c_alpha_f = c_alpha_r = Ca / Fz`, so the default stays neutral-steer until the maintainer
-  picks numbers in phase 3). The choice is made once, at construction (RULES 2.3). Phase 3's
+  rung 4's path: the tire's own numbers, one copy per wheel at `params["tire"]`. The choice is made once, at construction (RULES 2.3). Phase 3's
   switch is then a change of default, and its before and after are the same class built twice.
 
 ### 10.5 Presets, skins and the names that leave
@@ -609,8 +613,9 @@ def compute_tire_physics(self, v_body, u_inputs, params=None):
 | `UdeSRacecarDyn` (the equations) | `DrivetrainBicycle` holds them; `UdeSRacecarDyn(DrivetrainBicycle)` sets `PUBLIC_RACECAR_PARAMS`, the display sizes and `tf`, nothing else |
 | `UdeSRacecarDyn3D` | `UdeSRacecarDyn(wheel_angles=True)`, then `car.skin = racecar_skin_3d`. The option lives on `DrivetrainBicycle`: it appends `phi_rear, phi_front` |
 | `UdeSRacecar` | unchanged in use: `KinematicBicycle` with the racecar's numbers and frames |
-| `KinematicCar` | `KinematicBicycle` with the full-size numbers set by the caller and a four-wheel 2-D skin function in `graphical/catalog/skins.py` |
-| `DynamicBicycleCar3D` | `DynamicBicycle` with `car.skin = car_skin_3d`; its four corner arrows move into the skin |
+| `KinematicCar` | retired: `KinematicBicycle` carries the shared frame set and a full-size car's display sizes |
+| `DynamicBicycleCar3D` | retired: `DynamicBicycle` with `car.skin = car_skin_3d`; the corner arrows are dropped from the bicycle (the 3-D car shows its contact vectors as an option) |
+| (new, phase 2b) | `FormulaCar3D` and `OffRoadCar3D`: the 3-D car with a racer's and a buggy's numbers, tires, springs and looks (`formula_car_skin_3d`, `offroad_car_skin_3d`) |
 
 - **`DrivetrainBicycle`'s default numbers continue rung 3's car:** the same mass, inertia,
   `a`, `b`, radii and drag as `DynamicBicycle`, the per-unit-load stiffnesses derived from
@@ -629,14 +634,15 @@ class Bumps(Terrain):
     """Sinusoidal bumps along x and y."""
 
     def __init__(self):
-        self.params = {"terrain_amplitude": 0.05, "terrain_wavelength": 2.0, "terrain_mu": 1.0}
+        self.params = {"amplitude": 0.05, "wavelength": 2.0}
 
     def height(self, x, y, t, params): ...
     def gradient(self, x, y, t, params): ...
     def friction(self, x, y, t, params): ...
 ```
 
-- `Terrain` itself is the flat ground: height 0, gradient 0, friction 1.
+- `Terrain` itself is the flat ground: height 0, gradient 0, friction 1. The road's grip
+  is the car's `road_friction` factor; a friction map `μ(x, y)` waits for a demo.
 - Each built-in terrain writes its gradient in closed form, and a test checks it against a
   finite difference of the height.
 - The static block is one class in `terrain.py`: the positions of `n` points in; their
@@ -728,6 +734,8 @@ Public names are the maintainer's. The run uses these and lists them in its pull
 
 - tires: `LinearTire`, `BrushTire`, `MagicFormulaTire`, `LinearSaturation`; `wheel_slip`,
   `smooth_floor`;
+- 3-D presets and looks: `FormulaCar3D`, `OffRoadCar3D`, `formula_car_skin_3d`,
+  `offroad_car_skin_3d`;
 - terrain: `Terrain`, `Slope`, `Bumps`, `TerrainBlock`;
 - cars: `DrivetrainBicycle`, `SuspensionCar3D` (both ruled, §2), `SpringDamper`;
 - options: `tire=`, `terrain=`, `suspension=`, `wheel_angles=`, `massless_wheel=`.

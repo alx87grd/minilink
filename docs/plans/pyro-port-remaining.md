@@ -342,7 +342,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | KinematicBicyleModel | KinematicBicycle | `minilink/dynamics/catalog/vehicles/steering.py` |
 | HolonomicMobileRobot | HolonomicMobileRobot | `minilink/dynamics/catalog/vehicles/steering.py` |
 | Holonomic3DMobileRobot | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
-| KinematicCarModel | KinematicCar | `minilink/dynamics/catalog/vehicles/steering.py` |
+| KinematicCarModel | KinematicBicycle (with a four-wheel skin; `KinematicCar` retired) | `minilink/dynamics/catalog/vehicles/steering.py` |
 | ConstantSpeedKinematicCarModel | not in minilink (check at C1) | project only: `examples/projects/car_trajopt/vehicles/extras.py` |
 | UdeSRacecar | UdeSRacecar | `minilink/dynamics/catalog/vehicles/racecar.py` |
 | Manipulator | Manipulator | `minilink/dynamics/abstraction/manipulator.py` |

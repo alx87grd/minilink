@@ -70,7 +70,10 @@ state, with the same demo on the starting commit.
 
 ## 4. Run 2: the 3-D car
 
-Started after run 1 is merged. The equations are in plan §10.7.
+Built in run 1's branch on the maintainer's go (§6, "Run 1 continued"): VM-11 to VM-16
+landed, with the presets and looks of phase 2b. Left: VM-17's second demo (a rung-4 path
+tracker driving the 3-D car; the maintainer asked for open-loop demos only, so it waits
+for the demo clean-up) and the wheel-hop option (level ii). The equations are in plan §10.7.
 
 | Step | What | Done when |
 | --- | --- | --- |
@@ -273,6 +276,46 @@ Each entry: the step, the choice, the options it was taken over, and why.
     computed twice per `f`, and it reads `params.get("bw_rear", 0.0)`); the reverse-mode
     gradient of `LinearSaturation` at zero slip (NaN, as on the starting commit).
 
+### Run 1 continued: the tire parts, the merge of `dev`, phase 2 and 2b
+
+On the maintainer's go after the checkpoint (dev merged, full `pytest` passing, the ten car
+demos byte-identical to the merge commit), the run went on to the tire design ruled in plan
+§2, then phases 2 and 2b in the same branch. It stops before any demo moves to the brush
+tire (phase 3, the demo clean-up).
+
+- **The tire parts** (plan §2, "Tire parts"): `params["tire"][wheel]`, a deep copy of the
+  given tire per wheel; with no tire, rungs 3 and 3b keep the lent flat path. `axle_slips`
+  and the module `friction_use` leave (the methods stay). The terrains drop their key
+  prefixes and `terrain_mu`. Baseline byte-identical.
+- **One frame set, `KinematicCar` retires:** `KinematicBicycle.tf` reads its drawing sizes
+  through `getattr` defaults, so the read-only project's `ConstantSpeedKinematicCar` (which
+  never sets them) keeps working.
+- **`DynamicBicycleCar3D` retires;** the read-only `cascade_path_tracking.py` gets its two
+  lines (`DynamicBicycle(named_ports=True)` and `car_skin_3d`), as the maintainer allowed.
+- **One stacked `u`:** `named_ports=False` is the default on every car. The demos and the
+  GRO501 notebook that wire named ports pass `named_ports=True` (student-facing lines,
+  listed in the pull request); the read-only `car_trajopt_uturn.py` too (one keyword, the
+  only way to keep it running).
+- **`SuspensionCar3D`** (VM-11 to VM-16 in one commit): 15 states (17 with the wheel
+  angles), the nine of rung 4 first. Taken without asking, for the maintainer's look:
+  - the suspension is one `SpringDamper` part per wheel at `params["suspension"][wheel]`
+    (`k`, `c`, `F_eps`), its preload computed from the static loads, so it carries no free
+    length;
+  - the rear axle is locked (one `w_rear`), as plan §2 rules;
+  - no aerodynamic downforce;
+  - the contact vectors are a display attribute (`show_contact_vectors`), not a
+    constructor option;
+  - `cross` written component-wise (`np.cross` cost 70 µs of the 380 µs `f`).
+- **The presets and looks** (phase 2b): `FormulaCar3D` and `OffRoadCar3D` subclass
+  `SuspensionCar3D` and set the numbers, the parts and the skin, as `UdeSRacecarDyn` does.
+  The skins are procedural cartoon meshes (no brand, no real vehicle), in
+  `graphical/catalog/car_skins_3d.py`; the terrain is drawn under them when the plant sets
+  `scene_bounds`, the racecar skin's switch.
+- **The two demos** (`examples/demos/dynamics/formula_car_3d.py`, `offroad_car_3d.py`):
+  open-loop command schedules, no controller, `backend="jax"`. The formula schedule stays
+  under the rear grip: without downforce, 250 kW at 15 m/s asks 16 kN of rear tires that
+  hold about 7 kN, and the car spins (tried, then the schedule lowered).
+
 ## 7. Ledger
 
 The numbers that moved, each with how it was measured (machine, median of N, warm or cold).
@@ -334,3 +377,11 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   against the stored baselines with no `--update`; the GRO501 notebook's smoke check;
   nbstripout; the docs build with `-W`: all pass. The full local regression run (no
   `--tiny`) was not run (AGENTS.md asks it of a big compile or `Simulator` review).
+- **Phase 2 and 2b** (cloud container, warm, one run each unless said):
+  `SuspensionCar3D.f` 309 µs on NumPy; 10 s of driving 0.5 s compiled with JAX, about 26 s
+  per 5 s on SciPy, hence `backend="jax"` in its demos. At rest the loads sum to the weight
+  within the smooth floor's residual; the steady yaw rate on a narrow track is within 0.6 %
+  of rung 4's. The presets' automatic steps: 0.25 ms (formula, the stiff springs) and
+  0.45 ms (off-road). The demos: the formula car ends a 10 s run at 31.1 m/s with a peak
+  roll of 0.007 rad; the buggy over 0.12 m bumps peaks at 0.24 rad of roll and 0.054 rad
+  of pitch, with a wheel unloaded over some crests.
