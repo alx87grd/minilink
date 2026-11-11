@@ -42,6 +42,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Heading | `psi` on every rung (state label `"psi"`); rung 6 uses roll `φ`, pitch `θ`, yaw `ψ` |
 | Suspension | the design supports quasi-static load transfer (4b), spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only |
 | Load transfer | an exact continuous model: no lag on the acceleration |
+| Slip | try the smooth slip formula, today's kept as a commented line below it, the switch measured before and after on the flagship car demo (§5.1, §7) |
 | Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, and the UdeS Racecar preset brought to it with its real skin and parameters (§7) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
 
@@ -142,7 +143,7 @@ Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
 **The transitional law, `LinearSaturation`** (the maintainer, 2026-11-11):
 - It is today's `linear_tire_forces` moved behind the interface unchanged: linear forces
   scaled back onto the friction circle `|F| ≤ μ Fz`, with today's absolute stiffnesses
-  `Ca`, `Ck` shared by both axles and today's slip (`|vx| + ε`).
+  `Ca`, `Ck` shared by both axles; it uses today's slip until the slip switch (§7).
 - It is the default of rungs 3 and 3b during the refactor, so phase 1 moves no demo number.
 - After the demo clean-up, the demos switch to the brush law, and `LinearSaturation`
   retires.
@@ -159,11 +160,30 @@ load. It never serves rung 4b.
   This is what makes the exact load transfer of §6 possible.
 - **`Fz` is an argument, never computed inside the law.** Its source is the normal-load law
   (§5.3).
-- **One slip function** with a smooth floor replaces the four regularizations:
-  `wheel_slips(vx, vy, omega, R, v_eps)`, on the contact velocity in the wheel frame, with
-  denominator `√(vx² + ε²)`. The tire object owns its slip definition (`tire.slips(...)`),
-  with this function the default. That is how `LinearSaturation` keeps today's `|vx| + ε`,
-  and how a private law can bring its own definition.
+- **One slip function** replaces the four regularizations:
+  `wheel_slips(vx, vy, omega, R, v_eps)`, on the contact velocity in the wheel frame:
+
+  ```python
+  # Slips over the rolling speed, its floor smooth at rest:
+  # κ = (ω R − vx) / √(vx² + ε²), α = −atan(vy / √(vx² + ε²))
+  v_roll = xp.sqrt(vx**2 + v_eps**2)
+  # v_roll = xp.abs(vx) + v_eps   # the formula before the slip switch (§7)
+  ```
+
+  Today's racecar already uses the smooth form. Against today's `|vx| + ε` it:
+  - is smooth at `vx = 0`;
+  - biases the slips by about `ε²/(2 vx²)` instead of `ε/|vx|` (with ε = 0.1 m/s: 0.5 %
+    instead of 9 % at 1 m/s, and 0.005 % instead of 1 % at 10 m/s; computed from the
+    formulas).
+
+  What it costs:
+  - between rest and a few `ε` the tires are stiffer (up to √2 at `vx = ε`); at rest the
+    two formulas agree;
+  - every rung-3 and rung-3b number moves.
+
+  Hence the switch is one step of its own, measured (§7). The previous formula stays as a
+  commented line under the new one (the maintainer, 2026-11-11), until the demo clean-up
+  confirms the switch.
 - **Combined slip:**
   - linear: independent `Fx` and `Fy`;
   - brush: its one combined slip demand;
@@ -266,7 +286,24 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - ladder 1 to 5 consolidated: presets, skins, `psi`, one owner for the wheelbase, one slip
     function.
 
-  It sits inside v0.4's catalog clean-up.
+  It sits inside v0.4's catalog clean-up. Its order on the slips:
+  1. The tire module lands with today's slip on rungs 3 and 3b, so no demo number moves.
+  2. **The slip switch**, a step and a commit of its own: the smooth formula, with today's
+     kept as a commented line under it. It is measured before and after:
+     - **Demo:** the flagship car demo (`mpc_car_minimal`, the one car demo in the
+       flagship demo checks, `tests/demo_checks/flagship_manifest.json`), and the
+       trajectory-optimization comparison over the ladder
+       (`examples/projects/car_trajopt/car_trajopt_compare.py`, run only, not edited);
+       which demo is the reference is open (§9).
+     - **Numbers recorded on both sides:**
+       - for each solve: converged or not, iterations, final cost;
+       - solve time: the median of 5 warm runs on one machine, the two sides alternated;
+       - the largest state difference between the two optimal trajectories;
+       - for the MPC: the closed-loop tracking error.
+     - **Recorded in a ledger** in this plan.
+     - **The switch stays** if every solve still converges, the cost and the tracking
+       error are within noise or better, and the time is not slower beyond noise.
+       Otherwise stop and ask.
 - **Phase 2, the 3-D car.** Rung 6 at suspension level (i): spring-damper corners on the
   terrain, first flat, then the built-in terrains, with a teaching self-driving demo.
 - **Phase 3, the 3-D car's look and presets:**
@@ -313,5 +350,7 @@ here.
 6. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
 7. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
    module.
-8. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+8. **The reference demo for the slip switch** (§7): `mpc_car_minimal`, the trajectory-
+   optimization comparison, or another the maintainer names.
+9. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
    law and the terrain.
