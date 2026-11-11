@@ -21,7 +21,7 @@ from minilink.control import ModelPredictiveController  # noqa: E402
 from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
     DoubleIntegrator,
 )
-from minilink.planning import MPPIPlanner, MPPIRecord  # noqa: E402
+from minilink.planning import MPPIPlanner, MPPIRecord, evaluate  # noqa: E402
 
 DT = 0.05
 
@@ -254,6 +254,16 @@ def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
     heavy = edited(pv.params, {"cost": {"R": 100.0 * np.eye(1)}})
     z_heavy, _ = pv.solve(heavy, z0)
     assert np.max(np.abs(z_heavy[:-1])) < np.max(np.abs(z[:-1]))
+
+
+def test_the_evidence_of_a_solve_at_params_scores_the_edited_problem():
+    """A solve at an edited tree is scored on the problem it solved, the start moved."""
+    planner = double_integrator_planner()
+    tree = edited(planner.params, {"x0": np.array([0.5, 0.0])})
+    solution = planner.solve(params=tree, evaluate=True)
+    expected = evaluate(solution.problem, solution.controller, dt=DT)
+    np.testing.assert_allclose(solution.evaluation.J, expected.J)
+    np.testing.assert_allclose(solution.evaluation.x0, [[0.5, 0.0]])
 
 
 def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():

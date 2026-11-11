@@ -156,7 +156,8 @@ class MPPIPlanner(Planner):
         ``params`` is ``None`` (the problem as it is) or the complete tree of
         :attr:`params`, edited; ``guess`` (a trajectory or
         a solution) seeds ``U``, else the ports' nominal input. The controller is
-        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate``;
+        the held schedule ``u = π(t)``; ``evaluate`` scores it with ``evaluate`` on
+        the problem it solved (at ``params``);
         ``verbose`` prints the record.
         """
         started = time.perf_counter()
@@ -171,7 +172,11 @@ class MPPIPlanner(Planner):
 
         if evaluate:
             evaluation = planner_evidence(
-                self, solution.controller, dt=self.dt, n_trials=n_trials
+                self,
+                solution.controller,
+                dt=self.dt,
+                n_trials=n_trials,
+                problem=solution.problem,
             )
             solution = replace(solution, evaluation=evaluation)
         if verbose:
