@@ -177,57 +177,6 @@ class DrivetrainBicycle(DynamicBicycle):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-    @property
-    def solver_info(self) -> dict:
-        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
-        info = self.own_solver_info
-        info["smallest_time_constant"] = self.fastest_mode()
-
-        return info
-
-    @solver_info.setter
-    def solver_info(self, value: dict):
-        self.own_solver_info = dict(value)
-
-    def fastest_mode(self) -> float:
-        """The solver hint, in seconds: ten times the largest step an explicit run takes stably.
-
-        A fixed-step run without a step of its own takes ``Δt = 0.1 τ`` from this hint.
-        The tire modes are stiffest at rest, where the slip denominators sit on their
-        floor ``v_eps``: three are estimated, the wheel against the
-        longitudinal stiffness, the yaw and the sideslip against the cornering
-        stiffnesses. Those standstill modes come from the slip floor, not from the
-        car's behaviour, so the hint does not resolve them: it keeps Euler stable on
-        the stiffest, ``|λ| Δt < 2``, with a margin, and resolves the actuator lags.
-        It is a solver convenience, not a mode of the model; a run that needs
-        accuracy names its own step or uses an adaptive solver.
-        """
-        params = self.params
-
-        r_r = params["r_r"]
-        Jw_rear = params["Jw_rear"]
-        mass = params["mass"]
-        inertia = params["inertia"]
-        a = params["a"]
-        b = params["b"]
-        engine_tau = params["engine_tau"]
-        steering_tau = params["steering_tau"]
-
-        C_alpha_f, C_alpha_r, C_kappa, v_eps = self.axle_stiffnesses(params)
-
-        # The wheel and the car exchanging momentum through the rear contact; the yaw
-        # and the sideslip against the two cornering stiffnesses
-        T_long = v_eps / (C_kappa * (r_r**2 / Jw_rear + 1.0 / mass))
-        T_yaw = inertia * v_eps / (C_alpha_f * a**2 + C_alpha_r * b**2)
-        T_lat = mass * v_eps / (C_alpha_f + C_alpha_r)
-
-        # Euler stays stable on the stiffest mode for Δt < 2 T: Δt = 1.9 T, so τ = 19 T;
-        # the actuator lags are resolved, τ ≤ their time constants
-        T_stable = 19.0 * min(T_long, T_yaw, T_lat)
-        T_min = min(T_stable, engine_tau, steering_tau)
-
-        return T_min
-
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x, u)
@@ -256,7 +205,7 @@ class DrivetrainBicycle(DynamicBicycle):
         M = self.M(q, params)
         C = self.C(q, v, params)
         N = self.N(q, params)
-        d = self.generalized_d(q, v, u_in, params)
+        d = self.generalized_d(q, v, u_in, params, t)
 
         # Chassis: M v̇ + C v + d = 0, and q̇ = N v
         dv = xp.linalg.solve(M, -C @ v - d)
@@ -268,7 +217,7 @@ class DrivetrainBicycle(DynamicBicycle):
         #   Jw ẇ_rear = τ − τ_ground(v, w_rear, δ) − τ_brake(w_rear)
         P_dot = (xp.clip(P_cmd, -P_max, P_max) - P) / engine_tau
         tau = xp.clip(P / xp.sqrt(w_rear**2 + w_eps**2), -tau_sat, tau_sat)
-        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params, q)
+        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params, q, t)
         tau_brake = bw_drive * w_rear + tau_fric * xp.tanh(w_rear / w_c)
         w_rear_dot = (tau - tau_ground - tau_brake) / Jw_rear
 
@@ -335,8 +284,8 @@ class DrivetrainBicycle(DynamicBicycle):
         q = x[0:3]
         v_body = x[3:6]
         u_in = x[6:8]
-        friction_f, friction_r = self.contact_friction(q, params)
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q)
+        friction_f, friction_r = self.contact_friction(q, params, t)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
 
         # Static axle loads
         Fz_f = mass * gravity * b / (a + b)
@@ -364,7 +313,7 @@ class DrivetrainBicycle(DynamicBicycle):
         q = x[0:3]
         v_body = x[3:6]
         u_in = x[6:8]
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q, t)
         c_d = xp.cos(delta)
         s_d = xp.sin(delta)
 
@@ -395,9 +344,48 @@ class DrivetrainBicycle(DynamicBicycle):
 
         return power
 
+    def fastest_mode(self) -> float:
+        """The solver hint, in seconds: ten times the largest step an explicit run takes stably.
+
+        A fixed-step run without a step of its own takes ``Δt = 0.1 τ`` from this hint.
+        The tire modes are stiffest at rest, where the slip denominators sit on their
+        floor ``v_eps``: three are estimated, the wheel against the
+        longitudinal stiffness, the yaw and the sideslip against the cornering
+        stiffnesses. Those standstill modes come from the slip floor, not from the
+        car's behaviour, so the hint does not resolve them: it keeps Euler stable on
+        the stiffest, ``|λ| Δt < 2``, with a margin, and resolves the actuator lags.
+        It is a solver convenience, not a mode of the model; a run that needs
+        accuracy names its own step or uses an adaptive solver.
+        """
+        params = self.params
+
+        r_r = params["r_r"]
+        Jw_rear = params["Jw_rear"]
+        mass = params["mass"]
+        inertia = params["inertia"]
+        a = params["a"]
+        b = params["b"]
+        engine_tau = params["engine_tau"]
+        steering_tau = params["steering_tau"]
+
+        C_alpha_f, C_alpha_r, C_kappa, v_eps = self.axle_stiffnesses(params)
+
+        # The wheel and the car exchanging momentum through the rear contact; the yaw
+        # and the sideslip against the two cornering stiffnesses
+        T_long = v_eps / (C_kappa * (r_r**2 / Jw_rear + 1.0 / mass))
+        T_yaw = inertia * v_eps / (C_alpha_f * a**2 + C_alpha_r * b**2)
+        T_lat = mass * v_eps / (C_alpha_f + C_alpha_r)
+
+        # Euler stays stable on the stiffest mode for Δt < 2 T: Δt = 1.9 T, so τ = 19 T;
+        # the actuator lags are resolved, τ ≤ their time constants
+        T_stable = 19.0 * min(T_long, T_yaw, T_lat)
+        T_min = min(T_stable, engine_tau, steering_tau)
+
+        return T_min
+
     # Tires (the only physics overridden from DynamicBicycle)
 
-    def compute_tire_physics(self, v_body, u_inputs, params=None, q=None):
+    def compute_tire_physics(self, v_body, u_inputs, params=None, q=None, t=0.0):
         """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame.
 
         Static axle loads carry the weight. The free-rolling front axle makes a
@@ -407,8 +395,8 @@ class DrivetrainBicycle(DynamicBicycle):
         ``C_rr`` is charged to the front axle only: what the rear wheels lose to rolling
         is carried by the drivetrain terms (``bw_drive``, ``tau_fric``), which resist
         the wheel rate itself rather than the contact patch. ``q`` is the pose
-        ``[x, y, psi]``, where the road's friction is read; without it the car stands
-        at the origin.
+        ``[x, y, psi]`` and ``t`` the time at which the road's friction is read;
+        without ``q`` the car stands at the origin.
         """
         params = self.params if params is None else params
         xp = array_module(v_body, u_inputs)
@@ -431,7 +419,7 @@ class DrivetrainBicycle(DynamicBicycle):
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
             v_body, u_inputs, params
         )
-        friction_f, friction_r = self.contact_friction(q, params)
+        friction_f, friction_r = self.contact_friction(q, params, t)
 
         # Static axle loads
         Fz_f = mass * gravity * b / (a + b)
@@ -495,6 +483,11 @@ class DrivetrainBicycle(DynamicBicycle):
     def wheel_rate_and_steer(self, x, u):
         """The base class reads ``[w_rear, delta]`` here; both are states now."""
         return x[6:8]
+
+    def set_numbers(self, numbers):
+        """The car's own numbers replaced by a preset's, the command limits following."""
+        self.params.update(numbers)
+        self.bound_commands()
 
     def bound_commands(self):
         """The command ports' limits, ``+- P_max`` and ``+- delta_max``, from ``params``."""

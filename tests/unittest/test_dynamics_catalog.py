@@ -1068,3 +1068,30 @@ def test_a_friction_map_lowers_the_grip_of_the_axle_on_it_only():
 
     assert abs(Fy_f) < 0.2 * abs(Fy_f_dry)
     assert Fy_r == Fy_r_dry
+
+
+@pytest.mark.parametrize(
+    "plant",
+    [DynamicBicycle, BicycleDynRate, DrivetrainBicycle, UdeSRacecarDyn],
+    ids=lambda plant: plant.__name__,
+)
+def test_a_road_that_dries_with_time_is_read_at_the_time_of_the_call(plant):
+    from minilink.dynamics.catalog.vehicles.terrain import Terrain
+    from minilink.dynamics.catalog.vehicles.tires import BrushTire
+
+    class Drying(Terrain):
+        """Wet until t = 1 s, dry after."""
+
+        def friction(self, x, y, t=0.0, params=None):
+            return np.where(t < 1.0, 0.2, 1.0)
+
+    car = plant(tire=BrushTire(), terrain=Drying())
+    x = np.zeros(car.n)
+    x[3:6] = [10.0, 2.0, 0.0]
+    x[6:] = 0.0
+    u = np.zeros(car.m)
+
+    dvy_wet = car.f(x, u, 0.0)[4]
+    dvy_dry = car.f(x, u, 2.0)[4]
+
+    assert abs(dvy_wet) < 0.5 * abs(dvy_dry)

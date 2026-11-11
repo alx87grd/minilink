@@ -87,7 +87,7 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     """1/10-scale racecar: the drivetrain bicycle with the UdeS racecar's numbers.
 
     The equations, inputs, outputs and options (``named_ports``, ``tire``,
-    ``wheel_angles``) are :class:`DrivetrainBicycle`'s; this preset sets
+    ``wheel_angles``, ``terrain``) are :class:`DrivetrainBicycle`'s; this preset sets
     :data:`PUBLIC_RACECAR_PARAMS`, its two tires and the 1/10-scale look. A proxy
     that behaves roughly like the real car, for testing ideas, not an identified
     model of it. Its tires are brush tires on soft rubber (``mu`` 1 on a smooth hard
@@ -100,20 +100,23 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     the state.
     """
 
-    def __init__(self, named_ports=False, tire=None, wheel_angles=False):
+    def __init__(self, named_ports=False, tire=None, wheel_angles=False, terrain=None):
         # The 1/10 car's tires: the rear stiffer than the front
         if tire is None:
             tire = {
                 "f": BrushTire(mu=1.0, c_alpha=4.0, c_kappa=10.0, v_eps=0.2),
                 "r": BrushTire(mu=1.0, c_alpha=5.0, c_kappa=10.0, v_eps=0.2),
             }
-        super().__init__(named_ports=named_ports, tire=tire, wheel_angles=wheel_angles)
+        super().__init__(
+            named_ports=named_ports,
+            tire=tire,
+            wheel_angles=wheel_angles,
+            terrain=terrain,
+        )
 
-        # Parameters: the 1/10 car's numbers, its tires' held beside them
-        self.params.update(PUBLIC_RACECAR_PARAMS)
-
-        # Ports: the 1/10 car's command limits
-        self.bound_commands()
+        # Parameters: the 1/10 car's numbers and its command limits, its tires' held
+        # beside them
+        self.set_numbers(PUBLIC_RACECAR_PARAMS)
 
         # Graphics: a 1/10-scale car and a camera that follows it
         self.wheel_len = 2.0 * self.params["r_r"]
