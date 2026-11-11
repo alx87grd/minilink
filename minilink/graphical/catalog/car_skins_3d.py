@@ -22,8 +22,6 @@ FORMULA_COLORS = {
     "accent": "#f97316",
     "carbon": "#17181c",
     "cockpit": "#0b0b0d",
-    "helmet": "#facc15",
-    "visor": "#111827",
     "tire": "#141414",
     "rim": "#c0c4cc",
     "hub": "#f97316",
@@ -166,8 +164,6 @@ def formula_car_skin_3d(plant, colors=None):
         TriangleMesh(*rear_plates, color=colors["accent"], name="rear_plates"),
         TriangleMesh(*arms, color=colors["carbon"], name="arms", max_edges=0),
         TriangleMesh(*halo, color=colors["carbon"], name="halo", max_edges=0),
-        Sphere(radius=0.13, center=(-0.02, 0.0, g + 0.74), color=colors["helmet"]),
-        Sphere(radius=0.085, center=(0.06, 0.0, g + 0.75), color=colors["visor"]),
     ]
 
     # The wheels: wide slicks, the rear wider
@@ -351,11 +347,12 @@ def mount_rear_wheels(look, plant):
 
 
 def terrain_surface(plant, color, step=0.25):
-    """The plant's terrain as one mesh over ``plant.scene_bounds``; none without bounds.
+    """The plant's terrain as one mesh over ``plant.scene_bounds``; none when flat.
 
     ``scene_bounds`` ``(x_min, x_max, y_min, y_max)`` [m] is the opt-in, as for the
-    racecar's scene. The height comes from ``plant.terrain`` (flat when the plant has
-    none), sampled every ``step`` metres.
+    racecar's scene. The height comes from ``plant.terrain``, sampled every ``step``
+    metres. Flat ground (or a plant with no terrain) draws nothing: the viewer's own
+    grid is the ground.
     """
     bounds = getattr(plant, "scene_bounds", None)
     if bounds is None:
@@ -369,6 +366,8 @@ def terrain_surface(plant, color, step=0.25):
     terrain = getattr(plant, "terrain", None)
     Z = np.zeros_like(X) if terrain is None else np.asarray(terrain.height(X, Y))
     Z = np.broadcast_to(Z, X.shape)
+    if not np.any(Z):
+        return []
     vertices = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
     n_y = ys.size
     i, j = np.meshgrid(np.arange(xs.size - 1), np.arange(n_y - 1), indexing="ij")
