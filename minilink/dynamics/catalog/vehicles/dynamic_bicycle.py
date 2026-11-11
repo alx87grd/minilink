@@ -10,6 +10,7 @@ from minilink.core.kinematics import SE2, translation
 from minilink.core.params import held_params
 from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem, fastest_time_constant
+from minilink.dynamics.catalog.vehicles.terrain import Terrain
 from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
 from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d
@@ -36,8 +37,11 @@ class DynamicBicycle(DynamicSystem):
     own ``Ca``, ``Ck``, ``mu`` and slip floor ``v_min_epsilon``. A tire given, one for
     both wheels or a dict by wheel name, is a part: each wheel holds its own copy, its
     numbers at ``params["tire"][wheel]``, and the car's tire keys leave its ``params``.
-    ``road_friction`` [-] is the road's grip relative to the reference surface,
-    1 by default: it multiplies every tire's ``mu``.
+    The road is a ``terrain`` (flat by default), its numbers at
+    ``params["terrain"]``: its friction factor under each contact, 1 on the reference
+    surface, multiplies the tire's ``mu`` (``params["terrain"]["friction"]`` for a
+    uniform road, a terrain subclass for a map). The planar car reads only the
+    terrain's friction, never its height.
 
     Inputs
     ------
@@ -48,7 +52,7 @@ class DynamicBicycle(DynamicSystem):
     params = held_params()
     wheels = ("f", "r")
 
-    def __init__(self, named_ports=False, tire=None):
+    def __init__(self, named_ports=False, tire=None, terrain=None):
         super().__init__(state_dim=6)
         self.named_ports = bool(named_ports)
 
@@ -58,8 +62,7 @@ class DynamicBicycle(DynamicSystem):
         # stiffnesses shared by both axles, cornering Ca [N/rad] and longitudinal
         # Ck [N], friction mu [-] and the slip regularization speed v_min_epsilon
         # [m/s] (the keys of the car_trajopt project's ladder). A law of the tire
-        # module carries its own instead; road_friction [-] scales the grip of every
-        # tire (1 on the reference surface)
+        # module carries its own instead
         self.params.update(
             {
                 "a": 1.0,
@@ -75,9 +78,12 @@ class DynamicBicycle(DynamicSystem):
                 "Ck": 100000.0,
                 "mu": 1.0,
                 "v_min_epsilon": 0.1,
-                "road_friction": 1.0,
             }
         )
+
+        # The road: a part holding its own numbers, its friction factor among them
+        self.terrain = Terrain() if terrain is None else copy.deepcopy(terrain)
+        self.params["terrain"] = self.terrain.params
 
         # The tires, chosen once: the saturated linear tire on the car's own numbers,
         # or a part per wheel holding its own
@@ -279,13 +285,42 @@ class DynamicBicycle(DynamicSystem):
 
         return vx_f, vy_f, w_f, vx_r, vy_r, w_r
 
-    def compute_tire_physics(self, v_body, u_inputs, params=None):
-        """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame."""
-        Fx_f, Fy_f, Fx_r, Fy_r = self.axle_forces(v_body, u_inputs, params)
+    def compute_tire_physics(self, v_body, u_inputs, params=None, q=None):
+        """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame.
+
+        ``q`` is the pose ``[x, y, psi]``, where the road's friction is read; without
+        it the car stands at the origin.
+        """
+        xp = array_module(v_body, u_inputs)
+        q = xp.zeros(3) if q is None else q
+
+        Fx_f, Fy_f, Fx_r, Fy_r = self.axle_forces(v_body, u_inputs, q, params)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    def lent_tire_forces(self, v_body, u_inputs, params=None):
+    def contact_friction(self, q, params=None):
+        """The road's friction factor ``(friction_f, friction_r)`` [-] under the two axles."""
+        params = self.params if params is None else params
+        xp = array_module(q)
+
+        terrain = self.terrain
+        terrain_params = params["terrain"]
+        a = params["a"]
+        b = params["b"]
+
+        X = q[0]
+        Y = q[1]
+        psi = q[2]
+        c_psi = xp.cos(psi)
+        s_psi = xp.sin(psi)
+
+        # The contacts on the centreline, a ahead of and b behind the centre of gravity
+        friction_f = terrain.friction(X + a * c_psi, Y + a * s_psi, 0.0, terrain_params)
+        friction_r = terrain.friction(X - b * c_psi, Y - b * s_psi, 0.0, terrain_params)
+
+        return friction_f, friction_r
+
+    def lent_tire_forces(self, v_body, u_inputs, q, params=None):
         """The axle forces of the saturated linear tire, on the car's ``Ca``, ``Ck``, ``mu``."""
         params = self.params if params is None else params
 
@@ -301,7 +336,7 @@ class DynamicBicycle(DynamicSystem):
         Ck = params["Ck"]
         mu = params["mu"]
         v_min_epsilon = params["v_min_epsilon"]
-        road_friction = params["road_friction"]
+        friction_f, friction_r = self.contact_friction(q, params)
 
         L = a + b
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
@@ -318,12 +353,12 @@ class DynamicBicycle(DynamicSystem):
         # The slips at each contact, then the saturated linear forces
         kappa_f, alpha_f = tire_f.slip(vx_f, vy_f, w_f, r_f, lent)
         kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, r_r, lent)
-        Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, road_friction, lent)
-        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, road_friction, lent)
+        Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, friction_f, lent)
+        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, friction_r, lent)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    def part_tire_forces(self, v_body, u_inputs, params=None):
+    def part_tire_forces(self, v_body, u_inputs, q, params=None):
         """The axle forces of each wheel's own tire, on its own numbers."""
         params = self.params if params is None else params
 
@@ -337,7 +372,7 @@ class DynamicBicycle(DynamicSystem):
         r_r = params["r_r"]
         mass = params["mass"]
         gravity = params["gravity"]
-        road_friction = params["road_friction"]
+        friction_f, friction_r = self.contact_friction(q, params)
 
         L = a + b
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
@@ -351,8 +386,8 @@ class DynamicBicycle(DynamicSystem):
         # The slips at each contact, then each tire's forces
         kappa_f, alpha_f = tire_f.slip(vx_f, vy_f, w_f, r_f, p_f)
         kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, r_r, p_r)
-        Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, road_friction, p_f)
-        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, road_friction, p_r)
+        Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, friction_f, p_f)
+        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, friction_r, p_r)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
@@ -391,7 +426,7 @@ class DynamicBicycle(DynamicSystem):
         rho = params["rho"]
         CdA = params["CdA"]
 
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in, params)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v, u_in, params, q)
         delta = u_in[1]
         c_d = xp.cos(delta)
         s_d = xp.sin(delta)
@@ -439,7 +474,7 @@ class DynamicBicycle(DynamicSystem):
     def h(self, x, u, t=0.0, params=None):
         return x
 
-    def rear_wheel_ground_torque(self, v_body, w_rear, delta, params=None):
+    def rear_wheel_ground_torque(self, v_body, w_rear, delta, params=None, q=None):
         """Tire reaction plus viscous torque on the rear wheel [Nm].
 
         Satisfies ``Jw * w_rear_dot = tau_motor - tau_ground`` for the rate,
@@ -452,7 +487,7 @@ class DynamicBicycle(DynamicSystem):
         bw = params.get("bw_rear", 0.0)
 
         u_in = xp.array([w_rear, delta])
-        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params)
+        _, _, Fx_r, _ = self.compute_tire_physics(v_body, u_in, params, q)
 
         # τ_ground = r_r F_xr + b_w ω_rear: the road reaction through the rear tire,
         # plus the viscous bearing torque
@@ -529,11 +564,12 @@ class DynamicBicycle(DynamicSystem):
     ###########################################################################
 
     def param_parts(self) -> dict:
-        """The parts whose own numbers the tree holds: each wheel's tire, when it is a part."""
-        if not self.tire_is_part:
-            return {}
+        """The parts whose own numbers the tree holds: the terrain, each wheel's tire when it is a part."""
+        parts = {"terrain": self.terrain}
+        if self.tire_is_part:
+            parts["tire"] = dict(self.tire)
 
-        return {"tire": dict(self.tire)}
+        return parts
 
     def wheel_rate_and_steer(self, x, u):
         """``[w_rear, delta]`` from the port vector (overridden by the rate variant).
@@ -558,6 +594,7 @@ class DynamicBicycle(DynamicSystem):
         a = params["a"]
         b = params["b"]
 
+        q = x[0:3]
         v_body = x[3:6]
         u_in = self.wheel_rate_and_steer(x, u)
         delta = u_in[1]
@@ -571,7 +608,7 @@ class DynamicBicycle(DynamicSystem):
 
         # Tire forces: the front pair turned from the steered wheel to the body; the
         # rear pair is already in the body frame
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q)
         cd = np.cos(delta)
         sd = np.sin(delta)
         Fx_f_b = Fx_f * cd - Fy_f * sd
@@ -593,8 +630,8 @@ class BicycleDynRate(DynamicBicycle):
     :class:`DynamicBicycle`.
     """
 
-    def __init__(self, named_ports=False, tire=None):
-        super().__init__(named_ports=False, tire=tire)
+    def __init__(self, named_ports=False, tire=None, terrain=None):
+        super().__init__(named_ports=False, tire=tire, terrain=terrain)
         self.named_ports = bool(named_ports)
 
         # State: the body's six, then the rear wheel rate and the steer angle
@@ -676,11 +713,12 @@ class BicycleDynRate(DynamicBicycle):
 
         Jw_rear = params["Jw_rear"]
 
+        q = x[0:3]
         v_body = x[3:6]
         w_rear = x[6]
         delta = x[7]
         w_rear_dot = self.rates(x, u)[0]
-        tau_ground = self.rear_wheel_ground_torque(v_body, w_rear, delta, params)
+        tau_ground = self.rear_wheel_ground_torque(v_body, w_rear, delta, params, q)
 
         # Jw ẇ_rear = τ_rear − τ_ground, solved for the motor torque
         tau_rear = Jw_rear * w_rear_dot + tau_ground

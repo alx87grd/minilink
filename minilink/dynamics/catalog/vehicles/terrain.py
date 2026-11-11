@@ -16,16 +16,17 @@ class Terrain:
 
     A terrain is a hard surface described by named fields of the position ``(x, y)``
     [m] and the time ``t`` [s]: its height ``z(x, y)``, the gradient of that height,
-    and a friction factor that multiplies each tire's ``mu``, 1 on the reference
-    surface. A subclass writes its gradient in closed form, the exact derivative of
+    and a friction factor that multiplies each tire's ``mu``: the road's grip
+    relative to the reference surface (dry asphalt), ``params["friction"]``, 1 by
+    default, uniform unless a subclass maps it over the ground. A subclass writes its gradient in closed form, the exact derivative of
     its height, and keeps its numbers in ``params``.
     """
 
     params = own_params()
 
     def __init__(self):
-        # Parameters: none, the ground is flat
-        self.params = {}
+        # Parameters: the road's friction factor [-] (1 on the reference surface)
+        self.params = {"friction": 1.0}
 
     def height(self, x, y, t=0.0, params=None):
         """Ground height ``z`` [m] under each point."""
@@ -46,9 +47,13 @@ class Terrain:
 
     def friction(self, x, y, t=0.0, params=None):
         """Friction factor [-] under each point: the tire's ``mu`` is multiplied by it."""
+        params = self.params if params is None else params
         xp = array_module(x, y)
 
-        mu = xp.ones_like(x * y)
+        friction = params["friction"]
+
+        # Uniform over the ground
+        mu = friction * xp.ones_like(x * y)
 
         return mu
 
@@ -58,7 +63,7 @@ class Slope(Terrain):
 
     def __init__(self):
         # Parameters: the slope angle
-        self.params = {"slope": 0.1}
+        self.params = {"slope": 0.1, "friction": 1.0}
 
     def height(self, x, y, t=0.0, params=None):
         params = self.params if params is None else params
@@ -89,7 +94,7 @@ class Bumps(Terrain):
 
     def __init__(self):
         # Parameters: the bumps' amplitude and wavelength
-        self.params = {"amplitude": 0.05, "wavelength": 2.0}
+        self.params = {"amplitude": 0.05, "wavelength": 2.0, "friction": 1.0}
 
     def height(self, x, y, t=0.0, params=None):
         params = self.params if params is None else params

@@ -1,7 +1,5 @@
 """The 3-D car: a rigid body on four sprung corners, its tires on a terrain."""
 
-import copy
-
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -10,7 +8,6 @@ from minilink.core.params import own_params
 from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import wheel_parts
-from minilink.dynamics.catalog.vehicles.terrain import Terrain
 from minilink.dynamics.catalog.vehicles.tires import (
     BrushTire,
     smooth_floor,
@@ -47,7 +44,7 @@ class SuspensionCar3D(DrivetrainBicycle):
     own :class:`SpringDamper` (``suspension``), their numbers at
     ``params["tire"][wheel]`` and ``params["suspension"][wheel]``. ``terrain`` (flat
     by default) gives the ground's height and its friction factor under each wheel,
-    its numbers at ``params["terrain"]``; ``road_friction`` scales every tire's grip.
+    its numbers at ``params["terrain"]``; its friction factor scales every tire's grip.
 
     Corners
     -------
@@ -88,12 +85,13 @@ class SuspensionCar3D(DrivetrainBicycle):
         terrain=None,
         wheel_angles=False,
     ):
-        super().__init__(named_ports=named_ports, tire=tire, wheel_angles=False)
+        super().__init__(
+            named_ports=named_ports, tire=tire, wheel_angles=False, terrain=terrain
+        )
         self.wheel_angles = bool(wheel_angles)
         self.suspension = wheel_parts(
             SpringDamper() if suspension is None else suspension, self.wheels
         )
-        self.terrain = Terrain() if terrain is None else copy.deepcopy(terrain)
 
         # State: the drivetrain bicycle's nine, the body's six, the wheel angles
         self.n = 17 if self.wheel_angles else 15
@@ -115,7 +113,6 @@ class SuspensionCar3D(DrivetrainBicycle):
         self.params["suspension"] = {
             wheel: self.suspension[wheel].params for wheel in self.wheels
         }
-        self.params["terrain"] = self.terrain.params
         self.x0[9] = self.params["h_cg"]
 
         # Ports: the sensors of a 3-D body
@@ -455,7 +452,6 @@ class SuspensionCar3D(DrivetrainBicycle):
         h_cg = params["h_cg"]
         r_f = params["r_f"]
         r_r = params["r_r"]
-        road_friction = params["road_friction"]
         C_rr = params["C_rr"]
         v_c = params["v_c"]
 
@@ -502,9 +498,7 @@ class SuspensionCar3D(DrivetrainBicycle):
         vy_w = xp.sum(v_C * e_y, axis=1)
 
         # The road's grip under each contact
-        friction = road_friction * terrain.friction(
-            C[:, 0], C[:, 1], 0.0, terrain_params
-        )
+        friction = terrain.friction(C[:, 0], C[:, 1], 0.0, terrain_params)
 
         # Each wheel: its spring's load, its slips, its tire's forces
         Fz = []

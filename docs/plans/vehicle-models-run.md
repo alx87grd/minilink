@@ -345,6 +345,15 @@ tire (phase 3, the demo clean-up).
   over a crest (7 m/s sideways), physical but not a plain demo. A test coasts it over 1 m
   hills.
 
+- **Friction** (the maintainer's ruling B, after the phase 2b review): the terrain owns the
+  road's friction factor on every car rung; `road_friction` leaves. The bicycles read the
+  terrain's friction at their two axles from the pose, so `compute_tire_physics` and
+  `rear_wheel_ground_torque` take the pose as an optional last argument `q` (the car at
+  the origin without it: the read-only `car_trajopt` project calls the second with the
+  old arguments and keeps working). The five racecar demos, `make_assets.py` and the
+  GRO501 notebook set `params["terrain"]["friction"]` (student-facing lines); the three
+  3-D demos show the knob. Baseline byte-identical.
+
 ## 7. Ledger
 
 The numbers that moved, each with how it was measured (machine, median of N, warm or cold).

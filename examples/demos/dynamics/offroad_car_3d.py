@@ -16,6 +16,7 @@ N_SAMPLES = 1201
 car = OffRoadCar3D(terrain=Bumps(), wheel_angles=True)
 car.params["terrain"]["amplitude"] = 0.8  # [m] hills, crest to trough 1.6 m
 car.params["terrain"]["wavelength"] = 30.0  # [m]
+car.params["terrain"]["friction"] = 1.0  # [-] road grip: 1 dry, 0.7 wet, 0.1 ice
 
 # The schedule: steady power, the steering weaving left and right
 t = np.linspace(0.0, TF, N_SAMPLES)

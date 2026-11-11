@@ -54,13 +54,14 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Phases | 1 the foundations; 2 the 3-D car; 2b one or two good-looking generic 3-D skins for the 3-D car, two extremes (an open-wheel formula car, an off-road side-by-side); 3 a generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
 | Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
-| Tire parts (2026-11-11, after run 1's review) | each tire is a part with its own `params`, held by the car like a diagram's subsystem: the tire owns its grip `mu`, its stiffnesses per unit load `c_alpha`, `c_kappa`, its slip floor `v_eps` and its shape (`C`, `E` on the magic formula), and its slip computation. One tire per wheel, at `params["tire"][wheel]`, short wheel names (`f`, `r` on the bicycle; `fl`, `fr`, `rl`, `rr` on the 3-D car), so 4, 6 or 8 different tires fit later. A tire passed at construction is copied to every wheel and wins with its own numbers. The road's grip is one factor, `road_friction` (1 by default), on every rung; the terrain carries no friction number of its own. Supersedes the Tire, Tire numbers and Tire call rows |
+| Tire parts (2026-11-11, after run 1's review) | each tire is a part with its own `params`, held by the car like a diagram's subsystem: the tire owns its grip `mu`, its stiffnesses per unit load `c_alpha`, `c_kappa`, its slip floor `v_eps` and its shape (`C`, `E` on the magic formula), and its slip computation. One tire per wheel, at `params["tire"][wheel]`, short wheel names (`f`, `r` on the bicycle; `fl`, `fr`, `rl`, `rr` on the 3-D car), so 4, 6 or 8 different tires fit later. A tire passed at construction is copied to every wheel and wins with its own numbers. The road's grip: see the Friction row. Supersedes the Tire, Tire numbers and Tire call rows |
 | Rungs 3 and 3b without a tire | keep their flat `Ca`, `Ck`, `mu`, `v_min_epsilon` (today's numbers) until phase 3; given a tire, they take the per-wheel parts like rung 4 |
 | Solver hint (run 1's review) | `DrivetrainBicycle`'s defaults are an easy car to simulate (slip floor 0.5 m/s, `Jw_rear` 10), and its step hint is about 1 ms: a hint for quick runs, not a property of the model |
 | Inputs | one stacked `u` on every car; `named_ports=True` keeps the named ports for the demos and diagrams that use them |
 | Frames | one frame set on every rung (`body`, `axle_front`, `wheel_fl`, `wheel_fr`, plus `wheel_rl`, `wheel_rr` on the 3-D car), so a 3-D skin's body fits the bicycle too; `KinematicCar` and `DynamicBicycleCar3D` retire; the contact-force and contact-velocity arrows are a display option on the 3-D car (`show_contact_vectors`) |
 | Demo bar | a demo passes when it completes its task as before |
 | Wheel radius and vertical stiffness | decided in phase 2's wheel-hop step (level ii), not before |
+| Friction (after phase 2b) | two owners, multiplied, both 1 by default: the tire owns the rubber's `mu`, the terrain owns the road's factor. Every car rung holds a terrain (flat by default; the planar rungs read only its friction, at their two axles); a uniform road is `params["terrain"]["friction"]`, a map is a terrain subclass overriding `friction(x, y, t)`. Grip at a contact: `mu_tire × terrain.friction(x, y)`. `road_friction` leaves the car. Supersedes the Tire parts row's `road_friction` and the "dropped terrain mu" of the same day |
 | Topology (after phase 2b) | the 3-D car is tested and shown on real relief with the built-in terrains, kept simple: rolling hills from `Bumps` at a large wavelength (1 m high, 25–30 m long), no new terrain class. Each wheel touches at one point, so terrains stay smooth against the wheel radius; a `Hills` terrain or terrains that add up wait for a demo |
 | Phase 1's bar (review) | the same behaviour on the demos, not identical bytes: a rewrite that reorders the arithmetic is accepted (§7). Clarifies "no demo number moves" above |
 | Frame of the first nine (review) | on rung 6, `vx, vy` are the velocities in the heading frame (yawed, not rolled or pitched) and `r = ψ̇`, so they mean what they mean on rung 4 (§4) |
@@ -564,7 +565,8 @@ class BrushTire:
 - **A part's numbers live in the part's own `params`,** held by the car at a key per wheel:
   `params["tire"]["fl"]["mu"]`, `params["suspension"]["rr"]["k"]`, `params["terrain"]`.
   The keys inside a part carry no prefix (`mu`, `c_alpha`, `C`, `E`, `amplitude`).
-- **The car's own numbers stay flat:** `mass`, `a`, `b`, `track`, `h_cg`, `road_friction`.
+- **The car's own numbers stay flat:** `mass`, `a`, `b`, `track`, `h_cg`; the road's
+  friction factor is the terrain's (`params["terrain"]["friction"]`).
 - **Rungs 3 and 3b keep `Ca`, `Ck`, `mu`, `v_min_epsilon`** when no tire is given, until
   phase 3.
 
@@ -590,8 +592,9 @@ def compute_tire_physics(self, v_body, u_inputs, params=None):
     # Each wheel's tire computes its own slip and force, with its own numbers
     kappa_f, alpha_f = tire_f.slip(vx_f, vy_f, w_f, R_f, params["tire"]["f"])
     kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, R_r, params["tire"]["r"])
-    Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, road_friction, params["tire"]["f"])
-    Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, road_friction, params["tire"]["r"])
+    friction_f, friction_r = self.contact_friction(q, params)  # the terrain, at each axle
+    Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, friction_f, params["tire"]["f"])
+    Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, friction_r, params["tire"]["r"])
 
     # Rolling resistance of the free-rolling front axle: −C_rr Fz_f sign(vx)
     Fx_f = Fx_f - C_rr * Fz_f * smooth_sign(vx, v_c)
@@ -642,8 +645,9 @@ class Bumps(Terrain):
     def friction(self, x, y, t, params): ...
 ```
 
-- `Terrain` itself is the flat ground: height 0, gradient 0, friction 1. The road's grip
-  is the car's `road_friction` factor; a friction map `μ(x, y)` waits for a demo.
+- `Terrain` itself is the flat ground: height 0, gradient 0, and a uniform friction
+  factor `params["friction"]`, 1 by default. A friction map is a subclass overriding
+  `friction(x, y, t)`; every car rung reads it under its contacts.
 - Each built-in terrain writes its gradient in closed form, and a test checks it against a
   finite difference of the height.
 - The static block is one class in `terrain.py`: the positions of `n` points in; their

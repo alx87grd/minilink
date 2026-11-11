@@ -310,7 +310,7 @@ def racecar_mpc() -> None:
     scene = Scene(obstacles=[Sphere(c, CONE_RADIUS + CONE_MARGIN) for c in cones])
 
     design = UdeSRacecarDyn(named_ports=False)
-    design.params["road_friction"] = PLANNER_MU
+    design.params["terrain"]["friction"] = PLANNER_MU
     design.state.lower[6] = 0.0
     design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
     design.state.lower[7] = -design.params["delta_max"]
@@ -383,7 +383,7 @@ def racecar_mpc() -> None:
     mpc = ModelPredictiveController(planner, delay=True)
 
     car = UdeSRacecarDyn(named_ports=False)
-    car.params["road_friction"] = PLANT_MU
+    car.params["terrain"]["friction"] = PLANT_MU
     car.x0 = x0.copy()
     car.camera_scale = CAMERA_SCALE
     car.skin = racecar_skin_3d

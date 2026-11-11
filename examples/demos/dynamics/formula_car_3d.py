@@ -13,6 +13,7 @@ TF = 10.0
 N_SAMPLES = 1001
 
 car = FormulaCar3D(wheel_angles=True)
+car.params["terrain"]["friction"] = 1.0  # [-] road grip: 1 dry, 0.7 wet, 0.1 ice
 
 # The schedule: build speed on the straight, lift for a second, then a steady left
 # turn. Without downforce the slicks hold about 7 kN at the rear: more power than that

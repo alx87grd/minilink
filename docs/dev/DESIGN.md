@@ -538,11 +538,11 @@ never in `wrt`; every function is deterministic given its parameters, the seed a
 A car is assembled from parts the same way: each wheel's tire owns its numbers (`mu`, the
 stiffnesses, its slip floor, its shape), and the car holds each tire's dict at
 `params["tire"][wheel]` (`car.params["tire"]["f"] is car.tire["f"].params`), beside its own
-numbers and `road_friction`, the road's grip factor (1 on the reference surface); the car
-declares them with `param_parts()`, so a whole-tree assignment is routed to the tires. The
-3-D car holds each corner's spring-damper at `params["suspension"][wheel]` and its
-terrain's dict at `"terrain"`, the same way; a `TerrainBlock` holds its terrain's dict at
-`"terrain"`.
+numbers, and its terrain's dict at `"terrain"`, whose friction factor (1 on the reference
+surface) multiplies every tire's `mu`; the car declares them with `param_parts()`, so a
+whole-tree assignment is routed to the parts. The 3-D car also holds each corner's
+spring-damper at `params["suspension"][wheel]`; a `TerrainBlock` holds its terrain's dict
+at `"terrain"`.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

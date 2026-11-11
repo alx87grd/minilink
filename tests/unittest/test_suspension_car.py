@@ -228,7 +228,10 @@ def test_numpy_and_jax_agree_and_the_car_differentiates():
     jacobian = np.asarray(jax.jacfwd(car.f)(jnp.asarray(car.x0), jnp.asarray(u)))
     dmu = jax.grad(
         lambda mu: car.f(
-            jnp.asarray(x), jnp.asarray(u), 0.0, {**car.params, "road_friction": mu}
+            jnp.asarray(x),
+            jnp.asarray(u),
+            0.0,
+            {**car.params, "terrain": {**car.params["terrain"], "friction": mu}},
         )[4]
     )(1.0)
 
@@ -262,7 +265,7 @@ def test_on_a_frictionless_slope_the_car_slides_at_g_sin_beta():
     slope = Slope()
     slope.params["slope"] = beta
     car = SuspensionCar3D(terrain=slope)
-    car.params["road_friction"] = 1.0e-3
+    car.params["terrain"]["friction"] = 1.0e-3
     x0 = car.x0.copy()
 
     dx = car.f(x0, np.zeros(2))

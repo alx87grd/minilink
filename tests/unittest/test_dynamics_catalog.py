@@ -1002,15 +1002,15 @@ def test_the_saturated_linear_tire_given_runs_on_its_own_numbers():
     assert given.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
 
 
-def test_the_road_friction_scales_every_tire_in_one_line():
+def test_the_terrain_friction_scales_every_tire_in_one_line():
     car = DrivetrainBicycle(named_ports=False)
     x = np.array([0.0, 0.0, 0.0, 10.0, 1.0, 0.3, 10.0 / 0.3, 0.1, 0.0])
     u = np.zeros(2)
     dry = np.asarray(car.f(x, u))
 
-    car.params["road_friction"] = 0.4
+    car.params["terrain"]["friction"] = 0.4
     wet = np.asarray(car.f(x, u))
-    car.params["road_friction"] = 1.0
+    car.params["terrain"]["friction"] = 1.0
     for wheel in ("f", "r"):
         car.params["tire"][wheel]["mu"] *= 0.4
     the_same_by_the_tires = np.asarray(car.f(x, u))
@@ -1045,3 +1045,26 @@ def test_every_car_rung_publishes_the_car_frames_and_wears_any_car_look(make):
     assert CAR_FRAMES <= set(frames)
     for look in (car_skin_2d, car_skin_3d):
         assert set(look(car)) - {"world"} <= set(frames)
+
+
+def test_a_friction_map_lowers_the_grip_of_the_axle_on_it_only():
+    from minilink.dynamics.catalog.vehicles.terrain import Terrain
+
+    class IceAhead(Terrain):
+        """Ice where x > 0."""
+
+        def friction(self, x, y, t=0.0, params=None):
+            return np.where(x > 0.0, 0.1, 1.0)
+
+    car = DrivetrainBicycle(named_ports=False, terrain=IceAhead())
+    v = np.array([10.0, 1.0, 0.0])
+    u_in = np.array([10.0 / 0.3, 0.0])
+
+    # The car straddles the edge: the front axle on the ice, the rear on asphalt
+    _, Fy_f, _, Fy_r = car.compute_tire_physics(v, u_in, q=np.array([0.0, 0.0, 0.0]))
+    _, Fy_f_dry, _, Fy_r_dry = car.compute_tire_physics(
+        v, u_in, q=np.array([-5.0, 0.0, 0.0])
+    )
+
+    assert abs(Fy_f) < 0.2 * abs(Fy_f_dry)
+    assert Fy_r == Fy_r_dry

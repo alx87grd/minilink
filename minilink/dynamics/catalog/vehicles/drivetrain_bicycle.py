@@ -35,7 +35,7 @@ class DrivetrainBicycle(DynamicBicycle):
     :class:`~minilink.dynamics.catalog.vehicles.tires.BrushTire` by default), or the
     one a dict gives it by wheel name. A tire owns its slip, its law and its numbers
     (``mu``, the stiffnesses, the slip floor ``v_eps``), held at
-    ``params["tire"][wheel]``; ``road_friction`` scales every tire's grip. On a
+    ``params["tire"][wheel]``; the terrain's friction factor scales every tire's grip. On a
     bicycle each wheel's tire is the axle's effective tire.
 
     Propulsion
@@ -72,9 +72,9 @@ class DrivetrainBicycle(DynamicBicycle):
     floor of 0.5 m/s, so a fixed-step run takes about 1 ms steps (:meth:`fastest_mode`).
     """
 
-    def __init__(self, named_ports=False, tire=None, wheel_angles=False):
+    def __init__(self, named_ports=False, tire=None, wheel_angles=False, terrain=None):
         tire = BrushTire() if tire is None else tire
-        super().__init__(named_ports=True, tire=tire)
+        super().__init__(named_ports=True, tire=tire, terrain=terrain)
         self.named_ports = bool(named_ports)
         self.wheel_angles = bool(wheel_angles)
 
@@ -268,7 +268,7 @@ class DrivetrainBicycle(DynamicBicycle):
         #   Jw ẇ_rear = τ − τ_ground(v, w_rear, δ) − τ_brake(w_rear)
         P_dot = (xp.clip(P_cmd, -P_max, P_max) - P) / engine_tau
         tau = xp.clip(P / xp.sqrt(w_rear**2 + w_eps**2), -tau_sat, tau_sat)
-        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params)
+        tau_ground = self.rear_wheel_ground_torque(v, w_rear, delta, params, q)
         tau_brake = bw_drive * w_rear + tau_fric * xp.tanh(w_rear / w_c)
         w_rear_dot = (tau - tau_ground - tau_brake) / Jw_rear
 
@@ -331,11 +331,12 @@ class DrivetrainBicycle(DynamicBicycle):
         gravity = params["gravity"]
         a = params["a"]
         b = params["b"]
-        road_friction = params["road_friction"]
 
+        q = x[0:3]
         v_body = x[3:6]
         u_in = x[6:8]
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
+        friction_f, friction_r = self.contact_friction(q, params)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q)
 
         # Static axle loads
         Fz_f = mass * gravity * b / (a + b)
@@ -343,8 +344,8 @@ class DrivetrainBicycle(DynamicBicycle):
 
         # The used fraction of each tire's friction ellipse (the front's Fx is rolling
         # resistance only)
-        phi_f = tire_f.friction_use(Fx_f, Fy_f, Fz_f, road_friction, p_f)
-        phi_r = tire_r.friction_use(Fx_r, Fy_r, Fz_r, road_friction, p_r)
+        phi_f = tire_f.friction_use(Fx_f, Fy_f, Fz_f, friction_f, p_f)
+        phi_r = tire_r.friction_use(Fx_r, Fy_r, Fz_r, friction_r, p_r)
         grip = xp.array([phi_f, phi_r])
 
         return grip
@@ -360,9 +361,10 @@ class DrivetrainBicycle(DynamicBicycle):
         vx = x[3]
         yaw_rate = x[5]
         delta = x[7]
+        q = x[0:3]
         v_body = x[3:6]
         u_in = x[6:8]
-        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params)
+        Fx_f, Fy_f, Fx_r, Fy_r = self.compute_tire_physics(v_body, u_in, params, q)
         c_d = xp.cos(delta)
         s_d = xp.sin(delta)
 
@@ -395,7 +397,7 @@ class DrivetrainBicycle(DynamicBicycle):
 
     # Tires (the only physics overridden from DynamicBicycle)
 
-    def compute_tire_physics(self, v_body, u_inputs, params=None):
+    def compute_tire_physics(self, v_body, u_inputs, params=None, q=None):
         """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame.
 
         Static axle loads carry the weight. The free-rolling front axle makes a
@@ -404,9 +406,13 @@ class DrivetrainBicycle(DynamicBicycle):
 
         ``C_rr`` is charged to the front axle only: what the rear wheels lose to rolling
         is carried by the drivetrain terms (``bw_drive``, ``tau_fric``), which resist
-        the wheel rate itself rather than the contact patch.
+        the wheel rate itself rather than the contact patch. ``q`` is the pose
+        ``[x, y, psi]``, where the road's friction is read; without it the car stands
+        at the origin.
         """
         params = self.params if params is None else params
+        xp = array_module(v_body, u_inputs)
+        q = xp.zeros(3) if q is None else q
 
         tire_f = self.tire["f"]
         tire_r = self.tire["r"]
@@ -418,7 +424,6 @@ class DrivetrainBicycle(DynamicBicycle):
         b = params["b"]
         r_f = params["r_f"]
         r_r = params["r_r"]
-        road_friction = params["road_friction"]
         C_rr = params["C_rr"]
         v_c = params["v_c"]
 
@@ -426,6 +431,7 @@ class DrivetrainBicycle(DynamicBicycle):
         vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
             v_body, u_inputs, params
         )
+        friction_f, friction_r = self.contact_friction(q, params)
 
         # Static axle loads
         Fz_f = mass * gravity * b / (a + b)
@@ -434,8 +440,8 @@ class DrivetrainBicycle(DynamicBicycle):
         # The slips; the front axle rolls free (κ_f = 0), the rear one is driven
         _, alpha_f = tire_f.slip(vx_f, vy_f, w_f, r_f, p_f)
         kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, r_r, p_r)
-        Fx_f, Fy_f = tire_f.forces(0.0, alpha_f, Fz_f, road_friction, p_f)
-        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, road_friction, p_r)
+        Fx_f, Fy_f = tire_f.forces(0.0, alpha_f, Fz_f, friction_f, p_f)
+        Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, friction_r, p_r)
 
         # Rolling resistance of the free-rolling front axle: −C_rr Fz_f sign(vx)
         Fx_f = Fx_f - C_rr * Fz_f * smooth_sign(vx, v_c)
