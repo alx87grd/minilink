@@ -4,6 +4,7 @@ Broad catalog plant checks (instantiate, ``f`` finite, geometry) live in the
 demo-check layer: ``tests/demo_checks/run_catalog_checks.py``.
 """
 
+import copy
 import unittest
 import numpy as np
 from minilink.dynamics.catalog.aerial.drone import (
@@ -844,21 +845,34 @@ TIRE_LAWS = [BrushTire, MagicFormulaTire]
 @pytest.mark.parametrize(
     "make", [DynamicBicycle, BicycleDynRate], ids=lambda m: m.__name__
 )
-def test_a_dynamic_bicycle_takes_per_axle_stiffnesses_with_a_tire_law(make, law):
-    car = make(tire=law())
-    default = make()
-    p = default.params
-    Fz_f = p["mass"] * p["gravity"] * p["b"] / (p["a"] + p["b"])
-    Fz_r = p["mass"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
+def test_a_dynamic_bicycle_holds_a_copy_of_the_tire_on_each_wheel(make, law):
+    template = law(c_alpha=6.0)
+    car = make(tire=template)
 
-    assert "Ca" not in car.params and "Ck" not in car.params
-    assert car.params["c_alpha_f"] == pytest.approx(p["Ca"] / Fz_f)
-    assert car.params["c_alpha_r"] == pytest.approx(p["Ca"] / Fz_r)
-    assert car.params["c_kappa"] == pytest.approx(p["Ck"] / Fz_r)
-    assert car.params["tire"] is car.tire.params  # One home: the law's own dict
-    assert car.params["tire"] == law().params
-    # The same small-slip car: the same fastest tire mode
-    assert car.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
+    assert {"Ca", "Ck", "mu", "v_min_epsilon"}.isdisjoint(car.params)
+    for wheel in ("f", "r"):
+        assert car.params["tire"][wheel] is car.tire[wheel].params  # One home
+        assert car.tire[wheel] is not template  # A copy: the template is not held
+        assert car.params["tire"][wheel] == template.params  # The tire's numbers win
+    assert car.params["tire"]["f"] is not car.params["tire"]["r"]
+
+    # A whole-tree assignment is routed to the tires, which stay held
+    held = car.params["tire"]["r"]
+    tree = copy.deepcopy(car.params)
+    tree["tire"]["r"]["mu"] = 0.4
+    car.params = tree
+    assert car.params["tire"]["r"] is held and held["mu"] == 0.4
+    assert car.params["tire"]["f"]["mu"] == template.params["mu"]
+
+
+def test_a_tire_per_wheel_by_name():
+    front, rear = BrushTire(c_alpha=4.0), MagicFormulaTire(c_alpha=5.0)
+    car = DrivetrainBicycle(tire={"f": front, "r": rear})
+
+    assert car.params["tire"]["f"]["c_alpha"] == 4.0
+    assert car.params["tire"]["r"]["C"] == rear.params["C"]
+    with pytest.raises(ValueError, match="wheels"):
+        DrivetrainBicycle(tire={"f": front})
 
 
 @pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
@@ -972,16 +986,38 @@ def test_every_car_names_its_heading_psi_and_owns_its_wheelbase_once(make):
     assert {"a", "b"} <= set(car.params)
 
 
-def test_the_saturated_linear_tire_named_is_the_default_path():
+def test_the_saturated_linear_tire_given_runs_on_its_own_numbers():
     from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
 
     v = np.array([10.0, 0.5, 0.2])
     u = np.array([35.3, 0.05])
-    named = DynamicBicycle(tire=LinearSaturation())
+    default = DynamicBicycle()
+    given = DynamicBicycle(tire=LinearSaturation())  # Its defaults are rung 3's numbers
 
-    assert named.params == DynamicBicycle().params
-    assert named.compute_tire_physics(v, u) == DynamicBicycle().compute_tire_physics(
-        v, u
+    assert given.params["tire"]["f"] == {
+        "mu": 1.0,
+        "Ca": 60000.0,
+        "Ck": 100000.0,
+        "v_eps": 0.1,
+    }
+    np.testing.assert_allclose(
+        given.compute_tire_physics(v, u), default.compute_tire_physics(v, u), rtol=1e-12
     )
-    with pytest.raises(ValueError, match="per unit load"):
-        DrivetrainBicycle(tire=LinearSaturation())
+    assert given.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
+
+
+def test_the_road_friction_scales_every_tire_in_one_line():
+    car = DrivetrainBicycle(named_ports=False)
+    x = np.array([0.0, 0.0, 0.0, 10.0, 1.0, 0.3, 10.0 / 0.3, 0.1, 0.0])
+    u = np.zeros(2)
+    dry = np.asarray(car.f(x, u))
+
+    car.params["road_friction"] = 0.4
+    wet = np.asarray(car.f(x, u))
+    car.params["road_friction"] = 1.0
+    for wheel in ("f", "r"):
+        car.params["tire"][wheel]["mu"] *= 0.4
+    the_same_by_the_tires = np.asarray(car.f(x, u))
+
+    assert not np.allclose(dry, wet)
+    np.testing.assert_allclose(wet, the_same_by_the_tires, rtol=1e-12)

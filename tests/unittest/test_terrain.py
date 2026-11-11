@@ -45,15 +45,19 @@ def test_the_flat_ground_is_level_and_grips_fully():
 def test_the_fields_read_the_params_they_are_given():
     """A terrain's numbers live in ``params``; a call with its own tree reads that tree."""
     bumps = Bumps()
-    tall = {**bumps.params, "terrain_amplitude": 0.2}
+    tall = {**bumps.params, "amplitude": 0.2}
     slope = Slope()
-    icy = {**slope.params, "terrain_mu": 0.1}
+    steep = {**slope.params, "slope": 0.3}
 
     np.testing.assert_allclose(bumps.height(X, Y, 0.0, tall), 4.0 * bumps.height(X, Y))
-    np.testing.assert_allclose(slope.friction(X, Y, 0.0, icy), 0.1)
-    assert slope.height(1.0, 0.0) == pytest.approx(
-        np.tan(slope.params["terrain_slope"])
-    )
+    assert slope.height(1.0, 0.0, 0.0, steep) == pytest.approx(np.tan(0.3))
+    assert slope.height(1.0, 0.0) == pytest.approx(np.tan(slope.params["slope"]))
+
+
+@pytest.mark.parametrize("make", TERRAINS, ids=lambda m: m.__name__)
+def test_a_uniform_terrain_has_the_reference_grip(make):
+    """The friction factor is 1 everywhere on a terrain with one surface."""
+    np.testing.assert_array_equal(make().friction(X, Y), 1.0)
 
 
 @pytest.mark.jax

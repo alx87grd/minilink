@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.backends import array_module
+from minilink.core.params import own_params
 from minilink.core.system import System
 
 ###############################################################################
@@ -15,10 +16,12 @@ class Terrain:
 
     A terrain is a hard surface described by named fields of the position ``(x, y)``
     [m] and the time ``t`` [s]: its height ``z(x, y)``, the gradient of that height,
-    and a friction factor that multiplies the tire's ``mu``. A subclass writes its
-    gradient in closed form, the exact derivative of its height, and keeps its
-    numbers in ``params``.
+    and a friction factor that multiplies each tire's ``mu``, 1 on the reference
+    surface. A subclass writes its gradient in closed form, the exact derivative of
+    its height, and keeps its numbers in ``params``.
     """
+
+    params = own_params()
 
     def __init__(self):
         # Parameters: none, the ground is flat
@@ -51,17 +54,17 @@ class Terrain:
 
 
 class Slope(Terrain):
-    """A plane rising along ``x`` at the angle ``terrain_slope`` [rad]."""
+    """A plane rising along ``x`` at the angle ``slope`` [rad]; its friction factor is 1."""
 
     def __init__(self):
-        # Parameters: the slope angle, and the friction factor of its surface
-        self.params = {"terrain_slope": 0.1, "terrain_mu": 1.0}
+        # Parameters: the slope angle
+        self.params = {"slope": 0.1}
 
     def height(self, x, y, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x, y)
 
-        beta = params["terrain_slope"]
+        beta = params["slope"]
 
         # z = x tan β
         z = x * xp.tan(beta) * xp.ones_like(y)
@@ -72,7 +75,7 @@ class Slope(Terrain):
         params = self.params if params is None else params
         xp = array_module(x, y)
 
-        beta = params["terrain_slope"]
+        beta = params["slope"]
 
         # ∂z/∂x = tan β, ∂z/∂y = 0
         dz_dx = xp.tan(beta) * xp.ones_like(x * y)
@@ -80,34 +83,20 @@ class Slope(Terrain):
 
         return dz_dx, dz_dy
 
-    def friction(self, x, y, t=0.0, params=None):
-        params = self.params if params is None else params
-        xp = array_module(x, y)
-
-        mu_ground = params["terrain_mu"]
-
-        mu = mu_ground * xp.ones_like(x * y)
-
-        return mu
-
 
 class Bumps(Terrain):
-    """Sinusoidal bumps along ``x`` and ``y``: an egg-crate of amplitude ``terrain_amplitude``."""
+    """Sinusoidal bumps along ``x`` and ``y``: an egg-crate of amplitude ``amplitude``; friction 1."""
 
     def __init__(self):
-        # Parameters: the bumps' amplitude and wavelength, and the surface's friction
-        self.params = {
-            "terrain_amplitude": 0.05,
-            "terrain_wavelength": 2.0,
-            "terrain_mu": 1.0,
-        }
+        # Parameters: the bumps' amplitude and wavelength
+        self.params = {"amplitude": 0.05, "wavelength": 2.0}
 
     def height(self, x, y, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x, y)
 
-        A = params["terrain_amplitude"]
-        wavelength = params["terrain_wavelength"]
+        A = params["amplitude"]
+        wavelength = params["wavelength"]
 
         k = 2.0 * np.pi / wavelength
 
@@ -120,8 +109,8 @@ class Bumps(Terrain):
         params = self.params if params is None else params
         xp = array_module(x, y)
 
-        A = params["terrain_amplitude"]
-        wavelength = params["terrain_wavelength"]
+        A = params["amplitude"]
+        wavelength = params["wavelength"]
 
         k = 2.0 * np.pi / wavelength
 
@@ -130,16 +119,6 @@ class Bumps(Terrain):
         dz_dy = A * k * xp.sin(k * x) * xp.cos(k * y)
 
         return dz_dx, dz_dy
-
-    def friction(self, x, y, t=0.0, params=None):
-        params = self.params if params is None else params
-        xp = array_module(x, y)
-
-        mu_ground = params["terrain_mu"]
-
-        mu = mu_ground * xp.ones_like(x * y)
-
-        return mu
 
 
 class TerrainBlock(System):

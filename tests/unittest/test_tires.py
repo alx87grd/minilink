@@ -23,10 +23,14 @@ LAWS = [LinearTire, BrushTire, MagicFormulaTire]
 SATURATING = [BrushTire, MagicFormulaTire]
 
 
+def make(law):
+    """The law on this module's numbers."""
+    return law(mu=MU, c_alpha=C_ALPHA, c_kappa=C_KAPPA)
+
+
 def forces(law, kappa, alpha, Fz=FZ):
     """The law's forces on this module's numbers."""
-    tire = law()
-    Fx, Fy = tire.forces(kappa, alpha, Fz, MU, C_KAPPA, C_ALPHA, tire.params)
+    Fx, Fy = make(law).forces(kappa, alpha, Fz)
 
     return np.asarray(Fx), np.asarray(Fy)
 
@@ -74,14 +78,14 @@ def test_the_three_laws_agree_at_small_slip():
 
 def test_the_magic_formula_peaks_at_the_friction_limit():
     """The curve rises to ``mu Fz`` and falls past it, towards ``sin(C pi / 2)`` of it."""
-    tire = MagicFormulaTire()
+    tire = make(MagicFormulaTire)
     alpha = np.linspace(0.0, 3.0, 30001)
 
     _, Fy = forces(MagicFormulaTire, 0.0 * alpha, alpha)
 
     assert np.max(Fy) == pytest.approx(MU * FZ, rel=1e-6)
     assert Fy[-1] < 0.99 * np.max(Fy)
-    assert Fy[-1] > np.sin(tire.params["mf_C"] * np.pi / 2.0) * MU * FZ
+    assert Fy[-1] > np.sin(tire.params["C"] * np.pi / 2.0) * MU * FZ
 
 
 def test_a_force_points_along_the_slip_demand():
@@ -95,7 +99,7 @@ def test_a_force_points_along_the_slip_demand():
 
 def saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
     """The saturated linear tire written out at one contact: the law's reference."""
-    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+    kappa, alpha = tire_slip(vx, vy, w, R, v_min_epsilon)
     Fx = Ck * kappa
     Fy = Ca * alpha
     F_max = mu * Fz
@@ -113,8 +117,9 @@ def test_linear_saturation_is_its_reference_bit_for_bit():
     w = 30.0 * rng.standard_normal(500)
     R, Fz, Ca, Ck, mu, v_eps = 0.3, 7357.5, 60000.0, 100000.0, 1.0, 0.1
 
-    alpha, kappa = tire_slip(vx, vy, w, R, v_eps)
-    Fx, Fy = LinearSaturation().forces(kappa, alpha, Fz, mu, Ck, Ca)
+    tire = LinearSaturation(mu=mu, Ca=Ca, Ck=Ck, v_eps=v_eps)
+    kappa, alpha = tire.slip(vx, vy, w, R)
+    Fx, Fy = tire.forces(kappa, alpha, Fz)
     Fx_ref, Fy_ref = saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_eps)
 
     np.testing.assert_array_equal(Fx, Fx_ref)
@@ -126,14 +131,14 @@ def test_the_slips_vanish_when_the_wheel_rolls_free_and_straight():
     vx, R = 4.0, 0.3
 
     for slip in (tire_slip, wheel_slip):
-        alpha, kappa = slip(vx, 0.0, vx / R, R, 0.1)
+        kappa, alpha = slip(vx, 0.0, vx / R, R, 0.1)
         assert alpha == pytest.approx(0.0)
         assert kappa == pytest.approx(0.0)
 
 
 def test_the_smooth_slip_is_finite_and_smooth_at_rest():
     """At standstill the rolling speed sits on its floor ``v_min_epsilon``."""
-    alpha, kappa = wheel_slip(0.0, -0.05, 1.0, 0.3, 0.1)
+    kappa, alpha = wheel_slip(0.0, -0.05, 1.0, 0.3, 0.1)
 
     assert alpha == pytest.approx(np.arctan(0.5))
     assert kappa == pytest.approx(3.0)
@@ -156,10 +161,10 @@ def test_numpy_and_jax_agree(law):
     configure_jax(enable_x64=True)
     jnp = jax.numpy
     tire = law()
-    args = (0.08, 0.12, FZ, MU, C_KAPPA, C_ALPHA)
+    args = (0.08, 0.12, FZ, 0.8)
 
-    on_numpy = np.array(tire.forces(*args, tire.params))
-    on_jax = np.array(tire.forces(*[jnp.asarray(value) for value in args], tire.params))
+    on_numpy = np.array(tire.forces(*args))
+    on_jax = np.array(tire.forces(*[jnp.asarray(value) for value in args]))
 
     assert on_jax == pytest.approx(on_numpy, rel=1e-12)
 
@@ -171,11 +176,9 @@ def test_gradients_are_finite_at_zero_slip(law):
     jax = pytest.importorskip("jax")
     configure_jax(enable_x64=True)
     jnp = jax.numpy
-    tire = law()
+    tire = make(law)
     jacobian_of = jax.jacfwd(
-        lambda slips: jnp.array(
-            tire.forces(slips[0], slips[1], FZ, MU, C_KAPPA, C_ALPHA, tire.params)
-        )
+        lambda slips: jnp.array(tire.forces(slips[0], slips[1], FZ))
     )
 
     jacobian = np.array(jacobian_of(jnp.zeros(2)))
@@ -183,3 +186,31 @@ def test_gradients_are_finite_at_zero_slip(law):
     assert np.all(np.isfinite(jacobian))
     assert jacobian[0, 0] == pytest.approx(C_KAPPA * FZ, rel=1e-6)
     assert jacobian[1, 1] == pytest.approx(C_ALPHA * FZ, rel=1e-6)
+
+
+@pytest.mark.parametrize("law", LAWS + [LinearSaturation], ids=lambda law: law.__name__)
+def test_a_tire_owns_its_numbers_and_reads_the_tree_it_is_given(law):
+    """``params=None`` reads the tire's own dict; a tree given is read instead."""
+    tire = law()
+    given = {**tire.params, "mu": 0.5}
+    kappa, alpha = tire.slip(5.0, 0.4, 5.0 / 0.3 + 2.0, 0.3)
+
+    own = np.array(tire.forces(kappa, alpha, FZ))
+    from_tree = np.array(tire.forces(kappa, alpha, FZ, params=given))
+    on_a_wet_road = np.array(tire.forces(kappa, alpha, FZ, friction=0.5))
+
+    if law is not LinearTire:  # The linear tire has no friction limit
+        assert not np.allclose(own, from_tree)
+    np.testing.assert_array_equal(from_tree, on_a_wet_road)
+
+
+@pytest.mark.parametrize("law", LAWS + [LinearSaturation], ids=lambda law: law.__name__)
+def test_a_tire_params_assignment_keeps_its_dict(law):
+    """Assigning a tire's params refills its own dict, so a car holding it stays current."""
+    tire = law()
+    held = tire.params
+
+    tire.params = {**tire.params, "mu": 0.7}
+
+    assert tire.params is held
+    assert held["mu"] == 0.7

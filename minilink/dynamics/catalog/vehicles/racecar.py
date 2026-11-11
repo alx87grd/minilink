@@ -1,11 +1,13 @@
 """The UdeS 1/10-scale racecar: its numbers and its look on the kinematic and drivetrain bicycles."""
 
+import copy
 from functools import partial
 
 import numpy as np
 
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
+from minilink.dynamics.catalog.vehicles.tires import BrushTire
 from minilink.graphical.catalog.skins import car_skin_2d
 
 # Geometry and actuators of the 1/10 car.
@@ -22,11 +24,6 @@ PUBLIC_RACECAR_PARAMS = {
     "rho": 1.2,  # [kg/m^3] air at room temperature
     "CdA": 0.03,  # [m^2]  frontal area at Cd ~ 1 for an open 1/10 body
     "C_rr": 0.02,  # [-]   rolling resistance of a rubber tire on a hard floor
-    # Tires (stiffnesses per unit load)
-    "mu": 1.0,  # [-]      soft rubber on a smooth hard floor
-    "c_alpha_f": 4.0,  # [1/rad] front cornering stiffness per unit load
-    "c_alpha_r": 5.0,  # [1/rad] rear: stiffer, so the car understeers at the limit
-    "c_kappa": 10.0,  # [-]  longitudinal stiffness per unit load
     # Propulsion (what the drive can deliver, not how it is built)
     "P_max": 80.0,  # [W]
     "tau_sat": 1.5,  # [N m] torque the drivetrain holds at the rear axle at rest
@@ -40,7 +37,6 @@ PUBLIC_RACECAR_PARAMS = {
     "steering_tau": 0.08,  # [s] hobby servo closing its own position loop
     "steer_rate_max": 5.0,  # [rad/s] ~0.2 s per 60 deg
     # Smoothing scales: they keep the equations finite and differentiable near rest
-    "v_min_epsilon": 0.2,  # [m/s]   floor of the slip denominators
     "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
     "v_c": 0.05,  # [m/s]   creep speed of the rolling resistance
     "w_c": 1.0,  # [rad/s]  creep rate of the drivetrain dry friction
@@ -90,8 +86,12 @@ class UdeSRacecarDyn(DrivetrainBicycle):
 
     The equations, inputs, outputs and options (``named_ports``, ``tire``,
     ``wheel_angles``) are :class:`DrivetrainBicycle`'s; this preset sets
-    :data:`PUBLIC_RACECAR_PARAMS` and the 1/10-scale look. A proxy that behaves
-    roughly like the real car, for testing ideas, not an identified model of it.
+    :data:`PUBLIC_RACECAR_PARAMS`, its two tires and the 1/10-scale look. A proxy
+    that behaves roughly like the real car, for testing ideas, not an identified
+    model of it. Its tires are brush tires on soft rubber (``mu`` 1 on a smooth hard
+    floor), 4 /rad of cornering stiffness per unit load in front and 5 /rad behind,
+    so the car understeers at the limit, 10 of longitudinal stiffness, and a slip
+    floor of 0.2 m/s; a ``tire`` given replaces them, its own numbers included.
 
     ``tf`` publishes the link frames, so ``car.skin = racecar_skin_3d`` attaches the
     3-D look; its wheels spin when ``wheel_angles=True`` puts the rolling angles in
@@ -99,10 +99,16 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     """
 
     def __init__(self, named_ports=True, tire=None, wheel_angles=False):
+        # The 1/10 car's tires: the rear stiffer than the front
+        if tire is None:
+            tire = {
+                "f": BrushTire(mu=1.0, c_alpha=4.0, c_kappa=10.0, v_eps=0.2),
+                "r": BrushTire(mu=1.0, c_alpha=5.0, c_kappa=10.0, v_eps=0.2),
+            }
         super().__init__(named_ports=named_ports, tire=tire, wheel_angles=wheel_angles)
 
-        # Parameters: the 1/10 car's numbers, and the tire law's own dict at "tire"
-        self.params = {**PUBLIC_RACECAR_PARAMS, "tire": self.tire.params}
+        # Parameters: the 1/10 car's numbers, its tires' held beside them
+        self.params.update(PUBLIC_RACECAR_PARAMS)
 
         # Ports: the 1/10 car's command limits
         self.bound_commands()
@@ -138,11 +144,11 @@ def stiff_tires(params):
     Multiplies every slip stiffness and the friction coefficient so that the axles hold
     their contact conditions, which turns the dynamic bicycle into a kinematic one.
     """
-    rigid = dict(params)
-    rigid["c_alpha_f"] = 1.0e4
-    rigid["c_alpha_r"] = 1.0e4
-    rigid["c_kappa"] = 1.0e4
-    rigid["mu"] = 1.0e3
+    rigid = copy.deepcopy(params)
+    for tire in rigid["tire"].values():
+        tire["c_alpha"] = 1.0e4
+        tire["c_kappa"] = 1.0e4
+        tire["mu"] = 1.0e3
     rigid["C_rr"] = 0.0
 
     return rigid

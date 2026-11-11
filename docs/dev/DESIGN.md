@@ -535,9 +535,12 @@ law on both backends (`params=None` its defaults, the same values twice, the JAX
 NumPy ones, a finite gradient through a float leaf); `tests/unittest/test_params_model.py`
 pins the seven rules. The leaves are numbers and numeric arrays, an integer leaf (a seed)
 never in `wrt`; every function is deterministic given its parameters, the seed among them.
-A car holds its tire law's own dict at `"tire"` (`car.params["tire"] is car.tire.params`),
-beside the car's numbers (`mu`, `c_alpha_f`, `c_kappa`), and a `TerrainBlock` its terrain's
-dict at `"terrain"` (rule 2).
+A car is assembled from parts the same way: each wheel's tire owns its numbers (`mu`, the
+stiffnesses, its slip floor, its shape), and the car holds each tire's dict at
+`params["tire"][wheel]` (`car.params["tire"]["f"] is car.tire["f"].params`), beside its own
+numbers and `road_friction`, the road's grip factor (1 on the reference surface); the car
+declares them with `param_parts()`, so a whole-tree assignment is routed to the tires. A
+`TerrainBlock` holds its terrain's dict at `"terrain"`.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

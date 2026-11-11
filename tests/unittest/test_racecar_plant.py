@@ -103,7 +103,7 @@ def test_steady_cornering_matches_the_understeer_formula():
     car = UdeSRacecarDyn()
     p = car.params
     L = p["a"] + p["b"]
-    K_us = 1.0 / p["c_alpha_f"] - 1.0 / p["c_alpha_r"]
+    K_us = 1.0 / p["tire"]["f"]["c_alpha"] - 1.0 / p["tire"]["r"]["c_alpha"]
     speed, delta, n = 3.0, 0.06, 1201
     car.x0 = cruise_state(car, speed, delta, power=7.0)
 
@@ -133,7 +133,9 @@ def test_understeer_gradient_is_the_stiffness_difference():
         lateral.append(vx * yaw_rate / p["gravity"])
 
     K_us = (extra[1] - extra[0]) / (lateral[1] - lateral[0])
-    assert K_us == pytest.approx(1.0 / p["c_alpha_f"] - 1.0 / p["c_alpha_r"], rel=0.25)
+    assert K_us == pytest.approx(
+        1.0 / p["tire"]["f"]["c_alpha"] - 1.0 / p["tire"]["r"]["c_alpha"], rel=0.25
+    )
 
 
 def test_top_speed_is_set_by_the_power_and_the_drag():
@@ -166,7 +168,7 @@ def test_launch_is_traction_limited_and_spins_the_rear_wheel():
 
     slips = np.array([car.slips(traj.x[:, k], np.zeros(2)) for k in range(n)])
     imu = np.array([car.imu(traj.x[:, k], np.zeros(2)) for k in range(n)])
-    grip_limit = p["mu"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
+    grip_limit = p["tire"]["r"]["mu"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
     assert slips[:, 0].max() > 0.1
     assert imu[:, 0].max() < grip_limit * 1.02
     assert traj.x[6, 10] * p["r_r"] > traj.x[3, 10]

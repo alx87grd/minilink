@@ -5,30 +5,19 @@ import pytest
 
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.racecar import UdeSRacecarDyn
-from minilink.dynamics.catalog.vehicles.tires import (
-    BrushTire,
-    axle_slips,
-    brush_saturation,
-    smooth_sign,
-)
+from minilink.dynamics.catalog.vehicles.tires import brush_saturation, smooth_sign
 
-TIRE = BrushTire()
-PARAMS = UdeSRacecarDyn().params
+CAR = UdeSRacecarDyn()
+PARAMS = CAR.params
 L = PARAMS["a"] + PARAMS["b"]
 FZ_F = PARAMS["mass"] * PARAMS["gravity"] * PARAMS["b"] / L
 FZ_R = PARAMS["mass"] * PARAMS["gravity"] * PARAMS["a"] / L
 
 
 def axle_forces(kappa_r, alpha_f, alpha_r):
-    """The racecar's two axles on the brush tire: ``(Fy_f, Fx_r, Fy_r)`` [N]."""
-    mu = PARAMS["mu"]
-    c_kappa = PARAMS["c_kappa"]
-    _, Fy_f = TIRE.forces(
-        0.0, alpha_f, FZ_F, mu, c_kappa, PARAMS["c_alpha_f"], PARAMS["tire"]
-    )
-    Fx_r, Fy_r = TIRE.forces(
-        kappa_r, alpha_r, FZ_R, mu, c_kappa, PARAMS["c_alpha_r"], PARAMS["tire"]
-    )
+    """The racecar's two axles on their brush tires: ``(Fy_f, Fx_r, Fy_r)`` [N]."""
+    _, Fy_f = CAR.tire["f"].forces(0.0, alpha_f, FZ_F)
+    Fx_r, Fy_r = CAR.tire["r"].forces(kappa_r, alpha_r, FZ_R)
 
     return Fy_f, Fx_r, Fy_r
 
@@ -68,7 +57,7 @@ def test_pure_lateral_force_saturates_at_mu_fz():
     """A front tire at a huge slip angle carries exactly ``mu Fz``."""
     Fy_f, _, _ = axle_forces(0.0, 1.5, 0.0)
 
-    assert Fy_f == pytest.approx(PARAMS["mu"] * FZ_F, rel=1e-3)
+    assert Fy_f == pytest.approx(PARAMS["tire"]["f"]["mu"] * FZ_F, rel=1e-3)
 
 
 def test_combined_slip_stays_inside_the_friction_ellipse():
@@ -79,7 +68,9 @@ def test_combined_slip_stays_inside_the_friction_ellipse():
 
     _, Fx_r, Fy_r = axle_forces(K, 0.0 * K, A)
 
-    assert np.max(np.hypot(Fx_r, Fy_r)) <= PARAMS["mu"] * FZ_R * (1.0 + 1e-9)
+    assert np.max(np.hypot(Fx_r, Fy_r)) <= PARAMS["tire"]["r"]["mu"] * FZ_R * (
+        1.0 + 1e-9
+    )
 
 
 def test_small_slip_is_the_linear_tire():
@@ -88,9 +79,15 @@ def test_small_slip_is_the_linear_tire():
 
     Fy_f, Fx_r, Fy_r = axle_forces(kappa, alpha, alpha)
 
-    assert Fy_f == pytest.approx(PARAMS["c_alpha_f"] * FZ_F * alpha, rel=1e-3)
-    assert Fy_r == pytest.approx(PARAMS["c_alpha_r"] * FZ_R * alpha, rel=1e-3)
-    assert Fx_r == pytest.approx(PARAMS["c_kappa"] * FZ_R * kappa, rel=1e-3)
+    assert Fy_f == pytest.approx(
+        PARAMS["tire"]["f"]["c_alpha"] * FZ_F * alpha, rel=1e-3
+    )
+    assert Fy_r == pytest.approx(
+        PARAMS["tire"]["r"]["c_alpha"] * FZ_R * alpha, rel=1e-3
+    )
+    assert Fx_r == pytest.approx(
+        PARAMS["tire"]["r"]["c_kappa"] * FZ_R * kappa, rel=1e-3
+    )
 
 
 def test_force_signs_follow_the_slips():
@@ -120,9 +117,9 @@ def test_slips_vanish_when_the_wheel_rolls_free_and_straight():
     """Rolling straight at the matched wheel rate is the no-slip condition."""
     vx = 4.0
 
-    kappa_r, alpha_f, alpha_r = axle_slips(
-        vx, 0.0, 0.0, vx / PARAMS["r_r"], 0.0, PARAMS
-    )
+    x = np.array([0.0, 0.0, 0.0, vx, 0.0, 0.0, vx / PARAMS["r_r"], 0.0, 0.0])
+
+    kappa_r, alpha_f, alpha_r = CAR.slips(x, np.zeros(2))
 
     assert kappa_r == pytest.approx(0.0)
     assert alpha_f == pytest.approx(0.0)
@@ -133,8 +130,11 @@ def test_slips_have_the_expected_signs():
     """Overspeeding the wheel drives; sliding to the right makes a left-pushing force."""
     vx = 4.0
 
-    kappa_fast, _, _ = axle_slips(vx, 0.0, 0.0, 1.2 * vx / PARAMS["r_r"], 0.0, PARAMS)
-    _, alpha_f, alpha_r = axle_slips(vx, -0.4, 0.0, vx / PARAMS["r_r"], 0.0, PARAMS)
+    fast = np.array([0.0, 0.0, 0.0, vx, 0.0, 0.0, 1.2 * vx / PARAMS["r_r"], 0.0, 0.0])
+    sliding = np.array([0.0, 0.0, 0.0, vx, -0.4, 0.0, vx / PARAMS["r_r"], 0.0, 0.0])
+
+    kappa_fast, _, _ = CAR.slips(fast, np.zeros(2))
+    _, alpha_f, alpha_r = CAR.slips(sliding, np.zeros(2))
 
     assert kappa_fast > 0.0
     assert alpha_f > 0.0 and alpha_r > 0.0
@@ -167,7 +167,7 @@ def test_numpy_and_jax_agree():
 
 @pytest.mark.jax
 def test_gradients_are_finite_at_zero_slip():
-    """``z_floor`` keeps the slip demand differentiable where every slip is zero."""
+    """The slip-demand floor keeps the forces differentiable where every slip is zero."""
     jax = pytest.importorskip("jax")
     configure_jax(enable_x64=True)
     jnp = jax.numpy
@@ -178,4 +178,6 @@ def test_gradients_are_finite_at_zero_slip():
     jacobian = np.array(grad(jnp.zeros(3)))
 
     assert np.all(np.isfinite(jacobian))
-    assert jacobian[0, 1] == pytest.approx(PARAMS["c_alpha_f"] * FZ_F, rel=1e-6)
+    assert jacobian[0, 1] == pytest.approx(
+        PARAMS["tire"]["f"]["c_alpha"] * FZ_F, rel=1e-6
+    )
