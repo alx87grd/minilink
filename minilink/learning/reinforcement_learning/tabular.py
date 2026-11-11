@@ -22,6 +22,7 @@ from minilink.planning.planner import (
     planner_at,
     planner_evidence,
 )
+from minilink.planning.plotting import maybe_show
 from minilink.planning.problems import require_cost
 from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
@@ -404,9 +405,6 @@ class TabularLearningPlanner(Planner):
         """
         import matplotlib.pyplot as plt
 
-        # Lazy import: the graphics load on first use, not with the learner
-        from minilink.graphical.common.environment import is_blocking_needed
-
         created = ax is None
         if created:
             _, ax = plt.subplots(figsize=(8, 3))
@@ -422,8 +420,7 @@ class TabularLearningPlanner(Planner):
         ax.set_xlabel("episode")
         ax.set_ylabel("episode cost")
         ax.grid(True, alpha=0.3)
-        if created and show:
-            plt.show(block=is_blocking_needed())
+        maybe_show(plt, created and show, block_when_needed=True)
 
         return ax
 

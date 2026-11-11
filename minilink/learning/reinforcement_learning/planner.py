@@ -38,6 +38,7 @@ from minilink.learning.reinforcement_learning.policy import (
 )
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.planner import Planner, planner_at, planner_evidence
+from minilink.planning.plotting import maybe_show
 from minilink.planning.results import PlanningSolution, solve_time_text
 from minilink.planning.step_model import is_continuous
 
@@ -433,9 +434,6 @@ class ReinforcementLearningPlanner(Planner):
         """
         import matplotlib.pyplot as plt
 
-        # Lazy import: the graphics load on first use, not with the learner
-        from minilink.graphical.common.environment import is_blocking_needed
-
         created = ax is None
         if created:
             _, ax = plt.subplots(figsize=(8, 3))
@@ -447,8 +445,7 @@ class ReinforcementLearningPlanner(Planner):
         ax.set_xlabel("timesteps")
         ax.set_ylabel("mean episode return")
         ax.grid(True, alpha=0.3)
-        if created and show:
-            plt.show(block=is_blocking_needed())
+        maybe_show(plt, created and show, block_when_needed=True)
 
         return ax
 
