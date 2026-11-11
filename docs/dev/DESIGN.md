@@ -377,7 +377,7 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   default guess `pv.initial(params)` traces: under a trace it follows the traced `x0`
   and `t0` (the guess is affine in its start), so a traced loop's first plan equals the
   host's. `verbose=True` prints one line per solve on a host run (the tick's time, success,
-  iterations, cost, wall time). Ports out: `u`, `z` (the plan solved at this tick) and
+  iterations, `J`, wall time). Ports out: `u`, `z` (the plan solved at this tick) and
   `x_ref`, `u_ref` when the plan carries states. `PlanFollower(planner)` applies a received
   plan, `u = pv.command(z, x, t)`: the dual rate is `(mpc % slow) >> (PlanFollower(planner) %
   fast)`, the plan read at the slow tick itself; the one-period-late plan is the user's
@@ -1300,8 +1300,9 @@ source (trajectory optimization, MPPI, RRT) is a `TrajectorySource` `u = pi(t)`,
 `controller >> plant` (`solution.open_loop`); on a step problem the law ticks with the
 plant; the `record` (one
 frozen dataclass per planner with `success` and a one-line `str`, its cost named by its
-quantity: RRT's `path_cost`, the learners' `episode_cost`, the objective `cost` at the
-solution of trajectory optimization and MPPI, as on the `Optimizer`'s result; and the
+quantity: RRT's `path_cost`, the learners' `mean_episode_cost`, the objective `J` at the
+solution of trajectory optimization (and of each iterate) and MPPI, as on the `Optimizer`'s
+result and in a compiled solve's `status` (`{"success", "n_iterations", "J"}`); and the
 solve's wall time, `solve_time_s`, measured at the user's verb and without the evidence's
 scoring (the sweeps, the Riccati design, the search, the path-integral solve, the
 optimizer's backend solve, the training; `None` on a compiled face's solve, which has no wall

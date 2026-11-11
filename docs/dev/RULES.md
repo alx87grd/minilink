@@ -108,6 +108,14 @@ concrete formatting, ordered by the cost of being wrong:
   `renderer=` is the drawing library, on every drawing verb (`plot_renderer=` on `game` and the
   realtime simulator).
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
+  Four words, one meaning each (the maintainer's ruling 17b): `cost` is the cost object
+  (`problem.cost`, `cost=`, the parameter tree's `"cost"` key); `J` is a scalar, one run's cost
+  or a program's at `z` (`J*` at the optimum: a record's `.J`, a solve's `status["J"]`, the
+  running signal `"J"` and its rate `"dJ"`); `objective` is the criterion minimized over draws;
+  `cost_to_go` is the function `J(x, t)` (a `Field`; `J*` or `J_π` by its source, not its
+  name; `ValueTables.J` is the DP table). A quantity that is neither keeps a name of its own
+  (`raw_cost`, `path_cost`, `cost_to_come`, `mean_episode_cost`). Recorded exception:
+  `Manipulator.J(q)` is the Jacobian, the robotics textbook's letter.
   The whole vocabulary, one word per idea and one idea per word
   (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):
 
@@ -144,7 +152,8 @@ concrete formatting, ordered by the cost of being wrong:
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
   | A solve's wall time, on every planner's record (`None` where the solve has no wall clock) | `solve_time_s` | `train_time_s` for a solve's time (the neural learner's `train_time_s` counts every training of the planner) |
-  | A record's cost, named by its quantity: a search's path cost-to-come; a learner's mean episode cost at the end of training; the objective at the solution (the `Optimizer`, trajectory optimization, MPPI); a scored run's cost before the failure charge, beside its score `J` (`Evaluation`) | `path_cost`; `episode_cost`; `cost`; `raw_cost` | `cost` for a path's, an episode's or a run's raw cost |
+  | A record's cost, named by its quantity: the objective at the solution (the `Optimizer`, trajectory optimization and an iterate, MPPI, a compiled solve's `status`); a search's path cost-to-come, a tree node's, RRT*'s best; a learner's mean episode cost at the end of training; a scored run's cost before the failure charge, beside its score `J` (`Evaluation`) | `J`; `path_cost`, `node.cost_to_come`, `best_path_cost`; `mean_episode_cost`; `raw_cost` | `cost` for any scalar (the cost is the object), `episode_cost`, `best_goal_cost` |
+  | A run's running cost signals (`traj.with_cost`, `plot_cost`, a step problem's `rollout`): the discounted rate, its integral with the terminal cost at the last sample | `"dJ"`, `"J"` | `"cost_rate"`, `"cost"` |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
   | A block's channel count (sources, white noise, routing, saturation, delay, the PID family, the impedance laws) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
   | The fixed-step time integration of `solver=` (the simulator, as `discretize` and the evaluators) | `"rk4"`, `"euler"` | `"rk4_fixedsteps"`, `"euler_fixedsteps"` |

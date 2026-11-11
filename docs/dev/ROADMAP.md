@@ -431,8 +431,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *A record's cost, named by its quantity.* RRT's (and RRT*'s) `record.cost` →
     `record.path_cost`; the tabular and the neural learners' `record.cost` →
     `record.episode_cost` (the mean episode cost at the end of training). The objective at
-    the solution keeps `cost`: the `Optimizer`'s result, trajectory optimization's and MPPI's
-    records.
+    the solution kept `cost`: the `Optimizer`'s result, trajectory optimization's and MPPI's
+    records (ruling 17b, below, then renames it `J` and `episode_cost` `mean_episode_cost`).
   - *An evaluation's two costs.* `Evaluation.cost` → `raw_cost`: the run's discounted integral
     and terminal cost, before the failure charge; `J`, the score every statistic reads, is
     unchanged (the raw cost plus the failure cost of a failed or missed run). Its one-run
@@ -456,6 +456,24 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `planner.predict(x)` is gone: the law is `solution.controller` (or
     `planner.actor.action(x)`), an exploration draw the planner's `exploration_policy`
     (`sample`, then `input`); `predict` is Stable-Baselines3's word, read by `SB3Controller`.
+  - *Four words, one meaning each* (the maintainer's ruling 17b, RULES 2.7): `cost` the cost
+    object, `J` a scalar, `objective` the criterion over draws, `cost_to_go` the function.
+    A record's scalar `.cost` → `.J`: `OptimizationResult`, `TrajectoryOptimizationRecord` and
+    its iterates (`TrajectoryOptimizationIteration`), `MPPIRecord`, and a compiled solve's
+    `status["cost"]` → `status["J"]` (MPC's `STANDARD_STATUS`); the printouts still read
+    `J* = …` / `J = …`.
+  - *The running cost signals.* `traj.with_cost(cost)` and `plot_cost` write `"dJ"` (was
+    `"cost_rate"`) and `"J"` (was `"cost"`); the continuous `"J"` now adds the discounted
+    terminal cost `e^{−ρ(t_N − t0)} h(x_N, t_N)` at its last sample, as a step problem's
+    rollout already did with `γᴺ h`, so its last value is the run's `J` (an evaluation's
+    `raw_cost`, `compute_cost`): the one number that moved, and only where the cost writes an
+    `h`. The step problem's `rollout` signal `"cost"` → `"J"`, its values unchanged.
+  - *Cost-to-come.* RRT/RRT*'s `node.cost` → `node.cost_to_come`, a live step's and an RRT*
+    snapshot's `best_cost` → `best_cost_to_come`, `planner.best_goal_cost` →
+    `planner.best_path_cost`; `Edge.cost`, the edge's own cost, keeps its name. MPPI's
+    internal `path_cost(...)` → `rollout_cost(...)`.
+  - *The learners' records.* `episode_cost` → `mean_episode_cost`, on the tabular and the
+    neural learner. `Evaluation.raw_cost` and tabular learning's `greedy_tables` are kept.
 
 ## 3. Maturity (TRL)
 
