@@ -1,8 +1,10 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
-**Status:** designed; nothing built. The maintainer was interviewed on 2026-11-11; the answers
-are recorded in §2. A second review the same day added the rulings at the end of §2's table;
-one detail is asked at its step (§9).  
+**Status:** phase 1 built by run 1 of [vehicle-models-run.md](vehicle-models-run.md), in review
+on `vehicle-models-phase1`, except the two skins of §10.5 (`KinematicCar`,
+`DynamicBicycleCar3D`), which wait on the maintainer (the brief's §6), and the port layout (§9).
+The maintainer was interviewed on 2026-11-11; the answers are recorded in §2. A second review
+the same day added the rulings at the end of §2's table.  
 **Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
 to the maintainer's private repository, not to minilink.  
 **Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),

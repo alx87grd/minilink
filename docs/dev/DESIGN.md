@@ -510,6 +510,12 @@ law on both backends (`params=None` its defaults, the same values twice, the JAX
 NumPy ones, a finite gradient through a float leaf); `tests/unittest/test_params_model.py`
 pins the seven rules. The leaves are numbers and numeric arrays, an integer leaf (a seed)
 never in `wrt`; every function is deterministic given its parameters, the seed among them.
+One written exception to rule 2: a car's tire law
+(`minilink/dynamics/catalog/vehicles/tires.py`) copies its own numbers (`z_floor`, `mf_C`,
+`mf_E`) into the car's flat `params` at construction, and the car hands that tree to
+`tire.forces`, so the car's numbers stay the one flat tree its equations and its presets
+write (`mu`, `c_alpha_f`, `c_kappa` beside them); the law's own `params` is its default
+only. A `TerrainBlock`'s `params` is its terrain's dict (a wrapper, rule 2).
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

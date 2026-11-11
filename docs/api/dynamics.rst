@@ -58,6 +58,9 @@ Catalog
 .. automodule:: minilink.dynamics.catalog.vehicles.tires
    :members:
 
+.. automodule:: minilink.dynamics.catalog.vehicles.terrain
+   :members:
+
 .. automodule:: minilink.dynamics.catalog.vehicles.suspension
    :members:
 
