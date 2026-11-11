@@ -696,7 +696,7 @@ class ReinforcementLearningPlanner(Planner):
             n_timesteps=self.n_timesteps,
             train_time_s=self.train_time_s,
             solve_time_s=solve_time_s,
-            episode_cost=-self.last_ep_return_mean,
+            mean_episode_cost=-self.last_ep_return_mean,
             weights_finite=weights_finite,
             history=history,
             gamma=float(self.gamma),
@@ -727,7 +727,7 @@ class ReinforcementLearningRecord:
     far, the collections and the updates only; ``solve_time_s`` is this solve's
     wall time, its whole training (``None``: not timed).
 
-    ``episode_cost`` is the mean episode cost ``J`` of the last collection,
+    ``mean_episode_cost`` is the mean episode cost ``J`` of the last collection,
     positive and falling. ``history`` holds one dict per learning iteration
     (``n_timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
@@ -740,7 +740,7 @@ class ReinforcementLearningRecord:
     n_timesteps: int
     train_time_s: float
     solve_time_s: float | None
-    episode_cost: float
+    mean_episode_cost: float
     weights_finite: bool
     history: list
     gamma: float | None = None
@@ -766,7 +766,7 @@ class ReinforcementLearningRecord:
         trained_on = "-g dt" if self.reward == "running" else "-c_k"
         line = (
             f"{self.method}: {self.n_timesteps} plant steps in "
-            f"{self.train_time_s:.1f} s, mean episode cost {self.episode_cost:.2f}; trained on "
+            f"{self.train_time_s:.1f} s, mean episode cost {self.mean_episode_cost:.2f}; trained on "
             f"{trained_on}, scored on the problem's cost"
             f"{solve_time_text(self.solve_time_s)}"
         )

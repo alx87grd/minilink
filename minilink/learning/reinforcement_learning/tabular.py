@@ -324,7 +324,7 @@ class TabularLearningPlanner(Planner):
             x = grid.states[s]
             a = explore.choose(Q[s], N[s], rng, progress)
             visited = []
-            episode_cost = 0.0
+            c_sum = 0.0
 
             for _ in range(env.n_steps_per_episode):
                 # One control period of the plant under the grid input of action a
@@ -353,7 +353,7 @@ class TabularLearningPlanner(Planner):
 
                 # The episode so far, until it terminates or runs out of time
                 visited.append((s, a, c, eta_k))
-                episode_cost += c
+                c_sum += c
                 if terminated or truncated:
                     break
 
@@ -363,7 +363,7 @@ class TabularLearningPlanner(Planner):
             # Monte Carlo methods update the visited cells once the episode's cost is known
             algorithm.update_episode(Q, visited, gamma)
 
-            self.record_episode(episode_cost, len(visited), explore.epsilon(progress))
+            self.record_episode(c_sum, len(visited), explore.epsilon(progress))
 
         return self
 
@@ -379,7 +379,7 @@ class TabularLearningPlanner(Planner):
 
         # The mean cost of the last tenth of the episodes, the last one at least
         last = [record["cost"] for record in history[-max(len(history) // 10, 1) :]]
-        episode_cost = float(np.mean(last)) if last else float("nan")
+        mean_episode_cost = float(np.mean(last)) if last else float("nan")
 
         table_finite = bool(np.all(np.isfinite(Q)))
 
@@ -387,7 +387,7 @@ class TabularLearningPlanner(Planner):
             method=method,
             n_episodes=len(history),
             visited_fraction=visited_fraction,
-            episode_cost=episode_cost,
+            mean_episode_cost=mean_episode_cost,
             table_finite=table_finite,
             history=list(history),
             solve_time_s=solve_time_s,
@@ -491,7 +491,7 @@ class TabularLearningRecord:
     """
     Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``).
 
-    ``episode_cost`` is the mean cost of the last tenth of the episodes (the
+    ``mean_episode_cost`` is the mean cost of the last tenth of the episodes (the
     last one at least); ``history`` holds each episode's ``cost``;
     ``solve_time_s`` is the solve's wall time, its episodes.
     """
@@ -499,7 +499,7 @@ class TabularLearningRecord:
     method: str
     n_episodes: int
     visited_fraction: float
-    episode_cost: float
+    mean_episode_cost: float
     table_finite: bool
     history: list
     solve_time_s: float | None = None
@@ -515,7 +515,7 @@ class TabularLearningRecord:
     def __str__(self) -> str:
         return (
             f"{self.method}: {self.n_episodes} episodes, {100 * self.visited_fraction:.0f}% of "
-            f"the grid visited, mean episode cost {self.episode_cost:.2f} at the end"
+            f"the grid visited, mean episode cost {self.mean_episode_cost:.2f} at the end"
             f"{solve_time_text(self.solve_time_s)}"
         )
 

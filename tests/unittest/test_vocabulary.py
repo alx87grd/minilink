@@ -278,10 +278,10 @@ RETIRED_NAMES = {
         "raw_cost (J is the raw cost plus the failure cost of a failed or missed run)"
     ),
     "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.cost": (
-        "episode_cost"
+        "mean_episode_cost"
     ),
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningRecord.cost": (
-        "episode_cost"
+        "mean_episode_cost"
     ),
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
         "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
@@ -304,6 +304,12 @@ RETIRED_NAMES = {
     ),
     "minilink.planning.trajectory_optimization.path_integral.MPPIRecord.cost": "J",
     "minilink.planning.search.tree.Node.cost": "cost_to_come",
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.episode_cost": (
+        "mean_episode_cost"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningRecord.episode_cost": (
+        "mean_episode_cost"
+    ),
     "minilink.planning.search.rrt_star.RRTStarSnapshot.best_cost": "best_cost_to_come",
     "minilink.planning.search.live_plot.TreeSearchIteration.best_cost": (
         "best_cost_to_come"
