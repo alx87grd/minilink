@@ -293,6 +293,10 @@ RETIRED_NAMES = {
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.predict": (
         "solution.controller or planner.actor.action(x); predict is SB3's, through SB3Controller"
     ),
+    # One verb on both learners (the maintainer's ruling of 2026-11-11)
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.learn": (
+        "solve(n_episodes=), which continues the learning from the table as it stands"
+    ),
     # Four words, one meaning each (the maintainer's ruling 17b of 2026-11-10): cost the
     # object, J a scalar, objective the criterion over draws, cost_to_go the function
     "minilink.optimization.mathematical_program.OptimizationResult.cost": "J",

@@ -147,7 +147,7 @@ concrete formatting, ordered by the cost of being wrong:
   | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |
   | A planner's record | `solution.record` | `solution.solver` |
   | The block the RL planner trains, given and read back (the actor of actor-critic; the handed-out copy is `solution.controller`) | `actor=`, `planner.actor` | `policy=` |
-  | Train, and train more: every planner's one verb (the RL planner's `solve(n_timesteps=)` continues its training); the learned law's action | `solve`; `solution.controller`, `planner.actor.action(x)` | `learn`, `predict` (Stable-Baselines3's words, on the bridge's `SB3Controller` only) |
+  | Train, and train more: every planner's one verb (the RL planner's `solve(n_timesteps=)` and the tabular learner's `solve(n_episodes=)` continue their training); the learned law's action | `solve`; `solution.controller`, `planner.actor.action(x)` | `learn`, `predict` (Stable-Baselines3's words, on the bridge's `SB3Controller` only) |
   | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |

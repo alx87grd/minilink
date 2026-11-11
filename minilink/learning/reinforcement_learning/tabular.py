@@ -65,7 +65,7 @@ class TabularLearningPlanner(Planner):
         :class:`SARSA` or :class:`MonteCarloControl`.
     exploration : EpsilonGreedy or UCB, optional
         How actions are chosen while learning (default ``EpsilonGreedy()``,
-        annealed from 1 to 0.05 over each call to :meth:`learn`).
+        annealed from 1 to 0.05 over each call to :meth:`solve`).
     learning_rate : float, optional
         Learning rate ``η`` of the moving average; ``None`` averages the samples
         of each cell (the step ``1/N(x, u)``).
@@ -223,6 +223,9 @@ class TabularLearningPlanner(Planner):
         """
         Learn for ``n_episodes`` episodes; return the greedy law and its cost-to-go as a :class:`PlanningSolution`.
 
+        Each solve continues the learning where the last one stopped (:attr:`Q`
+        and :attr:`visits` as they stand, :attr:`history` counting every
+        episode); the solution holds the greedy law of the table at its end.
         ``evaluate=True`` also scores the law, as it is, over the problem's
         draws (integrated on the grid's ``dt``, over an episode on an
         infinite horizon).
@@ -238,9 +241,72 @@ class TabularLearningPlanner(Planner):
             )
             return self.store_solution(solution)
 
-        # Episodes of interaction, learning as they go, timed
+        # Episodes of interaction, learning as they go, timed; the table continues
+        # from where the last solve left it
         started = time.perf_counter()
-        self.learn(n_episodes, verbose=verbose)
+        grid = self.grid
+        env = self.env
+        Q = self.Q
+        N = self.visits
+        algorithm = self.algorithm
+        explore = self.exploration
+        eta = self.learning_rate
+        gamma = self.gamma
+        rng = self.rng
+        episodes = report_progress(
+            range(n_episodes), "Learning Q(x,u)", verbose, unit="episodes"
+        )
+
+        for episode in episodes:
+            # The episode's exploration schedule, parameter draw, start node and
+            # first action
+            progress = episode / max(n_episodes - 1, 1)
+            episode_params = env.sample_params(rng)
+            s = self.node(self.start())
+            t = env.t0
+            x = grid.states[s]
+            a = explore.choose(Q[s], N[s], rng, progress)
+            visited = []
+            c_sum = 0.0
+
+            for _ in range(env.n_steps_per_episode):
+                # One control period of the plant under the grid input of action a
+                u = grid.inputs[a]
+                x_next, t_next, reward, terminated, truncated = env.step(
+                    x, u, t, rng, episode_params
+                )
+
+                # What the learner sees: the stage cost c_k (plus a charged exit or a
+                # terminal cost), the next node, and the action it will take there
+                c = -float(reward)
+                s_next = self.node(x_next)
+                a_next = explore.choose(Q[s_next], N[s_next], rng, progress)
+
+                # The world is the grid: the plant continues from the node
+                x_next = grid.states[s_next]
+
+                # Step size of the moving average: η, or the sample average 1/N(x, u)
+                N[s, a] += 1
+                eta_k = 1.0 / N[s, a] if eta is None else eta
+
+                # Temporal-difference methods update the cell now, from this transition
+                algorithm.update(
+                    Q, s, a, c, s_next, a_next, bool(terminated), eta_k, gamma
+                )
+
+                # The episode so far, until it terminates or runs out of time
+                visited.append((s, a, c, eta_k))
+                c_sum += c
+                if terminated or truncated:
+                    break
+
+                # The next step starts from the node reached, with the action chosen there
+                x, t, s, a = x_next, t_next, s_next, a_next
+
+            # Monte Carlo methods update the visited cells once the episode's cost is known
+            algorithm.update_episode(Q, visited, gamma)
+
+            self.record_episode(c_sum, len(visited), explore.epsilon(progress))
 
         # The greedy law of the learned table
         tables = self.greedy_tables
@@ -298,74 +364,6 @@ class TabularLearningPlanner(Planner):
         )
 
         return {**kwargs, **self.given}
-
-    def learn(self, n_episodes, *, verbose=False):
-        """Run ``n_episodes`` episodes of interaction, learning as they go; returns ``self`` (``verbose``: the episodes' progress)."""
-        grid = self.grid
-        env = self.env
-        Q = self.Q
-        N = self.visits
-        algorithm = self.algorithm
-        explore = self.exploration
-        eta = self.learning_rate
-        gamma = self.gamma
-        rng = self.rng
-        episodes = report_progress(
-            range(n_episodes), "Learning Q(x,u)", verbose, unit="episodes"
-        )
-
-        for episode in episodes:
-            # The episode's exploration schedule, parameter draw, start node and
-            # first action
-            progress = episode / max(n_episodes - 1, 1)
-            params = env.sample_params(rng)
-            s = self.node(self.start())
-            t = env.t0
-            x = grid.states[s]
-            a = explore.choose(Q[s], N[s], rng, progress)
-            visited = []
-            c_sum = 0.0
-
-            for _ in range(env.n_steps_per_episode):
-                # One control period of the plant under the grid input of action a
-                u = grid.inputs[a]
-                x_next, t_next, reward, terminated, truncated = env.step(
-                    x, u, t, rng, params
-                )
-
-                # What the learner sees: the stage cost c_k (plus a charged exit or a
-                # terminal cost), the next node, and the action it will take there
-                c = -float(reward)
-                s_next = self.node(x_next)
-                a_next = explore.choose(Q[s_next], N[s_next], rng, progress)
-
-                # The world is the grid: the plant continues from the node
-                x_next = grid.states[s_next]
-
-                # Step size of the moving average: η, or the sample average 1/N(x, u)
-                N[s, a] += 1
-                eta_k = 1.0 / N[s, a] if eta is None else eta
-
-                # Temporal-difference methods update the cell now, from this transition
-                algorithm.update(
-                    Q, s, a, c, s_next, a_next, bool(terminated), eta_k, gamma
-                )
-
-                # The episode so far, until it terminates or runs out of time
-                visited.append((s, a, c, eta_k))
-                c_sum += c
-                if terminated or truncated:
-                    break
-
-                # The next step starts from the node reached, with the action chosen there
-                x, t, s, a = x_next, t_next, s_next, a_next
-
-            # Monte Carlo methods update the visited cells once the episode's cost is known
-            algorithm.update_episode(Q, visited, gamma)
-
-            self.record_episode(c_sum, len(visited), explore.epsilon(progress))
-
-        return self
 
     def learning_record(self, tables=None, solve_time_s=None) -> TabularLearningRecord:
         """The solver record: episodes, coverage of the grid, the cost of the last episodes, and the solve's wall time."""

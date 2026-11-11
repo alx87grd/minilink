@@ -125,11 +125,31 @@ def test_every_tabular_algorithm_learns_from_the_same_loop(algorithm):
         exploring_starts=False,
         **GRID,
     )
-    learner.learn(50)
+    learner.solve(n_episodes=50)
     assert len(learner.history) == 50
     assert learner.visits.sum() == sum(record["steps"] for record in learner.history)
     assert np.all(np.isfinite(learner.Q))
     assert not np.array_equal(learner.Q, np.zeros_like(learner.Q))
+
+
+def test_a_second_solve_continues_from_the_table_as_it_stands():
+    """One verb: solve(n_episodes=) learns on from the current table, as the RL planner's does."""
+    problem = double_integrator_problem()
+    learner = TabularLearningPlanner(problem, gamma=0.9, seed=0, **GRID)
+    first = learner.solve(n_episodes=40)
+    table_after_first = learner.Q.copy()
+    second = learner.solve(n_episodes=30)
+
+    # The history counts every episode, and the second record says so
+    assert len(learner.history) == 70
+    assert (first.record.n_episodes, second.record.n_episodes) == (40, 70)
+
+    # The first solve is a fresh learner's 40 episodes from the same seed
+    once = TabularLearningPlanner(problem, gamma=0.9, seed=0, **GRID)
+    once.solve(n_episodes=40)
+    np.testing.assert_array_equal(once.Q, table_after_first)
+    assert not np.array_equal(learner.Q, table_after_first)
+    assert not hasattr(learner, "learn")
 
 
 def test_exploration_policies_choose_valid_actions():

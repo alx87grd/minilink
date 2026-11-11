@@ -474,6 +474,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     internal `path_cost(...)` → `rollout_cost(...)`.
   - *The learners' records.* `episode_cost` → `mean_episode_cost`, on the tabular and the
     neural learner. `Evaluation.raw_cost` and tabular learning's `greedy_tables` are kept.
+  - *One verb on both learners* (the maintainer's ruling of 2026-11-11):
+    `TabularLearningPlanner.learn(n)` → `solve(n_episodes=n)`, which continues the learning
+    from the table as it stands, as the RL planner's `solve` does, and hands out the greedy law.
 
 ## 3. Maturity (TRL)
 
