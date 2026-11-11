@@ -85,7 +85,8 @@ class TestCatalogSmoke(unittest.TestCase):
         x0 = sys.x0
         dx = sys.f(x0, np.array([]))
         self.assertEqual(dx.shape, (18,))
-        np.testing.assert_allclose(dx[0:3], x0[3:6])
+        np.testing.assert_allclose(dx[0:9], x0[9:18])  # the positions' rates
+        self.assertEqual(sys.state.labels[:4], ["r1x", "r1y", "r1z", "r2x"])
         e0 = sys.total_energy(x0)
         self.assertLess(e0, 0.0)
         traj = sys.compute_trajectory(tf=1.0, n_samples=400, show=False, verbose=False)

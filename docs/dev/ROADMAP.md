@@ -531,6 +531,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     matrices as a continuous `dx̂`) and `luenberger` on a step or sampled system, which hands
     out that observer. A gain stays fine on a discrete model, its poles read in `z`:
     `place(model, poles)` and `luenberger_gain(A, C, poles)`.
+  - *`ThreeBody`'s state, positions first* (the maintainer's ruling Q5 of 2026-11-11):
+    `[r1, v1, r2, v2, r3, v3]` → `[r1, r2, r3, v1, v2, v3]`, its labels, units and figure-eight
+    `x0` with it (`x[0:9]` the positions, `x[9:18]` their rates); the numbers move only by
+    that permutation. RULES words "positions, then rates" as a style guideline, not a rule
+    enforced on a user's plant.
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the
