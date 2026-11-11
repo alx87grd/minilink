@@ -21,6 +21,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
+from minilink.dynamics.catalog.vehicles.suspension_car import SuspensionCar3D
 
 __all__ = [
     "BicycleDynRate",
@@ -32,6 +33,7 @@ __all__ = [
     "LongitudinalSlipCar",
     "MountainCar",
     "QuarterCar",
+    "SuspensionCar3D",
     "UdeSRacecar",
     "UdeSRacecarDyn",
 ]
