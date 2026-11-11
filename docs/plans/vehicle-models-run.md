@@ -1,6 +1,6 @@
 # Vehicle models: the run
 
-**Status:** not started.  
+**Status:** run 1 in progress on `vehicle-models-phase1`.  
 **What it is:** the brief of the automatic runs (AGENTS.md, "Automatic runs") that build
 [vehicle-models.md](vehicle-models.md): the steps in order, one commit each, what proves
 each one, and when to stop and ask. The design is in that plan (its §10 says how the pieces
@@ -100,7 +100,17 @@ Every other open choice takes the recommended option and is logged in §6.
 
 ## 6. Decisions taken during the run
 
-None yet. Each entry: the step, the choice, the options it was taken over, and why.
+Each entry: the step, the choice, the options it was taken over, and why.
+
+- **VM-0, the branch.** Cut from `vehicle-models-plan`: `dev` does not contain the plan yet.
+- **VM-0, the baseline harness.** A script in the session's scratchpad, not committed: the
+  car keys stay fixed across the run and a small table maps each key to the constructor of
+  the moment (`KinematicCar()` before VM-5, `KinematicBicycle` with `a = 2, b = 3` after).
+  It covers the thirteen vehicle classes of the catalog (and the stacked- or named-port
+  variants), `f` and every output port at 200 seeded states and inputs on NumPy and on JAX
+  (`jit`), a 5 s run on each backend, and for `BicycleDynRate` and `UdeSRacecarDyn` one
+  direct-collocation solve (JAX, SLSQP, 8 steps) and ten MPC ticks on the compiled face.
+  The racecar's solve is the harness's own: no benchmark scenario solves on it.
 
 ## 7. Ledger
 
