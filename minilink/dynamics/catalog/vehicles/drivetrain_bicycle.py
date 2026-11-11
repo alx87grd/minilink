@@ -437,22 +437,6 @@ class DrivetrainBicycle(DynamicBicycle):
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    def commands(self, x, u):
-        """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
-        xp = array_module(x, u)
-
-        commands = xp.asarray(u)
-
-        return commands
-
-    def wheel_rate_and_steer(self, x, u):
-        """The base class reads ``[w_rear, delta]`` here; both are states now."""
-        return x[6:8]
-
     def rolling_angle_rates(self, x, params):
         """``[phi_rear_dot, phi_front_dot]``: each wheel turning with its contact."""
         xp = array_module(x)
@@ -476,6 +460,22 @@ class DrivetrainBicycle(DynamicBicycle):
         dphi = xp.array([dphi_rear, dphi_front])
 
         return dphi
+
+    ###########################################################################
+    # Internal machinery
+    ###########################################################################
+
+    def commands(self, x, u):
+        """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
+        xp = array_module(x, u)
+
+        commands = xp.asarray(u)
+
+        return commands
+
+    def wheel_rate_and_steer(self, x, u):
+        """The base class reads ``[w_rear, delta]`` here; both are states now."""
+        return x[6:8]
 
     def no_wheel_angle_rates(self, x, params):
         """No rolling angle in the state: an empty block."""

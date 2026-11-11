@@ -275,6 +275,103 @@ class DynamicBicycle(DynamicSystem):
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
+    def saturated_linear_forces(self, v_body, u_inputs, params=None):
+        """The axle forces of the saturated linear tire, on ``Ca``, ``Ck`` and ``mu``."""
+        params = self.params if params is None else params
+
+        tire = self.tire
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+        mu = params["mu"]
+        v_min_epsilon = params["v_min_epsilon"]
+
+        L = a + b
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_inputs, params
+        )
+
+        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+
+        # The slips at each contact, over the rolling speed |vx| + ε
+        alpha_f, kappa_f = tire_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
+        alpha_r, kappa_r = tire_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
+
+        # Linear-slip forces at each contact, saturated on its friction circle
+        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, Ck, Ca, params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, Ck, Ca, params)
+
+        return Fx_f, Fy_f, Fx_r, Fy_r
+
+    def tire_law_forces(self, v_body, u_inputs, params=None):
+        """The axle forces of a law of the tire module, on stiffnesses per unit load."""
+        params = self.params if params is None else params
+
+        tire = self.tire
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        mu = params["mu"]
+        c_kappa = params["c_kappa"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+        v_min_epsilon = params["v_min_epsilon"]
+
+        L = a + b
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_inputs, params
+        )
+
+        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+
+        # The slips at each contact, over the rolling speed √(vx² + ε²)
+        alpha_f, kappa_f = wheel_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
+        alpha_r, kappa_r = wheel_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
+
+        # The law's forces at each contact
+        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+
+        return Fx_f, Fy_f, Fx_r, Fy_r
+
+    def absolute_stiffnesses(self, params):
+        """``(C_alpha_f, C_alpha_r, C_kappa)``: the shared ``Ca`` and ``Ck``."""
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+
+        return Ca, Ca, Ck
+
+    def per_unit_load_stiffnesses(self, params):
+        """``(C_alpha_f, C_alpha_r, C_kappa)``: the stiffnesses per unit load at the static loads."""
+        a = params["a"]
+        b = params["b"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        c_kappa = params["c_kappa"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+
+        # Static axle loads, and the axle stiffnesses they carry
+        Fz_f = mass * gravity * b / (a + b)
+        Fz_r = mass * gravity * a / (a + b)
+        C_alpha_f = c_alpha_f * Fz_f
+        C_alpha_r = c_alpha_r * Fz_r
+        C_kappa = c_kappa * Fz_r
+
+        return C_alpha_f, C_alpha_r, C_kappa
+
     def generalized_d(self, q, v, u_in, params=None):
         params = self.params if params is None else params
         xp = array_module(v, u_in)
@@ -466,103 +563,6 @@ class DynamicBicycle(DynamicSystem):
         F_r_loc = np.array([Fx_r, Fy_r])
 
         return v_r_loc, v_f_loc, F_r_loc, F_f_loc
-
-    def saturated_linear_forces(self, v_body, u_inputs, params=None):
-        """The axle forces of the saturated linear tire, on ``Ca``, ``Ck`` and ``mu``."""
-        params = self.params if params is None else params
-
-        tire = self.tire
-        a = params["a"]
-        b = params["b"]
-        r_f = params["r_f"]
-        r_r = params["r_r"]
-        mass = params["mass"]
-        gravity = params["gravity"]
-        Ca = params["Ca"]
-        Ck = params["Ck"]
-        mu = params["mu"]
-        v_min_epsilon = params["v_min_epsilon"]
-
-        L = a + b
-        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs, params
-        )
-
-        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
-        Fz_f = mass * gravity * (b / L)
-        Fz_r = mass * gravity * (a / L)
-
-        # The slips at each contact, over the rolling speed |vx| + ε
-        alpha_f, kappa_f = tire_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
-        alpha_r, kappa_r = tire_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
-
-        # Linear-slip forces at each contact, saturated on its friction circle
-        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, Ck, Ca, params)
-        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, Ck, Ca, params)
-
-        return Fx_f, Fy_f, Fx_r, Fy_r
-
-    def tire_law_forces(self, v_body, u_inputs, params=None):
-        """The axle forces of a law of the tire module, on stiffnesses per unit load."""
-        params = self.params if params is None else params
-
-        tire = self.tire
-        a = params["a"]
-        b = params["b"]
-        r_f = params["r_f"]
-        r_r = params["r_r"]
-        mass = params["mass"]
-        gravity = params["gravity"]
-        mu = params["mu"]
-        c_kappa = params["c_kappa"]
-        c_alpha_f = params["c_alpha_f"]
-        c_alpha_r = params["c_alpha_r"]
-        v_min_epsilon = params["v_min_epsilon"]
-
-        L = a + b
-        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs, params
-        )
-
-        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
-        Fz_f = mass * gravity * (b / L)
-        Fz_r = mass * gravity * (a / L)
-
-        # The slips at each contact, over the rolling speed √(vx² + ε²)
-        alpha_f, kappa_f = wheel_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
-        alpha_r, kappa_r = wheel_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
-
-        # The law's forces at each contact
-        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
-        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
-
-        return Fx_f, Fy_f, Fx_r, Fy_r
-
-    def absolute_stiffnesses(self, params):
-        """``(C_alpha_f, C_alpha_r, C_kappa)``: the shared ``Ca`` and ``Ck``."""
-        Ca = params["Ca"]
-        Ck = params["Ck"]
-
-        return Ca, Ca, Ck
-
-    def per_unit_load_stiffnesses(self, params):
-        """``(C_alpha_f, C_alpha_r, C_kappa)``: the stiffnesses per unit load at the static loads."""
-        a = params["a"]
-        b = params["b"]
-        mass = params["mass"]
-        gravity = params["gravity"]
-        c_kappa = params["c_kappa"]
-        c_alpha_f = params["c_alpha_f"]
-        c_alpha_r = params["c_alpha_r"]
-
-        # Static axle loads, and the axle stiffnesses they carry
-        Fz_f = mass * gravity * b / (a + b)
-        Fz_r = mass * gravity * a / (a + b)
-        C_alpha_f = c_alpha_f * Fz_f
-        C_alpha_r = c_alpha_r * Fz_r
-        C_kappa = c_kappa * Fz_r
-
-        return C_alpha_f, C_alpha_r, C_kappa
 
 
 class DynamicBicycleCar3D(DynamicBicycle):
