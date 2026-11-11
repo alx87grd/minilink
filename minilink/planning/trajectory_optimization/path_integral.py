@@ -553,8 +553,10 @@ class CompiledMPPIPlanner:
             x_next, t_next, reward, terminated, _ = env.step(
                 x, v, t, None, episode, t_origin=t0
             )
+            c = -reward  # the environment's reward is the stage cost negated
+
             # S += γ^t c_t while alive; a failure is charged once, its state then frozen
-            S = S - jnp.where(alive, discount * reward, 0.0)
+            S = S + jnp.where(alive, discount * c, 0.0)
             ended = alive & terminated
             x_next = jnp.where(alive & ~terminated, x_next, x)
             return (x_next, t_next, S, alive & ~ended, discount * gamma), (
