@@ -44,6 +44,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Load transfer | an exact continuous model: no lag on the acceleration |
 | Slip | today's slip definitions kept during the refactor, so no demo number moves; the smooth formula is tried later, together with the switch from `LinearSaturation` to the brush law, measured before and after (§5.1, §7). Supersedes the same day's answer to switch the slip during phase 1 |
 | Parameter names | flat, one suffix per axle (`c_alpha_f`, `k_r`), left and right symmetric, as the racecar and the textbook write them; rung 6 keeps the same; asymmetric corners are a later extension (private repository) |
+| Magic formula | default shape `C = 1.3`, `E = −0.5`, both directions: the peak `μ Fz` near the brush law's full slide (12° at `c = 13/rad`), then a fall to `sin(C π/2) ≈ 0.89` of the peak; both numbers in `params`; a fit to a published tire, cited in the module, can replace them when it is written |
 | Names | rung 4's generic class is `DrivetrainBicycle` ("powered" is too vague): the UdeS Racecar's `UdeSRacecarDyn` sits on it; rung 6 is `SuspensionCar3D`, named by what it adds |
 | Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, and the UdeS Racecar preset brought to it with its real skin and parameters (§7) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
@@ -350,10 +351,9 @@ here.
    Rung 6 is two-track either way.
 2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-3. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
-4. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
+3. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
    module.
-5. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
+4. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
    optimization comparison, or another the maintainer names.
-6. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+5. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
    law and the terrain.
