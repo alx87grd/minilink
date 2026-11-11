@@ -47,6 +47,7 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Magic formula | default shape `C = 1.3`, `E = −0.5`, both directions: the peak `μ Fz` near the brush law's full slide (12° at `c = 13/rad`), then a fall to `sin(C π/2) ≈ 0.89` of the peak; both numbers in `params`; a fit to a published tire, cited in the module, can replace them when it is written |
 | Names | rung 4's generic class is `DrivetrainBicycle` ("powered" is too vague): the UdeS Racecar's `UdeSRacecarDyn` sits on it; rung 6 is `SuspensionCar3D`, named by what it adds |
 | `QuarterCar` | a standalone, simpler demo plant, not part of the ladder: kept independent and unchanged for now; rung 6's corner and terrain do not build on it (its support status follows the catalog clean-up's own rule). To review in a later phase: whether rebuilding it on the corner law and the terrain is cleaner, weighed against keeping its own equations readable on one page |
+| Rollover | modelled on rung 6: roll passes 90° and 180° (the roll–pitch–yaw attitude is singular only at pitch ±90°, an end-over-end flip, documented); a `rollover` output gives the margin (the smallest wheel load, the roll angle), and a terminal set can end a run at rollover. Only the tire contacts touch the terrain, so a car past about 90° of roll sinks through the ground: documented. `Car3D` shows only the onset (an inner wheel's load reaching zero). Body contact points, so the car lands and keeps tumbling, are a later option, off by default |
 | Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
 | Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
@@ -367,6 +368,8 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - wheel hop (level ii, `massless_wheel=False`);
   - more presets;
   - a load-sensitive tire law;
+  - body contact points on rung 6 (`body_contact=True`, off by default): a few points on the
+    body with the corner's penalty law, so a car that rolls over lands and keeps tumbling;
   - the review of rebuilding `QuarterCar` on the corner law and the terrain (§2).
 
 ## 8. What leaves, what stays
