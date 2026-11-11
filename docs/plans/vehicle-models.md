@@ -42,6 +42,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Heading | `psi` on every rung (state label `"psi"`); rung 6 uses roll `φ`, pitch `θ`, yaw `ψ` |
 | Suspension | the design supports quasi-static load transfer (4b), spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only |
 | Load transfer | an exact continuous model: no lag on the acceleration |
+| Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, and the UdeS Racecar preset brought to it with its real skin and parameters (§7) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
 
 ## 3. Today
@@ -243,20 +244,30 @@ states. Rung 4b is rung 6's limit with an infinitely stiff suspension, so the st
 
 ## 7. Phases
 
-The first build of the suspension is level (i) only (§2). The order of the rest is open
-(§9, question 1). The agent's proposal:
+The maintainer's order (2026-11-11). Suspension level (i) is the only one built in phase 2.
 
-- **Phase 1, the foundations:** the tire module, the terrain fields, the static and
-  spring-damper normal-load laws' interface, and ladder 1 to 5 consolidated (presets, skins,
-  `psi`, one owner for the wheelbase, one slip function), inside v0.4's catalog clean-up.
-- **Phase 2, rung 6 at level (i):** the 3-D car on a flat terrain, then on built-in terrains,
-  with a teaching self-driving demo.
-- **Later:** rung 4b, wheel hop (level ii), the full-size presets.
+- **Phase 1, the foundations.** This phase builds:
+  - the tire module;
+  - the terrain fields and their static block;
+  - the interface of the normal-load law, with the static law;
+  - ladder 1 to 5 consolidated: presets, skins, `psi`, one owner for the wheelbase, one slip
+    function.
+
+  It sits inside v0.4's catalog clean-up.
+- **Phase 2, the 3-D car.** Rung 6 at suspension level (i): spring-damper corners on the
+  terrain, first flat, then the built-in terrains, with a teaching self-driving demo.
+- **Phase 3, the 3-D car's look and presets:**
+  - a good 3-D skin for rung 6;
+  - a generic parameter preset that drives plausibly;
+  - the UdeS Racecar preset brought to rung 6, with its real skin and its parameters (still
+    a proxy of the car, §2).
+- **Later, designed for but not scheduled:** rung 4b (quasi-static load transfer), wheel hop
+  (level ii), more presets.
 
 ## 8. What leaves, what stays
 
 - Inside minilink: today's look-only and parameter-only classes become presets and skins.
-  Their names are decided with question 5.
+  Their names are decided with question 4 of §9.
 - The two project folders stay as they are (read only). Their models inspired this design
   and are not migrated by it.
 - Their duplicates of catalog code (the point, the kinematic bicycle, the engine and servo
@@ -268,33 +279,31 @@ The first build of the suspension is level (i) only (§2). The order of the rest
 In order, one at a time. Each goes to QUESTIONS.md when it comes up, and its answer lands
 here.
 
-1. **The phases** (§7): the foundations first, the foundations and rung 6 together, or rung 6
-   first. Recommendation: the foundations first.
-2. **Rung 4b's geometry:**
+1. **Rung 4b's geometry:**
    - two-track (four wheels, both lateral and longitudinal transfer);
    - or the bicycle with front-to-back transfer only.
 
    Rung 6 is two-track either way.
-3. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
+2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-4. **The form of the rate-input bicycle (3b):** a class of its own (today), a construction
+3. **The form of the rate-input bicycle (3b):** a class of its own (today), a construction
    option on rung 3, or integrators wired in front of rung 3 (measured for MPC speed against
    the class first).
-5. **Names:**
+4. **Names:**
    - the generic names of rungs 4 and 6;
    - the UdeS Racecar's public face: thin classes that set only the preset and the skin
      (an exception to the catalog clean-up's "no two supported plants differ by parameters
      alone"), a preset argument, or a parameter set plus a skin.
-6. **The linear tire's limit:** pure (the textbook; the brush law adds the limit) or with
+5. **The linear tire's limit:** pure (the textbook; the brush law adds the limit) or with
    today's friction circle.
-7. **The default tire on each rung:**
+6. **The default tire on each rung:**
    - linear on rung 3 (the course linearizes it), brush on rungs 4 and 6;
    - or brush everywhere.
-8. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
+7. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
    `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
    parameter trees and compile first.
-9. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
-10. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
+8. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
+9. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
     module.
-11. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+10. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
     law and the terrain.
