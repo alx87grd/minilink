@@ -132,9 +132,9 @@ def linearize(
     a design made on it (``lqr``, ``kalman``) regulates to ``x̄`` and a run of
     it is the linear prediction of the system's. A step or sampled system
     gives a :class:`~minilink.dynamics.abstraction.state_space.LinearizedStepSystem`,
-    ``x_{k+1} = F(x̄, ū) + A_d (x_k − x̄) + B_d (u_k − ū)``, with the period it
-    runs at (``None`` for a tick law): its poles sit in ``z``, stable inside
-    the unit circle. ``model.deviation_model()`` is the pure linear model in
+    ``x_{k+1} = F(x̄, ū) + A_d (x_k − x̄) + B_d (u_k − ū)``, a tick law (a
+    sampled system's period stays on its clock: ``model % Δ`` reads seconds):
+    its poles sit in ``z``, stable inside the unit circle. ``model.deviation_model()`` is the pure linear model in
     the deviations from the point.
     """
     # The Jacobians at the operating point
@@ -150,13 +150,13 @@ def linearize(
     y_bar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
 
     # The model about the point: the drift f(x̄, ū) on a continuous system, the
-    # next state F(x̄, ū) on a step system, with its period
+    # next state F(x̄, ū) on a step system, per tick
     point = dict(x_bar=x_bar, u_bar=u_selected, y_bar=y_bar)
     name = f"Linearized {sys.name}"
     if isinstance(sys, StepSystem):
         x_next_bar = np.asarray(sys.step(x_bar, u_bar, t, params), dtype=float)
         model = LinearizedStepSystem(
-            A, B, C, D, x_next_bar=x_next_bar, period=period_of(sys), name=name, **point
+            A, B, C, D, x_next_bar=x_next_bar, name=name, **point
         )
     else:
         dx_bar = np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
@@ -404,10 +404,7 @@ def discrete_period(sys):
 
 
 def period_of(sys):
-    """The sample period ``Δ`` a step system runs at, in seconds; ``None`` for a tick law."""
-    if isinstance(sys, (DiscreteLTISystem, LinearizedStepSystem)):
-        return sys.period
-
+    """The sample period ``Δ`` a step system runs at, in seconds, its clock's; ``None`` for a tick law."""
     return getattr(sys, "sample_period", None)
 
 

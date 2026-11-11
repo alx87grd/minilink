@@ -301,17 +301,16 @@ class DiscreteLTISystem(ConstantMatrices, StepSystem):
         x_{k+1} = A_d @ x_k + B_d @ u_k
         y_k     = C_d @ x_k + D_d @ u_k
 
-    Its poles are read against the unit circle (``|z| < 1`` is stable), its
-    frequency response is ``G(e^{jωΔ})``. ``period`` is the sample period
-    ``Δ`` in seconds of the system it describes, ``None`` for a tick law (its
-    frequencies are then per tick, ``Δ = 1``); it describes the model and puts
-    it on no clock (``model % Δ`` does). The matrices are its ``params``
+    A tick law: its poles are read against the unit circle (``|z| < 1`` is
+    stable), its frequency response ``G(e^{jω})`` per tick. Seconds come only
+    from a clock: ``model % Δ`` runs it every ``Δ`` seconds, and the analysis
+    reads that clock (``G(e^{jωΔ})`` in rad/s). The matrices are its ``params``
     (``{"A", "B", "C", "D"}``). The model of a step or sampled system about an
     operating point is a :class:`LinearizedStepSystem`, and its
     :meth:`~LinearizedStepSystem.deviation_model` is this class.
     """
 
-    def __init__(self, A, B, C=None, D=None, *, period=None, name=None):
+    def __init__(self, A, B, C=None, D=None, *, name=None):
         # The matrices: C = I and D = 0 when omitted
         C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
         D = (
@@ -329,7 +328,6 @@ class DiscreteLTISystem(ConstantMatrices, StepSystem):
         )
         if name is not None:
             self.name = name
-        self.period = None if period is None else float(period)
 
         # Parameters: the four matrices
         self.params = {"A": A, "B": B, "C": C, "D": D}
@@ -355,7 +353,7 @@ class DiscreteLTISystem(ConstantMatrices, StepSystem):
         return y
 
     def __str__(self):
-        return f"{super().__str__()}\n  {period_text(self)}\n{matrices_text(self)}"
+        return f"{super().__str__()}\n  per tick\n{matrices_text(self)}"
 
 
 class LinearizedStepSystem(ConstantMatrices, StepSystem):
@@ -368,14 +366,12 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
     :func:`~minilink.analysis.linearization.linearize` returns on a tick law,
     a block on a clock or a sampled loop, ``F`` its step. ``x_next_bar =
     F(x̄, ū)`` equals ``x̄`` at an equilibrium. ``params`` holds ``{"A", "B",
-    "C", "D", "x_bar", "u_bar", "y_bar", "x_next_bar"}``; ``period`` is ``Δ``,
-    as on :class:`DiscreteLTISystem`, and :meth:`deviation_model` is that pure
-    difference equation in the deviations.
+    "C", "D", "x_bar", "u_bar", "y_bar", "x_next_bar"}``; a tick law, as
+    :class:`DiscreteLTISystem` (``model % Δ`` puts it on a clock), and
+    :meth:`deviation_model` is that pure difference equation in the deviations.
     """
 
-    def __init__(
-        self, A, B, C, D, *, x_bar, u_bar, y_bar, x_next_bar, period=None, name=None
-    ):
+    def __init__(self, A, B, C, D, *, x_bar, u_bar, y_bar, x_next_bar, name=None):
         # The dimensions and the ports u -> y, fed through only when D ≠ 0
         n, m, p = dimensions_of(A, B, C, D)
         feedthrough = bool(np.any(np.asarray(D)))
@@ -387,7 +383,6 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
         )
         if name is not None:
             self.name = name
-        self.period = None if period is None else float(period)
 
         # Parameters: the Jacobians and the operating point, with the system's
         # output ȳ = h(x̄, ū) and next state F(x̄, ū) there
@@ -454,7 +449,6 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
             self.B(),
             self.C(),
             self.D(),
-            period=self.period,
             name=f"{self.name} (deviations)",
         )
         relabel_deviations(model, self)
@@ -463,7 +457,7 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
 
     def __str__(self):
         return (
-            f"{super().__str__()}\n  {period_text(self)}\n{matrices_text(self)}\n"
+            f"{super().__str__()}\n  per tick\n{matrices_text(self)}\n"
             f"{point_text(self)}"
         )
 
@@ -567,11 +561,6 @@ def point_text(sys):
             + np.array2string(values, precision=4, suppress_small=True, prefix=prefix)
         )
     return "\n".join(lines)
-
-
-def period_text(sys):
-    """``Δ = 0.1 s``, or ``per tick`` for a tick law."""
-    return "per tick" if sys.period is None else f"Δ = {sys.period:g} s"
 
 
 def relabel_deviations(model, linearization):

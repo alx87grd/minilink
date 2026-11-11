@@ -177,7 +177,8 @@ def plot_step_response(
     """Step response of the selected channel with rise time, settling time and overshoot.
 
     The linear model's response, as :func:`step_response`; the title reads
-    "Linear Step Response" for an ``LTISystem`` and "Linearized Step
+    "Linear Step Response" for a linear model (an ``LTISystem`` or a
+    ``DiscreteLTISystem``, on a clock or not) and "Linearized Step
     Response", the response a deviation ``Δy``, for any other system and a
     ``LinearizedSystem``. A step or sampled system's
     response is drawn as its samples ``y_k``.
@@ -220,6 +221,15 @@ def first_time_reaching(time, progress, level):
     return time[reached[0]] if reached.size else np.nan
 
 
+def is_linear_model(sys) -> bool:
+    """Whether ``sys`` is a linear model, as it is or on a clock (``model % Δ``): no operating point, its response ``y`` itself."""
+    model = getattr(sys, "source", None)
+    if model is None:
+        model = sys
+
+    return isinstance(model, (LTISystem, DiscreteLTISystem))
+
+
 def step_figure(time, y, info, sys, of, wrt, period=None):
     """The step-response figure: the response and its peak, the steady state and the figures' note; a difference equation's as its samples."""
     # The steady-state line once settled, and the note of the finite figures
@@ -237,7 +247,7 @@ def step_figure(time, y, info, sys, of, wrt, period=None):
 
     # The title says whether the model is linear or a linearization, whose
     # response is the deviation Δy from the operating point
-    linear_model = isinstance(sys, (LTISystem, DiscreteLTISystem))
+    linear_model = is_linear_model(sys)
     title = style.LINEAR_STEP_TITLE if linear_model else style.LINEARIZED_STEP_TITLE
     y_label = style.AMPLITUDE_LABEL if linear_model else style.DEVIATION_LABEL
     output = "y" if linear_model else "Δy"

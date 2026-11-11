@@ -430,6 +430,11 @@ RETIRED_KEYWORDS = {
         "x_bar": "linearize(step_sys, x_bar), a LinearizedStepSystem",
         "u_bar": "linearize(step_sys, x_bar, u_bar), a LinearizedStepSystem",
         "y_bar": "a LinearizedStepSystem's params['y_bar']",
+        # A tick law (the maintainer's ruling Q1 of 2026-11-11): seconds come from a clock
+        "period": "model % dt, the clock the analysis reads",
+    },
+    "minilink.dynamics.abstraction.state_space.LinearizedStepSystem.__init__": {
+        "period": "model % dt, the clock the analysis reads",
     },
     # A set is its margin (the maintainer's ruling 22 of 2026-11-11): membership is derived
     "minilink.core.sets.CallableSet.__init__": {

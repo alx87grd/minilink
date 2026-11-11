@@ -271,7 +271,7 @@ class TestInZ(unittest.TestCase):
     def setUp(self):
         # x_{k+1} = a x_k + u_k, y_k = x_k: G(z) = 1 / (z − a), Δ = 0.1 s
         self.a = 0.5
-        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]], period=0.1)
+        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]]) % 0.1
 
     def tearDown(self):
         import matplotlib.pyplot as plt
@@ -292,7 +292,7 @@ class TestInZ(unittest.TestCase):
 
     def test_a_deadbeat_system_shows_a_few_ticks_not_ten_seconds(self):
         # Its pole at z = 0 settles in n = 1 tick: the horizon spans n + 1 ticks
-        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]], period=0.001)
+        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]]) % 0.001
         time, y = step_response(G)
         np.testing.assert_allclose(time, [0.0, 0.001, 0.002])
         np.testing.assert_allclose(y, [0.0, 1.0, 1.0])

@@ -273,8 +273,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     internal `score_run(horizon=)`, `planner_evidence(episode_length=)`, `steps_of(horizon,
     dt)` with it).
   - *Exported.* `DiscreteLTISystem`, the pure difference equation (a step linearization's
-    deviation model), is on `minilink.dynamics` beside `LTISystem`; its `period=` keeps its name (renaming
-    it `sample_period` would put the model on a clock, an open question).
+    deviation model), is on `minilink.dynamics` beside `LTISystem` (its `period=` then went,
+    ruling Q1 below).
   - *One signature order, the model's `(x, u, t; p)`.* `RolloutEnvironment.step(x, t, u, key,
     params)` → `step(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *,
     t=0.0)` and `NeuralPolicy.action(x, params=None)` → `action(x, t=0.0, params=None)`
@@ -514,6 +514,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     after it ends, and an infinite horizon runs the evaluator's default 10 s, as value
     iteration's and the LQR's evidence (RRT's ran its path's own length there); the record's
     "goal reached" stays the search's.
+  - *The discrete models are tick laws* (the maintainer's ruling Q1 of 2026-11-11):
+    `DiscreteLTISystem(A, B, C, D, period=Δ)` and `LinearizedStepSystem`'s `period` are gone,
+    `x⁺ = A_d x + B_d u` per tick; seconds come only from a clock, `model % Δ`, whose
+    `sample_period` the analysis reads, so `bode(lin % Δ)` is the rad/s Bode the period gave
+    (the same numbers) and `bode(lin)` the per-tick one; `linearize` of a sampled loop returns
+    the tick law, and the printouts say "per tick". A clocked linear model's step response is
+    titled "Linear", as the model's.
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the

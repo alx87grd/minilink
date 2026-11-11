@@ -16,7 +16,7 @@ from minilink import (
     closed_loop,
     discretize,
 )
-from minilink.analysis import linearize
+from minilink.analysis import bode, linearize
 from minilink.analysis.linear import poles
 from minilink.blocks.step import UnitDelay
 from minilink.core.backends import array_module
@@ -75,16 +75,24 @@ def test_a_pure_step_chain_rolls_out_and_linearizes_in_z_per_tick():
     run = chain.compute_rollout(5, u=np.ones(1))
     np.testing.assert_allclose(run.t, np.arange(6))
     model = linearize(chain)
-    assert isinstance(model, LinearizedStepSystem) and model.period is None
+    assert isinstance(model, LinearizedStepSystem) and "per tick" in str(model)
     np.testing.assert_allclose(np.sort(np.abs(poles(model.A()))), [0.0, 0.5])
 
 
-def test_a_computer_alone_reads_seconds_and_linearizes_with_its_period():
+def test_a_computer_alone_reads_seconds_and_linearizes_to_a_tick_law():
     computer = (Sine() % 0.01) >> (P(2.0) % 0.01)
     run = computer.compute_rollout(10)
     np.testing.assert_allclose(run.t, 0.01 * np.arange(11))
-    model = linearize(PID(Kp=2.0, Ki=1.0, Kd=0.5) % 0.01)
-    assert model.period == 0.01
+    law = PID(Kp=2.0, Ki=1.0, Kd=0.5) % 0.01
+    model = linearize(law)
+    assert "per tick" in str(model)
+
+    # Seconds come from a clock: the model on the law's clock reads the law's rad/s
+    w, mag, phase = bode(model % 0.01)
+    w_law, mag_law, phase_law = bode(law)
+    np.testing.assert_allclose(w, w_law)
+    np.testing.assert_allclose(mag, mag_law)
+    np.testing.assert_allclose(phase, phase_law)
 
 
 def test_the_sampled_loop_runs_its_ticks_its_dense_run_and_the_host_runner():

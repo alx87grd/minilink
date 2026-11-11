@@ -2340,12 +2340,13 @@ class TestLinearizedSystem(unittest.TestCase):
         sampled = self.plant % 0.1
         lin = linearize(sampled, x_bar=self.x_up)
         self.assertIsInstance(lin, LinearizedStepSystem)
-        self.assertEqual(lin.period, 0.1)
+        self.assertIn("per tick", str(lin))  # a tick law: seconds are the clock's
+        self.assertFalse(hasattr(lin, "period"))
         np.testing.assert_allclose(lin.params["x_next_bar"], self.x_up, atol=1e-12)
         np.testing.assert_allclose(
             lin.step(self.x_up, np.zeros(1)), self.x_up, atol=1e-12
         )
         model = lin.deviation_model()
         self.assertIs(type(model), DiscreteLTISystem)
-        self.assertEqual(model.period, 0.1)
+        self.assertFalse(hasattr(model, "period"))
         np.testing.assert_allclose(model.A(), lin.A())
