@@ -928,5 +928,16 @@ def test_a_learned_solution_is_learned_again_from_its_params():
     again = planner.solve(n_timesteps=64, params=first.params)
 
     assert set(first.params) == set(planner.params)
+    assert {"plant", "cost", "method", "seed"} <= set(first.params)
     for key, weights in first.controller.params["mlp"].items():
         np.testing.assert_array_equal(again.controller.params["mlp"][key], weights)
+
+    # The tree's problem leaves reach the planner rebuilt there (the maintainer, 2026-11-11)
+    import copy
+
+    from minilink.planning.planner import planner_at
+
+    edited = copy.deepcopy(first.params)
+    edited["x0"] = np.asarray(edited["x0"]) + 0.5
+    rebuilt = planner_at(planner, edited)
+    np.testing.assert_array_equal(rebuilt.problem.x0, edited["x0"])

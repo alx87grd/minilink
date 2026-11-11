@@ -781,9 +781,10 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
   comparison's given controller) keeps the problem's tree. No caller migrated: the problem's
   parts keep their paths in the planner's tree (`solution.params["plant"]`). A test solves every
   planner twice, the second from `solution.params`, and compares the pickled controller
-  numbers, plan and record (timings out), byte for byte. **A question:** the RL planner's tree
-  holds no problem leaves (`"method"`, `"seed"`), so its `solution.params` does not record the
-  plant and cost it trained on (TODO's row "A training run that rebinds its numbers" reworded).
+  numbers, plan and record (timings out), byte for byte. **Ruled 2026-11-11 (the maintainer):**
+  the RL planner's tree gains the problem's leaves by role, like every other planner's, so its
+  `solution.params` records the plant and cost it trained on and `solve(params=)` trains on a
+  problem holding the tree's leaves (a test edits `x0` and reads it on the planner rebuilt there).
 - **Q1.** `period` and `period_text` gone; `period_of` reads a clock's `sample_period` only. The
   analysis of `lin % 0.1` gives the period's numbers byte for byte (Bode, margins, pole-zero
   map, step response, root locus, Nyquist, the transfer function before Q4). One fix it needed:

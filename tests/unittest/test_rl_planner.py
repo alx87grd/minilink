@@ -167,7 +167,7 @@ def test_solve_at_another_tree_trains_the_planner_rebuilt_there_from_its_seed():
     )
     planner = ReinforcementLearningPlanner(prob, n_epochs=2, **settings)
     tree = copy.deepcopy(planner.params)
-    assert set(tree) == {"method", "seed"}
+    assert set(tree) == {*prob.parts_view(), "method", "seed"}
     tree["method"]["clip_range"] = 0.1
     tree["method"]["optimizer"]["learning_rate"] = 1e-3
     tree["seed"] = 3

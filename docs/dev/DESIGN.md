@@ -1750,9 +1750,9 @@ down to where it is read, never as planner state. A planner rebuilt for a sweep 
 rebuilt planner's `solve`. Value iteration rebuilds its grid with the grid's own options
 (`StateSpaceGrid.rebuilt_on`: `precompute`, `precompute_backend` and the grid's build report),
 as `gamma=` does. The compiled face's `pv.solve(params, z0)` takes none: it stays pure,
-silent and free of plots. There is no settings record on a planner. One exception:
-the RL planner's tree holds no problem leaves (`"method"` and `"seed"` only), its
-`solve(params=)` training a planner rebuilt there from its seed.
+silent and free of plots. There is no settings record on a planner. The RL planner's
+`solve(params=)` trains a planner rebuilt there from its seed, its weights from their
+initial draw.
 
 **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:

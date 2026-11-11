@@ -294,15 +294,19 @@ class ReinforcementLearningPlanner(Planner):
     @property
     def params(self) -> dict:
         """
-        The planner's tree: ``"method"``, the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
+        The planner's tree: the problem's leaves by role, ``"method"`` the numbers it trains with (the discount ``gamma``, the algorithm's and its optimizer's), and ``"seed"``.
 
         The numbers are read when the update is first traced: set them on the
         algorithm before learning, or solve at another tree
-        (``solve(params=)``). The problem's own leaves are the problem's (the
-        score is always the problem's). The network's weights are learned,
-        never a number of the tree.
+        (``solve(params=)``, which trains a planner rebuilt on the problem
+        holding the tree's leaves). The network's weights are learned, never a
+        number of the tree.
         """
-        return {"method": self.algorithm.method_params, "seed": self.seed}
+        return {
+            **self.problem.parts_view(),
+            "method": self.algorithm.method_params,
+            "seed": self.seed,
+        }
 
     @property
     def number_names(self) -> tuple:
