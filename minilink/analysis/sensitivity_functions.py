@@ -14,14 +14,16 @@ from minilink.core.roles import free_inputs
 
 
 def sensitivity(
-    *,
     plant,
     controller,
-    filter=None,
     x_bar=None,
     u_bar=None,
     t=0.0,
     params=None,
+    *,
+    filter=None,
+    of=None,
+    wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
 ):
@@ -29,23 +31,28 @@ def sensitivity(
 
     ``S`` maps an output disturbance to ``y`` and the reference ``r`` to the
     error ``e``. The loop is the plant ``H``, the controller ``C`` and the
-    optional filter ``F`` on the measurement, each a SISO ``System``
-    linearized first.
+    optional filter ``F`` on the measurement, each linearized first:
+    ``sensitivity(plant, controller)``, the analysis calling pattern with the
+    loop's two pieces first.
 
     Parameters
     ----------
     plant : System
-        The plant ``H``, from its one input besides ``d`` and ``n`` to its output.
+        The plant ``H``, read on one channel: ``of`` and ``wrt`` as in
+        :func:`~minilink.analysis.frequency.bode`, by default the first
+        component of ``y`` from the command port.
     controller : System
         The controller ``C``, from the error ``e`` to the command ``u``. A
         controller in the reference form (inputs ``r`` and ``y``) is refused:
         pass its channel from ``r``, ``transfer_function(C, wrt="r")``.
-    filter : System, optional
-        The filter ``F`` on the measurement; ``F = 1`` when omitted.
     x_bar, u_bar, t, params : optional
         The plant's operating point, as in
         :func:`~minilink.analysis.frequency.bode`; the controller and the
         filter are taken at their nominal point.
+    filter : System, optional
+        The filter ``F`` on the measurement, SISO; ``F = 1`` when omitted.
+    of, wrt : optional
+        The plant's channel, as in :func:`~minilink.analysis.frequency.bode`.
     method : {"auto", "fd", "jax"}, optional
         Differentiation backend of the linearizations.
     eps : float, optional
@@ -60,7 +67,7 @@ def sensitivity(
     """
     # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
-        plant, controller, filter, x_bar, u_bar, t, params, method, eps
+        plant, controller, filter, x_bar, u_bar, t, params, of, wrt, method, eps
     )
 
     # L(s) = C(s) H(s) F(s)
@@ -75,14 +82,16 @@ def sensitivity(
 
 
 def complementary_sensitivity(
-    *,
     plant,
     controller,
-    filter=None,
     x_bar=None,
     u_bar=None,
     t=0.0,
     params=None,
+    *,
+    filter=None,
+    of=None,
+    wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
 ):
@@ -92,7 +101,7 @@ def complementary_sensitivity(
     """
     # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
-        plant, controller, filter, x_bar, u_bar, t, params, method, eps
+        plant, controller, filter, x_bar, u_bar, t, params, of, wrt, method, eps
     )
 
     # L(s) = C(s) H(s) F(s)
@@ -107,14 +116,16 @@ def complementary_sensitivity(
 
 
 def load_sensitivity(
-    *,
     plant,
     controller,
-    filter=None,
     x_bar=None,
     u_bar=None,
     t=0.0,
     params=None,
+    *,
+    filter=None,
+    of=None,
+    wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
 ):
@@ -124,7 +135,7 @@ def load_sensitivity(
     """
     # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
-        plant, controller, filter, x_bar, u_bar, t, params, method, eps
+        plant, controller, filter, x_bar, u_bar, t, params, of, wrt, method, eps
     )
 
     # L(s) = C(s) H(s) F(s)
@@ -139,14 +150,16 @@ def load_sensitivity(
 
 
 def noise_sensitivity(
-    *,
     plant,
     controller,
-    filter=None,
     x_bar=None,
     u_bar=None,
     t=0.0,
     params=None,
+    *,
+    filter=None,
+    of=None,
+    wrt=None,
     method: str = "auto",
     eps: float = 1e-6,
 ):
@@ -157,7 +170,7 @@ def noise_sensitivity(
     """
     # The loop's pieces, each a SISO transfer function
     H, C, F = loop_pieces(
-        plant, controller, filter, x_bar, u_bar, t, params, method, eps
+        plant, controller, filter, x_bar, u_bar, t, params, of, wrt, method, eps
     )
 
     # L(s) = C(s) H(s) F(s)
@@ -176,13 +189,27 @@ def noise_sensitivity(
 ###############################################################################
 
 
-def loop_pieces(plant, controller, filter, x_bar, u_bar, t, params, method, eps):
+def loop_pieces(
+    plant, controller, filter, x_bar, u_bar, t, params, of, wrt, method, eps
+):
     """``H``, ``C`` and ``F`` as SISO transfer functions; ``F = 1`` without a filter."""
     # Lazy import: the block and its graphics load on first use, not with the analysis
     from minilink.blocks.transfer_function import TransferFunction
 
-    # The plant at its operating point; the controller and filter at their nominal one
-    H = siso_piece(plant, "plant", x_bar, u_bar, t, params, method, eps)
+    # The plant's channel at its operating point, bode's default unless named; the
+    # controller and filter, SISO, at their nominal one
+    H = transfer_function(
+        plant,
+        x_bar,
+        u_bar,
+        t,
+        params,
+        of=of,
+        wrt=wrt,
+        method=method,
+        eps=eps,
+        minimal=True,
+    )
     C = siso_piece(controller, "controller", None, None, 0.0, None, method, eps)
     if filter is None:
         F = TransferFunction([1.0], [1.0], name="F")

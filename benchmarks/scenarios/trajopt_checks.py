@@ -18,7 +18,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.cartpole import CartPole
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -36,8 +35,8 @@ def build_showcase_cartpole_problem() -> PlanningProblem:
     """Cart-pole swing-up aligned with ``showcase/minilink.ipynb`` trajopt section."""
     configure_jax(enable_x64=True)
     sys = CartPole()
-    sys.inputs["u"].lower_bound[0] = -10.0
-    sys.inputs["u"].upper_bound[0] = 10.0
+    sys.inputs["u"].lower[0] = -10.0
+    sys.inputs["u"].upper[0] = 10.0
 
     x0 = np.array([-2.0, 0.0, 0.0, 0.0])
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
@@ -75,11 +74,9 @@ def run_showcase_cartpole_trajopt(
     problem = build_showcase_cartpole_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=n_steps)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=n_steps),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": maxiter,
             "ftol": SHOWCASE_TRAJOPT_FTOL,
@@ -120,7 +117,7 @@ def run_showcase_cartpole_trajopt(
             t: [float(v) for v in samples[t]] for t in SHOWCASE_TRAJOPT_CHECKPOINTS
         },
         x_tf=[float(v) for v in traj.x[:, -1].reshape(-1)],
-        cost=float(optimization_result.cost),
+        cost=float(optimization_result.J),
         eq_inf=eq_inf,
         success=bool(optimization_result.success),
         total_s=float(np.mean(total_times)),

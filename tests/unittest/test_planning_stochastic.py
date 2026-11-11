@@ -16,8 +16,8 @@ from tests.unittest.planning_helpers import edited
 
 def pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2 * np.pi, -10.0])
-    plant.state.upper_bound = np.array([2 * np.pi, 10.0])
+    plant.state.lower = np.array([-2 * np.pi, -10.0])
+    plant.state.upper = np.array([2 * np.pi, 10.0])
     return plant
 
 
@@ -172,7 +172,7 @@ def test_an_explicit_alpha_is_the_planners_own_discount_inside_and_between_perio
     rho = -np.log(alpha) / dt
 
     # At rest at the bottom: J = c + α J, c = ∫₀^dt e^{−ρτ} dτ = (1 − α) / ρ, so J = 1 / ρ
-    J = planner.result.J[planner.grid.nearest_node(np.zeros(2))]
+    J = planner.tables.J[planner.grid.nearest_node(np.zeros(2))]
     np.testing.assert_allclose(J, 1.0 / rho, rtol=1e-6)
     assert solution.record.discount_rate == pytest.approx(rho)
     assert planner.problem.discount_rate == 1.0
@@ -296,8 +296,37 @@ def test_evaluate_trajectory_applies_the_discount_rate():
 
     t = np.linspace(0.0, 1.0, 101)
     traj = Trajectory(t=t, x=np.zeros((2, t.size)), u=np.zeros((1, t.size)))
-    J = traj.with_cost(Unit(), discount_rate=1.0).signals["cost"][0, -1]
+    J = traj.with_cost(Unit(), discount_rate=1.0).signals["J"][0, -1]
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
+
+
+def test_the_running_J_signal_ends_at_the_runs_J():
+    """Ruling 17b: the signal "J" carries h at its last sample, so it ends at raw_cost and compute_cost."""
+    from minilink.planning import evaluate_trajectory
+
+    plant = pendulum()
+    cost = QuadraticCost.from_system(
+        plant, Q=np.eye(2), R=np.eye(1), S=np.diag([2.0, 0.5])
+    )
+    t = np.linspace(0.5, 2.5, 21)
+    traj = Trajectory(
+        t=t, x=np.vstack([np.cos(t), np.sin(t)]), u=np.sin(3 * t).reshape(1, -1)
+    )
+
+    # Discounted from t0: J(t_N) = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ(t_N − t0)} h(x_N, t_N)
+    for rho in (0.0, 0.7):
+        problem = PlanningProblem(
+            plant, cost=cost, horizon=2.0, t0=0.5, discount_rate=rho
+        )
+        J = traj.with_cost(cost, discount_rate=rho, t0=0.5).signals["J"]
+        raw_cost = evaluate_trajectory(problem, traj).raw_cost[0]
+        np.testing.assert_allclose(J[0, -1], raw_cost, rtol=1e-12)
+        running = cost.integrate(traj, discount_rate=rho, t0=0.5)[1]
+        np.testing.assert_array_equal(J[0, :-1], running[:-1])  # h at the end only
+
+    # Undiscounted: the last sample is compute_cost's J = ∫ g dt + h(x_N, t_N)
+    J = traj.with_cost(cost).signals["J"][0, -1]
+    assert J == pytest.approx(plant.compute_cost(cost, traj=traj), rel=1e-12)
 
 
 def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
@@ -305,8 +334,8 @@ def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():
     from minilink.planning import evaluate_trajectory
 
     plant = pendulum()
-    plant.state.lower_bound = np.array([-1.0, -10.0])
-    plant.state.upper_bound = np.array([1.0, 10.0])
+    plant.state.lower = np.array([-1.0, -10.0])
+    plant.state.upper = np.array([1.0, 10.0])
 
     class Unit(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -401,8 +430,8 @@ def test_the_backends_share_the_score_on_identical_starts():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
 
     class Discounted(CostFunction):
         def g(self, x, u, t=0.0, params=None):
@@ -443,8 +472,8 @@ def test_the_law_runs_beyond_the_port_bounds_and_fails_the_declared_U():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-0.5])
-    plant.inputs["u"].upper_bound = np.array([0.5])
+    plant.inputs["u"].lower = np.array([-0.5])
+    plant.inputs["u"].upper = np.array([0.5])
     ctl = StateFeedback(K=[[30.0, 8.0]])  # |u| = 15 N m at the start
 
     class Effort(CostFunction):
@@ -519,8 +548,8 @@ def test_randomized_parameters_reach_the_dynamics_on_both_backends():
     from minilink.planning import evaluate
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     ctl = NeuralPolicy(plant, hidden=(8,), seed=5)
     start = Particles([[0.5, 0.0]])
     task = dict(cost=quadratic(plant), horizon=np.inf, x0=start)
@@ -544,8 +573,8 @@ def test_the_default_backend_scores_a_lookup_table_law_on_jax_when_it_traces():
     from minilink.planning import ProblemEvaluator
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     problem = PlanningProblem(
         plant,
         x0=[0.5, 0.0],
@@ -682,8 +711,8 @@ def test_gymnasium_view_of_a_stochastic_problem():
     from minilink.interfaces.gymnasium import Sys2Gym
 
     plant = pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     problem = PlanningProblem(
         plant,
         cost=quadratic(plant),
@@ -760,7 +789,7 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
         z = step_body(f_aug, z, u[:, k], u[:, k + 1], t[k], dt, "rk4", 1)
     J_hand = z[2] + cost.h(z[:2], t[-1])
     evaluator = plant.compile(backend="numpy", verbose=False)
-    xs = evaluator.rollout(problem.x0, u.T, 0.0, dt, hold="foh")
+    xs = evaluator.rollout(problem.x0, u.T, 0.0, dt, hold="linear")
     np.testing.assert_allclose(xs[-1], z[:2], rtol=1e-12)
     trapezoid = evaluate_trajectory(problem, Trajectory(t=t, x=xs.T, u=u)).J
     np.testing.assert_allclose(trapezoid, J_hand, rtol=2e-2)
@@ -777,12 +806,12 @@ def test_an_open_loop_source_scores_like_its_first_order_hold_rollout():
     np.testing.assert_allclose(reports["numpy", "scipy"].J, J_hand, rtol=1e-3)
 
     # a held (zero-order) replay keeps each sample until the next
-    held = TrajectorySource(t, u, interpolation="previous")
+    held = TrajectorySource(t, u, hold="zoh")
     empty = np.zeros(0)
     np.testing.assert_allclose(held.h(empty, empty, 0.15), u[:, 1])
     np.testing.assert_allclose(source.h(empty, empty, 0.15), 0.5 * (u[:, 1] + u[:, 2]))
     with pytest.raises(ValueError):
-        TrajectorySource(t, u, interpolation="cubic")
+        TrajectorySource(t, u, hold="cubic")
 
 
 def jax_available():

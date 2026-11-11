@@ -271,7 +271,7 @@ class TestInZ(unittest.TestCase):
     def setUp(self):
         # x_{k+1} = a x_k + u_k, y_k = x_k: G(z) = 1 / (z − a), Δ = 0.1 s
         self.a = 0.5
-        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]], period=0.1)
+        self.G = DiscreteLTISystem([[self.a]], [[1.0]], [[1.0]], [[0.0]]) % 0.1
 
     def tearDown(self):
         import matplotlib.pyplot as plt
@@ -292,7 +292,7 @@ class TestInZ(unittest.TestCase):
 
     def test_a_deadbeat_system_shows_a_few_ticks_not_ten_seconds(self):
         # Its pole at z = 0 settles in n = 1 tick: the horizon spans n + 1 ticks
-        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]], period=0.001)
+        G = DiscreteLTISystem([[0.0]], [[1.0]], [[1.0]], [[0.0]]) % 0.001
         time, y = step_response(G)
         np.testing.assert_allclose(time, [0.0, 0.001, 0.002])
         np.testing.assert_allclose(y, [0.0, 1.0, 1.0])
@@ -374,6 +374,10 @@ class TestPlots(unittest.TestCase):
         self.assertEqual(r.axes.get_xlabel(), "Time (seconds)")
         r = self.plant.plot_step_response(self.x_bar, show=False)
         self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        # a linearization's response is the deviation Δy, never titled "Linear"
+        r = self.plant.linearize(self.x_bar).plot_step_response(show=False)
+        self.assertEqual(r.figure._suptitle.get_text(), "Linearized Step Response")
+        self.assertEqual(r.axes.get_ylabel(), "Deviation Δy")
 
     def test_radius_frames_the_slow_roots_of_a_stiff_channel(self):
         stiff = TransferFunction([1.0], [1.0, 101.0, 100.0])  # poles at -1 and -100

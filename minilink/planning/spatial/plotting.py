@@ -178,7 +178,7 @@ def plot_track(
 
     # The centerline c(s), sampled by arc length, and its left normal n = (−t_y, t_x)
     ss = np.linspace(0.0, total, n_samples)
-    center = np.array([path.sample(s) for s in ss])
+    center = np.array([path.at(s) for s in ss])
     tangents = np.array([path.tangent(s) for s in ss])
     normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
 

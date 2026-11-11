@@ -5,8 +5,10 @@ import unittest
 from importlib import import_module
 from unittest import mock
 
+import numpy as np
+
 from minilink import PID, InvertedPendulum, Pendulum, TransferFunction
-from minilink.core.facades.analysis import DynamicAnalysis
+from minilink.core.facades.analysis import DynamicAnalysis, LinearAnalysis
 from minilink.core.facades.animation import DynamicAnimation
 from minilink.core.facades.plotting import DynamicPlotting, LinearPlotting
 
@@ -15,7 +17,7 @@ from minilink.core.facades.plotting import DynamicPlotting, LinearPlotting
 #   narrowed: a deliberate subset of them, each kept one identical to the band's
 SHORTCUTS = {
     "linearize": (
-        DynamicAnalysis,
+        LinearAnalysis,
         "minilink.analysis.linearization:linearize",
         "forward",
     ),
@@ -25,7 +27,7 @@ SHORTCUTS = {
         "forward",
     ),
     "transfer_function": (
-        DynamicAnalysis,
+        LinearAnalysis,
         "minilink.analysis.frequency:transfer_function",
         "forward",
     ),
@@ -42,6 +44,11 @@ SHORTCUTS = {
     "plot_pzmap": (
         LinearPlotting,
         "minilink.analysis.frequency:plot_pzmap",
+        "forward",
+    ),
+    "plot_nyquist": (
+        LinearPlotting,
+        "minilink.analysis.frequency:plot_nyquist",
         "forward",
     ),
     "animate_modal": (
@@ -63,7 +70,13 @@ SHORTCUTS = {
 }
 
 # The shortcut mixins of a DynamicSystem
-DYNAMIC_SHORTCUTS = (DynamicAnalysis, DynamicPlotting, LinearPlotting, DynamicAnimation)
+DYNAMIC_SHORTCUTS = (
+    LinearAnalysis,
+    DynamicAnalysis,
+    DynamicPlotting,
+    LinearPlotting,
+    DynamicAnimation,
+)
 
 # The data verbs stay band functions
 REMOVED = (
@@ -73,7 +86,6 @@ REMOVED = (
     "root_locus",
     "step_response",
     "nyquist",
-    "plot_nyquist",
     "region_of_attraction",
     "plot_region_of_attraction",
     "modal_analysis",
@@ -160,6 +172,42 @@ class TestSystemShortcuts(unittest.TestCase):
                 with mock.patch(f"{module}.{attr}") as recorder:
                     getattr(loop, name)(show=False)
                 self.assertIs(recorder.call_args.args[0], loop)
+
+    def test_a_step_system_has_the_linear_analysis_of_a_continuous_one(self):
+        loop = (PID(Kp=20.0, Ki=5.0, Kd=4.0) % 0.05) @ Pendulum()
+        for name, (owner, target, _) in SHORTCUTS.items():
+            if owner is not LinearAnalysis:
+                continue
+            with self.subTest(name):
+                module, attr = target.split(":")
+                with mock.patch(f"{module}.{attr}") as recorder:
+                    getattr(loop, name)()
+                self.assertIs(recorder.call_args.args[0], loop)
+
+    def test_a_step_systems_linear_model_is_in_z_and_its_transfer_function_refused(
+        self,
+    ):
+        from minilink.analysis import discretize, linearize, transfer_function
+        from minilink.dynamics import LinearizedStepSystem
+
+        stepped = discretize(Pendulum(), 0.1)
+        lin = stepped.linearize()
+        self.assertIsInstance(lin, LinearizedStepSystem)
+        np.testing.assert_array_equal(lin.A(), linearize(stepped).A())
+
+        # A transfer function is continuous (the maintainer's ruling Q4 of 2026-11-11)
+        for refused in (stepped, lin, Pendulum() % 0.1):
+            with self.assertRaisesRegex(TypeError, "a transfer function is continuous"):
+                transfer_function(refused)
+        with self.assertRaisesRegex(TypeError, r"then `% dt`"):
+            stepped.transfer_function()
+
+    def test_the_nyquist_diagram_is_drawn_from_the_plant(self):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        result = Pendulum().plot_nyquist(show=False)
+        self.assertIsNotNone(result.axes)
 
     def test_each_docstring_names_its_band_function(self):
         for name, (owner, target, _) in SHORTCUTS.items():

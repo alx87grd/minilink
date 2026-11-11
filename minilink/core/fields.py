@@ -142,6 +142,11 @@ class FieldSet(Set):
         return {"field": self.field}
 
     @property
+    def dim(self) -> int:
+        """Dimension of the state, its field's (when the field states one)."""
+        return self.field.dim
+
+    @property
     def lower(self):
         """The lower bound on ``V``, ``None`` when it is not set."""
         return self.params.get("lower")
@@ -318,6 +323,11 @@ class MarginField(Field):
     def __init__(self, set_: Set):
         self.set_ = set_
 
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, its set's (when the set states one)."""
+        return self.set_.dim
+
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
         xp = array_module(x)
@@ -358,6 +368,11 @@ class QuadraticField(Field):
 
     center = param_view("center")
     P = param_view("P")
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, the center's size."""
+        return int(np.size(self.center))
 
     @property
     def t(self):
@@ -432,7 +447,9 @@ class EllipsoidSet(FieldSet):
     radius ``r^{1/n}``, mapped through ``P = L Lᵀ``) from a NumPy generator, an
     integer seed or a JAX key, and gives the center for ``key=None``;
     :meth:`bounding_box` is ``c ± √(level · diag(P⁻¹))``, the ellipsoid's
-    shadow on each axis.
+    shadow on each axis. Built from a quadratic field and its level
+    (``V.as_set(upper=level)``), or from its numbers,
+    ``EllipsoidSet.from_matrix(center, P, level)``.
     """
 
     params = own_params('``{"center", "P", "level"}``, the ellipsoid\'s numbers.')
@@ -441,6 +458,11 @@ class EllipsoidSet(FieldSet):
         require_sublevel(lower, upper)
 
         self.params = {"center": field.center, "P": field.P, "level": upper}
+
+    @classmethod
+    def from_matrix(cls, center, P, level) -> EllipsoidSet:
+        """The ellipsoid ``{x : (x − c)ᵀ P (x − c) ≤ level}`` from its center ``c``, its matrix ``P`` and its level."""
+        return cls(QuadraticField(center, P), None, level)
 
     @property
     def field(self) -> QuadraticField:
@@ -581,6 +603,11 @@ class GridField(Field):
     def n(self) -> int:
         """The dimension of the grid."""
         return len(self.params["levels"])
+
+    @property
+    def dim(self) -> int:
+        """Dimension of the state, the grid's number of axes (:attr:`n`)."""
+        return self.n
 
     def value(self, x, u=None, t=0.0, params=None):
         params = self.params if params is None else params
@@ -889,11 +916,11 @@ def require_sublevel(lower, upper):
 
 
 def require_ellipsoid_key(key):
-    """Refuse a counter key: an ellipsoid's draw takes many numbers per point."""
+    """Refuse a counter key: an ellipsoid's (or a ball's) draw takes many numbers per point."""
     if is_counter_key(key):
         raise TypeError(
-            "an ellipsoid draws from a NumPy generator, an integer seed or a JAX key, "
-            "not a counter key"
+            "an ellipsoid or a ball draws from a NumPy generator, an integer seed or a "
+            "JAX key, not a counter key"
         )
 
 

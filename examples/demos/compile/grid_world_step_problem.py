@@ -17,10 +17,10 @@ class Walker(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=2, output_dim=2)
-        self.state.lower_bound[:] = [0.0, 0.0]
-        self.state.upper_bound[:] = [SIZE - 1.0, SIZE - 1.0]
-        self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-        self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+        self.state.lower[:] = [0.0, 0.0]
+        self.state.upper[:] = [SIZE - 1.0, SIZE - 1.0]
+        self.inputs["u"].lower[:] = [-1.0, -1.0]
+        self.inputs["u"].upper[:] = [1.0, 1.0]
         self.params = {"wall": np.array(WALL)}
 
     def step(self, x, u, k=0, params=None):
@@ -82,14 +82,14 @@ law = vi.controller
 walk = problem.rollout(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
-J = walk.signals["cost"][0, -1]
+J = walk.signals["J"][0, -1]
 print(
     f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.cost_to_go(problem.x0):g}"
 )
 
 # The cost-to-go and the walk
 fig, ax = plt.subplots()
-J_grid = vi.result.J.reshape(SIZE, SIZE).T
+J_grid = vi.tables.J.reshape(SIZE, SIZE).T
 image = ax.imshow(J_grid, origin="lower", cmap="viridis")
 ax.plot(walk.x[0], walk.x[1], "w.-", label="greedy walk")
 ax.plot(*GOAL, "r*", markersize=14, label="goal")

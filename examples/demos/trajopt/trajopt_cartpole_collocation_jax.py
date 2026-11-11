@@ -14,11 +14,11 @@ from minilink import (
 
 PRINT_SOLVE_REPORT = True  # Minilink's pre/post solve report
 LIVE_PLOT = False  # redraw the iterate trajectory during the solve
-OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "scipy_slsqp"
+OPTIMIZER = "ipopt" if importlib.util.find_spec("cyipopt") else "slsqp"
 
 sys = CartPole()
-sys.inputs["u"].lower_bound[0] = -10.0
-sys.inputs["u"].upper_bound[0] = 10.0
+sys.inputs["u"].lower[0] = -10.0
+sys.inputs["u"].upper[0] = 10.0
 
 x0 = np.array([-2.0, 1.0, 0.0, 0.0])
 x_goal = np.array([0.0, np.pi, 0.0, 0.0])
@@ -45,7 +45,7 @@ planner = TrajectoryOptimizationPlanner(
     transcription="direct_collocation",
     backend="jax",
     method=OPTIMIZER,
-    # method="scipy_slsqp",
+    # method="slsqp",
     # options={"maxiter": 500, "ftol": 1e-2},
 )
 

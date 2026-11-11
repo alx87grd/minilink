@@ -1,4 +1,4 @@
-"""Linear state-space systems (time-varying / parameter-dependent and LTI)."""
+"""Linear state-space systems: time-varying, LTI, and the linearization of a system about an operating point."""
 
 import numpy as np
 
@@ -98,7 +98,63 @@ class StateSpaceSystem(DynamicSystem):
         return y
 
 
-class LTISystem(StateSpaceSystem):
+class ConstantMatrices:
+    """The matrices ``A``, ``B``, ``C``, ``D`` of a model that stores them in its ``params``.
+
+    Each is a method ``A(t, params)``, as on :class:`StateSpaceSystem`, read
+    from the tree passed (the block's own ``params`` when ``None``), so a
+    tree passed to ``f`` or ``h`` moves them.
+    """
+
+    def A(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["A"]
+
+    def B(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["B"]
+
+    def C(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["C"]
+
+    def D(self, t=0.0, params=None):
+        params = self.params if params is None else params
+        return params["D"]
+
+
+class OperatingPoint:
+    """The operating point ``(x̄, ū, ȳ)`` of a model that stores it in its ``params``.
+
+    ``x_bar``, ``u_bar`` and ``y_bar`` read ``params``; :meth:`set_nominal_point`
+    makes the point the model's nominal state and input.
+    """
+
+    @property
+    def x_bar(self):
+        """The operating point's state ``x̄`` (``params["x_bar"]``)."""
+        return self.params["x_bar"]
+
+    @property
+    def u_bar(self):
+        """The operating point's input ``ū`` (``params["u_bar"]``)."""
+        return self.params["u_bar"]
+
+    @property
+    def y_bar(self):
+        """The system's output at the operating point, ``ȳ = h(x̄, ū)`` (``params["y_bar"]``)."""
+        return self.params["y_bar"]
+
+    def set_nominal_point(self):
+        """Make ``x̄`` the nominal state and ``ū`` the inputs' nominal values, each input port its share (each signal keeps its own copy)."""
+        u_bar = self.params["u_bar"]
+
+        self.state.nominal_value = self.params["x_bar"]
+        for port_id, port in self.inputs.items():
+            port.nominal_value = u_bar[self.get_input_port_slice(port_id)]
+
+
+class LTISystem(ConstantMatrices, StateSpaceSystem):
     """Linear time-invariant system with constant matrices::
 
         dx = A @ x + B @ u
@@ -113,11 +169,11 @@ class LTISystem(StateSpaceSystem):
     its own layout (a compensator ``TransferFunction``); ``expose_state=False``
     declares ``u`` and ``y`` only (a filter is not a plant).
 
-    A model obtained by :func:`~minilink.analysis.linearization.linearize`
-    describes deviations about an operating point, which it carries as
-    ``x_bar``, ``u_bar`` and ``y_bar`` (the state, the inputs of its ``B``
-    columns, and the outputs of its ``C`` rows), so a design made on it knows
-    where it applies. A model built from arrays sits at the origin.
+    The model of a system about an operating point is a
+    :class:`LinearizedSystem`, what
+    :func:`~minilink.analysis.linearization.linearize` returns; its
+    :meth:`~LinearizedSystem.deviation_model` is this class, in the
+    deviations from that point.
     """
 
     def __init__(
@@ -130,9 +186,6 @@ class LTISystem(StateSpaceSystem):
         name=None,
         declare_ports=True,
         expose_state=True,
-        x_bar=None,
-        u_bar=None,
-        y_bar=None,
     ):
         # The matrices, as passed: C = I and D = 0 when omitted
         C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
@@ -160,33 +213,6 @@ class LTISystem(StateSpaceSystem):
         # Parameters: the four matrices
         self.params = {"A": A, "B": B, "C": C, "D": D}
 
-        # The operating point the deviations are measured from (the origin by
-        # default), its output ȳ = C x̄ + D ū unless given
-        self.x_bar = point_component(x_bar, n, "x_bar")
-        self.u_bar = point_component(u_bar, m, "u_bar")
-        self.y_bar = (
-            np.asarray(C, dtype=float) @ self.x_bar
-            + np.asarray(D, dtype=float) @ self.u_bar
-            if y_bar is None
-            else point_component(y_bar, p, "y_bar")
-        )
-
-    def A(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["A"]
-
-    def B(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["B"]
-
-    def C(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["C"]
-
-    def D(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["D"]
-
     def __str__(self):
         return f"{super().__str__()}\n{matrices_text(self)}"
 
@@ -194,35 +220,112 @@ class LTISystem(StateSpaceSystem):
         return lti_latex()
 
 
-class DiscreteLTISystem(StepSystem):
+class LinearizedSystem(OperatingPoint, ConstantMatrices, StateSpaceSystem):
+    """The first-order model of a system about an operating point ``(x̄, ū)``, in the system's own coordinates::
+
+        dx = f(x̄, ū) + A @ (x - x̄) + B @ (u - ū)
+        y  = h(x̄, ū) + C @ (x - x̄) + D @ (u - ū)
+
+    What :func:`~minilink.analysis.linearization.linearize` returns on a
+    continuous system. Its state, inputs and outputs are the system's own,
+    with its labels and units, so the model closes a loop wherever the system
+    does (``lqr(lin, Q, R) @ lin`` regulates to ``x̄``) and a simulation of it
+    is the system's linear prediction near ``x̄``. ``A, B, C, D`` are the
+    Jacobians, read by every analysis and design verb; the drift
+    ``dx_bar = f(x̄, ū)`` is zero at an equilibrium, and the verbs warn when it
+    is not. Everything is in ``params`` (``{"A", "B", "C", "D", "x_bar",
+    "u_bar", "y_bar", "dx_bar"}``), numbers only, so JAX traces them;
+    ``x_bar``, ``u_bar``, ``y_bar`` read them. The nominal state is ``x̄``, the
+    input ports' nominal ``ū``. :meth:`deviation_model` is the pure
+    ``LTISystem`` in the deviations ``Δx = x − x̄``, ``Δu = u − ū``.
+    """
+
+    def __init__(self, A, B, C, D, *, x_bar, u_bar, y_bar, dx_bar, name=None):
+        # The dimensions and the ports u -> y, x, fed through only when D ≠ 0
+        n, m, p = dimensions_of(A, B, C, D)
+        feedthrough = bool(np.any(np.asarray(D)))
+        super().__init__(
+            state_dim=n,
+            input_dim=m,
+            output_dim=p,
+            feedthrough=feedthrough,
+            name=name,
+        )
+
+        # Parameters: the Jacobians and the operating point, with the system's
+        # output ȳ = h(x̄, ū) and drift f(x̄, ū) there
+        self.params = {
+            "A": A,
+            "B": B,
+            "C": C,
+            "D": D,
+            "x_bar": point_component(x_bar, n, "x_bar"),
+            "u_bar": point_component(u_bar, m, "u_bar"),
+            "y_bar": point_component(y_bar, p, "y_bar"),
+            "dx_bar": point_component(dx_bar, n, "dx_bar"),
+        }
+
+        # The nominal point: x̄, and ū on the input
+        self.set_nominal_point()
+
+    def f(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        A = params["A"]
+        B = params["B"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
+        dx_bar = params["dx_bar"]
+
+        dx = dx_bar + A @ (x - x_bar) + B @ (u - u_bar)
+
+        return dx
+
+    def h(self, x, u, t=0.0, params=None):
+        params = self.params if params is None else params
+
+        C = params["C"]
+        D = params["D"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
+        y_bar = params["y_bar"]
+
+        y = y_bar + C @ (x - x_bar) + D @ (u - u_bar)
+
+        return y
+
+    def deviation_model(self):
+        """The ``LTISystem`` ``(A, B, C, D)`` in the deviations ``Δx = x − x̄``, ``Δu = u − ū``, ``Δy = y − ȳ``, its labels with a Δ."""
+        model = LTISystem(
+            self.A(), self.B(), self.C(), self.D(), name=f"{self.name} (deviations)"
+        )
+        relabel_deviations(model, self)
+
+        return model
+
+    def __str__(self):
+        return f"{super().__str__()}\n{matrices_text(self)}\n{point_text(self)}"
+
+    def _repr_latex_(self):
+        return linearized_latex()
+
+
+class DiscreteLTISystem(ConstantMatrices, StepSystem):
     """Linear time-invariant difference equation with constant matrices::
 
         x_{k+1} = A_d @ x_k + B_d @ u_k
         y_k     = C_d @ x_k + D_d @ u_k
 
-    The discrete-time model of :func:`~minilink.analysis.linearization.linearize`
-    on a step or sampled system: its poles are read against the unit circle
-    (``|z| < 1`` is stable), its frequency response is ``G(e^{jωΔ})``.
-    ``period`` is the sample period ``Δ`` in seconds of the system it was taken
-    from, ``None`` for a tick law (its frequencies are then per tick, ``Δ = 1``);
-    it describes the model and puts it on no clock (``model % Δ`` does). The
-    matrices are its ``params`` (``{"A", "B", "C", "D"}``) and it carries its
-    operating point as :class:`LTISystem` does.
+    A tick law: its poles are read against the unit circle (``|z| < 1`` is
+    stable), its frequency response ``G(e^{jω})`` per tick. Seconds come only
+    from a clock: ``model % Δ`` runs it every ``Δ`` seconds, and the analysis
+    reads that clock (``G(e^{jωΔ})`` in rad/s). The matrices are its ``params``
+    (``{"A", "B", "C", "D"}``). The model of a step or sampled system about an
+    operating point is a :class:`LinearizedStepSystem`, and its
+    :meth:`~LinearizedStepSystem.deviation_model` is this class.
     """
 
-    def __init__(
-        self,
-        A,
-        B,
-        C=None,
-        D=None,
-        *,
-        period=None,
-        name=None,
-        x_bar=None,
-        u_bar=None,
-        y_bar=None,
-    ):
+    def __init__(self, A, B, C=None, D=None, *, name=None):
         # The matrices: C = I and D = 0 when omitted
         C = identity_on(A, matrix_shape("A", A)[0]) if C is None else C
         D = (
@@ -240,56 +343,134 @@ class DiscreteLTISystem(StepSystem):
         )
         if name is not None:
             self.name = name
-        self.period = None if period is None else float(period)
 
         # Parameters: the four matrices
         self.params = {"A": A, "B": B, "C": C, "D": D}
 
-        # The operating point the deviations are measured from
-        self.x_bar = point_component(x_bar, n, "x_bar")
-        self.u_bar = point_component(u_bar, m, "u_bar")
-        self.y_bar = (
-            np.asarray(C, dtype=float) @ self.x_bar
-            + np.asarray(D, dtype=float) @ self.u_bar
-            if y_bar is None
-            else point_component(y_bar, p, "y_bar")
-        )
-
-    def A(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["A"]
-
-    def B(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["B"]
-
-    def C(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["C"]
-
-    def D(self, t=0.0, params=None):
-        params = self.params if params is None else params
-        return params["D"]
-
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
 
-        # x_{k+1} = A_d x_k + B_d u_k
-        x_next = params["A"] @ x + params["B"] @ u
+        A_d = params["A"]
+        B_d = params["B"]
+
+        x_next = A_d @ x + B_d @ u
 
         return x_next
 
     def h(self, x, u, k=0, params=None):
         params = self.params if params is None else params
 
-        # y_k = C_d x_k + D_d u_k
-        y = params["C"] @ x + params["D"] @ u
+        C_d = params["C"]
+        D_d = params["D"]
+
+        y = C_d @ x + D_d @ u
 
         return y
 
     def __str__(self):
-        period = "per tick" if self.period is None else f"Δ = {self.period:g} s"
-        return f"{super().__str__()}\n  {period}\n{matrices_text(self)}"
+        return f"{super().__str__()}\n  per tick\n{matrices_text(self)}"
+
+
+class LinearizedStepSystem(OperatingPoint, ConstantMatrices, StepSystem):
+    """The first-order model of a step or sampled system about an operating point ``(x̄, ū)``, in the system's own coordinates::
+
+        x_{k+1} = F(x̄, ū) + A_d @ (x_k - x̄) + B_d @ (u_k - ū)
+        y_k     = h(x̄, ū) + C_d @ (x_k - x̄) + D_d @ (u_k - ū)
+
+    The twin of :class:`LinearizedSystem` that
+    :func:`~minilink.analysis.linearization.linearize` returns on a tick law,
+    a block on a clock or a sampled loop, ``F`` its step. ``x_next_bar =
+    F(x̄, ū)`` equals ``x̄`` at an equilibrium. ``params`` holds ``{"A", "B",
+    "C", "D", "x_bar", "u_bar", "y_bar", "x_next_bar"}``; a tick law, as
+    :class:`DiscreteLTISystem` (``model % Δ`` puts it on a clock), and
+    :meth:`deviation_model` is that pure difference equation in the deviations.
+    """
+
+    def __init__(self, A, B, C, D, *, x_bar, u_bar, y_bar, x_next_bar, name=None):
+        # The dimensions and the ports u -> y, fed through only when D ≠ 0
+        n, m, p = dimensions_of(A, B, C, D)
+        feedthrough = bool(np.any(np.asarray(D)))
+        super().__init__(
+            state_dim=n,
+            input_dim=m,
+            output_dim=p,
+            y_dependencies=("u",) if feedthrough else (),
+        )
+        if name is not None:
+            self.name = name
+
+        # Parameters: the Jacobians and the operating point, with the system's
+        # output ȳ = h(x̄, ū) and next state F(x̄, ū) there
+        self.params = {
+            "A": A,
+            "B": B,
+            "C": C,
+            "D": D,
+            "x_bar": point_component(x_bar, n, "x_bar"),
+            "u_bar": point_component(u_bar, m, "u_bar"),
+            "y_bar": point_component(y_bar, p, "y_bar"),
+            "x_next_bar": point_component(x_next_bar, n, "x_next_bar"),
+        }
+
+        # The nominal point: x̄, and ū on the input
+        self.set_nominal_point()
+
+    def step(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        A_d = params["A"]
+        B_d = params["B"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
+        x_next_bar = params["x_next_bar"]
+
+        x_next = x_next_bar + A_d @ (x - x_bar) + B_d @ (u - u_bar)
+
+        return x_next
+
+    def h(self, x, u, k=0, params=None):
+        params = self.params if params is None else params
+
+        C_d = params["C"]
+        D_d = params["D"]
+        x_bar = params["x_bar"]
+        u_bar = params["u_bar"]
+        y_bar = params["y_bar"]
+
+        y = y_bar + C_d @ (x - x_bar) + D_d @ (u - u_bar)
+
+        return y
+
+    def deviation_model(self):
+        """The ``DiscreteLTISystem`` ``(A_d, B_d, C_d, D_d)`` in the deviations from the point, its labels with a Δ."""
+        model = DiscreteLTISystem(
+            self.A(),
+            self.B(),
+            self.C(),
+            self.D(),
+            name=f"{self.name} (deviations)",
+        )
+        relabel_deviations(model, self)
+
+        return model
+
+    def __str__(self):
+        return (
+            f"{super().__str__()}\n  per tick\n{matrices_text(self)}\n"
+            f"{point_text(self)}"
+        )
+
+
+# The linear models a design reads as they are, and those of them taken about a point
+LINEARIZATIONS = (LinearizedSystem, LinearizedStepSystem)
+LINEAR_MODELS = (LTISystem, DiscreteLTISystem, *LINEARIZATIONS)
+
+
+def design_point(model):
+    """The point a design on ``model`` holds: ``(x̄, ū, ȳ)`` of a linearization, the origin of a linear model."""
+    if isinstance(model, LINEARIZATIONS):
+        return model.x_bar, model.u_bar, model.y_bar
+    return np.zeros(model.n), np.zeros(model.m), np.zeros(model.p)
 
 
 ###############################################################################
@@ -315,8 +496,19 @@ def zeros_on(template, shape):
     return xp.zeros(shape, dtype=dtype)
 
 
+def require_arrays(**matrices):
+    """Refuse a model's matrix method (``sys.A``) given where its matrix (``sys.A()``) goes."""
+    for name, matrix in matrices.items():
+        if callable(matrix):
+            raise TypeError(
+                f"{name} is a method of the model, not its matrix: call it, "
+                f"sys.{name}() (sys.{name}(t, params) on a time-varying model)"
+            )
+
+
 def matrix_shape(name, matrix):
     """The ``(rows, columns)`` of a matrix of any backend; refuses anything not 2D."""
+    require_arrays(**{name: matrix})
     shape = getattr(matrix, "shape", None)
     if shape is None:
         shape = np.shape(matrix)
@@ -367,11 +559,57 @@ def matrices_text(sys):
     return "\n".join(blocks)
 
 
+def point_text(sys):
+    """The operating point a linearization carries, one aligned line per vector."""
+    lines = []
+    for name in ("x_bar", "u_bar", "y_bar", "dx_bar", "x_next_bar"):
+        if name not in sys.params:
+            continue
+        prefix = f"  {name} = "
+        values = np.asarray(sys.params[name], dtype=float) + 0.0  # -0.0 prints as 0.0
+        lines.append(
+            prefix
+            + np.array2string(values, precision=4, suppress_small=True, prefix=prefix)
+        )
+    return "\n".join(lines)
+
+
+def relabel_deviations(model, linearization):
+    """Label ``model``'s state, input and output as the deviations of ``linearization``'s (``Δθ``), the units kept."""
+    input_labels, input_units = linearization.get_all_input_labels_and_units()
+    output = linearization.outputs["y"]
+
+    model.state.labels = deviation_labels(linearization.state.labels)
+    model.state.units = list(linearization.state.units)
+    model.inputs["u"].labels = deviation_labels(input_labels)
+    model.inputs["u"].units = list(input_units)
+    model.outputs["y"].labels = deviation_labels(output.labels)
+    model.outputs["y"].units = list(output.units)
+    if "x" in model.outputs:
+        model.outputs["x"].labels = list(model.state.labels)
+        model.outputs["x"].units = list(model.state.units)
+
+
+def deviation_labels(labels):
+    """``θ`` -> ``Δθ``: the label of a deviation from the operating point."""
+    return [f"Δ{label}" for label in labels]
+
+
 def lti_latex():
     """The state-space equations in LaTeX."""
     return (
         r"\begin{align*}"
         r"\dot{x} &= A x + B u \\"
         r"y &= C x + D u"
+        r"\end{align*}"
+    )
+
+
+def linearized_latex():
+    """The linearized equations about the operating point in LaTeX."""
+    return (
+        r"\begin{align*}"
+        r"\dot{x} &= f(\bar{x}, \bar{u}) + A (x - \bar{x}) + B (u - \bar{u}) \\"
+        r"y &= h(\bar{x}, \bar{u}) + C (x - \bar{x}) + D (u - \bar{u})"
         r"\end{align*}"
     )

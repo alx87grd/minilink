@@ -33,6 +33,50 @@ class TestPublicImports(unittest.TestCase):
         self.assertTrue(callable(modal_analysis))
         self.assertTrue(callable(Impedance))
 
+    def test_the_settled_facade_names_are_the_defining_ones(self):
+        """AS-49: the model families and ``step_info`` on the root, the records on analysis, the shapings on core."""
+        import numpy as np
+
+        from minilink import (
+            LinearizedSystem,
+            LTISystem,
+            MechanicalSystem,
+            linearize,
+            margins,
+            step_info,
+        )
+        from minilink import Pendulum as RootPendulum
+        from minilink.analysis import Margins, StepInfo, step_response
+        from minilink.core import (
+            QuadraticField,
+            inverse_barrier,
+            occupancy,
+            quadratic_excess,
+            quadratic_hinge,
+        )
+        from minilink.dynamics import LTISystem as LTISystemDef
+        from minilink.dynamics import MechanicalSystem as MechanicalDef
+
+        self.assertIs(LTISystem, LTISystemDef)
+        self.assertIs(MechanicalSystem, MechanicalDef)
+        self.assertIsInstance(RootPendulum(), MechanicalSystem)
+        lin = linearize(RootPendulum(), np.array([np.pi, 0.0]))
+        self.assertIsInstance(lin, LinearizedSystem)
+        self.assertIsInstance(lin.deviation_model(), LTISystem)
+
+        model = LTISystem(np.array([[-1.0]]), np.array([[1.0]]), np.array([[1.0]]))
+        t, y = step_response(model)
+        info = step_info(t, y)
+        self.assertIsInstance(info, StepInfo)
+        self.assertAlmostEqual(info.overshoot, 0.0, places=6)
+        self.assertIsInstance(margins(model), Margins)
+
+        # Each shaping as a field's cost: zero inside, a penalty past the edge
+        V = QuadraticField(np.zeros(1), np.eye(1))
+        for shaping in (quadratic_hinge, quadratic_excess, inverse_barrier, occupancy):
+            cost = V.as_cost(shaping=shaping())
+            self.assertTrue(np.isfinite(cost.g(np.array([0.5]), np.zeros(1))))
+
     def test_root_prelude_is_the_teaching_surface(self):
         import minilink
 

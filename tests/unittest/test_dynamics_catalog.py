@@ -18,8 +18,8 @@ from minilink.dynamics.catalog.equations.integrators import (
     DoubleIntegrator,
     TripleIntegrator,
 )
-from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanderPol
-from minilink.dynamics.catalog.astro.three_body import ThreeBodyProblem
+from minilink.dynamics.catalog.equations.oscillators import Lorenz, VanDerPol
+from minilink.dynamics.catalog.astro.three_body import ThreeBody
 from minilink.dynamics.catalog.manipulators.arms import (
     FiveLinkManipulator,
     OneLinkManipulator,
@@ -70,7 +70,7 @@ class TestCatalogSmoke(unittest.TestCase):
             [4.0, 6.0, 3.0],
         )
         np.testing.assert_allclose(
-            VanderPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
+            VanDerPol(mu=0.5).f(np.array([1.0, 2.0]), np.array([0.0])), [2.0, -1.0]
         )
         np.testing.assert_allclose(
             Lorenz().f(np.array([0.0, 0.0, 0.0]), np.array([])), [0.0, 0.0, 0.0]
@@ -81,11 +81,12 @@ class TestCatalogSmoke(unittest.TestCase):
         )
 
     def test_three_body_energy_and_dynamics(self):
-        sys = ThreeBodyProblem(preset="figure_eight")
+        sys = ThreeBody(preset="figure_eight")
         x0 = sys.x0
         dx = sys.f(x0, np.array([]))
         self.assertEqual(dx.shape, (18,))
-        np.testing.assert_allclose(dx[0:3], x0[3:6])
+        np.testing.assert_allclose(dx[0:9], x0[9:18])  # the positions' rates
+        self.assertEqual(sys.state.labels[:4], ["r1x", "r1y", "r1z", "r2x"])
         e0 = sys.total_energy(x0)
         self.assertLess(e0, 0.0)
         traj = sys.compute_trajectory(tf=1.0, n_samples=400, show=False, verbose=False)
@@ -143,9 +144,9 @@ class TestCatalogSmoke(unittest.TestCase):
         # force b (y' - z') grows linearly with the forward speed vx.
         car = QuarterCar()
         b, mass = car.params["b"], car.params["mass"]
-        x = np.array([0.0, 0.0, 2.0])
+        x = np.array([2.0, 0.0, 0.0])  # [x, y, ẏ]: positions, then the rate
         u = np.zeros(1)
-        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[0] for vx in (0.0, 3.0))
+        a0, a3 = (car.f(x, u, params=dict(car.params, vx=vx))[2] for vx in (0.0, 3.0))
         np.testing.assert_allclose(a3 - a0, 3.0 * b * car.dz(2.0) / mass)
         np.testing.assert_allclose(a3, 1.5436826659862837, rtol=1e-12)
 
@@ -187,7 +188,7 @@ class TestCatalogSmoke(unittest.TestCase):
             acceleration = np.zeros(plane.dof)
             nominal = np.zeros(plane.m)
             nominal[1] = 0.05
-            plane.inputs["u"].set_nominal_value(nominal)
+            plane.inputs["u"].nominal_value = np.array(nominal, dtype=float)
             np.testing.assert_allclose(
                 plane.inverse_dynamics(q, v, acceleration),
                 plane.inverse_dynamics(q, v, acceleration, nominal),
@@ -280,7 +281,9 @@ class TestCartPole(unittest.TestCase):
         sys = CartPole()
         x = np.zeros(sys.n)
         u = np.zeros(sys.m)
-        np.testing.assert_allclose(sys.compile("numpy").f(x, u, 0.0), np.zeros(sys.n))
+        np.testing.assert_allclose(
+            sys.compile(backend="numpy").f(x, u, 0.0), np.zeros(sys.n)
+        )
         frame = resolve_draw_frame(sys)
         cart_boxes = [
             primitive for primitive in frame["primitives"] if isinstance(primitive, Box)
@@ -338,7 +341,7 @@ class TestDoublePendulum(unittest.TestCase):
         )
         x = np.zeros(sys.n)
         np.testing.assert_allclose(
-            sys.compile("numpy").f(x, np.zeros(sys.m), 0.0), np.zeros(sys.n)
+            sys.compile(backend="numpy").f(x, np.zeros(sys.m), 0.0), np.zeros(sys.n)
         )
         geometry_smoke(sys)
 
@@ -555,9 +558,7 @@ class TestManipulatorCatalog(unittest.TestCase):
             self.assertGreater(geom[f"link{i}"][0].sweep, 0.0)
             np.testing.assert_allclose(
                 geom[f"link{i}"][0].sweep,
-                -tau[i]
-                * (2.0 * np.pi / 3.0)
-                / max(abs(arm.inputs["u"].upper_bound[i]), 1.0),
+                -tau[i] * (2.0 * np.pi / 3.0) / max(abs(arm.inputs["u"].upper[i]), 1.0),
             )
 
     def test_from_manipulator_inherits_kinematics(self):
@@ -859,13 +860,9 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.params["a"], profile.a)
         self.assertAlmostEqual(sys.params["b"], profile.b)
         self.assertFalse(hasattr(sys, "tire_model_f"))
-        self.assertAlmostEqual(sys.state.upper_bound[6], profile.limits.w_rear_max)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.limits.w_rear_dot_max
-        )
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[1], profile.limits.delta_dot_max
-        )
+        self.assertAlmostEqual(sys.state.upper[6], profile.limits.w_rear_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.w_rear_dot_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_dot_max)
 
     def test_apply_car_profile_servo_plant(self):
         from examples.projects.car_trajopt.vehicles.car_profile import (
@@ -878,10 +875,8 @@ class TestCarProfile(unittest.TestCase):
         profile = racecar_profile()
         self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
         self.assertAlmostEqual(sys.params["torque_tau"], 0.05)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
-        )
-        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.tau_rear_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
 
     def test_apply_car_profile_engine_plant(self):
         from examples.projects.car_trajopt.vehicles.car_profile import (
@@ -899,15 +894,11 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.params["tau_fric"], profile.tau_fric)
         self.assertNotIn("engine_power_peak", sys.params)
         self.assertNotIn("transmission_ratio", sys.params)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.engine_power_peak
-        )
-        self.assertAlmostEqual(
-            sys.inputs["u"].lower_bound[0], -profile.engine_power_peak
-        )
-        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
-        self.assertAlmostEqual(sys.state.upper_bound[8], profile.engine_power_peak)
-        self.assertAlmostEqual(sys.state.lower_bound[8], -profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].lower[0], -profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
+        self.assertAlmostEqual(sys.state.upper[8], profile.engine_power_peak)
+        self.assertAlmostEqual(sys.state.lower[8], -profile.engine_power_peak)
 
 
 # The params family: a method reads the params it is given
@@ -1076,7 +1067,7 @@ def method_args(plant, method):
     """A state and input off the nominal ones; the joint angles for the kinematics."""
     rng = np.random.default_rng(0)
     x0 = np.asarray(plant.x0, dtype=float)
-    u0 = np.asarray(plant.get_u_from_input_ports(), dtype=float)
+    u0 = np.asarray(plant.u_nominal, dtype=float)
     x = x0 + 0.3 * rng.standard_normal(x0.shape)
     u = u0 + 0.5 + 0.3 * rng.standard_normal(u0.shape)
     if method in ("forward_kinematics", "J", "forward_kinematic_effector"):

@@ -45,7 +45,7 @@ def find_equilibrium(sys, x_guess=None, u_bar=None, t=0.0, params=None, *, tol=1
         x_guess = sys.state.nominal_value
     x_guess = np.asarray(x_guess, dtype=float).reshape(-1)
     if u_bar is None:
-        u_bar = sys.get_u_from_input_ports()
+        u_bar = sys.u_nominal
     u_bar = np.asarray(u_bar, dtype=float).reshape(-1)
     params = sys.realize(None) if params is None else params
 

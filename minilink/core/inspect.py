@@ -118,7 +118,7 @@ def system_text(sys):
 
     subsystems = getattr(sys, "subsystems", None)
     if subsystems:
-        body.append(body_line("blocks", ", ".join(subsystems)))
+        body.append(body_line("subsystems", ", ".join(subsystems)))
 
     return format_inspect(head, body)
 

@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from minilink.core.diagram import DiagramSystem, block_run
+from minilink.core.diagram import DiagramSystem, subsystem_run
 from minilink.core.system import System
 from minilink.graphical.common import PlotResult
 from minilink.graphical.signals.signal_colors import (
@@ -18,7 +18,7 @@ TIME_ABSCISSA_LABEL = "Time [s]"
 STEP_ABSCISSA_LABEL = "Step [k]"
 
 # The channels CostFunction.evaluate_trajectory adds, labeled as in the textbook
-_COST_SIGNAL_LABELS = {"cost_rate": "dJ/dt", "cost": "J"}
+_COST_SIGNAL_LABELS = {"dJ": "dJ/dt", "J": "J"}
 
 
 ###############################################################################
@@ -67,13 +67,15 @@ class LivePlotHandle:
 def resolve_plot_signals(sys) -> tuple[str, ...]:
     """Return default time-signal names for ``sys`` (leaf or diagram).
 
-    Leaf systems plot the state ``x``, and the input ``u`` when they have one.
-    Diagrams plot flattened states plus controller control outputs
+    Leaf systems plot the state ``x``, and the input ``u`` when they have one;
+    a source (no state, no input) plots its outputs. Diagrams plot flattened states plus controller control outputs
     (``{id}:u`` for static or dynamic controllers) and source outputs
     (``{id}:y``) without requiring explicit ``sys_id:port`` names from the
     user.
     """
     if not isinstance(sys, DiagramSystem):
+        if not sys.n and not sys.m and sys.outputs:
+            return tuple(sys.outputs)
         return ("x", "u") if sys.m else ("x",)
 
     # The flattened state
@@ -152,10 +154,10 @@ def build_signal_plot_spec(
             labels = labels_for_vector(input_labels, values.shape[0], "u")
             units = units_for_vector(input_units, values.shape[0])
         elif signal_name in nested:
-            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            values = np.asarray(traj.signal(signal_name), dtype=float)
             labels, units = nested[signal_name]
         else:
-            values = np.asarray(traj.get_signal(signal_name), dtype=float)
+            values = np.asarray(traj.signal(signal_name), dtype=float)
             labels, units = labels_and_units_for_extra_signal(
                 sys,
                 signal_name,
@@ -359,7 +361,7 @@ def subsystem_path(diagram, subsystem):
 def nested_signal(sys, traj, name):
     """Sample the output ``"a/b/c:port"`` of a nested block along ``traj``: ``(values, labels, units)``.
 
-    The trajectory is narrowed one diagram level at a time (``block_run``)
+    The trajectory is narrowed one diagram level at a time (``subsystem_run``)
     to the diagram holding the block, whose internal signals give the port.
     """
     path, port_id = name.rsplit(":", 1)
@@ -370,13 +372,13 @@ def nested_signal(sys, traj, name):
     diagram_traj = traj
     for sys_id in outer:
         inner = diagram.subsystems[sys_id]
-        diagram_traj = block_run(diagram, sys_id, diagram_traj)
+        diagram_traj = subsystem_run(diagram, sys_id, diagram_traj)
         diagram = inner
 
     # The port among the internal signals of the diagram holding the block
     diagram_traj = diagram.reconstruct_internal_signals(diagram_traj)
     key = f"{block_id}:{port_id}"
-    values = np.asarray(diagram_traj.get_signal(key), dtype=float)
+    values = np.asarray(diagram_traj.signal(key), dtype=float)
     labels, units = labels_and_units_for_extra_signal(diagram, key, values.shape[0])
 
     return values, labels, units
@@ -510,7 +512,7 @@ def evaluate_system_channel(
         return np.asarray(port.compute(x, u, t), dtype=float).reshape(port.dim).copy()
     if name in sys.inputs:
         port = sys.inputs[name]
-        (val,) = sys.get_port_values_from_u(u, name)
+        (val,) = sys.ports(u, name)
         return np.asarray(val, dtype=float).reshape(port.dim).copy()
     idx = list(sys.state.labels).index(name)
     return np.asarray(x[idx : idx + 1], dtype=float).copy()

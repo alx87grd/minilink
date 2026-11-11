@@ -85,11 +85,12 @@ class Gain(System):
     """Constant gain ``y = K · u``.
 
     ``K`` may be a full ``(p, m)`` matrix, a 1-D vector (diagonal gain), or a
-    scalar (needs ``dim`` to set the port size). The gain lives in
-    ``params["K"]`` so it can be tuned or differentiated.
+    scalar times the ``dim`` identity (``Gain(2.0)`` one channel, as ``Sum``,
+    ``Saturation`` and ``UnitDelay``). The gain lives in ``params["K"]`` so it
+    can be tuned or differentiated.
     """
 
-    def __init__(self, K, dim=None):
+    def __init__(self, K, dim=1):
         super().__init__()
 
         # Parameters: the gain as a (p, m) matrix
@@ -192,8 +193,6 @@ def gain_matrix(K, dim):
     """``K`` as a ``(p, m)`` matrix: a scalar times the ``dim`` identity, a vector on the diagonal."""
     K = np.asarray(K, dtype=float)
     if K.ndim == 0:
-        if dim is None:
-            raise ValueError("scalar gain needs an explicit dim")
         K = float(K) * np.eye(int(dim))
     elif K.ndim == 1:
         K = np.diag(K)

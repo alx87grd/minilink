@@ -7,7 +7,7 @@ import numpy as np
 ###############################################################################
 
 
-def coerce_forced_input(sys, times, u, input_port_id=None):
+def coerce_forced_input(sys, times, u, port=None):
     """Return the sampled ``(m, n_pts)`` input matrix for a forced simulation.
 
     A run's ``u=`` accepts a callable ``u(t)``, a constant scalar or
@@ -23,28 +23,29 @@ def coerce_forced_input(sys, times, u, input_port_id=None):
         Time samples; callables are evaluated at each entry.
     u : callable, scalar, or array_like
         Full input ``u(t)`` / constant / ``(dim, n_pts)`` matrix — for the
-        whole input vector, or for one port when ``input_port_id`` is given.
-    input_port_id : str, optional
+        whole input vector, or for one port when ``port`` is given.
+    port : str, optional
         Name of the single forced input port.
     """
     n_pts = len(times)
 
     # The whole input vector forced
-    if input_port_id is None:
+    if port is None:
         return coerce_forced_signal(u, sys.m, times, "u")
 
     # One port forced
-    port = sys.inputs[input_port_id]
-    port_slice = sys.get_input_port_slice(input_port_id)
+    port_id = port
+    port = sys.inputs[port_id]
+    port_slice = sys.get_input_port_slice(port_id)
 
     # The other ports held at their nominal values, the forced port's rows replaced
-    u_nominal = sys.get_u_from_input_ports().reshape(sys.m, 1)
+    u_nominal = sys.u_nominal.reshape(sys.m, 1)
     u_traj = np.repeat(u_nominal, n_pts, axis=1)
     u_traj[port_slice, :] = coerce_forced_signal(
         u,
         port.dim,
         times,
-        f"u for input port '{input_port_id}'",
+        f"u for input port '{port_id}'",
     )
 
     return validate_forced_u_traj(u_traj, sys.m, n_pts)
@@ -131,10 +132,29 @@ def coerce_forced_array(data, expected_dim, n_pts, label):
             column = arr.reshape(expected_dim, 1)
             signal = np.repeat(column, n_pts, axis=1)
             return signal
-        raise ValueError(f"{label} must have shape {expected_shape}")
+        raise ValueError(sampled_shape_error(label, expected_shape, arr.shape))
 
     # A matrix: the samples themselves
     if arr.ndim == 2 and arr.shape == expected_shape:
         return arr
 
-    raise ValueError(f"{label} must have shape {expected_shape}")
+    raise ValueError(sampled_shape_error(label, expected_shape, arr.shape))
+
+
+def sampled_shape_error(label, expected_shape, shape) -> str:
+    """The refusal of a sampled input off the run's grid, naming the grid's keywords."""
+    text = f"{label} must have shape {expected_shape}, got {shape}"
+    dim, n_pts = expected_shape
+    n_given = shape[-1]
+
+    # The right rows (or the one input's vector of samples), the wrong sample count
+    samples = (len(shape) == 2 and shape[0] == dim) or (len(shape) == 1 and dim == 1)
+    if not samples or n_given == n_pts:
+        return text
+
+    # A sample count off the grid: the run's grid is the caller's to choose
+    return (
+        f"{text}: a sampled input has one column per time of the run's grid ({n_pts} "
+        f"here); run on a grid of {n_given} samples (n_samples={n_given}, or the dt "
+        "that gives it), or give u as a function u(t)"
+    )

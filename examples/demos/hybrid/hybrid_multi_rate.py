@@ -38,7 +38,7 @@ plant = Integrator()
 loop = closed_loop(
     P(10.0, ports="reference") % (10 * DT_BASE),
     plant,
-    reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
+    reference=Step(np.array([0.0]), np.array([1.0]), step_time=1.0),
     filter=DiscreteLowPass(alpha=0.6) % DT_BASE,
 )
 

@@ -42,20 +42,20 @@ class MechanicalSystem(DynamicSystem):
             y_dependencies=(),
         )
 
-        # Signal labels and units: an angle and a velocity per coordinate; no bounds,
-        # each plant states its own range
+        # Signal labels and units, counted from 1: the angles q1…, then their rates
+        # dq1…; no bounds, each plant states its own range
         for i in range(dof):
-            self.state.labels[i] = f"Angle {i}"
-            self.state.units[i] = "[rad]"
+            self.state.labels[i] = f"q{i + 1}"
+            self.state.units[i] = "rad"
             j = i + dof
-            self.state.labels[j] = f"Velocity {i}"
-            self.state.units[j] = "[rad/sec]"
+            self.state.labels[j] = f"dq{i + 1}"
+            self.state.units[j] = "rad/s"
 
-        # A torque per actuator, and the output named after the state
+        # A torque per actuator, u1…, and the output named after the state
         uport = self.inputs["u"]
         for i in range(actuators):
-            uport.labels[i] = f"Torque {i}"
-            uport.units[i] = "[Nm]"
+            uport.labels[i] = f"u{i + 1}"
+            uport.units[i] = "Nm"
 
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)

@@ -12,11 +12,11 @@ from minilink.core.compile.evaluators.base import (
     Evaluator,
     added,
     assigned,
-    blocks_params,
-    every_block,
+    every_subsystem,
     gather_u,
     outputs_from_ports,
     require_jax_traceable,
+    subsystems_params,
 )
 from minilink.core.compile.evaluators.compiled import body_of, compiled
 from minilink.core.compile.evaluators.dynamic import check_leaf_traces
@@ -111,7 +111,7 @@ class DiscreteEvaluator(Evaluator):
         return u_seq
 
     def rollout_inputs_of(self, n_steps, u):
-        """The rollout's inputs ``(m, n_steps + 1)``: the nominal one, a constant, an ``(m, n_steps)`` sequence or ``u(k)``."""
+        """The rollout's inputs ``(m, n_steps + 1)``: the nominal one, a constant (a scalar on one input), an ``(m, n_steps)`` sequence or ``u(k)``."""
         if n_steps < 0:
             raise ValueError("n_steps must be nonnegative")
 
@@ -125,6 +125,11 @@ class DiscreteEvaluator(Evaluator):
             )
         else:
             u_arr = np.asarray(u, dtype=float)
+
+            # A scalar is the constant input of a one-input system
+            if u_arr.ndim == 0 and self.m == 1:
+                u_arr = u_arr.reshape(1)
+
             if u_arr.ndim == 1:
                 if u_arr.shape != (self.m,):
                     raise ValueError(f"Constant u must have shape ({self.m},)")
@@ -157,15 +162,13 @@ class StepEvaluator(DiscreteEvaluator):
     def __init__(self, system: StepSystem, backend="numpy", verbose=False):
         if not isinstance(system, StepSystem):
             raise TypeError("StepEvaluator requires a StepSystem")
-        super().__init__(
-            system.n, system.m, system.p, backend, system.get_u_from_input_ports()
-        )
+        super().__init__(system.n, system.m, system.p, backend, system.u_nominal)
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params
 
         # A system on a clock steps its seconds face at t0 + k Δ
-        self.seconds = isinstance(system, SampledSystem) and not system.counts
+        self.seconds = isinstance(system, SampledSystem) and not system.is_tick_law
 
         if backend == BACKEND_JAX:
             check_leaf_traces(self, system, system.step, 0, verbose)
@@ -211,7 +214,7 @@ class StepEvaluator(DiscreteEvaluator):
         ks = self.indices(u_seq.shape[0])
 
         def period(x, k, u_k):
-            if not system.resolves:
+            if not system.is_integrated:
                 x_next = xp.reshape(self.step(x, u_k, k, params, t0=t0), (n,))
                 return x_next, x_next[None, :]
             # The plant integrated once over the period: the path's last row is the tick
@@ -232,12 +235,10 @@ class StepDiagramEvaluator(DiscreteEvaluator):
         self, plan: StepExecutionPlan, diagram, backend="numpy", verbose=False
     ):
         p = sum(diagram.outputs[pid].dim for pid in plan.external_output_slices)
-        super().__init__(
-            plan.state_dim, diagram.m, p, backend, diagram.get_u_from_input_ports()
-        )
+        super().__init__(plan.state_dim, diagram.m, p, backend, diagram.u_nominal)
         self.plan = plan
         self.dtype = self.xp.float64
-        self._frozen_params = every_block(
+        self._frozen_params = every_subsystem(
             {
                 op.sys_id: op.bound_params
                 for op in (*plan.port_ops, *plan.step_ops)
@@ -245,7 +246,7 @@ class StepDiagramEvaluator(DiscreteEvaluator):
             },
             diagram,
         )
-        self.params_reader = lambda: blocks_params(diagram, self._frozen_params)
+        self.params_reader = lambda: subsystems_params(diagram, self._frozen_params)
         self._subsystem_ids = tuple(diagram.subsystems)
 
         if backend == BACKEND_JAX:
@@ -425,7 +426,7 @@ class SampledDiagramEvaluator(StepDiagramEvaluator):
             diagram.m,
             p,
             backend,
-            diagram.get_u_from_input_ports(),
+            diagram.u_nominal,
         )
         self.plan = plan
         self.dtype = self.xp.float64

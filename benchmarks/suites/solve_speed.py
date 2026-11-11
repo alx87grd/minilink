@@ -23,7 +23,6 @@ from minilink.core.sets import SingletonSet
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -66,7 +65,7 @@ def _optimizer_nlp_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRecord]:
     cases = tuple(c for c in STANDARD_OPTIMIZATION_CASES if c.id in NLP_CASE_IDS)
     variant = OptimizerBenchmarkVariant(
         name="scipy-SLSQP",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": 200 if not cfg.tiny else 80,
             "ftol": 1e-8,
@@ -77,7 +76,7 @@ def _optimizer_nlp_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRecord]:
     result = benchmark_optimizer_backends(cases, (variant,), n_runs=n_runs)
     metrics: list[MetricRecord] = []
     for row in result.rows:
-        prefix = f"optimizer.{row.case_id}.scipy_slsqp"
+        prefix = f"optimizer.{row.case_id}.slsqp"
         metrics.append(
             MetricRecord(
                 id=f"{prefix}.solve_s",
@@ -106,8 +105,8 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     n_runs = 1 if cfg.tiny else cfg.n_runs
 
     sys = Pendulum()
-    sys.inputs["u"].lower_bound[0] = -PENDULUM_TAU_MAX
-    sys.inputs["u"].upper_bound[0] = PENDULUM_TAU_MAX
+    sys.inputs["u"].lower[0] = -PENDULUM_TAU_MAX
+    sys.inputs["u"].upper[0] = PENDULUM_TAU_MAX
 
     x0 = np.array([0.0, 0.0])
     x_goal = np.array([np.pi, 0.0])
@@ -129,11 +128,9 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=PENDULUM_N_STEPS)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=PENDULUM_N_STEPS),
         backend="numpy",
-        method="scipy_slsqp",
+        method="slsqp",
         options={
             "maxiter": PENDULUM_MAXITER,
             "ftol": PENDULUM_FTOL,
@@ -169,7 +166,7 @@ def _pendulum_numpy_trajopt_metrics(cfg: SolveSpeedSuiteConfig) -> list[MetricRe
             unit="s",
             notes=(
                 f"catalog Pendulum swing-up, backend=numpy, "
-                f"n_steps={PENDULUM_N_STEPS}, scipy_slsqp"
+                f"n_steps={PENDULUM_N_STEPS}, slsqp"
             ),
         ),
         MetricRecord(

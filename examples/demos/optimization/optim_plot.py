@@ -36,9 +36,7 @@ def jac_g(z):
 
 
 prog = MathematicalProgram(n_z=1, J=J, grad_J=grad_J, g=g, jac_g=jac_g)
-opt = Optimizer(
-    prog, z0=z0, method="scipy_slsqp", options={"maxiter": 200, "ftol": 1e-12}
-)
+opt = Optimizer(prog, z0=z0, method="slsqp", options={"maxiter": 200, "ftol": 1e-12})
 # opt = Optimizer(prog, z0=z0, method="ipopt", options={"maxiter": 200})
 
 iterates = [(z0[0], J(z0))]

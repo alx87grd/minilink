@@ -81,7 +81,7 @@ class ScipyMinimizeOptimizer(OptimizerBackend):
         return OptimizationResult(
             z=np.asarray(raw_result.x, dtype=float),
             success=bool(raw_result.success),
-            cost=float(raw_result.fun) if raw_result.fun is not None else None,
+            J=float(raw_result.fun) if raw_result.fun is not None else None,
             message=str(raw_result.message),
             stats=stats,
             raw_result=raw_result,

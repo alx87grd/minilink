@@ -73,8 +73,8 @@ def test_the_discretized_problem_answers_as_the_continuous_problems_model(solver
     # One rollout, one J: Σ γᵏ c_k + γᴺ h on both
     law = lambda x, t: np.array([-2.0 * x[0] - x[1]])  # noqa: E731
     assert (
-        model.rollout(law).signals["cost"][0, -1]
-        == (sampled.rollout(law).signals["cost"][0, -1])
+        model.rollout(law).signals["J"][0, -1]
+        == (sampled.rollout(law).signals["J"][0, -1])
     )
 
 
@@ -110,10 +110,10 @@ class Walk(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=1, input_dim=1, output_dim=1)
-        self.state.lower_bound[:] = [0.0]
-        self.state.upper_bound[:] = [5.0]
-        self.inputs["u"].lower_bound[:] = [-1.0]
-        self.inputs["u"].upper_bound[:] = [1.0]
+        self.state.lower[:] = [0.0]
+        self.state.upper[:] = [5.0]
+        self.inputs["u"].lower[:] = [-1.0]
+        self.inputs["u"].upper[:] = [1.0]
 
     def step(self, x, u, k=0, params=None):
         return np.clip(x + u, 0.0, 5.0)
@@ -127,7 +127,7 @@ def test_a_step_problem_has_its_own_horizon_discount_and_tick_offset():
     np.testing.assert_array_equal(traj.x[0], [1, 2, 3, 4, 5, 5, 5])
     np.testing.assert_array_equal(traj.t, 2 + np.arange(7))  # the ticks t0 + k
     assert traj.u.shape == (1, 7)  # the last input held at the final state
-    J = traj.signals["cost"][0]  # J_k = Σ_{j<k} γʲ c_j, γᴺ h added at the end
+    J = traj.signals["J"][0]  # J_k = Σ_{j<k} γʲ c_j, γᴺ h added at the end
     assert J[0] == 0.0 and J[3] == pytest.approx(1 + 0.9 + 0.81)
     assert J[-1] == pytest.approx(1 + 0.9 + 0.81 + 0.0 + 0.9**4 + 0.9**5)
     assert step_model_of(problem).time_of(3) == 5  # the tick offset, an integer
@@ -180,10 +180,10 @@ def grid_world(**fields):
     class Walker(StepSystem):
         def __init__(self):
             super().__init__(state_dim=2, input_dim=2, output_dim=2)
-            self.state.lower_bound[:] = [0.0, 0.0]
-            self.state.upper_bound[:] = [6.0, 6.0]
-            self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-            self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+            self.state.lower[:] = [0.0, 0.0]
+            self.state.upper[:] = [6.0, 6.0]
+            self.inputs["u"].lower[:] = [-1.0, -1.0]
+            self.inputs["u"].upper[:] = [1.0, 1.0]
 
         def step(self, x, u, k=0, params=None):
             return np.clip(x + u, 0.0, 6.0)
@@ -282,8 +282,8 @@ def test_a_step_problem_started_at_k0_scores_as_from_0_with_the_cost_shifted(n_s
     traj = late.rollout(law, n_steps=4)
     traj_0 = shifted.rollout(law, n_steps=4)
     np.testing.assert_array_equal(traj.x, traj_0.x)
-    np.testing.assert_array_equal(traj.signals["cost"], traj_0.signals["cost"])
-    J, J_0 = traj.signals["cost"][0, -1], traj_0.signals["cost"][0, -1]
+    np.testing.assert_array_equal(traj.signals["J"], traj_0.signals["J"])
+    J, J_0 = traj.signals["J"][0, -1], traj_0.signals["J"][0, -1]
     assert J == J_0 == 13.0 + 0.9 * 11.0 + 0.81 * 7.0
 
     # The same cost bound: the stage and terminal costs read at the tick offset
@@ -299,7 +299,7 @@ def test_a_grid_world_solves_by_value_iteration_as_a_step_problem():
     vi.solve()
 
     # J(x) = the moves to the goal, diagonal moves allowed: the Chebyshev distance
-    J = vi.result.J.reshape(7, 7)
+    J = vi.tables.J.reshape(7, 7)
     cells = np.arange(7.0)
     distance = np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
     np.testing.assert_array_equal(J, distance)
@@ -341,7 +341,7 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_ru
 
     solution = vi.solve(evaluate=True)
     assert solution.evaluation.n_trials == 1 and solution.trajectory is None
-    J = vi.problem.rollout(solution.controller, n_steps=10).signals["cost"][0, -1]
+    J = vi.problem.rollout(solution.controller, n_steps=10).signals["J"][0, -1]
     assert float(solution.evaluation.J[0]) == J == sum(0.9**k for k in range(5))
     assert bool(solution.evaluation.reached[0]) and not solution.evaluation.failed[0]
     run = drawn_trajectory_of(solution)
@@ -354,7 +354,7 @@ def test_value_iteration_on_a_step_problem_solves_at_a_tree_and_scores_on_its_ru
     finite = DynamicProgrammingPlanner(
         grid_world(gamma=0.9, n_steps=8), x_grid=(7, 7), u_grid=(3, 3)
     ).solve(evaluate=True)
-    J = finite.problem.rollout(finite.controller).signals["cost"][0, -1]
+    J = finite.problem.rollout(finite.controller).signals["J"][0, -1]
     assert float(finite.evaluation.J[0]) == J
     from minilink import Uniform
 
@@ -393,8 +393,8 @@ def test_the_discretized_problem_charges_the_terminal_cost_at_the_horizons_time(
     assert model.terminal(x) == sampled.terminal(x) == 1.0 + 2.5
     law = lambda x, t: np.array([-x[0]])  # noqa: E731
     assert (
-        model.rollout(law).signals["cost"][0, -1]
-        == (sampled.rollout(law).signals["cost"][0, -1])
+        model.rollout(law).signals["J"][0, -1]
+        == (sampled.rollout(law).signals["J"][0, -1])
     )
 
 
@@ -408,8 +408,8 @@ def test_value_iteration_on_a_problem_and_on_its_discretization_agree():
     assert vi.out_of_bound_cost == vd.out_of_bound_cost
     vi.solve()
     vd.solve()
-    np.testing.assert_array_equal(vi.result.J, vd.result.J)
-    np.testing.assert_array_equal(vi.result.pi, vd.result.pi)
+    np.testing.assert_array_equal(vi.tables.J, vd.tables.J)
+    np.testing.assert_array_equal(vi.tables.pi, vd.tables.pi)
 
 
 def test_a_step_problems_grid_takes_no_period_and_a_source_does_not_discretize():
@@ -449,7 +449,7 @@ def test_policy_evaluation_scores_value_iterations_policy_on_the_face():
     vi.solve()
     J_pi = vi.evaluate_policy(vi.controller)
     np.testing.assert_allclose(
-        J_pi.params["values"].reshape(-1), vi.result.J, atol=1e-6
+        J_pi.params["values"].reshape(-1), vi.tables.J, atol=1e-6
     )
 
 
@@ -474,7 +474,7 @@ def episode_return(env, law):
     x, t = env.reset(0), env.t0
     total, k = 0.0, 0
     while True:
-        x, t, r, terminated, truncated = env.step(x, t, law(x), None)
+        x, t, r, terminated, truncated = env.step(x, law(x), t, None)
         total += env.model.gamma**k * float(r)
         k += 1
         if terminated or truncated:
@@ -494,7 +494,7 @@ def test_the_rollout_environment_steps_a_native_step_problem_on_its_model():
 
     # One step is the model's transition, rewarded −c_k
     x_next, t_next, r, terminated, truncated = env.step(
-        np.array([1.0]), 3.0, np.array([1.0]), None
+        np.array([1.0]), np.array([1.0]), 3.0, None
     )
     assert (
         x_next[0] == 2.0
@@ -505,7 +505,7 @@ def test_the_rollout_environment_steps_a_native_step_problem_on_its_model():
 
     # The return is −J of the problem's run, and the same from k₀ as from 0 on the shifted cost
     law = lambda x: np.array([1.0 if x[0] < 3.5 else 0.0])  # noqa: E731
-    J = late.rollout(lambda x, t: law(x)).signals["cost"][0, -1]
+    J = late.rollout(lambda x, t: law(x)).signals["J"][0, -1]
     assert episode_return(env, law) == (-J, 4)
     shifted_env = RolloutEnvironment(shifted, backend="numpy")
     assert episode_return(shifted_env, law) == (-J, 4)
@@ -567,3 +567,32 @@ def test_a_step_problem_prints_its_horizon_its_discount_and_its_parts():
     assert "n_steps=None, gamma=1, criterion=expectation" in lawful
     assert "  x0: Uniform" in lawful
     assert str(grid_world().cost) == "Moves"
+
+
+def test_a_step_problem_replaces_a_field_and_keeps_what_it_samples():
+    problem = swing_problem()
+    sampled = problem.discretize(0.1)
+    moved = sampled.replace(x0=[0.2, 0.0])
+    assert type(moved) is StepPlanningProblem
+    np.testing.assert_array_equal(moved.x0, [0.2, 0.0])
+    np.testing.assert_array_equal(sampled.x0, [0.3, 0.0])
+    assert (moved.n_steps, moved.dt, moved.gamma) == (
+        sampled.n_steps,
+        0.1,
+        sampled.gamma,
+    )
+    assert moved.cost is sampled.cost and moved.sys is sampled.sys
+    # Only the start moved: the continuous problem it samples, and its bound, are kept
+    assert moved.origin is problem
+    assert moved.cost_bound() == sampled.cost_bound()
+    # Another task: a native step problem
+    assert sampled.replace(gamma=0.9).origin is None
+    with pytest.raises(TypeError, match="no field"):
+        sampled.replace(horizon=1.0)
+
+
+def test_a_native_step_problem_replaces_its_horizon():
+    problem = StepPlanningProblem(Walk(), n_steps=5, cost=Moves([5.0]), x0=[0.0])
+    longer = problem.replace(n_steps=8)
+    assert (longer.n_steps, problem.n_steps) == (8, 5)
+    assert longer.rollout(lambda x, t: np.array([1.0])).x.shape[1] == 9

@@ -32,13 +32,11 @@ class ParkingBoat(Boat2DWithCurrent):
         self.name = "Parking Boat"
         self.params["current_velocity"] = np.asarray(current, dtype=float)
         self.params["thrust_max"] = THRUST_MAX
-        self.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-        self.inputs["u"].upper_bound = np.array([+1.0, +1.0])
+        self.inputs["u"].lower = np.array([-1.0, -1.0])
+        self.inputs["u"].upper = np.array([+1.0, +1.0])
         self.inputs["u"].units = ["-", "-"]
-        self.state.lower_bound = np.array(
-            [-XY_RANGE, -XY_RANGE, -4 * np.pi, -5, -5, -2]
-        )
-        self.state.upper_bound = -self.state.lower_bound
+        self.state.lower = np.array([-XY_RANGE, -XY_RANGE, -4 * np.pi, -5, -5, -2])
+        self.state.upper = -self.state.lower
         self.x0 = X_START.copy()
         self.camera_follow_frame = None
         self.camera_scale = XY_RANGE

@@ -16,10 +16,10 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 
 def make_bounded_pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2.0 * np.pi, -12.0])
-    plant.state.upper_bound = np.array([+2.0 * np.pi, +12.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([+1.0])
+    plant.state.lower = np.array([-2.0 * np.pi, -12.0])
+    plant.state.upper = np.array([+2.0 * np.pi, +12.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([+1.0])
     plant.x0 = np.array([-np.pi, 0.0])
     return plant
 
@@ -298,10 +298,10 @@ class TestSys2GymJax(unittest.TestCase):
 
             def __init__(self):
                 super().__init__(state_dim=1, input_dim=1, output_dim=1)
-                self.state.lower_bound = np.array([-5.0])
-                self.state.upper_bound = np.array([5.0])
-                self.inputs["u"].lower_bound = np.array([-1.0])
-                self.inputs["u"].upper_bound = np.array([1.0])
+                self.state.lower = np.array([-5.0])
+                self.state.upper = np.array([5.0])
+                self.inputs["u"].lower = np.array([-1.0])
+                self.inputs["u"].upper = np.array([1.0])
 
             def f(self, x, u, t=0, params=None):
                 gain = 2.0 if x[0] > 0.0 else 1.0

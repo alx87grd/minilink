@@ -10,7 +10,7 @@ from minilink.core.system import DynamicSystem
 ###############################################################################
 
 
-class VanderPol(DynamicSystem):
+class VanDerPol(DynamicSystem):
     """Van der Pol oscillator."""
 
     def __init__(self, mu=0.5):
@@ -22,8 +22,8 @@ class VanderPol(DynamicSystem):
         # Signal labels, units and bounds
         self.state.labels = ["y", "dy"]
         self.state.units = ["", "1/s"]
-        self.state.lower_bound[:] = [-3.0, -3.0]
-        self.state.upper_bound[:] = [3.0, 3.0]
+        self.state.lower[:] = [-3.0, -3.0]
+        self.state.upper[:] = [3.0, 3.0]
         self.inputs["u"].labels = ["unused"]
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
@@ -94,7 +94,7 @@ class Lorenz(DynamicSystem):
 
 
 if __name__ == "__main__":
-    sys = VanderPol()
+    sys = VanDerPol()
     sys.x0 = np.array([0.0, 1.0])
     sys.compute_trajectory(tf=20.0, n_samples=400, show=True, verbose=False)
     sys.plot_phase_plane(traj=sys.traj)

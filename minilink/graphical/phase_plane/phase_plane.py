@@ -494,7 +494,7 @@ def x_ref_of(sys, x_ref) -> np.ndarray:
 def u_of(sys, u) -> np.ndarray:
     """The held input: ``u``, else the input ports' values."""
     if u is None:
-        value = sys.get_u_from_input_ports()
+        value = sys.u_nominal
     else:
         value = u
     arr = np.asarray(value, dtype=float).reshape(-1)
@@ -538,8 +538,8 @@ def phase_bounds_of(
         y_bounds = require_ordered_bounds(arr[1], "y bounds")
         return x_bounds, y_bounds
 
-    lower = sys.state.lower_bound
-    upper = sys.state.upper_bound
+    lower = sys.state.lower
+    upper = sys.state.upper
 
     x_bounds = bounds_from_state_or_overlay(
         lower,

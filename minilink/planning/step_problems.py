@@ -5,8 +5,10 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.core.costs import SampledCost, StepCost, box_samples
+from minilink.core.distributions import Distribution
 from minilink.core.inspect import repr_pretty
 from minilink.core.params import require_complete
+from minilink.core.sets import Set, SingletonSet
 from minilink.core.trajectory import Trajectory
 from minilink.planning.problems import (
     PlanningProblem,
@@ -74,7 +76,7 @@ class StepPlanningProblem:
 
         # The task: the step system, its horizon, its cost and discount per tick
         self.sys = sys
-        self.n_steps = coerce_horizon(n_steps)
+        self.n_steps = coerce_n_steps(n_steps)
         self.cost = cost
         self.gamma = coerce_gamma(gamma)
         self.dt = None if dt is None else float(dt)
@@ -150,6 +152,38 @@ class StepPlanningProblem:
     def sample_x0(self, key, n=None):
         """Draw starts from the start's law (the shared parts')."""
         return self.parts.sample_x0(key, n)
+
+    def replace(self, **changes):
+        """A new problem of the same class with the named fields replaced (the others shared), as on a continuous problem.
+
+        A discretized problem keeps the continuous problem it samples (its
+        cost bound and its design point) when only the start, the failure's
+        price or the criterion change; any other change makes the new problem
+        a native step problem, its bound read on its own boxes.
+        """
+        fields = {name: getattr(self, name) for name in STEP_FIELDS}
+        fields["distributions"] = self.distributions or None
+        if self.start_law is not None:
+            fields["x0"] = self.start_law
+        unknown = sorted(set(changes) - set(fields))
+        if unknown:
+            raise TypeError(f"{type(self).__name__} has no field(s) {unknown}")
+        fields.update(changes)
+
+        # A new start takes its own singleton X0, or its own law's support, unless one is given
+        if "x0" in changes and "X0" not in changes:
+            if isinstance(self.X0, SingletonSet) or self.start_law is not None:
+                fields["X0"] = None
+            if isinstance(changes["x0"], (Distribution, Set)):
+                fields["X0"] = None
+
+        problem = type(self)(**fields)
+
+        # The continuous problem it samples, while the change leaves it the same task
+        if set(changes) <= KEEPS_ORIGIN:
+            problem.origin = self.origin
+
+        return problem
 
     @property
     def params(self) -> dict:
@@ -255,7 +289,7 @@ class StepPlanningProblem:
 
     def rollout(self, controller, x0=None, params=None, n_steps=None) -> Trajectory:
         """
-        The rollout under ``controller``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks, its running cost the signal ``"cost"``.
+        The rollout under ``controller``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks, its running cost the signal ``"J"``.
 
         ``controller`` is a controller block (its state on its measurement
         port, its other inputs at their nominal values) or a law
@@ -263,7 +297,7 @@ class StepPlanningProblem:
         ``N = n_steps`` ticks (``None``: :attr:`n_steps`; an infinite horizon
         needs it). The samples sit at ``t0 + k dt`` (``t0 + k`` on a native
         problem), ``x`` ``(n, N + 1)`` and ``u`` ``(m, N + 1)``, the last
-        input held; ``traj.signals["cost"]`` ``(1, N + 1)`` is
+        input held; ``traj.signals["J"]`` ``(1, N + 1)`` is
         ``J_k = Σ_{j<k} γʲ c_j`` with ``γᴺ h(x_N)`` added at the last sample,
         so ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)`` is its last value.
         """
@@ -409,6 +443,27 @@ def discretize_problem(problem, dt, *, solver="rk4", substeps=1) -> StepPlanning
 # Internal machinery
 ###############################################################################
 
+# The fields a step problem is built from, and those a change of which keeps the
+# continuous problem a discretized one samples
+STEP_FIELDS = (
+    "sys",
+    "n_steps",
+    "cost",
+    "gamma",
+    "x0",
+    "X",
+    "U",
+    "X0",
+    "Xf",
+    "t0",
+    "dt",
+    "penalize_failure",
+    "failure_cost",
+    "distributions",
+    "criterion",
+)
+KEEPS_ORIGIN = {"x0", "X0", "penalize_failure", "failure_cost", "criterion"}
+
 
 def sampled_cost_bound(problem, N, gamma, dt, params=None):
     """
@@ -439,7 +494,7 @@ def build_step_model(problem):
     return StepModel(problem)
 
 
-def coerce_horizon(N):
+def coerce_n_steps(N):
     """The horizon: ``None`` (infinite), or a positive whole number of ticks."""
     if N is None:
         return None

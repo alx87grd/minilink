@@ -111,9 +111,7 @@ class TestDiagrams(unittest.TestCase):
 
     def test_plot_diagram_no_display_returns_graph(self):
         pytest.importorskip("graphviz")
-        graph = plot_diagram(
-            Integrator(), show=False, show_inline=False, show_pdf=False
-        )
+        graph = plot_diagram(Integrator(), show=False)
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
 
@@ -126,7 +124,7 @@ class TestDiagrams(unittest.TestCase):
 
         override_env("script")
         try:
-            graph = plot_diagram(Integrator(), show=True, show_inline=False)
+            graph = plot_diagram(Integrator(), show="window")
         finally:
             override_env(None)
         self.assertIsNotNone(graph)
@@ -147,9 +145,7 @@ class TestDiagrams(unittest.TestCase):
             mock.patch.object(graphviz.Digraph, "pipe", return_value=b"<svg/>"),
             mock.patch("IPython.display.display") as display,
         ):
-            graph = plot_diagram(
-                Integrator(), show=True, show_inline=True, show_pdf=False
-            )
+            graph = plot_diagram(Integrator(), show="inline")
         display.assert_not_called()
         self.assertIsNotNone(graph)
         self.assertIn("Integrator", graph.source)
@@ -167,11 +163,9 @@ class TestDiagrams(unittest.TestCase):
                 self.renders.append((filename, view))
 
         graph = RecordedGraph()
-        render_diagram_graph(graph, show=False, show_inline=False, show_pdf=True)
+        render_diagram_graph(graph, show=False)
         self.assertEqual(graph.renders, [])
-        render_diagram_graph(
-            graph, show=False, show_inline=False, show_pdf=True, file_name="out.gv"
-        )
+        render_diagram_graph(graph, show=False, file_name="out.gv")
         self.assertEqual(graph.renders, [("out.gv", False)])
 
     def test_plot_diagram_without_graphviz_warns_once_and_skips(self):
@@ -257,13 +251,12 @@ class TestDiagrams(unittest.TestCase):
         self.assertIn("n=1", text)
         self.assertIn("inputs: r (1)", text)
         self.assertIn("outputs: y_meas (1)", text)
-        self.assertIn("blocks: controller, plant", text)
+        self.assertIn("subsystems: controller, plant", text)
 
     @staticmethod
     def _make_case_diagrams():
         # A subsystem with an input ``v``, an output ``V`` and an input ``v_d``.
         inner = DiagramSystem()
-        inner.connection_verbose = False
         inner.add_subsystem(Integrator(), "integ")
         inner.add_input_port("v")
         inner.add_input_port("v_d")
@@ -271,7 +264,6 @@ class TestDiagrams(unittest.TestCase):
         inner.connect_new_output_port("integ", "y", "V")
 
         outer = DiagramSystem()
-        outer.connection_verbose = False
         outer.add_subsystem(Integrator(), "racecar")
         outer.add_subsystem(inner, "arduino")
         outer.add_input_port("r")
@@ -284,7 +276,6 @@ class TestDiagrams(unittest.TestCase):
     @staticmethod
     def _make_diagram():
         diagram = DiagramSystem()
-        diagram.connection_verbose = False
         diagram.add_subsystem(P(ports="reference"), "controller")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")
@@ -494,7 +485,6 @@ from minilink.graphical.diagrams import build_diagram_topology
 
 def _build_closed_loop():
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(P(2.5, ports="reference"), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
@@ -555,7 +545,6 @@ def _build_feedthrough_loop():
             return u * 2
 
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(FeedthroughSystem("A"), "A")
     diagram.add_subsystem(FeedthroughSystem("B"), "B")
     diagram.add_subsystem(FeedthroughSystem("C"), "C")
@@ -597,8 +586,8 @@ class TestWiringMixin(unittest.TestCase):
         x = np.array([0.25])
         u = np.array([1.0])
         t = 0.5
-        plant_y = diagram.compute_subsys_output_port(x, u, t, "plant", "y")
-        ctl_u = diagram.compute_subsys_output_port(x, u, t, "controller", "u")
+        plant_y = diagram.compute_subsystem_output_port(x, u, t, "plant", "y")
+        ctl_u = diagram.compute_subsystem_output_port(x, u, t, "controller", "u")
         np.testing.assert_allclose(plant_y, np.array([0.25]))
         np.testing.assert_allclose(ctl_u, np.array([2.5 * (1.0 - 0.25)]))
         local_u = diagram.get_local_input(x, u, t, "controller")
@@ -925,7 +914,7 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         ):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                dot_module.render_diagram_graph(graph, show=True, show_inline=True)
+                dot_module.render_diagram_graph(graph, show="inline")
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
     def test_plot_diagram_returns_nothing_for_the_cell_to_render(self):
@@ -942,7 +931,7 @@ class TestDiagramRenderWithoutDot(unittest.TestCase):
         with mock.patch.object(graphviz.Digraph, "pipe", side_effect=missing_dot):
             with warnings.catch_warnings(record=True) as caught:
                 warnings.simplefilter("always")
-                graph = loop.plot_diagram(show=True, show_inline=True)
+                graph = loop.plot_diagram(show="inline")
         self.assertIsNone(graph)
         self.assertTrue(any("Graphviz binary" in str(w.message) for w in caught))
 
@@ -963,7 +952,7 @@ def test_record_keeps_a_diagrams_signals_equal_to_the_reconstruction():
     traj = loop.compute_trajectory(tf=1.0, record=("controller:u",), verbose=False)
     full = loop.reconstruct_internal_signals(traj)
     np.testing.assert_array_equal(
-        traj.get_signal("controller:u"), full.get_signal("controller:u")
+        traj.signal("controller:u"), full.signal("controller:u")
     )
 
 
@@ -1000,7 +989,7 @@ def test_a_nested_blocks_signal_is_recorded_by_its_path():
     assert run.u.shape == (1, traj.n_samples)
     expected = inner.reconstruct_internal_signals(
         _inner_run(outer, traj), ports=("plant:u",)
-    ).get_signal("plant:u")
+    ).signal("plant:u")
     np.testing.assert_allclose(run.u, expected, atol=1e-12)
 
 
@@ -1032,6 +1021,6 @@ def test_a_sampled_loops_nested_block_is_selected_by_the_id_it_was_added_under()
 
 
 def _inner_run(outer, traj):
-    from minilink.core.diagram import block_run
+    from minilink.core.diagram import subsystem_run
 
-    return block_run(outer, "plant", traj)
+    return subsystem_run(outer, "plant", traj)

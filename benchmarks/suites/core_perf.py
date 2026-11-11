@@ -188,7 +188,7 @@ def _simulation_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     try:
         pendulum_result = benchmark_simulation_backend(
             pendulum,
-            candidate=SimulationBenchmarkVariant("rk4_fixedsteps", "jax"),
+            candidate=SimulationBenchmarkVariant("rk4", "jax"),
             truth=TRUTH_SIMULATION_VARIANT,
             t0=pendulum_case.t0,
             tf=pendulum_case.tf,
@@ -211,7 +211,7 @@ def _simulation_metrics(cfg: CorePerfSuiteConfig) -> list[MetricRecord]:
     diagram = diagram_case.build()
     diagram_result = benchmark_simulation_backend(
         diagram,
-        candidate=SimulationBenchmarkVariant("rk4_fixedsteps", "numpy"),
+        candidate=SimulationBenchmarkVariant("rk4", "numpy"),
         truth=TRUTH_SIMULATION_VARIANT,
         t0=diagram_case.t0,
         tf=diagram_case.tf,

@@ -83,7 +83,7 @@ def tick_on_the_host(ev, system, x, u, k, t0, params, points, rtol, atol):
         inside = inside_points(ev, x, x_next, paths, points)
     else:
         params = system.params if params is None else params
-        if system.resolves:
+        if system.is_integrated:
             x_next = advance(system, x, u, t0 + k * h, params)
             inside = paths[0]
         else:

@@ -13,7 +13,6 @@ mux = Mux(dims=(1, 1))
 controller = MLP(input_dim=2, output_dim=1, hidden=(8,), seed=2)
 
 diagram = DiagramSystem()
-diagram.connection_verbose = False
 diagram.add_subsystem(mux, "mux")
 diagram.add_subsystem(controller, "nn")
 diagram.add_subsystem(plant, "plant")
@@ -80,7 +79,7 @@ result = Optimizer(
 ).solve()
 print(result)
 
-assert result.cost < batch_loss(nn_params), "training did not reduce the loss"
+assert result.J < batch_loss(nn_params), "training did not reduce the loss"
 
 
 # Part 3: simulate with the learned controller

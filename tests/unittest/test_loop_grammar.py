@@ -16,13 +16,16 @@ from minilink import (
     closed_loop,
     discretize,
 )
-from minilink.analysis import linearize
+from minilink.analysis import bode, linearize
 from minilink.analysis.linear import poles
 from minilink.blocks.step import UnitDelay
 from minilink.core.backends import array_module
 from minilink.core.discrete.sampled_diagram import SampledDiagramSystem
 from minilink.core.discrete.sampled_system import SampledSystem
-from minilink.dynamics.abstraction.state_space import DiscreteLTISystem, LTISystem
+from minilink.dynamics.abstraction.state_space import (
+    LinearizedStepSystem,
+    LinearizedSystem,
+)
 from minilink.planning.step_model import step_model_of
 
 
@@ -64,7 +67,7 @@ def test_a_continuous_loop_runs_and_linearizes_in_s():
     loop = pid() @ pendulum()
     run = loop.compute_trajectory(tf=1.0, dt=0.01)
     assert run.t[-1] == pytest.approx(1.0)
-    assert isinstance(linearize(loop, x_bar=np.zeros(loop.n)), LTISystem)
+    assert isinstance(linearize(loop, x_bar=np.zeros(loop.n)), LinearizedSystem)
 
 
 def test_a_pure_step_chain_rolls_out_and_linearizes_in_z_per_tick():
@@ -72,16 +75,24 @@ def test_a_pure_step_chain_rolls_out_and_linearizes_in_z_per_tick():
     run = chain.compute_rollout(5, u=np.ones(1))
     np.testing.assert_allclose(run.t, np.arange(6))
     model = linearize(chain)
-    assert isinstance(model, DiscreteLTISystem) and model.period is None
+    assert isinstance(model, LinearizedStepSystem) and "per tick" in str(model)
     np.testing.assert_allclose(np.sort(np.abs(poles(model.A()))), [0.0, 0.5])
 
 
-def test_a_computer_alone_reads_seconds_and_linearizes_with_its_period():
+def test_a_computer_alone_reads_seconds_and_linearizes_to_a_tick_law():
     computer = (Sine() % 0.01) >> (P(2.0) % 0.01)
     run = computer.compute_rollout(10)
     np.testing.assert_allclose(run.t, 0.01 * np.arange(11))
-    model = linearize(PID(Kp=2.0, Ki=1.0, Kd=0.5) % 0.01)
-    assert model.period == 0.01
+    law = PID(Kp=2.0, Ki=1.0, Kd=0.5) % 0.01
+    model = linearize(law)
+    assert "per tick" in str(model)
+
+    # Seconds come from a clock: the model on the law's clock reads the law's rad/s
+    w, mag, phase = bode(model % 0.01)
+    w_law, mag_law, phase_law = bode(law)
+    np.testing.assert_allclose(w, w_law)
+    np.testing.assert_allclose(mag, mag_law)
+    np.testing.assert_allclose(phase, phase_law)
 
 
 def test_the_sampled_loop_runs_its_ticks_its_dense_run_and_the_host_runner():
@@ -128,7 +139,7 @@ def test_the_continuous_dynamics_the_computer_does_not_own_are_the_plants():
 
 def test_a_plants_euler_model_on_the_computer_is_never_adaptive():
     predictor = Pendulum() % 0.01
-    assert predictor.kind == "law" and not predictor.resolves
+    assert predictor.kind == "law" and not predictor.is_integrated
     ticks = predictor.compute_rollout(5)
     host = predictor.compute_trajectory(tf=0.05, solver="scipy")
     np.testing.assert_array_equal(host.x, ticks.x)

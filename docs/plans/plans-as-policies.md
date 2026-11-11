@@ -63,7 +63,7 @@ planner on the two axes:
 | --- | --- | --- | --- | --- | --- |
 | Trajectory optimization | open loop | varying (finite only) | knots, `t0` | `u(t)` | built |
 | MPPI | open loop | varying (finite only) | input sequence, `t0` | `u(t)` | built |
-| Trajectory plus tracking (`trajectory_lqr`) | feedback | varying | knots, `K(t)`, `K∞` at `x_d(tf)`, `t0` | `u_d(t) − K(t)(x − x_d(t))`; the stationary law at the goal past `tf` | later, same contract |
+| Trajectory plus tracking (`lqr_trajectory`) | feedback | varying | knots, `K(t)`, `K∞` at `x_d(tf)`, `t0` | `u_d(t) − K(t)(x − x_d(t))`; the stationary law at the goal past `tf` | later, same contract |
 | LQR, infinite | feedback | stationary | `K`, `x̄`, `ū` | `ū − K (x − x̄)` | §4 |
 | LQR, finite | feedback | varying | `K(t)`, `K∞`, `x̄`, `ū`, `t0` | `ū − K(t − t0)(x − x̄)`; `K∞` past `tf` | §4 |
 | Value iteration, infinite | feedback | stationary | `J`, the command table `u` | the lookup of `u` at `x` | §3 |
@@ -96,7 +96,7 @@ numbers) and closes in the follower only; an infinite one is refused above a siz
   (never action `0`, the corner of the input box).
 - **`pv.command(z, x, t)`:** the lookup law's arithmetic on `z`'s table at `x` (finite: at the
   stage of `t`, the stage rule of `LookupPolicy`).
-- **`status`:** `{"success", "iterations", "delta", "cost"}`, `cost = J(x0)`.
+- **`status`:** `{"success", "n_iterations", "delta", "cost"}`, `cost = J(x0)`.
 - **A fixed number of sweeps per solve,** in the infinite mode only: truncated, warm-started
   value iteration (not "real-time dynamic programming", which backs up states asynchronously
   along simulated paths). Its spelling is `PP-Q8`.

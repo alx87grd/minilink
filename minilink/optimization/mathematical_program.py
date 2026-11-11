@@ -92,6 +92,9 @@ class MathematicalProgram:
     params : dict, optional
         The default values of the parameters the callables read, a nested
         dict of numbers; ``None`` (the default) for callables of ``z`` alone.
+    z0 : array_like, optional
+        The program's own start, ``(n_z,)``, the :class:`~minilink.optimization.Optimizer`'s
+        default (an exported program sets it); ``None`` when it has none.
     """
 
     n_z: int
@@ -107,6 +110,7 @@ class MathematicalProgram:
     backend: str = BACKEND_NUMPY
     metadata: dict[str, object] = field(default_factory=dict)
     params: dict | None = None
+    z0: np.ndarray | None = None
 
     def __post_init__(self) -> None:
         n_z = int(self.n_z)
@@ -116,11 +120,13 @@ class MathematicalProgram:
         lower = as_vector_or_none("lower", self.lower, n_z)
         upper = as_vector_or_none("upper", self.upper, n_z)
         require_ordered_bounds(lower, upper)
+        z0 = as_start_or_none(self.z0, n_z)
 
         # The frozen fields take their checked values, the metadata its own copy
         object.__setattr__(self, "n_z", n_z)
         object.__setattr__(self, "lower", lower)
         object.__setattr__(self, "upper", upper)
+        object.__setattr__(self, "z0", z0)
         object.__setattr__(self, "metadata", dict(self.metadata))
         require_params_tree(self.params)
 
@@ -152,7 +158,7 @@ class OptimizationResult:
 
     z: np.ndarray
     success: bool
-    cost: float | None = None
+    J: float | None = None
     message: str = ""
     stats: dict[str, object] = field(default_factory=dict)
     raw_result: object | None = None
@@ -171,6 +177,11 @@ class OptimizationResult:
         # The measured time as a float, when one was measured
         if self.solve_time_s is not None:
             object.__setattr__(self, "solve_time_s", float(self.solve_time_s))
+
+    @property
+    def n_iterations(self) -> int | None:
+        """The iterations the solve took, ``stats["nit"]`` (``None`` when the solver reports none)."""
+        return self.stats.get("nit")
 
     def __str__(self):
         return optimization_result_text(self)
@@ -218,6 +229,16 @@ def as_vector_or_none(name: str, value, n_z: int) -> np.ndarray | None:
     if arr.shape != (n_z,):
         raise ValueError(f"{name} bounds must have shape ({n_z},)")
     return arr
+
+
+def as_start_or_none(z0, n_z: int) -> np.ndarray | None:
+    """The program's start as a flat float copy of shape ``(n_z,)``, or ``None`` when absent."""
+    if z0 is None:
+        return None
+    start = np.asarray(z0, dtype=float).reshape(-1).copy()
+    if start.shape != (n_z,):
+        raise ValueError(f"z0 must have shape ({n_z},), got {start.shape}")
+    return start
 
 
 def require_ordered_bounds(lower, upper):
@@ -268,8 +289,8 @@ def optimization_result_text(result):
     headline = f"OptimizationResult, success={success}"
     body = []
 
-    if result.cost is not None:
-        body.append(body_line("J*", f"{float(result.cost):.6g}"))
+    if result.J is not None:
+        body.append(body_line("J*", f"{float(result.J):.6g}"))
     body.append(body_line("z*", preview_vector(result.z)))
     if result.message:
         message = result.message.strip()

@@ -237,8 +237,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new input port to the system.
@@ -260,8 +260,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def add_output_port(
@@ -274,8 +274,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Add a new output port to the system.
@@ -304,8 +304,8 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     def rename_ports(self, **names):
@@ -345,12 +345,14 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
 
         return self
 
-    def get_u_from_input_ports(self):
+    @property
+    def u_nominal(self):
         """
-        Concatenated default values of all input ports.
+        The input ports' nominal values, concatenated in port order (read-only).
 
-        This is the disconnected / nominal fallback used for standalone
-        systems and for the evaluator IVP tier.
+        This is what an unconnected port reads: the input of a standalone
+        system and of the evaluator's IVP tier. It is not an operating point
+        (``u_bar``, which a linearization carries in its ``params``).
         """
         u = np.zeros(self.m)
 
@@ -358,12 +360,12 @@ class System(SystemSimulation, SystemAnalysis, SystemPlotting, SystemAnimation):
         # unconnected port contributes
         i = 0
         for port in self.inputs.values():
-            u[i : i + port.dim] = port.get_default_value()
+            u[i : i + port.dim] = port.nominal_value
             i += port.dim
 
         return u
 
-    def get_port_values_from_u(self, u, *port_ids):
+    def ports(self, u, *port_ids):
         """
         Extract named port signals from the concatenated input vector ``u``.
 

@@ -101,7 +101,7 @@ def animate_search(
     step: int = 5,
     interval: int = 30,
     show: bool = True,
-    save: str | None = None,
+    file_name: str | None = None,
     figsize=(6.0, 5.0),
     tree_color="0.6",
     path_color="tab:blue",
@@ -112,7 +112,7 @@ def animate_search(
     ``step`` edges are revealed per frame, in node insertion order; the solution
     path is drawn at the end. Returns the
     :class:`~matplotlib.animation.FuncAnimation` (keep a reference). Pass
-    ``save="tree.gif"`` to write it, or ``show=True`` to play it.
+    ``file_name="tree.gif"`` to write it, or ``show=True`` to play it.
     """
     import matplotlib.pyplot as plt
     from matplotlib.animation import FuncAnimation
@@ -157,8 +157,8 @@ def animate_search(
     anim = FuncAnimation(
         fig, update, frames=n_frames, interval=interval, blit=False, repeat=False
     )
-    if save is not None:
-        anim.save(save)
+    if file_name is not None:
+        anim.save(file_name)
 
     maybe_show(plt, show, block_when_needed=True)
 
@@ -173,7 +173,7 @@ def animate_convergence(
     ax=None,
     interval: int = 50,
     show: bool = True,
-    save: str | None = None,
+    file_name: str | None = None,
     figsize=(7.0, 6.0),
     tree_color="0.75",
     path_color="tab:blue",
@@ -182,7 +182,8 @@ def animate_convergence(
     """
     Animate recorded RRT* history showing tree growth and best-path refinement.
 
-    Requires ``planner.history`` from a solve with ``record_history=True``.
+    Requires the latest solution's ``record.history``, from a solve with
+    ``record_history=True``.
     Each frame redraws the full tree (including rewiring) and highlights the
     current best goal path. Returns the
     :class:`~matplotlib.animation.FuncAnimation` (keep a reference).
@@ -238,10 +239,10 @@ def animate_convergence(
             )
 
         # The iteration, and the best cost once the goal is reached
-        if snapshot.reached_goal and snapshot.best_cost is not None:
+        if snapshot.reached_goal and snapshot.best_cost_to_come is not None:
             title.set_text(
                 f"{title_prefix}  iter={snapshot.iteration}  "
-                f"best cost={snapshot.best_cost:.2f}"
+                f"best cost={snapshot.best_cost_to_come:.2f}"
             )
         else:
             title.set_text(f"{title_prefix}  iter={snapshot.iteration}  searching...")
@@ -257,8 +258,8 @@ def animate_convergence(
         blit=False,
         repeat=True,
     )
-    if save is not None:
-        anim.save(save)
+    if file_name is not None:
+        anim.save(file_name)
 
     maybe_show(plt, show, block_when_needed=True)
 
@@ -269,13 +270,14 @@ def draw_search_state(
     ax,
     planner,
     *,
+    reached_goal: bool = False,
     x_axis: int = 0,
     y_axis: int = 1,
     tree_color="0.75",
     path_color="tab:blue",
 ):
     """
-    Draw the current search tree and best path on ``ax``.
+    Draw the current search tree on ``ax``, and the best path once ``reached_goal``.
 
     Returns ``(tree_lines, path_line)`` artist handles for live updates.
     """
@@ -296,7 +298,7 @@ def draw_search_state(
 
     # The path to the goal node, once the goal is reached
     path_line = None
-    path_states = best_path_states(planner)
+    path_states = best_path_states(planner, reached_goal)
     if path_states is not None:
         (path_line,) = ax.plot(
             path_states[:, x_axis],
@@ -414,8 +416,11 @@ def set_limits(ax, planner, x_axis, y_axis):
 
 
 def require_history(planner):
-    """Refuse a planner that recorded no search history; return its history."""
-    history = getattr(planner, "history", None)
+    """Refuse a planner whose latest solution recorded no search history; return that history."""
+    # Lazy import: the planner base loads with the planners, the plots after them
+    from minilink.planning.planner import require_solution
+
+    history = require_solution(planner).record.history
     if not history:
         raise ValueError(
             "No search history recorded; run solve with record_history=True"
@@ -434,10 +439,10 @@ def clear_search_artists(tree_lines, path_line):
         path_line.remove()
 
 
-def best_path_states(planner):
+def best_path_states(planner, reached_goal):
     """The states along the path to the planner's goal node, or ``None`` before the goal."""
     node = getattr(planner, "solution_node", None)
-    if node is None or not getattr(planner, "reached_goal", False):
+    if node is None or not reached_goal:
         return None
 
     if hasattr(planner, "path_states"):
@@ -448,10 +453,10 @@ def best_path_states(planner):
 
 def search_title(step):
     """The live plot's title for one search step."""
-    if step.reached_goal and step.best_cost is not None:
+    if step.reached_goal and step.best_cost_to_come is not None:
         return (
             f"RRT search  phase={step.phase}  iter={step.iteration}  "
-            f"nodes={step.n_nodes}  best cost={step.best_cost:.2f}"
+            f"nodes={step.n_nodes}  best cost={step.best_cost_to_come:.2f}"
         )
 
     return (

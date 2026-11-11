@@ -12,4 +12,4 @@ prog = MathematicalProgram(
     grad_J=lambda z: z - z_bar,
 )
 
-Optimizer(prog, z0=np.zeros(3), method="scipy_slsqp").solve(verbose=True)
+Optimizer(prog, z0=np.zeros(3), method="slsqp").solve(verbose=True)

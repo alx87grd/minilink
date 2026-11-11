@@ -13,6 +13,7 @@ from minilink.analysis.structural import (
     controllability_matrix,
     observability_matrix,
 )
+from minilink.dynamics.abstraction.state_space import require_arrays
 
 # A pencil eigenvalue with |β| below this fraction of |α| is infinite, not a zero:
 # rounding turns the pencil's infinite eigenvalues into finite ones near 1e15
@@ -29,6 +30,7 @@ _INFINITE_ZERO_RATIO = 1e-8
 
 def poles(A):
     """Eigenvalues of ``A``."""
+    require_arrays(A=A)
     A = np.asarray(A, dtype=float)
 
     # A static channel has no pole
@@ -358,6 +360,7 @@ def settling_horizon(A, period=None):
 
 def as_matrices(A, B, C, D):
     """The four matrices as 2-D float arrays; a static channel's empty ``B`` and ``C`` take their shapes from ``D``."""
+    require_arrays(A=A, B=B, C=C, D=D)
     A = np.atleast_2d(np.asarray(A, dtype=float))
     B = np.atleast_2d(np.asarray(B, dtype=float))
     C = np.atleast_2d(np.asarray(C, dtype=float))

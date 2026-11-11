@@ -43,10 +43,10 @@ class HangCost(CostFunction):
 
 def bounded_pendulum(plant=None):
     plant = Pendulum() if plant is None else plant
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
-    plant.state.lower_bound = np.array([-np.pi, -8.0])
-    plant.state.upper_bound = np.array([np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    plant.state.lower = np.array([-np.pi, -8.0])
+    plant.state.upper = np.array([np.pi, 8.0])
     return plant
 
 
@@ -80,14 +80,14 @@ def test_environment_infinite_horizon_truncates_at_the_training_zone_by_default(
     x, t = jnp.zeros(2), 0.0
     for _ in range(2):
         x, t, r, terminated, truncated = env.step(
-            x, t, jnp.zeros(1), jax.random.PRNGKey(0)
+            x, jnp.zeros(1), t, jax.random.PRNGKey(0)
         )
         assert not bool(terminated) and not bool(truncated)
-    x, t, r, terminated, truncated = env.step(x, t, jnp.zeros(1), jax.random.PRNGKey(0))
+    x, t, r, terminated, truncated = env.step(x, jnp.zeros(1), t, jax.random.PRNGKey(0))
     assert bool(truncated) and not bool(terminated)  # episode length reached
     # leaving the training zone: truncated (bootstrap), no charge
     _, _, r_exit, terminated, truncated = env.step(
-        jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
+        jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0, jax.random.PRNGKey(0)
     )
     assert bool(truncated) and not bool(terminated)
     expected = -0.1 * float(env.cost.g(jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0))
@@ -120,11 +120,11 @@ def test_environment_finite_horizon_charges_h_and_the_failure_cost():
     )
     assert env.finite_horizon and env.failure_cost == 50.0
     x, t, r1, terminated, _ = env.step(
-        jnp.zeros(2), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
+        jnp.zeros(2), jnp.zeros(1), 0.0, jax.random.PRNGKey(0)
     )
     assert not bool(terminated)
     x, t, r2, terminated, truncated = env.step(
-        x, t, jnp.zeros(1), jax.random.PRNGKey(0)
+        x, jnp.zeros(1), t, jax.random.PRNGKey(0)
     )
     assert bool(terminated) and not bool(truncated)
     np.testing.assert_allclose(
@@ -132,7 +132,7 @@ def test_environment_finite_horizon_charges_h_and_the_failure_cost():
     )  # the terminal cost h = 1
     # a charged exit: terminated, reward carries the -50 penalty
     _, _, r_exit, terminated, truncated = env.step(
-        jnp.array([3.1, 7.9]), 0.0, jnp.array([4.0]), jax.random.PRNGKey(0)
+        jnp.array([3.1, 7.9]), jnp.array([4.0]), 0.0, jax.random.PRNGKey(0)
     )
     assert bool(terminated) and float(r_exit) < -49.0
 
@@ -148,7 +148,7 @@ def test_neural_policy_controller_normalizes_and_composes():
     u = ctl.action(np.zeros(2))
     assert u.shape == (1,) and -4.0 <= u[0] <= 4.0
     # traces under JAX with an explicit params pytree
-    u_jax = jax.jit(lambda p, x: ctl.action(x, p))(ctl.params, jnp.zeros(2))
+    u_jax = jax.jit(lambda p, x: ctl.action(x, params=p))(ctl.params, jnp.zeros(2))
     np.testing.assert_allclose(np.asarray(u_jax), u, atol=1e-6)
     cl_sys = ctl @ plant
     traj = cl_sys.compute_trajectory(tf=0.2, dt=0.1, verbose=False)
@@ -162,10 +162,12 @@ def test_solve_at_another_tree_trains_the_planner_rebuilt_there_from_its_seed():
     import copy
 
     prob = problem(horizon=np.inf, discount_rate=0.5)
-    settings = dict(dt=0.1, hidden=(8,), n_envs=2, n_steps=16, batch_size=16)
+    settings = dict(
+        dt=0.1, hidden=(8,), n_rollouts=2, n_steps_per_update=16, batch_size=16
+    )
     planner = ReinforcementLearningPlanner(prob, n_epochs=2, **settings)
     tree = copy.deepcopy(planner.params)
-    assert set(tree) == {"method", "seed"}
+    assert set(tree) == {*prob.parts_view(), "method", "seed"}
     tree["method"]["clip_range"] = 0.1
     tree["method"]["optimizer"]["learning_rate"] = 1e-3
     tree["seed"] = 3
@@ -197,13 +199,14 @@ def test_solve_at_another_tree_trains_the_planner_rebuilt_there_from_its_seed():
 def test_planner_learns_returns_a_policy_plan_and_a_controller():
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=32, batch_size=32
+        prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=32, batch_size=32
     )
     assert isinstance(planner.algorithm, PPO)
     assert planner.gamma == 0.99  # undiscounted cost -> the usual default
     solution = planner.solve(n_timesteps=256)
     assert isinstance(solution, PlanningSolution) and solution.success
     assert solution.record.n_timesteps == 256 and solution.record.method == "PPO"
+    assert 0.0 < solution.record.solve_time_s and "solved in" in str(solution.record)
     assert solution.trajectory is None and solution.evaluation is None  # not asked
     assert planner.n_timesteps == 256 and len(planner.history) == 2
     ctl = planner.controller
@@ -216,25 +219,57 @@ def test_planner_learns_returns_a_policy_plan_and_a_controller():
     np.testing.assert_allclose(
         solution.controller.params["mlp"]["W0"], np.asarray(actor["W0"])
     )
-    u, _ = planner.predict(np.zeros((3, 2)))
-    assert u.shape == (3, 1)
+    u = solution.controller.action(np.zeros(2))
+    assert u.shape == (1,)
 
 
-def test_predict_draws_unless_deterministic():
+def test_the_planner_trains_the_actor_it_is_given():
+    prob = problem(horizon=np.inf)
+    actor = NeuralPolicy(prob.sys, hidden=(4,), seed=5)
     planner = ReinforcementLearningPlanner(
-        problem(horizon=np.inf), dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8
+        prob,
+        dt=0.1,
+        actor=actor,
+        hidden=(4,),
+        n_rollouts=2,
+        n_steps_per_update=8,
+        batch_size=16,
     )
+    assert planner.actor is actor and planner.build_kwargs()["actor"] is not actor
+    solution = planner.solve(n_timesteps=16)
+    assert solution.controller is not actor  # the snapshot handed out
+    np.testing.assert_allclose(
+        solution.controller.params["mlp"]["W0"], actor.params["mlp"]["W0"]
+    )
+
+
+def test_the_exploration_policy_draws_around_the_actors_law():
+    planner = ReinforcementLearningPlanner(
+        problem(horizon=np.inf),
+        dt=0.1,
+        hidden=(8, 8),
+        n_rollouts=4,
+        n_steps_per_update=8,
+    )
+    policy = planner.exploration_policy
+    theta = planner.algorithm.params(planner.train_state)["policy"]
     x = np.array([[0.1, 0.0], [-0.2, 0.3], [0.4, -0.1], [0.0, 0.2]])
-    mean_1, _ = planner.predict(x)
-    mean_2, _ = planner.predict(x)
-    draw_1, _ = planner.predict(x, deterministic=False)
-    draw_2, _ = planner.predict(x, deterministic=False)
-    np.testing.assert_array_equal(mean_1, mean_2)
-    assert draw_1.shape == mean_1.shape == (4, 1)
+    mean = np.stack([planner.actor.action(xi) for xi in x])
+    np.testing.assert_array_equal(
+        mean, np.stack([planner.actor.action(xi) for xi in x])
+    )
+
+    def draw(seed, states):
+        key = jax.random.PRNGKey(seed)
+        if states.ndim == 2:
+            key = jax.random.split(key, states.shape[0])
+        return np.asarray(policy.input(policy.sample(theta, jnp.asarray(states), key)))
+
+    draw_1, draw_2 = draw(0, x), draw(1, x)
+    assert draw_1.shape == mean.shape == (4, 1)
     assert not np.array_equal(draw_1, draw_2)
     assert np.all(np.abs(draw_1) <= 4.0)  # mapped onto the input port's bounds
-    one, _ = planner.predict(x[0], deterministic=False)
-    assert one.shape == (1,)
+    assert draw(2, x[0]).shape == (1,)
 
 
 def test_training_reports_only_when_the_verb_asks(capsys):
@@ -242,12 +277,12 @@ def test_training_reports_only_when_the_verb_asks(capsys):
         problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=8,
+        n_rollouts=4,
+        n_steps_per_update=8,
         batch_size=32,
     )
     assert capsys.readouterr().out == ""
-    planner.learn(32, verbose=True)
+    planner.solve(n_timesteps=32, verbose=True)
     logged = capsys.readouterr().out
     assert "ReinforcementLearningPlanner: " in logged and "steps" in logged
     planner.solve(n_timesteps=32)
@@ -266,7 +301,7 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32
+        prob, dt=0.1, n_rollouts=2, n_steps_per_update=16, batch_size=32
     )
     np.testing.assert_allclose(planner.gamma, np.exp(-0.1))
     # the step reward is −g dt, the running cost at the period's start: gamma
@@ -274,8 +309,8 @@ def test_planner_reads_the_problem_discount_and_rejects_bad_batches():
     x = jnp.array([1.0, 0.0])
     u = jnp.zeros(1)
     g0 = float(planner.env.cost.g(x, u, 0.0))
-    _, _, r0, _, _ = planner.env.step(x, 0.0, u, jax.random.PRNGKey(0))
-    _, _, r_later, _, _ = planner.env.step(x, 5.0, u, jax.random.PRNGKey(0))
+    _, _, r0, _, _ = planner.env.step(x, u, 0.0, jax.random.PRNGKey(0))
+    _, _, r_later, _, _ = planner.env.step(x, u, 5.0, jax.random.PRNGKey(0))
     np.testing.assert_allclose(float(r0), -g0 * 0.1, atol=1e-6)
     np.testing.assert_allclose(float(r_later), float(r0), atol=1e-6)
     with pytest.raises(ValueError):
@@ -291,7 +326,9 @@ def test_the_discount_has_one_owner_and_an_announced_default():
         x0=Uniform([-0.5, -0.5], [0.5, 0.5]),
         discount_rate=1.0,
     )
-    small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32)
+    small = dict(
+        dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=8, batch_size=32
+    )
 
     def build(prob, **kwargs):
         with warnings.catch_warnings(record=True) as caught:
@@ -321,7 +358,9 @@ def test_the_discount_has_one_owner_and_an_announced_default():
 def test_the_solutions_run_is_the_undisturbed_loop_from_the_start():
     from minilink.planning.results import drawn_trajectory_of
 
-    small = dict(dt=0.1, hidden=(8, 8), n_envs=4, n_steps=8, batch_size=32)
+    small = dict(
+        dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=8, batch_size=32
+    )
 
     # no disturbance port: the law from the start, no draw consumed
     prob = problem(horizon=np.inf)
@@ -352,8 +391,8 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
         problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=16,
+        n_rollouts=4,
+        n_steps_per_update=16,
         batch_size=32,
         episode_length=0.5,  # episodes end inside a collection: the record's cost is a number
     )
@@ -368,11 +407,13 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
         n_trials=4,
         key=0,
         backend="jax",
-        episode_length=planner.env.tf,
+        episode_length=planner.env.episode_length,
     )
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
-    assert np.isfinite(solution.record.cost) and "plant steps" in str(solution.record)
-    assert solution.record.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
+    assert np.isfinite(solution.record.mean_episode_cost) and "plant steps" in str(
+        solution.record
+    )
+    assert solution.record.history[-1]["J"] == -planner.history[-1]["ep_return_mean"]
     assert "feedback" in str(solution)
     # the critic estimates the training discount, not the problem's: no cost-to-go
     assert solution.cost_to_go is None
@@ -384,10 +425,10 @@ def test_plain_planning_problem_trains_from_its_single_start():
         plant, x0=[0.2, 0.0], cost=HangCost(), horizon=np.inf, U=plant.input_box
     )
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, n_envs=2, n_steps=16, batch_size=32
+        prob, dt=0.1, n_rollouts=2, n_steps_per_update=16, batch_size=32
     )
     np.testing.assert_allclose(np.asarray(planner.carry[0]), [[0.2, 0.0], [0.2, 0.0]])
-    planner.learn(32)
+    planner.solve(n_timesteps=32)
     assert planner.n_timesteps == 32
 
 
@@ -430,8 +471,8 @@ def test_sac_trains_through_the_same_planner_loop():
         dt=0.1,
         hidden=(8, 8),
         method="sac",
-        n_envs=2,
-        n_steps=8,
+        n_rollouts=2,
+        n_steps_per_update=8,
         batch_size=16,
         learning_starts=16,
         buffer_size=64,
@@ -439,7 +480,9 @@ def test_sac_trains_through_the_same_planner_loop():
     )
     assert isinstance(planner.algorithm, SAC) and not planner.algorithm.on_policy
     assert planner.actor.squash == "tanh"
-    planner.learn(48)  # three collections: fill the buffer, then two update rounds
+    planner.solve(
+        n_timesteps=48
+    )  # three collections: fill the buffer, then two update rounds
     assert planner.replay.size == 48
     assert "critic_loss" in planner.history[-1] and "alpha" in planner.history[-1]
     u = planner.actor.action(np.zeros(2))
@@ -468,10 +511,10 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
 
         def __init__(self):
             super().__init__(state_dim=3, input_dim=3, output_dim=3)
-            self.state.lower_bound = -2.0 * np.ones(3)
-            self.state.upper_bound = 2.0 * np.ones(3)
-            self.inputs["u"].lower_bound = -np.ones(3)
-            self.inputs["u"].upper_bound = np.ones(3)
+            self.state.lower = -2.0 * np.ones(3)
+            self.state.upper = 2.0 * np.ones(3)
+            self.inputs["u"].lower = -np.ones(3)
+            self.inputs["u"].upper = np.ones(3)
 
         def f(self, x, u, t=0.0, params=None):
             return 1.0 * u
@@ -492,8 +535,8 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
             hidden=(8,),
             method=sac,
             gamma=0.99,
-            n_envs=2,
-            n_steps=8,
+            n_rollouts=2,
+            n_steps_per_update=8,
         )
 
     def sac():
@@ -504,8 +547,8 @@ def test_sac_reused_across_plants_targets_each_plant_input_dimension():
     assert reused.target_entropy is None  # the user's choice, kept
     planner = sac_planner(three_inputs, reused)
     fresh = sac_planner(three_inputs, sac())
-    planner.learn(32)
-    fresh.learn(32)
+    planner.solve(n_timesteps=32)
+    fresh.solve(n_timesteps=32)
     np.testing.assert_allclose(
         np.asarray(planner.train_state["log_alpha"]),
         np.asarray(fresh.train_state["log_alpha"]),
@@ -555,7 +598,7 @@ def test_neural_closed_loop_compiles_and_differentiates_under_jax():
 def test_solve_reports_the_monte_carlo_score_and_rejects_other_criteria():
     prob = problem(horizon=np.inf)
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32
+        prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=16, batch_size=32
     )
     solution = planner.solve(n_timesteps=64, evaluate=True, n_trials=4)
     assert np.isfinite(solution.evaluation.mean) and solution.success
@@ -585,7 +628,7 @@ def test_planner_trains_with_randomized_parameters():
         U=plant.input_box,
     )
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32
+        prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=16, batch_size=32
     )
     assert (
         planner.env.randomizes_params
@@ -593,7 +636,7 @@ def test_planner_trains_with_randomized_parameters():
     )
     episode = planner.carry[3]
     assert set(np.unique(np.asarray(episode["plant"]["m"]))) <= {0.5, 2.0}
-    planner.learn(64)
+    planner.solve(n_timesteps=64)
     assert np.all(np.isfinite(np.asarray(planner.carry[0])))
 
 
@@ -607,10 +650,10 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
 
     plant = bounded_pendulum()
     inner = StateFeedback(K=[[20.0, 4.0]], x_bar=[0.0, 0.0]) @ plant
-    inner.inputs["r"].lower_bound = np.array([-1.0, -2.0])
-    inner.inputs["r"].upper_bound = np.array([1.0, 2.0])
-    inner.state.lower_bound = plant.state.lower_bound
-    inner.state.upper_bound = plant.state.upper_bound
+    inner.inputs["r"].lower = np.array([-1.0, -2.0])
+    inner.inputs["r"].upper = np.array([1.0, 2.0])
+    inner.state.lower = plant.state.lower
+    inner.state.upper = plant.state.upper
     assert "u" not in inner.inputs and list(inner.inputs) == ["r"]
 
     prob = PlanningProblem(
@@ -632,10 +675,10 @@ def test_outer_loop_on_an_inner_loop_with_nested_params():
     assert inner.params["plant"]["m"] == 1.0  # untouched
 
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32
+        prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=16, batch_size=32
     )
     assert planner.env.action_port == "r" and planner.env.m == 2
-    planner.learn(64)
+    planner.solve(n_timesteps=64)
     ctl = planner.actor
     u = ctl.action(np.zeros(2))
     assert u.shape == (2,) and -1.0 <= u[0] <= 1.0 and -2.0 <= u[1] <= 2.0
@@ -649,10 +692,10 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
     class Explosive(DynamicSystem):
         def __init__(self):
             super().__init__(state_dim=1, input_dim=1, output_dim=1)
-            self.inputs["u"].lower_bound = np.array([-1.0])
-            self.inputs["u"].upper_bound = np.array([1.0])
-            self.state.lower_bound = np.array([-10.0])
-            self.state.upper_bound = np.array([10.0])
+            self.inputs["u"].lower = np.array([-1.0])
+            self.inputs["u"].upper = np.array([1.0])
+            self.state.lower = np.array([-10.0])
+            self.state.upper = np.array([10.0])
 
         def f(self, x, u, t=0.0, params=None):
             return 1e6 * x  # stiff enough to overflow an RK4 step of 1 s
@@ -672,7 +715,7 @@ def test_a_step_that_blows_up_ends_the_episode_finitely():
     )
     env = RolloutEnvironment(prob, dt=1.0, episode_length=5.0)
     x_next, t, r, terminated, truncated = env.step(
-        jnp.array([1.0]), 0.0, jnp.zeros(1), jax.random.PRNGKey(0)
+        jnp.array([1.0]), jnp.zeros(1), 0.0, jax.random.PRNGKey(0)
     )
     assert (
         bool(jnp.all(jnp.isfinite(x_next)))
@@ -693,24 +736,31 @@ def test_reinforce_and_actor_critic_train_through_the_same_planner(algorithm):
         dt=0.1,
         hidden=(8, 8),
         method=algorithm,
-        n_envs=4,
-        n_steps=16,
+        n_rollouts=4,
+        n_steps_per_update=16,
         episode_length=0.5,
     )
     expected = {"reinforce": REINFORCE, "actor_critic": ActorCritic}[algorithm]
     assert isinstance(planner.algorithm, expected) and planner.algorithm.on_policy
     if algorithm == "reinforce":
-        assert planner.critic is None and planner.n_steps == 5  # one episode length
+        # one episode length
+        assert planner.critic is None and planner.n_steps_per_update == 5
     else:
-        assert planner.critic is not None and planner.n_steps == 16
+        assert planner.critic is not None and planner.n_steps_per_update == 16
     before = np.asarray(planner.actor.params["mlp"]["W0"]).copy()
-    planner.learn(2 * planner.n_steps * planner.n_envs)
+    planner.solve(n_timesteps=2 * planner.n_steps_per_update * planner.n_rollouts)
     assert len(planner.history) == 2
     assert not np.array_equal(planner.actor.params["mlp"]["W0"], before)
-    solution = planner.solve(n_timesteps=planner.n_steps * planner.n_envs)
+    solution = planner.solve(
+        n_timesteps=planner.n_steps_per_update * planner.n_rollouts
+    )
     assert (
         solution.success and solution.record.method == type(planner.algorithm).__name__
     )
+    # a solve continues the training where the last one stopped
+    per_update = planner.n_steps_per_update * planner.n_rollouts
+    assert solution.record.n_timesteps == planner.n_timesteps == 3 * per_update
+    assert len(planner.history) == 3
 
 
 def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
@@ -732,8 +782,11 @@ def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
         G = reward[k] + gamma * G * (1.0 - done[k])
         returns.append(G)
     returns = jnp.stack(returns[::-1])
+    # The two sums accumulate in another order: equal to the draws' precision
+    # (float32 when the test runs before anything enables JAX's float64)
+    rtol = max(1e-7, 10 * float(jnp.finfo(reward.dtype).eps))
     np.testing.assert_allclose(
-        gae(delta, done, gamma, 1.0), returns - value, atol=1e-12
+        gae(delta, done, gamma, 1.0), returns - value, rtol=rtol, atol=1e-12
     )
     # the Monte Carlo return of an episode stops at its end
     R = returns_to_go(reward, done, gamma)
@@ -746,8 +799,8 @@ def test_stochastic_policy_and_critics_take_one_state_or_a_batch():
         problem(horizon=np.inf),
         dt=0.1,
         hidden=(8,),
-        n_envs=2,
-        n_steps=8,
+        n_rollouts=2,
+        n_steps_per_update=8,
         batch_size=16,
     )
     pi, V = planner.exploration_policy, planner.critic
@@ -775,10 +828,10 @@ def test_numpy_and_jax_environments_take_the_same_step():
     env_np = RolloutEnvironment(prob, dt=0.1, episode_length=1.0, backend="numpy")
     x, u = np.array([0.3, -0.2]), np.array([1.5])
     x_jax, t_jax, r_jax, term_jax, trunc_jax = env_jax.step(
-        jnp.asarray(x), 0.0, jnp.asarray(u), jax.random.PRNGKey(0)
+        jnp.asarray(x), jnp.asarray(u), 0.0, jax.random.PRNGKey(0)
     )
     x_np, t_np, r_np, term_np, trunc_np = env_np.step(
-        x, 0.0, u, np.random.default_rng(0)
+        x, u, 0.0, np.random.default_rng(0)
     )
     np.testing.assert_allclose(np.asarray(x_jax), x_np, atol=1e-12)
     np.testing.assert_allclose(float(r_jax), float(r_np), atol=1e-12)
@@ -795,7 +848,7 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
         discount_rate=1.0,
     )
     planner = ReinforcementLearningPlanner(
-        prob, dt=0.1, hidden=(8, 8), n_envs=4, n_steps=16, batch_size=32
+        prob, dt=0.1, hidden=(8, 8), n_rollouts=4, n_steps_per_update=16, batch_size=32
     )
     solution = planner.solve(n_timesteps=64)
     x = np.array([0.2, 0.0])
@@ -818,8 +871,8 @@ def test_cost_to_go_comes_from_the_critic_only_when_the_discounts_match():
         prob,
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=16,
+        n_rollouts=4,
+        n_steps_per_update=16,
         batch_size=32,
         gamma=0.5,
     )
@@ -838,8 +891,8 @@ def test_the_planner_trains_on_a_substepped_step_model():
         dt=0.1,
         substeps=2,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=8,
+        n_rollouts=4,
+        n_steps_per_update=8,
         batch_size=32,
     )
     solution = planner.solve(n_timesteps=32)
@@ -895,8 +948,8 @@ def test_the_collector_draws_each_episode_at_its_own_policy_seed():
         dt=0.1,
         episode_length=0.3,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=8,
+        n_rollouts=4,
+        n_steps_per_update=8,
         batch_size=32,
     )
     seeds = np.asarray(planner.carry[4])
@@ -907,7 +960,9 @@ def test_the_collector_draws_each_episode_at_its_own_policy_seed():
 
 def test_the_record_states_a_training_discount_that_is_not_the_scored_one():
     """The problem's discount by default; an override is a training choice the record names."""
-    kwargs = dict(dt=0.1, hidden=(8, 8), n_envs=2, n_steps=8, batch_size=16)
+    kwargs = dict(
+        dt=0.1, hidden=(8, 8), n_rollouts=2, n_steps_per_update=8, batch_size=16
+    )
     prob = problem(horizon=np.inf, discount_rate=0.5)
     derived = ReinforcementLearningPlanner(prob, **kwargs).solve(n_timesteps=16).record
     assert derived.gamma == derived.scored_gamma == np.exp(-prob.discount_rate * 0.1)
@@ -927,7 +982,7 @@ def test_environment_reward_stays_finite_when_a_step_blows_up():
     )
     env.model.transition_at = lambda x, u, t, tree: (np.array([np.inf, 0.0]), np.inf)
     x = np.array([0.1, 0.0])
-    x_next, _, reward, terminated, _ = env.step(x, 0.0, np.array([0.0]), None)
+    x_next, _, reward, terminated, _ = env.step(x, np.array([0.0]), 0.0, None)
     assert np.all(np.isfinite(x_next)) and np.isfinite(reward) and bool(terminated)
 
 
@@ -937,8 +992,8 @@ def test_training_again_leaves_an_earlier_solution_as_it_was():
         problem(horizon=np.inf),
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=32,
+        n_rollouts=4,
+        n_steps_per_update=32,
         batch_size=32,
     )
     first = planner.solve(n_timesteps=128)
@@ -961,10 +1016,10 @@ class GridWalker(StepSystem):
 
     def __init__(self):
         super().__init__(state_dim=2, input_dim=2, output_dim=2)
-        self.state.lower_bound[:] = [0.0, 0.0]
-        self.state.upper_bound[:] = [6.0, 6.0]
-        self.inputs["u"].lower_bound[:] = [-1.0, -1.0]
-        self.inputs["u"].upper_bound[:] = [1.0, 1.0]
+        self.state.lower[:] = [0.0, 0.0]
+        self.state.upper[:] = [6.0, 6.0]
+        self.inputs["u"].lower[:] = [-1.0, -1.0]
+        self.inputs["u"].upper[:] = [1.0, 1.0]
 
     def step(self, x, u, k=0, params=None):
         xp = array_module(x)
@@ -1007,7 +1062,12 @@ def grid_world(**fields):
 def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     problem = grid_world(gamma=0.9)
     planner = ReinforcementLearningPlanner(
-        problem, n_envs=8, n_steps=32, hidden=(32,), episode_length=12, seed=0
+        problem,
+        n_rollouts=8,
+        n_steps_per_update=32,
+        hidden=(32,),
+        episode_length=12,
+        seed=0,
     )
 
     # The environment reads the step model: ticks of 1, its γ, its cost bound over an episode
@@ -1029,7 +1089,7 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     assert solution.success and solution.record.reward == "stage"
     assert solution.record.gamma == solution.record.scored_gamma == 0.9
     assert solution.cost_to_go is not None
-    assert trained.signals["cost"][0, -1] < untrained.signals["cost"][0, -1]
+    assert trained.signals["J"][0, -1] < untrained.signals["J"][0, -1]
     assert np.max(np.abs(trained.x[:, -1] - [5.0, 3.0])) < np.max(
         np.abs(untrained.x[:, -1] - [5.0, 3.0])
     )
@@ -1038,15 +1098,19 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     # read as a block
     scored = planner.solve(n_timesteps=256, evaluate=True)
     assert scored.evaluation.n_trials == 1 and scored.trajectory is None
-    J = score(scored.controller).signals["cost"][0, -1]
+    J = score(scored.controller).signals["J"][0, -1]
     assert float(scored.evaluation.J[0]) == J
-    assert problem.rollout(scored.controller, n_steps=12).signals["cost"][0, -1] == J
+    assert problem.rollout(scored.controller, n_steps=12).signals["J"][0, -1] == J
 
 
 def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():
     with pytest.warns(UserWarning, match="ticks; declare gamma on the step problem"):
         planner = ReinforcementLearningPlanner(
-            grid_world(), n_envs=2, n_steps=8, hidden=(4,), episode_length=6
+            grid_world(),
+            n_rollouts=2,
+            n_steps_per_update=8,
+            hidden=(4,),
+            episode_length=6,
         )
     assert planner.gamma == 0.99 and planner.env.model.gamma == 1.0
     with pytest.raises(ValueError, match="own clock"):

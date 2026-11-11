@@ -27,18 +27,15 @@ from minilink.optimization.mathematical_program import MathematicalProgram
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
-    ShootingOptions,
     ShootingTranscription,
 )
 
@@ -70,7 +67,7 @@ class TrajectoryOptimizationBenchmarkVariant:
     precision: str = "n/a"
     start: str = "cold"
     optimizer_backend: str = "scipy"
-    optimizer_method: str = "scipy_slsqp"
+    optimizer_method: str = "slsqp"
     optimizer_options: Mapping[str, object] = field(default_factory=dict)
     use_hessian: bool = False
 
@@ -275,7 +272,7 @@ def default_trajectory_optimization_solver_variants(
             backend="numpy",
             derivative="finite-diff",
             optimizer_backend="scipy",
-            optimizer_method="scipy_slsqp",
+            optimizer_method="slsqp",
         ),
     ]
 
@@ -288,7 +285,7 @@ def default_trajectory_optimization_solver_variants(
                 derivative="jax",
                 precision="x64",
                 optimizer_backend="scipy",
-                optimizer_method="scipy_slsqp",
+                optimizer_method="slsqp",
             )
         )
         if include_trust_constr:
@@ -300,7 +297,7 @@ def default_trajectory_optimization_solver_variants(
                     derivative="jax",
                     precision="x64",
                     optimizer_backend="scipy",
-                    optimizer_method="scipy_trust_constr",
+                    optimizer_method="trust-constr",
                     use_hessian=True,
                 )
             )
@@ -511,7 +508,7 @@ def _run_trajopt_variant(
         nit=solution.stats.get("nit"),
         nfev=solution.stats.get("nfev"),
         njev=solution.stats.get("njev"),
-        cost=solution.cost,
+        cost=solution.J,
         eq_inf=max_eq,
         min_ineq=min_ineq,
         bound_inf=max_bound,
@@ -595,15 +592,11 @@ def _transcription(
     config: TrajectoryOptimizationBenchmarkConfig,
 ):
     if variant.transcription == "collocation":
-        return DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        return DirectCollocationTranscription(n_steps=config.n_steps)
     if variant.transcription == "shooting":
-        return ShootingTranscription(ShootingOptions(n_steps=config.n_steps))
+        return ShootingTranscription(n_steps=config.n_steps)
     if variant.transcription == "multiple_shooting":
-        return MultipleShootingTranscription(
-            MultipleShootingOptions(n_steps=config.n_steps)
-        )
+        return MultipleShootingTranscription(n_steps=config.n_steps)
     raise NotImplementedError(f"Unknown transcription {variant.transcription!r}")
 
 
@@ -611,7 +604,7 @@ def _optimizer_options(
     variant: TrajectoryOptimizationBenchmarkVariant,
     config: TrajectoryOptimizationBenchmarkConfig,
 ) -> dict[str, object]:
-    if variant.optimizer_method == "scipy_trust_constr":
+    if variant.optimizer_method == "trust-constr":
         return {
             "maxiter": int(config.maxiter),
             "xtol": float(config.ftol),
@@ -629,7 +622,7 @@ def _optimizer_options(
             **dict(variant.optimizer_options),
         }
 
-    if variant.optimizer_method != "scipy_slsqp":
+    if variant.optimizer_method != "slsqp":
         raise NotImplementedError(
             f"Unknown optimizer method {variant.optimizer_method!r}"
         )
@@ -653,15 +646,11 @@ def _warm_initial_trajectory(
     if jax_trajopt_available():
         configure_jax(enable_x64=True)
         problem = _cartpole_problem(CartPole(), tf=config.tf)
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        transcription = DirectCollocationTranscription(n_steps=config.n_steps)
         backend = "jax"
     else:
         problem = _cartpole_problem(CartPole(), tf=config.tf)
-        transcription = DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=config.n_steps)
-        )
+        transcription = DirectCollocationTranscription(n_steps=config.n_steps)
         backend = "numpy"
 
     planner = TrajectoryOptimizationPlanner(
@@ -687,8 +676,8 @@ def _warm_optimizer_options(
 
 
 def _cartpole_problem(sys, *, tf: float) -> PlanningProblem:
-    sys.inputs["u"].lower_bound[0] = -10.0
-    sys.inputs["u"].upper_bound[0] = 10.0
+    sys.inputs["u"].lower[0] = -10.0
+    sys.inputs["u"].upper[0] = 10.0
 
     x0 = np.array([-2.0, 1.0, 0.0, 0.0])
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])

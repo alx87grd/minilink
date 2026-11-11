@@ -123,7 +123,7 @@ class PurePursuit(System):
         # L_d = L₀ + k_v |vx| further along it
         s, _ = path.project(p, params=path_params)
         L_d = L_0 + k_v * xp.abs(vx)
-        p_t = path.sample(s + L_d, params=path_params)
+        p_t = path.at(s + L_d, params=path_params)
 
         # The target in the car's frame at the rear axle, (x_t, y_t) = Rᵀ(θ) (p_t − p)
         x_t = c_t * (p_t[0] - p[0]) + s_t * (p_t[1] - p[1])
@@ -159,7 +159,7 @@ class PurePursuit(System):
         p = xp.array([X - b * xp.cos(theta), Y - b * xp.sin(theta)])
         s, _ = path.project(p, params=path_params)
         L_d = L_0 + k_v * xp.abs(vx)
-        p_t = path.sample(s + L_d, params=path_params)
+        p_t = path.at(s + L_d, params=path_params)
 
         return p_t
 

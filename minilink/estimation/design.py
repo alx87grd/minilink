@@ -1,14 +1,13 @@
 """State-observer design: a model or arrays in, a ``StateObserver`` out, the duals of the state-feedback designs."""
 
-import re
-
 import numpy as np
 
 from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import care, require_weight
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
-from minilink.estimation.observer import StateObserver
+from minilink.dynamics.abstraction.state_space import require_arrays
+from minilink.estimation.observer import StateObserver, require_continuous_observer
 
 ###############################################################################
 # Public API
@@ -17,6 +16,7 @@ from minilink.estimation.observer import StateObserver
 
 def luenberger_gain(A, C, poles):
     """Return the observer gain ``L`` that puts the eigenvalues of ``A − L C`` at ``poles``."""
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
 
@@ -32,6 +32,7 @@ def luenberger_gain(A, C, poles):
 
 def kalman_gain(A, C, Q_n, R_n):
     """Return the Kalman gain ``L`` of the stationary filter for process noise ``Q_n`` and measurement noise ``R_n``."""
+    require_arrays(A=A, C=C)
     A = np.asarray(A, dtype=float)
     C = np.atleast_2d(np.asarray(C, dtype=float))
     Q_n = np.asarray(Q_n, dtype=float)
@@ -53,9 +54,10 @@ def luenberger(
 ):
     """Design an observer for ``sys`` by pole placement and return a ``StateObserver``.
 
-    ``sys`` is a linear model, used as is with the operating point it carries,
-    or any plant, linearized first about its command port at ``(x_bar, u_bar)``,
-    the nominal state and inputs when omitted. The block runs the model about
+    ``sys`` is a linear model, used as is with the operating point it carries
+    (the origin of an ``LTISystem``), or any plant, linearized first about its
+    command port at ``(x_bar, u_bar)``, the nominal state and inputs when
+    omitted. The block runs the model about
     that point and corrects it with ``L (y − ŷ)``, so the estimation error has
     the requested poles. Arguments as in :func:`~minilink.control.design.lqr`,
     with ``poles`` in place of ``Q, R``. On arrays the gain is
@@ -64,11 +66,13 @@ def luenberger(
     The observer reads the plant's output ``y``: a plant without one is
     refused (make the sensor part of the plant box, ``plant >> Gain(...)``),
     and a design on another output is made on ``linearize(plant, x_bar,
-    of=...)``.
+    of=...)``. The observer is continuous: a step or sampled system is refused
+    (``luenberger_gain`` on its matrices places the poles in ``z``).
     """
     model = design_model(
         sys, x_bar, u_bar, t, params, method=method, eps=eps, measured=True
     )
+    require_continuous_observer(model)
     A = model.A()
     C = model.C()
 
@@ -127,32 +131,11 @@ def require_observable(obsv, n):
 
 
 def build_observer(model, L, name):
-    """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
-    labels = [hat(label) for label in model.state.labels]
-
-    observer = StateObserver(
-        model.A(),
-        model.B(),
-        model.C(),
-        L,
-        model.D(),
-        x_bar=model.x_bar,
-        u_bar=model.u_bar,
-        y_bar=model.y_bar,
-        labels=labels,
-    )
+    """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point."""
+    observer = StateObserver(model, L)
     observer.name = name
 
     return observer
-
-
-def hat(label):
-    """``θ`` -> ``θ̂``, ``x[0]`` -> ``x̂[0]``, ``theta`` -> ``theta_hat``; a linearized model's ``Delta θ`` reads as its plant's label."""
-    label = label.removeprefix("Delta ")
-    component = re.fullmatch(r"(.)\[(\d+)\]", label)
-    if component:
-        return f"{component[1]}̂[{component[2]}]"
-    return f"{label}̂" if len(label) == 1 else f"{label}_hat"
 
 
 if __name__ == "__main__":

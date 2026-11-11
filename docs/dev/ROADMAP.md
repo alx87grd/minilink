@@ -231,6 +231,331 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `forward_differential_kinematic_effector` is gone.
   - Also: a one-line `repr` on systems, sets, fields, costs, laws and the `Optimizer`;
     refusals that name what to pass; `SumCost.g_max` / `h_max` index their terms as `g` does.
+- 2026-11-10 (the API settled before the demo rebuild, branch `api-settle`, for `0.4.0`; every
+  notebook migrated in the same commits, no alias):
+  - *Subsystem, the one word for a system placed in a diagram.* `print(diagram)` lists
+    `subsystems:` (it said `blocks:`); `get_subsys_input_port` → `get_subsystem_input_port`,
+    `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning,
+    the standard components of `minilink.blocks`.
+  - *Solver names.* `Simulator` and `compute_trajectory` take the step model's words, as
+    `discretize`, the evaluators and the sampled loop do: `solver="rk4_fixedsteps"` →
+    `"rk4"`, `"euler_fixedsteps"` → `"euler"`, both fixed-step; the variable-step Euler is
+    gone, and a non-uniform grid on a fixed-step solver is refused, naming `solver="scipy"`
+    or a uniform `dt`. The SciPy presets are unchanged.
+  - *A set's `margin` takes its member first, on every set* (`X.margin(x, t)`,
+    `U.margin(u, x, t)`), now written in CONSTITUTION §2; a box, a ball or a singleton refuses
+    a member of another size (`Pendulum().input_box.margin(x, u)` returned four numbers).
+  - *The author's reads.* `sys.get_port_values_from_u(u, "r", "y")` → `sys.ports(u, "r", "y")`
+    (the same three return forms: every port as a dict, one port, a tuple of several);
+    `traj.get_signal(name)` → `traj.signal(name)`.
+  - *The transcriptions take their interval count.*
+    `DirectCollocationTranscription(DirectCollocationOptions(n_steps=20))` →
+    `DirectCollocationTranscription(n_steps=20)`, the same for `ShootingTranscription` and
+    `MultipleShootingTranscription`; the option records are gone, and the grid
+    (`t(problem)`, `dt(problem)`, `n_knots`) is read on the transcription.
+  - *Every count is `n_<thing>`.* A compiled planner's `status["iterations"]` →
+    `status["n_iterations"]` (trajectory optimization, MPPI, the MPC's verbose line);
+    `MPPIRecord.effective_samples` → `effective_rollouts`; `StateSpaceGrid.nodes_n`,
+    `actions_n` → `n_nodes`, `n_actions`; `LyapunovCertificate.verify(n=)` →
+    `verify(n_rollouts=)`, and its plots' `n=` (`certificate.plot`,
+    `plot_region_of_attraction`) → `n_samples=`.
+  - *The plots' keywords.* `plot_sampled_futures(axes=("t", 0))` →
+    `plot_sampled_futures(x_axis="t", y_axis=0)`; value iteration's
+    `plot_control_law(axis=)` → `u_axis=`, as every other control-law plot, and its title
+    reads "Control law u[0]"; the animations write a file with `file_name=` (RRT's
+    `animate_search` and `animate_convergence` took `save=`, value iteration's
+    `animate_cost_to_go` and `animate_control_law` took `save_path=`);
+    `StateSpaceGrid.plot_value` → `plot_cost_to_go`.
+  - *`tf` is an absolute end time.* `DynamicProgrammingPlanner.final_time` → `planner.tf` (the
+    problem's `t0 + horizon`); where a length was called `tf`, it is `horizon` or
+    `episode_length`: `RolloutEnvironment.tf` → `env.episode_length`, and DESIGN's scoring
+    formula reads `e^{−ρ horizon} h(x(t_end), t_end)` with `t_end = t0 + horizon` (the
+    internal `score_run(horizon=)`, `planner_evidence(episode_length=)`, `steps_of(horizon,
+    dt)` with it).
+  - *Exported.* `DiscreteLTISystem`, the pure difference equation (a step linearization's
+    deviation model), is on `minilink.dynamics` beside `LTISystem` (its `period=` then went,
+    ruling Q1 below).
+  - *One signature order, the model's `(x, u, t; p)`.* `RolloutEnvironment.step(x, t, u, key,
+    params)` → `step(x, u, t, key, params=None)`; `LookupPolicy.action(x, params=None, *,
+    t=0.0)` and `NeuralPolicy.action(x, params=None)` → `action(x, t=0.0, params=None)`
+    (pass `params=` by keyword).
+  - *A word per idea.* `MPPIPlanner.method` (its dict of numbers, `params["method"]`'s
+    defaults) → `planner.method_numbers`; `TabularLearningPlanner(eta=)` and `.eta` →
+    `learning_rate` (the `params["method"]` key with them), as the `Optimizer`'s;
+    `ReinforcementLearningPlanner.train_time` → `train_time_s`, as its record;
+    `TrajectoryOptimizationRecord.solver_success` → `optimizer_success`.
+  - *The optimizer's native numbers are keywords.* `Optimizer(program, method="gd",
+    options={"maxiter": 5, "gtol": 1e-6})` → `Optimizer(program, method="gd",
+    max_iterations=5, tol=1e-6)` (Adam's `max_grad_norm` too); `options=` is refused on `gd`
+    and `adam` and stays the external solver's dict (SciPy, Ipopt); trajectory optimization
+    takes `max_iterations=` and `tol=` on a native method the same way.
+    `OptimizationResult.n_iterations` reads `stats["nit"]`; `stats["algorithm"]` →
+    `stats["method"]`.
+  - *One word per idea, on the runs and the sources.* `step_sys.plot_rollout(rollout=)` →
+    `plot_rollout(traj=)`; `compute_trajectory(u=…, input_port_id="left")` and
+    `Simulator.solve(input_port_id=)` → `port="left"`, as the blocks say; the hold between
+    samples is one keyword and two words on the three tools that read it:
+    `TrajectorySource(t, u, interpolation="previous")` → `TrajectorySource(t, u, hold="zoh")`
+    (`"linear"` the default, `from_trajectory(hold=)` with it, `source.hold` the attribute),
+    and the step model's `evaluator.rollout(…, hold="foh")` → `hold="linear"`, as the noise
+    sources already said.
+  - *Keyword-only where every sibling already is.* `PlanningProblem(sys, *, x0=, cost=, …)`;
+    a system's `compile(*, backend=, verbose=)` (`plant.compile("jax")` →
+    `plant.compile(backend="jax")`, the module function `compile(system, *, backend=, …)`
+    with it); `sys.animate(traj=None, *, speed=, …)` and `sys.render(x, u, t, *, is_3d=, …)`;
+    `MLP(input_dim, output_dim, *, hidden=, …)`; `Sys2Gym(sys, cost, *, dt=, …)`;
+    `NativeSampledSystem(state_dim=0, *, sample_period=, input_dim=, expose_state=)`, the
+    port shortcuts of a `System` but the output, declared in seconds (`output_dim=` then
+    added, ruling Q6 below). The reverse:
+    `evaluate(problem, controller, dt=None, *, …)` takes `dt` by position, as
+    `problem.compile(controller, dt)` does.
+  - *Removed: no caller, or against a rule.* `validate=` on `feedback`, `closed_loop` and
+    `autowire` (it switched off the algebraic-loop check, which now always runs);
+    `PlanningProblem.has_goal` and `has_cost` (write `problem.Xf is not None`,
+    `problem.cost is not None`); the `COMPILE_BACKEND_AUTO` re-export of
+    `minilink.simulation.simulator` (`backend="auto"`); `InputPort.get_default_value()` and
+    `signal.set_nominal_value(v)` (read `port.nominal_value`, assign
+    `signal.nominal_value = v`); `RRTPlanner.reached_goal` and `.iterations`, and RRT*'s,
+    copies of the record (`solution.record.reached_goal`, `solution.record.n_iterations`);
+    the comparison's record `GivenPolicy` → `GivenController`.
+  - *Library-internal helpers, one name each.* The problem's five checks (`coerce_horizon`,
+    `coerce_state`, `require_type`, `check_state_shape`, `require_member`) and the
+    `Optimizer`'s `start_vector`, `decision_vector` and solve panel
+    (`print_program_preamble`, `print_program_report`) are module functions, no longer
+    methods; `steps_of`, `planner_parts` and `require_cost_to_go` have one body each (MPPI's
+    refusal of a `dt` that does not divide the horizon now says `dt=… must divide the horizon
+    …`); MPPI's episode tree is `episode_leaves` and the step problem's check
+    `coerce_n_steps`, beside `problem_leaves` and `coerce_horizon`. A sampled block's
+    predicates read as questions: `SampledSystem.counts` → `is_tick_law`, `resolves` →
+    `is_integrated`; `minilink.core.sets.is_bounded(box)` → `has_finite_face(box)`.
+  - *The drawing shortcuts write their keywords out.* `sys.plot_input_output_map(…)`,
+    `sys.plot_control_law(…)` and a sampled loop's `animate(…)` take the named keywords of the
+    function they draw with, so an editor shows them (a misspelt keyword is refused at the call);
+    `plot_diagram(show_inline=True)` → `plot_diagram(show="inline")`, `show_pdf=True` →
+    `show="pdf"`, `show="window"` the Matplotlib window; `show=True` still picks the place
+    (inline in a notebook, a window in a script) and `show=False` builds the graph only.
+  - *The impedance laws take the PID family's signature* (the maintainer's ruling 9):
+    `Impedance(dof=1, *, Kp=10.0, Kd=1.0, …)` → `Impedance(Kp=10.0, Kd=1.0, *, dim=1,
+    tracking_ref=False, …)` and `IntegralImpedance(Kp, Ki, Kd, *, dim=1, …)`, so
+    `Impedance(10.0)` is a stiffness of 10, no longer a 10-axis block; `dof=` → `dim=` and the
+    attribute `.dof` → `.dim`, as `PD(Kp, Kd, *, dim=1)`. `JointImpedance` and
+    `TaskImpedance` take the plant and keep its `dof` (a manipulator's joints).
+  - *The linear models* (the maintainer's ruling 11). `linearize(plant, x_bar)` returns a
+    `LinearizedSystem`, `ẋ = f(x̄, ū) + A (x − x̄) + B (u − ū)`, `y = h(x̄, ū) + C (x − x̄) +
+    D (u − ū)`, in the plant's own coordinates, ports, labels and units (it returned an
+    `LTISystem` in the deviations whose `f` ignored the `x_bar` it stored, so
+    `lqr(lin, Q, R) @ lin` settled the upright pendulum at 6.27 rad); its `params` hold
+    `A, B, C, D` and the point (`x_bar`, `u_bar`, `y_bar`, the drift `dx_bar = f(x̄, ū)`),
+    read as `lin.x_bar`; its nominal state is `x̄`, its `x0` the plant's; `lin.deviation_model()`
+    is the pure `LTISystem` with Δ labels (they read `Delta θ`). A step or sampled system gives
+    `LinearizedStepSystem` (`x_next_bar = F(x̄, ū)`), its deviation model a `DiscreteLTISystem`.
+    `LTISystem(A, B, C, D)` and `DiscreteLTISystem` are pure: `x_bar=`, `u_bar=`, `y_bar=` and
+    their attributes are gone (a model from arrays sits at the origin). The analysis verbs read
+    `A, B, C, D` only, no number moved, and warn on a linearization off an equilibrium; a
+    design verb reads the point from the linearization, and a point given with a linear model
+    linearizes it there (it was refused). A linearization's step response is titled
+    "Linearized" and drawn as the deviation `Δy`. The matrices stay methods, `lin.A()`; a
+    method passed where its matrix goes (`lqr_gain(lin.A, …)`) is refused with the call to
+    write. `sys.get_u_from_input_ports()` → the read-only `sys.u_nominal`.
+  - *`Step` reads its final level first* (the maintainer's ruling 13):
+    `Step(initial_value=None, final_value=None, step_time=1.0)` →
+    `Step(final_value=1.0, initial_value=0.0, step_time=1.0, *, port="y")`, so `Step()` is the
+    unit step at `t = 1 s` (it was zero) and `Step(1.0)` steps up (it stepped down); a scalar
+    level takes the other level's size. The positional callers were flipped; a bare `Step()`'s
+    numbers move once (no test asserted them).
+  - *A plant's signals* (the maintainer's ruling 7): positions, then their rates; a rate
+    `d<position>` unless the textbook names it; bare units, the plot adds the brackets; default
+    labels counted from 1. `QuarterCar` and `ConstantSpeedHelicopterTunnel` were rates first,
+    `[dy, y, x]`: their state is `[x, y, dy]` (`x[0]` the forward position, `x[2]` the vertical
+    rate). `MechanicalSystem`'s default labels `"Angle 0"`, `"Velocity 0"`, `"Torque 0"` →
+    `q1`, `dq1`, `u1` (units `"rad"`, `"rad/s"`, `"Nm"`, they read `"[rad]"`, `"[rad/sec]"`,
+    `"[Nm]"`), `GeneralizedMechanicalSystem`'s → `q1`, `v1`, `u1`; a manipulator's task ports
+    read `p1…`, `dp1…` in `"m"`, `"m/s"`, and the robotic and model-based laws' inputs
+    `q1…`, `dq1…`.
+  - *`ModelPredictiveController` is the class* (the maintainer's ruling 15): it was a function
+    returning a `PredictiveController`; the class takes the function's signature,
+    `ModelPredictiveController(planner, *, inputs=None, delay=False, warm_start=True,
+    backend=None, verbose=False)`, so `isinstance(mpc, ModelPredictiveController)` holds and
+    `PredictiveController` is gone. Import it from the teaching facade,
+    `from minilink.control import ModelPredictiveController` (the
+    `minilink.planning.trajectory_optimization.mpc` export stays).
+  - *The optimizer's method names the algorithm* (the maintainer's ruling 12):
+    `method="scipy_slsqp"` → `method="slsqp"`, `"scipy_trust_constr"` → `"trust-constr"`
+    (SciPy's own spellings), on `Optimizer`, trajectory optimization (its default is
+    `"slsqp"`) and the MPC presets; the old strings are refused. `backend=` (the array module)
+    and the method select the implementation through one table keyed `(method, backend)`;
+    every method runs as before on NumPy and JAX.
+  - *A port and the box it builds say the same word* (the maintainer's ruling 5):
+    `add_input_port(…, lower_bound=, upper_bound=)` → `add_input_port(…, lower=, upper=)`,
+    `add_output_port` and `connect_new_output_port` with it; the attributes
+    `port.lower_bound`, `state.upper_bound` → `port.lower`, `state.upper`, as the box
+    (`port.box.lower`), the sets, `Saturation` and the program already said. A limit a law
+    applies to a named signal keeps that signal's name (`u_min`, `u_max`, `delta_max`).
+  - *Added, nothing breaks* ([api-stabilization.md](../plans/api-stabilization.md) §3):
+    `QuadraticCost(Q, R)` (`S`, `x_bar`, `u_bar` zero by default); `lower`, `upper`, `dim` on
+    `BoxInputSet` and `Uniform`, `dim` on every set and field that knows its size,
+    `BallSet.sample` and `SingletonSet.sample` (so a ball is a start a problem draws from);
+    `CostFunction.h` zero by default (a running cost writes `g` only); `Gain(2.0)` one channel
+    (`dim=1`, it was refused), `Integrator(dim=1)`, `Saturation` with one end stop per channel;
+    `poles(sys, x_bar)` on `minilink.analysis` and the root (the linear model's eigenvalues, in
+    `z` on a step system); `print(lqr(…))` shows `K`, read-only as `ctrl.K`;
+    `sys.plot_nyquist(…)` beside the other one-channel plots; `step_sys.linearize(…)` as on
+    a continuous system (`step_sys.transfer_function(…)` with it, then refused by ruling Q4);
+    `diagram.add_subsystem(sys)` without an id (the operators' default, returned); `StepPlanningProblem.replace`; a scalar
+    `u` on a one-input `compute_rollout`; a sampled `u` off the run's grid refused naming
+    `n_samples=` and `dt=`; `verbose=False` on the LQR, RRT, RRT* and MPPI planners' `solve`
+    (the record printed), `callback` a list of callables on trajectory optimization and
+    `Optimizer.solve`, `params=` on value iteration's `solve_steps`, `show=` on
+    `plot_signal` and the learning curves; `sensitivity(plant, controller, …)` (and its three
+    siblings) positional, the plant read on `bode`'s channel with `of=` / `wrt=` (a plant of
+    several channels was refused); on the facades: `LTISystem`, `LinearizedSystem`,
+    `MechanicalSystem`, `step_info` and `poles` on the root, `Margins` and `StepInfo` on
+    `minilink.analysis`, the shaping functions on `minilink.core`.
+  - *The planning plots take one keyword set and return a `PlotResult`* (the maintainer's
+    ruling 16): `sol.plot_cost_to_go(*, x_axis=0, y_axis=1, anchor=None, bounds=None,
+    grid_shape=(51, 51), t=0.0, jmax=None, is_3d=False, trajectory=None, title=None, ax=None,
+    renderer="matplotlib", show=True)` and `sol.plot_control_law` alike (with `u_axis=`, no
+    `jmax=`), written out instead of `**kwargs`, on `PlanningSolution` and every planner (a thin
+    call to the latest solution; value iteration keeps `field=`), a grid planner's table drawn
+    on its own nodes. Value iteration's and the tabular learner's plots returned `(fig, ax)`
+    and the comparison's `(fig, axes)`: every planning plot returns a `PlotResult`, read
+    `.figure` and `.axes` (`fig, ax = planner.plot_cost_to_go()` →
+    `result = planner.plot_cost_to_go(); result.axes`). `jmax=None` is now the failure cost on
+    a grid planner, as its default was; `jmax=np.inf` gives Matplotlib's own scale (it was
+    `jmax=None`). Keywords outside the set (`cmap=`, `vmin=`, `overlay_labels=`) are the grid's
+    and the controller's own plots'. The tutorial's call table follows.
+  - *A grid planner's tables, one name.* `DynamicProgrammingResult` → `ValueTables` (it holds
+    `J` and `pi`), read as `solution.record.tables`; `planner.result` → `planner.tables` on
+    value iteration and on the tabular learner, one meaning on both, the latest solution's
+    (`None` before a solve). The tabular learner's `result` was the table as it stands: that is
+    `planner.greedy_tables` (`J = min Q`, `pi = argmin Q` of the live `planner.Q`).
+  - *A record's cost, named by its quantity.* RRT's (and RRT*'s) `record.cost` →
+    `record.path_cost`; the tabular and the neural learners' `record.cost` →
+    `record.episode_cost` (the mean episode cost at the end of training). The objective at
+    the solution kept `cost`: the `Optimizer`'s result, trajectory optimization's and MPPI's
+    records (ruling 17b, below, then renames it `J` and `episode_cost` `mean_episode_cost`).
+  - *An evaluation's two costs.* `Evaluation.cost` → `raw_cost`: the run's discounted integral
+    and terminal cost, before the failure charge; `J`, the score every statistic reads, is
+    unchanged (the raw cost plus the failure cost of a failed or missed run). Its one-run
+    `str` reads `raw cost = …`.
+  - *Every record times its solve.* `solve_time_s` on every planner's record, as trajectory
+    optimization's already had: value iteration's (`solve` and `solve_steps`), the LQR's
+    Riccati record, RRT's and RRT*'s, MPPI's, the tabular and the neural learners'; the wall
+    time of the user's verb without the evidence's scoring, `None` on a compiled face's solve.
+    Each record's one-line `str` ends with "solved in … s". The neural learner's
+    `train_time_s` stays beside it: it counts every training of the planner, its collections
+    and updates only.
+  - *The RL planner speaks minilink's words* (the maintainer's ruling 18):
+    `ReinforcementLearningPlanner(n_envs=)` → `n_rollouts=` (the rollouts simulated in
+    parallel, as MPPI says), its `n_steps=` → `n_steps_per_update=` (each rollout's control
+    periods per collection, the data of one update; `n_steps` keeps one meaning, a horizon's
+    transitions), read back as `planner.n_rollouts` and `planner.n_steps_per_update`;
+    `policy=` → `actor=`, the block it trains, read back as `planner.actor` (the handed-out
+    copy stays `solution.controller`; the `…Policy` classes keep their names, an open question).
+    `planner.learn(n)` → `planner.solve(n_timesteps=n)`: each solve continues the training where
+    the last one stopped, as `learn` did, and hands out its copy of the law;
+    `planner.predict(x)` is gone: the law is `solution.controller` (or
+    `planner.actor.action(x)`), an exploration draw the planner's `exploration_policy`
+    (`sample`, then `input`); `predict` is Stable-Baselines3's word, read by `SB3Controller`.
+  - *Four words, one meaning each* (the maintainer's ruling 17b, RULES 2.7): `cost` the cost
+    object, `J` a scalar, `objective` the criterion over draws, `cost_to_go` the function.
+    A record's scalar `.cost` → `.J`: `OptimizationResult`, `TrajectoryOptimizationRecord` and
+    its iterates (`TrajectoryOptimizationIteration`), `MPPIRecord`, and a compiled solve's
+    `status["cost"]` → `status["J"]` (MPC's `STANDARD_STATUS`); the printouts still read
+    `J* = …` / `J = …`.
+  - *The running cost signals.* `traj.with_cost(cost)` and `plot_cost` write `"dJ"` (was
+    `"cost_rate"`) and `"J"` (was `"cost"`); the continuous `"J"` now adds the discounted
+    terminal cost `e^{−ρ(t_N − t0)} h(x_N, t_N)` at its last sample, as a step problem's
+    rollout already did with `γᴺ h`, so its last value is the run's `J` (an evaluation's
+    `raw_cost`, `compute_cost`): the one number that moved, and only where the cost writes an
+    `h`. The step problem's `rollout` signal `"cost"` → `"J"`, its values unchanged.
+  - *Cost-to-come.* RRT/RRT*'s `node.cost` → `node.cost_to_come`, a live step's and an RRT*
+    snapshot's `best_cost` → `best_cost_to_come`, `planner.best_goal_cost` →
+    `planner.best_path_cost` (then read on the record, ruling Q7 below); `Edge.cost`, the
+    edge's own cost, keeps its name. MPPI's internal `path_cost(...)` → `rollout_cost(...)`.
+  - *The learners' records.* `episode_cost` → `mean_episode_cost`, on the tabular and the
+    neural learner. `Evaluation.raw_cost` and tabular learning's `greedy_tables` are kept.
+  - *One verb on both learners* (the maintainer's ruling of 2026-11-11):
+    `TabularLearningPlanner.learn(n)` → `solve(n_episodes=n)`, which continues the learning
+    from the table as it stands, as the RL planner's `solve` does, and hands out the greedy law.
+    The learners' `record.history` entries write each episode's (tabular) or iteration's (RL)
+    cost as `"J"` (was `"cost"`): a scalar is `J` (ruling 17b).
+  - *The design verbs* (the maintainer's ruling 19): `trajectory_lqr` → `lqr_trajectory`, beside
+    `lqr`, `lqr_finite_horizon` and `lqr_gain_schedule`; their length `tf=` → `horizon=` (`tf` is
+    an absolute end time). `StateObserver(A, B, C, L, D, x_bar=, u_bar=, y_bar=)` →
+    `StateObserver(model, L)`, reading `A, B, C, D` and the operating point from a
+    `LinearizedSystem` (an `LTISystem` about the origin): the matrix form is
+    `StateObserver(LTISystem(A, B, C, D), L)`, the estimate's labels the model's with a hat.
+    No number moves.
+  - *Class names* (the maintainer's ruling 20b): `VanderPol` → `VanDerPol`, `ThreeBodyProblem`
+    → `ThreeBody`, `StructuralResult` → `StructuralProperties` (what `controllability` and
+    `observability` return; its printout says so). Their display names follow the class.
+  - *The smaller ones* (the maintainer's ruling 22): a `CallableSet(margin, params=None)`
+    requires its margin (`margin_fn=` → `margin=`; `contains_fn=` is gone, membership is
+    `margin ≥ 0`); `EllipsoidSet.from_matrix(center, P, level)` added; a path's
+    `path.sample(s)` → `path.at(s)`; `Source.plot_signal` is gone with the sources demo and
+    the `__main__` that existed for it (`source.compute_trajectory(tf=…)`, then
+    `source.plot_trajectory()`, which now plots a source's output by default);
+    `diagram.connection_verbose` is gone (`connect` prints nothing); the program's start
+    `program.metadata["z0"]` → `program.z0`, the `Optimizer`'s default;
+    `RRTPlanner(max_nodes=)` (and RRT*'s) → `max_iterations=`, the cap it always was.
+    `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` keep their units, the docstrings say why.
+  - *A run's grid ends at `tf`* (ruling 22): a `dt` that does not divide the run shortened
+    nothing and overshot (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); its last step is now shorter
+    and lands on `tf` (`[…, 0.9, 1.0]`), the fixed-step solvers (`rk4`, `euler`) taking it as
+    it is. Numbers move only on such grids, and only at their last sample (a run on the
+    automatic step of a loop whose step does not divide `tf`, for one).
+  - *A held plan is scored as planned* (the maintainer's ruling 23a): the evidence of RRT's,
+    RRT*'s and MPPI's plan (a `TrajectorySource` holding each sample) feeds the plant its
+    sample held over each step, as `plant.compute_trajectory(u=plan.u, dt=…)` does, so
+    `solve(evaluate=True)` and `evaluate(problem, solution.controller, dt=…)` on the plan's own
+    `dt` reproduce the plan (the swing-up's RRT plan, which reached its goal while its replay
+    missed it at `dt = 0.05` and `0.01`); the block handed out is unchanged. Every planner is
+    scored over the problem's horizon (ruling 23b): a plan shorter than it holds its last input
+    after it ends, and an infinite horizon runs the evaluator's default 10 s, as value
+    iteration's and the LQR's evidence (RRT's ran its path's own length there); the record's
+    "goal reached" stays the search's.
+  - *The discrete models are tick laws* (the maintainer's ruling Q1 of 2026-11-11):
+    `DiscreteLTISystem(A, B, C, D, period=Δ)` and `LinearizedStepSystem`'s `period` are gone,
+    `x⁺ = A_d x + B_d u` per tick; seconds come only from a clock, `model % Δ`, whose
+    `sample_period` the analysis reads, so `bode(lin % Δ)` is the rad/s Bode the period gave
+    (the same numbers) and `bode(lin)` the per-tick one; `linearize` of a sampled loop returns
+    the tick law, and the printouts say "per tick". A clocked linear model's step response is
+    titled "Linear", as the model's.
+  - *A length is a horizon* (the maintainer's ruling Q2 of 2026-11-11): the problem
+    evaluator's `pe.tf` → `pe.horizon` (the run's length), `LyapunovCertificate.verify(tf=)` →
+    `verify(horizon=)`.
+  - *A transfer function is continuous* (the maintainer's ruling Q4 of 2026-11-11):
+    `transfer_function` refuses a step or sampled system, "a transfer function is continuous;
+    design on the continuous plant, then `% dt`" (it returned a continuous block holding the
+    coefficients of `G(z)`); so do `StateObserver` on a step model (it ran the discrete
+    matrices as a continuous `dx̂`) and `luenberger` on a step or sampled system, which hands
+    out that observer. A gain stays fine on a discrete model, its poles read in `z`:
+    `place(model, poles)` and `luenberger_gain(A, C, poles)`.
+  - *`ThreeBody`'s state, positions first* (the maintainer's ruling Q5 of 2026-11-11):
+    `[r1, v1, r2, v2, r3, v3]` → `[r1, r2, r3, v1, v2, v3]`, its labels, units and figure-eight
+    `x0` with it (`x[0:9]` the positions, `x[9:18]` their rates); the numbers move only by
+    that permutation. RULES words "positions, then rates" as a style guideline, not a rule
+    enforced on a user's plant.
+  - *A sampled-data law takes `output_dim=`* (the maintainer's ruling Q6 of 2026-11-11), like
+    its siblings: `NativeSampledSystem(state_dim=0, *, sample_period=, input_dim=,
+    output_dim=, expose_state=, y_dependencies=())`, the output `y = h(x, u, t)` the law's own
+    `h`, in seconds; a law that writes no `h` is refused (the inherited `h` reads the law's
+    first output port, so `y` would read itself).
+  - *RRT*'s account is its record's* (the maintainer's ruling Q7 of 2026-11-11, RULES 2.4):
+    the planner's copies `planner.converged`, `planner.best_path_cost` and `planner.history`
+    are gone; read `solution.record.converged`, `record.path_cost` and `record.history`
+    (`animate_convergence` reads the latest solution's).
+  - *A port's nominal value is checked* (the maintainer's ruling Q8 of 2026-11-11):
+    `signal.nominal_value` is a property; an assignment (`plant.inputs["u"].nominal_value =
+    …`, `plant.state.nominal_value = …`) is checked against the signal's `dim`, as the
+    constructor's keyword was, and kept as its own flat float copy (it was stored as given,
+    any size); the module function `nominal_of` is gone.
+  - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
+    the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
+    on every planner, so `planner.solve(params=solution.params)` solves it again (it held the
+    problem's tree, and the call was refused for its missing `method` and `seed`). The
+    problem's parts keep their paths (`solution.params["plant"]["m"]`).
 
 ## 3. Maturity (TRL)
 
@@ -292,7 +617,7 @@ GRO501 (§4.2, v0.2) and GMC714 (§4.3, v0.3). A course is
 
 | Topic | Surface | Material | Gate |
 | --- | --- | --- | --- |
-| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost_to_go` / `plot_control_law` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos/value_iteration/` | `final_time` reads `problem.horizon`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
+| Value iteration / DP | `PlanningProblem`, `StateSpaceGrid`, `DynamicProgrammingPlanner`, `LookupPolicy`, `plot_cost_to_go` / `plot_control_law` | `pendulum_value_iteration`, `pendulum_value_iteration_vs_lqr`, `demos/value_iteration/` | `tf` reads the problem's `t0 + horizon`; `success` reports convergence; notebooks wire with `vi_ctl @ plant` |
 | LQR + linearization | `linearize`, `lqr` (on arrays, a linear model or the plant), `plot_control_law` | `basics/02_analyze_and_control`, `demos/control/` | — (green today) |
 | Trajectory optimization | `PlanningProblem`, `TrajectoryOptimizationPlanner` (`direct_collocation`, `multiple_shooting`, `single_shooting`), `QuadraticCost` | `basics/03_plan_and_sample`, `advanced/02_optimal_control`, `demos/trajopt/` | float64 by default on JAX; `success` means defects satisfied; canonical problems succeed with default optimizer |
 | Reinforcement Learning (tabular on the grid, neural in native JAX) | `TabularLearningPlanner` (Q-learning, SARSA, Monte Carlo control; `EpsilonGreedy`, `UCB`), `PlanningProblem` with laws, `ReinforcementLearningPlanner` (REINFORCE / actor-critic / PPO / SAC), `NeuralPolicy`, `evaluate` | `advanced/04_reinforcement_learning.ipynb`, `pendulum_value_iteration_vs_lqr_vs_rl.ipynb`, `drone_ppo.ipynb`, `gymnasium_interface.ipynb`, `showcase_from_rl_to_bode.ipynb`, `demos/rl/` (pendulum, cart-pole, drone, rocket) | pure-JAX training on compiled plant (pendulum swing-up, 120k steps in 12.5 s on CPU, 0% failure over 50 trials); neural policy closed loop linearizes, simulates, and plots Bode; those names (plus `Evaluation`, `Gaussian` / `Uniform`) are on the root prelude. Notebooks solve with the native planner; Gymnasium stays taught as the domain standard and `Sys2Gym` + SB3 stay as the external bridge |

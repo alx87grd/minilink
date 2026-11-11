@@ -18,7 +18,7 @@ _UNSET = object()
 
 
 @dataclass(frozen=True)
-class BlockRoles:
+class SubsystemRoles:
     """What a block reads and commands, read from its port names alone.
 
     A controller is an ordinary :class:`~minilink.core.system.System` (a
@@ -61,8 +61,8 @@ class BlockRoles:
         return self.entry is not None
 
 
-def block_roles(block) -> BlockRoles:
-    """What ``block`` reads and commands, from its port names (see :class:`BlockRoles`)."""
+def subsystem_roles(block) -> SubsystemRoles:
+    """What ``block`` reads and commands, from its port names (see :class:`SubsystemRoles`)."""
     inputs = getattr(block, "inputs", {})
     outputs = getattr(block, "outputs", {})
 
@@ -82,7 +82,7 @@ def block_roles(block) -> BlockRoles:
 
     stateful = int(getattr(block, "n", 0)) > 0
 
-    return BlockRoles(measurements, reference, command, entry, stateful)
+    return SubsystemRoles(measurements, reference, command, entry, stateful)
 
 
 def command_port(sys) -> str:
@@ -113,7 +113,7 @@ def require_command(block) -> str | None:
     (no measurement) or a box that commands through an output named ``y`` (a
     gain in series with a saturation) is left to its default output.
     """
-    roles = block_roles(block)
+    roles = subsystem_roles(block)
     outputs = getattr(block, "outputs", {})
 
     # An observer reads a measurement and gives the state back, with nothing to
@@ -171,11 +171,11 @@ def roles(system) -> Roles:
 
     # A diagram: the blocks under the reserved names, the observer possibly inside
     # the controller
-    plant = block_under(subsystems, "plant")
-    controller = block_under(subsystems, "controller")
-    observer = block_under(subsystems, "observer")
+    plant = subsystem_under(subsystems, "plant")
+    controller = subsystem_under(subsystems, "controller")
+    observer = subsystem_under(subsystems, "observer")
     if observer is None and controller is not None:
-        observer = block_under(getattr(controller, "subsystems", {}), "observer")
+        observer = subsystem_under(getattr(controller, "subsystems", {}), "observer")
 
     return Roles(plant, controller, observer)
 
@@ -205,7 +205,7 @@ def plot_space_of(block):
         return declared
 
     # Else the ports decide: the state, the error e = r − y, or the measurement
-    roles = block_roles(block)
+    roles = subsystem_roles(block)
     if "x" in roles.measurements:
         return "state"
 
@@ -288,7 +288,7 @@ def require_one_free_input(sys, inputs, free):
         )
 
 
-def block_under(subsystems, *names):
+def subsystem_under(subsystems, *names):
     """The block under the first of ``names`` present in ``subsystems``, or ``None``."""
     for name in names:
         if name in subsystems:

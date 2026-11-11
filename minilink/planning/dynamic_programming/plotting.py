@@ -111,7 +111,7 @@ def plot_control_law(
     grid_or_result,
     pi=None,
     *,
-    axis=0,
+    u_axis=0,
     x_axis=0,
     y_axis=1,
     anchor=None,
@@ -122,21 +122,21 @@ def plot_control_law(
     show=True,
 ):
     """
-    Draw a policy heatmap on the state grid.
+    Draw a control-law heatmap on the state grid.
 
     Grid form: ``plot_control_law(grid, pi, ...)`` for a raw policy table.
     Result form: ``plot_control_law(result, ...)`` from value iteration.
 
     ``x_axis`` and ``y_axis`` are the two state axes of the slice, integers,
-    or two lists of one length for several slices; ``axis`` (the input
+    or two lists of one length for several slices; ``u_axis`` (the input
     component) may be an int or a list aligned with them.
     """
     # Grid form: the raw table on its grid
     if pi is not None:
-        return plot_policy_field(
+        return plot_control_law_field(
             grid_or_result,
             pi,
-            axis=axis,
+            u_axis=u_axis,
             x_axis=x_axis,
             y_axis=y_axis,
             anchor=anchor,
@@ -152,11 +152,11 @@ def plot_control_law(
     # Several slices: one heatmap per pair, each with its own input axis
     if is_batch(x_axis, y_axis):
         slices = slices_of(x_axis, y_axis)
-        axis_list = axis_list_of(axis, slices)
+        u_axes = u_axes_of(u_axis, slices)
         return [
             plot_control_law(
                 result,
-                axis=axis_k,
+                u_axis=u_k,
                 x_axis=x_k,
                 y_axis=y_k,
                 anchor=anchor,
@@ -164,14 +164,14 @@ def plot_control_law(
                 cmap=cmap,
                 show=show,
             )
-            for (x_k, y_k), axis_k in zip(slices, axis_list)
+            for (x_k, y_k), u_k in zip(slices, u_axes)
         ]
 
     # The heatmap, shown now unless the overlay comes after it
-    fig, ax = plot_policy_field(
+    fig, ax = plot_control_law_field(
         result.grid,
         result.pi,
-        axis=axis,
+        u_axis=u_axis,
         x_axis=x_axis,
         y_axis=y_axis,
         anchor=anchor,
@@ -199,7 +199,7 @@ def animate_cost_to_go(
     jmax=None,
     anchor=None,
     interval=60,
-    save_path=None,
+    file_name=None,
     show=True,
 ):
     """
@@ -220,7 +220,7 @@ def animate_cost_to_go(
         vmax=jmax,
         interval=interval,
         show=show,
-        save_path=save_path,
+        file_name=file_name,
     )
 
 
@@ -232,7 +232,7 @@ def animate_control_law(
     y_axis=1,
     anchor=None,
     interval=60,
-    save_path=None,
+    file_name=None,
     show=True,
 ):
     """Animate the control-law sweeps recorded on ``result.history``."""
@@ -248,7 +248,7 @@ def animate_control_law(
         anchor=anchor,
         interval=interval,
         show=show,
-        save_path=save_path,
+        file_name=file_name,
     )
 
 
@@ -329,7 +329,7 @@ def animate(
     vmax=None,
     interval=60,
     show=True,
-    save_path=None,
+    file_name=None,
 ):
     """
     Animate a recorded value or policy field over the sweeps of ``history``.
@@ -386,8 +386,8 @@ def animate(
     ani = animation.FuncAnimation(
         fig, update, len(history), interval=interval, blit=False
     )
-    if save_path is not None:
-        ani.save(save_path, writer="pillow", fps=max(1, int(1000 / interval)))
+    if file_name is not None:
+        ani.save(file_name, writer="pillow", fps=max(1, int(1000 / interval)))
 
     maybe_show(plt, show)
 
@@ -454,33 +454,35 @@ def overlay_trajectory(ax, trajectory, x_axis, y_axis, labels):
     ax.legend(loc="upper right", fontsize=8)
 
 
-def plot_policy_field(grid, pi, *, axis, x_axis, y_axis, anchor, cmap, ax, show):
-    """Heatmap of input ``axis`` of a policy table, scaled to that input's bounds."""
-    u_axis = grid.input_from_policy(pi)[:, axis]
+def plot_control_law_field(grid, pi, *, u_axis, x_axis, y_axis, anchor, cmap, ax, show):
+    """Heatmap of input ``u_axis`` of a control-law table, scaled to that input's bounds."""
+    u = grid.input_from_policy(pi)[:, u_axis]
 
     return plot_field(
         grid,
-        u_axis,
+        u,
         x_axis=x_axis,
         y_axis=y_axis,
         anchor=anchor,
-        vmin=grid.u_lb[axis],
-        vmax=grid.u_ub[axis],
+        vmin=grid.u_lb[u_axis],
+        vmax=grid.u_ub[u_axis],
         cmap=cmap,
         ax=ax,
-        title=f"Policy u[{axis}]",
+        title=f"Control law u[{u_axis}]",
         show=show,
     )
 
 
-def axis_list_of(axis, slices):
-    """One input axis per slice: the list given, or ``axis`` repeated."""
-    if isinstance(axis, (list, tuple)):
-        if len(axis) != len(slices):
-            raise ValueError("axis list must match the x_axis and y_axis lists' length")
-        return axis
+def u_axes_of(u_axis, slices):
+    """One input axis per slice: the list given, or ``u_axis`` repeated."""
+    if isinstance(u_axis, (list, tuple)):
+        if len(u_axis) != len(slices):
+            raise ValueError(
+                "u_axis list must match the x_axis and y_axis lists' length"
+            )
+        return u_axis
 
-    return [axis] * len(slices)
+    return [u_axis] * len(slices)
 
 
 def last_sweep_max(grid, history, x_axis, y_axis, anchor, vmax):

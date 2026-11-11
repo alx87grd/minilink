@@ -16,11 +16,9 @@ from minilink.planning import (
 from minilink.planning.search.extenders import KinodynamicExtender
 from minilink.planning.search.rrt import RRTPlanner
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
@@ -31,8 +29,8 @@ from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
 
 def pendulum_problem(stochastic=False):
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(
         plant, Q=np.eye(2), R=0.1 * np.eye(1), S=np.eye(2), x_bar=np.array([np.pi, 0.0])
     )
@@ -57,8 +55,8 @@ def pendulum_problem(stochastic=False):
 def move_problem(stochastic=False):
     """A double integrator brought to rest at the origin in two seconds."""
     plant = DoubleIntegrator()
-    plant.inputs["u"].lower_bound = np.array([-2.0])
-    plant.inputs["u"].upper_bound = np.array([2.0])
+    plant.inputs["u"].lower = np.array([-2.0])
+    plant.inputs["u"].upper = np.array([2.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     if stochastic:
         return PlanningProblem(
@@ -89,14 +87,14 @@ def trajopt(problem, transcription, n_steps=10):
 
 
 def collocation(n_steps):
-    return DirectCollocationTranscription(DirectCollocationOptions(n_steps=n_steps))
+    return DirectCollocationTranscription(n_steps=n_steps)
 
 
 def shooting(n_steps):
-    return MultipleShootingTranscription(MultipleShootingOptions(n_steps=n_steps))
+    return MultipleShootingTranscription(n_steps=n_steps)
 
 
-def replay(problem, solution, solver="rk4_fixedsteps"):
+def replay(problem, solution, solver="rk4"):
     """The open-loop policy driving the plant in series, sampled on the solution's grid."""
     plant = problem.sys
     planned = solution.trajectory
@@ -160,10 +158,7 @@ def test_trajopt_evaluation_is_one_trial_deterministic_and_n_trials_stochastic()
     assert solution.evaluation.n_trials == 1 and not solution.evaluation.failed[0]
     assert str(solution.evaluation).startswith("J = ")
     # the replayed schedule scores the optimizer's cost up to the discretization gap
-    assert (
-        abs(solution.evaluation.mean - solution.record.cost)
-        < 0.05 * solution.record.cost
-    )
+    assert abs(solution.evaluation.mean - solution.record.J) < 0.05 * solution.record.J
 
     with pytest.warns(UserWarning):  # a deterministic planner on a stochastic problem
         planner = trajopt(move_problem(stochastic=True), shooting)
@@ -185,11 +180,11 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
             n_steps=6,
         ),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
     )
     solution = planner.solve()
     assert solution.success and solution.record.reached_goal
-    assert solution.open_loop and solution.controller.interpolation == "previous"
+    assert solution.open_loop and solution.controller.hold == "zoh"
     assert solution.evaluation is None  # the problem declares no cost
     planned = solution.trajectory
 
@@ -205,10 +200,10 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
 
 def double_integrator_problem():
     plant = DoubleIntegrator()
-    plant.state.lower_bound = np.array([-2.0, -2.0])
-    plant.state.upper_bound = np.array([2.0, 2.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.state.lower = np.array([-2.0, -2.0])
+    plant.state.upper = np.array([2.0, 2.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     return PlanningProblem(
         plant,
@@ -307,10 +302,10 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
     from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
 
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
-    plant.state.lower_bound = np.array([-np.pi, -8.0])
-    plant.state.upper_bound = np.array([np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    plant.state.lower = np.array([-np.pi, -8.0])
+    plant.state.upper = np.array([np.pi, 8.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.01 * np.eye(1))
     problem = PlanningProblem(
         plant,
@@ -323,8 +318,8 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
         problem,
         dt=0.1,
         hidden=(8, 8),
-        n_envs=4,
-        n_steps=16,
+        n_rollouts=4,
+        n_steps_per_update=16,
         batch_size=32,
         gamma=0.9,
     )
@@ -340,7 +335,7 @@ def test_the_rl_planner_scores_the_law_it_hands_out():
         n_trials=3,
         key=0,
         backend="jax",
-        episode_length=planner.env.tf,
+        episode_length=planner.env.episode_length,
     )
     np.testing.assert_array_equal(solution.evaluation.J, alone.J)
     assert isinstance(solution.plot_trajectory(show=False).figure, object)
@@ -357,10 +352,10 @@ def solved_pendulum():
     from minilink import LQRPlanner
 
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-2.0 * np.pi, -8.0])
-    plant.state.upper_bound = np.array([2.0 * np.pi, 8.0])
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.state.lower = np.array([-2.0 * np.pi, -8.0])
+    plant.state.upper = np.array([2.0 * np.pi, 8.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=np.eye(1), x_bar=[np.pi, 0])
     problem = PlanningProblem(
         plant,
@@ -397,8 +392,8 @@ def test_solution_verbs_draw_what_the_planner_produced():
 
     problem, vi, lqr = solved_pendulum()
     for solution in (vi, lqr):
-        fig, ax = solution.plot_cost_to_go(show=False, grid_shape=(11, 11))
-        assert ax.get_title().startswith("cost-to-go")
+        drawn = solution.plot_cost_to_go(show=False, grid_shape=(11, 11))
+        assert drawn.axes.get_title().startswith("cost-to-go")
         result = solution.plot_control_law(show=False)
         # the sweep is the problem's state box and the colour scale its input box
         x_lim, y_lim = result.axes.get_xlim(), result.axes.get_ylim()
@@ -438,7 +433,7 @@ def test_planner_shortcuts_draw_the_latest_solution():
         planner.plot_control_law()
     planner.solve()
     assert planner.plot_control_law(show=False).figure is not None
-    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9))[0] is not None
+    assert planner.plot_cost_to_go(show=False, grid_shape=(9, 9)).figure is not None
 
 
 def test_value_iteration_plots_its_own_tables_under_the_solution_names():
@@ -450,8 +445,8 @@ def test_value_iteration_plots_its_own_tables_under_the_solution_names():
     with pytest.raises(ValueError):
         planner.plot_control_law()
     planner.solve()
-    assert planner.plot_cost_to_go(show=False)[0] is not None
-    assert planner.plot_control_law(show=False)[0] is not None
+    assert planner.plot_cost_to_go(show=False).figure is not None
+    assert planner.plot_control_law(show=False).figure is not None
 
 
 def test_compare_reads_the_solutions_side_by_side():
@@ -464,12 +459,12 @@ def test_compare_reads_the_solutions_side_by_side():
     assert table.splitlines()[0].split() == ["success", "record", "evaluation"]
     assert "converged" in table and "closed-loop poles" in table and "J = " in table
 
-    fig, axes = race.plot_control_law(show=False)
+    axes = race.plot_control_law(show=False).axes
     assert [ax.get_title() for ax in axes] == ["VI", "LQR"]
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
-    fig, axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9))
+    axes = race.plot_cost_to_go(show=False, grid_shape=(9, 9)).axes
     assert axes[0].collections[0].get_clim() == axes[1].collections[0].get_clim()
-    fig, axes = race.plot_trajectory(show=False)
+    axes = race.plot_trajectory(show=False).axes
     assert len(axes) == 3 and len(axes[0].get_lines()) == 2
 
     # one evaluation scores every policy on the same draws; a solution stands for its policy
@@ -748,3 +743,222 @@ def test_a_tree_search_plan_starts_at_the_problem_start_time():
 
     assert plan.t0 == pytest.approx(2.0)
     np.testing.assert_allclose(solution.controller.params["t"], plan.t)
+
+
+def test_the_planning_plots_take_one_keyword_set_and_return_a_plot_result():
+    """Ruling 16: one written-out keyword set on the solution and every planner, a PlotResult back."""
+    import inspect
+
+    from minilink import LQRPlanner
+    from minilink.graphical.common.plot_result import PlotResult
+    from minilink.planning import PlanningSolution
+    from minilink.planning.planner import Planner
+
+    for name in ("plot_cost_to_go", "plot_control_law"):
+        solution_set = inspect.signature(getattr(PlanningSolution, name)).parameters
+        assert not any(p.kind is p.VAR_KEYWORD for p in solution_set.values()), name
+        assert {"x_axis", "y_axis", "is_3d", "ax", "renderer", "show"} <= set(
+            solution_set
+        )
+        for planner in (
+            Planner,
+            LQRPlanner,
+            DynamicProgrammingPlanner,
+            TabularLearningPlanner,
+        ):
+            planner_set = dict(inspect.signature(getattr(planner, name)).parameters)
+            planner_set.pop("field", None)  # value iteration's one extra
+            assert [(p.name, p.default) for p in planner_set.values()] == [
+                (p.name, p.default) for p in solution_set.values()
+            ], (planner.__name__, name)
+
+    problem, vi, lqr = solved_pendulum()
+    for solution in (vi, lqr):
+        for drawn in (
+            solution.plot_cost_to_go(show=False),
+            solution.plot_cost_to_go(is_3d=True, show=False),
+            solution.plot_control_law(show=False),
+        ):
+            assert isinstance(drawn, PlotResult) and drawn.figure is not None
+
+
+def test_a_grid_solution_is_drawn_on_its_nodes_unless_asked_for_another_mesh():
+    problem, vi, lqr = solved_pendulum()
+    grid = vi.record.tables.grid
+
+    # On the nodes: the table's own extent and the failure cost atop the scale
+    table = vi.plot_cost_to_go(show=False)
+    assert table.axes.get_title() == "Cost-to-go"
+    assert table.axes.collections[0].get_clim()[1] == 500.0
+    np.testing.assert_allclose(
+        table.axes.collections[0].get_array().max(),
+        min(500.0, float(np.max(vi.record.tables.J))),
+    )
+    # Another mesh, or a time: the field sampled
+    sampled = vi.plot_cost_to_go(bounds=((-1.0, 1.0), (-1.0, 1.0)), show=False)
+    assert sampled.axes.get_title() == "cost-to-go (value iteration)"
+    assert sampled.axes.get_xlim() == (-1.0, 1.0)
+    assert grid.n_nodes == 21 * 21
+
+    # A title replaced on the law's table
+    law = vi.plot_control_law(title="π", show=False)
+    assert law.axes.get_title() == "π"
+
+
+def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
+    problem, vi, lqr = solved_pendulum()
+    loop = lqr.controller @ problem.sys
+    traj = loop.compute_trajectory(tf=1.0, verbose=False).of("plant")
+    for solution in (vi, lqr):
+        drawn = solution.plot_cost_to_go(trajectory=traj, show=False)
+        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        drawn = solution.plot_control_law(trajectory=traj, show=False)
+        assert any(line.get_label() == "closed loop" for line in drawn.axes.get_lines())
+        with pytest.raises(ValueError, match="renderer='matplotlib'"):
+            solution.plot_cost_to_go(renderer="plotly", show=False)
+        with pytest.raises(ValueError, match="cannot be used together"):
+            solution.plot_cost_to_go(is_3d=True, trajectory=traj, show=False)
+    with pytest.raises(ValueError, match="anchor"):
+        lqr.plot_control_law(anchor=[np.pi, 0.0], show=False)
+    assert vi.plot_control_law(anchor=[np.pi, 0.0], show=False).figure is not None
+
+
+# --- the solution's params: the planner's complete tree, solved again ---
+
+
+ROUND_TRIP_NAMES = (
+    "value iteration",
+    "lqr",
+    "rrt",
+    "rrt*",
+    "trajectory optimization",
+    "mppi",
+    "tabular learning",
+)
+NEEDS_JAX = ("mppi",)
+
+
+def round_trip_planner(name):
+    """``(planner, solve keywords)`` for the planner ``name``, small and seeded (built only when asked: MPPI needs JAX)."""
+    from minilink import LQRPlanner
+    from minilink.planning import MPPIPlanner
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+
+    grid = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
+    infinite = move_problem().replace(horizon=np.inf, discount_rate=0.5)
+    compass = [
+        np.array([np.cos(a), np.sin(a)])
+        for a in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
+    ]
+
+    def obstacles():
+        problem, _ = make_holonomic_obstacle_problem()
+        return problem
+
+    def extender():
+        return KinodynamicExtender(controls=compass, horizon=0.6, n_steps=6)
+
+    builders = {
+        "value iteration": lambda: (DynamicProgrammingPlanner(infinite, **grid), {}),
+        "lqr": lambda: (LQRPlanner(move_problem()), {}),
+        "rrt": lambda: (
+            RRTPlanner(obstacles(), extender(), max_iterations=400, seed=3),
+            {},
+        ),
+        "rrt*": lambda: (
+            RRTStarPlanner(obstacles(), extender(), max_iterations=200, seed=3),
+            {},
+        ),
+        "trajectory optimization": lambda: (trajopt(move_problem(), collocation), {}),
+        "mppi": lambda: (
+            MPPIPlanner(move_problem(), dt=0.1, n_rollouts=64, n_iterations=2),
+            {},
+        ),
+        "tabular learning": lambda: (
+            TabularLearningPlanner(infinite, solver="euler", seed=2, **grid),
+            {"n_episodes": 20},
+        ),
+    }
+
+    return builders[name]()
+
+
+def solved_numbers(solution):
+    """What a solve computes, as bytes: the controller's numbers, the plan and the record but its timings."""
+    import pickle
+    from dataclasses import fields, is_dataclass
+
+    record = solution.record
+    numbers = {
+        name: getattr(record, name)
+        for name in (f.name for f in fields(record))
+        if not name.endswith("time_s") and name not in ("optimization_result",)
+    }
+    if is_dataclass(numbers.get("tables")):
+        tables = numbers.pop("tables")
+        numbers["J"], numbers["pi"] = tables.J, tables.pi
+    controller = {
+        key: value
+        for key, value in (solution.controller.params or {}).items()
+        if not isinstance(value, dict)
+    }
+    plan = solution.trajectory
+    plan = None if plan is None else (plan.t, plan.x, plan.u)
+
+    return pickle.dumps((sorted(controller.items()), plan, sorted(numbers.items())))
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(name, marks=pytest.mark.jax) if name in NEEDS_JAX else name
+        for name in ROUND_TRIP_NAMES
+    ],
+)
+def test_a_solution_is_solved_again_from_its_params(name):
+    """Ruling 24: solution.params is the planner's complete tree; solve(params=) reproduces it."""
+    planner, keywords = round_trip_planner(name)
+    first = planner.solve(**keywords)
+
+    assert set(first.params) == set(planner.params), name
+    assert {"method", "seed"} <= set(first.params)
+    again = planner.solve(params=first.params, **keywords)
+
+    assert solved_numbers(again) == solved_numbers(first), name
+
+
+@pytest.mark.jax
+def test_a_learned_solution_is_learned_again_from_its_params():
+    pytest.importorskip("jax")
+    from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
+
+    problem = move_problem().replace(horizon=np.inf, discount_rate=0.5)
+    problem.sys.state.lower = np.array([-3.0, -3.0])
+    problem.sys.state.upper = np.array([3.0, 3.0])
+    problem = problem.replace(X=problem.sys.state.box)
+    planner = ReinforcementLearningPlanner(
+        problem,
+        dt=0.1,
+        hidden=(8,),
+        n_rollouts=2,
+        n_steps_per_update=16,
+        batch_size=16,
+        episode_length=2.0,
+    )
+    first = planner.solve(n_timesteps=64)
+    again = planner.solve(n_timesteps=64, params=first.params)
+
+    assert set(first.params) == set(planner.params)
+    assert {"plant", "cost", "method", "seed"} <= set(first.params)
+    for key, weights in first.controller.params["mlp"].items():
+        np.testing.assert_array_equal(again.controller.params["mlp"][key], weights)
+
+    # The tree's problem leaves reach the planner rebuilt there (the maintainer, 2026-11-11)
+    import copy
+
+    from minilink.planning.planner import planner_at
+
+    edited = copy.deepcopy(first.params)
+    edited["x0"] = np.asarray(edited["x0"]) + 0.5
+    rebuilt = planner_at(planner, edited)
+    np.testing.assert_array_equal(rebuilt.problem.x0, edited["x0"])

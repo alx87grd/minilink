@@ -14,7 +14,7 @@ from minilink.learning.reinforcement_learning import (
     TabularLearningPlanner,
 )
 from minilink.planning import Uniform
-from minilink.planning.dynamic_programming.dp import DynamicProgrammingResult
+from minilink.planning.dynamic_programming.dp import ValueTables
 from minilink.planning.dynamic_programming.lookup_policy import LookupPolicy
 from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.results import PlanningSolution
@@ -24,10 +24,10 @@ GRID = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
 
 def double_integrator_problem(stochastic=False):
     plant = DoubleIntegrator()
-    plant.state.lower_bound = np.array([-2.0, -2.0])
-    plant.state.upper_bound = np.array([2.0, 2.0])
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.state.lower = np.array([-2.0, -2.0])
+    plant.state.upper = np.array([2.0, 2.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     cost = QuadraticCost.from_system(plant, Q=np.diag([1.0, 0.1]), R=np.diag([0.01]))
     exit_rule = dict(
         penalize_failure=True, failure_cost=20.0
@@ -60,19 +60,19 @@ def test_q_learning_approaches_value_iteration_on_the_same_grid():
 
     # The same grid, Euler step and exit failure_cost; the learner samples what value iteration sweeps
     learner = TabularLearningPlanner(
-        problem, gamma=0.9, eta=0.1, solver="euler", seed=0, **GRID
+        problem, gamma=0.9, learning_rate=0.1, solver="euler", seed=0, **GRID
     )
     solution = learner.solve(n_episodes=2000)
     assert isinstance(solution, PlanningSolution) and solution.success
     assert isinstance(solution.controller, LookupPolicy)
-    assert isinstance(learner.result, DynamicProgrammingResult)
+    assert isinstance(learner.tables, ValueTables)
     assert solution.record.n_episodes == 2000 and len(learner.history) == 2000
     assert solution.cost_to_go(np.zeros(2)) == learner.cost_to_go(np.zeros(2))
     assert learner.cost_to_go(np.zeros(2), t=1.0) == learner.cost_to_go(np.zeros(2))
     assert np.all(learner.visits.sum(axis=1) > 0)
 
-    J_vi = vi.result.J
-    error = np.abs(learner.result.J - J_vi)
+    J_vi = vi.tables.J
+    error = np.abs(learner.tables.J - J_vi)
     assert np.median(error) < 0.35 * np.median(J_vi)
 
     # The greedy law is a lookup-table block that closes the loop and regulates
@@ -125,11 +125,31 @@ def test_every_tabular_algorithm_learns_from_the_same_loop(algorithm):
         exploring_starts=False,
         **GRID,
     )
-    learner.learn(50)
+    learner.solve(n_episodes=50)
     assert len(learner.history) == 50
     assert learner.visits.sum() == sum(record["steps"] for record in learner.history)
     assert np.all(np.isfinite(learner.Q))
     assert not np.array_equal(learner.Q, np.zeros_like(learner.Q))
+
+
+def test_a_second_solve_continues_from_the_table_as_it_stands():
+    """One verb: solve(n_episodes=) learns on from the current table, as the RL planner's does."""
+    problem = double_integrator_problem()
+    learner = TabularLearningPlanner(problem, gamma=0.9, seed=0, **GRID)
+    first = learner.solve(n_episodes=40)
+    table_after_first = learner.Q.copy()
+    second = learner.solve(n_episodes=30)
+
+    # The history counts every episode, and the second record says so
+    assert len(learner.history) == 70
+    assert (first.record.n_episodes, second.record.n_episodes) == (40, 70)
+
+    # The first solve is a fresh learner's 40 episodes from the same seed
+    once = TabularLearningPlanner(problem, gamma=0.9, seed=0, **GRID)
+    once.solve(n_episodes=40)
+    np.testing.assert_array_equal(once.Q, table_after_first)
+    assert not np.array_equal(learner.Q, table_after_first)
+    assert not hasattr(learner, "learn")
 
 
 def test_exploration_policies_choose_valid_actions():
@@ -153,7 +173,7 @@ def test_exploration_policies_choose_valid_actions():
 
 def test_sample_average_step_and_the_planner_arguments():
     problem = double_integrator_problem()
-    learner = TabularLearningPlanner(problem, eta=None, **GRID)
+    learner = TabularLearningPlanner(problem, learning_rate=None, **GRID)
     solution = learner.solve(n_episodes=5, evaluate=True)
     assert learner.gamma == 1.0  # an undiscounted cost, as for value iteration
     assert "epsilon" in learner.history[-1]
@@ -174,12 +194,12 @@ def test_numpy_environment_steps_like_the_problem():
     x, t = env.reset(rng), 0.0
     assert x.shape == (2,)
     for k in range(3):
-        x, t, r, terminated, truncated = env.step(x, t, np.array([0.5]), rng)
+        x, t, r, terminated, truncated = env.step(x, np.array([0.5]), t, rng)
         assert np.isfinite(r) and not terminated
         assert bool(truncated) == (k == 2)
     # a state pushed out of the box pays the problem's exit failure_cost and terminates
     _, _, r, terminated, truncated = env.step(
-        np.array([1.99, 1.99]), 0.0, np.array([1.0]), rng
+        np.array([1.99, 1.99]), np.array([1.0]), 0.0, rng
     )
     assert bool(terminated) and not bool(truncated) and float(r) < -19.0
 

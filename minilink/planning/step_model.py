@@ -329,7 +329,7 @@ class StepModel:
         ``n_steps`` (``N``) defaults to the model's :attr:`n_steps`. The
         samples sit at the ticks' times ``t_k`` (:meth:`time_of`), ``x``
         ``(n, N + 1)``, ``u`` ``(m, N + 1)`` with the last input held at the
-        final state; the signal ``"cost"`` ``(1, N + 1)`` is the running sum
+        final state; the signal ``"J"`` ``(1, N + 1)`` is the running sum
         ``J_k = Σ_{j<k} γʲ c_j``, the terminal ``γᴺ h(x_N)`` added at the last
         sample, so its last value is ``J``: the one sum every tool's score is.
         """
@@ -366,7 +366,7 @@ class StepModel:
             t=t,
             x=np.stack(xs, axis=1),
             u=u,
-            signals={"cost": np.asarray(Js, dtype=float).reshape(1, -1)},
+            signals={"J": np.asarray(Js, dtype=float).reshape(1, -1)},
         )
 
         return traj

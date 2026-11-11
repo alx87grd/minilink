@@ -48,7 +48,7 @@ DEPENDENCY_PROBE = 0.5
 ###############################################################################
 
 
-def compile(system, backend=BACKEND_NUMPY, verbose=False, *, flatten=False):
+def compile(system, *, backend=BACKEND_NUMPY, verbose=False, flatten=False):
     """Compile a system into a typed evaluator.
 
     Returns a :class:`DynamicEvaluator` for a :class:`DynamicSystem`, a
@@ -375,7 +375,7 @@ def validate_equation_shapes(system, label=None):
         raise ValueError(
             f"x0 of '{name}' has shape {x0.shape}; expected ({n},) for n={n}"
         )
-    u0 = np.asarray(system.get_u_from_input_ports(), dtype=float).reshape(-1)
+    u0 = np.asarray(system.u_nominal, dtype=float).reshape(-1)
 
     if isinstance(system, DynamicSystem) and n > 0:
         require_shape(system.f(x0, u0, 0.0), (n,), f"f() of '{name}'", f"for n={n}")
@@ -475,12 +475,12 @@ def input_rows(system):
 
 def warn_shared_seeds(diagram):
     """Warn when two random blocks hold one seed: they would draw the same signal."""
-    blocks_by_seed = {}
+    subsystems_by_seed = {}
     for path, subsystem in iter_subsystems(diagram):
         seed = subsystem.params.get("seed") if subsystem.is_random else None
         if seed is not None:
-            blocks_by_seed.setdefault(int(seed), []).append(".".join(path))
-    for seed, ids in blocks_by_seed.items():
+            subsystems_by_seed.setdefault(int(seed), []).append(".".join(path))
+    for seed, ids in subsystems_by_seed.items():
         if len(ids) > 1:
             warnings.warn(
                 f"random blocks {', '.join(ids)} share seed {seed} and draw the same "

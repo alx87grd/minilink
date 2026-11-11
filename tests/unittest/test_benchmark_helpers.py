@@ -83,7 +83,7 @@ class TestBenchmarkSmoke(unittest.TestCase):
         variants = (
             OptimizerBenchmarkVariant(
                 name="scipy-SLSQP",
-                method="scipy_slsqp",
+                method="slsqp",
                 options={"maxiter": 200, "ftol": 1e-9, "disp": False},
             ),
         )

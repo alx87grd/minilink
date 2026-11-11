@@ -141,9 +141,7 @@ def test_the_held_train_reproduces_the_lyapunov_variance():
     samples = []
     for seed in range(12):
         noise.params["seed"] = seed
-        traj = loop.compute_trajectory(
-            tf=40.0, dt=period, solver="rk4_fixedsteps", verbose=False
-        )
+        traj = loop.compute_trajectory(tf=40.0, dt=period, solver="rk4", verbose=False)
         samples.append(
             traj.x[0, 500:]
         )  # after five time constants, at the sample instants

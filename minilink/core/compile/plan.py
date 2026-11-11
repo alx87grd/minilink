@@ -675,7 +675,7 @@ def require_tick_laws_on_their_box_clock(diagram, base, prefix=()):
 def face_of(sys, sampled_kind) -> str:
     """What the block reads as time in a sampled plan: ``"seconds"``, ``"count"`` or ``"base"``."""
     if isinstance(sys, sampled_kind):
-        return "count" if sys.counts else "seconds"
+        return "count" if sys.is_tick_law else "seconds"
     if isinstance(sys, StepSystem):
         return "base"
 

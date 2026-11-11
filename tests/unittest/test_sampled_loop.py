@@ -487,11 +487,9 @@ def test_a_bare_tick_law_is_refused_where_a_nested_box_would_speed_it_up():
 
 
 def test_the_mpc_box_has_no_clock_operator_of_its_own():
-    from minilink.planning.trajectory_optimization.mpc.predictive import (
-        PredictiveController,
-    )
+    from minilink.control import ModelPredictiveController
 
-    assert "__mod__" not in vars(PredictiveController)
+    assert "__mod__" not in vars(ModelPredictiveController)
 
 
 def test_the_host_runner_lands_on_the_period_end_for_any_substep_count():
@@ -551,6 +549,34 @@ def test_a_sampled_data_law_takes_its_period_at_construction():
         law % 0.2
     with pytest.raises(TypeError, match="already on a clock"):
         discretize(law, 0.1)
+
+
+def test_a_sampled_data_law_takes_output_dim_and_writes_its_h():
+    """Ruling Q6: output_dim= like its siblings; an h that would read its own output port refused."""
+    from minilink.core.discrete.sampled_system import NativeSampledSystem
+
+    class Accumulator(NativeSampledSystem):
+        """x_{k+1} = x_k + Δ u_k, y = 2 x: an integrator written in seconds."""
+
+        def __init__(self):
+            super().__init__(1, sample_period=0.1, input_dim=1, output_dim=1)
+
+        def update(self, x, u, t, params=None):
+            return x + self.sample_period * u
+
+        def h(self, x, u, t=0.0, params=None):
+            return 2.0 * x
+
+    law = Accumulator()
+    assert law.p == 1 and "y" in law.outputs
+    run = law.compute_rollout(3, u=np.ones(1))
+    np.testing.assert_allclose(run.x[0], [0.0, 0.1, 0.2, 0.3])
+    np.testing.assert_allclose(
+        law.outputs["y"].compute(np.array([0.3]), np.ones(1), 0.3), [0.6]
+    )
+
+    with pytest.raises(TypeError, match="y would read itself"):
+        NativeSampledSystem(1, sample_period=0.1, output_dim=1)
 
 
 def test_the_held_outputs_start_is_a_leaf_of_the_run():

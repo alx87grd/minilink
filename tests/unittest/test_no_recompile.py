@@ -9,7 +9,6 @@ from minilink import Pendulum, PlanningProblem, QuadraticCost  # noqa: E402
 from minilink.core.backends import configure_jax  # noqa: E402
 from minilink.core.sets import SingletonSet  # noqa: E402
 from minilink.planning.trajectory_optimization.direct_collocation import (  # noqa: E402
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.path_integral import (  # noqa: E402
@@ -35,8 +34,8 @@ jax.monitoring.register_event_duration_secs_listener(count_compile)
 
 def swing_problem():
     plant = Pendulum()
-    plant.inputs["u"].lower_bound[0] = -20.0
-    plant.inputs["u"].upper_bound[0] = 20.0
+    plant.inputs["u"].lower[0] = -20.0
+    plant.inputs["u"].upper[0] = 20.0
     goal = np.array([np.pi, 0.0])
     return PlanningProblem(
         sys=plant,
@@ -69,11 +68,9 @@ def test_the_compiled_trajectory_planner_at_new_numbers_compiles_nothing():
     configure_jax(enable_x64=True)
     planner = TrajectoryOptimizationPlanner(
         swing_problem(),
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=8)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=8),
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 20, "disp": False},
     )
 
@@ -117,10 +114,10 @@ def test_a_cost_edit_inside_the_problem_is_seen_by_the_next_value_iteration_solv
             max_iterations=5,
         )
         planner.solve()
-        J_before = planner.result.J.copy()
+        J_before = planner.tables.J.copy()
         problem.cost.params["R"] = 100.0 * problem.cost.params["R"]
         planner.solve()
-        J_after = planner.result.J.copy()
+        J_after = planner.tables.J.copy()
         problem.cost.params["R"] = problem.cost.params["R"] / 100.0
 
         assert not np.allclose(J_before, J_after), backend
@@ -132,11 +129,9 @@ def test_one_planner_solve_compiles_the_plant_once():
     problem = swing_problem()
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=DirectCollocationTranscription(
-            DirectCollocationOptions(n_steps=8)
-        ),
+        transcription=DirectCollocationTranscription(n_steps=8),
         backend="numpy",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 5, "disp": False},
     )
     compile_system = problem.sys.compile

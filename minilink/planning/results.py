@@ -14,6 +14,11 @@ from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import EPISODE_LENGTH
+from minilink.planning.plotting import (
+    cost_to_go_figure,
+    plot_control_law,
+    plot_solution_trajectory,
+)
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.step_model import is_continuous, step_model_of
 
@@ -72,10 +77,13 @@ class PlanningSolution:
         the solve was asked to evaluate (``solve(evaluate=True)``); ``None``
         otherwise, or when the problem declares no cost.
     params : dict, optional
-        The numbers the solve ran on: the problem's tree as it was when the
-        solution was made, a copy. ``None`` (the default) takes it from
-        ``problem`` at construction; the live problem may move afterwards, the
-        evidence keeps its numbers.
+        The numbers the solve ran on: the planner's complete tree as it was
+        when the solution was made, a copy (the problem's parts the planner
+        reads, ``"method"`` its numbers, ``"seed"``), so
+        ``planner.solve(params=solution.params)`` solves it again; the live
+        problem may move afterwards, the evidence keeps its numbers. ``None``
+        (the default, a solution no planner made) takes the problem's tree at
+        construction.
     """
 
     problem: PlanningProblem
@@ -87,7 +95,7 @@ class PlanningSolution:
     params: dict | None = None
 
     def __post_init__(self) -> None:
-        # The numbers solved on, a copy: the evidence keeps them when the problem moves
+        # A solution no planner made: the problem's numbers, a copy the evidence keeps
         if self.params is None:
             object.__setattr__(self, "params", copy.deepcopy(self.problem.params))
 
@@ -126,9 +134,6 @@ class PlanningSolution:
         titled plan or run. ``renderer`` is the drawing library,
         ``"matplotlib"`` or ``"plotly"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_solution_trajectory
-
         return plot_solution_trajectory(
             self,
             drawn_trajectory_of(self, dt),
@@ -150,35 +155,107 @@ class PlanningSolution:
             show=show,
         )
 
-    def plot_control_law(self, **kwargs):
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        anchor=None,
+        bounds=None,
+        grid_shape=(101, 101),
+        t=0.0,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
         """
-        Draw the feedback law over the problem's state box.
+        Draw the feedback law, input ``u_axis`` over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
-        The controller's own :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`,
-        with ``bounds`` filled from the problem's constraint set (or the
-        plant's state box) and the colour limits from its input set, so that
-        laws of one problem share one scale. Every keyword passes through
-        (``x_axis``, ``y_axis``, ``u_axis``, ``ax``, ``show``, ...).
+        A grid planner's law (value iteration, tabular learning) is its table
+        on the grid's own nodes; any other law is the controller's own
+        :meth:`~minilink.core.facades.plotting.SystemPlotting.plot_control_law`
+        swept over ``bounds``, the problem's constraint set (or the plant's
+        state box) by default, on a ``grid_shape`` mesh at the time ``t``,
+        its colour limits from the input set, so laws of one problem share one
+        scale (``bounds``, ``grid_shape``, ``t`` or ``is_3d`` given, a grid
+        law is swept the same way); ``anchor`` pins a grid law's other axes
+        (a controller's are at their nominal values). ``trajectory`` overlays a run, ``title``
+        replaces the title, ``ax`` draws into existing axes, ``show=False``
+        builds only; ``renderer`` is ``"matplotlib"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import control_law_kwargs
+        return plot_control_law(
+            self,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            u_axis=u_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
-        self.require_feedback_law()
-
-        return self.controller.plot_control_law(**control_law_kwargs(self, kwargs))
-
-    def plot_cost_to_go(self, **kwargs):
+    def plot_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
         """
-        Draw the method's cost-to-go over two state axes, the others pinned at the goal.
+        Draw the method's cost-to-go over the state axes ``x_axis`` and ``y_axis``: a :class:`~minilink.graphical.common.plot_result.PlotResult`.
 
-        A heatmap of ``cost_to_go`` sampled on the problem's state box; see
-        :func:`~minilink.planning.comparison.plot_cost_to_go` for ``x_axis``, ``y_axis``,
-        ``anchor``, ``bounds``, ``jmax``, ``ax`` and ``show``.
+        A grid planner's table is drawn on the grid's own nodes; any other
+        field is sampled on a ``grid_shape`` mesh over ``bounds`` (the
+        problem's state box) at the time ``t``, the other axes pinned at
+        ``anchor`` (the goal, else the start). ``jmax`` tops the colour scale,
+        by default the field's value past its grid (the failure cost) when it
+        has one, ``np.inf`` for Matplotlib's own scale; ``is_3d`` adds the
+        surface, ``trajectory`` overlays a run, ``title`` replaces the title,
+        ``ax`` draws into existing axes, ``show=False`` builds only;
+        ``renderer`` is ``"matplotlib"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_cost_to_go
+        field = require_cost_to_go(self)
+        tables = getattr(self.record, "tables", None)
 
-        return plot_cost_to_go(self, **kwargs)
+        return cost_to_go_figure(
+            self.problem,
+            field,
+            grid=None if tables is None else tables.grid,
+            family=self.family,
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            jmax=jmax,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
     # Display
 
@@ -204,6 +281,17 @@ class PlanningSolution:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_cost_to_go(solution, owner=None):
+    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``. ``owner`` names the solution's planner in the refusal (its family when ``None``)."""
+    if solution.cost_to_go is None:
+        owner = f"this {solution.family}" if owner is None else f"{owner}'s"
+        raise ValueError(
+            f"{owner} solution carries no cost-to-go field (its cost_to_go is None)"
+        )
+
+    return solution.cost_to_go
 
 
 def drawn_trajectory_of(solution, dt=None) -> Trajectory:
@@ -285,3 +373,11 @@ def solution_text(solution):
     ]
 
     return format_inspect(headline, body)
+
+
+def solve_time_text(solve_time_s) -> str:
+    """A record's printed solve time, ``"; solved in 0.123 s"``, or nothing when the solve has no wall clock (``None``)."""
+    if solve_time_s is None:
+        return ""
+
+    return f"; solved in {solve_time_s:.3g} s"

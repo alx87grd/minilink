@@ -124,14 +124,14 @@ def _speedup_metric(row, reference) -> MetricRecord:
 
 def _agreement_metrics(row, reference) -> list[MetricRecord]:
     """Cost-to-go and policy agreement of one backend against the NumPy reference."""
-    J = reference.result.J
+    J = reference.tables.J
     scale = np.maximum(np.abs(J), 1.0)
 
     # Relative gap: scale-free, so it does not track how much of the grid is infeasible
-    max_rel_dJ = np.max(np.abs(row.result.J - J) / scale)
+    max_rel_dJ = np.max(np.abs(row.tables.J - J) / scale)
 
     # Share of nodes whose greedy action differs
-    disagreement = np.mean(row.result.pi != reference.result.pi)
+    disagreement = np.mean(row.tables.pi != reference.tables.pi)
 
     return [
         MetricRecord(

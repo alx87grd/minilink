@@ -21,10 +21,7 @@ from minilink.control import ModelPredictiveController  # noqa: E402
 from minilink.dynamics.catalog.equations.integrators import (  # noqa: E402
     DoubleIntegrator,
 )
-from minilink.planning import MPPIPlanner, MPPIRecord  # noqa: E402
-from minilink.planning.trajectory_optimization.mpc.predictive import (  # noqa: E402
-    PredictiveController,
-)
+from minilink.planning import MPPIPlanner, MPPIRecord, evaluate  # noqa: E402
 
 DT = 0.05
 
@@ -43,8 +40,8 @@ class SwingUpCost(CostFunction):
 
 def swing_up_planner(**options):
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     problem = PlanningProblem(
         plant, cost=SwingUpCost(), horizon=2.0, x0=[0.0, 0.0], U=plant.input_box
     )
@@ -54,8 +51,8 @@ def swing_up_planner(**options):
 
 def double_integrator_planner():
     plant = DoubleIntegrator()
-    plant.inputs["u"].lower_bound = np.array([-5.0])
-    plant.inputs["u"].upper_bound = np.array([5.0])
+    plant.inputs["u"].lower = np.array([-5.0])
+    plant.inputs["u"].upper = np.array([5.0])
     cost = QuadraticCost.from_system(plant, Q=np.eye(2), R=0.1 * np.eye(1))
     problem = PlanningProblem(
         plant, cost=cost, horizon=1.0, x0=[1.0, 0.0], U=plant.input_box
@@ -82,7 +79,7 @@ def test_the_plan_lowers_the_cost_of_the_default_one():
         edited(pv.params, {"method": {"temperature": 1e9}}), z0
     )  # an unweighted average
     z, status = pv.solve(None, z0)
-    assert float(status["cost"]) < float(status_0["cost"])
+    assert float(status["J"]) < float(status_0["J"])
     assert z.shape == (pv.n_z,) and pv.n_z == 20 * 1 + 1
 
 
@@ -102,6 +99,7 @@ def test_the_first_input_points_the_way_lqr_does():
 def test_the_solution_is_a_held_schedule_with_its_record():
     solution = swing_up_planner().solve()
     assert isinstance(solution.record, MPPIRecord) and solution.family == "mppi"
+    assert solution.record.solve_time_s > 0.0 and "solved in" in str(solution.record)
     assert solution.trajectory.t.size == 41
     source = solution.controller
     u_mid = source.h(np.zeros(0), np.zeros(0), 0.5 * DT)
@@ -130,7 +128,7 @@ def test_shift_holds_the_last_input_and_command_reads_the_held_one():
 def test_the_mpc_runs_mppi_in_every_form(form, blocks):
     planner = swing_up_planner()
     mpc = ModelPredictiveController(planner, **form)
-    assert isinstance(mpc, PredictiveController) and list(mpc.subsystems) == blocks
+    assert isinstance(mpc, ModelPredictiveController) and list(mpc.subsystems) == blocks
     loop = (mpc % DT) @ planner.problem.sys
     run = loop.compute_trajectory(tf=0.5, dt=DT)
     assert np.all(np.isfinite(run.x)) and run.has_signal("plant:u")
@@ -156,8 +154,8 @@ def test_mppi_refuses_an_unboxed_input_and_a_ragged_horizon():
     boxed = PlanningProblem(
         plant, cost=cost, horizon=2.02, x0=[0.0, 0.0], U=plant.input_box
     )
-    plant.inputs["u"].lower_bound = np.array([-1.0])
-    plant.inputs["u"].upper_bound = np.array([1.0])
+    plant.inputs["u"].lower = np.array([-1.0])
+    plant.inputs["u"].upper = np.array([1.0])
     with pytest.raises(ValueError, match="whole number of periods"):
         MPPIPlanner(boxed, dt=0.05)
 
@@ -222,7 +220,7 @@ def test_the_overlays_and_the_figure_draw_mppi():
     fan = next(o for o in overlays if isinstance(o, SampledFutures))
     assert len(next(iter(fan.get_dynamic_geometry(0.2).values()))) == 8 + 1
     fig, ax = plot_sampled_futures(
-        run, mpc, loop=loop, ticks=[0, 5], axes=("t", 0), show=False
+        run, mpc, loop=loop, ticks=[0, 5], x_axis="t", y_axis=0, show=False
     )
     assert len(ax.lines) == 2 * (32 + 1) + 1
 
@@ -236,7 +234,7 @@ def test_verbose_prints_mppis_account():
         zero_delay_run(tf=0.1, verbose=True)
     line = out.getvalue().splitlines()[0]
     assert line.startswith("MPC @ t=0.00s") and "S_min=" in line
-    assert "effective_samples=" in line and "/512" in line and "exit_rate=" in line
+    assert "effective_rollouts=" in line and "/512" in line and "exit_rate=" in line
 
 
 def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
@@ -258,10 +256,20 @@ def test_mppis_tree_holds_the_problems_cost_and_a_moved_weight_moves_the_plan():
     assert np.max(np.abs(z_heavy[:-1])) < np.max(np.abs(z[:-1]))
 
 
+def test_the_evidence_of_a_solve_at_params_scores_the_edited_problem():
+    """A solve at an edited tree is scored on the problem it solved, the start moved."""
+    planner = double_integrator_planner()
+    tree = edited(planner.params, {"x0": np.array([0.5, 0.0])})
+    solution = planner.solve(params=tree, evaluate=True)
+    expected = evaluate(solution.problem, solution.controller, dt=DT)
+    np.testing.assert_allclose(solution.evaluation.J, expected.J)
+    np.testing.assert_allclose(solution.evaluation.x0, [[0.5, 0.0]])
+
+
 def test_the_mppi_mpcs_cost_is_tuned_through_the_solve_block():
     plant = Pendulum()
-    plant.inputs["u"].lower_bound = np.array([-4.0])
-    plant.inputs["u"].upper_bound = np.array([4.0])
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
     cost = QuadraticCost.from_system(plant, R=0.01 * np.eye(1))
     problem = PlanningProblem(
         plant, cost=cost, horizon=0.5, x0=[1.0, 0.0], U=plant.input_box
@@ -291,7 +299,7 @@ def test_a_gradient_through_mppis_temperature_is_finite():
         _, status = pv.solve_fn(
             {**pv.params, "method": {**pv.params["method"], "temperature": lam}}, z0
         )
-        return status["cost"]
+        return status["J"]
 
     assert np.isfinite(float(jax.grad(cost)(0.01)))
 

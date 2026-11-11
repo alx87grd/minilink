@@ -246,7 +246,7 @@
       "direction": "lower_better",
       "value": 1.0965155450103339,
       "unit": "s",
-      "notes": "showcase cart-pole swing-up, scipy_slsqp, compile_backend=jax"
+      "notes": "showcase cart-pole swing-up, slsqp, compile_backend=jax"
     },
     {
       "id": "trajopt.showcase_cartpole.jax_slsqp.solve_s",

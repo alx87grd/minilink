@@ -38,7 +38,6 @@ the maintainer would and logged in the run's record.
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
-| `Source.plot_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
@@ -55,7 +54,6 @@ the maintainer would and logged in the run's record.
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The README's two headline examples | — | v0.4 (with the demo rebuild) | the planner comparison's numbers so each planner reaches the goal, and bounds on the co-design example (KNOWN_ISSUES, "The README's examples") |
-| A linear model's matrices | — | before the v0.9 freeze | `lin.A()` kept as a call, or `lin.A` an attribute at the block's own `params` (KNOWN_ISSUES) |
 | The public face | V10 | v1.0 | a teaching quickstart first in README; `CONTRIBUTING.md` and templates |
 | The Stable-Baselines3 notebooks | S49 | v1.0 | retire two, decide two |
 | The realtime band's review | — | v1.0 | frozen surface or provisional |
@@ -450,8 +448,6 @@ reference are AGENTS'.
   instead of raising, with `link_lengths` the base contract (scan: dynamics#7).
 - [ ] **analysis** (T4): `analysis/lyapunov.py`'s `EVEN` / `ODD` slices sit under Internal
   machinery, apart from `METHODS` at the top.
-- [ ] **planning** (T5): `direct_collocation.py` / `shooting.py` / `multiple_shooting.py`
-  read `self.options.*` inside their bodies.
 
 **D1 — demos to the rule** (RULES 6.1 / 6.10 / 6.11; the census is comment FD-C14 of the
 2026-09-15 foundations review, in git history). The demo rows apply to the demos the
@@ -490,9 +486,6 @@ maintainer's rebuild keeps (§1.12); the notebooks' are unchanged.
 the 2026-09-05 consolidation inventory, in git history (nothing removed without the maintainer's
 pick):
 
-- [ ] `Source.plot_signal` (`show_signal` before the API naming sweep; 80 lines of bespoke matplotlib; the same picture is
-  `source.plot_trajectory(tf=…)`), with the sources demo and `__main__` that exist only for
-  it (scan: graphics#14) **[ask — user-callable]**.
 - [ ] Dead modules `planning/spatial/overlays.py` (retires with A3) and
   `experimental/symbolic/mechanics/utils.py` **[ask — importable names]**.
 - [ ] MPC debug figure → `planning/trajectory_optimization/mpc/viz.py`.
@@ -514,6 +507,10 @@ pick):
   arms, rotating cart-poles) → auto-fit or params-derived; raw ground `CustomLine`s in catalog
   skins → `ground_line()`. Also: a renderer capability table with honest fallbacks (scan:
   graphics#7); the physics owns the drawn lengths (scan: dynamics#9).
+- [ ] A tree search whose best effort is the root alone hands out an input with no channel
+  (`Tree.extract_trajectory`'s `u` of shape `(0, 1)`), so `solve(evaluate=True)` raises: the
+  root-only path holds the plant's nominal input (KNOWN_ISSUES, "A tree search that never
+  leaves its root cannot be scored").
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;
@@ -675,7 +672,7 @@ each plan states.
     bounds landed, each plant states its own): output ports that are
     the state or a slice of it read labels and units from the state (the 56 copy lines go);
     one port layout across the bicycle rungs; one owner for the wheelbase; the hidden `0.01`
-    damping in `Drone2D.d` and `Rocket.d` named; `VanderPol` with a real input or none;
+    damping in `Drone2D.d` and `Rocket.d` named; `VanDerPol` with a real input or none;
     constructor hygiene in the pendulum and mass-spring-damper families.
 - [ ] **Traceable linear analysis** (S73) **[idea to review — ask — core]**, proposed by the
   maintainer, not scheduled: `poles`, `frequency_response` and `margins` in
@@ -799,7 +796,7 @@ terms; the v1.0 rows after two cohorts.
   finite-horizon filter (`kalman_finite_horizon` → a time-varying observer, the dual of
   `lqr_finite_horizon`, the forward sweep on the dual pair with `riccati_step`); the
   linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
-  the dual of `trajectory_lqr`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
+  the dual of `lqr_trajectory`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
   R_n, x0, P0)`, `P` a state, Jacobians taken on the model's `f`, `h` inside its own `f`);
   the sampled filters (unscented, discrete Kalman, particle) on the sampled loop; the
   `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);
@@ -931,9 +928,6 @@ One line each; open a plan doc only when a design needs a writeup.
   shaping filter `τ ż = −z + w`, its state started from `N(0, W / 2τ)` so it is stationary
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
-- A training run that rebinds its numbers: the RL planner's `params` is a report
-  today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
-  one.
 - A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static
   HTML of one frame. The headless screenshot side exists: `docs/asset_export.py::html_to_gif`
   seeks an exported page frame by frame, so a still is one `seek` and one screenshot. With it,

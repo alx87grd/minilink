@@ -122,9 +122,11 @@ class RolloutEnvironment:
         # Horizon: a finite one ends after the model's N periods, an infinite one runs
         # episodes of fixed length
         self.finite_horizon = self.model.n_steps is not None
-        self.tf = episode_time_of(problem, self.model, self.dt, episode_length)
-        self.n_steps_per_episode = int(round(self.tf / self.dt))
-        require_episode_steps(self.n_steps_per_episode, self.tf, self.dt)
+        self.episode_length = episode_time_of(
+            problem, self.model, self.dt, episode_length
+        )
+        self.n_steps_per_episode = int(round(self.episode_length / self.dt))
+        require_episode_steps(self.n_steps_per_episode, self.episode_length, self.dt)
 
         # The training reward: −g dt on a continuous problem unless the stage cost is
         # asked for; a native step problem has only its stage cost
@@ -151,8 +153,8 @@ class RolloutEnvironment:
         # Input vector: the action fills its port, disturbances fill theirs
         self.action_port = command_port(self.sys)
         self.m = int(self.sys.inputs[self.action_port].dim)
-        u_nominal = np.asarray(self.sys.get_u_from_input_ports(), dtype=float)
-        self.nominal_inputs = self.sys.get_port_values_from_u(u_nominal)
+        u_nominal = np.asarray(self.sys.u_nominal, dtype=float)
+        self.nominal_inputs = self.sys.ports(u_nominal)
 
         # The cost a failure is charged: declared on the problem, else the model's cost
         # bound over the episode, the sum the return runs
@@ -196,7 +198,7 @@ class RolloutEnvironment:
             if block.is_random
         }
 
-    def step(self, x, t, u, key, params=None, *, t_origin=None):
+    def step(self, x, u, t, key, params=None, *, t_origin=None):
         """
         One control period: ``(x_next, t_next, reward, terminated, truncated)``.
 
@@ -207,12 +209,12 @@ class RolloutEnvironment:
         ends it with the value of ``x_next`` still to come: the episode length
         is reached, or the state left the training zone. ``t_origin`` is the
         episode's start when it is not the problem's ``t0`` (a receding
-        horizon solved from a later tick): the horizon is ``tf`` after it.
+        horizon solved from a later tick): the episode ends ``episode_length`` after it.
         """
         xp = array_module(x)
 
         dt = self.dt
-        tf = self.tf
+        episode_length = self.episode_length
         t0 = self.t0 if t_origin is None else t_origin
         finite_horizon = self.finite_horizon
         model = self.model
@@ -254,7 +256,7 @@ class RolloutEnvironment:
         out_of_X = ~xp.all(X.margin(x_next, t_next, X_params) >= 0.0)
         failed = out_of_X | out_of_U | ~finite
         left_zone = ~xp.all(zone.margin(x_next, t_next) >= 0.0)
-        horizon_reached = xp.asarray(t_next >= t0 + tf - 0.5 * dt)
+        horizon_reached = xp.asarray(t_next >= t0 + episode_length - 0.5 * dt)
 
         # A failure is charged its cost; a finite horizon pays h(x_N),
         # one tick later than the last stage cost: r_{N−1} = −c_{N−1} − γ h(x_N),
@@ -329,7 +331,7 @@ class RolloutEnvironment:
         episodes = (
             f"episodes of {self.n_steps_per_episode} ticks"
             if self.model.dt is None
-            else f"episodes of {self.tf:g} s at dt={self.dt:g}"
+            else f"episodes of {self.episode_length:g} s at dt={self.dt:g}"
         )
 
         return (
@@ -362,11 +364,11 @@ def require_reward(reward, supported):
         raise ValueError(f"reward must be one of {supported}, got {reward!r}")
 
 
-def require_episode_steps(n_steps, tf, dt):
+def require_episode_steps(n_steps, episode_length, dt):
     """Refuse an episode shorter than half a control period: it holds no step."""
     if n_steps == 0:
         raise ValueError(
-            f"an episode of {tf:g} s is shorter than half the control period dt={dt:g} s "
+            f"an episode of {episode_length:g} s is shorter than half the control period dt={dt:g} s "
             "and holds no step; lengthen the episode or shorten dt"
         )
 

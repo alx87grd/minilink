@@ -10,10 +10,10 @@ TORQUE = 5.0
 X0 = np.array([-0.1, 0.0])
 
 plant = Pendulum()
-plant.state.lower_bound = np.array([-10.0, -10.0])
-plant.state.upper_bound = np.array([10.0, 10.0])
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
+plant.state.lower = np.array([-10.0, -10.0])
+plant.state.upper = np.array([10.0, 10.0])
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
 
 cost = QuadraticCost.from_system(
     plant,

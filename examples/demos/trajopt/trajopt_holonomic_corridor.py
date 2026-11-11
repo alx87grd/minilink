@@ -66,7 +66,7 @@ def _sample_track_boundaries(track, n_samples=TRACK_ANIM_SAMPLES):
     """Centerline plus corridor upper/lower edges (same geometry as ``plot_track``)."""
     path = track.path
     ss = np.linspace(0.0, path.total_length, n_samples)
-    center = np.array([path.sample(s) for s in ss])
+    center = np.array([path.at(s) for s in ss])
     tangents = np.array([path.tangent(s) for s in ss])
     normals = np.stack([-tangents[:, 1], tangents[:, 0]], axis=1)
     half = float(track.half_width)
@@ -80,10 +80,10 @@ def _line3(xy):
 
 
 sys = HolonomicMobileRobot()
-sys.state.lower_bound = np.array([-2.0, -6.0])
-sys.state.upper_bound = np.array([10.0, 8.0])
-sys.inputs["u"].lower_bound = np.array([-1.5, -1.5])
-sys.inputs["u"].upper_bound = np.array([1.5, 1.5])
+sys.state.lower = np.array([-2.0, -6.0])
+sys.state.upper = np.array([10.0, 8.0])
+sys.inputs["u"].lower = np.array([-1.5, -1.5])
+sys.inputs["u"].upper = np.array([1.5, 1.5])
 
 scene = Scene(obstacles=OBSTACLES)
 track = ReferenceTrack(from_waypoints(WAYPOINTS), half_width=CORRIDOR_HALF_WIDTH)
@@ -127,7 +127,7 @@ t_grid = planner.transcription.initial_guess_time_grid(problem)
 s_start, _ = track.path.project(X_START)
 s_goal, _ = track.path.project(X_GOAL)
 arc = np.linspace(s_start, s_goal, t_grid.size)
-xy = np.array([track.path.sample(s) for s in arc])
+xy = np.array([track.path.at(s) for s in arc])
 guess = Trajectory(
     t=t_grid,
     x=xy.T,

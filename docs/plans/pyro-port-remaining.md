@@ -221,8 +221,8 @@ The open pyro scripts under `examples/` (of 195; the 28 Done at the 2026-09-05 s
 | `demos_by_tool/trajectory_planning/double_pendulum_with_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
 | `demos_by_tool/trajectory_planning/mountain_car_trajectory_optimization.py` | **Partial** | Trajopt done; plant-specific demo TODO |
 | `demos_by_tool/trajectory_stabilization/cartpole_swing_up_with_lqr_stabilization.py` | **Partial** | examples/demos/control/trajectory_lqr_cartpole.py |
-| `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
-| `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | Plant-specific demo TODO (`trajectory_lqr` landed) |
+| `demos_by_tool/trajectory_stabilization/double_pendulum_with_trajectory_following_lqr_controller.py` | **TODO** | Plant-specific demo TODO (`lqr_trajectory` landed) |
+| `demos_by_tool/trajectory_stabilization/pendulum_swing_up_with_lqr_stabilization.py` | **TODO** | Plant-specific demo TODO (`lqr_trajectory` landed) |
 | `demos_by_tool/transfer_functions/mass_with_pid.py` | **Partial** | examples/demos/control/pid_anti_windup.py |
 
 ### 3.4 `projects/`
@@ -282,7 +282,7 @@ Ordered by unblock count:
 | Priority | Work | Unblocks |
 | --- | --- | --- |
 | prio 2 | ~~`Manipulator` catalog rebase + `control/modelbased.py`, `control/robotic.py`~~ (library landed) | representative closed-loop demos per plant band |
-| prio 2 | ~~`TrajectoryLQRController`~~ (landed: `trajectory_lqr`) | trajectory_stabilization/ demos |
+| prio 2 | ~~`TrajectoryLQRController`~~ (landed: `lqr_trajectory`) | trajectory_stabilization/ demos |
 | prio 3 | `planning/trajectory_generation/` (min-snap) | differentialflatness/ demos |
 | prio 3 | ~~`estimation/luenberger.py`, `kalman.py`~~ (landed: `luenberger`, `kalman` in `estimation/design.py`) | LQG demos |
 | prio 3 | `identification/fitting.py` | params-gradient workflow |
@@ -307,7 +307,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | ss2tf() | transfer_function() (2026-09-07) | `minilink/analysis/frequency.py` |
 | StateObserver | StateObserver; `kalman()` / `luenberger()` replace the `kalman` / `kalman_from_ss` classmethods, pyro's `G=` is the caller's `Q_n = B W Bᵀ` (2026-10-14) | `minilink/estimation/observer.py`, `minilink/estimation/design.py` |
 | ObservedSystem | `lqg(...) @ plant`, the observer + gain box (2026-10-14) | `minilink/control/design.py` |
-| VanderPol | VanderPol | `minilink/dynamics/catalog/equations/oscillators.py` |
+| VanderPol | VanDerPol | `minilink/dynamics/catalog/equations/oscillators.py` |
 | SimpleIntegrator | the `Integrator` block (the plant deleted 2026-10-24) | `minilink/blocks/basic.py` |
 | DoubleIntegrator | DoubleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
 | TripleIntegrator | TripleIntegrator | `minilink/dynamics/catalog/equations/integrators.py` |
@@ -359,7 +359,7 @@ Record of every symbol marked Done, at the 2026-09-05 shrink and since; the sour
 | PIDController | PID (filtered PID), PI, PD (2026-09-07) | `minilink/control/siso.py` |
 | synthesize_lqr_controller | `lqr` on a linear model, `lqr_gain` on arrays | `minilink/control/design.py` |
 | linearize_and_synthesize_lqr_controller | `lqr(sys, Q, R, x_bar=, u_bar=)`, which linearizes then designs | `minilink/control/design.py` |
-| TrajectoryLQRController | trajectory_lqr, TrajectoryFeedback | `minilink/control/design.py`, `minilink/control/state.py` |
+| TrajectoryLQRController | lqr_trajectory, TrajectoryFeedback | `minilink/control/design.py`, `minilink/control/state.py` |
 | ComputedTorque | ComputedTorque | `minilink/control/modelbased.py` |
 | SlidingMode | SlidingMode | `minilink/control/modelbased.py` |
 | stable_baseline3_controller | SB3Controller | `minilink/interfaces/gymnasium.py` |

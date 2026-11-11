@@ -90,12 +90,12 @@ def default_optimizer_variants(
     variants: list[OptimizerBenchmarkVariant] = [
         OptimizerBenchmarkVariant(
             name="scipy-SLSQP",
-            method="scipy_slsqp",
+            method="slsqp",
             options={"maxiter": int(maxiter), "ftol": float(ftol), "disp": False},
         ),
         OptimizerBenchmarkVariant(
             name="scipy-trust-constr",
-            method="scipy_trust_constr",
+            method="trust-constr",
             options={"maxiter": int(maxiter), "xtol": float(ftol), "disp": False},
         ),
     ]
@@ -299,8 +299,8 @@ def _run_case(
         variant=variant,
         success=bool(last_result.success),
         solve_s=float(np.mean(durations)),
-        cost=last_result.cost,
-        cost_err=_cost_error(last_result.cost, case.cost_star),
+        cost=last_result.J,
+        cost_err=_cost_error(last_result.J, case.cost_star),
         z_err=_z_error(last_result.z, case.z_star),
         eq_inf=eq_inf,
         min_ineq=min_ineq,

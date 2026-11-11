@@ -112,12 +112,12 @@ keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
 scene = Scene(obstacles=[Sphere(c, keepout_radius) for c in OBSTACLE_CENTERS])
 
 sys_mpc = BicycleDynRate()
-sys_mpc.state.lower_bound[6] = 0.0
-sys_mpc.state.upper_bound[6] = 90.0
-sys_mpc.state.lower_bound[7] = -0.55
-sys_mpc.state.upper_bound[7] = 0.55
-sys_mpc.inputs["u"].lower_bound = np.array([-80.0, -2.0])
-sys_mpc.inputs["u"].upper_bound = np.array([80.0, 2.0])
+sys_mpc.state.lower[6] = 0.0
+sys_mpc.state.upper[6] = 90.0
+sys_mpc.state.lower[7] = -0.55
+sys_mpc.state.upper[7] = 0.55
+sys_mpc.inputs["u"].lower = np.array([-80.0, -2.0])
+sys_mpc.inputs["u"].upper = np.array([80.0, 2.0])
 
 r_r = sys_mpc.params["r_r"]
 x_cruise = np.array([0.0, 0.0, 0.0, U_TARGET, 0.0, 0.0, U_TARGET / r_r, 0.0])
@@ -189,7 +189,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=MPC_STEPS,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 150, "ftol": 0.1},
 )
 mpc = ModelPredictiveController(planner, delay=False)
