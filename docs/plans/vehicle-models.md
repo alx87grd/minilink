@@ -1,68 +1,83 @@
-# Vehicle models: one tire module, one car ladder, a 3-D future
+# Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
-**Status:** draft, opened 2026-11-11 from the maintainer's direction (below); nothing ruled,
-nothing landed. Its decisions (`VM-D1` to `VM-D10`) wait for the maintainer, one at a time.  
-**Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`) and one research project
-(`examples/projects/`).  
-**Rung:** v0.4's catalog clean-up. Once ruled, this plan is the design of the car part of
-that clean-up (the car cut, K8-0 in [TODO.md](TODO.md)). It also touches the review of the
-mechanical hierarchy and the cars' base (S32), and catalog hygiene's "one port layout across the
-bicycle rungs; one owner for the wheelbase" (S64).
+**Status:** in design. The maintainer was interviewed on 2026-11-11; his answers are recorded
+in §2. The questions still open are in §9. Nothing is built.  
+**Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
+to the maintainer's private repository, not to minilink.  
+**Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),
+then a 3-D car after it. It touches the review of the mechanical hierarchy and the cars' base
+(S32), and catalog hygiene's "one port layout across the bicycle rungs; one owner for the
+wheelbase" (S64).
 
-## 1. Direction and constraints
+## 1. Purpose
 
-The maintainer's direction (2026-11-11):
+Consolidate the car models into a small ladder that teaches one idea per rung. Give the
+dynamic rungs a shared set of pieces:
 
-1. **A big consolidation, but keep a bit more in minilink than a bare minimum:** self-driving
-   will be a major use case.
-2. **One tire module in minilink with three tire models**, one unified interface, swappable on
-   a plant.
-3. **A simplified modelling ladder** in minilink; the specialized models go to a project.
-4. **The UdeS Racecar is UdeS's flagship teaching platform:** it stays public, at least as a
-   preset.
-5. **Future-proof:** a 3-D car with pitch and roll dynamics and suspension will come. What
-   lands now must not have to be undone for it.
+- a tire module with three swappable laws;
+- a terrain;
+- a law for each corner's normal load.
 
-What self-driving asks of the library, and what this plan therefore keeps public: a kinematic
-model for planning, a dynamic model for MPC and estimation, a realistic actuated plant to
-simulate against, tire laws that can be swapped to study model mismatch (plan on one law, drive
-on another), and sensor outputs (speed, slips, grip, IMU) on the plants.
+A 3-D car with suspension can then be built on those pieces, and the maintainer's private
+research models (off-road) can build on the same pieces.
 
-## 2. Today
+Who uses it: the maintainer's courses and his research. Self-driving is the main use case:
+- planning on a kinematic model;
+- MPC and estimation on a dynamic one;
+- a realistic plant to simulate against;
+- tire laws swapped to study model mismatch.
 
-Measured by an audit on `dev` (2026-11-11; `grep` over the repository for each class name).
-It found **25 car-like plant classes and 6 tire laws** in four places:
+## 2. The maintainer's answers (2026-11-11)
+
+| Topic | Answer |
+| --- | --- |
+| Users | the courses and his research; advanced specialized models in his private repository |
+| Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity; 4b quasi-static load transfer, designed for (§6) |
+| 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it |
+| UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class |
+| Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws |
+| Terrain | a height `z(x, y)`, its gradient and a friction `μ(x, y)`; given to the car at construction, like the tire; also exported as a static block for custom diagrams |
+| Rung 6 and rung 4 | different models, but sharing the names and the positions of states and parameters as far as possible |
+| State layout | rung 4's state is the first part of rung 6's state, in the same order; the 3-D states come after it |
+| Heading | `psi` on every rung (state label `"psi"`); rung 6 uses roll `φ`, pitch `θ`, yaw `ψ` |
+| Suspension | the design supports quasi-static load transfer (4b), spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only |
+| Load transfer | an exact continuous model: no lag on the acceleration |
+| Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
+
+## 3. Today
+
+An audit on `dev` on 2026-11-11 (`grep` over the repository for each class name) found
+**25 car-like plant classes and 6 tire laws**:
 
 | Place | Models | Tire laws |
 | --- | --- | --- |
-| Catalog (`minilink/dynamics/catalog/vehicles/`) | `HolonomicMobileRobot`, `KinematicBicycle`, `KinematicCar`, `UdeSRacecar`, `DynamicBicycle`, `DynamicBicycleCar3D`, `BicycleDynRate`, `UdeSRacecarDyn`, `UdeSRacecarDyn3D`, `LongitudinalSlipCar`, `LongitudinalTorqueCar`, `QuarterCar`, `MountainCar` | linear with a friction circle (`dynamic_bicycle.py`); Fiala brush (`tires.py`); sigmoid `μ(s)` (`propulsion.py`) |
-| Trajectory-optimization project (`car_trajopt/vehicles/`) | `Holonomic`, `HolonomicAccel`, `BicycleKin`, `BicycleAcc`, `BicycleDynTauRate`, `BicycleDynServo`, `BicycleDynEngine`, three point and constant-speed extras; `CarProfile` presets | the catalog's linear law |
-| Path-tracking project (`pathtracking/common/vehicle.py`) | `ForceInputBicycle`, `RearDriveBicycle`, `EngineBicycle` | its own `LinearTire`, `Pacejka` (NumPy only, parameters as attributes) |
-| Experimental tier | — | ANCF flexible ring (a carcass model, not a force law; stays there) |
+| Catalog (`minilink/dynamics/catalog/vehicles/`) | `HolonomicMobileRobot`, `KinematicBicycle`, `KinematicCar`, `UdeSRacecar`, `DynamicBicycle`, `DynamicBicycleCar3D`, `BicycleDynRate`, `UdeSRacecarDyn`, `UdeSRacecarDyn3D`, `LongitudinalSlipCar`, `LongitudinalTorqueCar`, `QuarterCar`, `MountainCar` | linear with a friction circle; Fiala brush; sigmoid `μ(s)` |
+| `examples/projects/car_trajopt/vehicles/` | 7 ladder variants, 3 point and constant-speed extras, `CarProfile` | the catalog's linear law |
+| `examples/projects/pathtracking/common/vehicle.py` | `ForceInputBicycle`, `RearDriveBicycle`, `EngineBicycle` | its own linear law and `Pacejka` (NumPy only, parameters as attributes) |
+| Experimental tier | — | ANCF flexible ring (a carcass model, not a force law) |
 
-How the models vary:
+**The physics is mostly the same.** Every planar dynamic model has the same body,
+`M v̇ + C v + d = 0` with `M = diag(m, m, I_z)`, a static axle load and drag. **The variants
+differ in actuation:** what drives the rear wheel, and how the steering is driven. **Four
+classes exist only for their look.**
 
-- **The physics is mostly the same.** Every planar dynamic model has the same body
-  (`M v̇ + C v + d = 0`, `M = diag(m, m, I_z)`), a static axle load and drag.
-- **They differ in actuation:** what drives the rear wheel (wheel rate, wheel acceleration,
-  torque, lagged torque, power, throttle, force) and the steering (angle, rate, servo).
-- **Four classes exist only for their look.**
+Defects and traps, each checked on the code:
 
-What the audit found wrong, each checked on the code:
+- **Four slip regularizations near standstill:** `|vx| + ε`, `√(vx² + ε²)`,
+  `max(|vx|, |ωR|, ε)`, and `|v| + 10⁻⁶` clipped to ±0.5.
+- **Gradient kinks in the optimization plants:** the `|vx| + ε` slip, the hard friction
+  circle, and `sign` and `where` in the ladder's engine.
+- **`DynamicBicycle` is neutral-steer by default.** With one shared `Ca` and `a = b`,
+  `K = m/L (b/Ca_f − a/Ca_r) = 0`.
+- **`KinematicBicycle` ignores `params["length"]`:** `f` reads `a + b`.
+- **The catalog test imports project code:** `test_dynamics_catalog.py` imports `Pacejka`
+  from `examples/projects/`.
 
-- Four slip regularizations near standstill: `|vx| + ε`, `√(vx² + ε²)`, `max(|vx|, |ωR|, ε)`,
-  and `|v| + 10⁻⁶` clipped to ±0.5.
-- Gradient kinks in the plants used for optimization: the `|vx| + ε` slip, the hard friction
-  circle, and `sign` / `where` in the ladder's engine.
-- `DynamicBicycle` is neutral-steer by default. With one shared `Ca` and `a = b`, the
-  understeer gradient `K = m/L (b/Ca_f − a/Ca_r)` is exactly 0.
-- `KinematicBicycle` ignores `params["length"]`: `f` reads `a + b`.
-- The path-tracking vehicle has 0 reads of `params`. The library's catalog test imports its
-  `Pacejka` from `examples/projects/`.
+Lateral force at matched cornering stiffness, from the repository's own functions:
 
-Lateral force at matched cornering stiffness, from the repository's own functions
-(`C_α = 13 μFz/rad`, `μ = 1`, `Fz = 1`, Pacejka at its defaults `B = 10, C = 1.3, D = 1,
-E = 0.97`; NumPy, one deterministic run):
+- inputs: `C_α = 13 μFz/rad`, `μ = 1`, `Fz = 1`;
+- Pacejka at its defaults `B = 10, C = 1.3, D = 1, E = 0.97`;
+- computed on NumPy, in one deterministic run.
 
 | α [deg] | 0.5 | 1 | 2 | 4 | 6 | 12 | 20 |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
@@ -70,211 +85,216 @@ E = 0.97`; NumPy, one deterministic run):
 | brush | 0.109 | 0.210 | 0.389 | 0.661 | 0.837 | 0.999 | 1.000 |
 | Pacejka (defaults) | 0.113 | 0.221 | 0.409 | 0.655 | 0.777 | 0.897 | 0.938 |
 
-The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no peak, so today it
-does not show the one behaviour that sets it apart (the force falling past the peak).
+The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no peak.
 
-## 3. The tire module
+## 4. The ladder
 
-One file, `minilink/dynamics/catalog/vehicles/tires.py`, holds the three laws, the one slip
-function, and the grip measure. It is a teaching ladder of its own; each law adds one idea:
+| Rung | Model | State (appended to the rung below it) | Inputs | Teaches |
+| --- | --- | --- | --- | --- |
+| 1 | point | `x, y` | `vx, vy` | a point that moves where told |
+| 2 | kinematic bicycle | `x, y, psi` | `v, δ` | the no-slip constraint, the wheelbase |
+| 3 | dynamic bicycle | `+ vx, vy, r` | `w_rear, δ` | mass, yaw inertia, tires |
+| 3b | dynamic bicycle, rate inputs | `+ w_rear, δ` | `ẇ_rear, δ̇` | actuators as states: limits become bounds, rates become costs (the MPC plant) |
+| 4 | powered car | `+ P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering |
+| 4b | powered car with load transfer (designed for, §6) | none added | as rung 4 | the loads shift with the accelerations |
+| 5 | longitudinal car (side step) | `x, v, ω, φ` | wheel torque | slip ratio, maximum braking and acceleration |
+| 6 | 3-D car | rung 4's nine, then `z, φ, θ, vz, p, q`, then the corner states (§6) | as rung 4 | heave, roll, pitch, suspension, load transfer, terrain |
 
-| Law | Adds | Force (pure slip, lateral; longitudinal the same with `κ`, `c_kappa`) |
-| --- | --- | --- |
-| **Linear** | the cornering stiffness | `Fy = c_alpha Fz α` |
-| **Brush (Fiala)** | the friction limit `μ Fz`, reached smoothly | `Fy = c_alpha Fz α · g(z)`, `z = c_alpha α / μ`, `g` the brush saturation |
-| **Magic formula (Pacejka)** | a peak, then a fall to sliding friction | `Fy = μ Fz sin(C atan(B α − E (B α − atan(B α))))` |
+- **One rule, every rung: a rung appends states and never reorders them.** A controller,
+  estimator or MPC written for rung 4 therefore reads the first nine states of rung 6
+  unchanged. The planar MPC can drive the 3-D car directly, which is a model-mismatch study
+  for free.
+- **A model that differs only by its numbers is a preset, and one that differs only by its look
+  is a skin.** That covers today's full-size kinematic car, the 3-D looks, and the wheel
+  angles needed by the 3-D animation.
+- **The UdeS Racecar is a public preset** on rungs 2 and 4 (and on 6 when it lands): its
+  parameter set and its 3-D skin. It is a proxy of the real car, not an identification of it.
+- **Sensor outputs on rungs 3 and up:** `speed`, `slip`, `grip`, `imu`, by name, as the racecar
+  has them today.
+- **Rung 6's equations order the body's coordinates as the 6-DOF mechanics needs**
+  (`[position, attitude; twist]`), and map to and from the appended state layout in one place.
 
-### 3.1 One interface
+## 5. The shared pieces
 
-Every law is evaluated **per wheel**, on the wheel's slips and its normal load:
+The dynamic rungs (3 to 6) are built from four pieces, each a structural choice fixed at
+construction (RULES 2.3). Each piece copies its default numbers into the car's `params`, which
+stays the one numeric tree: overrides, gradients, parameter sweeps and system identification
+reach every number.
 
 ```python
-Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # wheel frame, [N]
+car = Car3D(tire=BrushTire(), terrain=Bumps(), suspension=SpringDamper())
+car.params["mu_f"] = 0.6          # one number, on the car
 ```
 
-- `Fz` is an argument, never computed inside the law. Today the plant passes the static axle
-  load. The 3-D car will pass the suspension's corner load, through the same call (§5).
-- `params` holds the law's coefficients (numbers only, RULES 2.3). Which law runs is a
-  structural choice fixed at construction: `DynamicBicycle(tire=BrushTire())` (`VM-D1`).
-- Every core law is written once with `xp`, traces under JAX, and is C¹ in the slips, so
-  trajectory optimization and gradients see no kink (`VM-D2` covers the linear law's limit).
-- The law owns its small-slip stiffness, so `fastest_mode()` and the course's linearization
-  read it from the tire, not from a formula copied into each plant.
+### 5.1 The tire
 
-### 3.2 One parameterization shared by the three laws
+```python
+Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
+```
 
-All three laws read the same three numbers per axle: the friction coefficient `mu`, and the
-slip stiffnesses **per unit load**, `c_alpha` [1/rad] and `c_kappa` [-]. Today's racecar uses
-this convention. The magic formula derives its stiffness factor from them:
-`B = c / (C μ)`, so its slope at zero slip is `B C D = c` per unit load, with `D = μ`. It adds
-only its shape `C` and curvature `E`. So **swapping a law keeps the small-slip behaviour and the
-friction limit the same; only the shape of the saturation changes.** That is what a
-model-mismatch study needs. Load sensitivity (`μ` and `c` falling with `Fz`) can enter a law
-later without changing the interface.
+| Law | Adds | Lateral force (longitudinal: the same with `κ`, `c_kappa`) |
+| --- | --- | --- |
+| linear | the cornering stiffness | `Fy = c_alpha Fz α` |
+| brush (Fiala) | the friction limit, reached smoothly | `Fy = c_alpha Fz α · g(c_alpha α / μ)` |
+| magic formula (Pacejka) | a peak, then a fall | `Fy = μ Fz sin(C atan(B α − E (B α − atan(B α))))` |
 
-### 3.3 One slip function, combined slip
-
-- `wheel_slips(vx, vy, omega, R, v_eps)` → `(kappa, alpha)`, on the wheel-frame contact
-  velocity, with the smooth floor `√(vx² + ε²)`. It replaces the four regularizations.
+- **Shared numbers.** All three laws read `mu` and the stiffnesses **per unit load**
+  (`c_alpha` [1/rad], `c_kappa` [-]). The magic formula derives `B = c / (C μ)`, so its
+  slope at zero slip is `c`; it adds only its shape `C` and its curvature `E`. Swapping a law
+  keeps the small-slip behaviour and the friction limit; only the shape of the saturation
+  changes.
+- **Linear in the load.** With these numbers every law has the form `F = Fz · φ(κ, α)`.
+  This is what makes the exact load transfer of §6 possible.
+- **`Fz` is an argument, never computed inside the law.** Its source is the normal-load law
+  (§5.3).
+- **One slip function** with a smooth floor replaces the four regularizations:
+  `wheel_slips(vx, vy, omega, R, v_eps)`, on the contact velocity in the wheel frame, with
+  denominator `√(vx² + ε²)`.
 - **Combined slip:**
-  - the linear law: independent `Fx` and `Fy`;
-  - the brush law: its one combined slip demand (today's ellipse);
-  - the magic formula: the pure-slip forces scaled onto the friction ellipse.
+  - linear: independent `Fx` and `Fy`;
+  - brush: its one combined slip demand;
+  - magic formula: the pure-slip forces scaled onto the friction ellipse.
+- **Written with `xp`:** NumPy and JAX through one path, C¹ in the slips. The law owns its
+  small-slip stiffness, which feeds the solver's time-constant hint and the course's
+  linearization.
+- **Left out of minilink:** load-sensitive coefficients, relaxation length, and the full
+  magic-formula weighting functions. They can be added behind the same interface, in the
+  private repository.
 
-  The full magic-formula weighting functions (`G_xα`, `G_yκ`) stay in the project (§6).
-- Rolling resistance belongs to the wheel, not to the tire law. It leaves `brush_tire_forces`
-  for the plant's wheel terms.
-- `friction_use` (the used fraction of the ellipse) stays and becomes the standard `grip`
-  output.
+### 5.2 The terrain
 
-## 4. The modelling ladder
+A hard surface, described as named fields over the plane, each a function of the position
+and the time:
 
-Four rungs in the catalog, each adding one physical idea. The longitudinal car is a side
-branch for the courses. A model that differs only by its numbers is a **preset**, one that
-differs only by its look is a **skin**.
+```python
+z = terrain.height(x, y, t, params)
+dz_dx, dz_dy = terrain.gradient(x, y, t, params)
+mu = terrain.friction(x, y, t, params)      # multiplies the tire's μ
+```
 
-| Rung | Model | State | Inputs | Adds | Presets and skins |
-| --- | --- | --- | --- | --- | --- |
-| 0 | `HolonomicMobileRobot` | `x, y` | `vx, vy` | a point that moves where told | — |
-| 1 | `KinematicBicycle` | `x, y, θ` | `v, δ` | the no-slip constraint, the wheelbase | full-size car (4-wheel skin, today `KinematicCar`); **UdeS Racecar** (3-D skin, today `UdeSRacecar`) |
-| 2 | `DynamicBicycle` | + `vx, vy, r` | `w_rear, δ` | mass, yaw inertia, **tires** (swappable) | 3-D skin (today `DynamicBicycleCar3D`) |
-| 3 | the actuated car (`VM-D7` names it) | + `w_rear, δ, P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering | **UdeS Racecar** (today `UdeSRacecarDyn`); full-size car; wheel angles for the 3-D skin (today `UdeSRacecarDyn3D`) |
-| side | `LongitudinalTorqueCar` | `x, v, ω, φ` | wheel torque | slip ratio and traction in 1-D | — |
-| later | the 3-D car (§5) | 6-DOF body, 4 corners | per corner | pitch, roll, heave, suspension, load transfer | — |
+- **The gradient defaults to the exact derivative of the height.** A built-in terrain gives
+  it in closed form (NumPy has no autodiff), as `QuarterCar` does today with `z` and `dz`.
+- **Its numbers are in `params`:** bump height, slope angle, the friction of an ice patch.
+- **A height map from a grid uses smooth interpolation** (bicubic, not bilinear): no kink at
+  every grid line.
+- **A private subclass can add fields** (soil stiffness, rolling resistance) without changing
+  the interface. Soft, deformable ground is out of scope.
+- **Exported as a static block** for custom diagrams: wheel positions in; height, normal and
+  friction out. This makes no algebraic loop, since the wheel positions depend only on the
+  state.
+- **The same fields serve planning:** they are the workspace fields that the geometry plan
+  (geometry-module.md) moves to `core/geometry/`, so a cost can avoid steep or slippery ground
+  with no second representation.
+- **Not covered:** overhangs, bridges and walls. A height map has one height per point;
+  obstacles stay `core/geometry` shapes placed on it.
 
-- **The UdeS Racecar** is a public preset on rungs 1 and 3: its parameter set
-  (`PUBLIC_RACECAR_PARAMS` today) and its 3-D skin, under a public name (`VM-D6`).
-- **Rung 3 is the generalized racecar.** `UdeSRacecarDyn`'s drive and servo are already the
-  smooth versions of the ladder's `BicycleDynEngine` and `BicycleDynServo`, so those two collapse
-  into it.
-- **The rate-input bicycle** (`BicycleDynRate`, the MPC plant: tutorial, MPC demos, benchmarks)
-  is rung 2 with integrators on its inputs. Where it lives is `VM-D5`.
-- **Sensor outputs on rungs 2 and 3:** `speed`, `slip`, `grip`, `imu`, as the racecar has them
-  today. Estimation and self-driving read them by name.
-- `QuarterCar` and `MountainCar` are not handling models. `MountainCar` follows the catalog
-  clean-up's rule. `QuarterCar` is the seed of the 3-D car's suspension corner (`VM-D9`).
+### 5.3 The normal load (per corner)
 
-## 5. Ready for the 3-D car
+| Law | Where `Fz` comes from | States added | Rung |
+| --- | --- | --- | --- |
+| static | the weight split, `m g b / L` | none | 3, 3b, 4 (today) |
+| quasi-static transfer | the exact solve of §6 | none | 4b |
+| spring-damper (level i) | compression from the body pose and the terrain height: `Fz = k Δ + b Δ̇`, floored at 0 (the wheel lifts off) | none beyond rung 6's body | 6 |
+| spring-damper and wheel mass (level ii) | the two-mass quarter car per corner | 2 per corner | 6, an option |
 
-Not built now; these choices are made now so that it fits without undoing rungs 2 and 3:
+### 5.4 The body
 
-1. **Per-wheel tire calls with `Fz` as an argument** (§3.1). Load transfer, longitudinal and
-   lateral, enters by computing `Fz` per corner; the tire module does not change.
-2. **Contact velocity in the wheel frame.** The plant computes each contact point's velocity
-   from the body twist and rotates it into the wheel frame before `wheel_slips`. The same code
-   serves two axles or four corners. Camber and the steer of each wheel enter as that frame's
-   rotation.
-3. **The body as a body-frame mechanical system:** `M v̇ + C(v) v + d = 0`, `q̇ = N(q) v`, as
-   `DynamicBicycle` writes it today. The 3-D body is the same equation with `q` = position and
-   roll, pitch, yaw, and `v` the 6-D twist. Where this sits in the mechanical hierarchy is the
-   pending review of the mechanical hierarchy and the cars' base (S32): this plan needs only
-   that the review keep the body-frame form.
-4. **One state layout on every rung:** `[pose; body velocities; wheel spins; actuator states;
-   display-only angles]`. A rung appends; it never reorders. This is catalog hygiene's "one
-   port layout across the bicycle rungs" (S64).
-5. **Corner-indexed parameters.** Today, axle suffixes (`c_alpha_f`, `c_alpha_r`). The 3-D
-   car needs four corners and per-corner suspension (`k`, `b`, the unsprung mass). The naming
-   chosen now must extend to `fl, fr, rl, rr` (`VM-D3`).
-6. **The ground** is the plane `z = 0` today. The 3-D car will read a terrain height
-   `z(x, y)` (the quarter car's road profile becomes a terrain field). That is for the 3-D
-   car's own plan, not this one.
+`M v̇ + C(v) v + d = 0`, `q̇ = N(q) v`, in the body frame:
 
-## 6. The vehicle project
+- planar for rungs 3 to 4b: `q = [x, y, psi]`;
+- 6-DOF for rung 6: position and roll, pitch, yaw.
 
-One folder, `examples/projects/vehicles/` (today's `car_trajopt/vehicles/` grown into it),
-the home of every specialized model. All of them are built on the catalog's body, tire module
-and slip function, so none copies them:
+The contact velocity of each wheel comes from the body twist and is rotated into the wheel
+frame. The same code serves two axles or four corners. Where this body sits in the
+mechanical hierarchy is the pending review (S32): this plan needs only that the review keep
+the body-frame form.
 
-- the research rungs that remain classes: `HolonomicAccel`, `BicycleAcc` (no-slip with
-  acceleration input), `BicycleDynTauRate` (torque-driven wheel), the point and constant-speed
-  extras;
-- `CarProfile` and its named envelopes (passenger car, race car, 1:5), the planning-limits
-  layer;
-- the full magic-formula combined slip (the weighting functions), relaxation length (tire
-  lag), load-sensitive coefficients;
-- the path-tracking vehicle, rebuilt on the catalog with `params`: the front-wheel spin state
-  and the throttle engine are the only parts it adds;
-- the cross-fidelity maps between rungs (TODO §6's later idea), if they return.
+## 6. Load transfer without an algebraic loop
 
-The duplicates are deleted, not moved: `Holonomic` (same as rung 0), `BicycleKin` (rung 1),
-`BicycleDynEngine` and `BicycleDynServo` (rung 3), and the path-tracking `LinearTire` and
-`Pacejka` (the tire module).
+**Quasi-static transfer (4b).** It is a loop: the loads depend on the accelerations, the
+accelerations on the tire forces, and the forces on the loads. It is solved exactly:
 
-## 7. Steps
+1. The tires are linear in the load: `F_i = Fz_i φ_i`, where `φ_i` depends on the state
+   only.
+2. The transfer is affine in the acceleration of the centre of gravity:
+   `Fz_i = Fz_i⁰ + G_i a`. `G_i` comes from the centre-of-gravity height, the wheelbase,
+   the track and the roll-stiffness split.
+3. Newton's law then gives a linear system, solved inside every `f` call:
 
-One commit each. The steps that move a number carry a ledger (the plant, the demo, the
-number before and after); the others are byte-identical against a seeded baseline (AGENTS.md).
+   ```text
+   (m I − Σ R_i φ_i G_i) a = Σ R_i φ_i Fz_i⁰ − drag
+   ```
 
-- **VM-1 The tire module.** The three laws, the interface, `wheel_slips`; no plant changes.
-  Tests:
-  - each law at zero slip gives the same stiffness;
-  - `|F| ≤ μ Fz` for the brush and magic-formula laws;
-  - continuity of the value and the slope across the brush branch;
-  - NumPy and JAX agree.
-- **VM-2 Rung 3 on the module.** The racecar takes `tire=`, brush by default. Byte-identical,
-  since it already runs the brush law on the smooth slips.
-- **VM-3 Rung 2 on the module.** `DynamicBicycle` with per-axle stiffness per unit load and the
-  default tire ruled by `VM-D10`. Numbers move: GMC714 lab 6, every `BicycleDynRate` demo, the
-  benchmarks.
-- **VM-4 Presets and skins** (K8-0). `KinematicCar`, `DynamicBicycleCar3D`, `UdeSRacecar` and
-  `UdeSRacecarDyn3D` folded as `VM-D6` and `VM-D7` rule. The wheelbase gets one owner. The
-  GRO501 notebook and the demos migrate in the same change.
-- **VM-5 The rate-input bicycle**, as `VM-D5` rules.
-- **VM-6 The vehicle project.** The duplicates deleted, the research rungs and the path-tracking
-  vehicle onto the catalog, the catalog test no longer importing project code.
-- **VM-7 Docs.** DESIGN's catalog section, the README's catalog line, the TRL ledger, ROADMAP
-  §4's course rows if a name changed.
-- **Later: the 3-D car**, its own plan when scheduled. §5 is its contract with this one.
+   The yaw acceleration `ṙ` then follows from the moments with the known loads.
 
-## 8. Decisions for the maintainer
+The result is a continuous ODE, pure, on NumPy and JAX, with no state added and no lag.
+`LongitudinalSlipCar` already does this by hand in 1-D: its denominator `m (1 + μ r_y)` is
+the solved loop.
 
-In this order; each one's recommendation is the agent's. Each goes to QUESTIONS.md when it
-comes up, and its ruling lands back here.
+Its limits:
+- The matrix is singular only at the tipping limit (roughly `μ h / L → 1`).
+- A smooth floor on `Fz` keeps lift-off continuous.
+- Load-sensitive tires make the loop nonlinear: a Newton solve inside `f`, for the private
+  repository.
 
-- **VM-D1 How a plant takes its tire.** The options:
-  - (a) a small tire object with `forces()` and its default coefficients:
-    `DynamicBicycle(tire=BrushTire())`;
-  - (b) a string choosing among the three: `tire="brush"`;
-  - (c) the force function itself: `tire=brush_forces`.
+**Rung 6 (level i) has no loop:** the loads come from the spring compressions, which are
+states. Rung 4b is rung 6's limit with an infinitely stiff suspension, so the story is
+4 → 4b → 6.
 
-  (a) lets a project add a law without touching the core; (b) does not; (c) leaves the law's
-  own coefficients without an owner. **Recommendation: (a).**
-- **VM-D2 The linear law's limit.** Is the linear law pure (`F = c Fz α`, no limit: the
-  textbook, the brush law then adds the limit), or linear with a friction circle, as
-  `DynamicBicycle` has today (a kink in the gradient)? **Recommendation:** pure.
-- **VM-D3 Parameter names for axles and corners.** Flat suffixed keys (`c_alpha_f`, later
-  `c_alpha_fl`), or one nested dict per axle or corner (`params["front"]["c_alpha"]`). No leaf
-  plant nests its `params` today, so nesting needs a check against the parameter trees
-  (`core/params.py`) and compile first. **Recommendation:** flat suffixes now; nesting decided
-  with the 3-D car.
-- **VM-D4 The magic formula's defaults.** Re-fit `C` and `E` so that the curve peaks (dry
-  asphalt: the peak `μ Fz` near 6°–8°, then a fall), with `B` derived (§3.2).
-  **Recommendation:** yes, with the fitted numbers and their source in the module.
-- **VM-D5 The rate-input bicycle.** The options:
-  - (a) keep `BicycleDynRate` as the one extra class;
-  - (b) an `inputs="rates"` construction option on `DynamicBicycle`;
-  - (c) integrators wired in front of rung 2 (a diagram), measured for MPC speed against the
-    leaf first.
+## 7. Phases
 
-  **Recommendation:** (a) for v0.4, the least churn; (c) evaluated later with numbers.
-- **VM-D6 The UdeS Racecar's public face.** The options:
-  - (a) keep `UdeSRacecar` and `UdeSRacecarDyn` as thin classes that set only the preset and
-    the skin. This is a stated exception to the catalog clean-up's "no two supported plants
-    differ by parameters alone";
-  - (b) a preset argument on the generic models: `KinematicBicycle(preset="udes_racecar")`;
-  - (c) a public parameter set plus a skin, assembled by the user.
+The first build of the suspension is level (i) only (§2). The order of the rest is open
+(§9, question 1). The agent's proposal:
 
-  **Recommendation:** (a). It is the name students and the GRO501 notebook know, and a flagship
-  earns the exception.
-- **VM-D7 Rung 3's name.** Keep `UdeSRacecarDyn` as the generic actuated car, or give the
-  rung a generic name (for example `PoweredBicycle`), with the UdeS Racecar its preset.
-  **Recommendation:** a generic name, decided with `VM-D6` so the notebooks migrate once.
-- **VM-D8 The longitudinal car's tire.** Keep its sigmoid `μ(s)` (in two courses), or move it
-  onto the tire module's longitudinal slice. **Recommendation:** keep the sigmoid until a course
-  term ends, then decide.
-- **VM-D9 `QuarterCar`.** Keep it in the catalog as the 3-D car's future suspension corner
-  (cleaned up then), or let it follow the catalog clean-up's rule (used by its test alone,
-  so it moves to the experimental tier). **Recommendation:** keep it.
-- **VM-D10 Rung 2's default tire.** Linear (the course's textbook) or brush (a realistic
-  limit). **Recommendation:** linear on rung 2, since GMC714 lab 6 linearizes it; brush on
-  rung 3.
+- **Phase 1, the foundations:** the tire module, the terrain fields, the static and
+  spring-damper normal-load laws' interface, and ladder 1 to 5 consolidated (presets, skins,
+  `psi`, one owner for the wheelbase, one slip function), inside v0.4's catalog clean-up.
+- **Phase 2, rung 6 at level (i):** the 3-D car on a flat terrain, then on built-in terrains,
+  with a teaching self-driving demo.
+- **Later:** rung 4b, wheel hop (level ii), the full-size presets.
+
+## 8. What leaves, what stays
+
+- Inside minilink: today's look-only and parameter-only classes become presets and skins.
+  Their names are decided with question 5.
+- The two project folders stay as they are (read only). Their models inspired this design
+  and are not migrated by it.
+- Their duplicates of catalog code (the point, the kinematic bicycle, the engine and servo
+  rungs, the linear and Pacejka tires) are a later clean-up, decided when the projects are
+  next touched.
+
+## 9. Open questions
+
+In order, one at a time. Each goes to QUESTIONS.md when it comes up, and its answer lands
+here.
+
+1. **The phases** (§7): the foundations first, the foundations and rung 6 together, or rung 6
+   first. Recommendation: the foundations first.
+2. **Rung 4b's geometry:**
+   - two-track (four wheels, both lateral and longitudinal transfer);
+   - or the bicycle with front-to-back transfer only.
+
+   Rung 6 is two-track either way.
+3. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
+   end), or a rung 7.
+4. **The form of the rate-input bicycle (3b):** a class of its own (today), a construction
+   option on rung 3, or integrators wired in front of rung 3 (measured for MPC speed against
+   the class first).
+5. **Names:**
+   - the generic names of rungs 4 and 6;
+   - the UdeS Racecar's public face: thin classes that set only the preset and the skin
+     (an exception to the catalog clean-up's "no two supported plants differ by parameters
+     alone"), a preset argument, or a parameter set plus a skin.
+6. **The linear tire's limit:** pure (the textbook; the brush law adds the limit) or with
+   today's friction circle.
+7. **The default tire on each rung:**
+   - linear on rung 3 (the course linearizes it), brush on rungs 4 and 6;
+   - or brush everywhere.
+8. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
+   `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
+   parameter trees and compile first.
+9. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
+10. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
+    module.
+11. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+    law and the terrain.

@@ -46,6 +46,6 @@ workboard id: a plan's own steps (`NS-1`, `CBF-2`, `RS-3`). Workboard ids (`A5`,
 | [pyro-port-remaining.md](pyro-port-remaining.md) | Pyro parity: open rows and the name map; the migration guide | v0.5 (C1) |
 | [repository-structure.md](repository-structure.md) | The examples tree and where the teaching material lives; options, a recommendation, the asks | v0.9 (K5, K6) |
 | [rl-reward-scaling.md](rl-reward-scaling.md) | Automatic reward scaling for the RL planner (RS-1–RS-4) | unscheduled (TODO §6) |
-| [vehicle-models.md](vehicle-models.md) | The car models: one tire module (linear, brush, magic formula; one interface, swappable), a four-rung ladder with the UdeS Racecar as a public preset, the specialized models to one project, the choices that keep the 3-D car possible; ten decisions for the maintainer (draft) | v0.4, the car part of the catalog clean-up (K8-0) |
+| [vehicle-models.md](vehicle-models.md) | The car models: a ladder from the point to a 3-D car with suspension (one idea per rung, states appended), the shared pieces (a swappable tire with three laws, a terrain of height, gradient and friction, a per-corner normal-load law), exact load transfer, the UdeS Racecar as a public preset; the maintainer's answers of 2026-11-11 and the open questions | v0.4, the car part of the catalog clean-up (K8-0); the 3-D car after it |
 
 Landed or superseded plan docs are deleted. Their history is git.
