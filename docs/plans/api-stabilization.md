@@ -126,12 +126,12 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 16 | **The planner's own plots.** Value iteration and tabular learning override `plot_cost_to_go` / `plot_control_law` with other keywords and another return type than the solution's; the plots return three shapes (`PlotResult`, `(fig, ax)`, `ax`) | few | **Ruled 2026-11-10: option 1** — the planning plots take one keyword set, written out (`sol.plot_cost_to_go(*, x_axis=, y_axis=, is_3d=, ax=, renderer=, show=)`, `plot_control_law` alike); the planner's method a thin call to the solution's, keeping only its extra `field=`; every plot returns `PlotResult`; scoped to the planning plots, the rest of S67 its own row. Landed on `api-settle`. |
 | 17 | **Records.** `DynamicProgrammingResult` / `record.tables` / `planner.result` (which means two things between value iteration and tabular learning); `cost` is five different quantities across records; timings on two records only | 60 | **Ruled 2026-11-10: option 1** — `DynamicProgrammingResult` → `ValueTables` (`sol.record.tables`); `planner.result` → `planner.tables` on both grid planners, one meaning (the latest solution's tables), tabular learning's live table its own name (`planner.q_table`); a record's `cost` named by its quantity (RRT's `path_cost`, the learners' `episode_cost`; the `Optimizer`'s `cost` stays `J(z*)`; `Evaluation` keeps one of `cost` / `J` after a count); `solve_time_s` on every record. Landed on `api-settle`. **17b ruled 2026-11-10 (after an audit of every `J` / `cost`):** four words, one meaning each — `cost` the cost object (`problem.cost`, `cost=`, the parameter tree's `"cost"` key); `J` a scalar, one run's cost or a program's at `z` (`J*` at the optimum); `objective` the criterion minimized over draws; `cost_to_go` the function `J(x, t)` (a `Field`; `J*` or `J_π` by its source, not its name; `ValueTables.J` the DP table, kept). Renames: the records' scalar `.cost` → `.J` (`OptimizationResult`, `TrajectoryOptimizationRecord`, an iterate's, MPC `status["cost"]`, `MPPIRecord`); the signals `"cost"` → `"J"` with `h` added at the last sample on the continuous run too (one number moves: that last sample gains `h`, so it equals the run's `J`), `"cost_rate"` → `"dJ"`; RRT/RRT* `node.cost` → `cost_to_come`, `best_cost` → `best_cost_to_come`, `best_goal_cost` → `best_path_cost`; MPPI's internal `path_cost(...)` → `rollout_cost(...)`; the learners' `episode_cost` → `mean_episode_cost`; `Evaluation.raw_cost` and tabular learning's `greedy_tables` kept. Exception recorded: `Manipulator.J(q)` the Jacobian. 17b landed on `api-settle`. |
 | 18 | **The learners' words.** `n_envs`, `n_steps` (periods per update, where `n_steps` is the horizon everywhere else), `policy=` that becomes `planner.actor`, `learn` and `predict` beside `solve`; `Sys2Gym` | 67; 45 | **Ruled 2026-11-10: option 1** — `n_envs` → `n_rollouts`; the RL planner's `n_steps` → `n_steps_per_update`; `policy=` → `actor=` (the block's role in actor-critic, read back as `planner.actor`; the handed-out snapshot stays `solution.controller`); `learn` folds into `solve`; `predict` moves to the SB3 bridge; `Sys2Gym` kept. The blocks named `…Policy` go to decision 20. Landed on `api-settle`. |
-| 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | **Ruled 2026-11-11: option 1** — `trajectory_lqr` → `lqr_trajectory`; `lqr_finite_horizon(..., tf)` → `horizon`; `StateObserver(model, L)` reading `A, B, C, D` and the operating point from a `LinearizedSystem` (or an `LTISystem`, point zero), the matrix form `StateObserver(LTISystem(A, B, C, D), L)`; no number moves |
-| 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first **20a ruled 2026-11-10: keep `LookupPolicy`, `NeuralPolicy`, `GaussianPolicy`** — "the controller is the block, the policy the function" is a guideline, not a hard rule; the RL and DP domain's own word for the deployed law is allowed (RULES 2.7 records the exception). **20b ruled 2026-11-11:** `VanderPol` → `VanDerPol`, `ThreeBodyProblem` → `ThreeBody`, `StructuralResult` → `StructuralProperties`; `TaskKinematic`, `TaskKinematicNullspace`, `OutputReference` and `StepCost.c` kept |
+| 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | **Ruled 2026-11-11: option 1** — `trajectory_lqr` → `lqr_trajectory`; `lqr_finite_horizon(..., tf)` → `horizon`; `StateObserver(model, L)` reading `A, B, C, D` and the operating point from a `LinearizedSystem` (or an `LTISystem`, point zero), the matrix form `StateObserver(LTISystem(A, B, C, D), L)`; no number moves. Landed on `api-settle`. |
+| 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first **20a ruled 2026-11-10: keep `LookupPolicy`, `NeuralPolicy`, `GaussianPolicy`** — "the controller is the block, the policy the function" is a guideline, not a hard rule; the RL and DP domain's own word for the deployed law is allowed (RULES 2.7 records the exception). **20b ruled 2026-11-11:** `VanderPol` → `VanDerPol`, `ThreeBodyProblem` → `ThreeBody`, `StructuralResult` → `StructuralProperties`; `TaskKinematic`, `TaskKinematicNullspace`, `OutputReference` and `StepCost.c` kept. 20b landed on `api-settle`. |
 | 21 | **The root list.** Names with no example use (`LinearApproximator`, `QuadraticFeatures`, `RadialBasisFeatures`, `StaticSimulator`, the `*_gain` four, `BoxInputSet`); half pairs (`lqr_gain` without `lqr_gain_schedule`) | maintainer-owned | **Ruled 2026-11-11: option 1** — regenerated from what the rebuilt demos and the course notebooks import, at the end of v0.4 with K8-1, drafted for the maintainer's review; a name leaving the root stays on its band facade; nothing changes now |
 | 23 | **How a held open-loop plan is replayed.** RRT's and MPPI's controller is a `TrajectorySource` holding each sample; read at every RK4 stage, it takes the next sample at a step's last stage, so RRT's replay on its own `dt = 0.05` misses the goal its plan reaches (it reaches it at `dt = 0.002`), while the same samples as a held input (`compute_trajectory(u=…)`) reproduce the plan exactly | KNOWN_ISSUES | **23a ruled 2026-11-11:** the evidence of a held open-loop plan (RRT, MPPI) runs the simulator's held-input rule, the handed-out `TrajectorySource` unchanged; measured on `api-settle` (pendulum swing-up, seed 0): the plan ends `[3.31, −0.15]` in the goal, the held replay reproduces it, the controller over the plan's 4.8 s misses at `dt = 0.05` and `0.01` and reaches at `0.002`. **23b ruled 2026-11-11:** every planner is scored on the problem's horizon, one judge; an open-loop plan shorter than the horizon holds its last input after it; the stray `episode_length=` on the open-loop evidence (ignored on a finite horizon, so it ran 10 s anyway: `J = 391.5`, failed) removed; RRT's record keeps "goal reached" for its search |
 | 24 | **`solution.params`** is the problem's tree, so `planner.solve(params=solution.params)` is refused ("missing `method`, `seed`") | a core record's shape | **Ruled 2026-11-11: option 1** — the solution stores the planner's complete tree (the problem's parts, the method's numbers, the seed), so `planner.solve(params=solution.params)` reproduces the solution; decided directly by the maintainer |
-| 22 | **Smaller ones:** `CallableSet(contains_fn=)` a set without a margin; `EllipsoidSet(field, …)` not buildable from `(center, P, level)`; `path.sample(s)` using the draw word (`path.at(s)`); a `dt` that does not divide the run overshoots `tf` (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); `LowPassFilter(cutoff_hz=)` beside `Sine(omega=)`; `Source.plot_signal`; `connection_verbose`; the program's start in `metadata["z0"]`; RRT's `max_nodes` (a cap on iterations) | small | **Ruled 2026-11-11: all nine as proposed** — a `CallableSet` requires `margin=` (`contains` derived); `EllipsoidSet.from_matrix(center, P, level)`; `path.sample(s)` → `path.at(s)`; a `dt` that does not divide the run shortens its last step to land on `tf` (numbers move on such grids only); `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` kept, the docstrings say why; `Source.plot_signal` and `connection_verbose` removed; `program.z0` an attribute (was `metadata["z0"]`); RRT's `max_nodes` → `max_iterations` |
+| 22 | **Smaller ones:** `CallableSet(contains_fn=)` a set without a margin; `EllipsoidSet(field, …)` not buildable from `(center, P, level)`; `path.sample(s)` using the draw word (`path.at(s)`); a `dt` that does not divide the run overshoots `tf` (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); `LowPassFilter(cutoff_hz=)` beside `Sine(omega=)`; `Source.plot_signal`; `connection_verbose`; the program's start in `metadata["z0"]`; RRT's `max_nodes` (a cap on iterations) | small | **Ruled 2026-11-11: all nine as proposed** — a `CallableSet` requires `margin=` (`contains` derived); `EllipsoidSet.from_matrix(center, P, level)`; `path.sample(s)` → `path.at(s)`; a `dt` that does not divide the run shortens its last step to land on `tf` (numbers move on such grids only); `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` kept, the docstrings say why; `Source.plot_signal` and `connection_verbose` removed; `program.z0` an attribute (was `metadata["z0"]`); RRT's `max_nodes` → `max_iterations`. Landed on `api-settle`. |
 
 ## 5. Planned work to pull forward
 
@@ -665,7 +665,71 @@ item 2's intended last samples.
   in the unpack beat (as `integrate` binds `g`), each equation's comment before its line; its
   own commit, byte-identical on the baseline.
 
+The run of rulings 19, 20b and 22 and of the two rulings outside the rows, on the branch
+`api-settle` (2026-11-11), one commit per ruling, 22 in two (its names, then the time grid). A
+new seeded baseline (ruling 17b's, made name-agnostic, plus ruling 11's linear designs and
+analyses, the gain schedule and the finite-horizon designs by keyword, an observer built by
+hand in both forms and closed in a loop, the two renamed plants simulated, the structural
+printouts, a `CallableSet`, an ellipsoid both ways, a path read at arc lengths, a program's
+start and the `Optimizer` on it, RRT and RRT* under either cap's name), run twice and compared,
+then after each commit: byte-identical.
+
+- **The tabular `learn`.** Its loop moved into `solve` verbatim (the episode's parameter draw
+  renamed `episode_params`, so it no longer shadows `solve`'s `params`); a test checks that a
+  second solve continues and that the first equals a fresh learner's run of the same episodes.
+  The exploration's annealing is per solve, as it was per `learn` call.
+- **The history key.** The tabular per-episode entries and the RL record's per-iteration
+  entries write `"J"`; the RL planner's own live `planner.history` keeps the algorithm's
+  `ep_return_mean` (a return, not a cost), turned into `J` on the record as before.
+- **Ruling 19, `horizon=`.** `lqr_gain_schedule`'s length was also `tf` (its schedule runs from
+  0): both it and `lqr_finite_horizon` take `horizon`. `LQRPlanner` reads the problem's horizon
+  and had no such keyword. The cart-pole demo file keeps its name
+  (`trajectory_lqr_cartpole.py`): renaming a file is the maintainer's; its call migrated.
+  ROADMAP §2's older dated entries keep the names they shipped with.
+- **Ruling 19, the observer.** `StateObserver(model, L)` takes no `labels=`, `x_bar=`, `u_bar=`,
+  `y_bar=` or `D=` any more: the model holds them, and its state labels with a hat are the
+  estimate's (an `LTISystem`'s `x[0]` → `x̂[0]`, what the matrix form printed before). A test's
+  observer at a point with a hand `ȳ` is now a `LinearizedSystem` built with that `y_bar`. A
+  plant is refused (`TypeError`, naming `LTISystem(A, B, C, D)`, `linearize` and the two design
+  verbs). The check accepts any model that stores its matrices, the step models included:
+  `luenberger` on a step linearization built a continuous observer from the discrete matrices
+  before, and still does (`kalman` refuses one since AS-1). A question for the maintainer
+  whether `luenberger` (and the observer) should refuse a step model too.
+- **Ruling 20b.** The display names follow the classes (`VanDerPol`, `ThreeBody`); the
+  catalog check registry's entry for the three-body plant is `ThreeBody`.
+- **Ruling 22a, the margin's signature.** The ruling's `margin=` keeps the set family's
+  signature, `margin(z, t, params)` (the one-signature paragraph: every object reads `params`),
+  not `(z, t)`. The one membership-only caller, a backend test, had `z[1] > 1`; its margin is
+  `z[1] − 1`, so the boundary point now belongs (no test point sits on it).
+- **Ruling 22f, the picture that replaces `plot_signal`.** `source.plot_trajectory()` refused a
+  source ("No signal components were selected": the default for a leaf was its state `x`); a
+  leaf with no state and no input now plots its outputs, so the replacement is
+  `source.compute_trajectory(tf=…)` then `source.plot_trajectory()`. The experimental noise
+  notebook's three cells migrated that way. `diagram_noise_ports.py`'s two commented-out
+  `plot_signal()` lines are the maintainer's scratch state and were left as they are.
+- **Ruling 22h.** `MathematicalProgram(z0=)` is a new last field, stored as a checked flat
+  copy of shape `(n_z,)`, `None` when absent (an earlier test asserted the program had no `z0`:
+  it now asserts `None`). The program's printout does not show it.
+- **Ruling 22i.** `max_iterations` on RRT and RRT* only; the record's `n_iterations` and
+  `n_nodes` unchanged.
+- **Ruling 22d, where the numbers moved.** The grid builder is `build_time_grid` (its `dt`
+  branch and the automatic fixed-step `dt`); the evaluators' `steps_of` already refuses a `dt`
+  that does not divide a horizon, and the sampled loops' grids count periods, so neither
+  changed. The fixed-step solvers run the steps of `dt` as one compiled rollout and the last
+  step as a second (the input-function RK4 loop steps it in place); the simulator's auto-RK4
+  rule and the solvers' refusal read a uniform grid with a shorter last step as fixed-step.
+  Found by instrumenting the grid builder on the commit before, over the full test suite, the
+  regression suites, the flagship demos, the catalog checks and the notebook sweep: five tests
+  (two runs whose last sample moves, t = 2.0319 → 2.0 and 6.0053 → 6.0, NumPy and JAX alike;
+  two that build a `Simulator` only; the test that pinned the overshoot, now pinning the new
+  grid); none of the 36 notebooks of the default sweep; no regression scenario, flagship demo or catalog check. Nothing
+  re-pinned.
+- **The textbook check.** The diffs that touch math (the tabular loop moved into `solve`, the
+  RK4 input loop's last step, the observer's constructor, the grid) read next to `dp.py`:
+  comments before their lines, binds first, no `self.` in the math; the textbook-style test
+  caught one quoted annotation (`from_matrix`), fixed in its own commit.
+
 ## Rulings of 2026-11-11 outside the numbered rows
 
-- **The tabular learner's `learn`** folds into `solve(n_episodes=)`, continuing from the current table, as the RL planner's did (ruling 18): one verb on both learners.
-- **The learners' per-episode `history` key** `"cost"` → `"J"` (ruling 17b's four-word rule).
+- **The tabular learner's `learn`** folds into `solve(n_episodes=)`, continuing from the current table, as the RL planner's did (ruling 18): one verb on both learners. Landed on `api-settle`.
+- **The learners' per-episode `history` key** `"cost"` → `"J"` (ruling 17b's four-word rule). Landed on `api-settle`.
