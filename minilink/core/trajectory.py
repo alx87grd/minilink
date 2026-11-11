@@ -126,14 +126,16 @@ class Trajectory(SampledSignals):
         last value is the run's ``J``, an evaluation's ``raw_cost`` on the same run.
         """
         xp = array_module(self.x)
+        h = cost.h
         rho = discount_rate
         t_N = self.t[-1]
         x_N = self.x[:, -1]
 
+        # dJ_k = e^{−ρ (t_k − t0)} g_k, and its trapezoid ∫_{t0}^{t_k} dJ dτ
         dJ, running = cost.integrate(self, discount_rate=rho, params=params, t0=t0)
 
-        # J(t_k) = ∫_{t0}^{t_k} e^{−ρ (τ − t0)} g dτ, and J(t_N) + e^{−ρ (t_N − t0)} h(x_N, t_N)
-        h_N = xp.exp(-rho * (t_N - t0)) * cost.h(x_N, t_N, params)
+        # J(t_k) = ∫_{t0}^{t_k} dJ dτ, the terminal e^{−ρ (t_N − t0)} h(x_N, t_N) added at t_N
+        h_N = xp.exp(-rho * (t_N - t0)) * h(x_N, t_N, params)
         J = xp.concatenate([running[:-1], running[-1:] + h_N])
 
         return self.with_signals({"dJ": dJ.reshape(1, -1), "J": J.reshape(1, -1)})
