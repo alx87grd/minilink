@@ -504,6 +504,12 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     and lands on `tf` (`[…, 0.9, 1.0]`), the fixed-step solvers (`rk4`, `euler`) taking it as
     it is. Numbers move only on such grids, and only at their last sample (a run on the
     automatic step of a loop whose step does not divide `tf`, for one).
+  - *A held plan is scored as planned* (the maintainer's ruling 23a): the evidence of RRT's,
+    RRT*'s and MPPI's plan (a `TrajectorySource` holding each sample) feeds the plant its
+    sample held over each step, as `plant.compute_trajectory(u=plan.u, dt=…)` does, so
+    `solve(evaluate=True)` and `evaluate(problem, solution.controller, dt=…)` on the plan's own
+    `dt` reproduce the plan (the swing-up's RRT plan, which reached its goal while its replay
+    missed it at `dt = 0.05` and `0.01`); the block handed out is unchanged.
 
 ## 3. Maturity (TRL)
 

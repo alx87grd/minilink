@@ -858,6 +858,68 @@ def test_a_planned_input_is_a_decision_leaf_with_the_goal_lowered():
     assert result.success and float(planned.reachability_margin[0]) >= -1e-8
 
 
+def swing_up_plan():
+    """The pendulum swing-up's RRT plan (seed 0): a held open-loop plan that reaches the goal."""
+    from minilink.planning.search.rrt import RRTPlanner
+
+    sys = Pendulum()
+    cost = QuadraticCost.from_system(sys, Q=np.eye(2), R=np.eye(1))
+    problem = PlanningProblem(
+        sys,
+        x0=[0.0, 0.0],
+        cost=cost,
+        horizon=10.0,
+        X=sys.state.box,
+        U=sys.input_box,
+        Xf=BallSet([np.pi, 0.0], 0.3),
+    )
+
+    return problem, RRTPlanner(problem, seed=0).solve()
+
+
+def test_a_held_plan_is_scored_as_planned():
+    """Ruling 23a: a held plan's samples are the plant's input held over each step, as compute_trajectory(u=) holds them."""
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    dt = float(np.median(np.diff(plan.t)))
+    assert solution.record.success and problem.Xf.contains(plan.x[:, -1])
+
+    # The plan's own length and step: the evidence reproduces the plan
+    over_plan = problem.replace(horizon=float(plan.tf))
+    report = evaluate(over_plan, solution.controller, dt=dt, trajectories=True)
+    run = report.trajectories[0].of("plant")
+    np.testing.assert_allclose(run.x, plan.x, atol=1e-9)
+    np.testing.assert_allclose(run.u[:, :-1], plan.u[:, :-1], atol=0.0)
+    assert bool(report.reached[0])
+
+    # A finer step holds each sample over its own interval: the goal still reached
+    assert bool(evaluate(over_plan, solution.controller, dt=0.01).reached[0])
+
+    # The block handed out is unchanged: read at a step's end, it gives the next sample
+    no_signal = np.zeros(0)
+    t_1 = plan.t[1]
+    np.testing.assert_array_equal(
+        solution.controller.h(no_signal, no_signal, t_1), plan.u[:, 1]
+    )
+
+
+@pytest.mark.jax
+def test_a_held_plan_scores_alike_on_jax():
+    pytest.importorskip("jax")
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    over_plan = problem.replace(horizon=float(plan.tf))
+    dt = float(np.median(np.diff(plan.t)))
+
+    reports = [
+        evaluate(over_plan, solution.controller, dt=dt, backend=backend)
+        for backend in ("numpy", "jax")
+    ]
+
+    np.testing.assert_allclose(reports[1].J, reports[0].J, rtol=1e-10)
+    assert bool(reports[1].reached[0])
+
+
 # --- the problem's laws, sources and starts: the seam review's cases ---
 
 

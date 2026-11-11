@@ -1479,7 +1479,12 @@ from a `Distribution` with its `np_random` (`None`: `sys.x0`), and
 **The problem evaluator (the second verb, `planning/evaluator.py`):**
 `pe = problem.compile(controller, dt=None, *, solver="rk4", substeps=None, backend="auto", episode_length=None)` closes
 a controller on the plant (`controller @ plant`; a source block drives the command; a built
-loop is taken when its block `plant` is the problem's system) and compiles it once. The
+loop is taken when its block `plant` is the problem's system) and compiles it once. A held
+open-loop plan (a `TrajectorySource` with `hold="zoh"`, the controller of RRT, RRT* and MPPI)
+enters by the simulator's held-input rule on a fixed-step solver: its sample, read inside each
+step, is the plant's input held over the step, as `plant.compute_trajectory(u=plan.u, dt=…)`
+holds it, so the evidence on the plan's own `dt` reproduces the plan; the block is unchanged,
+and read at every stage it would take the next sample at a step's last stage. The
 controller's kind decides the loop: a continuous law runs the continuous diagram on the
 grid of `dt` (omitted: the loop's automatic step, below); a sampled controller (`pid % 0.01`, a held policy, a loop on a clock) runs its
 `SampledDiagramSystem` on its own base period, `dt` omitted reading it and a differing `dt`

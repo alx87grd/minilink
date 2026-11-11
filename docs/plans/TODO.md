@@ -507,6 +507,10 @@ pick):
   arms, rotating cart-poles) → auto-fit or params-derived; raw ground `CustomLine`s in catalog
   skins → `ground_line()`. Also: a renderer capability table with honest fallbacks (scan:
   graphics#7); the physics owns the drawn lengths (scan: dynamics#9).
+- [ ] A tree search whose best effort is the root alone hands out an input with no channel
+  (`Tree.extract_trajectory`'s `u` of shape `(0, 1)`), so `solve(evaluate=True)` raises: the
+  root-only path holds the plant's nominal input (KNOWN_ISSUES, "A tree search that never
+  leaves its root cannot be scored").
 - [ ] RRT* tracks goal nodes incrementally; the transcriptions lower the state set
   member-wise (scan: planning#6, planning#12).
 - [ ] **Third-round notes from the 2026-09-23 fix reviews** (small, or design questions;

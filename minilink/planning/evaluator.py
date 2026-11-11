@@ -64,7 +64,11 @@ class ProblemEvaluator:
     every free input held at its port's nominal value), or a built loop whose block
     ``plant`` is the problem's system. One run integrates the loop to the horizon on
     the fixed-step model (``solver``, ``dt``, ``substeps``), records every block
-    output, and scores the plant's run by the problem's formula::
+    output, and scores the plant's run by the problem's formula. A held plan (a
+    :class:`~minilink.blocks.sources.TrajectorySource` holding each sample, the
+    controller of RRT, RRT* and MPPI) enters by the simulator's held-input rule:
+    its sample is the plant's input, constant over each step, as
+    ``plant.compute_trajectory(u=plan.u, dt=…)`` holds it::
 
         pe = problem.compile(pid, dt=0.01)
         report = pe.evaluate()                                   # the Evaluation
@@ -118,9 +122,13 @@ class ProblemEvaluator:
             backend = require_numpy_for_adaptive(backend)
 
         # The task and the loop that runs it: a continuous diagram, or a sampled
-        # loop on its own clock, its plant integrated at the step asked
+        # loop on its own clock, its plant integrated at the step asked; a held
+        # plan on a fixed step feeds the plant its samples, held over each step
         self.problem = problem
-        self.loop = closed_loop_of(problem, controller)
+        self.held_plan = self.adaptive is None and is_held_plan(
+            controller_of(controller)
+        )
+        self.loop = closed_loop_of(problem, controller, held_plan=self.held_plan)
         self.sampled = is_sampled(self.loop)
         if self.sampled:
             dt = sampled_dt_of(self.loop, dt)
@@ -147,7 +155,7 @@ class ProblemEvaluator:
         self.subsystem_ids = tuple(self.loop.subsystems)
         self.start_ids = stateful_subsystems_of(self.loop)
         self.draws = problem.is_stochastic or self.loop.is_random
-        self.free_inputs = tuple(self.loop.inputs)
+        self.free_inputs = () if self.held_plan else tuple(self.loop.inputs)
         require_free_names(self.free_inputs, self.subsystem_ids)
         require_no_x0_key(self.loop, self.start_ids)
 
@@ -538,9 +546,12 @@ class ProblemEvaluator:
         # The loop's start: each block's x0 leaf, the plant's slice at x0
         x0_loop = self.loop_start(params, x0, xp)
 
-        # The free inputs held at their parameters over every period
-        u = self.held_inputs(params, xp)
-        u_seq = xp.broadcast_to(u, (N, u.size))
+        # The loop's input at every sample: the free inputs held at their
+        # parameters, or a held plan's samples; row k is held over period k
+        t0 = params["t0"]
+        ts = t0 + xp.arange(N + 1) * dt
+        us = self.boundary_inputs(params, ts, xp)
+        u_seq = us[:N]
 
         # x_{k+1} = Φ(x_k, u, t_k), t_k = t0 + k dt, k = 0 … N − 1, with the
         # plant's stage cost integrated beside the state; or the adaptive
@@ -550,8 +561,6 @@ class ProblemEvaluator:
             for sys_id in self.subsystem_ids
         }
         loop_params = integer_seeds(loop, loop_params)
-        t0 = params["t0"]
-        ts = t0 + xp.arange(N + 1) * dt
         rate = self.cost_rate(params)
         if self.sampled:
             xs, running, signals = ev.rollout_with_cost(
@@ -572,9 +581,8 @@ class ProblemEvaluator:
         else:
             f_aug = ev.rhs_with_cost(loop_params, "plant", rate)
             z0 = xp.concatenate([xp.asarray(x0_loop, dtype=float), xp.zeros(1)])
-            zs = integrate_adaptive(f_aug, z0, u, ts, self.adaptive)
+            zs = integrate_adaptive(f_aug, z0, us[0], ts, self.adaptive)
             xs, running = zs[:, :-1], zs[:, -1]
-        us = xp.broadcast_to(u, (N + 1, u.size))
 
         # Every block output at every sample, and the plant's input among them: a
         # sampled loop's from the run's own signal pass
@@ -640,6 +648,28 @@ class ProblemEvaluator:
         return xp.concatenate(
             [xp.reshape(params[port], (-1,)) for port in self.free_inputs]
         )
+
+    def boundary_inputs(self, params, ts, xp):
+        """
+        The loop's input at the samples ``ts``, ``(N + 1, m)``: the free inputs held, or a held plan's samples.
+
+        A held plan's sample over the step ``[t_k, t_k + dt)`` is its value read
+        at the step's middle (so a rounding of ``t_k`` never reads the sample
+        before), the last at ``t_N``: on the plan's own grid, its ``u_k``.
+        """
+        if not self.held_plan:
+            u = self.held_inputs(params, xp)
+            return xp.broadcast_to(u, (ts.shape[0], u.size))
+
+        plan = self.loop.subsystems["controller"]
+        dt = self.dt
+        no_signal = xp.zeros(0)
+
+        # u_k = π(t_k + dt/2), k = 0 … N − 1, and u_N = π(t_N)
+        t_read = xp.concatenate([ts[:-1] + 0.5 * dt, ts[-1:]])
+        u = plan.h(no_signal, no_signal, t_read, params["controller"])
+
+        return u.T
 
     def score(self, params, x0, trajectories, failure_cost, bound):
         """One trial's row of the record (and its trajectory when ``trajectories``)."""
@@ -747,12 +777,14 @@ def controller_of(controller):
     return controller
 
 
-def closed_loop_of(problem, controller):
+def closed_loop_of(problem, controller, *, held_plan=False):
     """The loop a :class:`ProblemEvaluator` runs: ``controller`` closed on the problem's plant.
 
     A built loop (a diagram with a block ``plant`` of the plant's state size) is
     taken as it is; a solution gives its controller; a source block (no input) drives
-    the plant's command; any other block is closed by ``controller @ plant``.
+    the plant's command (a ``held_plan`` sits beside the plant, whose command is
+    the loop's input ``"plan"``, fed by the run); any other block is closed by
+    ``controller @ plant``.
     """
     # Lazy imports: the composition tools and the results load with the first loop
     from minilink.core.closed_loop import closed_loop
@@ -776,7 +808,7 @@ def closed_loop_of(problem, controller):
         )
     sources = dict(problem.disturbances)
     if int(controller.m) == 0:
-        return with_sources(open_loop_of(controller, plant), sources)
+        return with_sources(open_loop_of(controller, plant, held_plan), sources)
 
     # The loop closed_loop builds with the same sources: d and n under its role names
     loop = closed_loop(
@@ -851,8 +883,8 @@ def compile_loop(loop, backend):
     return backend, evaluator
 
 
-def open_loop_of(source, plant):
-    """A source block driving the plant's command: the loop ``{"controller", "plant"}``."""
+def open_loop_of(source, plant, held_plan=False):
+    """A source block driving the plant's command: the loop ``{"controller", "plant"}``; a held plan's command the loop's input ``"plan"``."""
     # Lazy imports: the diagram tools load with the first loop
     from minilink.core.diagram import DiagramSystem
     from minilink.core.roles import command_port
@@ -860,10 +892,23 @@ def open_loop_of(source, plant):
     loop = DiagramSystem()
     loop.add_subsystem(source, "controller")
     loop.add_subsystem(plant, "plant")
-    loop.connect("controller", next(iter(source.outputs)), "plant", command_port(plant))
+    if held_plan:
+        loop.expose_input("plan", [("plant", command_port(plant))])
+    else:
+        loop.connect(
+            "controller", next(iter(source.outputs)), "plant", command_port(plant)
+        )
     loop.name = f"{source.name} >> {plant.name}"
 
     return loop
+
+
+def is_held_plan(controller) -> bool:
+    """Whether ``controller`` is a held open-loop plan: a :class:`~minilink.blocks.sources.TrajectorySource` holding each sample."""
+    # Lazy import: the blocks load with the first loop
+    from minilink.blocks.sources import TrajectorySource
+
+    return isinstance(controller, TrajectorySource) and controller.hold == "zoh"
 
 
 def with_sources(loop, sources):
