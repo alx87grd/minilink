@@ -117,7 +117,9 @@ def test_at_rest_on_flat_ground_the_four_loads_carry_the_weight():
     np.testing.assert_allclose(dx, 0.0, atol=1e-3)
 
 
+@pytest.mark.jax
 def test_a_dropped_car_settles_at_its_ride_height():
+    pytest.importorskip("jax")
     car = SuspensionCar3D()
     x0 = car.x0.copy()
     x0[9] += 0.05
@@ -149,8 +151,10 @@ def test_the_spring_carries_its_static_load_at_ride_height():
 # The car on flat ground
 
 
+@pytest.mark.jax
 def test_the_first_nine_states_reduce_to_the_drivetrain_bicycle_on_a_narrow_track():
     """A steady turn on a narrow track with stiff springs: rung 4's yaw rate."""
+    pytest.importorskip("jax")
     car = SuspensionCar3D()
     car.params["track"] = 0.3
     for wheel in car.wheels:
@@ -180,7 +184,9 @@ def test_a_mirrored_turn_is_the_mirror_of_the_turn():
     np.testing.assert_allclose(dx_mirrored, mirror * dx, rtol=1e-9, atol=1e-9)
 
 
+@pytest.mark.jax
 def test_a_coasting_car_never_gains_energy():
+    pytest.importorskip("jax")
     car = SuspensionCar3D()
     p = car.params
     x0 = cruising(car, 12.0, x7=0.05, x10=0.02)
@@ -200,7 +206,9 @@ def test_a_coasting_car_never_gains_energy():
     assert energies[-1] < energies[0]
 
 
+@pytest.mark.jax
 def test_braking_pitches_the_nose_down_and_a_left_turn_rolls_to_the_right():
+    pytest.importorskip("jax")
     car = SuspensionCar3D()
 
     braking = car.compute_trajectory(
@@ -274,7 +282,9 @@ def test_on_a_frictionless_slope_the_car_slides_at_g_sin_beta():
     assert dx[3] == pytest.approx(-car.params["gravity"] * np.sin(beta), rel=0.05)
 
 
+@pytest.mark.jax
 def test_on_bumps_the_body_heave_stays_bounded():
+    pytest.importorskip("jax")
     bumps = Bumps()
     bumps.params["amplitude"] = 0.04
     car = SuspensionCar3D(terrain=bumps)
@@ -308,7 +318,9 @@ def test_a_patch_of_ice_lowers_only_the_grip_of_the_wheels_on_it():
     assert np.all(np.isfinite(grip))
 
 
+@pytest.mark.jax
 def test_a_turn_too_fast_for_the_track_lifts_an_inner_wheel():
+    pytest.importorskip("jax")
     car = SuspensionCar3D()
     car.params["h_cg"] = 1.0
     car.params["track"] = 1.0
@@ -366,10 +378,12 @@ def test_a_preset_rests_at_its_ride_height_and_its_look_fits_its_frames(preset):
 
 
 @pytest.mark.parametrize("preset", [FormulaCar3D, OffRoadCar3D])
+@pytest.mark.jax
 def test_a_preset_drives_off_and_keeps_its_four_wheels_down(preset):
+    pytest.importorskip("jax")
+    configure_jax()
     # Straight: full power from rest spins the rear tires, and a steered launch spins the car
     car = preset()
-    configure_jax()
 
     traj = car.compute_trajectory(
         tf=3.0, u=np.array([0.3 * car.params["P_max"], 0.0]), backend="jax"
@@ -433,12 +447,14 @@ def test_a_terrain_given_to_two_cars_is_copied_for_each():
     assert car_2.params["terrain"]["amplitude"] == 0.05
 
 
+@pytest.mark.jax
 def test_coasting_over_rolling_hills_the_car_follows_the_ground_and_loses_energy():
+    pytest.importorskip("jax")
+    configure_jax()
     hills = Bumps()
     hills.params["amplitude"] = 1.0  # [m]
     hills.params["wavelength"] = 25.0  # [m], grades up to 14°
     car = OffRoadCar3D(terrain=hills)
-    configure_jax()
     mass = car.params["mass"]
     gravity = car.params["gravity"]
     x0 = cruising(car, 8.0, x0=3.0, x1=4.0, x2=0.6)
