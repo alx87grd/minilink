@@ -205,6 +205,22 @@ Each entry: the step, the choice, the options it was taken over, and why.
   `length = a + b`, and `KinematicCar`'s look computes `length = a + b` from `params`; only
   the key leaves. `axle_offsets` in `skins.py` keeps its `params["length"]` fallback: it
   serves any plant (`LongitudinalSlipCar` keeps its own `length`).
+- **VM-7, the terrains' shapes.** `Bumps` is the egg-crate `z = A sin(k x) sin(k y)`,
+  `k = 2π / terrain_wavelength` (the other reading, `A (sin k x + sin k y) / 2`, is a
+  washboard along each axis); `Slope` rises along `x`, `z = x tan β` with
+  `β = terrain_slope` (0.1 rad by default). Both carry a uniform `terrain_mu` (1.0); the
+  ice patch is run 2's (VM-15).
+- **VM-7, the fields' signature.** `height(x, y, t=0.0, params=None)`, the same for
+  `gradient` (a pair) and `friction`: the plan's order, with the defaults every equation
+  path of the catalog takes.
+- **VM-7, the block's ports.** `TerrainBlock(terrain=None, n_points=4)` takes
+  `u = [x_1 … x_n, y_1 … y_n]` and gives three named outputs, `height`, `gradient`
+  (`dz_dx` of every point, then `dz_dy`) and `friction`; it has no `y`, so it wires with
+  `connect`, not `>>`. Its `params` is the terrain's own dict, one home.
+- **VM-7, where the terrain is imported from.** Like the tire laws it stays out of the
+  vehicles' `__all__` and the catalog index ("plants only in `__all__`"): it is imported
+  from `minilink.dynamics.catalog.vehicles.terrain`. Adding it to a facade is a public-name
+  decision, left to the maintainer.
 
 ## 7. Ledger
 
@@ -242,3 +258,4 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   slip); its fastest mode, the solver hint, 8.8 µs at rest (the wheel against the rear
   tire's stiffness at the slip floor), so a 5 s run from rest takes 8 s of wall time.
 - **VM-6:** none; byte-identical to VM-4's capture.
+- **VM-7:** none; byte-identical to VM-6's capture (nothing calls the terrain).
