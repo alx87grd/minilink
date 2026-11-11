@@ -47,8 +47,8 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Magic formula | default shape `C = 1.3`, `E = −0.5`, both directions: the peak `μ Fz` near the brush law's full slide (12° at `c = 13/rad`), then a fall to `sin(C π/2) ≈ 0.89` of the peak; both numbers in `params`; a fit to a published tire, cited in the module, can replace them when it is written |
 | Names | rung 4's generic class is `DrivetrainBicycle` ("powered" is too vague): the UdeS Racecar's `UdeSRacecarDyn` sits on it; rung 6 is `SuspensionCar3D`, named by what it adds |
 | `QuarterCar` | a standalone, simpler demo plant, not part of the ladder: kept independent and unchanged for now; rung 6's corner and terrain do not build on it (its support status follows the catalog clean-up's own rule). To review in a later phase: whether rebuilding it on the corner law and the terrain is cleaner, weighed against keeping its own equations readable on one page |
-| Rollover | modelled on rung 6: roll passes 90° and 180° (the roll–pitch–yaw attitude is singular only at pitch ±90°, an end-over-end flip, documented); a `rollover` output gives the margin (the smallest wheel load, the roll angle), and a terminal set can end a run at rollover. Only the tire contacts touch the terrain, so a car past about 90° of roll sinks through the ground: documented. `Car3D` shows only the onset (an inner wheel's load reaching zero). Body contact points, so the car lands and keeps tumbling, are a later option, off by default |
-| Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
+| Rollover | modelled on rung 6: roll passes 90° and 180° (the roll–pitch–yaw attitude is singular only at pitch ±90°, an end-over-end flip, documented); a `rollover` output gives the margin (the smallest wheel load, the roll angle), and a terminal set can end a run at rollover. What the model does after the car rolls past about 90° is not specified and not a concern for now: kept as simple as possible, no special contact rule (only the tire contacts touch the terrain). `Car3D` shows only the onset (an inner wheel's load reaching zero). Body contact points, so the car lands and keeps tumbling, are a later option, off by default |
+| Phases | 1 the foundations; 2 the 3-D car; 2b one or two good-looking generic 3-D skins for the 3-D car, two extremes (an open-wheel formula car, an off-road side-by-side); 3 a generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
 | Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
 
@@ -331,9 +331,24 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   keeps its slip, and rungs 3 and 3b keep `LinearSaturation`.
 - **Phase 2, the 3-D car.** Rung 6 at suspension level (i): spring-damper corners on the
   terrain, first flat, then the built-in terrains, with a teaching self-driving demo.
-- **Phase 3, the 3-D car's look and presets:**
-  - a good 3-D skin for rung 6;
-  - a generic parameter preset that drives plausibly;
+- **Phase 2b, generic 3-D skins.** Find or design one or two good-looking 3-D skins for
+  rung 6, at the quality of the UdeS Racecar's skin, but generic. Two extremes of the same
+  model:
+  - **an open-wheel formula car:** low, wide, stiff;
+  - **an off-road side-by-side:** a high centre of gravity, long suspension travel, the
+    rollover-prone one.
+
+  Phase 3's presets can then pair each look with matching numbers. The constraints:
+  - **Generic:** never a replica of a real vehicle, and no brand names, logos or recognisable
+    styling of a manufacturer.
+  - **License:** a found mesh must carry a license the repository can ship (CC0, or CC-BY
+    with its attribution recorded beside the asset). Otherwise the skin is built from the
+    mesh primitives in `minilink/graphical/meshes.py`, as parts of the racecar skin are.
+  - **Size:** about the racecar's assets (580 KB today).
+  - **Wheels as separate meshes on their own frames,** so they steer, spin and move with the
+    suspension, and the body rolls and pitches visibly.
+- **Phase 3, the 3-D car's presets:**
+  - a generic parameter preset that drives plausibly (and, with 2b, one per skin);
   - the UdeS Racecar preset brought to rung 6, with its real skin and its parameters (still
     a proxy of the car, §2);
   - **the tire and slip switch** (below).
