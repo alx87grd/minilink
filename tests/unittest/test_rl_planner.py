@@ -413,7 +413,7 @@ def test_solve_with_evaluate_scores_the_law_it_hands_out():
     assert np.isfinite(solution.record.mean_episode_cost) and "plant steps" in str(
         solution.record
     )
-    assert solution.record.history[-1]["cost"] == -planner.history[-1]["ep_return_mean"]
+    assert solution.record.history[-1]["J"] == -planner.history[-1]["ep_return_mean"]
     assert "feedback" in str(solution)
     # the critic estimates the training discount, not the problem's: no cost-to-go
     assert solution.cost_to_go is None

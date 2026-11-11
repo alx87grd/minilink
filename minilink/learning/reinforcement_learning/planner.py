@@ -686,7 +686,7 @@ class ReinforcementLearningPlanner(Planner):
         history = [
             {
                 **{k: v for k, v in record.items() if k != "ep_return_mean"},
-                "cost": -record["ep_return_mean"],
+                "J": -record["ep_return_mean"],
             }
             for record in self.history
         ]
@@ -729,7 +729,7 @@ class ReinforcementLearningRecord:
 
     ``mean_episode_cost`` is the mean episode cost ``J`` of the last collection,
     positive and falling. ``history`` holds one dict per learning iteration
-    (``n_timesteps``, ``cost``, ``n_episodes``, the algorithm's losses); returns
+    (``n_timesteps``, the mean episode cost ``J``, ``n_episodes``, the algorithm's losses); returns
     stay internal to the algorithms. ``gamma`` is the discount per period the
     training used, ``scored_gamma`` the problem's, the one its score uses; the record says when they differ.
     ``reward`` is what the training rewarded: ``"running"`` (``−g dt``) or

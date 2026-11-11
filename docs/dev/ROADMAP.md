@@ -477,6 +477,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *One verb on both learners* (the maintainer's ruling of 2026-11-11):
     `TabularLearningPlanner.learn(n)` → `solve(n_episodes=n)`, which continues the learning
     from the table as it stands, as the RL planner's `solve` does, and hands out the greedy law.
+    The learners' `record.history` entries write each episode's (tabular) or iteration's (RL)
+    cost as `"J"` (was `"cost"`): a scalar is `J` (ruling 17b).
 
 ## 3. Maturity (TRL)
 

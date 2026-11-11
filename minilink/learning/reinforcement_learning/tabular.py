@@ -99,7 +99,7 @@ class TabularLearningPlanner(Planner):
     visits : ndarray of int, shape (n_nodes, n_actions)
         How often each cell was updated.
     history : list of dict
-        One record per episode: its cost, length and exploration rate.
+        One record per episode: its cost ``J``, length and exploration rate.
     """
 
     accepts_stochastic = True
@@ -376,7 +376,7 @@ class TabularLearningPlanner(Planner):
         visited_fraction = float(np.mean(visits.sum(axis=1) > 0))
 
         # The mean cost of the last tenth of the episodes, the last one at least
-        last = [record["cost"] for record in history[-max(len(history) // 10, 1) :]]
+        last = [record["J"] for record in history[-max(len(history) // 10, 1) :]]
         mean_episode_cost = float(np.mean(last)) if last else float("nan")
 
         table_finite = bool(np.all(np.isfinite(Q)))
@@ -409,15 +409,13 @@ class TabularLearningPlanner(Planner):
         if created:
             _, ax = plt.subplots(figsize=(8, 3))
 
-        # The episode costs, and the averaging kernel over the window
-        cost = np.array([record["cost"] for record in self.history])
-        kernel = np.ones(min(window, cost.size)) / min(window, cost.size)
+        # The episodes' costs J, and the averaging kernel over the window
+        J = np.array([record["J"] for record in self.history])
+        kernel = np.ones(min(window, J.size)) / min(window, J.size)
 
         # The raw costs, then their moving average
-        ax.plot(np.arange(1, cost.size + 1), cost, alpha=0.3)
-        ax.plot(
-            np.arange(kernel.size, cost.size + 1), np.convolve(cost, kernel, "valid")
-        )
+        ax.plot(np.arange(1, J.size + 1), J, alpha=0.3)
+        ax.plot(np.arange(kernel.size, J.size + 1), np.convolve(J, kernel, "valid"))
 
         ax.set_xlabel("episode")
         ax.set_ylabel("episode cost")
@@ -473,11 +471,11 @@ class TabularLearningPlanner(Planner):
 
         return s
 
-    def record_episode(self, cost, steps, epsilon):
-        """Append one episode's record to ``history``: its number, cost, length and exploration rate."""
+    def record_episode(self, J, steps, epsilon):
+        """Append one episode's record to ``history``: its number, cost ``J``, length and exploration rate."""
         record = {
             "episode": len(self.history) + 1,
-            "cost": cost,
+            "J": J,
             "steps": steps,
             "epsilon": epsilon,
         }
@@ -490,7 +488,7 @@ class TabularLearningRecord:
     Episodes run, how much of the grid was visited, the mean episode cost at the end of learning, and the tables ``J`` and ``pi`` the solution was read from (their ``n_iterations`` the episodes, ``n_episodes``).
 
     ``mean_episode_cost`` is the mean cost of the last tenth of the episodes (the
-    last one at least); ``history`` holds each episode's ``cost``;
+    last one at least); ``history`` holds each episode's cost ``J``;
     ``solve_time_s`` is the solve's wall time, its episodes.
     """
 

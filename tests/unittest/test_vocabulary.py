@@ -532,7 +532,7 @@ def test_a_search_keeps_its_counts_on_its_record_only():
             assert not hasattr(planner, retired), f"{planner_class.__name__}.{retired}"
 
 
-def rl_planner():
+def rl_planner(**method_numbers):
     """A small RL planner on a bounded pendulum, built without training."""
     pytest.importorskip("jax")
     import numpy as np
@@ -553,7 +553,12 @@ def rl_planner():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")  # the default discount's notice
         return ReinforcementLearningPlanner(
-            problem, dt=0.1, hidden=(4,), n_rollouts=2, n_steps_per_update=8
+            problem,
+            dt=0.1,
+            hidden=(4,),
+            n_rollouts=2,
+            n_steps_per_update=8,
+            **method_numbers,
         )
 
 
@@ -606,6 +611,34 @@ def test_rrt_star_names_its_best_path_cost():
     planner.solve()
     assert hasattr(planner, "best_path_cost") and not hasattr(planner, "best_goal_cost")
     assert all(hasattr(node, "cost_to_come") for node in planner.tree.nodes)
+
+
+def test_the_learners_history_says_J():
+    """A learner's per-episode (tabular) and per-iteration (RL) history writes its cost as J."""
+    import numpy as np
+
+    from minilink import PlanningProblem, QuadraticCost
+    from minilink.dynamics.catalog.equations import DoubleIntegrator
+    from minilink.learning.reinforcement_learning import TabularLearningPlanner
+
+    plant = DoubleIntegrator()
+    plant.state.lower, plant.state.upper = np.array([-1.0, -1.0]), np.array([1.0, 1.0])
+    plant.inputs["u"].lower, plant.inputs["u"].upper = np.array([-1.0]), np.array([1.0])
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        horizon=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+    )
+    learner = TabularLearningPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.2)
+    record = learner.solve(n_episodes=2).record
+    for entry in record.history:
+        assert "J" in entry and "cost" not in entry
+
+    planner = rl_planner(batch_size=16)
+    for entry in planner.solve(n_timesteps=16).record.history:
+        assert "J" in entry and "cost" not in entry
 
 
 def test_a_solve_status_reports_its_scalar_as_J():
