@@ -252,6 +252,11 @@ Each entry: the step, the choice, the options it was taken over, and why.
   the model; a serious simulation will not use the hint"). The racecar inherits the rule
   (its automatic step 28 µs → 1.07 ms); its demos and the GRO501 notebook pass their own
   steps, so none moved.
+- **VM-10, the tire's numbers held at `"tire"`** (the maintainer's ruling: "similar to all
+  composition of stuff with params in minilink"): `car.params["tire"] is car.tire.params`,
+  as `loop.params["plant"] is plant.params`; the car passes `params["tire"]` to
+  `tire.forces`. Every bicycle carries the key, `{}` for the laws with no numbers, one shape
+  on every rung. DESIGN's written exception to rule 2 is removed. Baseline byte-identical.
 - **VM-10, the reviewers' findings not applied:**
   - writing `DrivetrainBicycle.compute_tire_physics` through `DynamicBicycle.tire_law_forces`
     (one copy of the axle forces): plan §10.4 writes rung 4's forces on its own page with

@@ -854,8 +854,8 @@ def test_a_dynamic_bicycle_takes_per_axle_stiffnesses_with_a_tire_law(make, law)
     assert car.params["c_alpha_f"] == pytest.approx(p["Ca"] / Fz_f)
     assert car.params["c_alpha_r"] == pytest.approx(p["Ca"] / Fz_r)
     assert car.params["c_kappa"] == pytest.approx(p["Ck"] / Fz_r)
-    for key, value in law().params.items():
-        assert car.params[key] == value
+    assert car.params["tire"] is car.tire.params  # One home: the law's own dict
+    assert car.params["tire"] == law().params
     # The same small-slip car: the same fastest tire mode
     assert car.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
 

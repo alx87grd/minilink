@@ -38,7 +38,8 @@ class DynamicBicycle(DynamicSystem):
     law of the tire module (``tire=BrushTire()``) runs on stiffnesses per unit load,
     ``c_kappa``, ``c_alpha_f``, ``c_alpha_r`` (derived from ``Ca`` and ``Ck`` at the
     static loads, so the small-slip car is the same), and the smooth slip floor
-    ``sqrt(vx^2 + v_min_epsilon^2)``; its own numbers join ``params``.
+    ``sqrt(vx^2 + v_min_epsilon^2)``. The law's own numbers stay its dict, held at
+    ``params["tire"]``.
 
     Inputs
     ------
@@ -57,8 +58,8 @@ class DynamicBicycle(DynamicSystem):
         # stiffnesses shared by both axles, cornering Ca [N/rad] and longitudinal
         # Ck [N], friction mu [-] and the slip regularization speed v_min_epsilon
         # [m/s] (the keys of the car_trajopt project's ladder). A law of the tire
-        # module takes them per unit load instead (c_alpha_f, c_alpha_r, c_kappa)
-        # with its own numbers.
+        # module takes them per unit load instead (c_alpha_f, c_alpha_r, c_kappa).
+        # The tire's own numbers are its dict, held at "tire".
         self.params = {
             "a": 1.0,
             "b": 1.0,
@@ -79,10 +80,14 @@ class DynamicBicycle(DynamicSystem):
         # the saturated linear tire; stiffnesses per unit load, the law's own numbers
         # and the smooth slip for a law of the tire module
         if isinstance(self.tire, LinearSaturation):
+            self.params = {**self.params, "tire": self.tire.params}
             self.axle_forces = self.saturated_linear_forces
             self.axle_stiffnesses = self.absolute_stiffnesses
         else:
-            self.params = {**per_unit_load_params(self.params), **self.tire.params}
+            self.params = {
+                **per_unit_load_params(self.params),
+                "tire": self.tire.params,
+            }
             self.axle_forces = self.tire_law_forces
             self.axle_stiffnesses = self.per_unit_load_stiffnesses
 
@@ -280,6 +285,7 @@ class DynamicBicycle(DynamicSystem):
         params = self.params if params is None else params
 
         tire = self.tire
+        tire_params = params["tire"]
         a = params["a"]
         b = params["b"]
         r_f = params["r_f"]
@@ -305,8 +311,8 @@ class DynamicBicycle(DynamicSystem):
         alpha_r, kappa_r = tire_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
 
         # Linear-slip forces at each contact, saturated on its friction circle
-        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, Ck, Ca, params)
-        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, Ck, Ca, params)
+        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, Ck, Ca, tire_params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, Ck, Ca, tire_params)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
@@ -315,6 +321,7 @@ class DynamicBicycle(DynamicSystem):
         params = self.params if params is None else params
 
         tire = self.tire
+        tire_params = params["tire"]
         a = params["a"]
         b = params["b"]
         r_f = params["r_f"]
@@ -341,8 +348,12 @@ class DynamicBicycle(DynamicSystem):
         alpha_r, kappa_r = wheel_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
 
         # The law's forces at each contact
-        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
-        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+        Fx_f, Fy_f = tire.forces(
+            kappa_f, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, tire_params
+        )
+        Fx_r, Fy_r = tire.forces(
+            kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, tire_params
+        )
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 

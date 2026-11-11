@@ -101,8 +101,8 @@ class UdeSRacecarDyn(DrivetrainBicycle):
     def __init__(self, named_ports=True, tire=None, wheel_angles=False):
         super().__init__(named_ports=named_ports, tire=tire, wheel_angles=wheel_angles)
 
-        # Parameters: the 1/10 car's numbers, then the tire law's own
-        self.params = {**PUBLIC_RACECAR_PARAMS, **self.tire.params}
+        # Parameters: the 1/10 car's numbers, and the tire law's own dict at "tire"
+        self.params = {**PUBLIC_RACECAR_PARAMS, "tire": self.tire.params}
 
         # Ports: the 1/10 car's command limits
         self.bound_commands()

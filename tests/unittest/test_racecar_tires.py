@@ -23,9 +23,11 @@ def axle_forces(kappa_r, alpha_f, alpha_r):
     """The racecar's two axles on the brush tire: ``(Fy_f, Fx_r, Fy_r)`` [N]."""
     mu = PARAMS["mu"]
     c_kappa = PARAMS["c_kappa"]
-    _, Fy_f = TIRE.forces(0.0, alpha_f, FZ_F, mu, c_kappa, PARAMS["c_alpha_f"], PARAMS)
+    _, Fy_f = TIRE.forces(
+        0.0, alpha_f, FZ_F, mu, c_kappa, PARAMS["c_alpha_f"], PARAMS["tire"]
+    )
     Fx_r, Fy_r = TIRE.forces(
-        kappa_r, alpha_r, FZ_R, mu, c_kappa, PARAMS["c_alpha_r"], PARAMS
+        kappa_r, alpha_r, FZ_R, mu, c_kappa, PARAMS["c_alpha_r"], PARAMS["tire"]
     )
 
     return Fy_f, Fx_r, Fy_r

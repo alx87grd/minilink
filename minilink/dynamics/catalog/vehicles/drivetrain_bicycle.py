@@ -38,8 +38,8 @@ class DrivetrainBicycle(DynamicBicycle):
     Tires
     -----
     ``tire`` is the law of both axles, :class:`~minilink.dynamics.catalog.vehicles.tires.BrushTire`
-    by default; its own numbers join ``params`` at construction, while ``mu`` and the
-    stiffnesses per unit load (``c_kappa``, ``c_alpha_f``, ``c_alpha_r``) stay the car's.
+    by default; its own numbers stay its dict, held at ``params["tire"]``, while ``mu``
+    and the stiffnesses per unit load (``c_kappa``, ``c_alpha_f``, ``c_alpha_r``) stay the car's.
 
     Propulsion
     ----------
@@ -392,6 +392,7 @@ class DrivetrainBicycle(DynamicBicycle):
         params = self.params if params is None else params
 
         tire = self.tire
+        tire_params = params["tire"]
         mass = params["mass"]
         gravity = params["gravity"]
         a = params["a"]
@@ -415,8 +416,12 @@ class DrivetrainBicycle(DynamicBicycle):
 
         # The front axle rolls free (κ_f = 0); the rear one is driven
         kappa_r, alpha_f, alpha_r = axle_slips(vx, vy, yaw_rate, w_rear, delta, params)
-        Fx_f, Fy_f = tire.forces(0.0, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
-        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+        Fx_f, Fy_f = tire.forces(
+            0.0, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, tire_params
+        )
+        Fx_r, Fy_r = tire.forces(
+            kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, tire_params
+        )
 
         # Rolling resistance of the free-rolling front axle: −C_rr Fz_f sign(vx)
         Fx_f = Fx_f - C_rr * Fz_f * smooth_sign(vx, v_c)
