@@ -34,7 +34,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Users | the courses and his research; advanced specialized models in his private repository |
 | Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity; 4b quasi-static load transfer, designed for (§6) |
 | 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it; its own class (`BicycleDynRate` today), sharing rung 3's chassis through the parent class, so rung 3's `f` stays a clean course page |
-| UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class |
+| UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class. Its public face: thin classes (`UdeSRacecar` on rung 2, `UdeSRacecarDyn` on rung 4) that set only the preset numbers and the skin, no equations; the one written exception to the catalog clean-up's "no two supported plants differ by parameters alone". `UdeSRacecarDyn3D` becomes a `wheel_angles=True` option on rung 4, as the car cut (K8-0) already says |
 | Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until the demo clean-up, then retires (§5.1) |
 | Terrain | a height `z(x, y)`, its gradient and a friction `μ(x, y)`; given to the car at construction, like the tire; also exported as a static block for custom diagrams |
 | Rung 6 and rung 4 | different models, but sharing the names and the positions of states and parameters as far as possible |
@@ -348,11 +348,7 @@ here.
    Rung 6 is two-track either way.
 2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-3. **Names:**
-   - the generic names of rungs 4 and 6;
-   - the UdeS Racecar's public face: thin classes that set only the preset and the skin
-     (an exception to the catalog clean-up's "no two supported plants differ by parameters
-     alone"), a preset argument, or a parameter set plus a skin.
+3. **The generic names of rungs 4 and 6** (the UdeS Racecar's thin classes sit on them).
 4. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
    `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
    parameter trees and compile first.

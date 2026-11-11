@@ -320,7 +320,7 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   (`camera.py`, `ProblemEnv` / `to_gymnasium`; the pygame renderer stays, the real-time
   default); **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly the course plants, `minilink.catalog`
-  lists only tested plants, no two supported plants differ by parameters alone, and
+  lists only tested plants, no two supported plants differ by parameters alone (except the UdeS Racecar's thin preset classes, ruled 2026-11-11: vehicle-models.md), and
   `test_teaching_surface.py` pins both lists.
 - [ ] **The kinematic car family declares its time constant** (v0.4, with K8-0): `KinematicBicycle` and `UdeSRacecar` get default input bounds and declare `τ = L / (v_max tan δ_max)`, so their loops leave the 1 ms default (1000 substeps a 0.1 s MPC period today). Done when the car family's automatic step reads its declared `τ` and the moved numbers sit in a ledger.
 - [ ] **The experimental tier, untested** (K9). Landed: the prototype
