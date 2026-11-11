@@ -826,46 +826,61 @@ def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
 # --- the solution's params: the planner's complete tree, solved again ---
 
 
-def round_trip_planners():
-    """``(name, planner, solve keywords)`` for every planner, each small and seeded."""
+ROUND_TRIP_NAMES = (
+    "value iteration",
+    "lqr",
+    "rrt",
+    "rrt*",
+    "trajectory optimization",
+    "mppi",
+    "tabular learning",
+)
+NEEDS_JAX = ("mppi",)
+
+
+def round_trip_planner(name):
+    """``(planner, solve keywords)`` for the planner ``name``, small and seeded (built only when asked: MPPI needs JAX)."""
     from minilink import LQRPlanner
     from minilink.planning import MPPIPlanner
     from minilink.planning.search.rrt_star import RRTStarPlanner
 
     grid = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
     infinite = move_problem().replace(horizon=np.inf, discount_rate=0.5)
-    obstacles, _ = make_holonomic_obstacle_problem()
     compass = [
         np.array([np.cos(a), np.sin(a)])
         for a in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
     ]
 
+    def obstacles():
+        problem, _ = make_holonomic_obstacle_problem()
+        return problem
+
     def extender():
         return KinodynamicExtender(controls=compass, horizon=0.6, n_steps=6)
 
-    planners = [
-        ("value iteration", DynamicProgrammingPlanner(infinite, **grid), {}),
-        ("lqr", LQRPlanner(move_problem()), {}),
-        ("rrt", RRTPlanner(obstacles, extender(), max_iterations=400, seed=3), {}),
-        (
-            "rrt*",
-            RRTStarPlanner(obstacles, extender(), max_iterations=200, seed=3),
+    builders = {
+        "value iteration": lambda: (DynamicProgrammingPlanner(infinite, **grid), {}),
+        "lqr": lambda: (LQRPlanner(move_problem()), {}),
+        "rrt": lambda: (
+            RRTPlanner(obstacles(), extender(), max_iterations=400, seed=3),
             {},
         ),
-        ("trajectory optimization", trajopt(move_problem(), collocation), {}),
-        (
-            "mppi",
+        "rrt*": lambda: (
+            RRTStarPlanner(obstacles(), extender(), max_iterations=200, seed=3),
+            {},
+        ),
+        "trajectory optimization": lambda: (trajopt(move_problem(), collocation), {}),
+        "mppi": lambda: (
             MPPIPlanner(move_problem(), dt=0.1, n_rollouts=64, n_iterations=2),
             {},
         ),
-        (
-            "tabular learning",
+        "tabular learning": lambda: (
             TabularLearningPlanner(infinite, solver="euler", seed=2, **grid),
             {"n_episodes": 20},
         ),
-    ]
+    }
 
-    return planners
+    return builders[name]()
 
 
 def solved_numbers(solution):
@@ -893,10 +908,16 @@ def solved_numbers(solution):
     return pickle.dumps((sorted(controller.items()), plan, sorted(numbers.items())))
 
 
-@pytest.mark.parametrize("index", range(7))
-def test_a_solution_is_solved_again_from_its_params(index):
+@pytest.mark.parametrize(
+    "name",
+    [
+        pytest.param(name, marks=pytest.mark.jax) if name in NEEDS_JAX else name
+        for name in ROUND_TRIP_NAMES
+    ],
+)
+def test_a_solution_is_solved_again_from_its_params(name):
     """Ruling 24: solution.params is the planner's complete tree; solve(params=) reproduces it."""
-    name, planner, keywords = round_trip_planners()[index]
+    planner, keywords = round_trip_planner(name)
     first = planner.solve(**keywords)
 
     assert set(first.params) == set(planner.params), name

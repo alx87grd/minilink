@@ -297,6 +297,7 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     assert ax.get_xlabel() == "episode"
 
 
+@pytest.mark.jax
 def test_an_mppi_solve_prints_its_record_when_verbose(capsys):
     from minilink.planning import MPPIPlanner
 

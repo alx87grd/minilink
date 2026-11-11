@@ -305,6 +305,7 @@ def test_a_ball_draws_inside_itself_and_its_center_with_no_key():
     assert ball.sample(3).shape == (2,)
 
 
+@pytest.mark.jax
 def test_a_ball_draws_on_jax_under_jit():
     jax = require_jax()
     jnp = require_jax_numpy()

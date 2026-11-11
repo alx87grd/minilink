@@ -2250,6 +2250,7 @@ class TestTextbookOptions(unittest.TestCase):
         self.assertEqual(first, second)
 
     def test_problem_evaluator_live_plot_callback_updates_figure(self):
+        pytest.importorskip("jax")  # gd needs the gradient a JAX compile gives
         import matplotlib
 
         from minilink import IntegralImpedance, Optimizer
