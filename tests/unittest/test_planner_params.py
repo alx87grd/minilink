@@ -282,7 +282,11 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     build, _ = PLANNERS["tabular"]
     planner = build()
     solve_of(planner)
-    with mock.patch("matplotlib.pyplot.show") as shown:
+    # An interactive backend: the planning views leave Agg silent
+    with (
+        mock.patch("matplotlib.pyplot.show") as shown,
+        mock.patch("matplotlib.pyplot.get_backend", return_value="TkAgg"),
+    ):
         ax = planner.plot_learning_curve(show=False)
         source = Step()
         source.compute_trajectory(tf=2.0)
