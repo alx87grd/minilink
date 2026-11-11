@@ -551,6 +551,34 @@ def test_a_sampled_data_law_takes_its_period_at_construction():
         discretize(law, 0.1)
 
 
+def test_a_sampled_data_law_takes_output_dim_and_writes_its_h():
+    """Ruling Q6: output_dim= like its siblings; an h that would read its own output port refused."""
+    from minilink.core.discrete.sampled_system import NativeSampledSystem
+
+    class Accumulator(NativeSampledSystem):
+        """x_{k+1} = x_k + Δ u_k, y = 2 x: an integrator written in seconds."""
+
+        def __init__(self):
+            super().__init__(1, sample_period=0.1, input_dim=1, output_dim=1)
+
+        def update(self, x, u, t, params=None):
+            return x + self.sample_period * u
+
+        def h(self, x, u, t=0.0, params=None):
+            return 2.0 * x
+
+    law = Accumulator()
+    assert law.p == 1 and "y" in law.outputs
+    run = law.compute_rollout(3, u=np.ones(1))
+    np.testing.assert_allclose(run.x[0], [0.0, 0.1, 0.2, 0.3])
+    np.testing.assert_allclose(
+        law.outputs["y"].compute(np.array([0.3]), np.ones(1), 0.3), [0.6]
+    )
+
+    with pytest.raises(TypeError, match="y would read itself"):
+        NativeSampledSystem(1, sample_period=0.1, output_dim=1)
+
+
 def test_the_held_outputs_start_is_a_leaf_of_the_run():
     from minilink import PlanningProblem, QuadraticCost
 

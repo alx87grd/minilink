@@ -317,13 +317,21 @@ class NativeSampledSystem(SampledSystem):
     Its equation needs its period, so ``sample_period`` is set at
     construction, and ``law % dt`` is refused: it is already on its clock
     (rule 1 of the loop's grammar). The keyword shortcuts create the standard
-    ports, as :class:`~minilink.core.system.System` does: the input ``u``
-    (``input_dim``) and the state output ``x`` (``expose_state``); the outputs
-    in seconds are declared with ``add_output_port``.
+    ports, as ``StepSystem`` does: the input ``u`` (``input_dim``), the output
+    ``y = h(x, u, t)`` (``output_dim``, ``h`` the subclass's, in seconds, its
+    inputs ``y_dependencies``) and the state output ``x`` (``expose_state``);
+    other outputs in seconds are declared with ``add_output_port``.
     """
 
     def __init__(
-        self, state_dim=0, *, sample_period=None, input_dim=None, expose_state=False
+        self,
+        state_dim=0,
+        *,
+        sample_period=None,
+        input_dim=None,
+        output_dim=None,
+        expose_state=False,
+        y_dependencies=(),
     ):
         # No source: the clock alone, set at construction
         self.source = None
@@ -332,8 +340,17 @@ class NativeSampledSystem(SampledSystem):
         self.kind = "law"
         self.sample_period = positive_period(require_period(sample_period))
 
-        # The System shell: its own state, ports, parameters and hints
-        System.__init__(self, state_dim, input_dim=input_dim, expose_state=expose_state)
+        # The System shell: its own state, ports, parameters and hints; the output
+        # y = h(x, u, t) the subclass's own h
+        require_own_output_map(self, output_dim)
+        System.__init__(
+            self,
+            state_dim,
+            input_dim=input_dim,
+            output_dim=output_dim,
+            expose_state=expose_state,
+            y_dependencies=y_dependencies,
+        )
 
     @property
     def params(self) -> dict:
@@ -445,6 +462,17 @@ def steps_per_period(sample_period, dt) -> int:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_own_output_map(law, output_dim):
+    """Refuse ``output_dim`` on a native law that writes no ``h``: its ``y`` would read its own output port."""
+    if output_dim is not None and type(law).h is NativeSampledSystem.h:
+        raise TypeError(
+            f"{type(law).__name__}: output_dim= declares the output y = h(x, u, t) "
+            "in seconds, and the law writes no h of its own: the inherited h reads "
+            "the law's first output port, so y would read itself; write "
+            "h(x, u, t, params) on the law, or declare the output with add_output_port"
+        )
 
 
 def exact_update(source, x, u, t, dt, params):

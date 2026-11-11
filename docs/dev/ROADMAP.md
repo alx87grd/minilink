@@ -305,7 +305,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     with it); `sys.animate(traj=None, *, speed=, …)` and `sys.render(x, u, t, *, is_3d=, …)`;
     `MLP(input_dim, output_dim, *, hidden=, …)`; `Sys2Gym(sys, cost, *, dt=, …)`;
     `NativeSampledSystem(state_dim=0, *, sample_period=, input_dim=, expose_state=)`, the
-    port shortcuts of a `System` but the output, declared in seconds. The reverse:
+    port shortcuts of a `System` but the output, declared in seconds (`output_dim=` then
+    added, ruling Q6 below). The reverse:
     `evaluate(problem, controller, dt=None, *, …)` takes `dt` by position, as
     `problem.compile(controller, dt)` does.
   - *Removed: no caller, or against a rule.* `validate=` on `feedback`, `closed_loop` and
@@ -536,6 +537,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `x0` with it (`x[0:9]` the positions, `x[9:18]` their rates); the numbers move only by
     that permutation. RULES words "positions, then rates" as a style guideline, not a rule
     enforced on a user's plant.
+  - *A sampled-data law takes `output_dim=`* (the maintainer's ruling Q6 of 2026-11-11), like
+    its siblings: `NativeSampledSystem(state_dim=0, *, sample_period=, input_dim=,
+    output_dim=, expose_state=, y_dependencies=())`, the output `y = h(x, u, t)` the law's own
+    `h`, in seconds; a law that writes no `h` is refused (the inherited `h` reads the law's
+    first output port, so `y` would read itself).
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the

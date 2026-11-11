@@ -388,7 +388,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   (`mpc_plans_from_rollout`, `mpc_animation_overlays`, the plan read from the run's `z` or
   from the memory's state). A sampled-data law written in seconds whose equation needs its
   period is a `NativeSampledSystem(state_dim, sample_period=Δ)`: its period set at construction, `%`
-  on it refused. Out of the MPC's contract: a shrinking horizon (`N` is structural) and
+  on it refused; `output_dim=` gives it the output `y = h(x, u, t)`, its own `h` in seconds (a
+  law that writes none is refused: the inherited `h` reads its first output port). Out of the MPC's contract: a shrinking horizon (`N` is structural) and
   event-triggered replanning (a later option in the tick).
 - **Observer:** a block that reads the plant's `u` and `y` and gives the estimate on `x`
   (`StateObserver`; later filters keep the ports, their state may be larger than the
