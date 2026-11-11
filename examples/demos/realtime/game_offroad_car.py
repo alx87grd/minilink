@@ -2,6 +2,7 @@
 
 from minilink import OffRoadCar3D
 from minilink.dynamics.catalog.vehicles.terrain import Bumps
+from minilink.simulation.realtime import PygameInput
 
 car = OffRoadCar3D(terrain=Bumps(), wheel_angles=True)
 car.params["terrain"]["amplitude"] = 0.8  # [m] hills, crest to trough 1.6 m
@@ -15,6 +16,10 @@ car.game(
     is_3d=True,
     plot=("loads", "rollover"),
     plot_renderer="plotly",
-    joystick_axes=[(1, 1.0), (0, -1.0)],
+    # UP/DOWN the power; LEFT steers left (a positive steering angle), RIGHT right
+    input=PygameInput(
+        key_axes=[("up", "down"), ("left", "right")],
+        joystick_axes=[(1, 1.0), (0, -1.0)],
+    ),
     backend="jax",
 )

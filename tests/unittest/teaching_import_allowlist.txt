@@ -42,3 +42,4 @@ examples/tutorial/core/01_systems.ipynb minilink.core.backends
 examples/tutorial/core/04_costs.ipynb minilink.core.backends
 examples/demos/dynamics/offroad_car_3d.py minilink.dynamics.catalog.vehicles.terrain
 examples/demos/realtime/game_offroad_car.py minilink.dynamics.catalog.vehicles.terrain
+examples/demos/realtime/game_offroad_car.py minilink.simulation.realtime
