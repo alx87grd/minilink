@@ -1,7 +1,7 @@
 """Vehicle dynamics: the teaching ladder from the holonomic point to the UdeS racecar, plus propulsion and suspension."""
 
-# Tire math (``tire_slip`` / ``linear_tire_forces`` in dynamic_bicycle, the brush pair
-# in tires) and parameter sets stay in their modules — plants only in __all__.
+# The tire laws and slips (``tires``) and the parameter sets stay in their modules:
+# plants only in __all__.
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     BicycleDynRate,
     DynamicBicycle,

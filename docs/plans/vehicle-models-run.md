@@ -111,9 +111,39 @@ Each entry: the step, the choice, the options it was taken over, and why.
   (`jit`), a 5 s run on each backend, and for `BicycleDynRate` and `UdeSRacecarDyn` one
   direct-collocation solve (JAX, SLSQP, 8 steps) and ten MPC ticks on the compiled face.
   The racecar's solve is the harness's own: no benchmark scenario solves on it.
+- **VM-0, the racecar's solve re-posed before any edit.** The first racecar solve (SLSQP,
+  `ftol = 10⁻⁶`, 60 iterations) turned a 10⁻¹⁵ change in `f` into an O(1) change of the
+  MPC run, so it could not judge VM-2's tolerance. Both solves now run to `ftol = 10⁻⁹`
+  (200 iterations at most) and the racecar's cost weighs the wheel rate and the power a
+  little more (`Q` 0.01 and 0.001, `R` 0.001 on `P_cmd`, `u_bar = [5 W, 0]`); a 10⁻¹³
+  nudge of the start then moves the MPC states by 3·10⁻⁶ and its iteration counts by 1 at
+  most. The baseline was captured again from a clean worktree of the starting commit,
+  and run twice, byte-identical.
+- **VM-1, `axle_slips` keeps its own lines until VM-2.** Routing it through `wheel_slip`
+  moves the last bit under JAX `jit` (XLA rewrites `a / √b` as `a · rsqrt(b)` when the root
+  is written twice, not when it is shared), while NumPy and eager JAX stay identical. So
+  VM-1, whose bar is byte-identical, keeps `axle_slips` as it is, and VM-2, whose bar is a
+  tolerance, routes it through `wheel_slip`; writing the root twice in `wheel_slip` to
+  match a compiler's rewrite was the other option.
+- **VM-1, "the three laws agree within 5 %".** Read as 5 % of the friction limit `μ Fz`:
+  relative to the force itself, the brush law is 10 % under the linear tire at a demand
+  of 0.3 (its shape is `z − z²/3 + z³/27`), so no law with a friction limit can meet that
+  reading. Measured (pure lateral slip, `z` up to 0.3): linear and brush 0.029, linear and
+  magic formula 0.007, brush and magic formula 0.022, in units of `μ Fz`.
+- **VM-1, the project tests leave `test_dynamics_catalog.py`.** The done-when asks that
+  the file import nothing from `examples/projects/`; it imported the pathtracking tires and
+  also the car_trajopt extras, ladder and profiles and the pathtracking helpers. All the
+  checks of project code move, unchanged, to a new `tests/unittest/test_car_projects.py`
+  (the other option, deleting the project checks, loses coverage). The project folders
+  are not edited.
+- **VM-1, `linear_tire_forces` stays beside `LinearSaturation` for one step.** It moves
+  into `tires.py` unchanged and the rungs still call it, so the step is a move; VM-3 makes
+  the rungs call the law and removes the function.
 
 ## 7. Ledger
 
-None yet. The numbers that moved, each with how it was measured (machine, median of N, warm
-or cold): VM-2's differences against the baseline, the solve times before and after, and the
-default numbers of the two new cars.
+The numbers that moved, each with how it was measured (machine, median of N, warm or cold).
+
+- **VM-1:** none; the baseline is byte-identical. The magic formula at its default shape
+  (`c = 13/rad`, `μ = 1`, one NumPy run on 300 001 angles): peak 1.000 at 12.2°, 0.982 at
+  20°, 0.943 at 40°, as the plan computed.

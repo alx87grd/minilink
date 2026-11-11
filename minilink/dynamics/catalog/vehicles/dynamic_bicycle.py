@@ -8,6 +8,7 @@ from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem, fastest_time_constant
+from minilink.dynamics.catalog.vehicles.tires import linear_tire_forces
 from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
@@ -640,46 +641,6 @@ class BicycleDynRate(DynamicBicycle):
     def wheel_rate_and_steer(self, x, u):
         """``[w_rear, delta]``: both are states on this rung."""
         return x[6:8]
-
-
-# Tire model: pure functions, the coefficients live in the plant's ``params``
-
-
-def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
-    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
-
-    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
-    """
-    xp = array_module(vx, vy, w)
-
-    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
-
-    # Linear slip forces: F_x = C_κ κ and F_y = C_α α
-    Fx = Ck * kappa
-    Fy = Ca * alpha
-
-    # Scaled back onto the friction circle |F| ≤ μ F_z (10⁻¹² guards the division)
-    F_max = mu * Fz
-    F_total = xp.sqrt(Fx**2 + Fy**2)
-    ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
-    Fx_sat = Fx * ratio
-    Fy_sat = Fy * ratio
-
-    return Fx_sat, Fy_sat
-
-
-def tire_slip(vx, vy, w, R, v_min_epsilon):
-    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact."""
-    xp = array_module(vx, vy, w)
-
-    # The regularized speed |vx| + ε keeps both slips finite at rest
-    vx_adj = xp.abs(vx) + v_min_epsilon
-
-    # α = −atan(vy / (|vx| + ε)) and κ = (ω R − vx) / (|vx| + ε)
-    alpha = -xp.arctan(vy / vx_adj)
-    kappa = (w * R - vx) / vx_adj
-
-    return alpha, kappa
 
 
 if __name__ == "__main__":

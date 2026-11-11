@@ -1,10 +1,249 @@
-"""Fiala brush tires: the axle slips, their saturated forces and the friction ellipse."""
+"""Tires: the slip of a wheel, and the laws that turn it into a force."""
 
 from minilink.core.backends import array_module
 
 ###############################################################################
 # Public API
 ###############################################################################
+
+
+class LinearTire:
+    """Linear tire: the force grows with the slip, with no friction limit.
+
+    The stiffnesses are per unit load, so the force is linear in the load ``Fz``.
+    It is the small-slip limit of every other law of this module.
+    """
+
+    def __init__(self):
+        # Parameters: none of its own; the car hands over the stiffnesses
+        self.params = {}
+
+    def forces(self, kappa, alpha, Fz, mu, c_kappa, c_alpha, params=None):
+        """Longitudinal and lateral force ``(Fx, Fy)`` [N] of one wheel, in its frame.
+
+        Parameters
+        ----------
+        kappa, alpha : float or array
+            Slip ratio [-] and slip angle [rad] of the wheel.
+        Fz : float or array
+            Normal load [N].
+        mu : float
+            Friction coefficient [-] (no friction limit here: unused).
+        c_kappa, c_alpha : float
+            Longitudinal [-] and cornering [1/rad] stiffness per unit load.
+        params : dict, optional
+            The law's own numbers (none).
+        """
+        Fx = c_kappa * Fz * kappa
+        Fy = c_alpha * Fz * alpha
+
+        return Fx, Fy
+
+
+class BrushTire:
+    """Fiala brush tire: the friction limit, reached smoothly.
+
+    The brush model integrates the bristle deflection over the contact patch: the
+    force follows the linear tire at small slip and reaches ``mu Fz`` once the whole
+    patch slides. Traction and cornering share one friction ellipse.
+
+    References
+    ----------
+    Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 3; Fiala, VDI Zeitschrift 96 (1954).
+    """
+
+    def __init__(self):
+        # Parameters: the floor that keeps the slip demand differentiable at zero slip
+        self.params = {"z_floor": 1.0e-6}
+
+    def forces(self, kappa, alpha, Fz, mu, c_kappa, c_alpha, params=None):
+        """Longitudinal and lateral force ``(Fx, Fy)`` [N] of one wheel, in its frame.
+
+        Parameters
+        ----------
+        kappa, alpha : float or array
+            Slip ratio [-] and slip angle [rad] of the wheel.
+        Fz : float or array
+            Normal load [N].
+        mu : float
+            Friction coefficient [-].
+        c_kappa, c_alpha : float
+            Longitudinal [-] and cornering [1/rad] stiffness per unit load.
+        params : dict, optional
+            Needs ``z_floor``.
+        """
+        params = self.params if params is None else params
+        xp = array_module(kappa, alpha, Fz)
+
+        z_floor = params["z_floor"]
+
+        # Slip demand: the linear force over the friction limit, per direction
+        s_x = c_kappa * kappa / mu
+        s_y = c_alpha * alpha / mu
+        z = xp.sqrt(s_x**2 + s_y**2 + z_floor**2)
+
+        # F = μ Fz shape(z) along the demand, with shape(z) = z g(z) for the brush
+        g = brush_saturation(z)
+        Fx = mu * Fz * s_x * g
+        Fy = mu * Fz * s_y * g
+
+        return Fx, Fy
+
+
+class MagicFormulaTire:
+    """Magic formula tire (Pacejka): a peak at the friction limit, then a fall.
+
+    The curve is taken along the slip demand ``z``, with ``B = c / (C mu)``, so its
+    slope at zero slip is the stiffness ``c`` and its peak is ``mu Fz``. The shape
+    ``mf_C`` sets the fall past the peak, to ``sin(mf_C pi / 2)`` of it at large
+    slip, and the curvature ``mf_E`` where the peak sits.
+
+    References
+    ----------
+    Pacejka, *Tyre and Vehicle Dynamics*, 3rd ed., ch. 4.
+    """
+
+    def __init__(self):
+        # Parameters: the shape and the curvature of the curve, and the slip floor
+        self.params = {"mf_C": 1.3, "mf_E": -0.5, "z_floor": 1.0e-6}
+
+    def forces(self, kappa, alpha, Fz, mu, c_kappa, c_alpha, params=None):
+        """Longitudinal and lateral force ``(Fx, Fy)`` [N] of one wheel, in its frame.
+
+        Parameters
+        ----------
+        kappa, alpha : float or array
+            Slip ratio [-] and slip angle [rad] of the wheel.
+        Fz : float or array
+            Normal load [N].
+        mu : float
+            Friction coefficient [-].
+        c_kappa, c_alpha : float
+            Longitudinal [-] and cornering [1/rad] stiffness per unit load.
+        params : dict, optional
+            Needs ``mf_C``, ``mf_E`` and ``z_floor``.
+        """
+        params = self.params if params is None else params
+        xp = array_module(kappa, alpha, Fz)
+
+        C = params["mf_C"]
+        E = params["mf_E"]
+        z_floor = params["z_floor"]
+
+        # Slip demand: the linear force over the friction limit, per direction
+        s_x = c_kappa * kappa / mu
+        s_y = c_alpha * alpha / mu
+        z = xp.sqrt(s_x**2 + s_y**2 + z_floor**2)
+
+        # shape(z) = sin(C atan(b − E (b − atan b))), with b = B slip = z / C
+        b = z / C
+        shape = xp.sin(C * xp.arctan(b - E * (b - xp.arctan(b))))
+
+        # F = μ Fz shape(z) along the demand
+        Fx = mu * Fz * s_x * shape / z
+        Fy = mu * Fz * s_y * shape / z
+
+        return Fx, Fy
+
+
+class LinearSaturation:
+    """Linear tire scaled back onto its friction circle ``|F| <= mu Fz``.
+
+    The stiffnesses here are absolute: ``c_kappa`` receives ``Ck`` [N] and
+    ``c_alpha`` receives ``Ca`` [N/rad], shared by both axles, and the force is not
+    multiplied by ``Fz``. The law of ``DynamicBicycle`` and ``BicycleDynRate``
+    with their default tire.
+    """
+
+    def __init__(self):
+        # Parameters: none of its own; the car hands over ``Ca``, ``Ck`` and ``mu``
+        self.params = {}
+
+    def forces(self, kappa, alpha, Fz, mu, c_kappa, c_alpha, params=None):
+        """Longitudinal and lateral force ``(Fx, Fy)`` [N] of one wheel, in its frame.
+
+        Parameters
+        ----------
+        kappa, alpha : float or array
+            Slip ratio [-] and slip angle [rad] of the wheel.
+        Fz : float or array
+            Normal load [N].
+        mu : float
+            Friction coefficient [-].
+        c_kappa, c_alpha : float
+            Absolute longitudinal [N] and cornering [N/rad] stiffness.
+        params : dict, optional
+            The law's own numbers (none).
+        """
+        xp = array_module(kappa, alpha)
+
+        # Linear slip forces: F_x = C_κ κ and F_y = C_α α
+        Fx = c_kappa * kappa
+        Fy = c_alpha * alpha
+
+        # Scaled back onto the friction circle |F| ≤ μ F_z (10⁻¹² guards the division)
+        F_max = mu * Fz
+        F_total = xp.sqrt(Fx**2 + Fy**2)
+        ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
+        Fx_sat = Fx * ratio
+        Fy_sat = Fy * ratio
+
+        return Fx_sat, Fy_sat
+
+
+# The slip of one wheel, from its contact velocity in its own frame
+
+
+def tire_slip(vx, vy, w, R, v_min_epsilon):
+    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact.
+
+    The rolling speed is floored as ``|vx| + v_min_epsilon``.
+    """
+    xp = array_module(vx, vy, w)
+
+    # The regularized speed |vx| + ε keeps both slips finite at rest
+    vx_adj = xp.abs(vx) + v_min_epsilon
+
+    # α = −atan(vy / (|vx| + ε)) and κ = (ω R − vx) / (|vx| + ε)
+    alpha = -xp.arctan(vy / vx_adj)
+    kappa = (w * R - vx) / vx_adj
+
+    return alpha, kappa
+
+
+def wheel_slip(vx, vy, w, R, v_min_epsilon):
+    """Slip angle ``alpha`` [rad] and slip ratio ``kappa`` [-] at one contact.
+
+    The rolling speed is floored as ``sqrt(vx^2 + v_min_epsilon^2)``, smooth at rest.
+
+    Parameters
+    ----------
+    vx, vy : float or array
+        Contact-point velocity in the wheel frame [m/s].
+    w : float or array
+        Wheel angular rate [rad/s], positive when rolling forward.
+    R : float
+        Wheel radius [m].
+    v_min_epsilon : float
+        Floor of the rolling speed [m/s].
+
+    Returns
+    -------
+    alpha : float or array
+        Slip angle [rad]: positive when the tire pushes the car to the left.
+    kappa : float or array
+        Slip ratio [-]: positive when the tire drives the car forward.
+    """
+    xp = array_module(vx, vy, w)
+
+    # The rolling speed |vx|, floored to √(vx² + ε²) near rest
+    v_roll = xp.sqrt(vx**2 + v_min_epsilon**2)
+
+    # α = −atan(vy / |vx|) and κ = (ω R − vx) / |vx|
+    alpha = -xp.arctan(vy / v_roll)
+    kappa = (w * R - vx) / v_roll
+
+    return alpha, kappa
 
 
 def axle_slips(vx, vy, yaw_rate, w_rear, delta, params):
@@ -59,6 +298,32 @@ def axle_slips(vx, vy, yaw_rate, w_rear, delta, params):
     alpha_r = -xp.arctan(vy_r / xp.sqrt(vx**2 + v_eps**2))
 
     return kappa_r, alpha_f, alpha_r
+
+
+# The axle forces
+
+
+def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
+    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
+
+    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
+    """
+    xp = array_module(vx, vy, w)
+
+    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+
+    # Linear slip forces: F_x = C_κ κ and F_y = C_α α
+    Fx = Ck * kappa
+    Fy = Ca * alpha
+
+    # Scaled back onto the friction circle |F| ≤ μ F_z (10⁻¹² guards the division)
+    F_max = mu * Fz
+    F_total = xp.sqrt(Fx**2 + Fy**2)
+    ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
+    Fx_sat = Fx * ratio
+    Fy_sat = Fy * ratio
+
+    return Fx_sat, Fy_sat
 
 
 def brush_tire_forces(kappa_r, alpha_f, alpha_r, vx, params):
@@ -163,7 +428,7 @@ def friction_use(Fx_f, Fy_f, Fx_r, Fy_r, params):
     return phi_f, phi_r
 
 
-# The building blocks of the brush law
+# The building blocks of the laws
 
 
 def smooth_sign(v, v_c):
@@ -174,6 +439,24 @@ def smooth_sign(v, v_c):
     s = xp.tanh(v / v_c)
 
     return s
+
+
+def smooth_floor(F, F_eps):
+    """``max(F, 0)`` softened over ``F_eps``: a normal load that lifts off smoothly.
+
+    Parameters
+    ----------
+    F : float or array
+        The load before the floor [N]: negative when the wheel would pull the ground.
+    F_eps : float
+        The width of the softened corner [N].
+    """
+    xp = array_module(F)
+
+    # max(F, 0) ≈ ½ (F + √(F² + F_eps²)): F well above F_eps, 0 well below, smooth at 0
+    F_floor = 0.5 * (F + xp.sqrt(F**2 + F_eps**2))
+
+    return F_floor
 
 
 def brush_saturation(z):
