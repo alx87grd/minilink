@@ -1740,3 +1740,21 @@ def test_a_sampled_input_off_the_runs_grid_names_the_grids_keywords():
     assert traj.u.shape == (1, 7)
     with pytest.raises(ValueError, match=r"got \(2, 7\)$"):
         plant.compute_trajectory(tf=1.0, u=np.ones((2, 7)))
+
+
+def test_a_sampled_loop_announces_an_end_off_its_ticks():
+    """A loop on a clock stops on a tick: a tf between two ticks warns with the end it reaches (the maintainer, 2026-11-11)."""
+    import warnings
+
+    from minilink import PID, Pendulum
+
+    loop = (PID(Kp=5.0, Kd=1.0) % 0.1) @ Pendulum()
+
+    with pytest.warns(UserWarning, match="ends at 1 s"):
+        traj = loop.compute_trajectory(tf=1.05)
+    assert traj.t[-1] == pytest.approx(1.0)
+
+    # A tf on a tick is silent
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        loop.compute_trajectory(tf=1.0)

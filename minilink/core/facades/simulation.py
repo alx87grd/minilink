@@ -1,6 +1,10 @@
 """Simulation shortcuts: compile a system, simulate it, score the run."""
 
+import warnings
+
 import numpy as np
+
+from minilink.core.options import caller_stacklevel
 
 ###############################################################################
 # Public API
@@ -284,7 +288,8 @@ class StepSimulation:
         Parameters
         ----------
         tf : float
-            End of the run in seconds; the run takes ``round((tf - t0) / Δ)`` ticks.
+            End of the run in seconds; the run takes ``round((tf - t0) / Δ)`` ticks,
+            and warns when it so ends at another time than ``tf``.
         u : array, sequence, callable, or None, optional
             The input of each tick, as for :meth:`compute_rollout`.
         x0 : array, optional
@@ -316,6 +321,7 @@ class StepSimulation:
         require_run_solver(solver)
         h = self.sample_period
         n_steps = int(round((float(tf) - float(t0)) / h))
+        warn_off_tick_end(tf, t0, h, n_steps)
         host = solver == "scipy"
         run = stepped_view(self, dt, None if host else solver)
         ev = run.compile(backend="numpy" if host else backend, verbose=verbose)
@@ -493,6 +499,21 @@ class StepSimulation:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def warn_off_tick_end(tf, t0, h, n_steps):
+    """Warn when a run of whole ticks ends at another time than the ``tf`` asked for."""
+    t_end = float(t0) + n_steps * h
+    gap = abs(t_end - float(tf))
+
+    # A loop on a clock stops on a tick: the end it reaches is announced
+    if gap > 1e-9 * max(1.0, abs(float(tf))):
+        warnings.warn(
+            f"tf={float(tf):g} is not a whole number of ticks of {h:g} s from "
+            f"t0={float(t0):g}: the run takes {n_steps} ticks and ends at "
+            f"{t_end:g} s",
+            stacklevel=caller_stacklevel(),
+        )
 
 
 def require_continuous_underneath(system):

@@ -863,3 +863,7 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
   `history` holds `"J"`, `mean_episode_cost`). The code already does this; nothing changed.
 - **The critics' `value(w, x)` (the architecture review's proposal).** Kept, weights first: "lets
   not be too rigid on internal tools". DESIGN's RL paragraph names the exception.
+- **A sampled loop's end off its ticks (the review pass's proposal).** Option 1: a loop on a
+  clock still runs `round((tf − t0) / Δ)` ticks, and now warns, naming the end it reaches,
+  when that is not `tf` (ruling 22(d) made a continuous run land on `tf`; a loop cannot stop
+  mid-tick). A `tf` on a tick is silent.
