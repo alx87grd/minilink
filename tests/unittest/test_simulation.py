@@ -374,7 +374,7 @@ class TestEulerSolverModes(unittest.TestCase):
 
     def test_an_uneven_grid_at_the_nanosecond_scale_is_not_uniform(self):
         from minilink.analysis.linear import uniform_step
-        from minilink.simulation.simulator import time_grid_is_uniform
+        from minilink.simulation.solvers.solver import fixed_steps_of
         from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
         from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 
@@ -382,13 +382,13 @@ class TestEulerSolverModes(unittest.TestCase):
         for backend in (EulerFixedStepSolverBackend(), RK4SolverBackend()):
             with self.assertRaisesRegex(ValueError, "needs a uniform time grid"):
                 backend.integrate(self.ev, times, self.plant.x0)
-        self.assertFalse(time_grid_is_uniform(times))
+        self.assertIsNone(fixed_steps_of(times))
         with self.assertRaisesRegex(ValueError, "uniform time grid"):
             uniform_step(times)
 
         # An even grid at the same scale is uniform
         even = 1e-9 * np.arange(4)
-        self.assertTrue(time_grid_is_uniform(even))
+        self.assertIsNotNone(fixed_steps_of(even))
         self.assertEqual(uniform_step(even), even[1])
 
     def test_simulator_accepts_euler(self):
@@ -1377,13 +1377,48 @@ class TestDtTimeGrid(unittest.TestCase):
         self.assertEqual(n_pts, 12)
         self.assertAlmostEqual(t[-1], 1.1)
 
-    def test_non_dividing_dt_still_covers_tf(self):
+    def test_non_dividing_dt_shortens_its_last_step_onto_tf(self):
         from minilink.simulation.time_grid import build_time_grid
 
         t, dt, n_pts = build_time_grid(0.0, 1.0, dt=0.3)
         self.assertEqual(n_pts, 5)
         self.assertAlmostEqual(dt, 0.3)
-        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.2])
+        np.testing.assert_allclose(t, [0.0, 0.3, 0.6, 0.9, 1.0])
+        self.assertEqual(t[-1], 1.0)
+
+        # A dt longer than the run is one step, the run itself
+        t, _, n_pts = build_time_grid(0.5, 0.7, dt=0.3)
+        np.testing.assert_array_equal(t, [0.5, 0.7])
+
+    def test_a_fixed_step_solver_lands_on_tf_with_a_shorter_last_step(self):
+        """ẋ = u with u = 1 from x = 0: every fixed-step method is exact, x(tf) = tf."""
+        from minilink.blocks.basic import Integrator
+
+        for solver in ("rk4", "euler"):
+            plant = Integrator()
+            plant.inputs["u"].nominal_value = np.array([1.0])
+            with self.subTest(solver=solver, input="nominal"):
+                traj = plant.compute_trajectory(
+                    x0=[0.0], tf=1.0, dt=0.3, solver=solver, verbose=False
+                )
+                np.testing.assert_allclose(traj.t, [0.0, 0.3, 0.6, 0.9, 1.0])
+                np.testing.assert_allclose(traj.x[0], traj.t, atol=1e-12)
+            with self.subTest(solver=solver, input="forced"):
+                traj = plant.compute_trajectory(
+                    x0=[0.0], tf=1.0, dt=0.3, solver=solver, u=lambda t: [2.0]
+                )
+                np.testing.assert_allclose(traj.x[0], 2.0 * traj.t, atol=1e-12)
+
+    def test_a_fixed_step_grid_reads_its_last_step(self):
+        from minilink.simulation.solvers.solver import fixed_steps_of
+
+        self.assertEqual(fixed_steps_of(np.array([0.0, 0.3, 0.6, 0.9])), (0.3, 0.3))
+        dt, dt_last = fixed_steps_of(np.array([0.0, 0.3, 0.6, 0.9, 1.0]))
+        self.assertEqual(dt, 0.3)
+        self.assertAlmostEqual(dt_last, 0.1)
+        # A step in the middle that differs, or a last one longer than dt: not fixed-step
+        self.assertIsNone(fixed_steps_of(np.array([0.0, 0.3, 0.5, 0.8])))
+        self.assertIsNone(fixed_steps_of(np.array([0.0, 0.3, 0.6, 1.0])))
 
     def test_dt_is_any_positive_finite_scalar_and_always_checked(self):
         from minilink.simulation.time_grid import build_time_grid

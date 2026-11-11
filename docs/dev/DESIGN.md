@@ -1164,7 +1164,10 @@ samples on a horizon `[t0, tf]`, endpoints included, is `n_samples` (`Simulator`
 continuous or static `compute_trajectory`, `step_response`, `bode`, `nyquist`,
 `frequency_response`, the LQR gain schedule, `animate_modal`: `N`
 samples, `N − 1` intervals). `n_samples=100` on `[0, 1]` is thus a step of `1/99`, and
-`n_steps=100` is `100` steps of `dt` (`test_simulation.py` pins each verb).
+`n_steps=100` is `100` steps of `dt` (`test_simulation.py` pins each verb). A run's grid of
+`dt` ends at `tf`: a `dt` that does not divide the run shortens its last step to land there
+(`[0, 0.3, 0.6, 0.9, 1.0]` for `dt = 0.3` on `[0, 1]`), the fixed-step solvers taking that
+last step as it is.
 
 **Automatic grid.** With neither `n_samples` nor `dt`, the solver is chosen first
 (user choice, else `euler` for discontinuous plants, else `rk4` when a block
@@ -1204,7 +1207,7 @@ Solver presets: `scipy`, `scipy_stiff` (Radau at `scipy`'s tolerances, `rtol=1e-
 `atol=1e-7`, with `∂f/∂x` from the evaluator: forward mode on JAX, central differences on
 NumPy), `scipy_max`, `scipy_ultra`, `scipy_lsoda`,
 and the two fixed-step solvers, the step model's words on every tool: `euler` (the step
-model's Euler rollout) and `rk4` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both refuse a non-uniform grid, with one relative check (`atol=0`) shared with the simulator, naming `solver="scipy"` or a uniform `dt`.
+model's Euler rollout) and `rk4` (the RK4 rollout; auto-picked when a block holds a signal over a `sample_period`, on either backend, and on JAX for an explicit uniform grid of ≥ 10 000 points). Both refuse a non-uniform grid (a shorter last step, landing on `tf`, aside), with one relative check (`atol=0`) shared with the simulator, naming `solver="scipy"` or a uniform `dt`.
 **One input rule on every solver** (`Simulator.solve(u=)`, `compute_trajectory(u=)`): a sampled
 input `(m, N)` is held over each sample period (`u(t) = u_k` on `[t_k, t_{k+1})`; one off the
 run's grid is refused, naming `n_samples=` and `dt=`), and a function

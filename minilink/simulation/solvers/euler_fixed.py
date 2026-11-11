@@ -1,11 +1,12 @@
-"""Fixed-step explicit Euler on a uniform simulation time grid."""
+"""Fixed-step explicit Euler on the simulation time grid."""
 
 import numpy as np
 
 from minilink.simulation.solvers.solver import (
     SolverBackend,
     fixed_step_debug,
-    require_uniform_times,
+    require_fixed_steps,
+    rollout_on_grid,
 )
 
 ###############################################################################
@@ -14,7 +15,7 @@ from minilink.simulation.solvers.solver import (
 
 
 class EulerFixedStepSolverBackend(SolverBackend):
-    """Fixed-step Euler via compiled rollout primitives (uniform ``times`` only); a diagram's ``record`` read off each step's pass."""
+    """Fixed-step Euler via compiled rollout primitives (uniform ``times``, the last step possibly shorter); a diagram's ``record`` read off each step's pass."""
 
     records_from_pass = True
 
@@ -32,12 +33,12 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "euler")
+        steps = require_fixed_steps(times, "euler")
         n_steps = n_pts - 1
 
         # x_{k+1} = x_k + Δt f(x_k, ū, t_k), n_steps steps from x₀ in one compiled rollout
-        run = evaluator.rollout(
-            x0, None, t0, dt, params, solver="euler", n_steps=n_steps, record=record
+        run = rollout_on_grid(
+            evaluator, x0, None, t0, steps, n_steps, params, record, solver="euler"
         )
         x_seq, records = run if record else (run, None)
         x_traj = np.asarray(x_seq).T  # (n, n_pts)
@@ -59,14 +60,23 @@ class EulerFixedStepSolverBackend(SolverBackend):
     ) -> np.ndarray:
         n_pts = times.shape[0]
         t0 = times[0]
-        dt = require_uniform_times(times, "euler")
+        steps = require_fixed_steps(times, "euler")
+        n_steps = n_pts - 1
 
         # The samples that drive a step: the last one starts none
-        u_sequence = np.asarray(u[:, : n_pts - 1].T)
+        u_sequence = np.asarray(u[:, :n_steps].T)
 
         # x_{k+1} = x_k + Δt f(x_k, u_k, t_k), each u_k held, in one compiled rollout
-        run = evaluator.rollout(
-            x0, u_sequence, t0, dt, params, solver="euler", record=record
+        run = rollout_on_grid(
+            evaluator,
+            x0,
+            u_sequence,
+            t0,
+            steps,
+            n_steps,
+            params,
+            record,
+            solver="euler",
         )
         x_seq, records = run if record else (run, None)
         x_traj = np.asarray(x_seq).T

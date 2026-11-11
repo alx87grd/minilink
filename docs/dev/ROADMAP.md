@@ -499,6 +499,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `program.metadata["z0"]` → `program.z0`, the `Optimizer`'s default;
     `RRTPlanner(max_nodes=)` (and RRT*'s) → `max_iterations=`, the cap it always was.
     `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` keep their units, the docstrings say why.
+  - *A run's grid ends at `tf`* (ruling 22): a `dt` that does not divide the run shortened
+    nothing and overshot (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); its last step is now shorter
+    and lands on `tf` (`[…, 0.9, 1.0]`), the fixed-step solvers (`rk4`, `euler`) taking it as
+    it is. Numbers move only on such grids, and only at their last sample (a run on the
+    automatic step of a loop whose step does not divide `tf`, for one).
 
 ## 3. Maturity (TRL)
 

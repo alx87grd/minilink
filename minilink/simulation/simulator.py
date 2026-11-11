@@ -22,6 +22,7 @@ from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnin
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
+from minilink.simulation.solvers.solver import fixed_steps_of
 from minilink.simulation.time_grid import build_time_grid
 
 # User-facing solver labels: (solver backend key, options)
@@ -114,13 +115,12 @@ class Simulator:
     n_samples : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
-        Step size when ``n_samples`` is not set. The grid ends at ``tf`` when
-        ``dt`` divides ``tf - t0``; otherwise its last sample is the first
-        step past ``tf``.
+        Step size when ``n_samples`` is not set. The grid ends at ``tf``: when
+        ``dt`` does not divide ``tf - t0``, its last step is shorter.
     solver : str, optional
         Solver mode; if ``None``, chosen by :meth:`select_solver`. ``"rk4"`` and
-        ``"euler"`` step at the grid's fixed ``dt`` (compiled rollouts, uniform
-        grid only); ``"scipy"`` and its presets (``"scipy_stiff"``,
+        ``"euler"`` step at the grid's fixed ``dt`` (compiled rollouts, a
+        uniform grid whose last step may be shorter); ``"scipy"`` and its presets (``"scipy_stiff"``,
         ``"scipy_max"``, ``"scipy_ultra"``, ``"scipy_lsoda"``) are adaptive.
     verbose : bool
         Print setup information (default quiet).
@@ -351,7 +351,7 @@ class Simulator:
           ["sample_period"]``, a noise source), return ``"rk4"``:
           the automatic grid then steps at a divisor of that period.
         - If the time grid was given explicitly, ``backend`` is
-          ``"jax"``, the grid is uniform, and it has at least
+          ``"jax"``, the grid is uniform (its last step may be shorter), and it has at least
           :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4"``
           (fast JIT rollout). The automatic grid never triggers this rule.
         - Otherwise, return ``"scipy"``.
@@ -366,7 +366,7 @@ class Simulator:
             not self.auto_time_grid
             and self.backend == BACKEND_JAX
             and self.n_samples >= RK4_AUTO_MIN_TIME_POINTS
-            and time_grid_is_uniform(self.t)
+            and fixed_steps_of(self.t) is not None
         ):
             return "rk4"
         return "scipy"
@@ -500,14 +500,6 @@ def require_dynamic_system(sys) -> None:
             f"Cannot simulate {type(sys).__name__} with n={sys.n}; "
             "use DynamicSystem for state evolution."
         )
-
-
-def time_grid_is_uniform(times: np.ndarray) -> bool:
-    """True if ``times`` are evenly spaced (required for :class:`RK4SolverBackend`)."""
-    if times.size < 2:
-        return True
-    d = np.diff(times)
-    return bool(np.allclose(d, d[0], atol=0.0))
 
 
 def print_setup_panel(sim: Simulator, notes: list[str]) -> None:
