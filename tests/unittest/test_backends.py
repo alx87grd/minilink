@@ -118,8 +118,9 @@ def test_quadratic_cost_numpy_math_and_reporting_helpers():
         t=np.array([0.0, 1.0]), x=np.column_stack((x, x)), u=np.column_stack((u, u))
     )
     evaluated = traj.with_cost(cost)
-    np.testing.assert_allclose(evaluated.signals["cost_rate"], [[6.0, 6.0]])
-    np.testing.assert_allclose(evaluated.signals["cost"], [[0.0, 6.0]])
+    np.testing.assert_allclose(evaluated.signals["dJ"], [[6.0, 6.0]])
+    # J(t_1) = ∫ g dt + h(x(t_1)) = 6 + 10: the terminal cost at the last sample
+    np.testing.assert_allclose(evaluated.signals["J"], [[0.0, 16.0]])
 
 
 def test_set_margins_are_jax_jittable():

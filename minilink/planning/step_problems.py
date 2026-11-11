@@ -289,7 +289,7 @@ class StepPlanningProblem:
 
     def rollout(self, controller, x0=None, params=None, n_steps=None) -> Trajectory:
         """
-        The rollout under ``controller``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks, its running cost the signal ``"cost"``.
+        The rollout under ``controller``: a :class:`~minilink.core.trajectory.Trajectory` on the ticks, its running cost the signal ``"J"``.
 
         ``controller`` is a controller block (its state on its measurement
         port, its other inputs at their nominal values) or a law
@@ -297,7 +297,7 @@ class StepPlanningProblem:
         ``N = n_steps`` ticks (``None``: :attr:`n_steps`; an infinite horizon
         needs it). The samples sit at ``t0 + k dt`` (``t0 + k`` on a native
         problem), ``x`` ``(n, N + 1)`` and ``u`` ``(m, N + 1)``, the last
-        input held; ``traj.signals["cost"]`` ``(1, N + 1)`` is
+        input held; ``traj.signals["J"]`` ``(1, N + 1)`` is
         ``J_k = Σ_{j<k} γʲ c_j`` with ``γᴺ h(x_N)`` added at the last sample,
         so ``J = Σ_{k<N} γᵏ c_k + γᴺ h(x_N)`` is its last value.
         """

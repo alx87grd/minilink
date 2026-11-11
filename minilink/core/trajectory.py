@@ -116,14 +116,27 @@ class Trajectory(SampledSignals):
         )
 
     def with_cost(self, cost, *, discount_rate=0.0, params=None, t0=0.0) -> Trajectory:
-        """The trajectory with the signals ``"cost_rate"`` and ``"cost"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``."""
-        cost_rate, running = cost.integrate(
-            self, discount_rate=discount_rate, params=params, t0=t0
-        )
+        """
+        The trajectory with the signals ``"dJ"`` and ``"J"`` of ``cost`` (shape ``(1, N)``), discounted from ``t0``.
 
-        return self.with_signals(
-            {"cost_rate": cost_rate.reshape(1, -1), "cost": running.reshape(1, -1)}
-        )
+        ``"dJ"`` is the discounted running cost ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``,
+        ``"J"`` its integral from ``t0`` (the trapezoid of
+        :meth:`~minilink.core.costs.CostFunction.integrate`) with the discounted
+        terminal cost ``e^{−ρ (t_N − t0)} h(x_N, t_N)`` added at the last sample: its
+        last value is the run's ``J``, an evaluation's ``raw_cost`` on the same run.
+        """
+        xp = array_module(self.x)
+        rho = discount_rate
+        t_N = self.t[-1]
+        x_N = self.x[:, -1]
+
+        dJ, running = cost.integrate(self, discount_rate=rho, params=params, t0=t0)
+
+        # J(t_k) = ∫_{t0}^{t_k} e^{−ρ (τ − t0)} g dτ, and J(t_N) + e^{−ρ (t_N − t0)} h(x_N, t_N)
+        h_N = xp.exp(-rho * (t_N - t0)) * cost.h(x_N, t_N, params)
+        J = xp.concatenate([running[:-1], running[-1:] + h_N])
+
+        return self.with_signals({"dJ": dJ.reshape(1, -1), "J": J.reshape(1, -1)})
 
     def of(self, role: str) -> Trajectory:
         """

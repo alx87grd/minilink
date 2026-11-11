@@ -346,7 +346,7 @@ def step_evaluation(
         traj = model.rollout(controller, params=params, n_steps=N)
         xs = traj.x.T
         us = traj.u[:, :N].T
-        raw_cost = traj.signals["cost"][0, -1]
+        raw_cost = traj.signals["J"][0, -1]
         t = [model.time_of(k, params) for k in range(N + 1)]
 
         # The judge's facts: finite, the least margin to X and U, the margin to Xf

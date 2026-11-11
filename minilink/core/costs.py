@@ -96,12 +96,13 @@ class CostFunction(ABC):
 
     def integrate(self, traj: Trajectory, *, discount_rate=0.0, params=None, t0=0.0):
         """
-        The run's discounted running cost: ``(cost_rate, cost)``, both shape ``(N,)``.
+        The run's discounted running cost: ``(dJ, running)``, both shape ``(N,)``.
 
-        ``cost_rate`` is the integrand ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``
+        ``dJ`` is the integrand ``e^{−ρ (t_k − t0)} g(x_k, u_k, t_k)``
         at each sample, the discount counted from the horizon's start,
-        and ``cost`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
-        ``cost[0] = 0``; the terminal cost ``h`` is not included. On the
+        and ``running`` its integral ``∫_{t_0}^{t_k}`` by the trapezoid,
+        ``running[0] = 0``; the terminal cost ``h`` is not included
+        (:meth:`~minilink.core.trajectory.Trajectory.with_cost` adds it). On the
         trajectory's array module, so it traces under JAX.
         """
         xp = array_module(traj.x)
@@ -116,13 +117,13 @@ class CostFunction(ABC):
         g_k = per_sample(g, x.T, u.T, t, params)
 
         # dJ_k = e^{−ρ (t_k − t0)} g_k
-        cost_rate = xp.exp(-rho * (t - t0)) * g_k
+        dJ = xp.exp(-rho * (t - t0)) * g_k
 
         # J(t_k) = Σ_{i<k} ½ (dJ_i + dJ_{i+1}) (t_{i+1} − t_i), J(t_0) = 0
-        increments = 0.5 * (cost_rate[:-1] + cost_rate[1:]) * (t[1:] - t[:-1])
-        cost = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
+        increments = 0.5 * (dJ[:-1] + dJ[1:]) * (t[1:] - t[:-1])
+        running = xp.concatenate([xp.zeros(1), xp.cumsum(increments)])
 
-        return cost_rate, cost
+        return dJ, running
 
     # Cost algebra
 

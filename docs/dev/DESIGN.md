@@ -935,7 +935,8 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   to `PlanningProblem`, not the plant. The cost is the integrand only: `integrate(traj, *,
   discount_rate, params)` is its trapezoid on the trajectory's array module, `g_max(X, U)`
   and `h_max(X)` its upper bounds over boxes (exact for a quadratic, sampled otherwise),
-  `traj.with_cost(cost)` the plotting signals. Compose with `+` → `SumCost` and `*` →
+  `traj.with_cost(cost)` the plotting signals `"dJ"` (the discounted rate) and `"J"` (its
+  integral, `h` added at the last sample, so its last value is the run's `J`). Compose with `+` → `SumCost` and `*` →
   `ScaledCost` (e.g. `base + w * obstacle_cost`); parameters nest by term id ('Parameters').
   The horizon, the discount, the sets and the failure cost are the problem's.
 - Geometry (`core/geometry/shapes.py`; the rest of its package is in §3): `Shape.sdf(p)` is the signed distance to a workspace
@@ -1549,7 +1550,7 @@ control problem, a `StepPlanningProblem`: `x_{k+1} = F(x_k, u_k)`, `c_k`,
 `transition(x, u, k, params=None) -> (x_next, c_k)`, one period of the plant stepped with
 the input held and `c_k = ∫₀^dt e^{−ρτ} g dτ` integrated beside the state by the same scheme
 (`g·dt` to the last bit under one Euler step); `terminal(x)`, `h` at the horizon's end;
-`rollout(controller)` (a `Trajectory` on the ticks, its running cost the signal `"cost"`,
+`rollout(controller)` (a `Trajectory` on the ticks, its running cost the signal `"J"`,
 whose last value is `J = Σ γᵏ c_k + γᴺ h`; a controller block read on its measurement port,
 or a function `u = π(x, t)`), with `n_steps` (`N = T/dt`, `T` the horizon), `gamma` (`e^{−ρ dt}`), `dt`,
 the sets, `cost_bound()` and `failure_cost_at()`. `params=None` reads the problem's numbers

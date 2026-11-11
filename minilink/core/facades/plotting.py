@@ -70,9 +70,9 @@ class SystemPlotting:
         """
         Convenience shortcut plotting the running cost and the cumulative cost ``J(t)``.
 
-        The signals are ``cost_rate`` (the discounted running cost) and
-        ``cost`` (its integral from the start); :meth:`compute_cost` adds the
-        terminal cost to the final value. ``of`` and ``traj`` select the scored
+        The signals are ``dJ`` (the discounted running cost) and ``J`` (its
+        integral from the start, the terminal cost added at the last sample: its
+        last value is :meth:`compute_cost`). ``of`` and ``traj`` select the scored
         trajectory as in :meth:`compute_cost`.
 
         Returns
@@ -85,7 +85,7 @@ class SystemPlotting:
         scored = scored_trajectory(self, of, traj).with_cost(cost)
 
         return scored_system.plot_trajectory(
-            scored, signals=("cost_rate", "cost"), renderer=renderer, show=show
+            scored, signals=("dJ", "J"), renderer=renderer, show=show
         )
 
     def plot_input_output_map(

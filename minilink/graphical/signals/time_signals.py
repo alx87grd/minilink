@@ -18,7 +18,7 @@ TIME_ABSCISSA_LABEL = "Time [s]"
 STEP_ABSCISSA_LABEL = "Step [k]"
 
 # The channels CostFunction.evaluate_trajectory adds, labeled as in the textbook
-_COST_SIGNAL_LABELS = {"cost_rate": "dJ/dt", "cost": "J"}
+_COST_SIGNAL_LABELS = {"dJ": "dJ/dt", "J": "J"}
 
 
 ###############################################################################

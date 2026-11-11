@@ -82,7 +82,7 @@ law = vi.controller
 walk = problem.rollout(
     lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=20
 )
-J = walk.signals["cost"][0, -1]
+J = walk.signals["J"][0, -1]
 print(
     f"moves to the goal: J = {J:g}, the cost-to-go at the start {vi.cost_to_go(problem.x0):g}"
 )

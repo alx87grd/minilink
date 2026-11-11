@@ -1086,7 +1086,7 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     assert solution.success and solution.record.reward == "stage"
     assert solution.record.gamma == solution.record.scored_gamma == 0.9
     assert solution.cost_to_go is not None
-    assert trained.signals["cost"][0, -1] < untrained.signals["cost"][0, -1]
+    assert trained.signals["J"][0, -1] < untrained.signals["J"][0, -1]
     assert np.max(np.abs(trained.x[:, -1] - [5.0, 3.0])) < np.max(
         np.abs(untrained.x[:, -1] - [5.0, 3.0])
     )
@@ -1095,9 +1095,9 @@ def test_an_rl_planner_trains_on_a_native_grid_world_through_its_step_model():
     # read as a block
     scored = planner.solve(n_timesteps=256, evaluate=True)
     assert scored.evaluation.n_trials == 1 and scored.trajectory is None
-    J = score(scored.controller).signals["cost"][0, -1]
+    J = score(scored.controller).signals["J"][0, -1]
     assert float(scored.evaluation.J[0]) == J
-    assert problem.rollout(scored.controller, n_steps=12).signals["cost"][0, -1] == J
+    assert problem.rollout(scored.controller, n_steps=12).signals["J"][0, -1] == J
 
 
 def test_an_undiscounted_grid_world_trains_at_the_default_discount_in_ticks():

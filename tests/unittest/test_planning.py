@@ -248,9 +248,9 @@ class TestPlanningArchitecture(unittest.TestCase):
             u=np.array([[0.0, 0.0]]),
         )
         evaluated = traj.with_cost(cost)
-        self.assertTrue(evaluated.has_signal("cost_rate"))
-        self.assertTrue(evaluated.has_signal("cost"))
-        self.assertGreaterEqual(float(evaluated.signals["cost"][0, -1]), 0.0)
+        self.assertTrue(evaluated.has_signal("dJ"))
+        self.assertTrue(evaluated.has_signal("J"))
+        self.assertGreaterEqual(float(evaluated.signals["J"][0, -1]), 0.0)
 
     def test_trajectory_save_load_roundtrip(self):
         traj = Trajectory(
@@ -366,7 +366,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         )
         self.assertLess(residual_norm, 1e-06)
         self.assertTrue(traj.has_signal("dx"))
-        self.assertTrue(traj.has_signal("cost"))
+        self.assertTrue(traj.has_signal("J"))
 
     def test_trajopt_solve_verbose_prints_planning_report(self):
         problem = self.make_single_integrator_problem()
@@ -421,7 +421,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
-        self.assertTrue(traj.has_signal("cost"))
+        self.assertTrue(traj.has_signal("J"))
 
     def test_multiple_shooting_solves_single_integrator(self):
         problem = self.make_single_integrator_problem()
@@ -439,7 +439,7 @@ class TestPlanningArchitecture(unittest.TestCase):
         np.testing.assert_allclose(traj.x[:, 0], [0.0], atol=1e-07)
         np.testing.assert_allclose(traj.x[:, -1], [1.0], atol=1e-07)
         self.assertTrue(traj.has_signal("dx"))
-        self.assertTrue(traj.has_signal("cost"))
+        self.assertTrue(traj.has_signal("J"))
 
     def test_dynamics_function_routes_system_params_through_compiled_evaluator(self):
         """System params flow through the compiled evaluator's params argument, not direct sys.f."""

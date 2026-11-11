@@ -296,8 +296,37 @@ def test_evaluate_trajectory_applies_the_discount_rate():
 
     t = np.linspace(0.0, 1.0, 101)
     traj = Trajectory(t=t, x=np.zeros((2, t.size)), u=np.zeros((1, t.size)))
-    J = traj.with_cost(Unit(), discount_rate=1.0).signals["cost"][0, -1]
+    J = traj.with_cost(Unit(), discount_rate=1.0).signals["J"][0, -1]
     np.testing.assert_allclose(J, 1.0 - np.exp(-1.0), atol=1e-4)  # int_0^1 e^{-t} dt
+
+
+def test_the_running_J_signal_ends_at_the_runs_J():
+    """Ruling 17b: the signal "J" carries h at its last sample, so it ends at raw_cost and compute_cost."""
+    from minilink.planning import evaluate_trajectory
+
+    plant = pendulum()
+    cost = QuadraticCost.from_system(
+        plant, Q=np.eye(2), R=np.eye(1), S=np.diag([2.0, 0.5])
+    )
+    t = np.linspace(0.5, 2.5, 21)
+    traj = Trajectory(
+        t=t, x=np.vstack([np.cos(t), np.sin(t)]), u=np.sin(3 * t).reshape(1, -1)
+    )
+
+    # Discounted from t0: J(t_N) = ∫ e^{−ρ(t − t0)} g dt + e^{−ρ(t_N − t0)} h(x_N, t_N)
+    for rho in (0.0, 0.7):
+        problem = PlanningProblem(
+            plant, cost=cost, horizon=2.0, t0=0.5, discount_rate=rho
+        )
+        J = traj.with_cost(cost, discount_rate=rho, t0=0.5).signals["J"]
+        raw_cost = evaluate_trajectory(problem, traj).raw_cost[0]
+        np.testing.assert_allclose(J[0, -1], raw_cost, rtol=1e-12)
+        running = cost.integrate(traj, discount_rate=rho, t0=0.5)[1]
+        np.testing.assert_array_equal(J[0, :-1], running[:-1])  # h at the end only
+
+    # Undiscounted: the last sample is compute_cost's J = ∫ g dt + h(x_N, t_N)
+    J = traj.with_cost(cost).signals["J"][0, -1]
+    assert J == pytest.approx(plant.compute_cost(cost, traj=traj), rel=1e-12)
 
 
 def test_evaluate_trajectory_integrates_to_tf_and_charges_by_the_switch():

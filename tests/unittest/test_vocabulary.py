@@ -555,6 +555,27 @@ def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
     assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
 
 
+def test_the_running_cost_signals_are_dJ_and_J():
+    """Ruling 17b: a run's cost signals are dJ (the rate) and J (the running J), never cost_rate / cost."""
+    import numpy as np
+
+    from minilink import Pendulum, QuadraticCost
+    from minilink.core.trajectory import Trajectory
+    from minilink.graphical.signals.time_signals import _COST_SIGNAL_LABELS
+    from minilink.planning import PlanningProblem
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    t = np.linspace(0.0, 1.0, 3)
+    traj = Trajectory(t=t, x=np.zeros((2, 3)), u=np.zeros((1, 3))).with_cost(cost)
+    step = PlanningProblem(plant, cost=cost, horizon=0.2).discretize(0.1)
+    walk = step.rollout(lambda x, t: np.zeros(1))
+    for signals in (traj.signals, walk.signals):
+        assert "J" in signals and "cost" not in signals and "cost_rate" not in signals
+    assert "dJ" in traj.signals
+    assert _COST_SIGNAL_LABELS == {"dJ": "dJ/dt", "J": "J"}
+
+
 def test_a_solve_status_reports_its_scalar_as_J():
     """Ruling 17b: a solve's scalar is J, never cost (the cost is the object)."""
     from minilink.planning.trajectory_optimization.mpc.predictive import (
