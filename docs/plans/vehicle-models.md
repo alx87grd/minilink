@@ -35,7 +35,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity; 4b quasi-static load transfer, designed for (§6) |
 | 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it |
 | UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class |
-| Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws |
+| Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until the demo clean-up, then retires (§5.1) |
 | Terrain | a height `z(x, y)`, its gradient and a friction `μ(x, y)`; given to the car at construction, like the tire; also exported as a static block for custom diagrams |
 | Rung 6 and rung 4 | different models, but sharing the names and the positions of states and parameters as far as possible |
 | State layout | rung 4's state is the first part of rung 6's state, in the same order; the 3-D states come after it |
@@ -139,6 +139,17 @@ Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
 | brush (Fiala) | the friction limit, reached smoothly | `Fy = c_alpha Fz α · g(c_alpha α / μ)` |
 | magic formula (Pacejka) | a peak, then a fall | `Fy = μ Fz sin(C atan(B α − E (B α − atan(B α))))` |
 
+**The transitional law, `LinearSaturation`** (the maintainer, 2026-11-11):
+- It is today's `linear_tire_forces` moved behind the interface unchanged: linear forces
+  scaled back onto the friction circle `|F| ≤ μ Fz`, with today's absolute stiffnesses
+  `Ca`, `Ck` shared by both axles and today's slip (`|vx| + ε`).
+- It is the default of rungs 3 and 3b during the refactor, so phase 1 moves no demo number.
+- After the demo clean-up, the demos switch to the brush law, and `LinearSaturation`
+  retires.
+
+It does not follow the shared parameterization below, nor the property of being linear in the
+load. It never serves rung 4b.
+
 - **Shared numbers.** All three laws read `mu` and the stiffnesses **per unit load**
   (`c_alpha` [1/rad], `c_kappa` [-]). The magic formula derives `B = c / (C μ)`, so its
   slope at zero slip is `c`; it adds only its shape `C` and its curvature `E`. Swapping a law
@@ -150,7 +161,9 @@ Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
   (§5.3).
 - **One slip function** with a smooth floor replaces the four regularizations:
   `wheel_slips(vx, vy, omega, R, v_eps)`, on the contact velocity in the wheel frame, with
-  denominator `√(vx² + ε²)`.
+  denominator `√(vx² + ε²)`. The tire object owns its slip definition (`tire.slips(...)`),
+  with this function the default. That is how `LinearSaturation` keeps today's `|vx| + ε`,
+  and how a private law can bring its own definition.
 - **Combined slip:**
   - linear: independent `Fx` and `Fy`;
   - brush: its one combined slip demand;
@@ -294,16 +307,11 @@ here.
    - the UdeS Racecar's public face: thin classes that set only the preset and the skin
      (an exception to the catalog clean-up's "no two supported plants differ by parameters
      alone"), a preset argument, or a parameter set plus a skin.
-5. **The linear tire's limit:** pure (the textbook; the brush law adds the limit) or with
-   today's friction circle.
-6. **The default tire on each rung:**
-   - linear on rung 3 (the course linearizes it), brush on rungs 4 and 6;
-   - or brush everywhere.
-7. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
+5. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
    `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
    parameter trees and compile first.
-8. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
-9. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
-    module.
-10. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
-    law and the terrain.
+6. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
+7. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
+   module.
+8. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+   law and the terrain.
