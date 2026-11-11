@@ -146,9 +146,12 @@ class OperatingPoint:
         return self.params["y_bar"]
 
     def set_nominal_point(self):
-        """Make ``x̄`` the nominal state and ``ū`` the input's nominal value (each signal keeps its own copy)."""
+        """Make ``x̄`` the nominal state and ``ū`` the inputs' nominal values, each input port its share (each signal keeps its own copy)."""
+        u_bar = self.params["u_bar"]
+
         self.state.nominal_value = self.params["x_bar"]
-        self.inputs["u"].nominal_value = self.params["u_bar"]
+        for port_id, port in self.inputs.items():
+            port.nominal_value = u_bar[self.get_input_port_slice(port_id)]
 
 
 class LTISystem(ConstantMatrices, StateSpaceSystem):

@@ -2362,3 +2362,21 @@ class TestLinearizedSystem(unittest.TestCase):
         self.assertIs(type(model), DiscreteLTISystem)
         self.assertFalse(hasattr(model, "period"))
         np.testing.assert_allclose(model.A(), lin.A())
+
+    def test_its_nominal_point_lands_on_each_input_port(self):
+        from minilink.control.siso import PID
+        from minilink.dynamics.catalog.pendulum.pendulum import NoisyPendulum
+
+        # A plant with ports u, d, n: each port takes its share of ū
+        lin = linearize(
+            NoisyPendulum(), x_bar=self.x_up, u_bar=np.array([1.0, 2.0, 3.0])
+        )
+        self.assertEqual(list(lin.inputs), ["u", "d", "n"])
+        lin.set_nominal_point()
+        for port_id, value in (("u", 1.0), ("d", 2.0), ("n", 3.0)):
+            np.testing.assert_allclose(lin.inputs[port_id].nominal_value, [value])
+
+        # A loop whose input port is not u
+        loop_lin = linearize(PID(Kp=1.0) >> Pendulum())
+        loop_lin.set_nominal_point()
+        np.testing.assert_allclose(loop_lin.inputs["e"].nominal_value, loop_lin.u_bar)
