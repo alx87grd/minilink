@@ -782,8 +782,11 @@ def test_gae_limits_are_the_td_error_and_the_return_minus_the_baseline():
         G = reward[k] + gamma * G * (1.0 - done[k])
         returns.append(G)
     returns = jnp.stack(returns[::-1])
+    # The two sums accumulate in another order: equal to the draws' precision
+    # (float32 when the test runs before anything enables JAX's float64)
+    rtol = max(1e-7, 10 * float(jnp.finfo(reward.dtype).eps))
     np.testing.assert_allclose(
-        gae(delta, done, gamma, 1.0), returns - value, atol=1e-12
+        gae(delta, done, gamma, 1.0), returns - value, rtol=rtol, atol=1e-12
     )
     # the Monte Carlo return of an episode stops at its end
     R = returns_to_go(reward, done, gamma)
