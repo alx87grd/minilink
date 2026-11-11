@@ -1,7 +1,8 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
 **Status:** designed; nothing built. The maintainer was interviewed on 2026-11-11; the answers
-are recorded in §2, and no question is open (§9).  
+are recorded in §2. A second review the same day added the rulings at the end of §2's table;
+one detail is asked at its step (§9).  
 **Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
 to the maintainer's private repository, not to minilink.  
 **Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),
@@ -51,6 +52,12 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Phases | 1 the foundations; 2 the 3-D car; 2b one or two good-looking generic 3-D skins for the 3-D car, two extremes (an open-wheel formula car, an off-road side-by-side); 3 a generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
 | Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
+| Tire call (review) | the car hands the tire its per-wheel numbers: `tire.forces(kappa, alpha, Fz, mu, c_kappa, c_alpha, params)`. The car and its preset own `mu` and the stiffnesses; the tire adds only its shape numbers to `params` (§5.1) |
+| Phase 1's bar (review) | the same behaviour on the demos, not identical bytes: a rewrite that reorders the arithmetic is accepted (§7). Clarifies "no demo number moves" above |
+| Frame of the first nine (review) | on rung 6, `vx, vy` are the velocities in the heading frame (yawed, not rolled or pitched) and `r = ψ̇`, so they mean what they mean on rung 4 (§4) |
+| Differential (review) | the first 3-D plant has a locked rear axle (one `w_rear`); the design allows independent wheel speeds later (§4) |
+| Optional states (review) | one order on every rung: the nine, the body's six, the wheel-hop states, the wheel angles last (§4) |
+| The switch's place (review) | it stays in phase 3: the prototype is built fully before any demo's behaviour changes |
 
 ## 3. Today
 
@@ -69,17 +76,15 @@ An audit on `dev` on 2026-11-11 (`grep` over the repository for each class name)
 differ in actuation:** what drives the rear wheel, and how the steering is driven. **Four
 classes exist only for their look.**
 
-Defects and traps, each checked on the code:
+Defects and traps, each checked on the code, with the phase that fixes it (§7):
 
-- **Four slip regularizations near standstill:** `|vx| + ε`, `√(vx² + ε²)`,
-  `max(|vx|, |ωR|, ε)`, and `|v| + 10⁻⁶` clipped to ±0.5.
-- **Gradient kinks in the optimization plants:** the `|vx| + ε` slip, the hard friction
-  circle, and `sign` and `where` in the ladder's engine.
-- **`DynamicBicycle` is neutral-steer by default.** With one shared `Ca` and `a = b`,
-  `K = m/L (b/Ca_f − a/Ca_r) = 0`.
-- **`KinematicBicycle` ignores `params["length"]`:** `f` reads `a + b`.
-- **The catalog test imports project code:** `test_dynamics_catalog.py` imports `Pacejka`
-  from `examples/projects/`.
+| Defect | Fixed in |
+| --- | --- |
+| **Four slip regularizations near standstill:** `|vx| + ε`, `√(vx² + ε²)`, `max(|vx|, |ωR|, ε)`, and `|v| + 10⁻⁶` clipped to ±0.5 | phase 3's switch (one slip function); the third is the project folders', not changed here (§8) |
+| **Gradient kinks in the optimization plants:** the `|vx| + ε` slip, the hard friction circle, and `sign` and `where` in the ladder's engine | the slip and the circle in phase 3's switch; the engine's `sign` is in `car_trajopt/`, not changed here (§8) |
+| **`DynamicBicycle` is neutral-steer by default.** With one shared `Ca` and `a = b`, `K = m/L (b/Ca_f − a/Ca_r) = 0` | phase 3's switch: the brush law reads `c_alpha_f` and `c_alpha_r` |
+| **`KinematicBicycle` ignores `params["length"]`:** `f` reads `a + b` | phase 1 (one owner for the wheelbase) |
+| **The catalog test imports project code:** `test_dynamics_catalog.py` imports `Pacejka` from `examples/projects/` | phase 1 (the magic formula is in the tire module) |
 
 Lateral force at matched cornering stiffness, from the repository's own functions:
 
@@ -106,17 +111,35 @@ The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no pe
 | 4 | `DrivetrainBicycle` | `+ P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering |
 | 5 | longitudinal car (side step) | `x, v, ω, φ` | wheel torque | slip ratio, maximum braking and acceleration |
 | 6a | `Car3D` (designed for, not built) | rung 4's nine, nothing added | as rung 4 | the double track: four wheels, the track width, quasi-static load transfer (§6) |
-| 6 | `SuspensionCar3D` | rung 4's nine, then `z, φ, θ, vz, p, q`, then the corner states (§5.3) | as rung 4 | heave, roll, pitch, suspension, load transfer, terrain |
+| 6 | `SuspensionCar3D` | rung 4's nine, then `z, φ, θ, vz, p, q`, then the optional blocks (below) | as rung 4 | heave, roll, pitch, suspension, load transfer, terrain |
 
 - **One rule, every rung: a rung appends states and never reorders them.** A controller,
   estimator or MPC written for rung 4 therefore reads the first nine states of rung 6
   unchanged. The planar MPC can drive the 3-D car directly, which is a model-mismatch study
   for free.
+- **The first nine keep their meaning on rung 6.** `x, y` are the world's horizontal
+  position and `psi` the yaw. `vx, vy` are the velocity of the centre of gravity in the
+  heading frame (yawed with the car, not rolled or pitched), and `r = ψ̇`. They are not the
+  components of the rolled and pitched body twist; the two differ as the roll and the pitch
+  grow, most at rollover. The map of the last bullet below does the conversion.
+- **Optional states append in one order:** the nine, the body's six, the wheel-hop states
+  (`massless_wheel=False`), then the wheel rolling angles (`wheel_angles=True`) last. An
+  option that is off leaves no gap. On rung 4 the same rule gives today's layout: the nine,
+  then the two angles.
+- **The rear axle is locked on the first 3-D plant:** one `w_rear`, both rear wheels at that
+  rate, the front wheels rolling free. In a tight turn the two rear tires then slip against
+  each other, a push the bicycle does not have; the demo states it. **Independent wheel speeds
+  are designed for:** the contact code takes one rate per wheel, so a later option can make
+  them states. Proposed for then: the extra rates append with the optional blocks, and
+  `w_rear` stays the rear axle's mean rate, so the first nine keep their meaning.
 - **A model that differs only by its numbers is a preset, and one that differs only by its look
   is a skin.** That covers today's full-size kinematic car, the 3-D looks, and the wheel
   angles needed by the 3-D animation.
 - **The UdeS Racecar is a public preset** on rungs 2 and 4 (and on 6 when it lands): its
   parameter set and its 3-D skin. It is a proxy of the real car, not an identification of it.
+  Its class on rung 6 is not named `UdeSRacecarDyn3D`: that name means "the nine states and
+  two wheel angles" today, in one course file among others, and would silently change meaning.
+  The name is chosen in phase 3.
 - **Sensor outputs on rungs 3 and up:** `speed`, `slip`, `grip`, `imu`, by name, as the racecar
   has them today.
 - **Rung 6's equations order the body's coordinates as the 6-DOF mechanics needs**
@@ -137,8 +160,17 @@ car.params["mu_f"] = 0.6          # one number, on the car
 ### 5.1 The tire
 
 ```python
-Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
+Fx, Fy = tire.forces(kappa, alpha, Fz, mu, c_kappa, c_alpha, params)   # per wheel, wheel frame [N]
 ```
+
+- **The car hands over the wheel's numbers.** The parameters are flat with one suffix per
+  axle (§2), so a law given only `params` could not know which wheel it serves. The car
+  reads `mu_f`, `c_kappa_f`, `c_alpha_f` (or the rear's) and passes them. The `mu` it passes
+  is already multiplied by the terrain's friction at that wheel (§5.2).
+- **`params` carries only the law's own shape numbers:** `C`, `E` for the magic formula,
+  `z_floor` for the brush. Those are what the tire copies into the car's `params` at
+  construction. `mu` and the stiffnesses belong to the car and its preset, so
+  `UdeSRacecarDyn(tire=MagicFormula())` keeps the racecar's grip and stiffness.
 
 | Law | Adds | Lateral force (longitudinal: the same with `κ`, `c_kappa`) |
 | --- | --- | --- |
@@ -150,18 +182,24 @@ Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
 - It is today's `linear_tire_forces` moved behind the interface unchanged: linear forces
   scaled back onto the friction circle `|F| ≤ μ Fz`, with today's absolute stiffnesses
   `Ca`, `Ck` shared by both axles, and today's slip `|vx| + ε`.
-- It is the default of rungs 3 and 3b during the refactor, so phase 1 moves no demo number.
+- It is the default of rungs 3 and 3b during the refactor, so phase 1 moves no demo's
+  behaviour.
 - In phase 3, the demos switch to the brush law, and `LinearSaturation`
   retires: the later switch of §7, decided together with the slip.
 
 It does not follow the shared parameterization below, nor the property of being linear in the
 load.
 
-- **Shared numbers.** All three laws read `mu` and the stiffnesses **per unit load**
-  (`c_alpha` [1/rad], `c_kappa` [-]). The magic formula derives `B = c / (C μ)`, so its
+- **Shared numbers.** All three laws read the stiffnesses **per unit load**
+  (`c_alpha` [1/rad], `c_kappa` [-]); the brush law and the magic formula also read `mu`. The
+  linear law has no friction limit and ignores it. The magic formula derives `B = c / (C μ)`, so its
   slope at zero slip is `c`; it adds only its shape `C` and its curvature `E`. Swapping a law
-  keeps the small-slip behaviour and the friction limit; only the shape of the saturation
-  changes.
+  keeps the small-slip behaviour; between the brush law and the magic formula it also keeps
+  the friction limit, and only the shape of the saturation changes.
+- **The default shape falls slowly.** Computed at `c = 13/rad`, `μ = 1`: the peak is 1.000
+  at 12.2°, then 0.98 at 20° and 0.94 at 40°; the 0.89 is the limit at large slip. If the
+  optimal-slip lesson (phase 3) needs a visible peak, raise `C` (1.6 gives a limit of 0.59);
+  decided with that lesson.
 - **Linear in the load.** With these numbers every law has the form `F = Fz · φ(κ, α)`.
   It is what decides how load transfer acts on the 3-D car (§6).
 - **`Fz` is an argument, never computed inside the law.** Its source is the normal-load law
@@ -169,12 +207,11 @@ load.
 - **Who owns the slip** (the maintainer, 2026-11-11):
   - **The car decides** which slip formula it uses, and calls it at one place: one method that
     turns each wheel's contact velocity (wheel frame) into `(κ, α)`. It then hands the slips to
-    `tire.forces(kappa, alpha, Fz, params)`.
+    `tire.forces(...)`.
   - **The formula itself is a function of the tire module**, imported by the car, never
     rewritten in a plant. The tire law stays a pure map from slip to force.
-- **The slips during the refactor:** no number moves, so the tire module holds today's two
-  formulas, moved unchanged (same operations, same order, so the results stay
-  bit-identical):
+- **The slips during the refactor:** no behaviour moves, so the tire module holds today's two
+  formulas, moved unchanged:
   - `|vx| + ε`, today's `tire_slip`, called by rungs 3 and 3b;
   - `√(vx² + ε²)`, today's `axle_slips` written per wheel, called by rung 4 and by every
     new car.
@@ -247,7 +284,7 @@ mu = terrain.friction(x, y, t, params)      # multiplies the tire's μ
 | --- | --- | --- | --- |
 | static | the weight split, `m g b / L` | none | 3, 3b, 4 (today) |
 | quasi-static transfer | the exact solve of §6 | none | 6a (`Car3D`) |
-| spring-damper (level i) | compression from the body pose and the terrain height: `Fz = k Δ + b Δ̇`, floored at 0 (the wheel lifts off) | none beyond rung 6's body | 6 |
+| spring-damper (level i) | compression from the body pose and the terrain height: `Fz = k Δ + b Δ̇`, with a smooth floor at 0 (the wheel lifts off; no kink, as §3 asks of the optimization plants) | none beyond rung 6's body | 6 |
 | spring-damper and wheel mass (level ii) | the two-mass quarter car per corner | 2 per corner | 6, with `massless_wheel=False` |
 
 ### 5.4 The body
@@ -296,8 +333,12 @@ The result is a continuous ODE, pure, on NumPy and JAX, with no state added and 
 
 Its limits:
 - The matrix is singular only at the tipping limit (roughly `μ h / L → 1`).
-- A smooth floor on `Fz` keeps a wheel's lift-off continuous.
-- A load-sensitive tire makes the loop nonlinear: a Newton solve inside `f`.
+- A smooth floor on `Fz` keeps a wheel's lift-off continuous. With the floor the loads are
+  no longer affine in the acceleration, so the 2×2 solve is exact only while the four wheels
+  carry load; near lift-off it needs the Newton solve below. On a tall, narrow car that is
+  ordinary limit cornering (an inner wheel lifts at `a_y = g · track / (2h)`, below `μ g`
+  when `track / (2h) < μ`), so `Car3D` is built with the Newton solve from the start.
+- A load-sensitive tire also makes the loop nonlinear: the same Newton solve inside `f`.
 
 Its state is rung 4's nine, so `SuspensionCar3D` appends to it as well. `Car3D` is
 `SuspensionCar3D`'s limit with an infinitely stiff suspension.
@@ -325,12 +366,29 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - the tire module;
   - the terrain fields and their static block;
   - the interface of the normal-load law, with the static law;
-  - ladder 1 to 5 consolidated: presets, skins, `psi`, one owner for the wheelbase.
+  - ladder 1 to 5 consolidated: presets, skins, `psi`, one owner for the wheelbase, one port
+    layout across the bicycle rungs (S64; the default is asked at that step, §9).
 
-  It sits inside v0.4's catalog clean-up. **No demo number moves in phase 1:** each tire law
-  keeps its slip, and rungs 3 and 3b keep `LinearSaturation`.
+  It sits inside v0.4's catalog clean-up. **No demo's behaviour moves in phase 1:** each tire
+  law keeps its slip, and rungs 3 and 3b keep `LinearSaturation`.
+
+  **The bar is the same behaviour on the demos, not identical bytes** (the maintainer,
+  2026-11-11). Writing the brush law per unit load reorders its arithmetic: on the racecar's
+  numbers, 34 % of 100 000 random slip angles change in the last bit (relative 5·10⁻¹⁶, one
+  NumPy run). So each car demo and regression gate is run before and after; a solve that
+  still converges to the same trajectory within the gates' tolerances passes. This is the
+  one written exception to the byte-identical bar of behaviour-preserving refactors.
+
+  **Done when** every car demo and gate behaves the same, the catalog test no longer imports
+  project code, and each law has its tests: slope `c` at zero slip, the friction limit, the
+  three laws agreeing at small slip, NumPy and JAX agreeing.
 - **Phase 2, the 3-D car.** Rung 6 at suspension level (i): spring-damper corners on the
   terrain, first flat, then the built-in terrains, with a teaching self-driving demo.
+  **Done when** the reduction tests pass: on flat ground with stiff springs, the 3-D car's
+  steady-state yaw rate in a constant-radius turn matches rung 4's within a stated tolerance
+  (a wide track makes the locked axle's push visible, so the test uses a narrow one); at rest
+  the four loads sum to the weight; a planar controller written for rung 4 drives it through
+  its first nine states.
 - **Phase 2b, generic 3-D skins.** Find or design one or two good-looking 3-D skins for
   rung 6, at the quality of the UdeS Racecar's skin, but generic. Two extremes of the same
   model:
@@ -353,7 +411,8 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
     a proxy of the car, §2);
   - **the tire and slip switch** (below).
 - **Phase 3's tire and slip switch** (the maintainer, 2026-11-11: in phase 3, after the demo
-  clean-up). Three moves, decided together, one commit each:
+  clean-up; confirmed at the review, which proposed moving it earlier: the prototype is built
+  fully before any demo's behaviour changes). Three moves, decided together, one commit each:
   - rungs 3 and 3b move from `LinearSaturation` to the brush law;
   - every law moves to the one smooth slip function, with the previous slip kept as a
     commented line;
@@ -383,8 +442,11 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - wheel hop (level ii, `massless_wheel=False`);
   - more presets;
   - a load-sensitive tire law;
+  - independent wheel speeds on rung 6 (an open differential; §4);
   - body contact points on rung 6 (`body_contact=True`, off by default): a few points on the
-    body with the corner's penalty law, so a car that rolls over lands and keeps tumbling;
+    body with the corner's penalty law, so a car that rolls over lands and keeps tumbling.
+    This is the edge of "not a contact engine" (CONSTITUTION §1.4), which is why it stays
+    unscheduled;
   - the review of rebuilding `QuarterCar` on the corner law and the terrain (§2).
 
 ## 8. What leaves, what stays
@@ -399,5 +461,11 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
 
 ## 9. Open questions
 
-None: the interview of 2026-11-11 answered every question this plan raised. A new question
-goes to QUESTIONS.md, and its answer lands here.
+No design question is open: the interview and the review of 2026-11-11 answered those this
+plan raised. A new one goes to QUESTIONS.md, and its answer lands here.
+
+Asked at their step, not before:
+- **The one port layout of the bicycle rungs** (phase 1): today rung 3 and the racecar default
+  to named ports and rung 3b to one stacked `u`, and 38 lines in the examples, tests and
+  benchmarks pass `named_ports`.
+- **The class name of the racecar preset on rung 6** (phase 3; §4).
