@@ -808,6 +808,26 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
 
+def test_an_open_loop_plan_on_no_horizon_is_scored_over_the_announced_default():
+    """A plan with no finite horizon to score it over warns that the evaluation uses the default (the maintainer, 2026-11-11)."""
+    from minilink import QuadraticCost
+
+    problem, _ = make_holonomic_obstacle_problem()
+    problem = problem.replace(cost=QuadraticCost(np.eye(2), np.eye(2)))
+    assert problem.horizon_kind() == "infinite"
+    planner = RRTPlanner(
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
+        seed=0,
+        max_iterations=4000,
+    )
+    with pytest.warns(
+        UserWarning, match="default horizon: the run is scored over 10 s"
+    ):
+        solution = planner.solve(evaluate=True, n_trials=1)
+    assert solution.evaluation is not None
+
+
 def test_kdtree_requires_euclidean_metric():
     sys = make_dubins_problem()
     problem = PlanningProblem(

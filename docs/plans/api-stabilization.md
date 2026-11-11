@@ -769,8 +769,10 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
   the path's own length; it now runs the evaluator's default 10 s with its warning, as value
   iteration's and the LQR's evidence do, one judge (the swing-up with no horizon: `J = 142.17`,
   reached, over 4.8 s → `439.71`, failed). The learners keep their environment's episode, the
-  run they trained on. **A question:** whether the open-loop evidence on an infinite horizon
-  should stop where the plan stops instead (it then judges a plan by a run it chose).
+  run they trained on. **Ruled 2026-11-11 (the maintainer):** the open-loop evidence keeps
+  the one default (10 s) on an infinite horizon, and the warning says a default horizon is used
+  for the evaluation; its advice no longer sends a `solve(evaluate=True)` caller to an
+  `episode_length=` the call does not take. A test pins the warning on RRT's evidence.
 - **Ruling 24.** Every planner hands its solution a copy of its own complete tree: value
   iteration, the LQR, RRT and RRT*, the tabular and the neural learners `deepcopy(planner.params)`;
   trajectory optimization the tree it solved (`checked(params, planner.params)`, or its own),

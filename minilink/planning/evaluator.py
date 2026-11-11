@@ -1110,9 +1110,9 @@ def horizon_of(problem, episode_length):
     # A default that sets what is scored is announced
     if episode_length is None:
         warnings.warn(
-            f"the problem has no finite horizon, so the run is scored over "
-            f"{EPISODE_LENGTH:g} s: pass episode_length= to choose it, or give the "
-            "problem a horizon",
+            f"the problem has no finite horizon, so the evaluation uses a default "
+            f"horizon: the run is scored over {EPISODE_LENGTH:g} s. Give the problem "
+            "a horizon to choose it (or pass episode_length= where the call takes it)",
             stacklevel=caller_stacklevel(),
         )
         return EPISODE_LENGTH
