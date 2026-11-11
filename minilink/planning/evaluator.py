@@ -659,7 +659,8 @@ class ProblemEvaluator:
         """
         if not self.held_plan:
             u = self.held_inputs(params, xp)
-            return xp.broadcast_to(u, (ts.shape[0], u.size))
+            us = xp.broadcast_to(u, (ts.shape[0], u.size))
+            return us
 
         plan = self.loop.subsystems["controller"]
         dt = self.dt
@@ -668,8 +669,9 @@ class ProblemEvaluator:
         # u_k = π(t_k + dt/2), k = 0 … N − 1, and u_N = π(t_N)
         t_read = xp.concatenate([ts[:-1] + 0.5 * dt, ts[-1:]])
         u = plan.h(no_signal, no_signal, t_read, params["controller"])
+        us = u.T
 
-        return u.T
+        return us
 
     def score(self, params, x0, trajectories, failure_cost, bound):
         """One trial's row of the record (and its trajectory when ``trajectories``)."""
