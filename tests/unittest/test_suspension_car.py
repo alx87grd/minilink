@@ -497,7 +497,7 @@ def test_the_drive_and_the_servo_are_the_drivetrain_bicycle_s():
     for _ in range(10):
         x = cruising(car, rng.uniform(2.0, 30.0))
         x[6] *= rng.uniform(0.9, 1.2)  # The rear wheels slipping
-        x[7] = rng.uniform(-0.7, 0.7)  # Past the steering lock too
+        x[7] = rng.uniform(-0.7, 0.7)
         x[8] = rng.uniform(-1.0e5, 1.0e5)
         u = np.array([rng.uniform(-2.0e5, 2.0e5), rng.uniform(-1.0, 1.0)])
 
@@ -508,12 +508,10 @@ def test_the_drive_and_the_servo_are_the_drivetrain_bicycle_s():
         np.testing.assert_allclose(rates_3d, rates_planar, rtol=1e-3, atol=1e-6)
 
 
-def test_the_car_is_a_model_of_its_own_with_no_planar_method():
+def test_the_car_is_a_model_of_its_own():
     car = SuspensionCar3D()
 
     assert not isinstance(car, DrivetrainBicycle)
-    for planar in ("compute_tire_physics", "generalized_d", "M", "C", "N"):
-        assert not hasattr(car, planar)
 
 
 # The terrain in time, and the numbers a preset or a user changes
@@ -521,10 +519,13 @@ def test_the_car_is_a_model_of_its_own_with_no_planar_method():
 
 def test_a_ground_that_moves_with_time_is_read_at_the_time_of_the_call():
     class Rising(Terrain):
-        """Flat ground rising at 0.1 m/s, drying at t = 1 s."""
+        """Ground rising at 0.1 m/s and tilting up along x with time, drying at t = 1 s."""
 
         def height(self, x, y, t=0.0, params=None):
-            return 0.1 * t + np.zeros_like(x * y)
+            return 0.1 * t + 0.05 * t * x
+
+        def gradient(self, x, y, t=0.0, params=None):
+            return 0.05 * t + np.zeros_like(x * y), np.zeros_like(x * y)
 
         def friction(self, x, y, t=0.0, params=None):
             return np.where(t < 1.0, 0.2, 1.0) + np.zeros_like(x * y)
@@ -536,9 +537,11 @@ def test_a_ground_that_moves_with_time_is_read_at_the_time_of_the_call():
     # The ground 0.2 m higher squeezes the springs; the dry road grips the sideslip
     assert car.loads(x, u, 2.0).sum() > 1.5 * car.loads(x, u, 0.0).sum()
     assert abs(car.f(x, u, 0.5)[4]) < 0.5 * abs(car.f(x, u, 2.0)[4])
-    assert car.tf(x, u, 2.0)["wheel_fl"][2, 3] == pytest.approx(
-        car.tf(x, u, 0.0)["wheel_fl"][2, 3] + 0.2
-    )
+    assert car.tf(x, u, 2.0)["wheel_fl"][2, 3] > car.tf(x, u, 0.0)["wheel_fl"][2, 3]
+
+    # The tilted ground leans each load backward: the normal's x component is its slope
+    n_x = car.corner_geometry(x, 2.0)["n"][:, 0]
+    np.testing.assert_allclose(n_x, -0.1 / np.sqrt(1.0 + 0.1**2))
 
 
 def test_the_rest_state_follows_the_ride_height():

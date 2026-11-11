@@ -3,7 +3,6 @@
 import numpy as np
 
 from minilink.core.kinematics import translation
-from minilink.graphical.catalog.car_skins_3d import terrain_surface
 from minilink.graphical.catalog.shapes import (
     Box,
     Line,
@@ -13,6 +12,10 @@ from minilink.graphical.catalog.shapes import (
     link_pose_3d,
     plane_airframe_3d,
 )
+from minilink.graphical.meshes import TriangleMesh
+
+#: The colour of a terrain's relief under a car
+GROUND_COLOR = "#9aa3ad"
 
 ###############################################################################
 # Public API
@@ -91,12 +94,13 @@ def car_skin_3d(plant, color="#151922"):
     body_length = (a + b) + body_length_overhang
     tire_radius = max(0.045, tire_radius_ratio * min(r_f, r_r))
 
-    # The ground, in the world frame: the plant's terrain over its scene_bounds when it
-    # sets them, the flat plane otherwise
-    if getattr(plant, "scene_bounds", None) is None:
-        ground = [ground_plane(ground_size)]
+    # The ground, in the world frame: the terrain of a car that rides one, over its
+    # scene_bounds when it sets them; the flat plane otherwise
+    rides_terrain = "rl" in getattr(plant, "wheels", ())
+    if rides_terrain and getattr(plant, "scene_bounds", None) is not None:
+        ground = terrain_surface(plant, GROUND_COLOR)
     else:
-        ground = terrain_surface(plant, "#9aa3ad")
+        ground = [ground_plane(ground_size)]
 
     # The body box, at a fixed offset within the body frame (the c.g. sits at its
     # origin): lifted to ride height and shifted to the wheelbase's geometric center
@@ -275,6 +279,64 @@ def wheel_rectangle(wl, ww, color="black", linewidth=1):
     # fmt: on
 
     return Line(corners, color=color, linewidth=linewidth)
+
+
+def terrain_surface(plant, color, step=0.25, spacing=2.0):
+    """The plant's ground over ``plant.scene_bounds``: a grid, and the relief's mesh.
+
+    ``scene_bounds`` ``(x_min, x_max, y_min, y_max)`` [m] is the opt-in, as for the
+    racecar's scene; without it nothing is drawn. Grid lines every ``spacing`` metres
+    follow the height of ``plant.terrain`` (flat when the plant has none), so the
+    ground reads the same on flat and hilly terrain; where the ground has relief, a
+    mesh sampled every ``step`` metres fills the cells.
+    """
+    bounds = getattr(plant, "scene_bounds", None)
+    if bounds is None:
+        return []
+    x_min, x_max, y_min, y_max = bounds
+    terrain = getattr(plant, "terrain", None)
+
+    def height(X, Y):
+        if terrain is None:
+            return np.zeros_like(X)
+        return np.broadcast_to(np.asarray(terrain.height(X, Y)), X.shape)
+
+    # The grid: lines along x and along y, a centimetre above the ground
+    shapes = []
+    xs = np.arange(x_min, x_max + 1e-9, step * 4)
+    ys = np.arange(y_min, y_max + 1e-9, step * 4)
+    for y in np.arange(y_min, y_max + 1e-9, spacing):
+        Y = np.full_like(xs, y)
+        shapes.append(np.column_stack([xs, Y, height(xs, Y) + 0.01]))
+    for x in np.arange(x_min, x_max + 1e-9, spacing):
+        X = np.full_like(ys, x)
+        shapes.append(np.column_stack([X, ys, height(X, ys) + 0.01]))
+    grid = [Line(pts, color="#d4d4d8", linewidth=1, opacity=0.6) for pts in shapes]
+    for line in grid:
+        line.camera_fit = False
+
+    # The relief: a height grid, two triangles per cell; none on flat ground
+    xs = np.arange(x_min, x_max + 1e-9, step)
+    ys = np.arange(y_min, y_max + 1e-9, step)
+    X, Y = np.meshgrid(xs, ys, indexing="ij")
+    Z = height(X, Y)
+    if not np.any(Z):
+        return grid
+    vertices = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
+    n_y = ys.size
+    i, j = np.meshgrid(np.arange(xs.size - 1), np.arange(n_y - 1), indexing="ij")
+    k = (i * n_y + j).ravel()
+    faces = np.concatenate(
+        [
+            np.column_stack([k, k + n_y, k + n_y + 1]),
+            np.column_stack([k, k + n_y + 1, k + 1]),
+        ]
+    ).astype(np.uint32)
+
+    ground = TriangleMesh(vertices, faces, color=color, name="terrain", max_edges=0)
+    ground.camera_fit = False
+
+    return [ground, *grid]
 
 
 def ground_plane(size):

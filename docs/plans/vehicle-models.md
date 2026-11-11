@@ -158,7 +158,7 @@ The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no pe
 ## 5. The shared pieces
 
 The dynamic rungs (3 to 6) are built from four pieces, each a structural choice fixed at
-construction (RULES 2.3). Each piece copies its default numbers into the car's `params`, which
+construction (RULES 2.3). Each piece holds its own numbers, its dict held by the car's `params` at its key, which
 stays the one numeric tree: overrides, gradients, parameter sweeps and system identification
 reach every number.
 
@@ -224,7 +224,7 @@ load.
 - **The slips during the refactor:** no behaviour moves, so the tire module holds today's two
   formulas, moved unchanged:
   - `|vx| + ε`, today's `tire_slip`, called by rungs 3 and 3b;
-  - `√(vx² + ε²)`, today's `axle_slips` written per wheel, called by rung 4 and by every
+  - `√(vx² + ε²)`, the former `axle_slips` written per wheel, called by rung 4 and by every
     new car.
 
   A tire swapped onto a car uses that car's slip formula.
@@ -298,7 +298,7 @@ mu = terrain.friction(x, y, t, params)      # multiplies the tire's μ
 | --- | --- | --- | --- |
 | static | the weight split, `m g b / L` | none | 3, 3b, 4 (today) |
 | quasi-static transfer | the exact solve of §6 | none | 6a (`Car3D`) |
-| spring-damper (level i) | compression from the body pose and the terrain height: `Fz = k Δ + b Δ̇`, with a smooth floor at 0 (the wheel lifts off; no kink, as §3 asks of the optimization plants) | none beyond rung 6's body | 6 |
+| spring-damper (level i) | compression from the body pose and the terrain height: `Fz = Fz0 + k (h_cg − d) − c ḋ` (§10.7), with a smooth floor at 0 (the wheel lifts off; no kink, as §3 asks of the optimization plants) | none beyond rung 6's body | 6 |
 | spring-damper and wheel mass (level ii) | the two-mass quarter car per corner | 2 per corner | 6, with `massless_wheel=False` |
 
 ### 5.4 The body
@@ -515,10 +515,9 @@ the mechanical hierarchy, S32, decides that one).
 Each saturating law is one line: its shape along the slip demand.
 
 ```python
-class BrushTire:
+class BrushTire(Tire):
     """Fiala brush tire: the friction limit, reached smoothly."""
 
-    def __init__(self):
     def forces(self, kappa, alpha, Fz, friction=1.0, params=None):
         params = self.params if params is None else params
         xp = array_module(kappa, alpha, Fz)
@@ -550,8 +549,8 @@ class BrushTire:
 - **The magic formula in `z`.** `B = c / (C μ)` and `z = c · slip / μ` give `B · slip = z / C`,
   so the curve depends on the demand alone. Its slope at zero is 1 (the linear tire) and its
   peak is 1 (the friction limit).
-- **`LinearSaturation` takes absolute stiffnesses.** Its `c_kappa` and `c_alpha` arguments
-  receive today's `Ck` [N] and `Ca` [N/rad], and it does not multiply by `Fz`. This is its
+- **`LinearSaturation` takes absolute stiffnesses.** Its own numbers are `Ck` [N] and
+  `Ca` [N/rad], and it does not multiply by `Fz`. This is its
   one documented difference from the other laws, and it leaves with it in phase 3.
 - **The slips are two module functions,** each for one wheel, from that wheel's contact
   velocity in its own frame:
@@ -560,7 +559,7 @@ class BrushTire:
     `axle_slips` written for one wheel.
 - **`smooth_floor(F, F_eps)`** is the load floor of §5.3: `½ (F + √(F² + F_eps²))`.
 - **Small-slip stiffness.** `c · Fz` for the module's laws, `Ca` for `LinearSaturation`. The
-  cars' `fastest_mode` already computes it from `params`; nothing is added to the tire for it.
+  cars' `fastest_mode` already computes it from `params`; each tire gives it under a load (`tire.stiffnesses(Fz)`).
 
 ### 10.3 Parameter keys
 
@@ -594,7 +593,7 @@ def compute_tire_physics(self, v_body, u_inputs, params=None):
     # Each wheel's tire computes its own slip and force, with its own numbers
     kappa_f, alpha_f = tire_f.slip(vx_f, vy_f, w_f, R_f, params["tire"]["f"])
     kappa_r, alpha_r = tire_r.slip(vx_r, vy_r, w_r, R_r, params["tire"]["r"])
-    friction_f, friction_r = self.contact_friction(q, params)  # the terrain, at each axle
+    friction_f, friction_r = self.contact_friction(q, params, t)  # the terrain, at each axle
     Fx_f, Fy_f = tire_f.forces(kappa_f, alpha_f, Fz_f, friction_f, params["tire"]["f"])
     Fx_r, Fy_r = tire_r.forces(kappa_r, alpha_r, Fz_r, friction_r, params["tire"]["r"])
 
@@ -760,10 +759,14 @@ weight; the load transfer matches theory; the planar rungs are bit-identical to 
 
 Applied, every number unchanged on a seeded baseline of every rung:
 
-- one `Tire` base class; a grip floor on a road of zero friction (it gave NaN);
-- one axle-force body on the bicycles; the terrain read at the time of the call on every rung;
-- `SuspensionCar3D` a model of its own (five inherited planar methods raised `KeyError` on
-  it); the presets in `car_presets_3d.py`, each applied in one step that also sets the command
+- one `Tire` base class; a grip floor on a road of zero friction (it gave NaN on arrays, a division error on
+  floats);
+- one axle-force body on the bicycles; the terrain read at the time of the call on every
+  catalog rung (`t` comes last on the bicycles' hooks, after `params` and `q`, so the
+  read-only project rungs that call them without it still read `t = 0`; on the 3-D car
+  it sits before `params`, as on `f`);
+- `SuspensionCar3D` a model of its own (four inherited planar methods and five bound
+  helpers raised `KeyError` on it); the presets in `car_presets_3d.py`, each applied in one step that also sets the command
   limits and the rest state (`set_numbers`, `rest_state()`);
 - the nine simulation tests of the 3-D car skip without JAX; its demos run on NumPy.
 

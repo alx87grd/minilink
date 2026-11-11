@@ -11,8 +11,8 @@ car = FormulaCar3D(wheel_angles=True)
 car.params["terrain"]["friction"] = 1.0  # [-] road grip: 1 dry, 0.7 wet, 0.1 ice
 
 # The schedule, with no controller: build speed on the straight, lift for a second,
-# then a steady left turn; the stiff racer stays flat through it. Without downforce the slicks hold about 7 kN at the rear: more power than that
-# spins the car.
+# then a steady left turn; the stiff racer stays flat through it. Without downforce
+# the slicks hold about 7 kN at the rear: more power than that spins the car.
 t = np.linspace(0.0, TF, N_SAMPLES)
 power = np.where(t < 5.0, 100e3, np.where(t < 6.0, 0.0, 40e3))  # [W]
 steer = np.where(t < 5.0, 0.0, 0.03)  # [rad]

@@ -312,7 +312,7 @@ tire (phase 3, the demo clean-up).
   `graphical/catalog/car_skins_3d.py`; the terrain is drawn under them when the plant sets
   `scene_bounds`, the racecar skin's switch.
 - **The two demos** (`examples/demos/dynamics/formula_car_3d.py`, `offroad_car_3d.py`):
-  open-loop command schedules, no controller, `backend="jax"`. The formula schedule stays
+  open-loop command schedules, no controller, on the default backend. The formula schedule stays
   under the rear grip: without downforce, 250 kW at 15 m/s asks 16 kN of rear tires that
   hold about 7 kN, and the car spins (tried, then the schedule lowered).
 
@@ -417,7 +417,8 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   `--tiny`) was not run (AGENTS.md asks it of a big compile or `Simulator` review).
 - **Phase 2 and 2b** (cloud container, warm, one run each unless said):
   `SuspensionCar3D.f` 309 µs on NumPy; 10 s of driving 0.5 s compiled with JAX, about 26 s
-  per 5 s on SciPy, hence `backend="jax"` in its demos. At rest the loads sum to the weight
+  per 5 s on SciPy's adaptive solver (its tests run on JAX); the demos' fixed-step runs
+  take under 3 s on NumPy. At rest the loads sum to the weight
   within the smooth floor's residual; the steady yaw rate on a narrow track is within 0.6 %
   of rung 4's. The presets' automatic steps: 0.25 ms (formula, the stiff springs) and
   0.45 ms (off-road). The demos: the formula car ends a 10 s run at 31.1 m/s with a peak

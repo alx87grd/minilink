@@ -242,7 +242,9 @@ class DrivetrainBicycle(DynamicBicycle):
     # Sensor outputs
 
     def speed(self, x, u, t=0.0, params=None):
-        return x[3:4]
+        speed = x[3:4]
+
+        return speed
 
     def slips(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -485,7 +487,7 @@ class DrivetrainBicycle(DynamicBicycle):
         return x[6:8]
 
     def set_numbers(self, numbers):
-        """The car's own numbers replaced by a preset's, the command limits following."""
+        """A preset's numbers written over the car's own; the command limits follow."""
         self.params.update(numbers)
         self.bound_commands()
 

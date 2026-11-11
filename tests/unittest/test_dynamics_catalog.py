@@ -1095,3 +1095,18 @@ def test_a_road_that_dries_with_time_is_read_at_the_time_of_the_call(plant):
     dvy_dry = car.f(x, u, 2.0)[4]
 
     assert abs(dvy_wet) < 0.5 * abs(dvy_dry)
+
+    # The rear wheel, stopped under a rolling car, is spun up harder by the dry road,
+    # and the used grip is read on the road of that time
+    if plant in (DrivetrainBicycle, UdeSRacecarDyn):
+        assert abs(car.f(x, u, 0.0)[6]) < 0.5 * abs(car.f(x, u, 2.0)[6])
+        np.testing.assert_allclose(car.grip(x, u, 0.0), car.grip(x, u, 2.0), rtol=0.2)
+        assert np.all(car.grip(x, u, 2.0) > 0.9)
+
+
+def test_the_racecar_s_command_limits_are_its_own_numbers():
+    car = UdeSRacecarDyn()
+    p = car.params
+
+    np.testing.assert_array_equal(car.inputs["u"].upper, [p["P_max"], p["delta_max"]])
+    np.testing.assert_array_equal(car.inputs["u"].lower, [-p["P_max"], -p["delta_max"]])

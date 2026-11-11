@@ -63,7 +63,8 @@ class SuspensionCar3D(DynamicSystem):
     Simplifications: the spring acts along the terrain's normal, not the body's ``z``
     axis; the terrain is read under the attachment point; the gap rate neglects the
     terrain's curvature and the ground's own velocity where the terrain moves with
-    time; the wheels are massless. All vanish on still, flat ground at small roll. The roll-pitch-yaw attitude is singular at a pitch of ``+-90`` deg, an
+    time; the wheels are massless. All vanish on still, flat ground at small roll.
+    The roll-pitch-yaw attitude is singular at a pitch of ``+-90`` deg, an
     end-over-end flip. Past 90 deg of roll the same springs hold the attachments
     off the ground: only the tires touch it.
 
@@ -239,6 +240,8 @@ class SuspensionCar3D(DynamicSystem):
         # Graphics: the generic car's plain look, a camera that follows it, the
         # contact vectors off, and no ground drawn until scene_bounds is set
         self.skin = car_skin_3d
+        self.wheel_len = 0.76
+        self.wheel_width = 0.27
         self.camera_follow_frame = "body"
         self.camera_scale = 8.0
         self.show_contact_vectors = False
@@ -461,8 +464,8 @@ class SuspensionCar3D(DynamicSystem):
         ``(4, 3)``), ``arm`` (the contacts from the centre of gravity), ``Fz`` (the
         normal loads), ``Fx``, ``Fy`` (the tire forces in the wheel frames),
         ``kappa``, ``alpha`` (the slips), ``vx``, ``vy`` (the contact velocities in
-        the wheel frames), ``grip`` (the used friction), ``e_x``, ``e_y`` (the wheel
-        frames' axes) and the corner geometry.
+        the wheel frames), ``v_C`` (the same in the world), ``grip`` (the used
+        friction), ``e_x``, ``e_y`` (the wheel frames' axes) and the corner geometry.
         """
         params = self.params if params is None else params
         xp = array_module(x)
@@ -586,9 +589,9 @@ class SuspensionCar3D(DynamicSystem):
     # Sensor outputs
 
     def speed(self, x, u, t=0.0, params=None):
-        vx = x[3:4]
+        speed = x[3:4]
 
-        return vx
+        return speed
 
     def power(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -802,7 +805,7 @@ class SuspensionCar3D(DynamicSystem):
         return T_min
 
     def rest_state(self):
-        """The state at rest on flat ground: every state zero, the centre of gravity at its ride height."""
+        """The state at rest on flat ground: zero, the centre of gravity at its ride height."""
         h_cg = self.params["h_cg"]
 
         x = np.zeros(self.n)
@@ -831,7 +834,7 @@ class SuspensionCar3D(DynamicSystem):
         return commands
 
     def set_numbers(self, numbers):
-        """The car's own numbers replaced by a preset's, the command limits and the rest state following."""
+        """A preset's numbers over the car's own; the command limits and the rest state follow."""
         self.params.update(numbers)
         self.bound_commands()
         self.x0 = self.rest_state()

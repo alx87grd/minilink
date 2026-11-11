@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from minilink.graphical.animation.primitives import Sphere
-from minilink.graphical.catalog.shapes import Line
+from minilink.graphical.catalog.skins import terrain_surface
 from minilink.graphical.meshes import (
     TriangleMesh,
     axis_angle_matrix,
@@ -445,64 +445,6 @@ def mount_rear_wheels(look, plant):
             look["body"].append(shape)
 
 
-def terrain_surface(plant, color, step=0.25, spacing=2.0):
-    """The plant's ground over ``plant.scene_bounds``: a grid, and the relief's mesh.
-
-    ``scene_bounds`` ``(x_min, x_max, y_min, y_max)`` [m] is the opt-in, as for the
-    racecar's scene; without it nothing is drawn. Grid lines every ``spacing`` metres
-    follow the height of ``plant.terrain`` (flat when the plant has none), so the
-    ground reads the same on flat and hilly terrain; where the ground has relief, a
-    mesh sampled every ``step`` metres fills the cells.
-    """
-    bounds = getattr(plant, "scene_bounds", None)
-    if bounds is None:
-        return []
-    x_min, x_max, y_min, y_max = bounds
-    terrain = getattr(plant, "terrain", None)
-
-    def height(X, Y):
-        if terrain is None:
-            return np.zeros_like(X)
-        return np.broadcast_to(np.asarray(terrain.height(X, Y)), X.shape)
-
-    # The grid: lines along x and along y, a centimetre above the ground
-    shapes = []
-    xs = np.arange(x_min, x_max + 1e-9, step * 4)
-    ys = np.arange(y_min, y_max + 1e-9, step * 4)
-    for y in np.arange(y_min, y_max + 1e-9, spacing):
-        Y = np.full_like(xs, y)
-        shapes.append(np.column_stack([xs, Y, height(xs, Y) + 0.01]))
-    for x in np.arange(x_min, x_max + 1e-9, spacing):
-        X = np.full_like(ys, x)
-        shapes.append(np.column_stack([X, ys, height(X, ys) + 0.01]))
-    grid = [Line(pts, color="#d4d4d8", linewidth=1, opacity=0.6) for pts in shapes]
-    for line in grid:
-        line.camera_fit = False
-
-    # The relief: a height grid, two triangles per cell; none on flat ground
-    xs = np.arange(x_min, x_max + 1e-9, step)
-    ys = np.arange(y_min, y_max + 1e-9, step)
-    X, Y = np.meshgrid(xs, ys, indexing="ij")
-    Z = height(X, Y)
-    if not np.any(Z):
-        return grid
-    vertices = np.column_stack([X.ravel(), Y.ravel(), Z.ravel()])
-    n_y = ys.size
-    i, j = np.meshgrid(np.arange(xs.size - 1), np.arange(n_y - 1), indexing="ij")
-    k = (i * n_y + j).ravel()
-    faces = np.concatenate(
-        [
-            np.column_stack([k, k + n_y, k + n_y + 1]),
-            np.column_stack([k, k + n_y + 1, k + 1]),
-        ]
-    ).astype(np.uint32)
-
-    ground = TriangleMesh(vertices, faces, color=color, name="terrain", max_edges=0)
-    ground.camera_fit = False
-
-    return [ground, *grid]
-
-
 def loft(sections, z0=0.0, y0=0.0, power=4.0, n=28):
     """A closed body through superellipse sections ``(x, half width, bottom, top)``.
 
@@ -565,12 +507,12 @@ def tube(p0, p1, radius, n=12):
 
 
 def pitched(mesh, angle):
-    """A wing element pitched nose-down by ``angle`` [rad] about the spanwise axis through its centre."""
+    """A wing element pitched leading edge down by ``angle`` [rad] about its spanwise centreline."""
     vertices, _ = mesh
     centre = 0.5 * (vertices.min(axis=0) + vertices.max(axis=0))
     turn = (
         translation_matrix(centre)
-        @ axis_angle_matrix((0.0, 1.0, 0.0), -angle)
+        @ axis_angle_matrix((0.0, 1.0, 0.0), angle)
         @ translation_matrix(-centre)
     )
 

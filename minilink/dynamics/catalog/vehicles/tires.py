@@ -19,10 +19,11 @@ GRIP_FLOOR = 1.0e-9
 class Tire:
     """A tire: a part of a car, with its law, its slip and its numbers.
 
-    A law of this module is a subclass that writes :meth:`forces`. Its numbers are
-    the grip ``mu`` on the reference surface, the stiffnesses per unit load
-    ``c_alpha`` [1/rad] and ``c_kappa`` [-], so the force is linear in the load
-    ``Fz``, and the floor ``v_eps`` [m/s] of the slip denominators.
+    A law of this module is a subclass that writes :meth:`forces`. Unless the law
+    says otherwise, its numbers are the grip ``mu`` on the reference surface, the
+    stiffnesses per unit load ``c_alpha`` [1/rad] and ``c_kappa`` [-], so the force
+    is linear in the load ``Fz``, and the floor ``v_eps`` [m/s] of the slip
+    denominators.
     """
 
     params = own_params()
@@ -74,7 +75,7 @@ class Tire:
     def friction_use(self, Fx, Fy, Fz, friction=1.0, params=None):
         """Used fraction of the friction ellipse [-] (:func:`used_grip`)."""
         params = self.params if params is None else params
-        xp = array_module(Fx, Fy, Fz)
+        xp = array_module(Fx, Fy, Fz, friction)
 
         mu = xp.maximum(friction * params["mu"], GRIP_FLOOR)
 
@@ -118,7 +119,7 @@ class BrushTire(Tire):
 
     def forces(self, kappa, alpha, Fz, friction=1.0, params=None):
         params = self.params if params is None else params
-        xp = array_module(kappa, alpha, Fz)
+        xp = array_module(kappa, alpha, Fz, friction)
 
         mu = xp.maximum(friction * params["mu"], GRIP_FLOOR)
         c_alpha = params["c_alpha"]
@@ -164,7 +165,7 @@ class MagicFormulaTire(Tire):
 
     def forces(self, kappa, alpha, Fz, friction=1.0, params=None):
         params = self.params if params is None else params
-        xp = array_module(kappa, alpha, Fz)
+        xp = array_module(kappa, alpha, Fz, friction)
 
         mu = xp.maximum(friction * params["mu"], GRIP_FLOOR)
         c_alpha = params["c_alpha"]
@@ -296,23 +297,6 @@ def wheel_slip(vx, vy, w, R, v_min_epsilon):
     return kappa, alpha
 
 
-def wheel_parts(part, wheels):
-    """Each wheel's own part: a copy of the one given, or of the one given for it by name.
-
-    The car holds copies, so a tire or a spring passed in is a template: edit the
-    car's through ``car.params``. A dict must name every wheel and no other.
-    """
-    if isinstance(part, dict):
-        if set(part) != set(wheels):
-            raise ValueError(
-                f"the parts name the wheels {sorted(part)}; this car's wheels are "
-                f"{list(wheels)}: pass one part for all, or one per wheel by name"
-            )
-        return {wheel: copy.deepcopy(part[wheel]) for wheel in wheels}
-
-    return {wheel: copy.deepcopy(part) for wheel in wheels}
-
-
 # The building blocks of the laws
 
 
@@ -382,3 +366,23 @@ def brush_saturation(z):
     g = xp.where(z < 3.0, 1.0 - z / 3.0 + z**2 / 27.0, 1.0 / xp.maximum(z, 3.0))
 
     return g
+
+
+# The parts of a car, one per wheel
+
+
+def wheel_parts(part, wheels):
+    """Each wheel's own part: a copy of the one given, or of the one given for it by name.
+
+    The car holds copies, so a tire or a spring passed in is a template: edit the
+    car's through ``car.params``. A dict must name every wheel and no other.
+    """
+    if isinstance(part, dict):
+        if set(part) != set(wheels):
+            raise ValueError(
+                f"the parts name the wheels {sorted(part)}; this car's wheels are "
+                f"{list(wheels)}: pass one part for all, or one per wheel by name"
+            )
+        return {wheel: copy.deepcopy(part[wheel]) for wheel in wheels}
+
+    return {wheel: copy.deepcopy(part) for wheel in wheels}
