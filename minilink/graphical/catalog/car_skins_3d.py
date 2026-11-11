@@ -18,14 +18,14 @@ from minilink.graphical.meshes import (
 )
 
 FORMULA_COLORS = {
-    "body": "#0f5c46",
-    "stripe": "#f4f1e4",
-    "accent": "#f2c230",
+    "body": "#f2f3f5",
+    "stripe": "#1b1d22",
+    "accent": "#7d848f",
     "carbon": "#17181c",
     "cockpit": "#0b0b0d",
     "tire": "#141414",
-    "rim": "#c0c4cc",
-    "hub": "#f2c230",
+    "rim": "#aeb3bb",
+    "hub": "#1b1d22",
     "light": "#ef4444",
     "ground": "#9aa3ad",
 }
