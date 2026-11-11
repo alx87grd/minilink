@@ -499,7 +499,7 @@ def test_a_method_takes_the_model_order(path):
     assert leading == ONE_SIGNATURE[path], f"{path} takes {leading}"
 
 
-# Keyword-only where every sibling already is (api-stabilization AS-29): the leading
+# Keyword-only where every sibling already is (the API settlement, PR #139): the leading
 # parameters a caller may pass by position, at the function's full path; every other one is
 # keyword-only
 LEADING_POSITIONALS = {
@@ -715,7 +715,7 @@ def test_a_solve_status_reports_its_scalar_as_J():
     assert "J" in STANDARD_STATUS and "cost" not in STANDARD_STATUS
 
 
-# One hold vocabulary on the three tools that read samples between their times (AS-28): the
+# One hold vocabulary on the three tools that read samples between their times: the
 # step model's rollout, the noise sources and the replay of a trajectory say "zoh" / "linear"
 RETIRED_HOLDS = {"foh": "linear", "previous": "zoh"}
 
@@ -734,7 +734,7 @@ def test_no_retired_hold(retired):
             refused()
 
 
-# The optimizer's native numbers are keywords (api-stabilization AS-27): options= is the
+# The optimizer's native numbers are keywords (the API settlement, PR #139): options= is the
 # external solver's dict, refused on gd and adam; the native method's statistics say method
 @pytest.mark.parametrize("retired", ["maxiter", "gtol"])
 def test_a_native_method_refuses_options(retired):
@@ -919,7 +919,7 @@ def test_the_helpers_are_module_functions_not_methods():
     assert not hits, f"module functions, not methods: {hits}"
 
 
-# A drawing shortcut writes its keywords out (api-stabilization AS-32, DESIGN section 4: every
+# A drawing shortcut writes its keywords out (the API settlement, PR #139; DESIGN section 4: every
 # editor shows them), the same keywords as the function it hands them to
 SHORTCUTS = {
     "minilink.core.facades.plotting.SystemPlotting.plot_input_output_map": (
@@ -945,7 +945,7 @@ def test_a_drawing_shortcut_writes_its_keywords_out(path):
     assert keywords(path) == keywords(SHORTCUTS[path])
 
 
-# One helper per name (api-stabilization AS-31): a helper is defined once, every other module
+# One helper per name (the API settlement, PR #139): a helper is defined once, every other module
 # imports it; two bodies under one name were two ideas, now two names
 ONE_HELPER = {
     "steps_of": (

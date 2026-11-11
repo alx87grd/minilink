@@ -783,7 +783,7 @@ class TestModalAnalysis(unittest.TestCase):
 
 
 class TestPoles(unittest.TestCase):
-    """``poles(sys, x_bar)``: the eigenvalues of the linear model's ``A`` (AS-44)."""
+    """``poles(sys, x_bar)``: the eigenvalues of the linear model's ``A``."""
 
     def test_the_pendulums_poles_hang_and_stand(self):
         from minilink import poles
@@ -2202,7 +2202,7 @@ class TestSensitivity(unittest.TestCase):
                 )
 
     def test_the_plant_is_read_on_bodes_channel_and_positional(self):
-        """``sensitivity(plant, controller)`` reads the plant's channel as ``bode`` does (AS-48)."""
+        """``sensitivity(plant, controller)`` reads the plant's channel as ``bode`` does."""
         from minilink.analysis import (
             complementary_sensitivity,
             load_sensitivity,

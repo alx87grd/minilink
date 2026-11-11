@@ -34,7 +34,7 @@ class TestPublicImports(unittest.TestCase):
         self.assertTrue(callable(Impedance))
 
     def test_the_settled_facade_names_are_the_defining_ones(self):
-        """AS-49: the model families and ``step_info`` on the root, the records on analysis, the shapings on core."""
+        """The model families and ``step_info`` on the root, the records on analysis, the shapings on core."""
         import numpy as np
 
         from minilink import (

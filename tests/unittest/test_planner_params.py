@@ -227,7 +227,7 @@ def test_the_grids_table_options_survive_a_discount_and_a_tree():
 
 
 def test_every_planner_takes_verbose_off_by_default():
-    """``verbose=False`` on every planner's solve (AS-47: LQR, RRT, RRT* and MPPI added)."""
+    """``verbose=False`` on every planner's solve (LQR, RRT, RRT* and MPPI included)."""
     import inspect
 
     from minilink import ReinforcementLearningPlanner, TrajectoryOptimizationPlanner

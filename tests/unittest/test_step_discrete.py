@@ -622,7 +622,7 @@ def test_a_system_on_a_clock_rolls_out_from_its_origin():
 
 
 class TestRolloutInputsAndDefaultIds(unittest.TestCase):
-    """A scalar input on a one-input rollout; ``add_subsystem`` without an id (AS-46)."""
+    """A scalar input on a one-input rollout; ``add_subsystem`` without an id."""
 
     def test_a_scalar_is_the_constant_input_of_a_one_input_rollout(self):
         scalar = Accumulator().compute_rollout(3, 2.0)

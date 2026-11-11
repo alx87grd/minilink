@@ -248,7 +248,7 @@ def test_a_summed_cost_bound_refuses_a_partial_tree():
         total.g_max(X, X, partial)
 
 
-# The bounds and the dimension where they are known; the ball and the singleton draw (AS-41)
+# The bounds and the dimension where they are known; the ball and the singleton draw
 
 
 def test_an_input_box_and_a_uniform_law_read_their_bounds_and_dimension():
