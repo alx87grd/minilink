@@ -9,7 +9,39 @@ the head of [TODO.md](../plans/TODO.md#rows-waiting-for-the-maintainers-go). Kno
 A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO or the plan
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
-2026-11-04 to 2026-11-08 live in DESIGN and RULES. Nothing on the core is open here; one question on the vision is.
+2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: four small names the API
+settlement (PR #139) left, and one question on the vision.
+
+## The API
+
+### Four small names the API settlement left
+- **Context:** the API settlement before the demo rebuild (PR #139, merged 2026-11-11) logged
+  four names it did not touch, because no ruling listed them; each is a public name, so each
+  waits for you. They are small and independent; the rebuilt demos would meet the
+  last two.
+  1. `SampledDiagramEvaluator.block_input(path, x, u, k)`, a public method of the compiled
+     evaluator (DESIGN §4, one test, the MPC drawing helper): it reads a subsystem's input,
+     where ruling 1 made "subsystem" the word for a system placed in a diagram.
+  2. `TrajectoryOptimizationPlanner.transcription_options()`, the verbose print's line: it
+     names the option records the settlement deleted (the transcription now takes
+     `n_steps=` itself) and returns `{"n_steps": N}`; its only caller is the print.
+  3. `animate_control_law(axis=0, ...)` (value iteration's planner and
+     `planning/dynamic_programming/plotting.py`): the input channel drawn, the idea
+     `plot_control_law` now names `u_axis=`.
+  4. The planners' `compile(backend=None)` (trajectory optimization, MPPI): `backend` stays
+     positional (the MPC calls `planner.compile(backend)`), where `System.compile(*, backend=)`
+     is keyword-only.
+- **Options**, per name:
+  1. `block_input` → `subsystem_input` (one library caller, one test), or kept as is.
+  2. `transcription_options()` → `transcription_numbers()`, folded into the print (no method
+     left), or kept as is.
+  3. `animate_control_law(axis=)` → `u_axis=`, as `plot_control_law`; or kept as is.
+  4. `compile(*, backend=None)` keyword-only, as the system's (two callers in the MPC), or
+     kept positional.
+- **Recommendation:** rename 1 and 3 and make 4 keyword-only (one word, one shape per idea,
+  RULES 2.7 and DESIGN §4); fold 2 into the print, since nothing else reads it.
+- **Blocks:** nothing; each is one commit with its callers, no alias.
+- **Answer:**
 
 ## The vision
 

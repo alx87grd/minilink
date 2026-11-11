@@ -1140,7 +1140,9 @@ Keep `ExecutionPlan.output_slices` and `external_output_slices` aligned.
   `rollout_batch` maps it over starts, inputs and a parameter family in one `vmap`, and a step
   diagram's `tick(x, u, k)` gives the next state and the boundary outputs from one signal pass;
   on a clock with a continuous plant underneath, `compute_trajectory(tf, u=None, *, x0=None,
-  t0=0.0, dt=None, solver=None)` is the same scan with the plant's substeps kept (the evaluator's
+  t0=0.0, dt=None, solver=None)` is the same scan with the plant's substeps kept, over
+  `round((tf − t0) / Δ)` ticks (a loop stops on a tick: a `tf` off the ticks is warned, naming
+  the end the run reaches) (the evaluator's
   `rollout_dense`, `(N·S + 1, n)`, `S` the plant's substeps, `⌈Δ / dt⌉` when `dt` is given), equal to the ticks bit for
   bit at the ticks, and `solver="scipy"` the host clock runner
   (`simulation/discrete/clock_runner.py`: the same blocks ticked on the host, the plant integrated

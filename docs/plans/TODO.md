@@ -31,9 +31,9 @@ the maintainer would and logged in the run's record.
 
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
-| The API settled before the demo rebuild | — | v0.4 (before the rebuild) | your go on [api-stabilization.md](api-stabilization.md): its defects section landed (2026-11-10); your go on the two other sections that need no decision, then its 24 decisions one at a time (the "API sweep's judgment calls" row of §1.11 is folded into them) |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
-| The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name |
+| The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name, `C(q, v)` or `C(q, dq)`, `actuators=` a count |
+| The root list regenerated from the rebuilt demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
@@ -67,7 +67,7 @@ the maintainer would and logged in the run's record.
 
 ## 1. v0.4 — the clean surface
 
-**Next, in order** (as of 2026-11-10). One rule orders v0.4: what changes a public name or a
+**Next, in order** (as of 2026-11-11). One rule orders v0.4: what changes a public name or a
 behaviour lands first, so the demos, notebooks and tests are redrafted once, on the settled
 surface, and the student-facing numbers are re-pinned once, at the release. Additive work that
 breaks nothing goes last and may follow the tag.
@@ -75,14 +75,14 @@ breaks nothing goes last and may follow the tag.
 Phases 1 to 4 landed on `dev` (2026-11-08): the planners' math and fields and value
 iteration's finite horizon (plans as policies, its first two changes), the core API proposals
 and the later round of API sweeps as ruled, the core's small leftovers, and the maintainer's
-rulings of 2026-11-07; then the API naming sweep (PR #138) and the API review's defects
-(2026-11-10). Their contracts are DESIGN's; the release's status is ROADMAP §5.4's. Every
-feature branch is merged into `dev`. What is left:
+rulings of 2026-11-07; then the API naming sweep (PR #138), the API review's defects
+(2026-11-10) and phase 4b, the API settled before the demo rebuild (PR #139, merged
+2026-11-11: the names a rule decided, the additions, the maintainer's rulings 1 to 24 and the
+questions after them). Four of its rulings are built later, each in its row: the pendulum's
+point-mass default (§1.10), the root list (§1.13), the path-tracking laws on the plant (§2,
+with K8-0) and the mechanical names (S32). Their contracts are DESIGN's; the release's status
+is ROADMAP §5.4's. Every feature branch is merged into `dev`. What is left:
 
-4b. **The API settled before the demo rebuild** (§1.11, [api-stabilization.md](api-stabilization.md)
-   §2 to §5) **[ask]**: on the maintainer's go, the names a rule already decides and the
-   additions that break nothing, then its 24 decisions one at a time, then the planned renames
-   pulled forward, so the rebuilt demos are written once.
 5. **The surface redrafted on the settled names** (§1.12): the maintainer's demo rebuild, then
    the tests' clean slate and the course notebooks on the new names; beside it the clean-up lane
    (§2: the catalog clean-up K8, the experimental tier K9, the car family's time constant), and
@@ -125,7 +125,6 @@ feature branch is merged into `dev`. What is left:
   - parameter-dictionary support on sets and distributions (one flatten rule, with
     identification or the robust problem);
   - `UnionSet` via `|`, when reachability or multi-goal work needs it;
-  - vector bounds on `Saturation`;
   - `PlanningProblem.hamiltonian()`, only if the course teaches Pontryagin;
   - the double-integrator homework's two verbs, entry time into a set and the Bellman residual
     (scan: examples#10).
@@ -234,21 +233,17 @@ naming sweep, §1.11).
   - the student-facing numbers re-pinned (notebook outputs, course figures, the pipeline figures
     of `docs/pipeline_figures.py`; the regression baselines moved with each change, §1's gates),
     after the maintainer checks the demos on `dev`;
+  - `Pendulum`'s default inertia `I = 0`, the textbook point mass (`ω = √(g/l)`, 3.13 rad/s for
+    `m = l = 1`; today `I = 1` gives 2.21), built with that re-pin and not before (the
+    maintainer's ruling 6b of 2026-11-10); the scalar inertia keeps the letter `I`;
   - the PR from `dev` to `main`;
   - the `0.4.0` tag.
 
 ### 1.11 The core API proposals
 
-- [ ] **The API settled before the demo rebuild** **[ask]** (design and status:
-  [api-stabilization.md](api-stabilization.md), the review of 2026-11-10): its defects section
-  (AS-1 to AS-15) landed on `dev`; left, on the maintainer's go, the names a rule already
-  decides (§2, AS-20 to AS-32), the additions that break nothing (§3, AS-40 to AS-49), the 24
-  decisions one at a time (§4; the API naming sweep's judgment calls of 2026-11-08 are folded
-  in there), and the planned rows pulled forward (§5: K8-0, K8-1, S64's and S32's names). Done
-  when every row has landed or been dropped and the plan doc is deleted.
-
-The proposals, the later round of API sweeps and the API naming sweep (PR #138) landed in
-v0.4 as ruled (contracts: DESIGN §4 to §6, RULES 2.7). Left:
+The proposals, the later round of API sweeps, the API naming sweep (PR #138) and the API
+settled before the demo rebuild (PR #139) landed in v0.4 as ruled (contracts: DESIGN §4 to §6,
+RULES 2.7). Left:
 
 - [ ] **The parameters model's last follow-up** (the model's contract: DESIGN §4,
   "Parameters"): the problem's internal helpers (`parts_view`, `sample_params`,
@@ -287,9 +282,18 @@ alone).
 
 ### 1.13 The root exports and the tutorials' quirks
 
-No open row: the root exports (`QuadraticField` and `GridField` on the root, the core's
+- [ ] **The root list regenerated from the rebuilt demos** **[ask]** (the maintainer's ruling 21
+  of 2026-11-11, with K8-1, §2): at the end of v0.4, after the maintainer's demo rebuild, the
+  agent drafts the root list from what the rebuilt demos and the course notebooks import, for
+  the maintainer's review; a name that leaves the root stays on its band facade. Today's
+  candidates, with no example use or half a pair: `LinearApproximator`, `QuadraticFeatures`,
+  `RadialBasisFeatures`, `StaticSimulator`, the four `*_gain` verbs, `BoxInputSet`; `lqr_gain`
+  without `lqr_gain_schedule`. Nothing changes before the rebuild. Done when the maintainer has
+  reviewed the list and `test_teaching_surface.py` pins it.
+
+Landed in v0.4: the root exports (`QuadraticField` and `GridField` on the root, the core's
 mathematical types on `minilink.core`), a linear model's matrices read as `lin.A()`, and the
-four linear-analysis plots on continuous and step systems alike landed in v0.4.
+four linear-analysis plots on continuous and step systems alike.
 
 ---
 
@@ -338,6 +342,13 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   constant today) a `fastest_mode()` read from its `params`, from its linearization at the
   nominal point by a closed formula. The kinematic bicycle declares none (a zero spectrum): an input box would give it one. Done when a sweep of the catalog shows no
   plant on the 1 ms default but the undeclared custom ones.
+- [ ] **The path-tracking laws take the plant** (v0.4, built with K8-0, the car family to three
+  models; the maintainer's ruling 10 of 2026-11-10): `PurePursuit(plant, path, *, lookahead=…)`
+  and its siblings read the wheelbase, the steering limit, the measurement size and the pose and
+  heading states from the plant, so `PurePursuit(car, path) @ car` closes on every catalog car.
+  Today they default to the UdeS racecar (`wheelbase=0.34`, `state_dim=9`) and close with `@`
+  on no catalog car. Done when every path-tracking law closes on each of the three cars with `@`
+  in a test.
 
 **GMC714**: no new feature; the teaching surface covers every lab (ROADMAP
 §4.3). The labs move from pyro to minilink as the maintainer's teaching work, outside this
@@ -360,7 +371,10 @@ workboard; the former wave G rows are §4 rows.
   family** (S32) **[ask — core]** rebuilt on the ruling. The review: which mechanical class is
   the child of which (`MechanicalSystem`, `GeneralizedMechanicalSystem`, the manipulators, the
   body-frame vehicles), where the car family sits (`DynamicBicycle` and its children, the
-  racecar, `BicycleDynRate`), and the one mass-matrix name. The proposal on the table:
+  racecar, `BicycleDynRate`), the one mass-matrix name, and the base's other names the
+  maintainer's ruling 8 of 2026-11-10 left to this review: the Coriolis term `C(q, v)` on the
+  two bases and the body-frame plants against `C(q, dq)` on the other plants, and
+  `actuators=`, a count. The proposal on the table:
   `GeneralizedMechanicalSystem` a child of `MechanicalSystem` beside `Manipulator`; `H` the one
   mass-matrix name (`M` renamed in the class, the boat, the plane, `DynamicBicycle.M` read by
   the racecar and `BicycleDynRate`, and `examples/projects/car_trajopt`'s ladder); `qv2x` /
@@ -665,8 +679,7 @@ each plan states.
   - [ ] **Modelling ladder** (C2): manipulators + the four-rung vehicle ladder as a
     tutorial lesson (not a GMC714 lab); robotic PID wrappers (`JointPD`, `EndEffectorPD` twins).
     Also: one constructor contract for the robotic laws (scan: control#6).
-  - [ ] **Blocks** (C3): `Ramp` / `Chirp` / `Delay` / `Switch`; `Integrator` and `UnitDelay` take
-    a `dim` like every static block (scan: graphics#11).
+  - [ ] **Blocks** (C3): `Ramp` / `Chirp` / `Delay` / `Switch` (scan: graphics#11).
   - [ ] **Catalog hygiene** (S64) **[ask — catalog]** (scan: dynamics#0, dynamics#1,
     dynamics#2, dynamics#3, dynamics#4, dynamics#6, dynamics#8; the mechanical default
     bounds landed, each plant states its own): output ports that are

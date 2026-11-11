@@ -12,7 +12,7 @@ Identity: [CONSTITUTION.md](CONSTITUTION.md).
 | **v0.1** | **GRO860 end to end**, plus a working **`pip install minilink` on PyPI**. Every topic of the running optimal-control & RL course runs on the teaching surface, in Colab (git-clone cell) and in the conda env: value iteration / DP on a grid · LQR + linearization · trajectory optimization · RL via native `ReinforcementLearningPlanner` (with `Sys2Gym` + SB3 as an optional bridge). See §4.1. | Fall 2026 — `0.1.0` on PyPI (2026-09-16); `0.1.1` (2026-09-26) is the first release a GitHub tag published. Conda from `environment.yml` is the recommended install. The course notebooks' names are frozen until v1.0, with the freeze paused between terms (§4.1 gate 7). |
 | **v0.2** | **GRO501 end to end** (the classical-control course: multi-physics modelling · root locus / Bode / margins · PID to spec · digital implementation · state feedback, pole placement, LQR, observers — see §4.2). Conda stays the recommended install. | `0.2.0` on PyPI (2026-10-17), from the GitHub tag; every §4.2 row green |
 | **v0.3** | **The complete core** (§5.3): one architecture from the plant to the evaluation and the optimizer, supporting stochastic problems and the sampled loop, built in the natural order of the code. First (DESIGN §4–§6): **the convergence pass** (the core kept, side features to the experimental tier) and **the continuous core** (one step model under every sampled tool, one evaluation of any run, and the deterministic differentiable path to the cost behind a clean API: `evaluate`, `compare`, `problem.compile(loop)`, the program export, cost parameters; a closing PID-tuning example by hand and by the pipeline, S77). Then two invariants (every object pure, every number a parameter; the step algebra first-class) and seven pillars (the eight items the maintainer named, the parametric and the stochastic programs grouped as one): one discrete judge, the draws over starts, parameters, disturbances and block seeds, the seeded stochastic policy, the sampled loop as a step diagram with two run verbs, one generic parametric program with the stochastic program its case, a native solver and an MPC on the planner's pure face as a proof of concept (MPPI on the same face), Fields. The teaching surface covers every GMC714 lab (§4.3); the course material stays on `main` until v0.3 merges. | `0.3.0` on PyPI (2026-10-30), from the GitHub tag; the core's small leftovers carried into v0.4 |
-| **v0.4** | **The clean surface** (§5.4, [TODO §1](../plans/TODO.md#1-v04--the-clean-surface)): the API one vocabulary and one shape across the tools (RULES 2.4 and 2.7, the planner's four kinds of argument; landed on `dev` after the tag), the tutorials in three layers (landed), the one parameters model and no cache (DESIGN §4; landed 2026-11-05), the nine API surface rulings (landed 2026-11-05), plans as policies (one face for every planner, value iteration's finite horizon, the cost-to-go as fields; [plans-as-policies.md](../plans/plans-as-policies.md); its first two changes landed 2026-11-08), the core API proposals CA-1, CA-2 and CA-5 and the root exports (landed 2026-11-08), the v0.3 core's small leftovers (mostly landed 2026-11-08), the API naming sweep (landed 2026-11-08, PR #138), the API review's defects (landed 2026-11-10) and the rest of the API settled before the demo rebuild ([api-stabilization.md](../plans/api-stabilization.md); left), and the demos, notebooks, tests and CI redrafted on the core (left). Breaking names land here, once, with every notebook in the same change. | After v0.3 (no date) |
+| **v0.4** | **The clean surface** (§5.4, [TODO §1](../plans/TODO.md#1-v04--the-clean-surface)): the API one vocabulary and one shape across the tools (RULES 2.4 and 2.7, the planner's four kinds of argument; landed on `dev` after the tag), the tutorials in three layers (landed), the one parameters model and no cache (DESIGN §4; landed 2026-11-05), the nine API surface rulings (landed 2026-11-05), plans as policies (one face for every planner, value iteration's finite horizon, the cost-to-go as fields; [plans-as-policies.md](../plans/plans-as-policies.md); its first two changes landed 2026-11-08), the core API proposals CA-1, CA-2 and CA-5 and the root exports (landed 2026-11-08), the v0.3 core's small leftovers (mostly landed 2026-11-08), the API naming sweep (landed 2026-11-08, PR #138), the API review's defects (landed 2026-11-10) and the rest of the API settled before the demo rebuild (landed 2026-11-11, PR #139), and the demos, notebooks, tests and CI redrafted on the core (left). Breaking names land here, once, with every notebook in the same change. | After v0.3 (no date) |
 | **v0.5** | **Features on the core** (§5.5), not intertwined with it: identification as the program export's first data consumer; `LQGPlanner`; workspace geometry; the RL follow-ups; native solvers beyond the proof of concept; the general serial chain (C6); pyro parity and the former wave G rows; traceable linear analysis. | After v0.3 (no date) |
 | **v0.9** | **Freeze candidate** (§5.6): the foundation questions that could still break a public name are decided (Diffrax as an optional solve, the glyph/solid rename, the frozen surface); the trust contract is in place (deprecation policy, pinned export list, CHANGELOG, pinned installs); the standard-syllabus holes close (estimation; the discrete-time one closes with S75 in v0.3); the docs site renders the tutorials. | Spring 2027 (indicative, set before 2026-10-26; the releases carry no dates now) |
 | **v1.0** | **A colleague can build a course on it and trust it for three years** (§5.7): the API frozen under the deprecation policy, the standard control syllabus covered and checked against textbook worked examples, course-neutral labs an instructor adopts outside UdeS, green on Windows, macOS and Linux; after two cohorts. Two Stable-Baselines3 teaching notebooks retire (S49) and the GRO860 name freeze becomes the general one. | 2027 (indicative, set before 2026-10-26; v1.0 comes when the API feels mature) |
@@ -214,8 +214,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `step_info(time, y)` → `step_info(t, y)`; `discretize(system=)` → `sys=`;
     `RRTPlanner.show_live_search()` is gone for `solve(callback=LiveSearchPlot())`. The RL
     planner's `solve(params=)` takes the planner's whole tree, as every planner's.
-- 2026-11-10 (the API review's defects, [api-stabilization.md](../plans/api-stabilization.md)
-  §1, merged into `dev` for `0.4.0`; no name breaks but one):
+- 2026-11-10 (the API review's defects, merged into `dev` for `0.4.0`; no name breaks but
+  one):
   - *Refused now:* `lqr`, `lqr_finite_horizon`, `kalman`, `lqg`, `trajectory_lqr` and
     `LQRPlanner` on a step or sampled model (they solved the continuous Riccati equation on
     the discrete matrices); `compute_trajectory` given both `n_samples=` and `dt=`; a
@@ -231,8 +231,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `forward_differential_kinematic_effector` is gone.
   - Also: a one-line `repr` on systems, sets, fields, costs, laws and the `Optimizer`;
     refusals that name what to pass; `SumCost.g_max` / `h_max` index their terms as `g` does.
-- 2026-11-10 (the API settled before the demo rebuild, branch `api-settle`, for `0.4.0`; every
-  notebook migrated in the same commits, no alias):
+- 2026-11-10 and 2026-11-11 (the API settled before the demo rebuild, merged into `dev` by PR
+  #139 on 2026-11-11, for `0.4.0`; every notebook migrated in the same commits, no alias):
   - *Subsystem, the one word for a system placed in a diagram.* `print(diagram)` lists
     `subsystems:` (it said `blocks:`); `get_subsys_input_port` → `get_subsystem_input_port`,
     `compute_subsys_output_port` → `compute_subsystem_output_port`. "Block" keeps one meaning,
@@ -391,7 +391,7 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `port.lower_bound`, `state.upper_bound` → `port.lower`, `state.upper`, as the box
     (`port.box.lower`), the sets, `Saturation` and the program already said. A limit a law
     applies to a named signal keeps that signal's name (`u_min`, `u_max`, `delta_max`).
-  - *Added, nothing breaks* ([api-stabilization.md](../plans/api-stabilization.md) §3):
+  - *Added, nothing breaks:*
     `QuadraticCost(Q, R)` (`S`, `x_bar`, `u_bar` zero by default); `lower`, `upper`, `dim` on
     `BoxInputSet` and `Uniform`, `dim` on every set and field that knows its size,
     `BallSet.sample` and `SingletonSet.sample` (so a ball is a start a problem draws from);
@@ -833,10 +833,11 @@ release, ROADMAP's former v0.4 features become v0.5. The rows are TODO §1 and �
 of TODO's "Next, in order": what changes a public name or a behaviour first, the surface
 redrafted once on the settled names, the numbers re-pinned once, additive work last.
 
-**Where it stands (2026-11-10).** The first four phases of that order are on `dev`, merged by
+**Where it stands (2026-11-11).** The first four phases of that order are on `dev`, merged by
 PRs #135 and #136 on 2026-11-08, then the API naming sweep (PR #138, 2026-11-08), the
-maintainer's PID autotuning demos with the evaluator's live plot (2026-11-09) and the API
-review's defects (2026-11-10). Their contracts are DESIGN's; every name they changed is in
+maintainer's PID autotuning demos with the evaluator's live plot (2026-11-09), the API
+review's defects (2026-11-10) and phase 4b, the API settled before the demo rebuild (PR #139,
+2026-11-11). Their contracts are DESIGN's; every name they changed is in
 §2's breaking changes. Every feature branch is merged: `dev` holds all the work.
 - *Before them, on `dev` after the tag:* the tutorials in three layers (basics, core,
   advanced); the vocabulary of RULES 2.7 and one last answer per object (RULES 2.4), held by
@@ -870,16 +871,15 @@ review's defects (2026-11-10). Their contracts are DESIGN's; every name they cha
   evaluation a `GridField`, the step problem's `rollout` a `Trajectory`, the records' `n_<thing>`.
 - *The PID autotuning demos (the maintainer, 2026-11-09):* `pe.live_plot(wrt)`, a progress
   callback for `Optimizer.solve(callback=)`, and `pid_autotuning_native.py` beside the JAX one.
-- *The API review before the demo rebuild* ([api-stabilization.md](../plans/api-stabilization.md),
-  2026-11-10): four independent reviewers over the public surface; its defects section (§1)
-  landed, its other sections wait for the maintainer.
+- *Phase 4b, the API settled before the demo rebuild* (PR #139, merged 2026-11-11): four
+  independent reviewers over the public surface (2026-11-10), then its defects, the names a
+  rule already decides, the additions that break nothing, and the maintainer's rulings 1 to 24
+  and the questions after them, one at a time, so the rebuilt demos are written on names that
+  hold. Four rulings are built later, each in its TODO row: the pendulum's point-mass default
+  at the release's re-pin, the root list after the demo rebuild, the path-tracking laws on the
+  plant with the car family's cut, the mechanical names with the mechanical family (S32).
 
 **Left**, in order (TODO §1, "Next, in order"):
-- **Phase 4b, the API settled before the demo rebuild** ([api-stabilization.md](../plans/api-stabilization.md)
-  §2 to §5, on the maintainer's go): the names a rule already decides, the additions that break
-  nothing, then 24 decisions one at a time, and the planned renames pulled forward (the car
-  family, the root prelude, the catalog's words, the mechanical names), so the rebuilt demos are
-  written once, on names that hold.
 - **Phase 5, the surface redrafted on the settled names** (TODO §1.12 and §2): the
   maintainer's demo rebuild, a minimal set in place of every demo, then the tests rebuilt from
   a clean slate around it; the course notebooks, their content the maintainer's; the
