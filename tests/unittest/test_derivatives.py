@@ -470,6 +470,15 @@ class TestFamilyPattern(unittest.TestCase):
         self.assertEqual(poles.size, 0)
         np.testing.assert_allclose(gain, -2.0)
 
+    def test_a_static_block_linearizes_to_its_feedthrough(self):
+        """A block with no state is the model D alone: no drift, y = ȳ + D (u − ū)."""
+        from minilink import Gain
+
+        model = linearize(Gain(2.0, dim=1))
+        np.testing.assert_allclose(model.D(), [[2.0]])
+        self.assertEqual(model.A().shape, (0, 0))
+        np.testing.assert_allclose(model.h(np.zeros(0), np.array([1.5])), [3.0])
+
     def test_methods_on_the_system_mirror_the_functions(self):
         plant = Pendulum()
         x_bar = [0.0, 0.0]

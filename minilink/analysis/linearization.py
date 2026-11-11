@@ -149,8 +149,8 @@ def linearize(
     u_selected = point_inputs(sys, u_bar, inputs)
     y_bar = point_outputs(sys, outputs, x_bar, u_bar, t, params)
 
-    # The model about the point: the drift f(x̄, ū) on a continuous system, the
-    # next state F(x̄, ū) on a step system, per tick
+    # The model about the point: the drift f(x̄, ū) on a continuous system (none
+    # on a static block), the next state F(x̄, ū) on a step system, per tick
     point = dict(x_bar=x_bar, u_bar=u_selected, y_bar=y_bar)
     name = f"Linearized {sys.name}"
     if isinstance(sys, StepSystem):
@@ -159,7 +159,11 @@ def linearize(
             A, B, C, D, x_next_bar=x_next_bar, name=name, **point
         )
     else:
-        dx_bar = np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
+        dx_bar = (
+            np.asarray(sys.f(x_bar, u_bar, t, params), dtype=float)
+            if sys.n > 0
+            else np.zeros(0)
+        )
         model = LinearizedSystem(A, B, C, D, dx_bar=dx_bar, name=name, **point)
 
     # The system's own signals: its labels and units, its ports, its start
