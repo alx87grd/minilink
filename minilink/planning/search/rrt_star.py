@@ -65,7 +65,7 @@ class RRTStarPlanner(RRTPlanner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes: int = 5000,
+        max_iterations: int = 5000,
         goal_bias: float = 0.1,
         seed: int = 0,
         edge_resolution: float | None = None,
@@ -83,7 +83,7 @@ class RRTStarPlanner(RRTPlanner):
             problem,
             extender,
             metric=metric,
-            max_nodes=max_nodes,
+            max_iterations=max_iterations,
             goal_bias=goal_bias,
             seed=seed,
             edge_resolution=edge_resolution,
@@ -119,7 +119,7 @@ class RRTStarPlanner(RRTPlanner):
         history_stride: int = 1,
     ) -> PlanningSolution:
         """
-        Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
+        Grow an RRT* until goal convergence, patience, or ``max_iterations`` (the solution as :meth:`RRTPlanner.solve`'s).
 
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
@@ -170,7 +170,7 @@ class RRTStarPlanner(RRTPlanner):
         best_goal_node = None
         stale_extensions = 0
 
-        for _ in range(self.max_nodes):
+        for _ in range(self.max_iterations):
             # Extend: steer toward a sample, attach through the cheapest near
             # parent, rewire the near nodes
             if not self.extend_once(rng):
@@ -220,7 +220,7 @@ class RRTStarPlanner(RRTPlanner):
             closest = self.tree.nearest(goal_point, metric)
             self.solution_node = closest
             if not self.return_best_effort:
-                raise RuntimeError("RRT* failed to reach goal within max_nodes")
+                raise RuntimeError("RRT* failed to reach goal within max_iterations")
 
         return self.finish_trajectory(
             self.tree.extract_trajectory(self.solution_node, self.problem.t0),

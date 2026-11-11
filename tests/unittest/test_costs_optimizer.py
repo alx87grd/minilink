@@ -715,7 +715,7 @@ def test_a_first_order_method_needs_a_gradient():
 def test_the_start_defaults_to_the_programs_own():
     from minilink.optimization.optimizer import Optimizer
 
-    program = quadratic_program(metadata={"z0": np.array([3.0, 3.0])})
+    program = quadratic_program(z0=np.array([3.0, 3.0]))
     assert Optimizer(program).z0.tolist() == [3.0, 3.0]
     with pytest.raises(ValueError, match="z0"):
         Optimizer(quadratic_program())

@@ -447,7 +447,9 @@ class EllipsoidSet(FieldSet):
     radius ``r^{1/n}``, mapped through ``P = L Lᵀ``) from a NumPy generator, an
     integer seed or a JAX key, and gives the center for ``key=None``;
     :meth:`bounding_box` is ``c ± √(level · diag(P⁻¹))``, the ellipsoid's
-    shadow on each axis.
+    shadow on each axis. Built from a quadratic field and its level
+    (``V.as_set(upper=level)``), or from its numbers,
+    ``EllipsoidSet.from_matrix(center, P, level)``.
     """
 
     params = own_params('``{"center", "P", "level"}``, the ellipsoid\'s numbers.')
@@ -456,6 +458,11 @@ class EllipsoidSet(FieldSet):
         require_sublevel(lower, upper)
 
         self.params = {"center": field.center, "P": field.P, "level": upper}
+
+    @classmethod
+    def from_matrix(cls, center, P, level) -> "EllipsoidSet":
+        """The ellipsoid ``{x : (x − c)ᵀ P (x − c) ≤ level}`` from its center ``c``, its matrix ``P`` and its level."""
+        return cls(QuadraticField(center, P), None, level)
 
     @property
     def field(self) -> QuadraticField:

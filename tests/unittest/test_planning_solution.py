@@ -180,7 +180,7 @@ def test_rrt_policy_holds_each_control_and_reproduces_the_path():
             n_steps=6,
         ),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
     )
     solution = planner.solve()
     assert solution.success and solution.record.reached_goal

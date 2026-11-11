@@ -67,13 +67,15 @@ class LivePlotHandle:
 def resolve_plot_signals(sys) -> tuple[str, ...]:
     """Return default time-signal names for ``sys`` (leaf or diagram).
 
-    Leaf systems plot the state ``x``, and the input ``u`` when they have one.
-    Diagrams plot flattened states plus controller control outputs
+    Leaf systems plot the state ``x``, and the input ``u`` when they have one;
+    a source (no state, no input) plots its outputs. Diagrams plot flattened states plus controller control outputs
     (``{id}:u`` for static or dynamic controllers) and source outputs
     (``{id}:y``) without requiring explicit ``sys_id:port`` names from the
     user.
     """
     if not isinstance(sys, DiagramSystem):
+        if not sys.n and not sys.m and sys.outputs:
+            return tuple(sys.outputs)
         return ("x", "u") if sys.m else ("x",)
 
     # The flattened state

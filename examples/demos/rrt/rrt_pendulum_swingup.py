@@ -27,7 +27,7 @@ planner = RRTPlanner(
     extender=KinodynamicExtender(controls=torques, horizon=0.3, n_steps=6),
     seed=0,
     goal_bias=0.05,
-    max_nodes=20000,
+    max_iterations=20000,
 )
 solution = planner.solve()
 print(solution.record)

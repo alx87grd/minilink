@@ -79,7 +79,7 @@ RETIRED = {
     "start_point": ("x0", ("PlanningProblem",)),
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
-    "sample": ("at", ("Trajectory",)),
+    "sample": ("at", ("Trajectory", "ReferencePath", "PolylinePath")),
     "n": (
         "state_dim on a system; n_rollouts (verify) or n_samples (the plots) on a certificate",
         (
@@ -190,7 +190,10 @@ RETIRED = {
     ),
     "filename": ("file_name", None),
     "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
-    "show_signal": ("plot_signal", None),
+    "show_signal": ("compute_trajectory, then plot_trajectory", None),
+    "plot_signal": ("compute_trajectory, then plot_trajectory", None),
+    "max_nodes": ("max_iterations (a cap on the iterations)", None),
+    "connection_verbose": ("print(diagram), which lists the connections", None),
     "time": ("t", ("step_info",)),
     "system": ("sys", ("discretize",)),
     "time_factor_video": ("speed", None),
@@ -312,6 +315,13 @@ RETIRED_NAMES = {
     "minilink.ThreeBodyProblem": "ThreeBody",
     "minilink.analysis.structural.StructuralResult": "StructuralProperties",
     "minilink.analysis.StructuralResult": "StructuralProperties",
+    # The smaller ones (the maintainer's ruling 22 of 2026-11-11)
+    "minilink.blocks.sources.Source.plot_signal": (
+        "source.compute_trajectory(tf=...), then source.plot_trajectory()"
+    ),
+    # A path is read at an arc length, not drawn from (the maintainer's ruling 22 of 2026-11-11)
+    "minilink.core.geometry.paths.ReferencePath.sample": "at",
+    "minilink.core.geometry.paths.PolylinePath.sample": "at",
     # One verb on both learners (the maintainer's ruling of 2026-11-11)
     "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.learn": (
         "solve(n_episodes=), which continues the learning from the table as it stands"
@@ -420,6 +430,11 @@ RETIRED_KEYWORDS = {
         "x_bar": "linearize(step_sys, x_bar), a LinearizedStepSystem",
         "u_bar": "linearize(step_sys, x_bar, u_bar), a LinearizedStepSystem",
         "y_bar": "a LinearizedStepSystem's params['y_bar']",
+    },
+    # A set is its margin (the maintainer's ruling 22 of 2026-11-11): membership is derived
+    "minilink.core.sets.CallableSet.__init__": {
+        "margin_fn": "margin",
+        "contains_fn": "margin (membership is margin >= 0)",
     },
     "minilink.blocks.sources.TrajectorySource.from_trajectory": {
         "interpolation": "hold"
@@ -547,7 +562,7 @@ def test_a_search_keeps_its_counts_on_its_record_only():
     problem, _ = make_holonomic_obstacle_problem()
     extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
     for planner_class in (RRTPlanner, RRTStarPlanner):
-        planner = planner_class(problem, extender=extender, max_nodes=5)
+        planner = planner_class(problem, extender=extender, max_iterations=5)
         record = planner.solve().record
         assert record.n_iterations >= 0 and not record.reached_goal
         for retired in ("reached_goal", "iterations"):
@@ -629,10 +644,24 @@ def test_rrt_star_names_its_best_path_cost():
 
     problem, _ = make_holonomic_obstacle_problem()
     extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
-    planner = RRTStarPlanner(problem, extender=extender, max_nodes=5)
+    planner = RRTStarPlanner(problem, extender=extender, max_iterations=5)
     planner.solve()
     assert hasattr(planner, "best_path_cost") and not hasattr(planner, "best_goal_cost")
     assert all(hasattr(node, "cost_to_come") for node in planner.tree.nodes)
+
+
+def test_a_diagram_connects_quietly_and_a_program_holds_its_start():
+    """Ruling 22: no connection_verbose switch; the program's start is program.z0, not metadata."""
+    import numpy as np
+
+    from minilink.core.diagram import DiagramSystem
+    from minilink.optimization import MathematicalProgram
+
+    assert not hasattr(DiagramSystem(), "connection_verbose")
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, z0=[2.0])
+    assert program.z0.tolist() == [2.0] and "z0" not in program.metadata
+    assert MathematicalProgram(n_z=1, J=lambda z: z @ z).z0 is None
+    assert np.asarray(program.z0).shape == (1,)
 
 
 def test_the_learners_history_says_J():

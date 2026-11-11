@@ -108,6 +108,19 @@ def test_a_non_symmetric_matrix_and_a_band_called_an_ellipsoid_are_refused():
         EllipsoidSet(V, None, -1.0)
 
 
+def test_an_ellipsoid_is_built_from_its_center_matrix_and_level():
+    """from_matrix(c, P, level) is {x : (x − c)ᵀ P (x − c) ≤ level}, the field's own sublevel set."""
+    region = EllipsoidSet.from_matrix(CENTER, P, 2.0)
+    same = QuadraticField(CENTER, P).as_set(upper=2.0)
+
+    assert isinstance(region, EllipsoidSet) and region.level == 2.0
+    for key in ("center", "P", "level"):
+        np.testing.assert_array_equal(region.params[key], same.params[key])
+    np.testing.assert_array_equal(region.sample(5, 4), same.sample(5, 4))
+    with pytest.raises(ValueError, match="level"):
+        EllipsoidSet.from_matrix(CENTER, P, -1.0)
+
+
 def test_the_ellipsoid_reads_its_params_and_moves_with_them():
     region = QuadraticField(CENTER, P).as_set(upper=2.0)
     moved = copy.deepcopy(region)
@@ -271,7 +284,7 @@ def test_every_set_and_field_states_its_dimension_where_it_is_known():
     }
     for name, obj in known.items():
         assert obj.dim == 3, name
-    unknown = CallableSet(margin_fn=lambda z, t, p: z)
+    unknown = CallableSet(margin=lambda z, t, p: z)
     assert not hasattr(unknown, "dim")
     assert not hasattr(unknown & unknown, "dim")
 

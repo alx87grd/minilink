@@ -70,7 +70,7 @@ def track_boundaries(track, n_samples: int = 200):
 
     # The centerline c(s) and its unit tangent τ(s), sampled along the arc length
     ss = np.linspace(0.0, path.total_length, n_samples)
-    center = np.array([path.sample(s) for s in ss])
+    center = np.array([path.at(s) for s in ss])
     tangents = np.array([path.tangent(s) for s in ss])
 
     # The left normal n = (−τ_y, τ_x), and the edges c ± w n at the half-width w

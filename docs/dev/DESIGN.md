@@ -624,8 +624,8 @@ Every `System` has the two cost shortcuts over that path:
 whole system in its own `(x, u)`, `of=subsystem` one subsystem of a diagram, and `traj`
 defaults to the last trajectory computed (a user shortcut; library code passes
 it).
-`connect()` validates port existence and dimensions at wiring time and is
-quiet by default (`connection_verbose=False`; set `True` for one line per connection).
+`connect()` validates port existence and dimensions at wiring time and prints nothing
+(`print(diagram)` lists the connections).
 It refuses to rewire a subsystem input that already reads a source (`ValueError`, naming
 both ends); `disconnect(sys_id, port_id)` opens the input and returns the source it read,
 so a rewire is the two calls. At compile, each leaf's `y = h(x, u, t)` is probed once more
@@ -867,7 +867,9 @@ edit of the plant's own ``params`` after the law is built, or a diagram-level
   `FieldSet`): its `params` are `{"center", "P", "level"}`, its `field` derived from them; it
   draws uniformly inside (`sample` on a NumPy generator, an integer seed or a JAX key; like a
   distribution, the center, its design point, for `key=None`) and bounds itself
-  (`bounding_box`, `half_width = √(level · diag(P⁻¹))`).
+  (`bounding_box`, `half_width = √(level · diag(P⁻¹))`); `EllipsoidSet.from_matrix(center, P,
+  level)` builds it from its numbers. A `CallableSet(margin)` is its user margin
+  `margin(z, t, params)`, membership derived (`margin ≥ 0`).
   `V(x)` calls `value`. A region-of-attraction certificate's `V` is its `QuadraticField(x̄, P)`
   and its `region` that ellipsoid; the LQR value `QuadraticField(x̄, S).as_terminal_cost()` ends
   a short-horizon MPC, and `LQRPlanner`'s `cost_to_go` is `QuadraticField(x̄, P)` (or
@@ -1160,7 +1162,7 @@ via `compute_trajectory(u=)`. Facades default `backend="numpy"`.
 `N + 1` samples `x_0 … x_N`; a transcription's intervals, `N + 1` knots). A count of time
 samples on a horizon `[t0, tf]`, endpoints included, is `n_samples` (`Simulator`, a
 continuous or static `compute_trajectory`, `step_response`, `bode`, `nyquist`,
-`frequency_response`, the LQR gain schedule, `animate_modal`, `Source.plot_signal`: `N`
+`frequency_response`, the LQR gain schedule, `animate_modal`: `N`
 samples, `N − 1` intervals). `n_samples=100` on `[0, 1]` is thus a step of `1/99`, and
 `n_steps=100` is `100` steps of `dt` (`test_simulation.py` pins each verb).
 
@@ -1237,7 +1239,7 @@ that run on that backend. Each algorithm has one implementation today on either 
 `library=` keyword may come later without a break. The program's class is read from its
 fields (`unconstrained`, `bounded`, `constrained`); `method="auto"` picks L-BFGS for the
 first two and SLSQP for the third, and a method the class does not admit (`gd` on
-constraint rows) is refused. `z0` defaults to `program.metadata["z0"]`. A program may
+constraint rows) is refused. `z0` defaults to the program's own start, `program.z0` (an exported program sets it). A program may
 declare parameters: `MathematicalProgram(..., params=tree)` takes callables of
 `(z, params)`, `tree` their default; `Optimizer(program).solve(params=, z0=)` takes the
 solve's complete tree (`optimizer.params`: the program's numbers and the method's under
@@ -1855,7 +1857,8 @@ obstacle, rebuild the `Scene` and solve again.
 **Reference track** (`core/geometry/paths.py`, `planning/spatial/track.py`): workspace centerlines
 from waypoint polylines via `from_waypoints` (default `kind="polyline"`; `closed=True` adds the
 segment back to the first waypoint and wraps the arc length round the loop, a structural
-switch held on the path, not in its `params`), wrapped in
+switch held on the path, not in its `params`; `path.at(s)` is the point at arc length `s`,
+`path.tangent(s)` its unit tangent), wrapped in
 `ReferenceTrack(path, half_width)`. Same export pattern as obstacles —
 `distance_field(robot).as_cost(shaping=quadratic_excess)` for soft path following,
 `corridor_field(body).as_set(lower=0)` for a hard tube. Probe semantics match
@@ -1873,7 +1876,7 @@ orchestrator `edge_resolution` densification along edges), goal region `problem.
 written as one, `Xf=BallSet(goal, tol)`; a singleton or no `Xf` is refused), its goal bias
 toward `problem.goal_point()`,
 free-space sampling from `problem.X` (direct `Set.sample` or rejection from the bounding box of `X`), dynamics `problem.sys.f` — so the system stays pure. After
-`solve()`, `reached_goal` and `solution_node` report success vs
+`solve()` (at most `max_iterations` sample-and-extend iterations), `reached_goal` and `solution_node` report success vs
 best-effort fallback (`return_best_effort`). The two swappable pieces are an injected
 `TrajectoryExtender` (`propose(from, toward, problem, rng) → Iterable[Edge]`:
 `KinodynamicExtender` forward-integrates controls, `SteeringExtender` connects exactly

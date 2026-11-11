@@ -53,7 +53,7 @@ class RRTPlanner(Planner):
         Pairwise nearest-neighbour distance ``metric(a, b) -> float``.
     Notes
     -----
-    The search's settings are keywords, read back as attributes: ``max_nodes``,
+    The search's settings are keywords, read back as attributes: ``max_iterations``,
     ``goal_bias``, ``seed``, ``edge_resolution``,
     ``max_sample_attempts``, ``return_best_effort``, ``nearest_method``.
     The workflow, ``callback`` (the live figure one of its hooks), is a keyword of :meth:`solve`.
@@ -74,7 +74,7 @@ class RRTPlanner(Planner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes: int = 5000,
+        max_iterations: int = 5000,
         goal_bias: float = 0.1,
         seed: int = 0,
         edge_resolution: float | None = None,
@@ -92,7 +92,7 @@ class RRTPlanner(Planner):
         self.metric = metric
 
         # The search's structure and numbers
-        self.max_nodes = int(max_nodes)
+        self.max_iterations = int(max_iterations)
         self.goal_bias = float(goal_bias)
         self.seed = int(seed)
         self.edge_resolution = edge_resolution
@@ -161,7 +161,7 @@ class RRTPlanner(Planner):
         # The extensions so far, and whether one reached the goal: the record's counts
         n_iterations = 0
         reached_goal = False
-        for _ in range(self.max_nodes):
+        for _ in range(self.max_iterations):
             # Sample a state, and extend the nearest node toward it
             x_rand = self.sample_state(rng)
             near = self.tree.nearest(x_rand, metric)
@@ -198,7 +198,7 @@ class RRTPlanner(Planner):
         closest = self.tree.nearest(goal_point, metric)
         self.solution_node = closest
         if not self.return_best_effort:
-            raise RuntimeError("RRT failed to reach goal within max_nodes")
+            raise RuntimeError("RRT failed to reach goal within max_iterations")
 
         return self.finish_trajectory(
             self.tree.extract_trajectory(closest, self.problem.t0),
@@ -213,7 +213,7 @@ class RRTPlanner(Planner):
     def build_kwargs(self) -> dict:
         """The keywords that rebuild this planner on another problem: the extender and metric, the search's settings and numbers."""
         kwargs = dict(extender=self.extender, metric=self.metric)
-        kwargs["max_nodes"] = self.max_nodes
+        kwargs["max_iterations"] = self.max_iterations
         kwargs["goal_bias"] = self.goal_bias
         kwargs["seed"] = self.seed
         kwargs["edge_resolution"] = self.edge_resolution

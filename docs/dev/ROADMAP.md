@@ -489,6 +489,16 @@ v0.9 they go to `CHANGELOG.md`, step V5):
   - *Class names* (the maintainer's ruling 20b): `VanderPol` → `VanDerPol`, `ThreeBodyProblem`
     → `ThreeBody`, `StructuralResult` → `StructuralProperties` (what `controllability` and
     `observability` return; its printout says so). Their display names follow the class.
+  - *The smaller ones* (the maintainer's ruling 22): a `CallableSet(margin, params=None)`
+    requires its margin (`margin_fn=` → `margin=`; `contains_fn=` is gone, membership is
+    `margin ≥ 0`); `EllipsoidSet.from_matrix(center, P, level)` added; a path's
+    `path.sample(s)` → `path.at(s)`; `Source.plot_signal` is gone with the sources demo and
+    the `__main__` that existed for it (`source.compute_trajectory(tf=…)`, then
+    `source.plot_trajectory()`, which now plots a source's output by default);
+    `diagram.connection_verbose` is gone (`connect` prints nothing); the program's start
+    `program.metadata["z0"]` → `program.z0`, the `Optimizer`'s default;
+    `RRTPlanner(max_nodes=)` (and RRT*'s) → `max_iterations=`, the cap it always was.
+    `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` keep their units, the docstrings say why.
 
 ## 3. Maturity (TRL)
 

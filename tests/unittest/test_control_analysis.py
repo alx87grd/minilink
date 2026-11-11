@@ -65,7 +65,6 @@ class _JaxIncompatibleOutputSystem(_PortLinearSystem):
 
 def _build_port_diagram():
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(_PortLinearSystem(), "plant")
     diagram.add_input_port("force")
     diagram.connect("input", "force", "plant", "force")
@@ -357,7 +356,6 @@ class TestLQR(unittest.TestCase):
             plant, Q=np.diag([10.0, 1.0]), R=np.array([[1.0]]), x_bar=[0.0, 0.0]
         )
         diagram = DiagramSystem()
-        diagram.connection_verbose = False
         diagram.add_subsystem(controller, "controller")
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "x", "controller", "x")
@@ -634,7 +632,6 @@ class TestImpedanceIntegralController(unittest.TestCase):
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
-        diagram.connection_verbose = False
         diagram.add_subsystem(pid, "pid")
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "x", "pid", "y")
@@ -682,7 +679,6 @@ class TestPID(unittest.TestCase):
         setpoint = 1.0
         pid.inputs["r"].nominal_value = np.array([setpoint])
         diagram = DiagramSystem()
-        diagram.connection_verbose = False
         diagram.add_subsystem(pid, "pid")
         diagram.add_subsystem(plant, "plant")
         diagram.connect("plant", "y", "pid", "y")
@@ -946,7 +942,6 @@ class FrequencyPlant(DynamicSystem):
 
 def build_frequency_diagram():
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(FrequencyPlant(), "plant")
     diagram.add_input_port("force", dim=2)
     diagram.add_input_port("bias")

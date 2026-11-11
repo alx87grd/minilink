@@ -442,53 +442,32 @@ class BallSet(Set):
 
 class CallableSet(Set):
     """
-    Set backed by user callables.
+    Set backed by a user margin, ``Z(t) = {z : margin(z, t, params) ≥ 0}``.
 
     Parameters
     ----------
-    margin_fn : callable, optional
-        Function ``margin_fn(z, t, params) -> array``.
-    contains_fn : callable, optional
-        Function ``contains_fn(z, t, params) -> bool``.
+    margin : callable
+        Function ``margin(z, t, params) -> array``, nonnegative inside; a set
+        is its margin, so membership is derived from it (:meth:`Set.contains`,
+        every entry ``≥ 0``).
     params : dict, optional
-        The numbers the functions read, handed to them when a call passes none.
+        The numbers the function reads, handed to it when a call passes none.
     """
 
-    def __init__(
-        self,
-        margin_fn: Callable | None = None,
-        contains_fn: Callable | None = None,
-        params: dict | None = None,
-    ):
-        require_margin_or_contains(margin_fn, contains_fn)
+    def __init__(self, margin: Callable, params: dict | None = None):
+        require_margin_function(margin)
 
-        self.margin_fn = margin_fn
-        self.contains_fn = contains_fn
+        self.margin_fn = margin
         self.params = {} if params is None else params
 
     def margin(self, z, t=0.0, params=None):
         """Evaluate the user-supplied margin function."""
         params = self.params if params is None else params
         margin_fn = self.margin_fn
-        require_margin_fn(margin_fn)
 
         margin = margin_fn(z, t, params)
 
         return margin
-
-    def contains(
-        self,
-        z: np.ndarray,
-        t: float = 0.0,
-        params=None,
-    ) -> bool:
-        """Evaluate membership through the supplied callable when present, on a flat ``z``."""
-        params = self.params if params is None else params
-        contains_fn = self.contains_fn
-        if contains_fn is not None:
-            return bool(contains_fn(np.asarray(z, dtype=float).reshape(-1), t, params))
-
-        return super().contains(z, t=t, params=params)
 
 
 class IntersectionSet(Set):
@@ -645,16 +624,13 @@ def require_nonnegative_radius(radius):
         raise ValueError("radius must be nonnegative")
 
 
-def require_margin_or_contains(margin_fn, contains_fn):
-    """Refuse a callable set given neither a margin nor a membership function."""
-    if margin_fn is None and contains_fn is None:
-        raise ValueError("Provide at least one of margin_fn or contains_fn")
-
-
-def require_margin_fn(margin_fn):
-    """Refuse a margin query on a callable set built from a membership function only."""
-    if margin_fn is None:
-        raise NotImplementedError("This CallableSet has no margin function")
+def require_margin_function(margin):
+    """Refuse a callable set without a margin function: membership is derived from it."""
+    if not callable(margin):
+        raise TypeError(
+            "CallableSet(margin) takes a function margin(z, t, params) -> array, "
+            "nonnegative inside; membership is margin >= 0"
+        )
 
 
 def require_members(sets):

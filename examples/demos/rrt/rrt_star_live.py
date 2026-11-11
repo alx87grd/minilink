@@ -88,7 +88,7 @@ planner = RRTStarPlanner(
     extender=extender,
     seed=SEED,
     goal_bias=0.08,
-    max_nodes=MAX_NODES,
+    max_iterations=MAX_NODES,
     optimize_after_goal=True,
     cost_tol=COST_TOL,
     convergence_patience=CONVERGENCE_PATIENCE,
@@ -96,7 +96,7 @@ planner = RRTStarPlanner(
 
 print("RRT* post-goal convergence demo")
 print(
-    f"  max_nodes={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
+    f"  max_iterations={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
     f"cost_tol={COST_TOL}  live_plot={LIVE_PLOT}"
 )
 if LIVE_PLOT:
@@ -118,7 +118,7 @@ goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
 stop_reason = (
     "converged"
     if planner.converged
-    else ("max_nodes" if record.n_iterations >= MAX_NODES else "first_goal")
+    else ("max_iterations" if record.n_iterations >= MAX_NODES else "first_goal")
 )
 
 print(f"  reached_goal={record.reached_goal}  converged={planner.converged}")

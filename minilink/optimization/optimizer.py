@@ -120,7 +120,7 @@ class Optimizer:
         Pure NLP description to compile and solve.
     z0 : array_like, optional
         Default initial decision vector for :meth:`solve`; unset, the program's
-        own start (``program.metadata["z0"]``, set by an exported program).
+        own start (``program.z0``, set by an exported program).
     method : str, optional
         The algorithm: ``"gd"`` and ``"adam"`` (first-order, projected on the
         box), ``"l-bfgs"``, ``"slsqp"``, ``"trust-constr"`` (SciPy's
@@ -598,15 +598,13 @@ def method_for(program, method):
 
 
 def start_of(program, z0):
-    """The default start: ``z0`` given, else the program's own (``metadata["z0"]``)."""
+    """The default start: ``z0`` given, else the program's own (``program.z0``)."""
     if z0 is not None:
         return z0
-    if "z0" in program.metadata:
-        return program.metadata["z0"]
+    if program.z0 is not None:
+        return program.z0
 
-    raise ValueError(
-        "Optimizer needs z0: this program carries no start (metadata['z0'])"
-    )
+    raise ValueError("Optimizer needs z0: this program carries no start (program.z0)")
 
 
 def require_gradient(program_evaluator, method):

@@ -69,7 +69,6 @@ class _JAXFriendlyIntegrator(DynamicSystem):
 def _build_small_closed_loop_jax():
     """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
@@ -91,7 +90,6 @@ def _build_closed_loop_with_external_output_jax():
 def _build_small_closed_loop():
     """Step → P → Integrator → feedback to controller."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = P(2.5, ports="reference")
     plant = Integrator()
     diag.add_subsystem(ctl, "controller")
@@ -124,7 +122,6 @@ def _build_feedthrough_loop():
             return u * 2
 
     diag = DiagramSystem()
-    diag.connection_verbose = False
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
     diag.add_subsystem(FeedthroughSystem("C"), "C")
@@ -270,7 +267,6 @@ class TestDiagramEvaluatorNumPy(unittest.TestCase):
     def test_f_zero_state(self):
         """Diagram with no dynamic subsystems should return empty dx."""
         diag = DiagramSystem()
-        diag.connection_verbose = False
 
         class Gain(System):
             def __init__(self):
@@ -402,7 +398,6 @@ class _JAXFriendlyStepIntegrator(StepSystem):
 def _build_step_loop_jax():
     """r → P → step integrator → feedback to the controller, its command a boundary output."""
     diag = StepDiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     ctl.params["Kp"] = 2.5
     diag.add_subsystem(ctl, "controller")
@@ -941,7 +936,7 @@ from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 
-def test_mathematical_program_is_pure_description_without_z0():
+def test_a_mathematical_program_without_a_start_has_none():
 
     def J(z: np.ndarray):
         return z @ z
@@ -949,8 +944,10 @@ def test_mathematical_program_is_pure_description_without_z0():
     program = MathematicalProgram(n_z=2, J=J, metadata={"source": "test"})
     assert program.backend == "numpy"
     assert program.n_z == 2
-    assert not hasattr(program, "z0")
+    assert program.z0 is None
     assert program.metadata == {"source": "test"}
+    with pytest.raises(ValueError, match=r"z0 must have shape \(2,\)"):
+        MathematicalProgram(n_z=2, J=J, z0=np.zeros(3))
 
 
 def test_mathematical_program_validates_bounds_dimension():

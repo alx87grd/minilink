@@ -687,9 +687,9 @@ def test_trajopt_counts_a_scalar_set_margin_as_one_constraint(transcription, bac
             horizon=1.0,
             x0=np.array([0.0]),
             cost=QuadraticCost.from_system(sys),
-            X=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
+            X=CallableSet(margin=lambda z, t, params: margin_fn(z)),
             U=MarginInputSet(margin_fn),
-            Xf=CallableSet(margin_fn=lambda z, t, params: margin_fn(z)),
+            Xf=CallableSet(margin=lambda z, t, params: margin_fn(z)),
         )
         program = transcription(n_steps=4).transcribe(problem, backend=backend)
         z = np.linspace(0.1, 0.5, program.n_z)
@@ -720,9 +720,11 @@ class TestRrtFlatConstructor(unittest.TestCase):
         extender = KinodynamicExtender(
             controls=[np.array([1.0, 0.0])], horizon=0.5, n_steps=4
         )
-        nested = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
-        flat = RRTPlanner(problem, extender, max_nodes=100, goal_bias=0.2, seed=1)
-        self.assertEqual(flat.max_nodes, nested.max_nodes)
+        nested = RRTPlanner(
+            problem, extender, max_iterations=100, goal_bias=0.2, seed=1
+        )
+        flat = RRTPlanner(problem, extender, max_iterations=100, goal_bias=0.2, seed=1)
+        self.assertEqual(flat.max_iterations, nested.max_iterations)
         self.assertEqual(flat.goal_bias, nested.goal_bias)
         self.assertEqual(flat.seed, nested.seed)
 
@@ -790,7 +792,7 @@ def test_kinodynamic_reaches_goal_with_kdtree_backend():
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
         nearest_method="kd_tree",
     )
     solution = planner.solve()
@@ -845,7 +847,7 @@ def test_kinodynamic_reaches_goal_and_stays_free():
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -864,7 +866,7 @@ def test_kinodynamic_random_controls_reaches_goal():
         problem,
         extender=KinodynamicExtender(controls=12, horizon=0.6, n_steps=6),
         seed=1,
-        max_nodes=6000,
+        max_iterations=6000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -881,7 +883,7 @@ def test_seeded_run_is_deterministic():
                 problem,
                 extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
                 seed=7,
-                max_nodes=4000,
+                max_iterations=4000,
             )
             .solve()
             .trajectory
@@ -900,7 +902,7 @@ def test_steering_reaches_goal_and_stays_free():
             StraightLineSteering(speed=1.0), max_distance=0.6, resolution=0.05
         ),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -981,7 +983,7 @@ def test_dubins_rrt_reaches_goal_pose():
         metric=dubins.distance,
         seed=0,
         goal_bias=0.2,
-        max_nodes=8000,
+        max_iterations=8000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -1019,7 +1021,7 @@ def test_reached_goal_false_on_budget_exhaustion():
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
-        max_nodes=10,
+        max_iterations=10,
         goal_bias=0.0,
     )
     assert not planner.solve().record.reached_goal
@@ -1032,7 +1034,7 @@ def test_return_best_effort_false_raises():
         problem,
         extender=KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6),
         seed=0,
-        max_nodes=5,
+        max_iterations=5,
         goal_bias=0.0,
         return_best_effort=False,
     )
@@ -1164,7 +1166,7 @@ def test_plot_tree_and_animate_search_smoke():
         problem,
         extender=KinodynamicExtender(controls=COMPASS),
         seed=0,
-        max_nodes=2000,
+        max_iterations=2000,
     )
     planner.solve()
     fig, ax = planner.plot_tree(x_axis=0, y_axis=1, show=False)
@@ -1192,7 +1194,7 @@ def test_rrt_star_reaches_goal():
         problem,
         extender=make_steering_extender(),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
     )
     solution = planner.solve()
     traj = solution.trajectory
@@ -1209,7 +1211,7 @@ def test_rrt_star_reaches_goal_with_kdtree_backend():
         problem,
         extender=make_steering_extender(),
         seed=0,
-        max_nodes=4000,
+        max_iterations=4000,
         nearest_method="kd_tree",
     )
     solution = planner.solve()
@@ -1225,7 +1227,7 @@ def test_rrt_star_improves_path_cost_over_rrt():
     star_costs = []
     rrt_costs = []
     for seed in range(12):
-        options = dict(seed=seed, max_nodes=3000)
+        options = dict(seed=seed, max_iterations=3000)
         rrt = RRTPlanner(problem, extender=extender, **options)
         rrt_record = rrt.solve().record
         star = RRTStarPlanner(problem, extender=extender, **options)
@@ -1245,14 +1247,14 @@ def test_rewire_false_is_at_least_as_costly():
         problem,
         extender=extender,
         seed=5,
-        max_nodes=2500,
+        max_iterations=2500,
         rewire=True,
     )
     without_rewire = RRTStarPlanner(
         problem,
         extender=extender,
         seed=5,
-        max_nodes=2500,
+        max_iterations=2500,
         rewire=False,
     )
     assert with_rewire.solve().record.reached_goal
@@ -1263,7 +1265,7 @@ def test_rewire_false_is_at_least_as_costly():
 def test_rrt_star_is_deterministic():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    options = dict(seed=11, max_nodes=2000)
+    options = dict(seed=11, max_iterations=2000)
 
     def run():
         planner = RRTStarPlanner(problem, extender=extender, **options)
@@ -1281,7 +1283,7 @@ def test_rrt_star_infers_rewire_eta_from_extender():
         problem,
         extender=make_steering_extender(),
         seed=0,
-        max_nodes=10,
+        max_iterations=10,
     )
     assert planner.max_connection() == pytest.approx(0.6)
 
@@ -1311,7 +1313,7 @@ def test_search_callback_sees_every_extension():
         problem,
         extender=make_steering_extender(),
         seed=0,
-        max_nodes=200,
+        max_iterations=200,
     )
     record = planner.solve(callback=RecordingCallback()).record
     assert [step.iteration for step in calls] == list(range(1, record.n_iterations + 1))
@@ -1341,7 +1343,7 @@ def test_the_live_plot_filters_for_itself():
         problem,
         extender=make_steering_extender(),
         seed=1,
-        max_nodes=2500,
+        max_iterations=2500,
         optimize_after_goal=True,
         convergence_patience=100,
     )
@@ -1367,7 +1369,7 @@ def test_live_plot_runs_beside_the_callback():
     calls = []
     problem, _ = make_holonomic_obstacle_problem()
     planner = RRTPlanner(
-        problem, extender=make_steering_extender(), seed=0, max_nodes=10
+        problem, extender=make_steering_extender(), seed=0, max_iterations=10
     )
     _, ax = plt.subplots()
     planner.solve(callback=[calls.append, LiveSearchPlot(pause=0.0, ax=ax)])
@@ -1380,7 +1382,7 @@ def test_live_plot_runs_beside_the_callback():
 def test_optimize_after_goal_runs_longer_and_refines_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = make_steering_extender()
-    base = dict(seed=4, max_nodes=3500, goal_bias=0.05)
+    base = dict(seed=4, max_iterations=3500, goal_bias=0.05)
     first_hit = RRTStarPlanner(
         problem,
         extender=extender,
@@ -1409,7 +1411,7 @@ def test_convergence_patience_stops_search():
         problem,
         extender=make_steering_extender(),
         seed=6,
-        max_nodes=8000,
+        max_iterations=8000,
         optimize_after_goal=True,
         cost_tol=0.05,
         convergence_patience=50,
@@ -1426,7 +1428,7 @@ def test_record_history_for_animation():
         problem,
         extender=make_steering_extender(),
         seed=0,
-        max_nodes=800,
+        max_iterations=800,
     )
     planner.solve(record_history=True, history_stride=25)
     assert len(planner.history) >= 2
@@ -1918,23 +1920,23 @@ def test_polyline_distance_to_segment():
     assert path.distance(np.array([11.0, 0.0])) == pytest.approx(1.0)
 
 
-def test_polyline_project_and_sample_roundtrip():
+def test_polyline_project_and_at_roundtrip():
     path = PolylinePath([[0.0, 0.0], [3.0, 4.0], [3.0, 9.0]])
     s, closest = path.project(np.array([3.0, 4.0]))
     assert s == pytest.approx(5.0)
     assert closest == pytest.approx([3.0, 4.0])
-    assert path.sample(5.0) == pytest.approx([3.0, 4.0])
+    assert path.at(5.0) == pytest.approx([3.0, 4.0])
     assert path.total_length == pytest.approx(10.0)
 
 
-def test_polyline_sample_and_tangent_take_a_vector_of_arc_lengths():
+def test_polyline_at_and_tangent_take_a_vector_of_arc_lengths():
     path = PolylinePath([[0.0, 0.0], [3.0, 4.0], [3.0, 9.0], [3.0, 9.0]])
     s = np.array([-1.0, 0.0, 2.5, 5.0, 7.0, 10.0, 12.0])
-    points = path.sample(s)
+    points = path.at(s)
     tangents = path.tangent(s)
     assert points.shape == tangents.shape == (s.size, 2)
     for k, s_k in enumerate(s):
-        np.testing.assert_allclose(points[k], path.sample(s_k), rtol=0, atol=1e-15)
+        np.testing.assert_allclose(points[k], path.at(s_k), rtol=0, atol=1e-15)
         np.testing.assert_allclose(tangents[k], path.tangent(s_k), rtol=0, atol=1e-15)
 
 
@@ -2015,7 +2017,7 @@ def test_jax_path_project_sample_tangent_match_numpy():
     s_jax, q_jax = path.project(jnp.array(p))
     assert float(s_jax) == pytest.approx(float(s_np))
     assert np.asarray(q_jax) == pytest.approx(q_np)
-    assert np.asarray(path.sample(jnp.array(5.0))) == pytest.approx(path.sample(5.0))
+    assert np.asarray(path.at(jnp.array(5.0))) == pytest.approx(path.at(5.0))
     assert np.asarray(path.tangent(jnp.array(5.0))) == pytest.approx(path.tangent(5.0))
     grad = jax.grad(lambda q: path.project(q)[0])(jnp.array(p, dtype=float))
     assert np.asarray(grad).shape == (2,)
@@ -2242,7 +2244,7 @@ def test_rrt_default_extender_is_bang_bang_from_input_bounds():
     from minilink.planning.search.extenders import bang_bang_controls
 
     problem, X = make_holonomic_obstacle_problem()
-    planner = RRTPlanner(problem, seed=0, max_nodes=50)
+    planner = RRTPlanner(problem, seed=0, max_iterations=50)
     assert isinstance(planner.extender, KinodynamicExtender)
     controls = planner.extender.candidate_controls(problem, np.random.default_rng(0))
     lower, upper = problem.U.box.lower, problem.U.box.upper
@@ -2258,8 +2260,8 @@ def test_rrt_star_defaults_its_extender_and_metric_like_rrt():
     from minilink.planning.search.metric import euclidean
 
     problem, _ = make_holonomic_obstacle_problem()
-    star = RRTStarPlanner(problem, seed=0, max_nodes=50)
-    plain = RRTPlanner(problem, seed=0, max_nodes=50)
+    star = RRTStarPlanner(problem, seed=0, max_iterations=50)
+    plain = RRTPlanner(problem, seed=0, max_iterations=50)
     assert isinstance(star.extender, KinodynamicExtender)
     assert star.metric is euclidean and plain.metric is euclidean
     rng = np.random.default_rng(0)
@@ -2573,7 +2575,7 @@ def test_an_unseeded_search_is_reproducible():
     extender = KinodynamicExtender(controls=COMPASS, horizon=0.6, n_steps=6)
     trees = []
     for _ in range(2):
-        planner = RRTPlanner(problem, extender=extender, max_nodes=200)
+        planner = RRTPlanner(problem, extender=extender, max_iterations=200)
         planner.solve()
         trees.append(np.array([node.x for node in planner.tree.nodes]))
 
@@ -2590,7 +2592,10 @@ def test_an_open_loop_plan_records_its_evidence_over_its_own_length():
     problem, _ = make_holonomic_obstacle_problem()
     problem = problem.replace(cost=QuadraticCost.from_system(problem.sys))
     planner = RRTPlanner(
-        problem, extender=KinodynamicExtender(controls=COMPASS), seed=0, max_nodes=300
+        problem,
+        extender=KinodynamicExtender(controls=COMPASS),
+        seed=0,
+        max_iterations=300,
     )
     assert planner.solve(evaluate=True).evaluation is not None
 

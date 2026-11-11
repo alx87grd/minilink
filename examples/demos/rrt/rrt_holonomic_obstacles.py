@@ -140,14 +140,14 @@ def run_rrt_vs_rrt_star():
         problem,
         extender,
         seed=SEED,
-        max_nodes=MAX_NODES,
+        max_iterations=MAX_NODES,
     )
     sol_rrt = rrt.solve()
     rrt_star = RRTStarPlanner(
         problem,
         extender,
         seed=SEED,
-        max_nodes=MAX_NODES,
+        max_iterations=MAX_NODES,
         optimize_after_goal=True,
         cost_tol=COST_TOL,
         convergence_patience=CONVERGENCE_PATIENCE,
@@ -201,7 +201,7 @@ def run_extender_comparison():
             problem,
             extender,
             seed=SEED,
-            max_nodes=EXTENDER_MAX_NODES,
+            max_iterations=EXTENDER_MAX_NODES,
         )
         traj = planner.solve().trajectory
         goal_error = float(np.linalg.norm(traj.x[:, -1] - X_GOAL))

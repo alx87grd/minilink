@@ -313,7 +313,7 @@ def test_the_program_reads_the_same_objective_and_the_declared_rows():
     wrt = ["controller.Kp", "controller.Kd"]
 
     program = pe.program(wrt, bounds={"controller.Kp": (0.0, None)}, params=upright(pe))
-    z0 = program.metadata["z0"]
+    z0 = program.z0
 
     assert program.n_z == 2 and program.backend == "jax"
     assert program.lower.tolist() == [0.0, -np.inf]
@@ -988,7 +988,7 @@ def test_a_robust_gain_tuning_solves_the_sample_average_program(backend):
         key=4,
         n_trials=6,
     )
-    z0 = program.metadata["z0"]
+    z0 = program.z0
     result = Optimizer(program, method="auto", options={"maxiter": 60}).solve()
     assert float(program.J(result.z)) < float(program.J(z0))
     np.testing.assert_array_equal(program.J(z0), program.J(z0))  # one key, one value

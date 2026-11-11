@@ -43,9 +43,6 @@ class WiredDiagramMixin:
         The diagram sets its subsystem registry and wiring table first, before
         ``System.__init__``, whose params setter reads them.
         """
-        # Wiring memory: a quiet connect
-        self.connection_verbose = False
-
         # The stacked state of the (still empty) subsystems
         self.n, self.state_index, self.state = state_layout(self.subsystems)
 
@@ -193,12 +190,6 @@ class WiredDiagramMixin:
             source_sys_id,
             source_port_id,
         )
-
-        if self.connection_verbose:
-            print(
-                f"Connected {source_sys_id}:{source_port_id} "
-                f"to {target_sys_id}:{target_port_id}"
-            )
 
     def disconnect(self, target_sys_id, target_port_id):
         """Open a subsystem input and return the ``(sys_id, port_id)`` it read, ``None`` if it was open."""

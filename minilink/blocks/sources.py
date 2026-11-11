@@ -48,93 +48,6 @@ class Source(System):
 
         return value
 
-    def plot_signal(self, t0=None, tf=None, n_samples=1000, ax=None, *, show=True):
-        """
-        Plot the source output signal over a time range.
-
-        Parameters
-        ----------
-        t0 : float, optional
-            Start time (default 0.0).
-        tf : float, optional
-            End time (default 10.0).
-        n_samples : int, optional
-            Number of evaluation points used for plotting.
-        ax : matplotlib.axes.Axes, optional
-            Existing axis to draw on. If None, a new figure is created and shown
-            (same policy as
-            :func:`minilink.graphical.signals.plot_time_signals`);
-            if an axis is passed, the caller controls display.
-        show : bool, optional
-            Show a figure made here (default); ``False`` builds it only.
-        """
-        import matplotlib.pyplot as plt
-
-        # Lazy import: the graphics load on first use, not with the core
-        from minilink.graphical.common.environment import (
-            allow_tall_stacked_figures,
-            is_blocking_needed,
-        )
-        from minilink.graphical.common.matplotlib_style import (
-            DPI_FIGURE,
-            FONT_SIZE,
-            signal_stack_figsize,
-            style_trajectory_subplot,
-        )
-
-        # The time range, 0 to 10 s by default
-        if t0 is None:
-            t0 = 0.0
-        if tf is None:
-            tf = 10.0
-        require_plot_points(n_samples)
-
-        # The signal sampled on the time grid, one row per channel
-        p = self.dim
-        t = np.linspace(t0, tf, int(n_samples))
-        y = np.zeros((p, t.size), dtype=float)
-        empty_x = np.array([])
-        empty_u = np.array([])
-        for i, ti in enumerate(t):
-            y_i = self.h(empty_x, empty_u, ti)
-            y[:, i] = np.asarray(y_i, dtype=float).reshape(p)
-
-        # A new figure when no axis is given, titled after the block
-        created = ax is None
-        if created:
-            fig, ax = plt.subplots(
-                1,
-                1,
-                figsize=signal_stack_figsize(
-                    1, allow_tall=allow_tall_stacked_figures()
-                ),
-                dpi=DPI_FIGURE,
-                frameon=True,
-            )
-            manager = getattr(fig.canvas, "manager", None)
-            set_window_title = getattr(manager, "set_window_title", None)
-            if callable(set_window_title):
-                set_window_title("Signal: " + self.name)
-        else:
-            fig = ax.figure
-
-        # One curve per channel
-        for i in range(p):
-            label = f"{self.name}[{i}]" if p > 1 else self.name
-            ax.plot(t, y[i, :], "b", linewidth=1.5, alpha=0.8, label=label)
-
-        ax.set_ylabel("value", fontsize=FONT_SIZE, multialignment="center")
-        style_trajectory_subplot(ax)
-        ax.legend(loc="upper right")
-        ax.set_xlabel("Time [s]", fontsize=FONT_SIZE)
-        ax.set_title(f"{self.name} signal", fontsize=FONT_SIZE)
-
-        # A figure made here is shown here; a passed axis leaves display to the caller
-        if created and show:
-            plt.show(block=is_blocking_needed())
-
-        return fig, ax
-
 
 class Step(Source):
     """Step source: ``y = initial_value`` if ``t < step_time``, else ``final_value``.
@@ -183,8 +96,11 @@ class Sine(Source):
     """Sine source: ``y = offset + amplitude sin(omega t + phase)``, ``omega`` in rad/s.
 
     ``amplitude`` sets the dimension; ``omega``, ``phase`` and ``offset`` are
-    scalars or arrays of the same shape. A frequency ``f`` in hertz is
-    ``omega = 2 * np.pi * f``.
+    scalars or arrays of the same shape. ``omega`` is the number in the
+    equation, in rad/s, as the textbook writes ``sin(ω t)``; a frequency ``f``
+    in hertz is ``omega = 2 * np.pi * f`` (a
+    :class:`~minilink.blocks.filters.LowPassFilter` takes ``cutoff_hz``, the
+    unit of its datasheet).
     """
 
     def __init__(self, amplitude=1.0, omega=1.0, phase=0.0, offset=0.0, *, port="y"):
@@ -443,12 +359,6 @@ class TrajectorySource(Source):
 ###############################################################################
 
 
-def require_plot_points(n_samples):
-    """Refuse a time grid of fewer than two points."""
-    if n_samples < 2:
-        raise ValueError("n_samples must be >= 2")
-
-
 def require_matching_levels(initial_value, final_value):
     """Refuse step levels of different shapes."""
     if final_value.shape != initial_value.shape:
@@ -506,15 +416,3 @@ def require_sample_shape(values, t):
     """Refuse values that do not hold one column per sample time."""
     if values.shape[1] != t.size:
         raise ValueError("values must have shape (p, len(t))")
-
-
-if __name__ == "__main__":
-    noise = WhiteNoise(1, psd=0.01, sample_period=0.01, seed=1)
-    fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
-    ax.set_title("Baseline")
-
-    # The intensity is fixed: a longer period holds smaller samples for longer
-    for period in (0.05, 0.2, 1.0):
-        noise.params["sample_period"] = period
-        fig, ax = noise.plot_signal(t0=-2.0, tf=12.0)
-        ax.set_title(f"sample_period = {period}")

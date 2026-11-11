@@ -168,7 +168,7 @@ def test_a_solve_times_itself_on_its_record():
         DynamicProgrammingPlanner(grid_problem, gamma=0.9, **grid).solve(),
         DynamicProgrammingPlanner(grid_problem, gamma=0.9, **grid).solve_steps(3),
         LQRPlanner(regulator).solve(),
-        RRTPlanner(search_problem, extender=extender, max_nodes=5).solve(),
+        RRTPlanner(search_problem, extender=extender, max_iterations=5).solve(),
         TabularLearningPlanner(grid_problem, gamma=0.9, **grid).solve(n_episodes=3),
     )
     for solution in solutions:

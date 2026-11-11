@@ -350,7 +350,8 @@ class ProblemEvaluator:
             upper=upper,
             grad_J=grad_J,
             backend=self.backend,
-            metadata={"wrt": wrt, "z0": z0, "rows": rows},
+            metadata={"wrt": wrt, "rows": rows},
+            z0=z0,
         )
 
     def pack(self, params, wrt) -> np.ndarray:

@@ -73,9 +73,12 @@ PLANNERS = {
         lambda **k: LQRPlanner(reach().replace(Xf=None), **k),
         {"x_bar": X_UP},
     ),
-    "RRT": (lambda **k: RRTPlanner(reach(), max_nodes=60, **k), {"goal_bias": 0.3}),
+    "RRT": (
+        lambda **k: RRTPlanner(reach(), max_iterations=60, **k),
+        {"goal_bias": 0.3},
+    ),
     "RRT*": (
-        lambda **k: RRTStarPlanner(reach(), max_nodes=40, **k),
+        lambda **k: RRTStarPlanner(reach(), max_iterations=40, **k),
         {"radius_constant": 2.0},
     ),
 }
@@ -281,7 +284,9 @@ def test_the_learning_curve_and_a_sources_signal_take_show():
     solve_of(planner)
     with mock.patch("matplotlib.pyplot.show") as shown:
         ax = planner.plot_learning_curve(show=False)
-        Step().plot_signal(show=False)
+        source = Step()
+        source.compute_trajectory(tf=2.0)
+        source.plot_trajectory(show=False)
         assert not shown.called
         planner.plot_learning_curve()
         assert shown.call_count == 1

@@ -102,7 +102,15 @@ def test_callable_set_margin_preserves_numpy_output():
 
 
 def test_callable_set_contains_reads_a_flat_point():
-    set_ = CallableSet(contains_fn=lambda z, t, params: z.shape == (2,) and z[1] > 1.0)
+    """Membership is the margin's sign, the margin read on a flat point (z₁ ≥ 1 here)."""
+
+    def margin(z, t, params):
+        assert z.shape == (2,)
+        return np.array([z[1] - 1.0])
+
+    set_ = CallableSet(margin)
+    with pytest.raises(TypeError, match="membership is margin >= 0"):
+        CallableSet(None)
     assert set_.contains(np.array([[1.0], [2.0]]))
     assert set_.contains([[1.0, 2.0]])
     assert not set_.contains(np.array([1.0, 0.5]))
@@ -281,11 +289,11 @@ def test_intersection_flattens_nested_and():
 
 
 def test_intersection_accepts_a_member_whose_margin_is_a_scalar():
-    free = CallableSet(margin_fn=lambda z, t, params: 1.0 - float(z[0]))
+    free = CallableSet(margin=lambda z, t, params: 1.0 - float(z[0]))
     box = BoxSet([0.0], [2.0])
     np.testing.assert_allclose((box & free).margin(np.array([0.5])), [0.5, 1.5, 0.5])
     jax = pytest.importorskip("jax")
-    constant = CallableSet(margin_fn=lambda z, t, params: 1.0)
+    constant = CallableSet(margin=lambda z, t, params: 1.0)
     margin = (box & constant).margin(jax.numpy.array([0.5]))
     np.testing.assert_allclose(np.asarray(margin), [0.5, 1.5, 1.0])
 

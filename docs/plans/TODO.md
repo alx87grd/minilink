@@ -38,7 +38,6 @@ the maintainer would and logged in the run's record.
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
 | The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
-| `Source.plot_signal` | D2 | standing (wave D) | remove it (the same picture is `plot_trajectory`) |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
 | Workspace geometry | A3 | v0.5 | the `core/geometry/` package; `planning.spatial` moved, then deleted |
@@ -487,9 +486,6 @@ maintainer's rebuild keeps (§1.12); the notebooks' are unchanged.
 the 2026-09-05 consolidation inventory, in git history (nothing removed without the maintainer's
 pick):
 
-- [ ] `Source.plot_signal` (`show_signal` before the API naming sweep; 80 lines of bespoke matplotlib; the same picture is
-  `source.plot_trajectory(tf=…)`), with the sources demo and `__main__` that exist only for
-  it (scan: graphics#14) **[ask — user-callable]**.
 - [ ] Dead modules `planning/spatial/overlays.py` (retires with A3) and
   `experimental/symbolic/mechanics/utils.py` **[ask — importable names]**.
 - [ ] MPC debug figure → `planning/trajectory_optimization/mpc/viz.py`.

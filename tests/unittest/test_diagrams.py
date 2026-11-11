@@ -257,7 +257,6 @@ class TestDiagrams(unittest.TestCase):
     def _make_case_diagrams():
         # A subsystem with an input ``v``, an output ``V`` and an input ``v_d``.
         inner = DiagramSystem()
-        inner.connection_verbose = False
         inner.add_subsystem(Integrator(), "integ")
         inner.add_input_port("v")
         inner.add_input_port("v_d")
@@ -265,7 +264,6 @@ class TestDiagrams(unittest.TestCase):
         inner.connect_new_output_port("integ", "y", "V")
 
         outer = DiagramSystem()
-        outer.connection_verbose = False
         outer.add_subsystem(Integrator(), "racecar")
         outer.add_subsystem(inner, "arduino")
         outer.add_input_port("r")
@@ -278,7 +276,6 @@ class TestDiagrams(unittest.TestCase):
     @staticmethod
     def _make_diagram():
         diagram = DiagramSystem()
-        diagram.connection_verbose = False
         diagram.add_subsystem(P(ports="reference"), "controller")
         diagram.add_subsystem(Integrator(), "plant")
         diagram.add_input_port("r")
@@ -488,7 +485,6 @@ from minilink.graphical.diagrams import build_diagram_topology
 
 def _build_closed_loop():
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(P(2.5, ports="reference"), "controller")
     diagram.add_subsystem(Integrator(), "plant")
     diagram.add_input_port("r")
@@ -549,7 +545,6 @@ def _build_feedthrough_loop():
             return u * 2
 
     diagram = DiagramSystem()
-    diagram.connection_verbose = False
     diagram.add_subsystem(FeedthroughSystem("A"), "A")
     diagram.add_subsystem(FeedthroughSystem("B"), "B")
     diagram.add_subsystem(FeedthroughSystem("C"), "C")

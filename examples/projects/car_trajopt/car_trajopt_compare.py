@@ -395,7 +395,7 @@ def _corner_track() -> ReferenceTrack:
 
 
 def _pose_on_track(track: ReferenceTrack, s: float) -> tuple[np.ndarray, float]:
-    xy = np.asarray(track.path.sample(s), dtype=float)
+    xy = np.asarray(track.path.at(s), dtype=float)
     tangent = track.path.tangent(s)
     theta = float(np.arctan2(tangent[1], tangent[0]))
     if abs(np.cos(2.0 * theta)) > 1.0 - 1e-9:

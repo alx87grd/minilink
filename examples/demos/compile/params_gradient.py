@@ -85,7 +85,6 @@ print("Finite-difference check passed.")
 # Part 2: closed-loop diagram, identify gravity and damping by equation error
 
 diagram = DiagramSystem()
-diagram.connection_verbose = False
 diagram.add_subsystem(TraceableImpedanceController(), "controller")
 diagram.add_subsystem(TraceablePendulum(), "plant")
 diagram.add_input_port("r", dim=1)
