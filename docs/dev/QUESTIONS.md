@@ -10,7 +10,7 @@ A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO 
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
 2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: four small names the API
-settlement (PR #139) left, and one question on the vision.
+settlement (PR #139) left, three questions on the car ladder, and one question on the vision.
 
 ## The API
 
@@ -41,6 +41,75 @@ settlement (PR #139) left, and one question on the vision.
 - **Recommendation:** rename 1 and 3 and make 4 keyword-only (one word, one shape per idea,
   RULES 2.7 and DESIGN §4); fold 2 into the print, since nothing else reads it.
 - **Blocks:** nothing; each is one commit with its callers, no alias.
+- **Answer:**
+
+### The 3-D car's rear axle: locked, or an open differential?
+- **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder, in review on
+  `vehicle-models-phase1`) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
+  2026-11-11). Measured on the built car against the drivetrain bicycle with the same numbers,
+  steady yaw rate at a steer of 0.01 rad, 5 and 15 m/s: 65 % of the bicycle's on the default
+  car, 79 % on the off-road preset, 88 % on the formula preset. The two rear tires slip against
+  each other and resist the yaw, like about 1 m more wheelbase on a 2 m car. The reduction test
+  passes because it narrows the track to 0.3 m. So "the two rungs are the same car" and "a
+  planar MPC drives the 3-D car" do not hold at the default track.
+- **Code, today and under option 1:**
+  ```python
+  # Today: both rear wheels at the axle's rate
+  w_wheel = vx_w[i] / r_wheel if front else w_rear
+  # Open: each rear wheel at its own rate, w_rear their mean (side = +1 left, -1 right)
+  w_wheel = vx_w[i] / r_wheel if front else w_rear + side * 0.5 * dw_rear
+  ```
+- **Options:**
+  1. *An open differential by default.* Each rear wheel turns at its own rate, the drive torque
+     split evenly; `w_rear` stays the axle's mean rate, so the first nine states keep their
+     meaning (plan §4 already designs for it). The 3-D car then reduces to the bicycle at any
+     track. Costs: the two rates are either two more states, or solved from the even torque
+     split inside `f`.
+  2. *Keep the locked axle,* and say in the class docstring and the tests that the car steers
+     less than the bicycle, with the numbers above. Costs nothing; the model-mismatch study
+     starts with a mismatch that is not the suspension's.
+  3. *A `locked_axle=` option,* open by default. Both behaviours, one more structural switch.
+- **Recommendation:** option 1: it is what makes the 3-D car the bicycle's limit, which the
+  ladder promises.
+- **Blocks:** the planar-controller-drives-the-3-D-car demo, and the presets' final numbers.
+- **Answer:**
+
+### Which point does the kinematic bicycle's `(x, y)` follow?
+- **Context:** `KinematicBicycle.f` writes `ẋ = v cos ψ`, `ψ̇ = v tan δ / L`, the equations of
+  the rear axle's centre. Its frames draw `(x, y)` as the centre of gravity, `b` ahead of the
+  rear axle, as on the dynamic rungs, where `(x, y)` is the centre of gravity. The ladder's
+  rule is that a state keeps its meaning from rung to rung. This predates the vehicle branch.
+- **Options:**
+  1. *The centre of gravity,* with the sideslip `β = atan(b tan δ / L)`:
+     `ẋ = v cos(ψ + β)`, `ψ̇ = v cos β tan δ / L`. The same point on every rung; one more line
+     in the first model a student reads, and the numbers of every kinematic demo move.
+  2. *The rear axle, drawn there:* `f` unchanged, the body frame's drawing moved back by `b`.
+     The simplest textbook model stays; `(x, y)` changes meaning between rungs 2 and 3, said
+     in both docstrings.
+  3. *Leave it,* and state the approximation in the docstring.
+- **Recommendation:** option 2: rung 2 is the no-slip lesson and its page should stay three
+  lines; the drawing and the docstring then tell the truth.
+- **Blocks:** nothing.
+- **Answer:**
+
+### The public face of the car's parts
+- **Context:** the tires, the springs and the terrains are parts a car is built from. Three
+  small inconsistencies, each a public name or call:
+  1. tires and springs take their numbers at construction (`BrushTire(mu=1.6)`); terrains do
+     not (`Bumps()`, then `car.params["terrain"]["amplitude"] = 0.8`);
+  2. the parts are imported from their modules
+     (`from minilink.dynamics.catalog.vehicles.terrain import Bumps`), which the demos'
+     import check allowlists; the cars come from `minilink`;
+  3. `TerrainBlock` (ruled: "also exported as a static block") has no car port to wire to:
+     no car outputs its contact positions or takes ground heights.
+- **Options,** per item:
+  1. `Bumps(amplitude=0.8, wavelength=30.0)`, as the tires; or kept.
+  2. the parts on `minilink.catalog` beside the cars; or kept in their modules.
+  3. a `contacts` output on the 3-D car for the block; or the block waits for a diagram that
+     needs it; or kept as it is.
+- **Recommendation:** constructor numbers on the terrains and the parts on `minilink.catalog`
+  (one way to build a car, one import line); the block waits.
+- **Blocks:** nothing; each is one commit.
 - **Answer:**
 
 ## The vision

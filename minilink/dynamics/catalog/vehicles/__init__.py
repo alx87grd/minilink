@@ -1,4 +1,4 @@
-"""Vehicle dynamics: the teaching ladder from the holonomic point to the UdeS racecar, plus propulsion and suspension."""
+"""Vehicle dynamics: the teaching ladder from the holonomic point to the 3-D car on its suspension, plus propulsion and the quarter car."""
 
 # The tire laws and slips (``tires``) and the parameter sets stay in their modules:
 # plants only in __all__.

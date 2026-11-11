@@ -1,10 +1,10 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
-**Status:** phase 1 built by run 1 of [vehicle-models-run.md](vehicle-models-run.md), in review
-on `vehicle-models-phase1`, except the two skins of §10.5 (`KinematicCar`,
-`DynamicBicycleCar3D`), which wait on the maintainer (the brief's §6), and the port layout (§9).
-The maintainer was interviewed on 2026-11-11; the answers are recorded in §2. A second review
-the same day added the rulings at the end of §2's table.  
+**Status:** phases 1, 2 and 2b built by run 1 of [vehicle-models-run.md](vehicle-models-run.md),
+in review on `vehicle-models-phase1`. The maintainer was interviewed on 2026-11-11; the answers
+are recorded in §2. A second review the same day added the rulings at the end of §2's table. An
+independent review of the built branch followed (§11): its fixes that keep names and behaviour
+are applied, and its three design questions wait in [QUESTIONS.md](../dev/QUESTIONS.md).  
 **Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
 to the maintainer's private repository, not to minilink.  
 **Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),
@@ -164,23 +164,24 @@ reach every number.
 
 ```python
 car = SuspensionCar3D(tire=BrushTire(), terrain=Bumps(), suspension=SpringDamper())
-car.params["mu"] = 0.6            # one number, on the car
+car.params["tire"]["fl"]["mu"] = 0.6      # one number, at its part's key
+car.params["terrain"]["friction"] = 0.7   # the road, for every wheel
 ```
 
 ### 5.1 The tire
 
 ```python
-Fx, Fy = tire.forces(kappa, alpha, Fz, mu, c_kappa, c_alpha, params)   # per wheel, wheel frame [N]
+kappa, alpha = tire.slip(vx, vy, w, R, params)                 # per wheel, wheel frame
+Fx, Fy = tire.forces(kappa, alpha, Fz, friction, params)       # [N]
 ```
 
-- **The car hands over the wheel's numbers.** The parameters are flat with one suffix per
-  axle (§2), so a law given only `params` could not know which wheel it serves. The car
-  reads `mu`, `c_kappa` and `c_alpha_f` (or `c_alpha_r`) and passes them. The `mu` it passes
-  is already multiplied by the terrain's friction at that wheel (§5.2).
-- **`params` carries only the law's own shape numbers:** `mf_C`, `mf_E` for the magic
-  formula, `z_floor` for the saturating laws (§10.3). Those are what the tire copies into the car's `params` at
-  construction. `mu` and the stiffnesses belong to the car and its preset, so
-  `UdeSRacecarDyn(tire=MagicFormula())` keeps the racecar's grip and stiffness.
+- **The tire owns its numbers** (the Tire parts row of §2): `mu`, `c_alpha`, `c_kappa`, the
+  slip floor `v_eps`, and `C`, `E` on the magic formula, in its own `params`, held by the car
+  at `params["tire"][wheel]`. The car passes that dict and the road's friction factor under
+  the wheel (§5.2); the grip is `friction × mu`, floored at 10⁻⁹ so a road of zero friction
+  stays finite.
+- **One base class, `Tire`,** holds what every law shares (`slip`, `stiffnesses`,
+  `friction_use`); a law writes only its `forces`.
 
 | Law | Adds | Lateral force (longitudinal: the same with `κ`, `c_kappa`) |
 | --- | --- | --- |
@@ -501,6 +502,7 @@ All under `minilink/dynamics/catalog/vehicles/`:
 | `drivetrain_bicycle.py` | rung 4, `DrivetrainBicycle` | new: the equations of today's `UdeSRacecarDyn`, moved |
 | `racecar.py` | `PUBLIC_RACECAR_PARAMS`, `UdeSRacecar`, `UdeSRacecarDyn`, `stiff_tires`, `link_frames` | shrinks to numbers and looks |
 | `suspension_car.py` | rung 6, `SuspensionCar3D`, and the `SpringDamper` law | new, phase 2 |
+| `car_presets_3d.py` | `FormulaCar3D`, `OffRoadCar3D`: their numbers, tires, springs and looks | new, phase 2b |
 | `propulsion.py`, `suspension.py`, `mountain_car.py` | the longitudinal cars, `QuarterCar`, `MountainCar` | untouched until phase 3 |
 
 Plant equations stay on each plant's own page (RULES 7.8). What the rungs share is only the
@@ -517,18 +519,18 @@ class BrushTire:
     """Fiala brush tire: the friction limit, reached smoothly."""
 
     def __init__(self):
-        # Parameters: the floor that keeps the slip demand differentiable at zero slip
-        self.params = {"z_floor": 1.0e-6}
-
-    def forces(self, kappa, alpha, Fz, mu, c_kappa, c_alpha, params):
+    def forces(self, kappa, alpha, Fz, friction=1.0, params=None):
+        params = self.params if params is None else params
         xp = array_module(kappa, alpha, Fz)
 
-        z_floor = params["z_floor"]
+        mu = xp.maximum(friction * params["mu"], GRIP_FLOOR)
+        c_alpha = params["c_alpha"]
+        c_kappa = params["c_kappa"]
 
         # Slip demand: the linear force over the friction limit, per direction
         s_x = c_kappa * kappa / mu
         s_y = c_alpha * alpha / mu
-        z = xp.sqrt(s_x**2 + s_y**2 + z_floor**2)
+        z = xp.sqrt(s_x**2 + s_y**2 + SLIP_DEMAND_FLOOR**2)
 
         # F = μ Fz shape(z) along the demand, with shape(z) = z g(z) for the brush
         g = brush_saturation(z)
@@ -541,8 +543,8 @@ class BrushTire:
 | Law | `shape(z) / z`, the factor on the linear force | Own numbers |
 | --- | --- | --- |
 | `LinearTire` | `1` | none |
-| `BrushTire` | `g(z) = 1 − z/3 + z²/27` while `z < 3`, then `1/z` | `z_floor` |
-| `MagicFormulaTire` | `sin(C atan(b − E (b − atan b))) / z`, with `b = z / C` | `mf_C`, `mf_E`, `z_floor` |
+| `BrushTire` | `g(z) = 1 − z/3 + z²/27` while `z < 3`, then `1/z` | none |
+| `MagicFormulaTire` | `sin(C atan(b − E (b − atan b))) / z`, with `b = z / C` | `C`, `E` |
 | `LinearSaturation` (transitional) | today's `linear_tire_forces`, statement for statement | none |
 
 - **The magic formula in `z`.** `B = c / (C μ)` and `z = c · slip / μ` give `B · slip = z / C`,
@@ -554,8 +556,8 @@ class BrushTire:
 - **The slips are two module functions,** each for one wheel, from that wheel's contact
   velocity in its own frame:
   - `tire_slip(vx, vy, w, R, v_eps)`: today's function, `|vx| + ε`, unchanged;
-  - `wheel_slip(vx, vy, w, R, v_eps)`: the `√(vx² + ε²)` form, the body of today's
-    `axle_slips` written for one wheel. `axle_slips` stays as a name and calls it.
+  - `wheel_slip(vx, vy, w, R, v_eps)`: the `√(vx² + ε²)` form, the body of the former
+    `axle_slips` written for one wheel.
 - **`smooth_floor(F, F_eps)`** is the load floor of §5.3: `½ (F + √(F² + F_eps²))`.
 - **Small-slip stiffness.** `c · Fz` for the module's laws, `Ca` for `LinearSaturation`. The
   cars' `fastest_mode` already computes it from `params`; nothing is added to the tire for it.
@@ -652,9 +654,9 @@ class Bumps(Terrain):
   finite difference of the height.
 - The static block is one class in `terrain.py`: the positions of `n` points in; their
   height, gradient and friction out.
-- **Phase 1 builds and tests the module but wires it into no planar rung.** Its first user
-  is rung 6. A friction patch under the bicycle is one line in its tire method, added when a
-  demo asks for it; until then the planar `f` pays nothing for it.
+- **Every car rung holds a terrain** (the Friction row of §2): the planar rungs read its
+  friction under their two axles, the 3-D car its height, gradient and friction under its
+  four corners, each at the time of the call.
 - **The grid height map (bicubic) and the bridge to the planning fields are not built** until
   a demo or the geometry plan's spatial fields need them.
 
@@ -700,9 +702,8 @@ and the 6-DOF mechanics (§4).
 P_i = p_cg + R c_i                      attachment point, world
 n_i = (−∂z/∂x, −∂z/∂y, 1) / ‖·‖         terrain normal under it
 d_i = n_i,z (P_i,z − z_terrain)         gap, along the normal
-Δ_i = l_free − d_i                      compression
-Δ̇_i = −n_i · Ṗ_i                        compression rate
-Fz_i = smooth_floor(k Δ_i + b Δ̇_i)      normal load, along n_i
+ḋ_i = n_i · Ṗ_i                         gap rate
+Fz_i = smooth_floor(Fz0_i + k (h_cg − d_i) − c ḋ_i)   normal load, along n_i
 C_i = P_i − d_i n_i                     contact point
 ```
 
@@ -718,8 +719,13 @@ C_i = P_i − d_i n_i                     contact point
 - **Past 90° of roll** the same law holds the attachment points off the ground, so the car
   rests on its side or roof and never falls through. Nothing more is specified (§2).
 
+- **The spring is preloaded:** it carries the corner's static load `Fz0_i` at the ride height
+  `h_cg`, so the car rests at `h_cg` whatever its mass and stiffness; there is no free length.
+
 **Drive and steering:** rung 4's three equations, written again in this class's `f`, with the
-ground torque `(Fx_rl + Fx_rr) r_r`.
+ground torque `(Fx_rl + Fx_rr) r_r`. The class is a model of its own, a `DynamicSystem` leaf,
+not a subclass of the drivetrain bicycle: a test pins the numbers the two share and the
+drive and servo rates they write alike.
 
 **Outputs:** `y` (the state), `speed`, `slip` (the four `κ`, the four `α`), `grip`, `imu`
 (specific force and angular rates in the body frame), `power`, `loads` (the four `Fz`) and
@@ -744,4 +750,33 @@ Public names are the maintainer's. The run uses these and lists them in its pull
 - terrain: `Terrain`, `Slope`, `Bumps`, `TerrainBlock`;
 - cars: `DrivetrainBicycle`, `SuspensionCar3D` (both ruled, §2), `SpringDamper`;
 - options: `tire=`, `terrain=`, `suspension=`, `wheel_angles=`, `massless_wheel=`.
+
+## 11. The independent review of the built branch
+
+A second-opinion review of `vehicle-models-phase1` (two independent reviewers, one reproducing
+the physics, one judging the architecture) found the equations right: momentum balances to
+10⁻¹⁰ on 200 random states on flat ground, a slope and bumps; the loads at rest sum to the
+weight; the load transfer matches theory; the planar rungs are bit-identical to `dev`.
+
+Applied, every number unchanged on a seeded baseline of every rung:
+
+- one `Tire` base class; a grip floor on a road of zero friction (it gave NaN);
+- one axle-force body on the bicycles; the terrain read at the time of the call on every rung;
+- `SuspensionCar3D` a model of its own (five inherited planar methods raised `KeyError` on
+  it); the presets in `car_presets_3d.py`, each applied in one step that also sets the command
+  limits and the rest state (`set_numbers`, `rest_state()`);
+- the nine simulation tests of the 3-D car skip without JAX; its demos run on NumPy.
+
+Left for the maintainer, in QUESTIONS.md: the rear axle of the 3-D car (locked, it steers
+65 % as much as the drivetrain bicycle at the default track), the point the kinematic
+bicycle's `(x, y)` follows, and the parts' public face (constructor numbers on the terrains,
+where the parts are imported from, `TerrainBlock`).
+
+Known and left as they are:
+
+- the solver hint keeps about 4 % of margin under Euler's stability limit at rest, and the
+  realtime game steps about seven times coarser than the hint: a parked car's rear wheel
+  chatters there (up to 0.5 m/s of wheel-surface speed with Euler), and stays finite;
+- `x0` and the command limits are set at construction and by `set_numbers`: after a direct
+  edit of `params["h_cg"]`, `car.x0 = car.rest_state()` brings the car back to rest.
 

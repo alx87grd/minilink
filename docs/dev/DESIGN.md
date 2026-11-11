@@ -280,7 +280,8 @@ a method passed where its matrix goes is refused with the call to write; `Manipu
 task ports `p`, `pdot`; `forward_kinematics`, `J`, `inverse_kinematics`) is the base of the
 serial arms, read straight by the robotic laws (`ctl @ plant` on `y = [q; dq]`). Mixed
 inputs are named ports with concrete allocation hooks, never inheritance branches. The
-vehicle ladder (four teaching rungs, dual-backend) is in the catalog; its research rungs and
+vehicle ladder (from the point to the 3-D car on its suspension, dual-backend) is in the
+catalog; its research rungs and
 the named car profiles live with their scenarios in `examples/projects/car_trajopt/`.
 
 ## 4. Core Object Contracts
