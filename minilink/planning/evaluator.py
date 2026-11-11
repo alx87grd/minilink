@@ -100,7 +100,8 @@ class ProblemEvaluator:
     backend : {"auto", "jax", "numpy"}
         ``"auto"`` is JAX when it is installed and the loop traces on it.
     episode_length : float, optional
-        Length of the run of an infinite-horizon problem (10 s by default).
+        Length of the run of an infinite-horizon problem (by default 10 s,
+        announced, rounded up to whole periods of ``dt``).
     """
 
     def __init__(
@@ -138,11 +139,14 @@ class ProblemEvaluator:
         self.substeps = 1 if substeps is None else int(substeps)
 
         # The grid: N periods of dt to the horizon, a continuous loop that names
-        # no dt on its automatic step
-        self.horizon = horizon_of(problem, episode_length)
+        # no dt on its automatic step; the default run, announced, ends on a period
+        horizon = horizon_of(problem, episode_length)
         if dt is None:
-            dt = automatic_dt_of(self.loop, self.horizon)
+            dt = automatic_dt_of(
+                self.loop, EPISODE_LENGTH if horizon is None else horizon
+            )
         self.dt = float(dt)
+        self.horizon = default_horizon_of(self.dt) if horizon is None else horizon
         self.n_steps = steps_of(self.horizon, self.dt)
 
         # The loop, compiled once on its backend
@@ -1103,21 +1107,36 @@ def is_concrete_number(value) -> bool:
 
 
 def horizon_of(problem, episode_length):
-    """The length of a run: the finite horizon, else ``episode_length`` (10 s by default)."""
+    """The length of a run: the finite horizon, else ``episode_length``; ``None`` when neither is given (the default run)."""
     if problem.horizon_kind() == "finite":
         return float(problem.horizon)
-
-    # A default that sets what is scored is announced
     if episode_length is None:
-        warnings.warn(
-            f"the problem has no finite horizon, so the evaluation uses a default "
-            f"horizon: the run is scored over {EPISODE_LENGTH:g} s. Give the problem "
-            "a horizon to choose it (or pass episode_length= where the call takes it)",
-            stacklevel=caller_stacklevel(),
-        )
-        return EPISODE_LENGTH
+        return None
 
     return float(episode_length)
+
+
+def default_horizon_of(dt):
+    """The default run of a problem with no finite horizon, announced: 10 s, rounded up to whole periods of ``dt`` when ``dt`` does not divide it."""
+    # N = 10 s / dt periods when dt divides 10 s, else N = ⌈10 s / dt⌉ and T = N dt
+    n_steps = int(round(EPISODE_LENGTH / dt))
+    if abs(n_steps * dt - EPISODE_LENGTH) <= 1e-9 * EPISODE_LENGTH:
+        horizon = EPISODE_LENGTH
+        rounded = ""
+    else:
+        n_steps = int(np.ceil(EPISODE_LENGTH / dt))
+        horizon = n_steps * dt
+        rounded = f" ({EPISODE_LENGTH:g} s rounded up to whole periods of dt={dt:g} s)"
+
+    # A default that sets what is scored is announced
+    warnings.warn(
+        f"the problem has no finite horizon, so the evaluation uses a default "
+        f"horizon: the run is scored over {horizon:g} s{rounded}. Give the problem "
+        "a horizon to choose it (or pass episode_length= where the call takes it)",
+        stacklevel=caller_stacklevel(),
+    )
+
+    return horizon
 
 
 def steps_of(horizon, dt):

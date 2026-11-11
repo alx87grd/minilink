@@ -828,6 +828,25 @@ def test_an_open_loop_plan_on_no_horizon_is_scored_over_the_announced_default():
     assert solution.evaluation is not None
 
 
+def test_the_default_run_is_rounded_up_to_whole_periods_of_the_plan_s_step():
+    """A plan step that does not divide the default 10 s scores the run rounded up to whole steps, announced; a finite horizon it does not divide is refused."""
+    from minilink import QuadraticCost
+
+    problem, _ = make_holonomic_obstacle_problem()
+    problem = problem.replace(cost=QuadraticCost(np.eye(2), np.eye(2)))
+    extender = KinodynamicExtender(controls=COMPASS, horizon=0.3, n_steps=7)
+    planner = RRTPlanner(problem, extender=extender, seed=0, max_iterations=4000)
+    with pytest.warns(UserWarning, match=r"scored over 10.0286 s \(10 s rounded up"):
+        solution = planner.solve(evaluate=True, n_trials=1)
+    assert np.isfinite(solution.evaluation.J).all()
+
+    finite = RRTPlanner(
+        problem.replace(horizon=4.0), extender=extender, seed=0, max_iterations=4000
+    )
+    with pytest.raises(ValueError, match="must divide the horizon 4.0"):
+        finite.solve(evaluate=True, n_trials=1)
+
+
 def test_kdtree_requires_euclidean_metric():
     sys = make_dubins_problem()
     problem = PlanningProblem(
