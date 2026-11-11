@@ -195,14 +195,14 @@ def lqg(
     return box
 
 
-def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_samples=1001):
+def lqr_gain_schedule(A, B, Q, R, S_f, horizon, *, n_samples=1001):
     """Return ``(t, K, S)``: the finite-horizon gain ``K(t)`` of the law ``u = -K(t) x`` and the Riccati matrix ``S(t)``.
 
-    ``S`` is swept backward from the terminal weight ``S(t_f) = S_f``, exactly on
+    ``S`` is swept backward from the terminal weight ``S(T) = S_f``, exactly on
     a uniform grid, through the Hamiltonian system of the co-state
     (:func:`~minilink.analysis.riccati.riccati_step`): no integration error, no
     stiffness, and ``S`` stays symmetric. ``t`` holds ``n_samples`` samples from
-    ``0`` to ``tf``; ``K`` has shape ``(n_samples, m, n)`` and ``S`` shape
+    ``0`` to ``T = horizon``; ``K`` has shape ``(n_samples, m, n)`` and ``S`` shape
     ``(n_samples, n, n)``. ``S_f`` is the boundary condition ``S(T) = S_f`` of the
     Riccati equation, the cost's terminal weight ``S``.
     """
@@ -215,13 +215,13 @@ def lqr_gain_schedule(A, B, Q, R, S_f, tf, *, n_samples=1001):
     n = A.shape[0]
     n_samples = int(n_samples)
 
-    require_horizon(n_samples, tf)
+    require_horizon(n_samples, horizon)
 
     R_inv = np.linalg.inv(R)
-    t = np.linspace(0.0, float(tf), n_samples)
-    dt = float(tf) / (n_samples - 1)
+    t = np.linspace(0.0, float(horizon), n_samples)
+    dt = float(horizon) / (n_samples - 1)
 
-    # −dS/dt = S A + Aᵀ S − S B R⁻¹ Bᵀ S + Q, swept backward from S(t_f) = S_f; the
+    # −dS/dt = S A + Aᵀ S − S B R⁻¹ Bᵀ S + Q, swept backward from S(T) = S_f; the
     # dynamics are constant, so one transition over a substep serves the whole sweep
     H = hamiltonian_matrix(A, B, Q, R_inv)
     n_sub = substeps(H, dt)
@@ -246,7 +246,7 @@ def lqr_finite_horizon(
     Q,
     R,
     S_f,
-    tf,
+    horizon,
     *,
     n_samples=1001,
     after="hold",
@@ -262,8 +262,8 @@ def lqr_finite_horizon(
     ``sys`` is a linear model or any plant, as in :func:`lqr`. The block
     implements ``u = u_bar - K(t) (x - r)`` with
     ``K(t)`` from :func:`lqr_gain_schedule`, minimizing
-    ``∫₀^tf xᵀQx + uᵀRu dt + x(tf)ᵀ S_f x(tf)`` for the linear model. Past the
-    horizon the block keeps ``K(tf)`` (``after="hold"``) or switches to the
+    ``∫₀^T xᵀQx + uᵀRu dt + x(T)ᵀ S_f x(T)``, ``T = horizon``, for the linear
+    model. Past the horizon the block keeps ``K(T)`` (``after="hold"``) or switches to the
     infinite-horizon gain of :func:`lqr_gain` (``after="stationary"``). ``S_f`` is
     the boundary condition ``S(T) = S_f`` of the Riccati equation, the cost's
     terminal weight ``S``.
@@ -276,15 +276,15 @@ def lqr_finite_horizon(
     B = model.B()
     x_bar, u_bar, _ = design_point(model)
 
-    t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, tf, n_samples=n_samples)
+    t_schedule, K, _ = lqr_gain_schedule(A, B, Q, R, S_f, horizon, n_samples=n_samples)
 
-    # Past the horizon: K(t_f) held, or the stationary gain
+    # Past the horizon: K(T) held, or the stationary gain
     K_after = lqr_gain(A, B, Q, R) if after == "stationary" else None
 
     return TimeVaryingFeedback(t_schedule, K, x_bar=x_bar, u_bar=u_bar, K_after=K_after)
 
 
-def trajectory_lqr(
+def lqr_trajectory(
     sys, trajectory, Q, R, S_f=None, *, params=None, method="auto", eps=1e-6
 ):
     """Design an LQR along a reference trajectory and return a ``TrajectoryFeedback``.
@@ -315,7 +315,7 @@ def trajectory_lqr(
     eps : float, optional
         Central-difference step.
     """
-    require_continuous_model(sys, "trajectory_lqr")
+    require_continuous_model(sys, "lqr_trajectory")
 
     t = np.asarray(trajectory.t, dtype=float).reshape(-1)
     X = np.asarray(trajectory.x, dtype=float).T
@@ -404,10 +404,10 @@ def require_placed(A, B, K, poles):
         )
 
 
-def require_horizon(n_samples, tf):
+def require_horizon(n_samples, horizon):
     """Refuse a schedule without a positive horizon or without two samples."""
-    if n_samples < 2 or tf <= 0.0:
-        raise ValueError("lqr_gain_schedule needs tf > 0 and n_samples >= 2")
+    if n_samples < 2 or horizon <= 0.0:
+        raise ValueError("lqr_gain_schedule needs horizon > 0 and n_samples >= 2")
 
 
 def require_after(after):

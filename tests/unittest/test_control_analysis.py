@@ -17,7 +17,7 @@ from minilink.control.design import (
     lqr_finite_horizon,
     lqr_gain,
     lqr_gain_schedule,
-    trajectory_lqr,
+    lqr_trajectory,
 )
 from minilink.core.trajectory import Trajectory
 from minilink.core.backends import array_module
@@ -395,7 +395,7 @@ class TestTrajectoryLQR(unittest.TestCase):
     def test_equilibrium_reference_gives_the_stationary_gain_everywhere(self):
         t = np.linspace(0.0, 5.0, 51)
         rest = Trajectory(t=t, x=np.zeros((2, 51)), u=np.zeros((1, 51)))
-        ctl = trajectory_lqr(DoubleIntegrator(), rest, self.Q, self.R)
+        ctl = lqr_trajectory(DoubleIntegrator(), rest, self.Q, self.R)
         K_inf = lqr_gain(self.A, self.B, self.Q, self.R)
         np.testing.assert_allclose(
             ctl.params["K"], np.broadcast_to(K_inf, (51, 1, 2)), atol=1e-6
@@ -404,7 +404,7 @@ class TestTrajectoryLQR(unittest.TestCase):
     def test_tracks_a_moving_reference_from_a_perturbed_start(self):
         reference = self.sinusoid()
         plant = DoubleIntegrator()
-        ctl = trajectory_lqr(plant, reference, self.Q, self.R)
+        ctl = lqr_trajectory(plant, reference, self.Q, self.R)
         plant.x0 = reference.x[:, 0] + np.array([0.5, 0.5])
         loop = ctl @ plant
         traj = loop.compute_trajectory(tf=8.0, n_samples=801, verbose=False)
@@ -418,7 +418,7 @@ class TestTrajectoryLQR(unittest.TestCase):
         reference = self.sinusoid(tf=8.0, n=21)
         Q = 1e3 * self.Q
         A, B, R_inv = self.A, self.B, np.linalg.inv(self.R)
-        K = trajectory_lqr(DoubleIntegrator(), reference, Q, self.R).params["K"]
+        K = lqr_trajectory(DoubleIntegrator(), reference, Q, self.R).params["K"]
 
         def riccati_rhs(tau, s):
             S = s.reshape(2, 2)
@@ -460,7 +460,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_schedule_starts_at_the_terminal_weight(self):
         S_f = np.diag([3.0, 2.0])
-        t, K, S = lqr_gain_schedule(self.A, self.B, self.Q, self.R, S_f, tf=2.0)
+        t, K, S = lqr_gain_schedule(self.A, self.B, self.Q, self.R, S_f, horizon=2.0)
         self.assertEqual(K.shape, (1001, 1, 2))
         np.testing.assert_allclose(t[[0, -1]], [0.0, 2.0])
         np.testing.assert_allclose(S[-1], S_f)
@@ -468,7 +468,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_long_horizon_recovers_the_stationary_gain(self):
         _, K, _ = lqr_gain_schedule(
-            self.A, self.B, self.Q, self.R, np.zeros((2, 2)), tf=30.0
+            self.A, self.B, self.Q, self.R, np.zeros((2, 2)), horizon=30.0
         )
         np.testing.assert_allclose(
             K[0], lqr_gain(self.A, self.B, self.Q, self.R), atol=1e-6
@@ -476,7 +476,13 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_schedule_matches_the_riccati_equation(self):
         t, _, S = lqr_gain_schedule(
-            self.A, self.B, self.Q, self.R, np.diag([1.0, 2.0]), tf=3.0, n_samples=3001
+            self.A,
+            self.B,
+            self.Q,
+            self.R,
+            np.diag([1.0, 2.0]),
+            horizon=3.0,
+            n_samples=3001,
         )
         R_inv = np.linalg.inv(self.R)
         A, B, Q = self.A, self.B, self.Q
@@ -523,7 +529,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
         matplotlib.use("Agg")
         ctl = lqr_finite_horizon(
-            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), tf=1.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=np.zeros((2, 2)), horizon=1.0
         )
         ax = ctl.plot_gain_schedule(show=False)
         self.assertEqual(len(ax.lines), 2)  # one line per entry of the 1 x 2 gain
@@ -534,7 +540,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
             self.Q,
             self.R,
             S_f=np.zeros((2, 2)),
-            tf=2.0,
+            horizon=2.0,
             after="stationary",
         )
         z = np.array([1.0, 0.0, 0.0, 0.0])
@@ -546,7 +552,7 @@ class TestFiniteHorizonLQR(unittest.TestCase):
 
     def test_finite_horizon_loop_reaches_the_target(self):
         ctl = lqr_finite_horizon(
-            LTISystem(self.A, self.B), self.Q, self.R, S_f=20.0 * np.eye(2), tf=5.0
+            LTISystem(self.A, self.B), self.Q, self.R, S_f=20.0 * np.eye(2), horizon=5.0
         )
         plant = DoubleIntegrator()
         plant.x0 = np.array([1.0, 0.0])

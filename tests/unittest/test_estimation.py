@@ -11,7 +11,7 @@ from minilink.core.closed_loop import closed_loop
 from minilink.core.diagram import DiagramSystem
 from minilink.core.roles import roles
 from minilink.core.system import DynamicSystem
-from minilink.dynamics.abstraction.state_space import LTISystem
+from minilink.dynamics.abstraction.state_space import LinearizedSystem, LTISystem
 from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 from minilink.estimation.design import kalman, kalman_gain, luenberger, luenberger_gain
 from minilink.estimation.observer import StateObserver
@@ -25,7 +25,7 @@ L = place_gain(A.T, C.T, POLES).T  # the dual placement, written out here
 
 
 def observer():
-    return StateObserver(A, B, C, L)
+    return StateObserver(LTISystem(A, B, C), L)
 
 
 def test_ports_params_and_labels():
@@ -51,15 +51,26 @@ def test_the_innovation_form():
 
 def test_the_operating_point_is_an_equilibrium_of_the_estimate():
     x_bar, u_bar = np.array([0.7, 0.0]), np.array([0.0])
-    obs = StateObserver(A, B, C, L, x_bar=x_bar, u_bar=u_bar, y_bar=C @ x_bar + 0.1)
+    model = LinearizedSystem(
+        A,
+        B,
+        C,
+        np.zeros((1, 1)),
+        x_bar=x_bar,
+        u_bar=u_bar,
+        y_bar=C @ x_bar + 0.1,
+        dx_bar=np.zeros(2),
+    )
+    obs = StateObserver(model, L)
     np.testing.assert_allclose(obs.params["y_bar"], C @ x_bar + 0.1)
+    np.testing.assert_allclose(obs.x0, x_bar)
     dx_hat = obs.f(x_bar, np.concatenate([u_bar, C @ x_bar + 0.1]))
     np.testing.assert_allclose(dx_hat, 0.0, atol=1e-12)
-    # a shape that describes no plant is refused
+    # a gain that describes no plant is refused, and a plant: the observer runs a linear model
     with pytest.raises(ValueError, match="L must be"):
-        StateObserver(A, B, C, np.ones((3, 1)))
-    with pytest.raises(ValueError, match=r"x_bar must have shape \(2,\)"):
-        StateObserver(A, B, C, L, x_bar=[0.7, 0.0, 0.0])
+        StateObserver(LTISystem(A, B, C), np.ones((3, 1)))
+    with pytest.raises(TypeError, match=r"LTISystem\(A, B, C, D\) or linearize"):
+        StateObserver(Pendulum(), L)
 
 
 def test_the_estimate_converges_on_the_plant():

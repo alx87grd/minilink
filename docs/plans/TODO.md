@@ -796,7 +796,7 @@ terms; the v1.0 rows after two cohorts.
   finite-horizon filter (`kalman_finite_horizon` → a time-varying observer, the dual of
   `lqr_finite_horizon`, the forward sweep on the dual pair with `riccati_step`); the
   linearized Kalman filter along a trajectory (`trajectory_kalman` → `TrajectoryObserver`,
-  the dual of `trajectory_lqr`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
+  the dual of `lqr_trajectory`); the extended Kalman filter (`ExtendedKalmanFilter(model, Q_n,
   R_n, x0, P0)`, `P` a state, Jacobians taken on the model's `f`, `h` inside its own `f`);
   the sampled filters (unscented, discrete Kalman, particle) on the sampled loop; the
   `EstimationProblem` / `EstimationSolution` and the `*Estimator` tools (§5 of the plan);

@@ -51,8 +51,15 @@ RETIRED = {
     "optimizer_options": ("options", None),
     "tf": (
         "horizon, or episode_length",
-        ("PlanningProblem", "Sys2Gym", "RolloutEnvironment"),
+        (
+            "PlanningProblem",
+            "Sys2Gym",
+            "RolloutEnvironment",
+            "lqr_finite_horizon",
+            "lqr_gain_schedule",
+        ),
     ),
+    "trajectory_lqr": ("lqr_trajectory", None),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
@@ -478,6 +485,9 @@ LEADING_POSITIONALS = {
     "minilink.control.impedance.Impedance.__init__": ("Kp", "Kd"),
     "minilink.control.impedance.IntegralImpedance.__init__": ("Kp", "Ki", "Kd"),
     "minilink.control.siso.PID.__init__": ("Kp", "Ki", "Kd", "tau"),
+    # The design verbs (the maintainer's ruling 19 of 2026-11-11): the observer runs a linear
+    # model, StateObserver(LTISystem(A, B, C, D), L) the matrix form
+    "minilink.estimation.observer.StateObserver.__init__": ("model", "L"),
     # The step reads its final level first: Step() is the unit step at t = 1 s
     # (the maintainer's ruling 13 of 2026-11-10)
     "minilink.blocks.sources.Step.__init__": (

@@ -200,7 +200,7 @@ TEACHING_MODULE_FUNCTIONS = (
     ("minilink.control.design", "lqr"),
     ("minilink.control.design", "lqr_gain"),
     ("minilink.control.design", "lqr_finite_horizon"),
-    ("minilink.control.design", "trajectory_lqr"),
+    ("minilink.control.design", "lqr_trajectory"),
     ("minilink.control.design", "place"),
     ("minilink.control.design", "place_gain"),
     ("minilink.control.design", "lqg"),

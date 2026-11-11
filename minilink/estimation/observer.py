@@ -1,9 +1,12 @@
 """The state observer: a copy of the linear model, corrected by the output it mispredicts."""
 
+import re
+
 import numpy as np
 
+from minilink.analysis.linearization import design_point
 from minilink.core.system import DynamicSystem, fastest_time_constant
-from minilink.dynamics.abstraction.state_space import point_component
+from minilink.dynamics.abstraction.state_space import ConstantMatrices
 
 ###############################################################################
 # Public API
@@ -13,43 +16,44 @@ from minilink.dynamics.abstraction.state_space import point_component
 class StateObserver(DynamicSystem):
     """Linear state observer ``dx̂ = A (x̂ − x̄) + B (u − ū) + L (y − ŷ)``, the estimate on ``x``.
 
-    The observer runs the model ``(A, B, C, D)`` of the plant about the operating
-    point ``(x̄, ū, ȳ)`` and corrects it with the innovation, the measured ``y``
-    minus the predicted ``ŷ = ȳ + C (x̂ − x̄) + D (u − ū)``, through the gain ``L``.
+    The observer runs ``model``, the plant's linear model ``(A, B, C, D)``
+    about its operating point ``(x̄, ū, ȳ)``, and corrects it with the
+    innovation, the measured ``y`` minus the predicted ``ŷ = ȳ + C (x̂ − x̄) +
+    D (u − ū)``, through the gain ``L``. ``model`` is a
+    :class:`~minilink.dynamics.abstraction.state_space.LinearizedSystem`, its
+    point read from it (``ȳ = h(x̄, ū)``), or an
+    :class:`~minilink.dynamics.abstraction.state_space.LTISystem`, about the
+    origin: the matrix form is ``StateObserver(LTISystem(A, B, C, D), L)``.
     The estimation error then follows ``A − L C``, so the gain sets its poles:
     :func:`~minilink.estimation.design.luenberger` places them and
     :func:`~minilink.estimation.design.kalman` makes them optimal for white noise.
     Both return this block.
 
     Ports: the plant's command ``u`` (dimension ``m``) and measurement ``y``
-    (dimension ``p``) in; the estimate ``x`` (dimension ``n``, labelled with a
-    hat) out. The initial estimate ``x0`` starts at x̄. The matrices, the gain and the
-    operating point live in ``params``; ``ȳ`` defaults to ``C x̄ + D ū``, the
-    linear model's own output, and the plant-taking designs pass ``h(x̄, ū)``.
+    (dimension ``p``) in; the estimate ``x`` (dimension ``n``, the model's
+    state labels with a hat) out. The initial estimate ``x0`` starts at x̄.
+    The matrices, the gain and the operating point live in ``params``.
     A box holding this block under the key ``observer`` and a state-feedback
     gain, with ``r``, ``y`` -> ``u`` on its edge, is a controller for ``@``.
     """
 
-    def __init__(
-        self, A, B, C, L, D=None, *, x_bar=None, u_bar=None, y_bar=None, labels=None
-    ):
-        # The model (A, B, C, D), the gain L and the operating point (x̄, ū, ȳ),
-        # with ȳ = C x̄ + D ū by default: the linear model's own output
-        A = np.asarray(A, dtype=float)
-        B = np.atleast_2d(np.asarray(B, dtype=float))
-        C = np.atleast_2d(np.asarray(C, dtype=float))
+    def __init__(self, model, L):
+        # The model (A, B, C, D) and its operating point (x̄, ū, ȳ), the origin
+        # of a linear model; the gain L
+        require_linear_model(model)
+        A = np.asarray(model.A(), dtype=float)
+        B = np.atleast_2d(np.asarray(model.B(), dtype=float))
+        C = np.atleast_2d(np.asarray(model.C(), dtype=float))
+        D = np.atleast_2d(np.asarray(model.D(), dtype=float))
         L = np.atleast_2d(np.asarray(L, dtype=float))
         n, m = B.shape
         p = C.shape[0]
-        D = np.zeros((p, m)) if D is None else np.atleast_2d(np.asarray(D, dtype=float))
         check_dimensions(A, B, C, D, L)
-        x_bar = point_component(x_bar, n, "x_bar")
-        u_bar = point_component(u_bar, m, "u_bar")
-        y_bar = (
-            C @ x_bar + D @ u_bar
-            if y_bar is None
-            else point_component(y_bar, p, "y_bar")
+        x_bar, u_bar, y_bar = (
+            np.asarray(component, dtype=float).reshape(-1)
+            for component in design_point(model)
         )
+        labels = [hat(label) for label in model.state.labels]
 
         super().__init__(n)
         self.id = "observer"
@@ -66,10 +70,8 @@ class StateObserver(DynamicSystem):
             "y_bar": y_bar,
         }
 
-        # Signal labels: the estimate x̂, each entry with a hat
-        self.state.labels = (
-            [f"x̂[{i}]" for i in range(n)] if labels is None else list(labels)
-        )
+        # Signal labels: the model's state, each entry with a hat
+        self.state.labels = labels
 
         # Initial estimate: the operating point, where the model holds
         self.state.nominal_value = np.array(x_bar, dtype=float).reshape(-1)
@@ -149,6 +151,24 @@ class StateObserver(DynamicSystem):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_linear_model(model):
+    """Refuse anything but a linear model, one that stores its matrices: the observer runs them."""
+    if not isinstance(model, ConstantMatrices):
+        raise TypeError(
+            f"StateObserver(model, L) runs a linear model, got {type(model).__name__}: "
+            "pass LTISystem(A, B, C, D) or linearize(plant, x_bar), or design on the "
+            "plant with luenberger(plant, poles) or kalman(plant, Q_n, R_n)"
+        )
+
+
+def hat(label):
+    """``θ`` -> ``θ̂``, ``x[0]`` -> ``x̂[0]``, ``theta`` -> ``theta_hat``."""
+    component = re.fullmatch(r"(.)\[(\d+)\]", label)
+    if component:
+        return f"{component[1]}̂[{component[2]}]"
+    return f"{label}̂" if len(label) == 1 else f"{label}_hat"
 
 
 def check_dimensions(A, B, C, D, L):

@@ -479,6 +479,13 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     from the table as it stands, as the RL planner's `solve` does, and hands out the greedy law.
     The learners' `record.history` entries write each episode's (tabular) or iteration's (RL)
     cost as `"J"` (was `"cost"`): a scalar is `J` (ruling 17b).
+  - *The design verbs* (the maintainer's ruling 19): `trajectory_lqr` → `lqr_trajectory`, beside
+    `lqr`, `lqr_finite_horizon` and `lqr_gain_schedule`; their length `tf=` → `horizon=` (`tf` is
+    an absolute end time). `StateObserver(A, B, C, L, D, x_bar=, u_bar=, y_bar=)` →
+    `StateObserver(model, L)`, reading `A, B, C, D` and the operating point from a
+    `LinearizedSystem` (an `LTISystem` about the origin): the matrix form is
+    `StateObserver(LTISystem(A, B, C, D), L)`, the estimate's labels the model's with a hat.
+    No number moves.
 
 ## 3. Maturity (TRL)
 

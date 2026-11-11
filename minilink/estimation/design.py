@@ -1,14 +1,8 @@
 """State-observer design: a model or arrays in, a ``StateObserver`` out, the duals of the state-feedback designs."""
 
-import re
-
 import numpy as np
 
-from minilink.analysis.linearization import (
-    design_model,
-    design_point,
-    require_continuous_model,
-)
+from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import care, require_weight
 from minilink.analysis.structural import observability_matrix, rank
 from minilink.control.design import place_gain
@@ -135,32 +129,11 @@ def require_observable(obsv, n):
 
 
 def build_observer(model, L, name):
-    """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point, its labels with a hat."""
-    labels = [hat(label) for label in model.state.labels]
-    x_bar, u_bar, y_bar = design_point(model)
-
-    observer = StateObserver(
-        model.A(),
-        model.B(),
-        model.C(),
-        L,
-        model.D(),
-        x_bar=x_bar,
-        u_bar=u_bar,
-        y_bar=y_bar,
-        labels=labels,
-    )
+    """The ``StateObserver`` called ``name`` running ``model`` with gain ``L`` at the model's operating point."""
+    observer = StateObserver(model, L)
     observer.name = name
 
     return observer
-
-
-def hat(label):
-    """``θ`` -> ``θ̂``, ``x[0]`` -> ``x̂[0]``, ``theta`` -> ``theta_hat``."""
-    component = re.fullmatch(r"(.)\[(\d+)\]", label)
-    if component:
-        return f"{component[1]}̂[{component[2]}]"
-    return f"{label}̂" if len(label) == 1 else f"{label}_hat"
 
 
 if __name__ == "__main__":

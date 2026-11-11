@@ -76,7 +76,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     "lqr": ("minilink.control.design", "lqr"),
     "lqr_gain": ("minilink.control.design", "lqr_gain"),
     "lqr_finite_horizon": ("minilink.control.design", "lqr_finite_horizon"),
-    "trajectory_lqr": ("minilink.control.design", "trajectory_lqr"),
+    "lqr_trajectory": ("minilink.control.design", "lqr_trajectory"),
     "place": ("minilink.control.design", "place"),
     "place_gain": ("minilink.control.design", "place_gain"),
     "lqg": ("minilink.control.design", "lqg"),

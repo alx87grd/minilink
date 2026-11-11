@@ -806,7 +806,7 @@ def test_the_gradient_reaches_an_observers_start():
     B = np.array([[0.0], [1.0]])
     C = np.array([[1.0, 0.0]])
     plant_ = LTISystem(A, B, C)
-    observer = StateObserver(A, B, C, np.array([[3.0], [2.0]]))
+    observer = StateObserver(plant_, np.array([[3.0], [2.0]]))
     loop = closed_loop(StateFeedback(np.array([[1.0, 1.5]])), plant_, observer=observer)
     problem = PlanningProblem(
         plant_, x0=[1.0, 0.0], cost=QuadraticCost.from_system(plant_), horizon=2.0

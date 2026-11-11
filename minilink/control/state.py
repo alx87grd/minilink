@@ -195,7 +195,7 @@ class TrajectoryFeedback(System):
     gain, so it keeps regulating where the trajectory ends — usually an
     equilibrium. The measurement is the full state and the reference is the
     trajectory itself, so there is no reference port. This is the block
-    :func:`minilink.control.design.trajectory_lqr` returns.
+    :func:`minilink.control.design.lqr_trajectory` returns.
     """
 
     def __init__(self, trajectory, K):

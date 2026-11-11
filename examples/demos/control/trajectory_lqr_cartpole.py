@@ -11,7 +11,7 @@ from minilink import (
     SingletonSet,
     TrajectoryOptimizationPlanner,
     TrajectorySource,
-    trajectory_lqr,
+    lqr_trajectory,
 )
 
 TF = 4.0
@@ -54,7 +54,7 @@ replay.compute_trajectory(tf=2 * TF)
 replay.animate()
 
 # 2. Feedback along the reference: u = u_d(t) - K(t) (x - x_d(t))
-controller = trajectory_lqr(
+controller = lqr_trajectory(
     plant, reference, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.diag([1.0])
 )
 controller.plot_gain_schedule()

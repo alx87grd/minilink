@@ -27,9 +27,11 @@ SYSTEM_FACTORIES = {
     "Source": lambda: minilink.Source(2),
     "StateFeedback": lambda: minilink.StateFeedback(np.array([[1.0, 0.5]])),
     "StateObserver": lambda: minilink.StateObserver(
-        np.array([[0.0, 1.0], [-2.0, -0.5]]),
-        np.array([[0.0], [1.0]]),
-        np.array([[1.0, 0.0]]),
+        minilink.LTISystem(
+            np.array([[0.0, 1.0], [-2.0, -0.5]]),
+            np.array([[0.0], [1.0]]),
+            np.array([[1.0, 0.0]]),
+        ),
         np.array([[3.0], [2.0]]),
     ),
     "TimeVaryingFeedback": lambda: minilink.TimeVaryingFeedback(

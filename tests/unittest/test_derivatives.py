@@ -495,7 +495,7 @@ class TestFamilyPattern(unittest.TestCase):
         np.testing.assert_allclose(lin.linearize([0.1, 0.0]).A(), lin.A())
         poles, _ = modal_analysis(lin, [0.1, 0.0])
         np.testing.assert_allclose(np.sort(poles), np.sort(np.linalg.eigvals(lin.A())))
-        # the raw derivative evaluates where it is told: trajectory_lqr reads it along x(t)
+        # the raw derivative evaluates where it is told: lqr_trajectory reads it along x(t)
         np.testing.assert_allclose(jacobian(lin, "f", "x", [0.1, 0.0]), lin.A())
 
     def test_the_operating_point_size_is_checked_by_name(self):
