@@ -168,7 +168,7 @@ def run_rrt_vs_rrt_star():
         )
         extra = ""
         if title == "RRT*" and sol_rrt_star.record.reached_goal:
-            extra = f", converged={planner.converged}"
+            extra = f", converged={sol_rrt_star.record.converged}"
         planner.plot_tree(
             ax=ax,
             show=False,

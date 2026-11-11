@@ -575,6 +575,9 @@ def test_a_search_keeps_its_counts_on_its_record_only():
         assert record.n_iterations >= 0 and not record.reached_goal
         for retired in ("reached_goal", "iterations"):
             assert not hasattr(planner, retired), f"{planner_class.__name__}.{retired}"
+    # RRT*'s record copies (the maintainer's ruling Q7 of 2026-11-11): the record's alone
+    for retired in ("converged", "best_path_cost", "history"):
+        assert not hasattr(planner, retired), f"RRTStarPlanner.{retired}"
 
 
 def rl_planner(**method_numbers):
@@ -645,7 +648,7 @@ def test_the_running_cost_signals_are_dJ_and_J():
 
 
 def test_rrt_star_names_its_best_path_cost():
-    """Ruling 17b: RRT*'s best goal node's cost is the best path cost, never best_goal_cost."""
+    """Ruling 17b: RRT*'s best goal node's cost is the record's path_cost, never best_goal_cost."""
     from minilink.planning.search.extenders import KinodynamicExtender
     from minilink.planning.search.rrt_star import RRTStarPlanner
     from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
@@ -653,8 +656,8 @@ def test_rrt_star_names_its_best_path_cost():
     problem, _ = make_holonomic_obstacle_problem()
     extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
     planner = RRTStarPlanner(problem, extender=extender, max_iterations=5)
-    planner.solve()
-    assert hasattr(planner, "best_path_cost") and not hasattr(planner, "best_goal_cost")
+    record = planner.solve().record
+    assert hasattr(record, "path_cost") and not hasattr(planner, "best_goal_cost")
     assert all(hasattr(node, "cost_to_come") for node in planner.tree.nodes)
 
 

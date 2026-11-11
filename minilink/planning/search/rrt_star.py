@@ -43,18 +43,10 @@ class RRTStarPlanner(RRTPlanner):
 
     Its :meth:`solve` takes RRT's workflow, plus ``record_history`` and
     ``history_stride``: an :class:`RRTStarSnapshot` every ``history_stride``
-    extensions, for the animation.
-
-    Attributes
-    ----------
-    converged : bool
-        ``True`` when post-goal optimization stopped on the patience criterion.
-    iterations : int
-        Number of successful tree extensions performed.
-    best_path_cost : float or None
-        Best cost-to-come among nodes in the goal region.
-    history : list of RRTStarSnapshot
-        Recorded frames of a ``solve(record_history=True)``.
+    extensions, for the animation. The search's account is the solution's
+    record: ``converged`` (post-goal optimization stopped on the patience
+    criterion), ``path_cost`` (the best cost-to-come in the goal region) and
+    ``history`` (the snapshots of a ``solve(record_history=True)``).
     """
 
     number_names = RRTPlanner.number_names + ("radius_constant", "rewire_eta")
@@ -102,11 +94,6 @@ class RRTStarPlanner(RRTPlanner):
         self.cost_tol = float(cost_tol)
         self.convergence_patience = int(convergence_patience)
 
-        # The search's convergence, refreshed by every solve
-        self.converged: bool = False
-        self.best_path_cost: float | None = None
-        self.history: list[RRTStarSnapshot] = []
-
     def solve(
         self,
         *,
@@ -124,8 +111,8 @@ class RRTStarPlanner(RRTPlanner):
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         The workflow is :meth:`RRTPlanner.solve`'s, plus ``record_history``: an
-        :class:`RRTStarSnapshot` in :attr:`history` on the first and every
-        ``history_stride``-th extension, and on the last.
+        :class:`RRTStarSnapshot` in the record's ``history`` on the first and
+        every ``history_stride``-th extension, and on the last.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
@@ -159,15 +146,16 @@ class RRTStarPlanner(RRTPlanner):
             nearest_method=self.nearest_method,
         )
         self.solution_node = None
-        self.converged = False
-        self.best_path_cost = None
-        self.history = []
         report = self.build_search_report(callback)
 
-        # The extensions so far, and whether one reached the goal: the record's counts
+        # The extensions so far, whether one reached the goal, the best path's
+        # cost, the convergence and the snapshots: the record's account
         n_iterations = 0
         reached_goal = False
         best_goal_node = None
+        best_path_cost = None
+        converged = False
+        history = []
         stale_extensions = 0
 
         for _ in range(self.max_iterations):
@@ -184,7 +172,7 @@ class RRTStarPlanner(RRTPlanner):
             if best_goal_node is not None:
                 reached_goal = True
                 self.solution_node = best_goal_node
-                self.best_path_cost = float(best_goal_node.cost_to_come)
+                best_path_cost = float(best_goal_node.cost_to_come)
 
             # The step's callback, and its snapshot when the history is recorded
             phase = "optimize" if reached_goal and optimize_after_goal else "explore"
@@ -192,7 +180,7 @@ class RRTStarPlanner(RRTPlanner):
             if record_history and (
                 n_iterations == 1 or n_iterations % history_stride == 0
             ):
-                self.record_snapshot(best_goal_node, n_iterations)
+                history.append(self.snapshot_of(best_goal_node, n_iterations))
 
             # Stop at the first goal hit, or once the goal cost has gone patience
             # extensions without improving by cost_tol
@@ -205,14 +193,12 @@ class RRTStarPlanner(RRTPlanner):
                 else:
                     stale_extensions += 1
                 if stale_extensions >= patience:
-                    self.converged = True
+                    converged = True
                     break
 
         # The last extension's snapshot, when the stride skipped it
-        if record_history and (
-            not self.history or self.history[-1].iteration != n_iterations
-        ):
-            self.record_snapshot(best_goal_node, n_iterations)
+        if record_history and (not history or history[-1].iteration != n_iterations):
+            history.append(self.snapshot_of(best_goal_node, n_iterations))
 
         # No goal node: the node closest to the goal, when best effort is allowed
         if self.solution_node is None:
@@ -227,7 +213,12 @@ class RRTStarPlanner(RRTPlanner):
             evaluate,
             n_trials,
             self.search_record(
-                reached_goal, n_iterations, time.perf_counter() - started
+                reached_goal,
+                n_iterations,
+                time.perf_counter() - started,
+                best_path_cost=best_path_cost,
+                converged=converged,
+                history=history,
             ),
             verbose=verbose,
         )
@@ -244,24 +235,29 @@ class RRTStarPlanner(RRTPlanner):
 
         return kwargs
 
-    def search_record(self, reached_goal, n_iterations, solve_time_s=None):
-        """The RRT* record: the best goal cost, and whether patience declared convergence."""
+    def search_record(
+        self,
+        reached_goal,
+        n_iterations,
+        solve_time_s=None,
+        *,
+        best_path_cost=None,
+        converged=False,
+        history=(),
+    ):
+        """The RRT* record: the best goal cost, whether patience declared convergence, the snapshots."""
         record = super().search_record(reached_goal, n_iterations, solve_time_s)
-        path_cost = (
-            record.path_cost
-            if self.best_path_cost is None
-            else float(self.best_path_cost)
-        )
+        path_cost = record.path_cost if best_path_cost is None else best_path_cost
 
         return replace(
             record,
             path_cost=path_cost,
-            converged=bool(self.converged),
-            history=list(self.history),
+            converged=bool(converged),
+            history=list(history),
         )
 
     def animate_convergence(self, **kwargs):
-        """Animate recorded RRT* history (a ``solve(record_history=True)``)."""
+        """Animate the latest solution's recorded history (a ``solve(record_history=True)``)."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_convergence
 
@@ -416,8 +412,8 @@ class RRTStarPlanner(RRTPlanner):
 
         return best_goal_node, improved
 
-    def record_snapshot(self, best_goal_node, n_iterations):
-        """Append the tree and the best goal path of extension ``n_iterations`` to the history."""
+    def snapshot_of(self, best_goal_node, n_iterations):
+        """The tree and the best goal path of extension ``n_iterations``: one :class:`RRTStarSnapshot` of the history."""
         tree_edges = [
             np.asarray(node.edge.states, dtype=float)
             for node in self.tree.nodes
@@ -427,18 +423,16 @@ class RRTStarPlanner(RRTPlanner):
         if best_goal_node is not None:
             path_states = self.path_states(best_goal_node)
 
-        self.history.append(
-            RRTStarSnapshot(
-                iteration=n_iterations,
-                best_cost_to_come=(
-                    None
-                    if best_goal_node is None
-                    else float(best_goal_node.cost_to_come)
-                ),
-                reached_goal=best_goal_node is not None,
-                tree_edges=tree_edges,
-                path_states=path_states,
-            )
+        best_cost_to_come = None
+        if best_goal_node is not None:
+            best_cost_to_come = float(best_goal_node.cost_to_come)
+
+        return RRTStarSnapshot(
+            iteration=n_iterations,
+            best_cost_to_come=best_cost_to_come,
+            reached_goal=best_goal_node is not None,
+            tree_edges=tree_edges,
+            path_states=path_states,
         )
 
 

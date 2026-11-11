@@ -182,7 +182,8 @@ def animate_convergence(
     """
     Animate recorded RRT* history showing tree growth and best-path refinement.
 
-    Requires ``planner.history`` from a solve with ``record_history=True``.
+    Requires the latest solution's ``record.history``, from a solve with
+    ``record_history=True``.
     Each frame redraws the full tree (including rewiring) and highlights the
     current best goal path. Returns the
     :class:`~matplotlib.animation.FuncAnimation` (keep a reference).
@@ -415,8 +416,11 @@ def set_limits(ax, planner, x_axis, y_axis):
 
 
 def require_history(planner):
-    """Refuse a planner that recorded no search history; return its history."""
-    history = getattr(planner, "history", None)
+    """Refuse a planner whose latest solution recorded no search history; return that history."""
+    # Lazy import: the planner base loads with the planners, the plots after them
+    from minilink.planning.planner import require_solution
+
+    history = require_solution(planner).record.history
     if not history:
         raise ValueError(
             "No search history recorded; run solve with record_history=True"

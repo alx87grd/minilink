@@ -542,6 +542,10 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     output_dim=, expose_state=, y_dependencies=())`, the output `y = h(x, u, t)` the law's own
     `h`, in seconds; a law that writes no `h` is refused (the inherited `h` reads the law's
     first output port, so `y` would read itself).
+  - *RRT*'s account is its record's* (the maintainer's ruling Q7 of 2026-11-11, RULES 2.4):
+    the planner's copies `planner.converged`, `planner.best_path_cost` and `planner.history`
+    are gone; read `solution.record.converged`, `record.path_cost` and `record.history`
+    (`animate_convergence` reads the latest solution's).
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the

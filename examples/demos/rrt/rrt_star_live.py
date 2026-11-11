@@ -117,23 +117,23 @@ traj, record = solution.trajectory, solution.record
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
 stop_reason = (
     "converged"
-    if planner.converged
+    if record.converged
     else ("max_iterations" if record.n_iterations >= MAX_NODES else "first_goal")
 )
 
-print(f"  reached_goal={record.reached_goal}  converged={planner.converged}")
+print(f"  reached_goal={record.reached_goal}  converged={record.converged}")
 print(f"  extensions={record.n_iterations}  tree nodes={len(planner.tree.nodes)}")
-print(f"  best path cost={planner.best_path_cost:.3f}  goal error={goal_error:.3f} m")
+print(f"  best path cost={record.path_cost:.3f}  goal error={goal_error:.3f} m")
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
-if REPLAY_HISTORY and planner.history:
-    first_goal = next((frame for frame in planner.history if frame.reached_goal), None)
+if REPLAY_HISTORY and record.history:
+    first_goal = next((frame for frame in record.history if frame.reached_goal), None)
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
             f"cost={first_goal.best_cost_to_come:.3f}"
         )
-        final_cost = planner.history[-1].best_cost_to_come
+        final_cost = record.history[-1].best_cost_to_come
         print(
             f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost_to_come - final_cost:.3f})"
         )

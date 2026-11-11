@@ -1199,8 +1199,8 @@ def test_rrt_star_reaches_goal():
     solution = planner.solve()
     traj = solution.trajectory
     assert solution.record.reached_goal and solution.success
-    assert solution.record.path_cost == planner.best_path_cost
-    assert solution.record.converged == planner.converged
+    assert solution.record.path_cost == planner.solution_node.cost_to_come
+    assert not solution.record.converged  # no post-goal optimization asked
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))
 
@@ -1418,7 +1418,7 @@ def test_convergence_patience_stops_search():
     )
     record = planner.solve().record
     assert record.reached_goal
-    assert planner.converged
+    assert record.converged
     assert record.n_iterations < 8000
 
 
@@ -1430,10 +1430,10 @@ def test_record_history_for_animation():
         seed=0,
         max_iterations=800,
     )
-    planner.solve(record_history=True, history_stride=25)
-    assert len(planner.history) >= 2
-    assert planner.history[0].iteration == 1
-    assert all((frame.tree_edges for frame in planner.history[1:]))
+    history = planner.solve(record_history=True, history_stride=25).record.history
+    assert len(history) >= 2
+    assert history[0].iteration == 1
+    assert all((frame.tree_edges for frame in history[1:]))
 
 
 from dataclasses import dataclass

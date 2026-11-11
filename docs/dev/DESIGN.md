@@ -1906,9 +1906,10 @@ with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
 `Tree.propagate_cost`); `Edge.cost` is the edge's own cost and `Node.cost_to_come` the sum
 of them from the root. With
 `optimize_after_goal`, the search continues after the first goal connection until
-the best path cost (`planner.best_path_cost`; a live step's and a snapshot's
-`best_cost_to_come`) stops improving for `convergence_patience` extensions;
-`solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
+the best path cost (the record's `path_cost`; a live step's and a snapshot's
+`best_cost_to_come`) stops improving for `convergence_patience` extensions (the record's
+`converged`); `solve(record_history=True)` keeps the snapshots in the record's `history`,
+and `animate_convergence` replays the latest solution's tree growth and path refinement.
 `solve(callback=…)` takes a callable or a list of callables and hands every successful
 extension to each (a `TreeSearchIteration`), each hook filtering for itself; the live figure is
 one such hook, `LiveSearchPlot(every=1, pause=…, after_goal_only=False, ax=None)`, exported on
