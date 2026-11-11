@@ -22,5 +22,4 @@ car.game(
         key_axes=[("up", "down"), ("left", "right")],
         joystick_axes=[(1, 1.0), (0, -1.0)],
     ),
-    backend="jax",
 )

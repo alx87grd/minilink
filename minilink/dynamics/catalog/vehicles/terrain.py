@@ -18,8 +18,9 @@ class Terrain:
     [m] and the time ``t`` [s]: its height ``z(x, y)``, the gradient of that height,
     and a friction factor that multiplies each tire's ``mu``: the road's grip
     relative to the reference surface (dry asphalt), ``params["friction"]``, 1 by
-    default, uniform unless a subclass maps it over the ground. A subclass writes its gradient in closed form, the exact derivative of
-    its height, and keeps its numbers in ``params``.
+    default, uniform unless a subclass maps it over the ground. A subclass writes its
+    gradient in closed form, the exact derivative of its height, and keeps its numbers
+    in ``params``.
     """
 
     params = own_params()
@@ -53,9 +54,9 @@ class Terrain:
         friction = params["friction"]
 
         # Uniform over the ground
-        mu = friction * xp.ones_like(x * y)
+        factor = friction * xp.ones_like(x * y)
 
-        return mu
+        return factor
 
 
 class Slope(Terrain):
@@ -196,6 +197,6 @@ class TerrainBlock(System):
         p_x = u[:n]
         p_y = u[n:]
 
-        mu = terrain.friction(p_x, p_y, t, terrain_params)
+        factor = terrain.friction(p_x, p_y, t, terrain_params)
 
-        return mu
+        return factor

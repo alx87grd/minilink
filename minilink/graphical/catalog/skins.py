@@ -3,6 +3,7 @@
 import numpy as np
 
 from minilink.core.kinematics import translation
+from minilink.graphical.catalog.car_skins_3d import terrain_surface
 from minilink.graphical.catalog.shapes import (
     Box,
     Line,
@@ -90,8 +91,12 @@ def car_skin_3d(plant, color="#151922"):
     body_length = (a + b) + body_length_overhang
     tire_radius = max(0.045, tire_radius_ratio * min(r_f, r_r))
 
-    # The ground, in the world frame
-    ground = ground_plane(ground_size)
+    # The ground, in the world frame: the plant's terrain over its scene_bounds when it
+    # sets them, the flat plane otherwise
+    if getattr(plant, "scene_bounds", None) is None:
+        ground = [ground_plane(ground_size)]
+    else:
+        ground = terrain_surface(plant, "#9aa3ad")
 
     # The body box, at a fixed offset within the body frame (the c.g. sits at its
     # origin): lifted to ride height and shifted to the wheelbase's geometric center
@@ -122,7 +127,7 @@ def car_skin_3d(plant, color="#151922"):
     wheel_fr = wheel()
 
     look = {
-        "world": [ground],
+        "world": ground,
         "body": [body, wheel_rl, wheel_rr],
         "wheel_fl": [wheel_fl],
         "wheel_fr": [wheel_fr],
