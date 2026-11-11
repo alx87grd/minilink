@@ -767,7 +767,7 @@ There is no profile table and no port override attribute.
 The port names drive three tools:
 
 - **`@` composition** reads `subsystem_roles` (the sampled loop through
-  `resolve_standard_feedback` and `default_computer_boundary_ports`): every
+  `resolve_standard_feedback`): every
   controller input named `y` or `x` is wired to the plant output of the same
   name (a mechanical plant's `y` is its state `[q; dq]`, read straight; a
   plant box gives its own state), a controller with neither gets an `Error`

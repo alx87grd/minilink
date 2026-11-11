@@ -283,17 +283,6 @@ class StandardFeedbackWiring:
     plant_out: str
 
 
-def default_computer_boundary_ports(controller) -> tuple[str, str]:
-    """Return ``(measurement_in, control_out)`` for step-diagram boundary expose."""
-    roles = subsystem_roles(controller)
-
-    # The measurement y or x, else the error entry, else the default input
-    measurement_in = roles.measurement or roles.entry or default_input_port(controller)
-    control_out = default_control_out(controller)
-
-    return measurement_in, control_out
-
-
 ###############################################################################
 # Internal machinery
 ###############################################################################
