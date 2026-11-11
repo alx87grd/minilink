@@ -1,7 +1,7 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
-**Status:** in design. The maintainer was interviewed on 2026-11-11; his answers are recorded
-in §2. The questions still open are in §9. Nothing is built.  
+**Status:** designed; nothing built. The maintainer was interviewed on 2026-11-11; the answers
+are recorded in §2, and no question is open (§9).  
 **Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
 to the maintainer's private repository, not to minilink.  
 **Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),
@@ -21,7 +21,7 @@ dynamic rungs a shared set of pieces:
 A 3-D car with suspension can then be built on those pieces, and the maintainer's private
 research models (off-road) can build on the same pieces.
 
-Who uses it: the maintainer's courses and his research. Self-driving is the main use case:
+Who uses it: the maintainer's courses and research. Self-driving is the main use case:
 - planning on a kinematic model;
 - MPC and estimation on a dynamic one;
 - a realistic plant to simulate against;
@@ -31,8 +31,8 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 
 | Topic | Answer |
 | --- | --- |
-| Users | the courses and his research; advanced specialized models in his private repository |
-| Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity |
+| Users | the maintainer's courses and research; advanced specialized models in the maintainer's private repository |
+| Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6a `Car3D`, a double-track rigid car whose four wheel loads follow the accelerations (no suspension; designed for, not built); 6 a 3-D car with suspension on a hard surface, at video-game fidelity |
 | 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it; its own class (`BicycleDynRate` today), sharing rung 3's chassis through the parent class, so rung 3's `f` stays a clean course page |
 | UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class. Its public face: thin classes (`UdeSRacecar` on rung 2, `UdeSRacecarDyn` on rung 4) that set only the preset numbers and the skin, no equations; the one written exception to the catalog clean-up's "no two supported plants differ by parameters alone". `UdeSRacecarDyn3D` becomes a `wheel_angles=True` option on rung 4, as the car cut (K8-0) already says |
 | Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until phase 3, then retires (§5.1, §7) |
@@ -40,8 +40,8 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Rung 6 and rung 4 | different models, but sharing the names and the positions of states and parameters as far as possible |
 | State layout | rung 4's state is the first part of rung 6's state, in the same order; the 3-D states come after it |
 | Heading | `psi` on every rung (state label `"psi"`); rung 6 uses roll `φ`, pitch `θ`, yaw `ψ` |
-| Suspension | the design supports spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only |
-| Load transfer | only on the 3-D car, with its four tires, where it comes from the suspension; the bicycle series (rungs 3 to 4) has none. A quasi-static rung 4b, solved exactly, was considered and dropped (2026-11-11). Load transfer is an exact continuous model: no lag on the acceleration |
+| Suspension | the design supports spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only. Wheel hop is a construction option on rung 6, `massless_wheel=True` by default (level i); `massless_wheel=False` adds each corner's wheel mass, its states appended at the end |
+| Load transfer | not on the single track: the bicycle series (rungs 3 to 4) keeps static axle loads, as the transfer is not worth it there. On the double track only: quasi-static on `Car3D` (four wheels, no suspension; designed for, not built), and from the suspension on rung 6. Always an exact continuous model, never a lag on the acceleration (§6). Clarifies the same day's "only on the 3-D car" |
 | Slip | today's slip definitions kept during the refactor, so no demo number moves; the smooth formula is tried later, together with the switch from `LinearSaturation` to the brush law, measured before and after (§5.1, §7). Supersedes the same day's answer to switch the slip during phase 1 |
 | Parameter names | flat, one suffix per axle (`c_alpha_f`, `k_r`), left and right symmetric, as the racecar and the textbook write them; rung 6 keeps the same; asymmetric corners are a later extension (private repository) |
 | Magic formula | default shape `C = 1.3`, `E = −0.5`, both directions: the peak `μ Fz` near the brush law's full slide (12° at `c = 13/rad`), then a fall to `sin(C π/2) ≈ 0.89` of the peak; both numbers in `params`; a fit to a published tire, cited in the module, can replace them when it is written |
@@ -104,6 +104,7 @@ The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no pe
 | 3b | dynamic bicycle, rate inputs | `+ w_rear, δ` | `ẇ_rear, δ̇` | actuators as states: limits become bounds, rates become costs (the MPC plant) |
 | 4 | `DrivetrainBicycle` | `+ P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering |
 | 5 | longitudinal car (side step) | `x, v, ω, φ` | wheel torque | slip ratio, maximum braking and acceleration |
+| 6a | `Car3D` (designed for, not built) | rung 4's nine, nothing added | as rung 4 | the double track: four wheels, the track width, quasi-static load transfer (§6) |
 | 6 | `SuspensionCar3D` | rung 4's nine, then `z, φ, θ, vz, p, q`, then the corner states (§5.3) | as rung 4 | heave, roll, pitch, suspension, load transfer, terrain |
 
 - **One rule, every rung: a rung appends states and never reorders them.** A controller,
@@ -244,14 +245,15 @@ mu = terrain.friction(x, y, t, params)      # multiplies the tire's μ
 | Law | Where `Fz` comes from | States added | Rung |
 | --- | --- | --- | --- |
 | static | the weight split, `m g b / L` | none | 3, 3b, 4 (today) |
+| quasi-static transfer | the exact solve of §6 | none | 6a (`Car3D`) |
 | spring-damper (level i) | compression from the body pose and the terrain height: `Fz = k Δ + b Δ̇`, floored at 0 (the wheel lifts off) | none beyond rung 6's body | 6 |
-| spring-damper and wheel mass (level ii) | the two-mass quarter car per corner | 2 per corner | 6, an option |
+| spring-damper and wheel mass (level ii) | the two-mass quarter car per corner | 2 per corner | 6, with `massless_wheel=False` |
 
 ### 5.4 The body
 
 `M v̇ + C(v) v + d = 0`, `q̇ = N(q) v`, in the body frame:
 
-- planar for rungs 3 to 4: `q = [x, y, psi]`;
+- planar for rungs 3 to 4 and for `Car3D`: `q = [x, y, psi]`;
 - 6-DOF for rung 6: position and roll, pitch, yaw.
 
 The contact velocity of each wheel comes from the body twist and is rotated into the wheel
@@ -261,28 +263,58 @@ the body-frame form.
 
 ## 6. Load transfer
 
-**Only on the 3-D car** (the maintainer, 2026-11-11). The bicycle series (rungs 3 to 4) keeps
-static axle loads.
+**Not on the single track** (the maintainer, 2026-11-11): the bicycle series (rungs 3 to 4)
+keeps static axle loads. **On the double track, two ways:**
 
-**On rung 6 the transfer comes from the suspension, with no algebraic loop.** Each corner's
-load comes from its spring compression and compression rate, which are states. Pitch under
-braking moves load forward, and roll in a turn moves it to the outer wheels. The model stays a
-plain continuous ODE `ẋ = f(x, u)`, with no lag and no solve inside `f`.
+**`Car3D` (rung 6a, designed for, not built): quasi-static, on four wheels, no suspension.**
+The body stays planar and rigid. Each wheel's load follows the accelerations of the centre of
+gravity. That is a loop: the loads depend on the accelerations, the accelerations on the tire
+forces, and the forces on the loads. It is solved exactly, inside `f`:
+
+1. The tires are linear in the load: `F_i = Fz_i φ_i`, where `φ_i` depends on the state
+   only (§5.1).
+2. The loads are affine in the acceleration `a = (a_x, a_y)`:
+
+   ```text
+   Fz_i = Fz_i⁰ + G_i a
+   ```
+
+   `G_i` comes from the centre-of-gravity height `h`, the wheelbase, the track and the
+   front share of the roll stiffness.
+3. Newton's law is then a linear 2×2 system:
+
+   ```text
+   (m I − Σ R_i φ_i G_i) a = Σ R_i φ_i Fz_i⁰ − drag
+   ```
+
+   The yaw acceleration `ṙ` then follows from the moments with the known loads.
+
+The result is a continuous ODE, pure, on NumPy and JAX, with no state added and no lag.
+`LongitudinalSlipCar` already solves this loop by hand in 1-D: its denominator
+`m (1 + μ r_y)` is the solved loop.
+
+Its limits:
+- The matrix is singular only at the tipping limit (roughly `μ h / L → 1`).
+- A smooth floor on `Fz` keeps a wheel's lift-off continuous.
+- A load-sensitive tire makes the loop nonlinear: a Newton solve inside `f`.
+
+Its state is rung 4's nine, so `SuspensionCar3D` appends to it as well. `Car3D` is
+`SuspensionCar3D`'s limit with an infinitely stiff suspension.
+
+**`SuspensionCar3D` (rung 6): from the suspension, with no loop.** Each corner's load comes
+from its spring compression and compression rate, which are states. Pitch under braking moves
+load forward; roll in a turn moves it to the outer wheels. The model stays a plain continuous
+ODE, with no solve inside `f`.
 
 **What the transfer changes with the module's tire laws.** All three laws are linear in the
-load (`F = Fz · φ(slip)`), so an axle's total force is `φ · (Fz_left + Fz_right)`:
+load (`F = Fz · φ(slip)`), so an axle's total force is `φ · (Fz_left + Fz_right)`, on both
+cars:
 - **Front-to-back transfer changes the axle totals.** Braking oversteer shows directly.
 - **Side-to-side transfer leaves each axle's total unchanged** while both wheels grip. It
-  shows as body roll and as a wheel lifting off, not as a change of balance. Changing the
-  balance (roll-stiffness tuning) needs a load-sensitive tire, whose grip per unit load
-  falls as the load rises. That law can be added behind the same interface later, or in the
-  private repository.
-
-**Considered and dropped: a quasi-static rung 4b.** It was a bicycle whose loads follow the
-accelerations. It can be solved exactly: the loads are affine in the acceleration and the
-forces linear in the loads, so `(m I − Σ R_i φ_i G_i) a = Σ R_i φ_i Fz_i⁰ − drag` is a
-linear solve inside `f`. That is the 2-D form of what `LongitudinalSlipCar` does in 1-D.
-Recorded here in case the question returns.
+  shows as a wheel lifting off, and on rung 6 as body roll, not as a change of balance.
+  Changing the balance (roll-stiffness tuning) needs a load-sensitive tire, whose grip per
+  unit load falls as the load rises. That law can be added behind the same interface later,
+  or in the private repository.
 
 ## 7. Phases
 
@@ -330,9 +362,12 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - **Recorded in a ledger** in this plan.
   - **A switch stays** if every solve still converges, the cost and the tracking error are
     within noise or better, and the time is not slower beyond noise. Otherwise stop and ask.
-- **Later, designed for but not scheduled:** wheel hop (level ii), more presets, a
-  load-sensitive tire law, and the review of rebuilding `QuarterCar` on the corner law and
-  the terrain (§2).
+- **Later, designed for but not scheduled:**
+  - `Car3D` (rung 6a);
+  - wheel hop (level ii, `massless_wheel=False`);
+  - more presets;
+  - a load-sensitive tire law;
+  - the review of rebuilding `QuarterCar` on the corner law and the terrain (§2).
 
 ## 8. What leaves, what stays
 
@@ -346,8 +381,5 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
 
 ## 9. Open questions
 
-In order, one at a time. Each goes to QUESTIONS.md when it comes up, and its answer lands
-here.
-
-1. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
-   end), or a rung 7.
+None: the interview of 2026-11-11 answered every question this plan raised. A new question
+goes to QUESTIONS.md, and its answer lands here.
