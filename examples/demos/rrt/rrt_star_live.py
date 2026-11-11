@@ -123,7 +123,7 @@ stop_reason = (
 
 print(f"  reached_goal={record.reached_goal}  converged={planner.converged}")
 print(f"  extensions={record.n_iterations}  tree nodes={len(planner.tree.nodes)}")
-print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3f} m")
+print(f"  best path cost={planner.best_path_cost:.3f}  goal error={goal_error:.3f} m")
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
 if REPLAY_HISTORY and planner.history:
@@ -131,11 +131,11 @@ if REPLAY_HISTORY and planner.history:
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
-            f"cost={first_goal.best_cost:.3f}"
+            f"cost={first_goal.best_cost_to_come:.3f}"
         )
-        final_cost = planner.history[-1].best_cost
+        final_cost = planner.history[-1].best_cost_to_come
         print(
-            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost - final_cost:.3f})"
+            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost_to_come - final_cost:.3f})"
         )
 
 if LIVE_PLOT:

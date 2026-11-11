@@ -113,7 +113,7 @@ def run_scene_intro():
 
 
 def path_cost(planner) -> float:
-    return float(planner.solution_node.cost)
+    return float(planner.solution_node.cost_to_come)
 
 
 def path_hops(planner) -> int:

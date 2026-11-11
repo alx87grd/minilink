@@ -21,7 +21,7 @@ class TreeSearchIteration:
         RRT* convergence after the first goal connection.
     reached_goal : bool
         Whether a goal-region node exists in the tree.
-    best_cost : float or None
+    best_cost_to_come : float or None
         Best goal cost-to-come when ``reached_goal``; otherwise ``None``.
     n_nodes : int
         Current tree size.
@@ -32,7 +32,7 @@ class TreeSearchIteration:
     iteration: int
     phase: str
     reached_goal: bool
-    best_cost: float | None
+    best_cost_to_come: float | None
     n_nodes: int
     planner: object
 

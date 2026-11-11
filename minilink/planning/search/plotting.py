@@ -238,10 +238,10 @@ def animate_convergence(
             )
 
         # The iteration, and the best cost once the goal is reached
-        if snapshot.reached_goal and snapshot.best_cost is not None:
+        if snapshot.reached_goal and snapshot.best_cost_to_come is not None:
             title.set_text(
                 f"{title_prefix}  iter={snapshot.iteration}  "
-                f"best cost={snapshot.best_cost:.2f}"
+                f"best cost={snapshot.best_cost_to_come:.2f}"
             )
         else:
             title.set_text(f"{title_prefix}  iter={snapshot.iteration}  searching...")
@@ -449,10 +449,10 @@ def best_path_states(planner, reached_goal):
 
 def search_title(step):
     """The live plot's title for one search step."""
-    if step.reached_goal and step.best_cost is not None:
+    if step.reached_goal and step.best_cost_to_come is not None:
         return (
             f"RRT search  phase={step.phase}  iter={step.iteration}  "
-            f"nodes={step.n_nodes}  best cost={step.best_cost:.2f}"
+            f"nodes={step.n_nodes}  best cost={step.best_cost_to_come:.2f}"
         )
 
     return (

@@ -303,6 +303,14 @@ RETIRED_NAMES = {
         "J"
     ),
     "minilink.planning.trajectory_optimization.path_integral.MPPIRecord.cost": "J",
+    "minilink.planning.search.tree.Node.cost": "cost_to_come",
+    "minilink.planning.search.rrt_star.RRTStarSnapshot.best_cost": "best_cost_to_come",
+    "minilink.planning.search.live_plot.TreeSearchIteration.best_cost": (
+        "best_cost_to_come"
+    ),
+    "minilink.planning.trajectory_optimization.path_integral.CompiledMPPIPlanner.path_cost": (
+        "rollout_cost"
+    ),
 }
 
 
@@ -574,6 +582,20 @@ def test_the_running_cost_signals_are_dJ_and_J():
         assert "J" in signals and "cost" not in signals and "cost_rate" not in signals
     assert "dJ" in traj.signals
     assert _COST_SIGNAL_LABELS == {"dJ": "dJ/dt", "J": "J"}
+
+
+def test_rrt_star_names_its_best_path_cost():
+    """Ruling 17b: RRT*'s best goal node's cost is the best path cost, never best_goal_cost."""
+    from minilink.planning.search.extenders import KinodynamicExtender
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+    from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
+
+    problem, _ = make_holonomic_obstacle_problem()
+    extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
+    planner = RRTStarPlanner(problem, extender=extender, max_nodes=5)
+    planner.solve()
+    assert hasattr(planner, "best_path_cost") and not hasattr(planner, "best_goal_cost")
+    assert all(hasattr(node, "cost_to_come") for node in planner.tree.nodes)
 
 
 def test_a_solve_status_reports_its_scalar_as_J():

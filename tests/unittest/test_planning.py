@@ -1152,7 +1152,7 @@ def test_tree_rewire_and_propagate_cost():
     tree.rewire(b, tree.root, edge_rc)
     assert not any((child is b for child in a.children))
     assert any((child is b for child in tree.root.children))
-    assert b.cost == pytest.approx(2.0)
+    assert b.cost_to_come == pytest.approx(2.0)
     assert a.children == []
 
 
@@ -1183,7 +1183,7 @@ def path_cost(planner) -> float:
     node = planner.solution_node
     if node is None:
         return float("inf")
-    return float(node.cost)
+    return float(node.cost_to_come)
 
 
 def test_rrt_star_reaches_goal():
@@ -1197,7 +1197,7 @@ def test_rrt_star_reaches_goal():
     solution = planner.solve()
     traj = solution.trajectory
     assert solution.record.reached_goal and solution.success
-    assert solution.record.path_cost == planner.best_goal_cost
+    assert solution.record.path_cost == planner.best_path_cost
     assert solution.record.converged == planner.converged
     assert np.linalg.norm(traj.x[:, -1] - X_GOAL) < 0.5
     assert all((X.contains(traj.x[:, i]) for i in range(traj.x.shape[1])))

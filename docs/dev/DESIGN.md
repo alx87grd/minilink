@@ -1880,9 +1880,11 @@ via a `SteeringFunction` including `DubinsSteering`) and a `metric(a,b)` callabl
 `(t,x,u)`; `solve() → PlanningSolution` with a held (`hold="zoh"`)
 `TrajectorySource` as its controller and a `TreeSearchRecord`. `RRTStarPlanner` extends the attach step
 with near-neighbour parent selection and cost-based rewiring (`Tree.rewire`,
-`Tree.propagate_cost`); `Edge.cost` is the cost-to-come along the tree. With
+`Tree.propagate_cost`); `Edge.cost` is the edge's own cost and `Node.cost_to_come` the sum
+of them from the root. With
 `optimize_after_goal`, the search continues after the first goal connection until
-the best goal cost stops improving for `convergence_patience` extensions;
+the best path cost (`planner.best_path_cost`; a live step's and a snapshot's
+`best_cost_to_come`) stops improving for `convergence_patience` extensions;
 `solve(record_history=True)` + `animate_convergence` replay tree growth and path refinement.
 `solve(callback=…)` takes a callable or a list of callables and hands every successful
 extension to each (a `TreeSearchIteration`), each hook filtering for itself; the live figure is

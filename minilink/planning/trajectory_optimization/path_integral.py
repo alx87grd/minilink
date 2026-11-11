@@ -294,7 +294,7 @@ class CompiledMPPIPlanner:
     def solve_body(self, P, z0):
         """One path-integral solve from ``P["x0"]``: :meth:`passes`, then the plan's own rollout and the status."""
         jnp = self.jnp
-        path_cost = self.path_cost
+        rollout_cost = self.rollout_cost
 
         x0 = P["x0"]
         t0 = P["t0"]
@@ -303,7 +303,7 @@ class CompiledMPPIPlanner:
         U, last = self.passes(P, z0)
 
         # The plan's own rollout: its J and whether it stays in X
-        J, left, _ = path_cost(x0, t0, U, P)
+        J, left, _ = rollout_cost(x0, t0, U, P)
         S = last["S"]
         w = last["w"]
         status = {
@@ -330,7 +330,7 @@ class CompiledMPPIPlanner:
         t_origin = self.problem.t0
         u_lower = self.u_lower
         u_upper = self.u_upper
-        path_cost = self.path_cost
+        rollout_cost = self.rollout_cost
 
         # The start, the method's numbers, the plan
         x0 = P["x0"]
@@ -349,7 +349,7 @@ class CompiledMPPIPlanner:
             V = jnp.clip(U + eps, u_lower, u_upper)
 
             # Roll out and score: S^k = Σ_t γ^t c_t + γ^N h(x_N) + the cost of leaving X
-            S_path, left_X, X = jax.vmap(lambda V_k: path_cost(x0, t0, V_k, P))(V)
+            S_path, left_X, X = jax.vmap(lambda V_k: rollout_cost(x0, t0, V_k, P))(V)
 
             # The information term: λ (1 − α) Σ_t u_tᵀ Σ⁻¹ ε^k_t
             S = S_path + lam * (1.0 - alpha) * jnp.einsum(
@@ -533,7 +533,7 @@ class CompiledMPPIPlanner:
 
         return xp.reshape(z[:-1], (self.N, self.m))
 
-    def path_cost(self, x0, t0, V, P):
+    def rollout_cost(self, x0, t0, V, P):
         """``(S, left_X, x_path)`` of one held sequence ``V`` from ``x0`` at ``t0``: the discounted cost, whether it left ``X``, the states ``(N + 1, n)``."""
         jax = self.jax
         jnp = self.jnp

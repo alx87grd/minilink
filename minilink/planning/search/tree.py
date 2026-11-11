@@ -20,12 +20,12 @@ NEAREST_METHODS = (NEAREST_BRUTE_FORCE, NEAREST_KD_TREE)
 
 @dataclass
 class Node:
-    """A tree node: a state, its parent, the reaching edge, and cost-to-come."""
+    """A tree node: a state, its parent, the reaching edge, and its cost-to-come."""
 
     x: np.ndarray
     parent: "Node | None"
     edge: Edge | None
-    cost: float
+    cost_to_come: float
     children: list = field(default_factory=list, repr=False)
 
 
@@ -104,14 +104,14 @@ class Tree:
         # Attach it under the new parent: c(node) = c(parent) + c(edge)
         node.parent = new_parent
         node.edge = new_edge
-        node.cost = new_parent.cost + new_edge.cost
+        node.cost_to_come = new_parent.cost_to_come + new_edge.cost
         new_parent.children.append(node)
 
     def propagate_cost(self, node: Node) -> None:
         """Refresh cost-to-come for ``node`` and all descendants."""
         # c(child) = c(node) + c(edge), down the whole subtree
         for child in node.children:
-            child.cost = node.cost + child.edge.cost
+            child.cost_to_come = node.cost_to_come + child.edge.cost
             self.propagate_cost(child)
 
     def extract_trajectory(self, node: Node, t0: float = 0.0) -> Trajectory:

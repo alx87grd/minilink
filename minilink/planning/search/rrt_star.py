@@ -51,7 +51,7 @@ class RRTStarPlanner(RRTPlanner):
         ``True`` when post-goal optimization stopped on the patience criterion.
     iterations : int
         Number of successful tree extensions performed.
-    best_goal_cost : float or None
+    best_path_cost : float or None
         Best cost-to-come among nodes in the goal region.
     history : list of RRTStarSnapshot
         Recorded frames of a ``solve(record_history=True)``.
@@ -104,7 +104,7 @@ class RRTStarPlanner(RRTPlanner):
 
         # The search's convergence, refreshed by every solve
         self.converged: bool = False
-        self.best_goal_cost: float | None = None
+        self.best_path_cost: float | None = None
         self.history: list[RRTStarSnapshot] = []
 
     def solve(
@@ -155,12 +155,12 @@ class RRTStarPlanner(RRTPlanner):
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x0, parent=None, edge=None, cost=0.0),
+            Node(x=x0, parent=None, edge=None, cost_to_come=0.0),
             nearest_method=self.nearest_method,
         )
         self.solution_node = None
         self.converged = False
-        self.best_goal_cost = None
+        self.best_path_cost = None
         self.history = []
         report = self.build_search_report(callback)
 
@@ -184,7 +184,7 @@ class RRTStarPlanner(RRTPlanner):
             if best_goal_node is not None:
                 reached_goal = True
                 self.solution_node = best_goal_node
-                self.best_goal_cost = float(best_goal_node.cost)
+                self.best_path_cost = float(best_goal_node.cost_to_come)
 
             # The step's callback, and its snapshot when the history is recorded
             phase = "optimize" if reached_goal and optimize_after_goal else "explore"
@@ -249,8 +249,8 @@ class RRTStarPlanner(RRTPlanner):
         record = super().search_record(reached_goal, n_iterations, solve_time_s)
         path_cost = (
             record.path_cost
-            if self.best_goal_cost is None
-            else float(self.best_goal_cost)
+            if self.best_path_cost is None
+            else float(self.best_path_cost)
         )
 
         return replace(
@@ -289,7 +289,9 @@ class RRTStarPlanner(RRTPlanner):
         near_nodes = tree.near(x_new, radius, metric)
 
         # The new state joins the tree through its cheapest near parent
-        best_parent, best_edge, best_cost = self.choose_parent(near_nodes, x_new, rng)
+        best_parent, best_edge, best_cost_to_come = self.choose_parent(
+            near_nodes, x_new, rng
+        )
         if best_edge is None:
             return False
 
@@ -298,7 +300,7 @@ class RRTStarPlanner(RRTPlanner):
                 x=x_new,
                 parent=best_parent,
                 edge=best_edge,
-                cost=best_cost,
+                cost_to_come=best_cost_to_come,
             )
         )
 
@@ -358,19 +360,19 @@ class RRTStarPlanner(RRTPlanner):
         """The near node, edge and cost-to-come that reach ``x_new`` cheapest."""
         best_parent = None
         best_edge = None
-        best_cost = np.inf
+        best_cost_to_come = np.inf
 
         for node in near_nodes:
             edge = self.try_extend(node, x_new, rng)
             if edge is None:
                 continue
-            cost = node.cost + edge.cost
-            if cost < best_cost:
-                best_cost = cost
+            cost = node.cost_to_come + edge.cost
+            if cost < best_cost_to_come:
+                best_cost_to_come = cost
                 best_parent = node
                 best_edge = edge
 
-        return best_parent, best_edge, best_cost
+        return best_parent, best_edge, best_cost_to_come
 
     def rewire_near(self, new_node, near_nodes, rng):
         """Reparent each near node through ``new_node`` when that lowers its cost-to-come."""
@@ -382,26 +384,34 @@ class RRTStarPlanner(RRTPlanner):
             edge = self.try_extend(new_node, candidate.x, rng)
             if edge is None:
                 continue
-            new_cost = new_node.cost + edge.cost
-            if new_cost < candidate.cost:
+            new_cost = new_node.cost_to_come + edge.cost
+            if new_cost < candidate.cost_to_come:
                 tree.rewire(candidate, new_node, edge)
                 tree.propagate_cost(candidate)
 
     def refresh_best_goal(self, goal_region, best_goal_node, cost_tol):
         """The cheapest node in the goal region, and whether it beats the previous best by ``cost_tol``."""
         improved = False
-        previous_cost = None if best_goal_node is None else float(best_goal_node.cost)
+        previous_cost = (
+            None if best_goal_node is None else float(best_goal_node.cost_to_come)
+        )
 
         for node in self.tree.nodes:
             if not goal_region.contains(node.x):
                 continue
-            if best_goal_node is None or node.cost < best_goal_node.cost:
+            if (
+                best_goal_node is None
+                or node.cost_to_come < best_goal_node.cost_to_come
+            ):
                 best_goal_node = node
 
         if best_goal_node is None:
             return None, False
 
-        if previous_cost is None or best_goal_node.cost < previous_cost - cost_tol:
+        if (
+            previous_cost is None
+            or best_goal_node.cost_to_come < previous_cost - cost_tol
+        ):
             improved = True
 
         return best_goal_node, improved
@@ -420,8 +430,10 @@ class RRTStarPlanner(RRTPlanner):
         self.history.append(
             RRTStarSnapshot(
                 iteration=n_iterations,
-                best_cost=(
-                    None if best_goal_node is None else float(best_goal_node.cost)
+                best_cost_to_come=(
+                    None
+                    if best_goal_node is None
+                    else float(best_goal_node.cost_to_come)
                 ),
                 reached_goal=best_goal_node is not None,
                 tree_edges=tree_edges,
@@ -439,7 +451,7 @@ class RRTStarSnapshot:
     ----------
     iteration : int
         Extension index when the snapshot was taken.
-    best_cost : float or None
+    best_cost_to_come : float or None
         Best goal cost-to-come at this frame (``None`` before any goal node).
     reached_goal : bool
         Whether a goal-region node exists at this frame.
@@ -450,7 +462,7 @@ class RRTStarSnapshot:
     """
 
     iteration: int
-    best_cost: float | None
+    best_cost_to_come: float | None
     reached_goal: bool
     tree_edges: list
     path_states: np.ndarray | None = None

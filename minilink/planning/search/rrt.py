@@ -152,7 +152,7 @@ class RRTPlanner(Planner):
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x0, parent=None, edge=None, cost=0.0),
+            Node(x=x0, parent=None, edge=None, cost_to_come=0.0),
             nearest_method=self.nearest_method,
         )
         self.solution_node = None
@@ -170,8 +170,10 @@ class RRTPlanner(Planner):
                 continue
 
             # The new node, with its cost-to-come
-            cost = near.cost + edge.cost
-            node = self.tree.add(Node(x=edge.x_end, parent=near, edge=edge, cost=cost))
+            cost = near.cost_to_come + edge.cost
+            node = self.tree.add(
+                Node(x=edge.x_end, parent=near, edge=edge, cost_to_come=cost)
+            )
             n_iterations += 1
 
             # Stop at the first node inside the goal region
@@ -231,7 +233,7 @@ class RRTPlanner(Planner):
             reached_goal=bool(reached_goal),
             n_iterations=int(n_iterations),
             n_nodes=len(self.tree.nodes),
-            path_cost=float("nan") if node is None else float(node.cost),
+            path_cost=float("nan") if node is None else float(node.cost_to_come),
             converged=False,
             history=[],
             solve_time_s=solve_time_s,
@@ -410,15 +412,15 @@ class RRTPlanner(Planner):
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.live_plot import TreeSearchIteration
 
-        best_cost = None
+        best_cost_to_come = None
         if reached_goal and self.solution_node is not None:
-            best_cost = float(self.solution_node.cost)
+            best_cost_to_come = float(self.solution_node.cost_to_come)
 
         return TreeSearchIteration(
             iteration=n_iterations,
             phase=phase,
             reached_goal=reached_goal,
-            best_cost=best_cost,
+            best_cost_to_come=best_cost_to_come,
             n_nodes=len(self.tree.nodes),
             planner=self,
         )
