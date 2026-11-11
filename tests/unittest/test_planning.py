@@ -832,7 +832,9 @@ def test_kdtree_requires_euclidean_metric():
         X=sys.state.box,
         U=sys.input_box,
     )
-    dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
+    dubins = DubinsSteering(
+        wheelbase=sys.params["a"] + sys.params["b"], max_steering=0.5, speed=1.5
+    )
     planner = RRTPlanner(
         problem,
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),
@@ -962,7 +964,9 @@ def test_dubins_connect_reaches_pose_exactly_and_distance_is_finite():
 def test_dubins_edge_is_dynamically_feasible():
     sys = make_dubins_problem()
     evaluator = sys.compile(backend="numpy", verbose=False)
-    dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.0)
+    dubins = DubinsSteering(
+        wheelbase=sys.params["a"] + sys.params["b"], max_steering=0.5, speed=1.0
+    )
     states, inputs, times, _ = dubins.connect(
         np.array([0.0, 0.0, 0.3]),
         np.array([3.0, -1.0, -0.6]),
@@ -988,7 +992,9 @@ def test_dubins_rrt_reaches_goal_pose():
         Xf=BallSet(x_goal, 0.6),
         U=sys.input_box,
     )
-    dubins = DubinsSteering(wheelbase=sys.params["length"], max_steering=0.5, speed=1.5)
+    dubins = DubinsSteering(
+        wheelbase=sys.params["a"] + sys.params["b"], max_steering=0.5, speed=1.5
+    )
     planner = RRTPlanner(
         problem,
         extender=SteeringExtender(dubins, max_distance=1.5, resolution=0.1),

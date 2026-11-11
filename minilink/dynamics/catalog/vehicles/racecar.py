@@ -72,7 +72,6 @@ class UdeSRacecar(KinematicBicycle):
         self.b = b
         self.params["a"] = a
         self.params["b"] = b
-        self.params["length"] = a + b
         self.params["r_r"] = r
 
         # Graphics: 1/10-scale wheels, and a camera that follows the body

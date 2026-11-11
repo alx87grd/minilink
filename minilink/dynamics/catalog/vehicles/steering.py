@@ -26,13 +26,13 @@ class KinematicBicycle(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=3, input_dim=2, output_dim=3, expose_state=True)
 
-        # Parameters: a CG-centered wheelbase, ``length = a + b`` (the frame
-        # convention of
+        # Parameters: the CG-to-axle distances a and b, the wheelbase L = a + b (the
+        # frame convention of
         # :class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle`)
-        self.params = {"a": 1.0, "b": 1.0, "length": 2.0}
+        self.params = {"a": 1.0, "b": 1.0}
 
         # Signal labels and units
-        self.state.labels = ["x", "y", "theta"]
+        self.state.labels = ["x", "y", "psi"]
         self.state.units = ["m", "m", "rad"]
         self.inputs["u"].labels = ["speed", "steering"]
         self.inputs["u"].units = ["m/s", "rad"]
@@ -55,13 +55,13 @@ class KinematicBicycle(DynamicSystem):
 
         length = a + b
         speed, steering = u
-        theta = x[2]
+        psi = x[2]
 
-        # Kinematic bicycle: ẋ = v cos θ, ẏ = v sin θ, θ̇ = v tan δ / L
+        # Kinematic bicycle: ẋ = v cos ψ, ẏ = v sin ψ, ψ̇ = v tan δ / L
         dx = xp.array(
             [
-                speed * xp.cos(theta),
-                speed * xp.sin(theta),
+                speed * xp.cos(psi),
+                speed * xp.sin(psi),
                 speed * xp.tan(steering) / length,
             ]
         )
@@ -99,10 +99,9 @@ class KinematicCar(KinematicBicycle):
         self.b = 3.0
         self.params["a"] = self.a
         self.params["b"] = self.b
-        self.params["length"] = self.a + self.b
 
-        # Graphics (display only; the EoM use only ``length``): a rectangular body
-        # filling the ``length x width`` collision footprint plus four wheels, the
+        # Graphics (display only; the EoM use only ``a + b``): a rectangular body
+        # filling the ``(a + b) x width`` collision footprint plus four wheels, the
         # front pair steering, in place of the bicycle's pointed outline and two
         # in-line wheels, so it reads as a car
         self.width = 2.0
@@ -110,10 +109,10 @@ class KinematicCar(KinematicBicycle):
         self.visual_wheelbase_ratio = 0.64  # Axle separation as a fraction of length
         self.tire_length = 0.95
         self.tire_width = 0.34
-        self.camera_scale = 2.0 * self.params["length"]
+        self.camera_scale = 2.0 * (self.params["a"] + self.params["b"])
 
     def get_kinematic_geometry(self):
-        length = self.params["length"]
+        length = self.params["a"] + self.params["b"]
         width = self.width
         body_width_ratio = self.body_width_ratio
         wheelbase_ratio = self.visual_wheelbase_ratio
@@ -146,7 +145,7 @@ class KinematicCar(KinematicBicycle):
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
-        length = params["length"]
+        length = params["a"] + params["b"]
         wheelbase_ratio = self.visual_wheelbase_ratio
         width = self.width
         tire_width = self.tire_width

@@ -25,7 +25,7 @@ class DynamicBicycle(DynamicSystem):
     """
     Dynamic bicycle with rear wheel speed and steer inputs.
 
-    State ``x = [x, y, theta, vx, vy, yaw_rate]``: the world pose and the body-frame
+    State ``x = [x, y, psi, vx, vy, yaw_rate]``: the world pose and the body-frame
     velocities. The two inputs come as two named ports, or as one stacked ``u`` port
     with ``named_ports=False``. The research rungs live in
     ``examples/projects/car_trajopt/vehicles/ladder.py``.
@@ -106,7 +106,7 @@ class DynamicBicycle(DynamicSystem):
         self.add_output_port("y", dim=6, function=self.h, dependencies=())
 
         # Signal labels and units
-        self.state.labels = ["x", "y", "theta", "vx", "vy", "yaw_rate"]
+        self.state.labels = ["x", "y", "psi", "vx", "vy", "yaw_rate"]
         self.state.units = ["m", "m", "rad", "m/s", "m/s", "rad/s"]
 
         # Graphics: the 2-D centerline look
@@ -221,9 +221,9 @@ class DynamicBicycle(DynamicSystem):
     def N(self, q, params=None):
         xp = array_module(q)
 
-        theta = q[2]
-        c = xp.cos(theta)
-        s = xp.sin(theta)
+        psi = q[2]
+        c = xp.cos(psi)
+        s = xp.sin(psi)
 
         # World-frame velocity kinematics: q̇ = N(q) v
         # fmt: off
@@ -622,7 +622,7 @@ class DynamicBicycleCar3D(DynamicBicycle):
 class BicycleDynRate(DynamicBicycle):
     """Dynamic bicycle with rear-wheel and steer *rate* inputs (the MPC plant).
 
-    State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta]``: the wheel
+    State ``x = [x, y, psi, vx, vy, yaw_rate, w_rear, delta]``: the wheel
     rate and the steer angle are states driven by the inputs
     ``[w_rear_dot, delta_dot]`` — one stacked ``u`` port, or ``named_ports=True``
     for a ``w_rear_dot`` and a ``delta_dot`` port. ``Jw_rear`` / ``bw_rear``
@@ -671,7 +671,7 @@ class BicycleDynRate(DynamicBicycle):
         self.state.labels = [
             "x",
             "y",
-            "theta",
+            "psi",
             "vx",
             "vy",
             "yaw_rate",

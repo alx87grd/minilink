@@ -188,6 +188,23 @@ Each entry: the step, the choice, the options it was taken over, and why.
   vehicles' `__all__` drop it and add `DrivetrainBicycle`; the check registry runs
   `DrivetrainBicycle` and `UdeSRacecarDyn(wheel_angles=True)`; `docs/api/dynamics.rst`
   documents the new module.
+- **VM-5, stopped: waiting for the maintainer** (§5). Three of its stop conditions hold:
+  - `DynamicBicycleCar3D`'s eight corner arrows depend on the state, and a skin is static
+    geometry, `(plant) -> dict`, built once (`System.get_kinematic_geometry`); per-frame
+    geometry comes only from `get_dynamic_geometry`. Moving the arrows into a skin changes
+    the skin contract.
+  - `examples/projects/pathtracking/cascade_path_tracking.py` (read only) imports and
+    builds `DynamicBicycleCar3D`.
+  - `KinematicCar`'s four-wheel look needs a new skin function in
+    `graphical/catalog/skins.py`, a public name that plan §10.8 does not list.
+
+  `KinematicCar` and `DynamicBicycleCar3D` stay as they are; the steps after VM-5 do not
+  depend on them (VM-6 renames `KinematicCar`'s heading and moves its `length` reads to
+  `a + b`). The questions, with their options, are in the pull request.
+- **VM-6, the local name of the wheelbase.** `KinematicBicycle.f` keeps its local
+  `length = a + b`, and `KinematicCar`'s look computes `length = a + b` from `params`; only
+  the key leaves. `axle_offsets` in `skins.py` keeps its `params["length"]` fallback: it
+  serves any plant (`LongitudinalSlipCar` keeps its own `length`).
 
 ## 7. Ledger
 
@@ -224,3 +241,4 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   rolling resistance and the drivetrain's drag alone (the rest is the rear tire's 1.7 %
   slip); its fastest mode, the solver hint, 8.8 µs at rest (the wheel against the rear
   tire's stiffness at the slip floor), so a 5 s run from rest takes 8 s of wall time.
+- **VM-6:** none; byte-identical to VM-4's capture.

@@ -272,7 +272,7 @@ class TestCarProfile(unittest.TestCase):
         profile = udes_1_5_profile()
         self.assertAlmostEqual(profile.a, udes.params["a"])
         self.assertAlmostEqual(profile.b, udes.params["b"])
-        self.assertAlmostEqual(profile.length, udes.params["length"])
+        self.assertAlmostEqual(profile.length, udes.params["a"] + udes.params["b"])
 
     def test_apply_car_profile_rate_plant(self):
         from examples.projects.car_trajopt.vehicles.car_profile import (

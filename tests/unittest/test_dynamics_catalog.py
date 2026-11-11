@@ -734,7 +734,7 @@ PARAMS_CASES = [
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "r_f", 0.4),
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
     # The kinematic car: its steered front wheels
-    (stored(KinematicCar), "tf", "length", 6.0),
+    (stored(KinematicCar), "tf", "a", 3.0),
     # The longitudinal cars: the traction arrow
     (
         stored(LongitudinalSlipCar),
@@ -940,3 +940,29 @@ def test_the_drivetrain_bicycle_turns_the_way_it_steers():
         x = np.array([0.0, 0.0, 0.0, 15.0, 0.0, 0.0, 15.0 / r_r, delta, 0.0])
         yaw_acceleration = car.f(x, np.array([0.0, delta]))[5]
         assert np.sign(yaw_acceleration) == np.sign(delta)
+
+
+# The car ladder's heading is psi, and the wheelbase is a + b
+
+from minilink.dynamics.catalog.vehicles.racecar import UdeSRacecar, UdeSRacecarDyn
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        KinematicBicycle,
+        KinematicCar,
+        UdeSRacecar,
+        DynamicBicycle,
+        BicycleDynRate,
+        DrivetrainBicycle,
+        UdeSRacecarDyn,
+    ],
+    ids=lambda m: m.__name__,
+)
+def test_every_car_names_its_heading_psi_and_owns_its_wheelbase_once(make):
+    car = make()
+
+    assert car.state.labels[2] == "psi"
+    assert "length" not in car.params
+    assert {"a", "b"} <= set(car.params)

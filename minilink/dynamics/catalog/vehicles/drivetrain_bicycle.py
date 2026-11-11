@@ -20,7 +20,7 @@ from minilink.dynamics.catalog.vehicles.tires import (
 class DrivetrainBicycle(DynamicBicycle):
     """Dynamic bicycle driven by a power-limited rear axle and a steering servo.
 
-    State ``x = [x, y, theta, vx, vy, yaw_rate, w_rear, delta, P]``: world pose, body
+    State ``x = [x, y, psi, vx, vy, yaw_rate, w_rear, delta, P]``: world pose, body
     velocities, rear wheel rate [rad/s], steer angle [rad] and the power on its way to
     the ground [W]. With ``wheel_angles=True`` the rear and front rolling angles
     ``phi_rear, phi_front`` [rad] follow, for a look whose wheels turn. The equation
@@ -183,7 +183,7 @@ class DrivetrainBicycle(DynamicBicycle):
         )
 
         # Signal labels and units
-        labels = ["x", "y", "theta", "vx", "vy", "yaw_rate", "w_rear", "delta", "P"]
+        labels = ["x", "y", "psi", "vx", "vy", "yaw_rate", "w_rear", "delta", "P"]
         units = ["m", "m", "rad", "m/s", "m/s", "rad/s", "rad/s", "rad", "W"]
         if self.wheel_angles:
             labels = labels + ["phi_rear", "phi_front"]

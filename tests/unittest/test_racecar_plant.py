@@ -25,7 +25,7 @@ def test_kinematic_scale_matches_the_public_params():
 
     assert car.n == 3
     assert car.params["a"] == pytest.approx(car.params["b"])
-    assert car.params["length"] == pytest.approx(car.params["a"] + car.params["b"])
+    assert "length" not in car.params  # The wheelbase is a + b, one owner
     assert list(car.inputs["u"].labels) == ["speed", "steering"]
 
 
