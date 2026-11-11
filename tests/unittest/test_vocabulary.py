@@ -958,6 +958,7 @@ ONE_HELPER = {
         "minilink.planning.trajectory_optimization.compiled",
     ),
     "require_cost_to_go": (
+        "minilink.planning.results",
         "minilink.planning.planner",
         "minilink.planning.comparison",
     ),

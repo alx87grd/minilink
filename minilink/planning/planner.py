@@ -12,7 +12,11 @@ from minilink.core.roles import command_port
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution, episode_ticks_of
+from minilink.planning.results import (
+    PlanningSolution,
+    episode_ticks_of,
+    require_cost_to_go,
+)
 from minilink.planning.step_model import is_continuous, step_model_of
 
 ###############################################################################
@@ -234,17 +238,6 @@ def require_solution(planner) -> PlanningSolution:
         raise ValueError("No solution has been computed yet")
 
     return planner.last_solution
-
-
-def require_cost_to_go(solution, owner=None):
-    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``. ``owner`` names the solution's planner in the refusal (its family when ``None``)."""
-    if solution.cost_to_go is None:
-        owner = f"this {solution.family}" if owner is None else f"{owner}'s"
-        raise ValueError(
-            f"{owner} solution carries no cost-to-go field (its cost_to_go is None)"
-        )
-
-    return solution.cost_to_go
 
 
 def open_loop_controller_of(trajectory, sys, *, hold="linear") -> TrajectorySource:

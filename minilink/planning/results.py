@@ -14,6 +14,11 @@ from minilink.core.system import System
 from minilink.core.trajectory import Trajectory
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import EPISODE_LENGTH
+from minilink.planning.plotting import (
+    cost_to_go_figure,
+    plot_control_law,
+    plot_solution_trajectory,
+)
 from minilink.planning.problems import PlanningProblem, require_cost
 from minilink.planning.step_model import is_continuous, step_model_of
 
@@ -129,9 +134,6 @@ class PlanningSolution:
         titled plan or run. ``renderer`` is the drawing library,
         ``"matplotlib"`` or ``"plotly"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_solution_trajectory
-
         return plot_solution_trajectory(
             self,
             drawn_trajectory_of(self, dt),
@@ -185,9 +187,6 @@ class PlanningSolution:
         replaces the title, ``ax`` draws into existing axes, ``show=False``
         builds only; ``renderer`` is ``"matplotlib"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_control_law
-
         return plot_control_law(
             self,
             x_axis=x_axis,
@@ -235,11 +234,14 @@ class PlanningSolution:
         ``ax`` draws into existing axes, ``show=False`` builds only;
         ``renderer`` is ``"matplotlib"``.
         """
-        # A real cycle: comparison imports PlanningSolution from this module
-        from minilink.planning.comparison import plot_cost_to_go
+        field = require_cost_to_go(self)
+        tables = getattr(self.record, "tables", None)
 
-        return plot_cost_to_go(
-            self,
+        return cost_to_go_figure(
+            self.problem,
+            field,
+            grid=None if tables is None else tables.grid,
+            family=self.family,
             x_axis=x_axis,
             y_axis=y_axis,
             anchor=anchor,
@@ -279,6 +281,17 @@ class PlanningSolution:
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def require_cost_to_go(solution, owner=None):
+    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``. ``owner`` names the solution's planner in the refusal (its family when ``None``)."""
+    if solution.cost_to_go is None:
+        owner = f"this {solution.family}" if owner is None else f"{owner}'s"
+        raise ValueError(
+            f"{owner} solution carries no cost-to-go field (its cost_to_go is None)"
+        )
+
+    return solution.cost_to_go
 
 
 def drawn_trajectory_of(solution, dt=None) -> Trajectory:
