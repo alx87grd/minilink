@@ -823,6 +823,25 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
 - **The textbook check.** The diffs that touch math (the held plan's read, `ThreeBody`'s `f`,
   the certificate's horizon) read next to `dp.py`: the read and its comment one beat, the
   arrays bound to a name before the return (its own commit, byte-identical).
+- **The independent review of 2026-11-11, its fixes.** Five reproduced bugs, each with a test
+  that fails on the base: `discretize(lin, dt, solver="exact")` holds a linearization about its
+  nominal point and keeps its drift (`x⁺ = x̄ + A_d (x − x̄) + B_d (u − ū) + Γ f(x̄, ū)`; the
+  pendulum at `[π, 0]` from `x̄ + [0.1, 0]` over 0.1 s: `[3.3214, 1.6030]` → `[3.2441, 0.0495]`,
+  its own flow; an LTI model byte for byte); `linearize(Gain(2.0, dim=1))` returns `D = [[2.]]`
+  again (no drift on a static block); the default 10 s run of an infinite horizon is rounded up
+  to whole periods of a `dt` that does not divide it, the warning naming the length run (RRT with
+  a 0.3/7 s step: refused → 10.0286 s, `J = 270.74`; an explicit `episode_length` or a finite
+  horizon keeps its refusal, every run that ran before unchanged); MPPI's evidence scores
+  `solution.problem` (the pendulum solved at `x0 = [1, 0]`: `J = 10.081` → `10.483`); the
+  `StateObserver` adds its model's drift `params["dx_bar"]` (with `L = 0` it copies its model:
+  `[0, 0]` → `[0, −4.905]` at `[π/2, 0]`; at an equilibrium as before). The GAE limit test failed
+  alone on `dev` too, in float32; its tolerance follows the draws' precision. The cleanups moved
+  no number: `design_point` and the linear-model tuples live in `state_space.py`; an
+  `OperatingPoint` mixin holds the linearizations' point; the diagram's `subsystem_roles` is
+  `subsystem_layouts`; `default_computer_boundary_ports` is gone; `host_copy` serves the three
+  planners that copied their tree with `host_tree` (the five that `deepcopy` keep their Python
+  scalars); the single-solution plots live in `planning/plotting.py`, the lazy imports that broke
+  the cycle through `comparison.py` gone.
 
 ## Rulings of 2026-11-11 outside the numbered rows
 
