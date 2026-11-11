@@ -322,16 +322,10 @@ def copy_signals(model, sys, inputs, outputs, u_bar):
 def selected_input_ports(sys, inputs, u_bar):
     """The input ports of ``sys`` the ``wrt`` selectors pick, in the order of the ``B`` columns, at ``ū``; ``None`` when a selector is not on a port."""
     # Each B column as (port id, component of that port)
-    columns = []
-    for name, index in inputs:
-        if name == "u":
-            stacked = range(sys.m) if index is None else [index]
-            columns += [port_component_of(sys, i) for i in stacked]
-        elif name in sys.inputs:
-            components = range(sys.inputs[name].dim) if index is None else [index]
-            columns += [(name, i) for i in components]
-        else:
-            return None
+    entries = selected_columns(sys, inputs)
+    if entries is None:
+        return None
+    columns = [port_component_of(sys, i) for i in entries]
 
     # The consecutive columns of one port make one port, each port once
     groups = []
@@ -399,14 +393,11 @@ def discrete_period(sys):
     """``Δ`` of a step system's model (1 per tick for a tick law), ``None`` for a continuous one."""
     if not isinstance(sys, StepSystem):
         return None
-    period = period_of(sys)
+
+    # The clock's period in seconds; a tick law has none
+    period = getattr(sys, "sample_period", None)
 
     return 1.0 if period is None else period
-
-
-def period_of(sys):
-    """The sample period ``Δ`` a step system runs at, in seconds, its clock's; ``None`` for a tick law."""
-    return getattr(sys, "sample_period", None)
 
 
 def input_selectors(sys, wrt):
