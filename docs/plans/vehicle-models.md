@@ -35,7 +35,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity; 4b quasi-static load transfer, designed for (§6) |
 | 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it; its own class (`BicycleDynRate` today), sharing rung 3's chassis through the parent class, so rung 3's `f` stays a clean course page |
 | UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class. Its public face: thin classes (`UdeSRacecar` on rung 2, `UdeSRacecarDyn` on rung 4) that set only the preset numbers and the skin, no equations; the one written exception to the catalog clean-up's "no two supported plants differ by parameters alone". `UdeSRacecarDyn3D` becomes a `wheel_angles=True` option on rung 4, as the car cut (K8-0) already says |
-| Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until the demo clean-up, then retires (§5.1) |
+| Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until phase 3, then retires (§5.1, §7) |
 | Terrain | a height `z(x, y)`, its gradient and a friction `μ(x, y)`; given to the car at construction, like the tire; also exported as a static block for custom diagrams |
 | Rung 6 and rung 4 | different models, but sharing the names and the positions of states and parameters as far as possible |
 | State layout | rung 4's state is the first part of rung 6's state, in the same order; the 3-D states come after it |
@@ -46,7 +46,8 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Parameter names | flat, one suffix per axle (`c_alpha_f`, `k_r`), left and right symmetric, as the racecar and the textbook write them; rung 6 keeps the same; asymmetric corners are a later extension (private repository) |
 | Magic formula | default shape `C = 1.3`, `E = −0.5`, both directions: the peak `μ Fz` near the brush law's full slide (12° at `c = 13/rad`), then a fall to `sin(C π/2) ≈ 0.89` of the peak; both numbers in `params`; a fit to a published tire, cited in the module, can replace them when it is written |
 | Names | rung 4's generic class is `DrivetrainBicycle` ("powered" is too vague): the UdeS Racecar's `UdeSRacecarDyn` sits on it; rung 6 is `SuspensionCar3D`, named by what it adds |
-| Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, and the UdeS Racecar preset brought to it with its real skin and parameters (§7) |
+| Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, the UdeS Racecar preset brought to it with its real skin and parameters, and the tire and slip switch (§7) |
+| Longitudinal car | left as it is through phases 1 and 2; in phase 3, with the tire and slip switch, it joins the tire module (a `tire=` slot, the module's slip, the ladder's parameter names) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
 
 ## 3. Today
@@ -148,7 +149,7 @@ Fx, Fy = tire.forces(kappa, alpha, Fz, params)   # per wheel, wheel frame [N]
   scaled back onto the friction circle `|F| ≤ μ Fz`, with today's absolute stiffnesses
   `Ca`, `Ck` shared by both axles, and today's slip `|vx| + ε`.
 - It is the default of rungs 3 and 3b during the refactor, so phase 1 moves no demo number.
-- After the demo clean-up, the demos switch to the brush law, and `LinearSaturation`
+- In phase 3, the demos switch to the brush law, and `LinearSaturation`
   retires: the later switch of §7, decided together with the slip.
 
 It does not follow the shared parameterization below, nor the property of being linear in the
@@ -309,12 +310,22 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
   - a good 3-D skin for rung 6;
   - a generic parameter preset that drives plausibly;
   - the UdeS Racecar preset brought to rung 6, with its real skin and its parameters (still
-    a proxy of the car, §2).
-- **After the demo clean-up, the tire and slip switch.** Rungs 3 and 3b move from
-  `LinearSaturation` to the brush law, and every law to the one smooth slip function: decided
-  together, one commit each, the previous slip kept as a commented line. Each is measured
-  before and after:
-  - **Demo:** the flagship car demo (`mpc_car_minimal`, the one car demo in the flagship
+    a proxy of the car, §2);
+  - **the tire and slip switch** (below).
+- **Phase 3's tire and slip switch** (the maintainer, 2026-11-11: in phase 3, after the demo
+  clean-up). Three moves, decided together, one commit each:
+  - rungs 3 and 3b move from `LinearSaturation` to the brush law;
+  - every law moves to the one smooth slip function, with the previous slip kept as a
+    commented line;
+  - the longitudinal car joins the tire module: a `tire=` slot, its slip on the module's
+    function, its parameter names aligned with the ladder's (`mu`, `c_kappa`, `CdA`, `r_r`,
+    `Jw_rear`, today `mu_max`, `mu_slope`, `cdA`, `wheel_radius`, `wheel_inertia`). Whether
+    its default stays the sigmoid is decided then; the magic formula's peak opens the
+    optimal-slip lesson (ABS, traction control).
+
+  Until then the longitudinal car is left as it is. Each move is measured before and after:
+  - **Demo:** for the longitudinal car, the course labs' scripts (GRO501 APP2, GMC714
+    lab 6); for the rest, the flagship car demo (`mpc_car_minimal`, the one car demo in the flagship
     demo checks, `tests/demo_checks/flagship_manifest.json`), and the trajectory-optimization
     comparison over the ladder (`examples/projects/car_trajopt/car_trajopt_compare.py`, run
     only, not edited); which demo is the reference is open (§9).
@@ -351,9 +362,7 @@ here.
    Rung 6 is two-track either way.
 2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-3. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
-   module.
-4. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
+3. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
    optimization comparison, or another the maintainer names.
-5. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+4. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
    law and the terrain.
