@@ -77,8 +77,10 @@ class KinematicBicycle(DynamicSystem):
         params = self.params if params is None else params
 
         a = params["a"]
-        track = self.track
-        r = self.wheel_radius
+        # Drawing sizes, with the car looks' defaults for a plant that borrows these
+        # frames and sets none
+        track = getattr(self, "track", 1.6)
+        r = getattr(self, "wheel_radius", 0.3)
 
         steering = u[1]
 
