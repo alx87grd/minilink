@@ -61,6 +61,7 @@ Who uses it: the maintainer's courses and research. Self-driving is the main use
 | Frames | one frame set on every rung (`body`, `axle_front`, `wheel_fl`, `wheel_fr`, plus `wheel_rl`, `wheel_rr` on the 3-D car), so a 3-D skin's body fits the bicycle too; `KinematicCar` and `DynamicBicycleCar3D` retire; the contact-force and contact-velocity arrows are a display option on the 3-D car (`show_contact_vectors`) |
 | Demo bar | a demo passes when it completes its task as before |
 | Wheel radius and vertical stiffness | decided in phase 2's wheel-hop step (level ii), not before |
+| Topology (after phase 2b) | the 3-D car is tested and shown on real relief with the built-in terrains, kept simple: rolling hills from `Bumps` at a large wavelength (1 m high, 25–30 m long), no new terrain class. Each wheel touches at one point, so terrains stay smooth against the wheel radius; a `Hills` terrain or terrains that add up wait for a demo |
 | Phase 1's bar (review) | the same behaviour on the demos, not identical bytes: a rewrite that reorders the arithmetic is accepted (§7). Clarifies "no demo number moves" above |
 | Frame of the first nine (review) | on rung 6, `vx, vy` are the velocities in the heading frame (yawed, not rolled or pitched) and `r = ψ̇`, so they mean what they mean on rung 4 (§4) |
 | Differential (review) | the first 3-D plant has a locked rear axle (one `w_rear`); the design allows independent wheel speeds later (§4) |

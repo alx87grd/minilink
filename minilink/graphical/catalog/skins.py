@@ -60,7 +60,9 @@ def car_skin_3d(plant, color="#151922"):
 
     Frame keys: ``world`` (ground), ``body`` (chassis box plus the two rear wheel
     rods; fixed hub offsets are baked into each rod ``local_transform``), and
-    ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``).
+    ``wheel_fl`` / ``wheel_fr`` (steered front rods placed by ``tf``). On the 3-D car
+    (its body frame at the centre of gravity, ``h_cg`` above the ground) the rear
+    rods ride on their own ``wheel_rl`` / ``wheel_rr`` frames.
     """
     # The axle offsets and the tire radii: the params', else the plant's, else its
     # drawn wheel radius, else 0.3 m
@@ -68,6 +70,9 @@ def car_skin_3d(plant, color="#151922"):
     r_wheel = getattr(plant, "wheel_radius", 0.3)
     r_f = plant.params.get("r_f", getattr(plant, "r_f", r_wheel))
     r_r = plant.params.get("r_r", getattr(plant, "r_r", r_wheel))
+
+    # The ride height: the body frame's height above the ground (0 on a bicycle)
+    h = plant.params.get("h_cg", 0.0)
 
     # The drawing attributes, with the defaults of a bare plant
     track = getattr(plant, "track", 1.6)
@@ -99,7 +104,7 @@ def car_skin_3d(plant, color="#151922"):
         opacity=1.0,
     )
     cx_body = 0.5 * (a - b)
-    z_body = r_r + body_ground_clearance + 0.5 * body_height
+    z_body = r_r + body_ground_clearance + 0.5 * body_height - h
     body.local_transform = translation(cx_body, 0.0, z_body)
 
     # Every wheel: a dark cylinder of the drawn tire radius, as long as the wheel is wide
@@ -109,19 +114,29 @@ def car_skin_3d(plant, color="#151922"):
     # The rear wheels, fixed at their hubs in the body frame
     wheel_rl = wheel()
     wheel_rr = wheel()
-    wheel_rl.local_transform = translation(-b, 0.5 * track, r_r)
-    wheel_rr.local_transform = translation(-b, -0.5 * track, r_r)
+    wheel_rl.local_transform = translation(-b, 0.5 * track, r_r - h)
+    wheel_rr.local_transform = translation(-b, -0.5 * track, r_r - h)
 
     # The front wheels, placed and steered by their own frames
     wheel_fl = wheel()
     wheel_fr = wheel()
 
-    return {
+    look = {
         "world": [ground],
         "body": [body, wheel_rl, wheel_rr],
         "wheel_fl": [wheel_fl],
         "wheel_fr": [wheel_fr],
     }
+
+    # The 3-D car's rear wheels ride the suspension on frames of their own
+    if "rl" in getattr(plant, "wheels", ()):
+        wheel_rl.local_transform = np.eye(4)
+        wheel_rr.local_transform = np.eye(4)
+        look["body"] = [body]
+        look["wheel_rl"] = [wheel_rl]
+        look["wheel_rr"] = [wheel_rr]
+
+    return look
 
 
 def plane_skin_3d(plant, color="#2f6fed"):

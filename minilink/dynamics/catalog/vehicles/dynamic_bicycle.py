@@ -87,7 +87,7 @@ class DynamicBicycle(DynamicSystem):
             self.axle_forces = self.lent_tire_forces
             self.axle_stiffnesses = self.lent_tire_stiffnesses
         else:
-            self.tire = wheel_tires(tire, self.wheels)
+            self.tire = wheel_parts(tire, self.wheels)
             self.tire_is_part = True
             for key in ("Ca", "Ck", "mu", "v_min_epsilon"):
                 del self.params[key]
@@ -709,7 +709,7 @@ class BicycleDynRate(DynamicBicycle):
 ###############################################################################
 
 
-def wheel_tires(tire, wheels):
+def wheel_parts(tire, wheels):
     """Each wheel's own tire: a copy of the one given, or of the one given for it by name.
 
     The car holds copies, so a tire passed in is a template: edit the car's through

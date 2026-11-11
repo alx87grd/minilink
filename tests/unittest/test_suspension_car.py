@@ -5,6 +5,9 @@ import pytest
 
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
+from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import (
+    DrivetrainBicycle as Rung4,
+)
 from minilink.dynamics.catalog.vehicles.suspension_car import (
     FormulaCar3D,
     OffRoadCar3D,
@@ -16,6 +19,11 @@ from minilink.dynamics.catalog.vehicles.suspension_car import (
 )
 from minilink.dynamics.catalog.vehicles.terrain import Bumps, Slope, Terrain
 from minilink.dynamics.catalog.vehicles.tires import BrushTire
+from minilink.graphical.catalog import (
+    car_skin_3d,
+    formula_car_skin_3d,
+    offroad_car_skin_3d,
+)
 
 
 def cruising(car, v, **states):
@@ -350,7 +358,7 @@ def test_a_preset_rests_at_its_ride_height_and_its_look_fits_its_frames(preset):
     frames = car.tf(car.x0, np.zeros(2))
 
     assert np.sum(loads) == pytest.approx(car.params["mass"] * 9.81, rel=1e-3)
-    assert set(look) <= set(frames)
+    assert set(look) - {"world"} <= set(frames)
     assert {"body", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"} <= set(look)
 
 
@@ -373,3 +381,72 @@ def test_a_tire_given_to_a_preset_replaces_its_slicks():
     car = FormulaCar3D(tire=BrushTire(mu=0.3))
 
     assert car.params["tire"]["fl"]["mu"] == 0.3
+
+
+@pytest.mark.parametrize(
+    "skin", [car_skin_3d, formula_car_skin_3d, offroad_car_skin_3d]
+)
+def test_a_3d_look_fits_the_3d_car_and_the_bicycle(skin):
+    for car in (SuspensionCar3D(wheel_angles=True), Rung4(wheel_angles=True)):
+        car.skin = skin
+
+        look = car.skin(car)
+        frames = car.tf(car.x0, np.zeros(2))
+
+        assert set(look) - {"world"} <= set(frames)
+
+
+def test_the_plain_car_has_a_look_and_one_track():
+    car = SuspensionCar3D()
+
+    car.track = 1.4
+
+    assert car.params["track"] == 1.4
+    assert "wheel_rl" in car.skin(car)
+
+
+def test_the_front_axle_frame_sits_on_the_ground_between_its_contacts():
+    car = SuspensionCar3D(terrain=Slope())
+    x = car.x0.copy()
+    x[0] = -10.0
+    x[9] = car.terrain.height(-10.0, 0.0) + car.params["h_cg"]
+    x[11] = -0.1
+
+    frames = car.tf(x, np.zeros(2))
+    corners = car.corner_geometry(x)
+    axle = frames["axle_front"][:3, 3]
+
+    assert np.allclose(axle, 0.5 * (corners["C"][0] + corners["C"][1]))
+    assert axle[2] == pytest.approx(car.terrain.height(axle[0], axle[1]), abs=1e-3)
+
+
+def test_a_terrain_given_to_two_cars_is_copied_for_each():
+    bumps = Bumps()
+    car_1 = SuspensionCar3D(terrain=bumps)
+    car_2 = SuspensionCar3D(terrain=bumps)
+
+    car_1.params["terrain"]["amplitude"] = 0.3
+
+    assert car_2.params["terrain"]["amplitude"] == 0.05
+
+
+def test_coasting_over_rolling_hills_the_car_follows_the_ground_and_loses_energy():
+    hills = Bumps()
+    hills.params["amplitude"] = 1.0  # [m]
+    hills.params["wavelength"] = 25.0  # [m], grades up to 14°
+    car = OffRoadCar3D(terrain=hills)
+    configure_jax()
+    mass = car.params["mass"]
+    gravity = car.params["gravity"]
+    x0 = cruising(car, 8.0, x0=3.0, x1=4.0, x2=0.6)
+    x0[9] = hills.height(3.0, 4.0) + car.params["h_cg"]
+
+    traj = car.compute_trajectory(tf=10.0, x0=x0, u=np.zeros(2), backend="jax")
+    x = traj.x
+    ride = x[9] - hills.height(x[0], x[1])
+    energy = 0.5 * mass * (x[3] ** 2 + x[4] ** 2 + x[12] ** 2) + mass * gravity * x[9]
+
+    # Over 2 m of relief: on its springs all along, never gaining energy
+    assert np.ptp(hills.height(x[0], x[1])) > 1.5
+    assert np.max(np.abs(ride - car.params["h_cg"])) < 0.15
+    assert np.max(energy - energy[0]) < 1.0

@@ -169,6 +169,7 @@ def link_frames(X, Y, psi, delta, params, track, phi_rear=0.0, phi_front=None):
     b = params["b"]
     a = params["a"]
     r_r = params["r_r"]
+    r_f = params.get("r_f", r_r)  # The kinematic racecar has one wheel radius
 
     wheelbase = a + b
     T_body = SE2(X, Y, psi)
@@ -185,8 +186,8 @@ def link_frames(X, Y, psi, delta, params, track, phi_rear=0.0, phi_front=None):
         wheelbase=wheelbase,
         wheel_radius=r_r,
     )
-    frames["wheel_fl"] = T_body @ translation(a, 0.5 * track, r_r) @ R_steer
-    frames["wheel_fr"] = T_body @ translation(a, -0.5 * track, r_r) @ R_steer
+    frames["wheel_fl"] = T_body @ translation(a, 0.5 * track, r_f) @ R_steer
+    frames["wheel_fr"] = T_body @ translation(a, -0.5 * track, r_f) @ R_steer
 
     return frames
 

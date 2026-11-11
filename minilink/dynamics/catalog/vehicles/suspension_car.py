@@ -1,5 +1,7 @@
 """The 3-D car: a rigid body on four sprung corners, its tires on a terrain."""
 
+import copy
+
 import numpy as np
 
 from minilink.core.backends import array_module
@@ -7,7 +9,7 @@ from minilink.core.kinematics import SE3, Rx, Ry, Rz
 from minilink.core.params import own_params
 from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import wheel_tires
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import wheel_parts
 from minilink.dynamics.catalog.vehicles.terrain import Terrain
 from minilink.dynamics.catalog.vehicles.tires import (
     BrushTire,
@@ -88,10 +90,10 @@ class SuspensionCar3D(DrivetrainBicycle):
     ):
         super().__init__(named_ports=named_ports, tire=tire, wheel_angles=False)
         self.wheel_angles = bool(wheel_angles)
-        self.suspension = wheel_tires(
+        self.suspension = wheel_parts(
             SpringDamper() if suspension is None else suspension, self.wheels
         )
-        self.terrain = Terrain() if terrain is None else terrain
+        self.terrain = Terrain() if terrain is None else copy.deepcopy(terrain)
 
         # State: the drivetrain bicycle's nine, the body's six, the wheel angles
         self.n = 17 if self.wheel_angles else 15
@@ -177,24 +179,25 @@ class SuspensionCar3D(DrivetrainBicycle):
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
-        # Graphics: the 3-D look of the generic car, a camera that follows it, and
-        # the contact vectors off by default
-        self.skin = None
+        # Lazy import: the graphics load on first use, not with the core
+        from minilink.graphical.catalog.skins import car_skin_3d
+
+        # Graphics: the generic car's plain look, a camera that follows it, the
+        # contact vectors off, and no ground drawn until scene_bounds is set
+        self.skin = car_skin_3d
         self.camera_follow_frame = "body"
         self.camera_scale = 8.0
         self.show_contact_vectors = False
+        self.scene_bounds = None
 
     @property
-    def solver_info(self) -> dict:
-        """The solver hints, the smallest time constant read from the current ``params`` (:meth:`fastest_mode`)."""
-        info = self.own_solver_info
-        info["smallest_time_constant"] = self.fastest_mode()
+    def track(self) -> float:
+        """The track [m], a view of ``params["track"]``."""
+        return self.params["track"]
 
-        return info
-
-    @solver_info.setter
-    def solver_info(self, value: dict):
-        self.own_solver_info = dict(value)
+    @track.setter
+    def track(self, value: float):
+        self.params["track"] = value
 
     def fastest_mode(self) -> float:
         """The solver hint, in seconds: ten times the largest step an explicit run takes stably.
@@ -286,11 +289,11 @@ class SuspensionCar3D(DrivetrainBicycle):
         w_rear = x[6]
         delta = x[7]
         P = x[8]
+        phi = x[10]
+        theta = x[11]
         vz = x[12]
         p = x[13]
         q = x[14]
-        phi = x[10]
-        theta = x[11]
         P_cmd, delta_cmd = self.commands(x, u)
         c_psi = xp.cos(psi)
         s_psi = xp.sin(psi)
@@ -351,7 +354,10 @@ class SuspensionCar3D(DrivetrainBicycle):
         # with the mean of its contacts, φ̇_front = (vx_fl + vx_fr) / (2 r_f)
         dphi_rear = w_rear
         dphi_front = 0.5 * (corners["vx"][0] + corners["vx"][1]) / r_f
-        dphi = xp.array([dphi_rear, dphi_front])[: self.n - 15]
+        if self.wheel_angles:
+            dphi = xp.array([dphi_rear, dphi_front])
+        else:
+            dphi = xp.zeros(0)
 
         # ẋ = [ẋ, ẏ, ψ̇, v̇x, v̇y, ṙ, ẇ_rear, δ̇, Ṗ, ż, φ̇, θ̇, v̇z, ṗ, q̇, φ̇_wheels]
         dx = xp.concatenate(
@@ -369,7 +375,8 @@ class SuspensionCar3D(DrivetrainBicycle):
 
         Returns a dict of arrays over the wheels ``(fl, fr, rl, rr)``: ``P`` (the
         attachments, shape ``(4, 3)``), ``n`` (the terrain normals), ``d`` (the gaps
-        along the normals), ``C`` (the contact points) and ``R`` (the attitude).
+        along the normals), ``C`` (the contact points), ``R`` (the attitude) and
+        ``e_x``, ``e_y`` (the wheel frames' heading and axle, on the ground plane).
         """
         params = self.params if params is None else params
         xp = array_module(x)
@@ -386,6 +393,7 @@ class SuspensionCar3D(DrivetrainBicycle):
         z = x[9]
         phi = x[10]
         theta = x[11]
+        delta = x[7]
         R = attitude(phi, theta, psi)
         p_cg = xp.array([X, Y, z])
 
@@ -411,7 +419,17 @@ class SuspensionCar3D(DrivetrainBicycle):
         d = n[:, 2] * (P[:, 2] - z_ground)
         C = P - d[:, None] * n
 
-        geometry = {"P": P, "n": n, "d": d, "C": C, "R": R}
+        # The wheel frames: the body's x axis on the ground plane, turned by δ at the
+        # front; e_y = n × e_x
+        x_body = R[:, 0]
+        e_flat = x_body - xp.sum(n * x_body, axis=1)[:, None] * n
+        e_flat = e_flat / xp.sqrt(xp.sum(e_flat**2, axis=1))[:, None]
+        steer = xp.array([1.0, 1.0, 0.0, 0.0]) * delta
+        n_cross_e = cross(n, e_flat)
+        e_x = xp.cos(steer)[:, None] * e_flat + xp.sin(steer)[:, None] * n_cross_e
+        e_y = cross(n, e_x)
+
+        geometry = {"P": P, "n": n, "d": d, "C": C, "R": R, "e_x": e_x, "e_y": e_y}
 
         return geometry
 
@@ -449,12 +467,11 @@ class SuspensionCar3D(DrivetrainBicycle):
         vy = x[4]
         r = x[5]
         w_rear = x[6]
-        delta = x[7]
+        phi = x[10]
+        theta = x[11]
         vz = x[12]
         p = x[13]
         q = x[14]
-        phi = x[10]
-        theta = x[11]
         corners = self.corner_geometry(x, params)
         R = corners["R"]
         n = corners["n"]
@@ -475,15 +492,8 @@ class SuspensionCar3D(DrivetrainBicycle):
         P_dot = v_cg + cross(omega_world, P - p_cg)
         d_dot = xp.sum(n * P_dot, axis=1)
 
-        # The wheel frames: the body's x axis on the ground plane, turned by δ at the
-        # front; e_y = n × e_x
-        x_body = R[:, 0]
-        e_flat = x_body - xp.sum(n * x_body, axis=1)[:, None] * n
-        e_flat = e_flat / xp.sqrt(xp.sum(e_flat**2, axis=1))[:, None]
-        steer = xp.array([1.0, 1.0, 0.0, 0.0]) * delta
-        n_cross_e = cross(n, e_flat)
-        e_x = xp.cos(steer)[:, None] * e_flat + xp.sin(steer)[:, None] * n_cross_e
-        e_y = cross(n, e_x)
+        e_x = corners["e_x"]
+        e_y = corners["e_y"]
 
         # Each contact's velocity v_C = v + ω × (C − p_cg), in its wheel frame
         arm = C - p_cg
@@ -515,11 +525,11 @@ class SuspensionCar3D(DrivetrainBicycle):
             w_wheel = vx_w[i] / R_wheel if front else w_rear
             Fz_i = spring.load(d[i], d_dot[i], Fz0[wheel], h_cg, p_spring)
             kappa_i, alpha_i = tire.slip(vx_w[i], vy_w[i], w_wheel, R_wheel, p_tire)
-            kappa_i = 0.0 * kappa_i if front else kappa_i
             Fx_i, Fy_i = tire.forces(kappa_i, alpha_i, Fz_i, friction[i], p_tire)
 
             # Rolling resistance of the free-rolling front wheels: −C_rr Fz sign(vx)
-            Fx_i = Fx_i - C_rr * Fz_i * smooth_sign(vx_w[i], v_c) if front else Fx_i
+            if front:
+                Fx_i = Fx_i - C_rr * Fz_i * smooth_sign(vx_w[i], v_c)
             grip_i = tire.friction_use(Fx_i, Fy_i, Fz_i, friction[i], p_tire)
 
             Fz.append(Fz_i)
@@ -547,8 +557,6 @@ class SuspensionCar3D(DrivetrainBicycle):
             "vy": vy_w,
             "v_C": v_C,
             "grip": xp.stack(grip),
-            "e_x": e_x,
-            "e_y": e_y,
             **corners,
         }
 
@@ -634,9 +642,8 @@ class SuspensionCar3D(DrivetrainBicycle):
         wheel_angles = self.wheel_angles
         r_f = params["r_f"]
         r_r = params["r_r"]
-        a = params["a"]
 
-        corners = self.contact_forces(np.asarray(x, dtype=float), params)
+        corners = self.corner_geometry(np.asarray(x, dtype=float), params)
         R = np.asarray(corners["R"])
         n = np.asarray(corners["n"])
         C = np.asarray(corners["C"])
@@ -650,9 +657,10 @@ class SuspensionCar3D(DrivetrainBicycle):
             R_wheel = np.column_stack([e_x[i], e_y[i], n[i]]) @ Ry(spin[i])
             frames[f"wheel_{wheel}"] = SE3(R_wheel, C[i] + radius * n[i])
 
-        # The planar frames of every car rung: the front axle on the ground
-        T_body = frames["body"]
-        frames["axle_front"] = T_body @ SE3(Rz(x[7]), np.array([a, 0.0, -x[9]]))
+        # The planar frame of every car rung: the front axle, steered, on the ground
+        # between its two contacts
+        R_axle = np.column_stack([e_x[0], e_y[0], n[0]])
+        frames["axle_front"] = SE3(R_axle, 0.5 * (C[0] + C[1]))
 
         return frames
 
@@ -724,14 +732,17 @@ class FormulaCar3D(SuspensionCar3D):
         from minilink.graphical.catalog.car_skins_3d import formula_car_skin_3d
 
         # The racer's parts: slicks and stiff springs
-        tire = (
-            BrushTire(mu=1.6, c_alpha=18.0, c_kappa=22.0, v_eps=0.5)
-            if tire is None
-            else tire
-        )
+        if tire is None:
+            tire = BrushTire(mu=1.6, c_alpha=18.0, c_kappa=22.0, v_eps=0.5)
         if suspension is None:
             suspension = SpringDamper(k=96700.0, c=3500.0, F_eps=50.0)
-        super().__init__(named_ports, tire, suspension, terrain, wheel_angles)
+        super().__init__(
+            named_ports=named_ports,
+            tire=tire,
+            suspension=suspension,
+            terrain=terrain,
+            wheel_angles=wheel_angles,
+        )
 
         # Parameters: the racer's numbers
         self.params.update(
@@ -792,14 +803,17 @@ class OffRoadCar3D(SuspensionCar3D):
         from minilink.graphical.catalog.car_skins_3d import offroad_car_skin_3d
 
         # The buggy's parts: knobby tires and soft springs
-        tire = (
-            BrushTire(mu=0.9, c_alpha=8.0, c_kappa=10.0, v_eps=0.5)
-            if tire is None
-            else tire
-        )
+        if tire is None:
+            tire = BrushTire(mu=0.9, c_alpha=8.0, c_kappa=10.0, v_eps=0.5)
         if suspension is None:
             suspension = SpringDamper(k=13350.0, c=1150.0, F_eps=50.0)
-        super().__init__(named_ports, tire, suspension, terrain, wheel_angles)
+        super().__init__(
+            named_ports=named_ports,
+            tire=tire,
+            suspension=suspension,
+            terrain=terrain,
+            wheel_angles=wheel_angles,
+        )
 
         # Parameters: the buggy's numbers
         self.params.update(

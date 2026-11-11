@@ -316,6 +316,35 @@ tire (phase 3, the demo clean-up).
   under the rear grip: without downforce, 250 kW at 15 m/s asks 16 kN of rear tires that
   hold about 7 kN, and the car spins (tried, then the schedule lowered).
 
+- **The review after phase 2b** (two independent reviewers; each claim checked against the
+  code before it was applied). Fixed, names and behaviour kept:
+  - `axle_front` on the 3-D car sat at the world's z = 0 on relief: it now sits on the
+    ground between the two front contacts, steered (test on a slope);
+  - the plain `SuspensionCar3D` drew nothing: it wears `car_skin_3d`, which now rides on
+    the 3-D car's frames (the body at the centre of gravity, the rear wheels on their own
+    frames) and still fits the bicycles;
+  - the 3-D looks failed on the bicycle rungs (no `track` or `h_cg` in their `params`):
+    they read the bicycle's drawing track and a ride height of 0, and mount the rear
+    wheels on the body; a test fits all three looks to both cars;
+  - the 3-D car's `track` had two owners (the bicycle's drawing attribute 1.92 m and
+    `params["track"]` 1.6 m): `track` is now a view of the parameter;
+  - the terrain given to a car is copied, like the tires and the springs;
+  - smaller ones: the duplicate `solver_info`, the presets' keyword call to the parent,
+    the wheel axes computed in `corner_geometry` (so `tf` runs no tire law), the
+    racecar's front wheel frames at `r_f`, `wheel_tires` renamed `wheel_parts` (internal,
+    it builds the springs too), `scene_bounds` declared on the car, the state unpacked
+    in order, the formula demo's lift made real and its docstring reworded.
+  - Not applied: `KinematicBicycle.tf`'s `getattr` defaults are not dead (the read-only
+    project's `ConstantSpeedKinematicCar` never sets them).
+  - Proposals for the maintainer (the pull request): the 3-D car's base class (the
+    bicycle's own methods fail on it), a `Tire` base class, the terrain and tire names on
+    the `minilink` facade, the presets' numbers as module constants, the method names
+    `lent_tire_forces` / `part_tire_forces`.
+- **Topology** (the maintainer's ruling A): the off-road demo weaves over rolling hills
+  (`Bumps`, 0.8 m, 30 m), 12 kW and ±0.10 rad: at 25 kW and ±0.12 rad the buggy spun out
+  over a crest (7 m/s sideways), physical but not a plain demo. A test coasts it over 1 m
+  hills.
+
 ## 7. Ledger
 
 The numbers that moved, each with how it was measured (machine, median of N, warm or cold).
@@ -385,3 +414,9 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   0.45 ms (off-road). The demos: the formula car ends a 10 s run at 31.1 m/s with a peak
   roll of 0.007 rad; the buggy over 0.12 m bumps peaks at 0.24 rad of roll and 0.054 rad
   of pitch, with a wheel unloaded over some crests.
+- **The review after phase 2b:** the seeded baseline byte-identical to the frame-set
+  capture. Over rolling hills (`Bumps` 1 m, 25 m; JAX, one run): coasting from 8 m/s the
+  energy never rises (maximum − start 0 J) and the ride height stays within 0.53–0.69 m
+  (`h_cg` 0.65); powered at 25 kW the buggy reaches 12.6 m/s and leaves the ground over
+  the crests (`v² A k²` ≈ 10 m/s² > g), as it should. The off-road demo's schedule
+  (12 kW, ±0.10 rad): side slip at most 0.68 m/s, 1.56 m of relief crossed.

@@ -55,17 +55,13 @@ def formula_car_skin_3d(plant, colors=None):
     A skin of the 3-D car: the body on its ``body`` frame (the centre of gravity at
     the origin, the ground ``h_cg`` below), each wheel on its own ``wheel_*`` frame
     at the hub, so the wheels steer, spin and ride the suspension. The proportions
-    follow the plant's ``a``, ``b``, ``track``, ``h_cg`` and wheel radii. A generic,
+    follow the plant's ``a``, ``b``, ``track``, ``h_cg`` and wheel radii. On a
+    bicycle rung (no rear wheel frames, the body frame on the ground) the rear wheels
+    ride on the body. A generic,
     cartoon racer: no real car's livery or shape.
     """
     colors = {**FORMULA_COLORS, **(colors or {})}
-    p = plant.params
-    a = p["a"]
-    b = p["b"]
-    track = p["track"]
-    h = p["h_cg"]
-    r_f = p["r_f"]
-    r_r = p["r_r"]
+    a, b, track, h, r_f, r_r = chassis(plant)
     g = -h  # The ground, in the body frame
 
     # The monocoque: a nose rising to the cockpit, the engine cover, the tail
@@ -183,8 +179,10 @@ def formula_car_skin_3d(plant, colors=None):
             r_f if front else r_r, 0.30 if front else 0.38, side, colors
         )
 
-    # The ground under it, when the plant asks for a scene
+    # The ground under it, when the plant asks for a scene; the rear wheels on the
+    # body when the plant is a bicycle
     look["world"] = terrain_surface(plant, colors["ground"])
+    mount_rear_wheels(look, plant)
 
     return look
 
@@ -197,13 +195,7 @@ def offroad_car_skin_3d(plant, colors=None):
     vehicle's shape or badge.
     """
     colors = {**OFFROAD_COLORS, **(colors or {})}
-    p = plant.params
-    a = p["a"]
-    b = p["b"]
-    track = p["track"]
-    h = p["h_cg"]
-    r_f = p["r_f"]
-    r_r = p["r_r"]
+    a, b, track, h, r_f, r_r = chassis(plant)
     g = -h  # The ground, in the body frame
     half = 0.5 * track - 0.12
 
@@ -311,8 +303,10 @@ def offroad_car_skin_3d(plant, colors=None):
         side = 1.0 if wheel[1] == "l" else -1.0
         look[f"wheel_{wheel}"] = knobby_wheel(radius, 0.30, side, colors)
 
-    # The ground under it, when the plant asks for a scene
+    # The ground under it, when the plant asks for a scene; the rear wheels on the
+    # body when the plant is a bicycle
     look["world"] = terrain_surface(plant, colors["ground"])
+    mount_rear_wheels(look, plant)
 
     return look
 
@@ -320,6 +314,40 @@ def offroad_car_skin_3d(plant, colors=None):
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def chassis(plant):
+    """The sizes a car look follows: ``a``, ``b``, track, ride height, wheel radii [m].
+
+    The 3-D car keeps them all in ``params``. A bicycle rung has no ``track`` or
+    ``h_cg`` there: its track is a drawing attribute and its body frame sits on the
+    ground (a ride height of 0); a rung without wheel radii uses its drawn one.
+    """
+    p = plant.params
+    r_wheel = getattr(plant, "wheel_radius", 0.3)
+
+    a = p["a"]
+    b = p["b"]
+    track = p["track"] if "track" in p else plant.track
+    h = p.get("h_cg", 0.0)
+    r_f = p.get("r_f", r_wheel)
+    r_r = p.get("r_r", r_wheel)
+
+    return a, b, track, h, r_f, r_r
+
+
+def mount_rear_wheels(look, plant):
+    """Move the rear wheels onto the body for a plant with no rear wheel frames."""
+    if "rl" in getattr(plant, "wheels", ()):
+        return
+    a, b, track, h, r_f, r_r = chassis(plant)
+
+    # The hub in the body frame: behind by b, out by half the track, up by r_r − h
+    for wheel, side in (("rl", 1.0), ("rr", -1.0)):
+        hub = translation_matrix((-b, side * 0.5 * track, r_r - h))
+        for shape in look.pop(f"wheel_{wheel}"):
+            shape.local_transform = hub @ shape.local_transform
+            look["body"].append(shape)
 
 
 def terrain_surface(plant, color, step=0.25):
