@@ -260,8 +260,8 @@ def test_the_facade_reads_a_sampled_controllers_clock_and_a_continuous_ones_auto
     # Δt = 0.1 τ_min shortened to divide the run: dt = tf / ⌈tf / Δt⌉
     pe = problem.compile(pid(), backend="numpy")
     step = automatic_step_of(pe.loop.solver_info)
-    assert pe.dt <= step and pe.n_steps == int(np.ceil(pe.tf / step - 1e-9))
-    np.testing.assert_allclose(pe.n_steps * pe.dt, pe.tf, rtol=1e-12)
+    assert pe.dt <= step and pe.n_steps == int(np.ceil(pe.horizon / step - 1e-9))
+    np.testing.assert_allclose(pe.n_steps * pe.dt, pe.horizon, rtol=1e-12)
     automatic = evaluate(problem, pid(), backend="numpy")
     stated = evaluate(problem, pid(), dt=pe.dt, backend="numpy")
     np.testing.assert_array_equal(automatic.J, stated.J)

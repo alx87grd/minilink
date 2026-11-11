@@ -57,6 +57,8 @@ RETIRED = {
             "RolloutEnvironment",
             "lqr_finite_horizon",
             "lqr_gain_schedule",
+            "ProblemEvaluator",
+            "LyapunovCertificate",
         ),
     ),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
@@ -391,6 +393,7 @@ RETIRED_KEYWORDS = {
     "minilink.planning.evaluation.score_run": {"tf": "horizon"},
     "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
     "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
+    "minilink.analysis.lyapunov.LyapunovCertificate.verify": {"tf": "horizon"},
     "minilink.core.facades.plotting.SystemPlotting.plot_diagram": {
         "show_inline": 'show="inline"',
         "show_pdf": 'show="pdf"',

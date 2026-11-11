@@ -521,6 +521,9 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     (the same numbers) and `bode(lin)` the per-tick one; `linearize` of a sampled loop returns
     the tick law, and the printouts say "per tick". A clocked linear model's step response is
     titled "Linear", as the model's.
+  - *A length is a horizon* (the maintainer's ruling Q2 of 2026-11-11): the problem
+    evaluator's `pe.tf` → `pe.horizon` (the run's length), `LyapunovCertificate.verify(tf=)` →
+    `verify(horizon=)`.
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the

@@ -308,12 +308,12 @@ class LyapunovCertificate:
 
     # The two questions asked of it
 
-    def verify(self, n_rollouts: int = 200, tf: float = None, tol: float = None):
+    def verify(self, n_rollouts: int = 200, horizon: float = None, tol: float = None):
         """
         Integrate ``n_rollouts`` states drawn inside the certified region: all must converge.
 
-        States are drawn uniformly in the ellipsoid ``{V <= level}``. ``tf``
-        defaults to ten time constants of the slowest linearized mode and
+        States are drawn uniformly in the ellipsoid ``{V <= level}``, each
+        integrated for ``horizon`` seconds, by default ten time constants of the slowest linearized mode and
         ``tol`` to a hundredth of the certified extent. A failure means the
         sublevel search was too coarse, or the model is not what it seems,
         and the report carries the offending state.
@@ -322,12 +322,12 @@ class LyapunovCertificate:
         region = self.region
 
         # Ten time constants of the slowest mode, a hundredth of the certified extent
-        tf = horizon_of(self) if tf is None else float(tf)
+        horizon = horizon_of(self) if horizon is None else float(horizon)
         tol = 0.01 * float(np.max(self.extent)) if tol is None else float(tol)
 
-        # Initial states drawn uniformly in {V ≤ c}, each integrated for tf
+        # Initial states drawn uniformly in {V ≤ c}, each integrated over the horizon
         x0 = region.sample(CERTIFICATE_SEED, n_rollouts)
-        x_final = self.rollout(tf)(x0)
+        x_final = self.rollout(horizon)(x0)
 
         # Every trial must end within tol of the equilibrium
         final_distance = np.linalg.norm(x_final - x_bar, axis=1)
@@ -373,14 +373,14 @@ class LyapunovCertificate:
             self.backend, self.evaluator, self.u_bar, self.t, self.params
         )
 
-    def rollout(self, tf: float):
-        """``rollout(X0) -> X_final``: integrate a stack of states for ``tf``."""
+    def rollout(self, horizon: float):
+        """``rollout(X0) -> X_final``: integrate a stack of states over ``horizon`` seconds."""
         poles = self.poles
 
         # A tenth of the fastest linearized time constant, and at least 50 steps
-        dt = min(0.1 / float(np.max(np.abs(poles))), tf / 50.0)
+        dt = min(0.1 / float(np.max(np.abs(poles))), horizon / 50.0)
 
-        return rollout_on(self.backend, self.evaluator, self.u_bar, self.t, dt, tf)
+        return rollout_on(self.backend, self.evaluator, self.u_bar, self.t, dt, horizon)
 
 
 @dataclass
@@ -681,9 +681,9 @@ def horizon_of(cert):
     return horizon
 
 
-def rollout_on(backend, evaluator, u_bar, t, dt: float, tf: float):
-    """Return ``rollout(X0) -> X_final`` integrating each state for ``tf``."""
-    n_steps = max(1, int(round(tf / dt)))
+def rollout_on(backend, evaluator, u_bar, t, dt: float, horizon: float):
+    """Return ``rollout(X0) -> X_final`` integrating each state over ``horizon`` seconds."""
+    n_steps = max(1, int(round(horizon / dt)))
 
     u_seq = np.tile(np.asarray(u_bar, dtype=float), (n_steps, 1))
 

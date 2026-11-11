@@ -139,11 +139,11 @@ class ProblemEvaluator:
 
         # The grid: N periods of dt to the horizon, a continuous loop that names
         # no dt on its automatic step
-        self.tf = horizon_of(problem, episode_length)
+        self.horizon = horizon_of(problem, episode_length)
         if dt is None:
-            dt = automatic_dt_of(self.loop, self.tf)
+            dt = automatic_dt_of(self.loop, self.horizon)
         self.dt = float(dt)
-        self.n_steps = steps_of(self.tf, self.dt)
+        self.n_steps = steps_of(self.horizon, self.dt)
 
         # The loop, compiled once on its backend
         self.backend, self.evaluator = compile_loop(self.loop, backend)
@@ -171,10 +171,10 @@ class ProblemEvaluator:
         # The failure cost and the cost bound at the compile's numbers (a call at
         # other numbers computes its own)
         self.failure_cost = failure_cost_of(
-            problem, self.tf, None, problem.discount_rate
+            problem, self.horizon, None, problem.discount_rate
         )
         self.cost_bound = diverged_cost_of(
-            problem, self.tf, self.failure_cost, None, problem.discount_rate
+            problem, self.horizon, self.failure_cost, None, problem.discount_rate
         )
 
         # "auto" keeps JAX only when the whole score traces (the cost and the sets too)
@@ -474,9 +474,9 @@ class ProblemEvaluator:
         if own_numbers or traced:
             return self.failure_cost, self.cost_bound
 
-        failure_cost = failure_cost_of(problem, self.tf, cost_params, float(rate))
+        failure_cost = failure_cost_of(problem, self.horizon, cost_params, float(rate))
         bound = diverged_cost_of(
-            problem, self.tf, failure_cost, cost_params, float(rate)
+            problem, self.horizon, failure_cost, cost_params, float(rate)
         )
 
         return failure_cost, bound
@@ -628,8 +628,8 @@ class ProblemEvaluator:
 
         # An abstract trace of the run and its score: no compile, no numbers
         try:
-            failure_cost = failure_cost_of(self.problem, self.tf)
-            bound = diverged_cost_of(self.problem, self.tf, failure_cost)
+            failure_cost = failure_cost_of(self.problem, self.horizon)
+            bound = diverged_cost_of(self.problem, self.horizon, failure_cost)
             jax.eval_shape(
                 lambda p, x0: self.score(p, x0, False, failure_cost, bound)[0],
                 params,
@@ -679,7 +679,7 @@ class ProblemEvaluator:
         row = score_run(
             self.problem,
             plant_run,
-            horizon=self.tf,
+            horizon=self.horizon,
             params=params,
             failure_cost=failure_cost,
             cost_bound=bound,
@@ -983,22 +983,22 @@ def plant_stepped(loop, solver, substeps):
     return with_plant_steps(loop, substeps=substeps, solver=solver)
 
 
-def automatic_dt_of(loop, tf):
+def automatic_dt_of(loop, horizon):
     """
     A continuous loop's period when it names none: its automatic step, shortened to divide the run.
 
     ``Δt`` is the continuous simulator's automatic step of the loop
     (:func:`~minilink.core.system.automatic_step_of`, ``0.1 τ_min``), and
-    ``dt = tf / ⌈tf / Δt⌉``, the largest step under it that ends on the horizon.
+    ``dt = horizon / ⌈horizon / Δt⌉``, the largest step under it that ends on the horizon.
     """
     # A real cycle: the system module imports the compile chain, which loads after this one
     from minilink.core.system import automatic_step_of
 
     step = automatic_step_of(loop.solver_info)
 
-    # n = ⌈tf / Δt⌉ periods, a multiple landing on its round despite the division
-    n = max(1, int(np.ceil(tf / step - 1e-9)))
-    dt = tf / n
+    # n = ⌈horizon / Δt⌉ periods, a multiple landing on its round despite the division
+    n = max(1, int(np.ceil(horizon / step - 1e-9)))
+    dt = horizon / n
 
     return dt
 
