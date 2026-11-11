@@ -8,7 +8,11 @@ from minilink.core.backends import array_module
 from minilink.core.kinematics import SE2, translation
 from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem, fastest_time_constant
-from minilink.dynamics.catalog.vehicles.tires import linear_tire_forces
+from minilink.dynamics.catalog.vehicles.tires import (
+    LinearSaturation,
+    tire_slip,
+    wheel_slip,
+)
 from minilink.graphical.animation.primitives import Arrow
 from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
 
@@ -26,15 +30,26 @@ class DynamicBicycle(DynamicSystem):
     with ``named_ports=False``. The research rungs live in
     ``examples/projects/car_trajopt/vehicles/ladder.py``.
 
+    Tires
+    -----
+    With no ``tire`` given, both axles run the linear tire saturated on its friction
+    circle (:class:`~minilink.dynamics.catalog.vehicles.tires.LinearSaturation`) on the
+    absolute stiffnesses ``Ca``, ``Ck`` and the slip floor ``|vx| + v_min_epsilon``. A
+    law of the tire module (``tire=BrushTire()``) runs on stiffnesses per unit load,
+    ``c_kappa``, ``c_alpha_f``, ``c_alpha_r`` (derived from ``Ca`` and ``Ck`` at the
+    static loads, so the small-slip car is the same), and the smooth slip floor
+    ``sqrt(vx^2 + v_min_epsilon^2)``; its own numbers join ``params``.
+
     Inputs
     ------
     w_rear : rear wheel angular rate [rad/s]
     delta  : front steer angle [rad]
     """
 
-    def __init__(self, named_ports=True):
+    def __init__(self, named_ports=True, tire=None):
         super().__init__(state_dim=6)
         self.named_ports = bool(named_ports)
+        self.tire = LinearSaturation() if tire is None else tire
 
         # Parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
         # mass [kg], yaw inertia [kg m^2], gravity [m/s^2], air density rho
@@ -58,6 +73,18 @@ class DynamicBicycle(DynamicSystem):
             "mu": 1.0,
             "v_min_epsilon": 0.1,
         }
+        if tire is not None:
+            self.params = {**per_unit_load_params(self.params), **self.tire.params}
+
+        # The tire path, chosen once: absolute stiffnesses and the |vx| + ε slip for
+        # the saturated linear tire, stiffnesses per unit load and the smooth slip for
+        # a law of the tire module
+        if tire is None:
+            self.axle_forces = self.saturated_linear_forces
+            self.axle_stiffnesses = self.absolute_stiffnesses
+        else:
+            self.axle_forces = self.tire_law_forces
+            self.axle_stiffnesses = self.per_unit_load_stiffnesses
 
         # Ports: two named commands, or one stacked command port (the planning and
         # trajectory-optimization convention)
@@ -134,19 +161,19 @@ class DynamicBicycle(DynamicSystem):
         b = params["b"]
         mass = params["mass"]
         inertia = params["inertia"]
-        Ca = params["Ca"]
-        Ck = params["Ck"]
         v_eps = params["v_min_epsilon"]
 
-        # m v̇x = −C_κ vx / ε, the rear tire alone (the front wheel rolls free)
-        A11 = -Ck / (mass * v_eps)
+        C_alpha_f, C_alpha_r, C_kappa = self.axle_stiffnesses(params)
 
-        # m v̇y = C_α (α_f + α_r) and I ṙ = C_α (a α_f − b α_r), with
+        # m v̇x = −C_κ vx / ε, the rear tire alone (the front wheel rolls free)
+        A11 = -C_kappa / (mass * v_eps)
+
+        # m v̇y = C_αf α_f + C_αr α_r and I ṙ = a C_αf α_f − b C_αr α_r, with
         # α_f = −(vy + a r) / ε and α_r = −(vy − b r) / ε
-        A22 = -2.0 * Ca / (mass * v_eps)
-        A23 = -Ca * (a - b) / (mass * v_eps)
-        A32 = -Ca * (a - b) / (inertia * v_eps)
-        A33 = -Ca * (a**2 + b**2) / (inertia * v_eps)
+        A22 = -(C_alpha_f + C_alpha_r) / (mass * v_eps)
+        A23 = -(a * C_alpha_f - b * C_alpha_r) / (mass * v_eps)
+        A32 = -(a * C_alpha_f - b * C_alpha_r) / (inertia * v_eps)
+        A33 = -(a**2 * C_alpha_f + b**2 * C_alpha_r) / (inertia * v_eps)
 
         # fmt: off
         A = np.array([
@@ -243,35 +270,8 @@ class DynamicBicycle(DynamicSystem):
         return vx_f, vy_f, w_f, vx_r, vy_r, w_r
 
     def compute_tire_physics(self, v_body, u_inputs, params=None):
-        params = self.params if params is None else params
-
-        a = params["a"]
-        b = params["b"]
-        r_f = params["r_f"]
-        r_r = params["r_r"]
-        mass = params["mass"]
-        gravity = params["gravity"]
-        Ca = params["Ca"]
-        Ck = params["Ck"]
-        mu = params["mu"]
-        v_min_epsilon = params["v_min_epsilon"]
-
-        L = a + b
-        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
-            v_body, u_inputs, params
-        )
-
-        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
-        Fz_f = mass * gravity * (b / L)
-        Fz_r = mass * gravity * (a / L)
-
-        # Linear-slip forces at each contact, saturated on its friction circle
-        Fx_f, Fy_f = linear_tire_forces(
-            vx_f, vy_f, w_f, r_f, Fz_f, Ca, Ck, mu, v_min_epsilon
-        )
-        Fx_r, Fy_r = linear_tire_forces(
-            vx_r, vy_r, w_r, r_r, Fz_r, Ca, Ck, mu, v_min_epsilon
-        )
+        """Axle forces ``(Fx_f, Fy_f, Fx_r, Fy_r)`` [N], each in its own wheel frame."""
+        Fx_f, Fy_f, Fx_r, Fy_r = self.axle_forces(v_body, u_inputs, params)
 
         return Fx_f, Fy_f, Fx_r, Fy_r
 
@@ -467,6 +467,103 @@ class DynamicBicycle(DynamicSystem):
 
         return v_r_loc, v_f_loc, F_r_loc, F_f_loc
 
+    def saturated_linear_forces(self, v_body, u_inputs, params=None):
+        """The axle forces of the saturated linear tire, on ``Ca``, ``Ck`` and ``mu``."""
+        params = self.params if params is None else params
+
+        tire = self.tire
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+        mu = params["mu"]
+        v_min_epsilon = params["v_min_epsilon"]
+
+        L = a + b
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_inputs, params
+        )
+
+        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+
+        # The slips at each contact, over the rolling speed |vx| + ε
+        alpha_f, kappa_f = tire_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
+        alpha_r, kappa_r = tire_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
+
+        # Linear-slip forces at each contact, saturated on its friction circle
+        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, Ck, Ca, params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, Ck, Ca, params)
+
+        return Fx_f, Fy_f, Fx_r, Fy_r
+
+    def tire_law_forces(self, v_body, u_inputs, params=None):
+        """The axle forces of a law of the tire module, on stiffnesses per unit load."""
+        params = self.params if params is None else params
+
+        tire = self.tire
+        a = params["a"]
+        b = params["b"]
+        r_f = params["r_f"]
+        r_r = params["r_r"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        mu = params["mu"]
+        c_kappa = params["c_kappa"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+        v_min_epsilon = params["v_min_epsilon"]
+
+        L = a + b
+        vx_f, vy_f, w_f, vx_r, vy_r, w_r = self.compute_wheel_velocities(
+            v_body, u_inputs, params
+        )
+
+        # Static normal-load split between the axles: F_zf = m g b / L, F_zr = m g a / L
+        Fz_f = mass * gravity * (b / L)
+        Fz_r = mass * gravity * (a / L)
+
+        # The slips at each contact, over the rolling speed √(vx² + ε²)
+        alpha_f, kappa_f = wheel_slip(vx_f, vy_f, w_f, r_f, v_min_epsilon)
+        alpha_r, kappa_r = wheel_slip(vx_r, vy_r, w_r, r_r, v_min_epsilon)
+
+        # The law's forces at each contact
+        Fx_f, Fy_f = tire.forces(kappa_f, alpha_f, Fz_f, mu, c_kappa, c_alpha_f, params)
+        Fx_r, Fy_r = tire.forces(kappa_r, alpha_r, Fz_r, mu, c_kappa, c_alpha_r, params)
+
+        return Fx_f, Fy_f, Fx_r, Fy_r
+
+    def absolute_stiffnesses(self, params):
+        """``(C_alpha_f, C_alpha_r, C_kappa)``: the shared ``Ca`` and ``Ck``."""
+        Ca = params["Ca"]
+        Ck = params["Ck"]
+
+        return Ca, Ca, Ck
+
+    def per_unit_load_stiffnesses(self, params):
+        """``(C_alpha_f, C_alpha_r, C_kappa)``: the stiffnesses per unit load at the static loads."""
+        a = params["a"]
+        b = params["b"]
+        mass = params["mass"]
+        gravity = params["gravity"]
+        c_kappa = params["c_kappa"]
+        c_alpha_f = params["c_alpha_f"]
+        c_alpha_r = params["c_alpha_r"]
+
+        # Static axle loads, and the axle stiffnesses they carry
+        Fz_f = mass * gravity * b / (a + b)
+        Fz_r = mass * gravity * a / (a + b)
+        C_alpha_f = c_alpha_f * Fz_f
+        C_alpha_r = c_alpha_r * Fz_r
+        C_kappa = c_kappa * Fz_r
+
+        return C_alpha_f, C_alpha_r, C_kappa
+
 
 class DynamicBicycleCar3D(DynamicBicycle):
     """
@@ -529,11 +626,12 @@ class BicycleDynRate(DynamicBicycle):
     rate and the steer angle are states driven by the inputs
     ``[w_rear_dot, delta_dot]`` — one stacked ``u`` port, or ``named_ports=True``
     for a ``w_rear_dot`` and a ``delta_dot`` port. ``Jw_rear`` / ``bw_rear``
-    feed :meth:`inverse_propulsion_dynamics`.
+    feed :meth:`inverse_propulsion_dynamics`. ``tire`` as on
+    :class:`DynamicBicycle`.
     """
 
-    def __init__(self, named_ports=False):
-        super().__init__(named_ports=False)
+    def __init__(self, named_ports=False, tire=None):
+        super().__init__(named_ports=False, tire=tire)
         self.named_ports = bool(named_ports)
 
         # State: the body's six, then the rear wheel rate and the steer angle
@@ -641,6 +739,37 @@ class BicycleDynRate(DynamicBicycle):
     def wheel_rate_and_steer(self, x, u):
         """``[w_rear, delta]``: both are states on this rung."""
         return x[6:8]
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def per_unit_load_params(params):
+    """The same car on stiffnesses per unit load: ``Ca``, ``Ck`` over the static loads.
+
+    ``c_alpha_f = Ca / Fz_f``, ``c_alpha_r = Ca / Fz_r`` and ``c_kappa = Ck / Fz_r``, so
+    every axle keeps its stiffness at small slip.
+    """
+    a = params["a"]
+    b = params["b"]
+    mass = params["mass"]
+    gravity = params["gravity"]
+    Ca = params["Ca"]
+    Ck = params["Ck"]
+
+    # Static axle loads
+    Fz_f = mass * gravity * b / (a + b)
+    Fz_r = mass * gravity * a / (a + b)
+
+    # c = C / Fz: the absolute stiffnesses over the loads they carry
+    per_unit = {key: value for key, value in params.items() if key not in ("Ca", "Ck")}
+    per_unit["c_kappa"] = Ck / Fz_r
+    per_unit["c_alpha_f"] = Ca / Fz_f
+    per_unit["c_alpha_r"] = Ca / Fz_r
+
+    return per_unit
 
 
 if __name__ == "__main__":

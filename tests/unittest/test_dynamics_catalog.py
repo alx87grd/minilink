@@ -830,3 +830,58 @@ def test_a_method_reads_the_params_it_is_given(make, method, key, value):
     np.testing.assert_equal(given, from_stored)
     with pytest.raises(AssertionError):
         np.testing.assert_equal(given, default)
+
+
+# The dynamic bicycles on a law of the tire module
+
+from minilink.dynamics.catalog.vehicles.tires import BrushTire, MagicFormulaTire
+
+TIRE_LAWS = [BrushTire, MagicFormulaTire]
+
+
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+@pytest.mark.parametrize(
+    "make", [DynamicBicycle, BicycleDynRate], ids=lambda m: m.__name__
+)
+def test_a_dynamic_bicycle_takes_per_axle_stiffnesses_with_a_tire_law(make, law):
+    car = make(tire=law())
+    default = make()
+    Fz_f = car.params["mass"] * car.params["gravity"] * car.params["b"] / 2.0
+
+    assert "Ca" not in car.params and "Ck" not in car.params
+    assert car.params["c_alpha_f"] == pytest.approx(default.params["Ca"] / Fz_f)
+    assert car.params["c_alpha_r"] == pytest.approx(default.params["Ca"] / Fz_f)
+    for key, value in law().params.items():
+        assert car.params[key] == value
+    # The same small-slip car: the same fastest tire mode
+    assert car.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
+
+
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+def test_a_dynamic_bicycle_on_a_tire_law_simulates(law):
+    car = DynamicBicycle(tire=law())
+    x0 = np.array([0.0, 0.0, 0.0, 5.0, 0.0, 0.0])
+
+    traj = car.compute_trajectory(tf=3.0, u=np.array([18.0, 0.1]), x0=x0)
+
+    assert np.all(np.isfinite(traj.x))
+    assert traj.x[5, -1] > 0.0  # A left steer turns the car left
+
+
+@pytest.mark.jax
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+def test_a_rate_bicycle_on_a_tire_law_traces_under_jax(law):
+    jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
+    jnp = jax.numpy
+    car = BicycleDynRate(tire=law())
+    x = jnp.array([0.0, 0.0, 0.1, 4.0, 0.2, 0.1, 14.0, 0.05])
+    u = jnp.array([1.0, 0.1])
+
+    dx = jax.jit(car.f)(x, u)
+    dmu = jax.grad(lambda mu: car.f(x, u, 0.0, {**car.params, "mu": mu})[4])(1.0)
+
+    np.testing.assert_allclose(
+        np.asarray(dx), np.asarray(car.f(np.asarray(x), np.asarray(u))), rtol=1e-12
+    )
+    assert np.isfinite(float(dmu))

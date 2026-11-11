@@ -9,7 +9,6 @@ from minilink.dynamics.catalog.vehicles.tires import (
     LinearSaturation,
     LinearTire,
     MagicFormulaTire,
-    linear_tire_forces,
     smooth_floor,
     tire_slip,
     wheel_slip,
@@ -94,7 +93,19 @@ def test_a_force_points_along_the_slip_demand():
         assert Fy / Fx == pytest.approx((C_ALPHA * alpha) / (C_KAPPA * kappa))
 
 
-def test_linear_saturation_is_the_linear_tire_forces_bit_for_bit():
+def saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
+    """The dynamic bicycle's original tire function, kept as the reference of the law."""
+    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
+    Fx = Ck * kappa
+    Fy = Ca * alpha
+    F_max = mu * Fz
+    F_total = np.sqrt(Fx**2 + Fy**2)
+    ratio = np.where(F_total > F_max, F_max / np.maximum(F_total, 1e-12), 1.0)
+
+    return Fx * ratio, Fy * ratio
+
+
+def test_linear_saturation_is_the_original_function_bit_for_bit():
     """The law is the moved function: the same slips give the same bits."""
     rng = np.random.default_rng(3)
     vx = 10.0 * rng.standard_normal(500)
@@ -104,7 +115,7 @@ def test_linear_saturation_is_the_linear_tire_forces_bit_for_bit():
 
     alpha, kappa = tire_slip(vx, vy, w, R, v_eps)
     Fx, Fy = LinearSaturation().forces(kappa, alpha, Fz, mu, Ck, Ca)
-    Fx_ref, Fy_ref = linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_eps)
+    Fx_ref, Fy_ref = saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_eps)
 
     np.testing.assert_array_equal(Fx, Fx_ref)
     np.testing.assert_array_equal(Fy, Fy_ref)

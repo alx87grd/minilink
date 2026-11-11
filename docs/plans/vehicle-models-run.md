@@ -149,6 +149,22 @@ Each entry: the step, the choice, the options it was taken over, and why.
 - **VM-2, the rolling-resistance test.** The brush law no longer knows the speed, so the
   check that the front axle resists its rolling moves from the tire to the car's
   `compute_tire_physics`.
+- **VM-3, how the rung binds its tire path.** `__init__` binds two methods once:
+  `axle_forces` (`saturated_linear_forces` or `tire_law_forces`) and `axle_stiffnesses`
+  (for the solver hint), and `compute_tire_physics` delegates to the first; RULES 2.3's
+  pattern of binding a function at construction. Assigning over `compute_tire_physics`
+  itself was the other option, but it would shadow the racecar's override.
+- **VM-3, no rolling resistance on rungs 3 and 3b with a module law.** "Rung 4's path"
+  there means its tire keys (`mu`, `c_kappa`, `c_alpha_f`, `c_alpha_r`, the law's own),
+  its smooth slip and its law, not the racecar's `C_rr`: rung 3 has none, and phase 3's
+  switch then changes the law and the slip alone, so its before and after measure the
+  tire. `Ca` and `Ck` leave `params` when a law is given (one home per number).
+- **VM-3, the solver hint written per axle.** `fastest_mode` reads `(C_αf, C_αr, C_κ)` from
+  the bound `axle_stiffnesses` and writes the linearization with the two axles apart
+  (`−(a C_αf − b C_αr)` for the shared `−C_α (a − b)`). On the default numbers (`a = b`)
+  the bits are the same; for `a ≠ b` the hint may move by its last bit.
+- **VM-3, `linear_tire_forces` removed.** The rungs call `LinearSaturation` through
+  `tire.forces`; the bit-for-bit test keeps the original function as its reference.
 
 ## 7. Ledger
 
@@ -167,3 +183,4 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   alternating the two trees, median of 5 warm solves each): the racecar's first solve on
   a compiled face 0.266, 0.309, 0.272 s before and 0.285, 0.305, 0.264 s after; the rate
   bicycle's 0.141, 0.127, 0.096 s before and 0.107, 0.131, 0.134 s after: within noise.
+- **VM-3:** none; byte-identical to VM-2's capture.

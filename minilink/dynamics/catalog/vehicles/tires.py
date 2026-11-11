@@ -299,32 +299,6 @@ def axle_slips(vx, vy, yaw_rate, w_rear, delta, params):
     return kappa_r, alpha_f, alpha_r
 
 
-# The transitional law at one contact, its slip computed inside
-
-
-def linear_tire_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
-    """Linear-slip tire forces with friction-circle saturation (pyro ``LinearTire``).
-
-    ``Fx = Ck kappa`` and ``Fy = Ca alpha``, scaled back onto ``|F| <= mu Fz``.
-    """
-    xp = array_module(vx, vy, w)
-
-    alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
-
-    # Linear slip forces: F_x = C_κ κ and F_y = C_α α
-    Fx = Ck * kappa
-    Fy = Ca * alpha
-
-    # Scaled back onto the friction circle |F| ≤ μ F_z (10⁻¹² guards the division)
-    F_max = mu * Fz
-    F_total = xp.sqrt(Fx**2 + Fy**2)
-    ratio = xp.where(F_total > F_max, F_max / xp.maximum(F_total, 1e-12), 1.0)
-    Fx_sat = Fx * ratio
-    Fy_sat = Fy * ratio
-
-    return Fx_sat, Fy_sat
-
-
 # The friction an axle uses
 
 
