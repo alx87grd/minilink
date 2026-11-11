@@ -24,5 +24,9 @@ u = np.vstack([power, steer])
 
 traj = car.compute_trajectory(tf=TF, u=u, n_samples=N_SAMPLES, backend="jax")
 
+# A grid on the ground under the drive, a margin around it
+x, y = traj.x[0], traj.x[1]
+car.scene_bounds = (x.min() - 10, x.max() + 10, y.min() - 10, y.max() + 10)
+
 # car.plot_trajectory()
 car.animate(traj, renderer="meshcat")
