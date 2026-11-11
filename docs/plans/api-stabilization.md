@@ -733,3 +733,12 @@ then after each commit: byte-identical.
 
 - **The tabular learner's `learn`** folds into `solve(n_episodes=)`, continuing from the current table, as the RL planner's did (ruling 18): one verb on both learners. Landed on `api-settle`.
 - **The learners' per-episode `history` key** `"cost"` → `"J"` (ruling 17b's four-word rule). Landed on `api-settle`.
+- **Q1, the discrete models' `period`** (AS-24's leftover): `DiscreteLTISystem` and `LinearizedStepSystem` lose `period` and are pure tick laws, `x⁺ = A_d x + B_d u`; seconds come only from a clock (CONSTITUTION invariant 1): `model % Δ`, whose `sample_period` the analysis already reads; `linearize` of a sampled loop returns the tick-law model; the printout says "per tick". The maintainer: Bode is for continuous time; the existing discrete support stays only because it is free (per tick on a tick law, rad/s on `model % Δ`); no new discrete-frequency work.
+- **Q2:** `ProblemEvaluator.tf` → `pe.horizon`; `LyapunovCertificate.verify(tf=)` → `horizon=`.
+- **Q3:** no `sys.poles()` shortcut; `poles(sys)` is the verb; `TransferFunction.poles` and `StateObserver.poles` keep their names.
+- **Q4:** `transfer_function` refuses a step or sampled system ("a transfer function is continuous; design on the continuous plant, then `% dt`"); the KNOWN_ISSUES entry leaves with the fix.
+- **Q5:** `ThreeBody`'s state ordered globally (all positions, then all rates). "Positions then rates" (ruling 7) is a style guideline, not a rule enforced in general: RULES words it so, and no test enforces it on a user's plant.
+- **Q6:** `NativeSampledSystem` takes `output_dim=` like its siblings, with a domain sentence refusing an `h` that would read its own output port.
+- **Q7:** RRT*'s planner copies of its record (`converged`, its best path cost, `history`) removed; callers read `solution.record` (RULES 2.4, as AS-30 did for RRT).
+- **Q8:** a port's `nominal_value` is a checked property (assignment checked against `dim`, one domain sentence); the module function `nominal_of` goes.
+- **Q9:** `PlotResult` keeps `.figure` (matplotlib's word); ruling 16's `.fig` was a slip of the text.
