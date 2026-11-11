@@ -800,8 +800,9 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
   `LinearizedStepSystem`); `luenberger` on a step or sampled system, before it builds the gain
   (`kalman` and so `lqg` refused one since AS-1). Kept: `place` on a discrete model and
   `luenberger_gain(A, C, poles)`, their poles read in `z`; the Riccati refusal's sentence now
-  names `luenberger_gain`, not `luenberger`. **A question:** whether `transfer_function` leaves
-  the step systems' facade (`LinearAnalysis` is shared by the two families) instead of refusing.
+  names `luenberger_gain`, not `luenberger`. **Ruled 2026-11-11 (the maintainer):**
+  `transfer_function` stays on the step systems' facade and refuses with the ruling's sentence
+  (a discrete frequency response may come back later).
 - **Q5.** Byte-identical through the permutation (the RK4 step is component-wise): `x0`, `f`,
   the labels, the bounds and a 0.5 s run. The demo's `x0[0]` is still `r1x`; no notebook uses the
   plant. The catalog's bounds are the default infinite box, so only their order moved.
@@ -856,3 +857,9 @@ refuses, `ThreeBody`'s raw order, equal once permuted back).
 - **Q7:** RRT*'s planner copies of its record (`converged`, its best path cost, `history`) removed; callers read `solution.record` (RULES 2.4, as AS-30 did for RRT). Landed on `api-settle`.
 - **Q8:** a port's `nominal_value` is a checked property (assignment checked against `dim`, one domain sentence); the module function `nominal_of` goes. Landed on `api-settle`.
 - **Q9:** `PlotResult` keeps `.figure` (matplotlib's word); ruling 16's `.fig` was a slip of the text.
+- **The RL vocabulary (the architecture review's proposal).** Reward and return are fine on the
+  RL-specific tools (the planner's `history`, `last_ep_return_mean`, `plot_learning_curve`, the
+  verbose line); the planning problem and solution always speak cost minimization (the record's
+  `history` holds `"J"`, `mean_episode_cost`). The code already does this; nothing changed.
+- **The critics' `value(w, x)` (the architecture review's proposal).** Kept, weights first: "lets
+  not be too rigid on internal tools". DESIGN's RL paragraph names the exception.

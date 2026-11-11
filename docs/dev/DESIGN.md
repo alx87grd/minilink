@@ -1650,7 +1650,8 @@ What the algorithm trains is an `ExplorationPolicy` (`planner.exploration_policy
 mean action (its `actor`, the planner's) with an exploration head around it (`GaussianHead` for the policy-gradient family,
 `SquashedGaussianHead` for SAC), one pytree `theta = {"mlp", "head"}`, and the methods
 `sample`, `log_prob`, `entropy` and `input(a)`. Critics `ValueFunction` and `QFunction` sit
-on the same features. One file per algorithm under `algorithms/` (`REINFORCE`,
+on the same features; their `value(w, x)` and `value(w, x, a)` take the weights first, the
+`jax.grad` idiom, an internal exception to the one signature (the maintainer, 2026-11-11). One file per algorithm under `algorithms/` (`REINFORCE`,
 `ActorCritic`, `PPO`, `SAC`), each owning only its update rule and train state; three class
 attributes declare the family (`on_policy`, `head_kind`, `critic_kind`). Bare JAX, no
 Flax/Optax dependency. Training is quiet by default; `solve(verbose=True)` prints one line per
