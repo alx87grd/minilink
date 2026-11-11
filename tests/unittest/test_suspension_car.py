@@ -6,6 +6,8 @@ import pytest
 from minilink.core.backends import configure_jax
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.suspension_car import (
+    FormulaCar3D,
+    OffRoadCar3D,
     SpringDamper,
     SuspensionCar3D,
     attitude,
@@ -334,3 +336,40 @@ def test_the_wheel_frames_sit_at_the_hubs_and_the_contact_vectors_draw():
         hub = frames[f"wheel_{wheel}"][:3, 3]
         assert hub[2] == pytest.approx(car.params["r_f"], abs=1e-9)
     assert len(arrows["world"]) == 8
+
+
+# The presets and their looks
+
+
+@pytest.mark.parametrize("preset", [FormulaCar3D, OffRoadCar3D])
+def test_a_preset_rests_at_its_ride_height_and_its_look_fits_its_frames(preset):
+    car = preset(wheel_angles=True)
+
+    loads = car.loads(car.x0, np.zeros(2))
+    look = car.skin(car)
+    frames = car.tf(car.x0, np.zeros(2))
+
+    assert np.sum(loads) == pytest.approx(car.params["mass"] * 9.81, rel=1e-3)
+    assert set(look) <= set(frames)
+    assert {"body", "wheel_fl", "wheel_fr", "wheel_rl", "wheel_rr"} <= set(look)
+
+
+@pytest.mark.parametrize("preset", [FormulaCar3D, OffRoadCar3D])
+def test_a_preset_drives_off_and_keeps_its_four_wheels_down(preset):
+    # Straight: full power from rest spins the rear tires, and a steered launch spins the car
+    car = preset()
+    configure_jax()
+
+    traj = car.compute_trajectory(
+        tf=3.0, u=np.array([0.3 * car.params["P_max"], 0.0]), backend="jax"
+    )
+
+    assert traj.x[3, -1] > 10.0
+    assert np.all(np.isfinite(traj.x))
+    assert min(car.rollover(traj.x[:, -1], np.zeros(2))[0], 1e9) > 200.0
+
+
+def test_a_tire_given_to_a_preset_replaces_its_slicks():
+    car = FormulaCar3D(tire=BrushTire(mu=0.3))
+
+    assert car.params["tire"]["fl"]["mu"] == 0.3

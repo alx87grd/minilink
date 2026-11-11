@@ -75,7 +75,11 @@ from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
-from minilink.dynamics.catalog.vehicles.suspension_car import SuspensionCar3D
+from minilink.dynamics.catalog.vehicles.suspension_car import (
+    FormulaCar3D,
+    OffRoadCar3D,
+    SuspensionCar3D,
+)
 from minilink.graphical.catalog.skins import car_skin_3d
 
 
@@ -169,6 +173,8 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("UdeSRacecarDyn", UdeSRacecarDyn),
     CatalogCheckEntry("DrivetrainBicycle", DrivetrainBicycle),
     CatalogCheckEntry("SuspensionCar3D", SuspensionCar3D),
+    CatalogCheckEntry("FormulaCar3D", FormulaCar3D),
+    CatalogCheckEntry("OffRoadCar3D", OffRoadCar3D),
     CatalogCheckEntry(
         "UdeSRacecarDyn(wheel_angles=True)",
         lambda: UdeSRacecarDyn(wheel_angles=True),
