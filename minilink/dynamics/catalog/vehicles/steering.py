@@ -95,10 +95,8 @@ class KinematicCar(KinematicBicycle):
         super().__init__()
 
         # Parameters: a full-size wheelbase
-        self.a = 2.0
-        self.b = 3.0
-        self.params["a"] = self.a
-        self.params["b"] = self.b
+        self.params["a"] = 2.0
+        self.params["b"] = 3.0
 
         # Graphics (display only; the EoM use only ``a + b``): a rectangular body
         # filling the ``(a + b) x width`` collision footprint plus four wheels, the

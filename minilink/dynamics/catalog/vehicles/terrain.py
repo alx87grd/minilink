@@ -148,16 +148,16 @@ class TerrainBlock(System):
     Input ``u = [x_1, ..., x_n, y_1, ..., y_n]``: the horizontal positions [m] of
     ``n_points`` points. Outputs ``height`` (``n_points`` heights [m]), ``gradient``
     (``dz_dx`` of every point, then ``dz_dy``) and ``friction`` (``n_points`` factors).
-    The block's ``params`` are the terrain's own.
+    The block's ``params`` hold the terrain's own dict at ``"terrain"``.
     """
 
     def __init__(self, terrain: Terrain | None = None, n_points: int = 4):
         super().__init__()
 
-        # Parameters: the terrain's numbers, one home
+        # Parameters: the terrain's own dict, held at its key (one home)
         self.terrain = Terrain() if terrain is None else terrain
         self.n_points = int(n_points)
-        self.params = self.terrain.params
+        self.params = {"terrain": self.terrain.params}
 
         # Ports
         n = self.n_points
@@ -176,12 +176,13 @@ class TerrainBlock(System):
         params = self.params if params is None else params
 
         terrain = self.terrain
+        terrain_params = params["terrain"]
         n = self.n_points
 
         p_x = u[:n]
         p_y = u[n:]
 
-        z = terrain.height(p_x, p_y, t, params)
+        z = terrain.height(p_x, p_y, t, terrain_params)
 
         return z
 
@@ -190,12 +191,13 @@ class TerrainBlock(System):
         xp = array_module(u)
 
         terrain = self.terrain
+        terrain_params = params["terrain"]
         n = self.n_points
 
         p_x = u[:n]
         p_y = u[n:]
 
-        dz_dx, dz_dy = terrain.gradient(p_x, p_y, t, params)
+        dz_dx, dz_dy = terrain.gradient(p_x, p_y, t, terrain_params)
         gradient = xp.concatenate([dz_dx, dz_dy])
 
         return gradient
@@ -204,11 +206,12 @@ class TerrainBlock(System):
         params = self.params if params is None else params
 
         terrain = self.terrain
+        terrain_params = params["terrain"]
         n = self.n_points
 
         p_x = u[:n]
         p_y = u[n:]
 
-        mu = terrain.friction(p_x, p_y, t, params)
+        mu = terrain.friction(p_x, p_y, t, terrain_params)
 
         return mu

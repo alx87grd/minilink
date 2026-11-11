@@ -846,11 +846,14 @@ TIRE_LAWS = [BrushTire, MagicFormulaTire]
 def test_a_dynamic_bicycle_takes_per_axle_stiffnesses_with_a_tire_law(make, law):
     car = make(tire=law())
     default = make()
-    Fz_f = car.params["mass"] * car.params["gravity"] * car.params["b"] / 2.0
+    p = default.params
+    Fz_f = p["mass"] * p["gravity"] * p["b"] / (p["a"] + p["b"])
+    Fz_r = p["mass"] * p["gravity"] * p["a"] / (p["a"] + p["b"])
 
     assert "Ca" not in car.params and "Ck" not in car.params
-    assert car.params["c_alpha_f"] == pytest.approx(default.params["Ca"] / Fz_f)
-    assert car.params["c_alpha_r"] == pytest.approx(default.params["Ca"] / Fz_f)
+    assert car.params["c_alpha_f"] == pytest.approx(p["Ca"] / Fz_f)
+    assert car.params["c_alpha_r"] == pytest.approx(p["Ca"] / Fz_r)
+    assert car.params["c_kappa"] == pytest.approx(p["Ck"] / Fz_r)
     for key, value in law().params.items():
         assert car.params[key] == value
     # The same small-slip car: the same fastest tire mode
@@ -966,3 +969,18 @@ def test_every_car_names_its_heading_psi_and_owns_its_wheelbase_once(make):
     assert car.state.labels[2] == "psi"
     assert "length" not in car.params
     assert {"a", "b"} <= set(car.params)
+
+
+def test_the_saturated_linear_tire_named_is_the_default_path():
+    from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
+
+    v = np.array([10.0, 0.5, 0.2])
+    u = np.array([35.3, 0.05])
+    named = DynamicBicycle(tire=LinearSaturation())
+
+    assert named.params == DynamicBicycle().params
+    assert named.compute_tire_physics(v, u) == DynamicBicycle().compute_tire_physics(
+        v, u
+    )
+    with pytest.raises(ValueError, match="per unit load"):
+        DrivetrainBicycle(tire=LinearSaturation())

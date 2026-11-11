@@ -94,7 +94,7 @@ def test_a_force_points_along_the_slip_demand():
 
 
 def saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
-    """The dynamic bicycle's original tire function, kept as the reference of the law."""
+    """The saturated linear tire written out at one contact: the law's reference."""
     alpha, kappa = tire_slip(vx, vy, w, R, v_min_epsilon)
     Fx = Ck * kappa
     Fy = Ca * alpha
@@ -105,8 +105,8 @@ def saturated_linear_forces(vx, vy, w, R, Fz, Ca, Ck, mu, v_min_epsilon):
     return Fx * ratio, Fy * ratio
 
 
-def test_linear_saturation_is_the_original_function_bit_for_bit():
-    """The law is the moved function: the same slips give the same bits."""
+def test_linear_saturation_is_its_reference_bit_for_bit():
+    """The law gives the reference's bits: linear inside the circle, on it beyond."""
     rng = np.random.default_rng(3)
     vx = 10.0 * rng.standard_normal(500)
     vy = 2.0 * rng.standard_normal(500)

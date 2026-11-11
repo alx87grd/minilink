@@ -68,8 +68,6 @@ class UdeSRacecar(KinematicBicycle):
         a = PUBLIC_RACECAR_PARAMS["a"]
         b = PUBLIC_RACECAR_PARAMS["b"]
         r = PUBLIC_RACECAR_PARAMS["r_r"]
-        self.a = a
-        self.b = b
         self.params["a"] = a
         self.params["b"] = b
         self.params["r_r"] = r

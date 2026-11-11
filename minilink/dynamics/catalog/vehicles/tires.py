@@ -177,7 +177,7 @@ class LinearSaturation:
         """
         xp = array_module(kappa, alpha)
 
-        # Linear slip forces: F_x = C_κ κ and F_y = C_α α
+        # The linear slip forces
         Fx = c_kappa * kappa
         Fy = c_alpha * alpha
 

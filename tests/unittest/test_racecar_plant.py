@@ -79,7 +79,7 @@ def test_rigid_tires_reproduce_the_kinematic_bicycle():
     traj = car.compute_trajectory(u=u, tf=tf, n_samples=n, verbose=False)
 
     kinematic = KinematicBicycle()
-    kinematic.params = {"a": car.params["a"], "b": car.params["b"], "length": 0.34}
+    kinematic.params = {"a": car.params["a"], "b": car.params["b"]}
     kinematic.x0 = np.zeros(3)
     kin_traj = kinematic.compute_trajectory(
         u=np.vstack([traj.x[3], np.full(n, delta)]), tf=tf, n_samples=n, verbose=False

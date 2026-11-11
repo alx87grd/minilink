@@ -32,8 +32,8 @@ class DynamicBicycle(DynamicSystem):
 
     Tires
     -----
-    With no ``tire`` given, both axles run the linear tire saturated on its friction
-    circle (:class:`~minilink.dynamics.catalog.vehicles.tires.LinearSaturation`) on the
+    With no ``tire`` given, or ``LinearSaturation()``, both axles run the linear tire
+    saturated on its friction circle (:class:`~minilink.dynamics.catalog.vehicles.tires.LinearSaturation`) on the
     absolute stiffnesses ``Ca``, ``Ck`` and the slip floor ``|vx| + v_min_epsilon``. A
     law of the tire module (``tire=BrushTire()``) runs on stiffnesses per unit load,
     ``c_kappa``, ``c_alpha_f``, ``c_alpha_r`` (derived from ``Ca`` and ``Ck`` at the
@@ -53,11 +53,12 @@ class DynamicBicycle(DynamicSystem):
 
         # Parameters: CG-to-axle distances a/b [m], wheel radii r_f/r_r [m],
         # mass [kg], yaw inertia [kg m^2], gravity [m/s^2], air density rho
-        # [kg/m^3], drag area CdA = Cd * A [m^2], and linear-slip tire
-        # coefficients shared by both axles: cornering stiffness Ca [N/rad],
-        # longitudinal stiffness Ck [N], friction mu [-], and slip
-        # regularization speed v_min_epsilon [m/s] (same keys as the JAX
-        # vehicle ladder).
+        # [kg/m^3], drag area CdA = Cd * A [m^2], and the tires: absolute
+        # stiffnesses shared by both axles, cornering Ca [N/rad] and longitudinal
+        # Ck [N], friction mu [-] and the slip regularization speed v_min_epsilon
+        # [m/s] (the keys of the car_trajopt project's ladder). A law of the tire
+        # module takes them per unit load instead (c_alpha_f, c_alpha_r, c_kappa)
+        # with its own numbers.
         self.params = {
             "a": 1.0,
             "b": 1.0,
@@ -73,16 +74,15 @@ class DynamicBicycle(DynamicSystem):
             "mu": 1.0,
             "v_min_epsilon": 0.1,
         }
-        if tire is not None:
-            self.params = {**per_unit_load_params(self.params), **self.tire.params}
 
         # The tire path, chosen once: absolute stiffnesses and the |vx| + ε slip for
-        # the saturated linear tire, stiffnesses per unit load and the smooth slip for
-        # a law of the tire module
-        if tire is None:
+        # the saturated linear tire; stiffnesses per unit load, the law's own numbers
+        # and the smooth slip for a law of the tire module
+        if isinstance(self.tire, LinearSaturation):
             self.axle_forces = self.saturated_linear_forces
             self.axle_stiffnesses = self.absolute_stiffnesses
         else:
+            self.params = {**per_unit_load_params(self.params), **self.tire.params}
             self.axle_forces = self.tire_law_forces
             self.axle_stiffnesses = self.per_unit_load_stiffnesses
 

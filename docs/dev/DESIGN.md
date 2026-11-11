@@ -515,7 +515,7 @@ One written exception to rule 2: a car's tire law
 `mf_E`) into the car's flat `params` at construction, and the car hands that tree to
 `tire.forces`, so the car's numbers stay the one flat tree its equations and its presets
 write (`mu`, `c_alpha_f`, `c_kappa` beside them); the law's own `params` is its default
-only. A `TerrainBlock`'s `params` is its terrain's dict (a wrapper, rule 2).
+only. A `TerrainBlock` holds its terrain's dict at `"terrain"` (rule 2).
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the

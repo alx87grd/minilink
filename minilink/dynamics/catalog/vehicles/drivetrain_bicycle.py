@@ -7,6 +7,7 @@ from minilink.core.signals import VectorSignal
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.dynamics.catalog.vehicles.tires import (
     BrushTire,
+    LinearSaturation,
     axle_slips,
     friction_use,
     smooth_sign,
@@ -74,10 +75,11 @@ class DrivetrainBicycle(DynamicBicycle):
     """
 
     def __init__(self, named_ports=True, tire=None, wheel_angles=False):
-        super().__init__(named_ports=True)
+        tire = BrushTire() if tire is None else tire
+        require_load_proportional_tire(tire)
+        super().__init__(named_ports=True, tire=tire)
         self.named_ports = bool(named_ports)
         self.wheel_angles = bool(wheel_angles)
-        self.tire = BrushTire() if tire is None else tire
 
         # State: the body's six, the rear wheel rate, the steer angle and the power,
         # then the two rolling angles when they are states
@@ -85,25 +87,12 @@ class DrivetrainBicycle(DynamicBicycle):
         self.state = VectorSignal("x", dim=self.n)
         self.x0 = np.zeros(self.n)
 
-        # Parameters: the full-size car of the dynamic bicycle, then the tire law's own
-        car = {
-            # Chassis
-            "mass": 1500.0,  # [kg]
-            "inertia": 2500.0,  # [kg m^2]
-            "a": 1.0,  # [m]    CG to front axle
-            "b": 1.0,  # [m]    CG to rear axle
-            "r_f": 0.3,  # [m]    front tire radius
-            "r_r": 0.3,  # [m]    rear tire radius
-            "gravity": 9.81,  # [m/s^2]
-            # Aero and rolling resistance
-            "rho": 1.225,  # [kg/m^3]
-            "CdA": 0.3 * 2.2,  # [m^2]
+        # Parameters: the dynamic bicycle's full-size car on stiffnesses per unit load
+        # (its Ca and Ck over the static loads, with the tire law's own numbers), then
+        # the rolling resistance, the drive and the steering
+        drivetrain = {
+            # Rolling resistance
             "C_rr": 0.015,  # [-]   rolling resistance of a road tire
-            # Tires (stiffnesses per unit load: Ca and Ck over the static loads)
-            "mu": 1.0,  # [-]
-            "c_alpha_f": 60000.0 / (1500.0 * 9.81 * 0.5),  # [1/rad]
-            "c_alpha_r": 60000.0 / (1500.0 * 9.81 * 0.5),  # [1/rad]
-            "c_kappa": 100000.0 / (1500.0 * 9.81 * 0.5),  # [-]
             # Propulsion
             "P_max": 100000.0,  # [W]
             "tau_sat": 2500.0,  # [N m] torque the drivetrain holds at the rear axle
@@ -117,12 +106,11 @@ class DrivetrainBicycle(DynamicBicycle):
             "steering_tau": 0.1,  # [s]
             "steer_rate_max": 1.0,  # [rad/s]
             # Smoothing scales: they keep the equations finite and differentiable at rest
-            "v_min_epsilon": 0.1,  # [m/s]   floor of the slip denominators
             "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
             "v_c": 0.1,  # [m/s]   creep speed of the rolling resistance
             "w_c": 1.0,  # [rad/s] creep rate of the drivetrain dry friction
         }
-        self.params = {**car, **self.tire.params}
+        self.params = {**self.params, **drivetrain}
 
         # The wheel angles, chosen once: two more states, or none
         if self.wheel_angles:
@@ -219,24 +207,15 @@ class DrivetrainBicycle(DynamicBicycle):
 
         r_r = params["r_r"]
         Jw_rear = params["Jw_rear"]
-        c_kappa = params["c_kappa"]
         v_eps = params["v_min_epsilon"]
-        c_alpha_f = params["c_alpha_f"]
-        c_alpha_r = params["c_alpha_r"]
         mass = params["mass"]
-        gravity = params["gravity"]
         inertia = params["inertia"]
         a = params["a"]
         b = params["b"]
         engine_tau = params["engine_tau"]
         steering_tau = params["steering_tau"]
 
-        # Static axle loads, and the slip stiffnesses per unit load they scale
-        Fz_f = mass * gravity * b / (a + b)
-        Fz_r = mass * gravity * a / (a + b)
-        C_kappa = c_kappa * Fz_r
-        C_alpha_f = c_alpha_f * Fz_f
-        C_alpha_r = c_alpha_r * Fz_r
+        C_alpha_f, C_alpha_r, C_kappa = self.axle_stiffnesses(params)
 
         # The wheel and the car exchanging momentum through the rear contact; the yaw
         # and the sideslip against the two cornering stiffnesses
@@ -461,6 +440,14 @@ class DrivetrainBicycle(DynamicBicycle):
 
         return dphi
 
+    def no_wheel_angle_rates(self, x, params):
+        """No rolling angle in the state: an empty block."""
+        xp = array_module(x)
+
+        dphi = xp.zeros(0)
+
+        return dphi
+
     ###########################################################################
     # Internal machinery
     ###########################################################################
@@ -477,14 +464,6 @@ class DrivetrainBicycle(DynamicBicycle):
         """The base class reads ``[w_rear, delta]`` here; both are states now."""
         return x[6:8]
 
-    def no_wheel_angle_rates(self, x, params):
-        """No rolling angle in the state: an empty block."""
-        xp = array_module(x)
-
-        dphi = xp.zeros(0)
-
-        return dphi
-
     def bound_commands(self):
         """The command ports' limits, ``+- P_max`` and ``+- delta_max``, from ``params``."""
         P_max = self.params["P_max"]
@@ -498,3 +477,18 @@ class DrivetrainBicycle(DynamicBicycle):
         else:
             self.inputs["u"].lower_bound = np.array([-P_max, -delta_max])
             self.inputs["u"].upper_bound = np.array([P_max, delta_max])
+
+
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
+def require_load_proportional_tire(tire):
+    """Refuse the saturated linear tire: the car's stiffnesses are per unit load."""
+    if isinstance(tire, LinearSaturation):
+        raise ValueError(
+            "the drivetrain bicycle reads stiffnesses per unit load: pass a law of the "
+            "tire module (LinearTire, BrushTire or MagicFormulaTire), not "
+            "LinearSaturation"
+        )

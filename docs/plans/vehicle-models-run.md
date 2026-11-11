@@ -221,6 +221,42 @@ Each entry: the step, the choice, the options it was taken over, and why.
   vehicles' `__all__` and the catalog index ("plants only in `__all__`"): it is imported
   from `minilink.dynamics.catalog.vehicles.terrain`. Adding it to a facade is a public-name
   decision, left to the maintainer.
+- **VM-10, the reviewers' findings applied** (each reproduced first; baseline
+  byte-identical after them, and `DrivetrainBicycle`'s numbers, solver hint and `f` the same
+  bits):
+  - `DynamicBicycle(tire=LinearSaturation())` took the per-unit-load path and fed the
+    absolute law per-unit stiffnesses (forces some 7000 times too soft, silently): the rung
+    now binds its path on the law's kind, and `DrivetrainBicycle` refuses
+    `LinearSaturation` with a message naming the laws it takes.
+  - `DrivetrainBicycle` kept its parent's bindings for the linear law (`axle_stiffnesses`
+    raised `KeyError('Ca')`): it now passes its tire to the parent, builds its numbers on
+    the parent's (no second copy of rung 3's car) and reads its stiffnesses through the
+    bound `axle_stiffnesses`.
+  - `TerrainBlock`'s `params` was a copy of its terrain's dict (`System.params` copies an
+    assignment), not one home: it now holds the terrain's dict at `"terrain"`, rule 2's
+    composite form, with a test of the identity.
+  - The wheelbase's second owner: `KinematicCar` and `UdeSRacecar` kept `self.a`,
+    `self.b`, which the skins read before `params`, so an edit of `params["a"]` left the
+    drawing stale; the attributes leave.
+  - Clean-ups: one branch for the tire path in `DynamicBicycle.__init__`, its parameter
+    comment true for both key sets; a copied comment in `LinearSaturation`; the empty
+    wheel-angle block beside its twin; a test's `c_alpha_r` against `Fz_r`; a retired
+    `length` key in a racecar test; `pyro-port-remaining.md` and ROADMAP's wording.
+- **VM-10, the reviewers' findings not applied:**
+  - writing `DrivetrainBicycle.compute_tire_physics` through `DynamicBicycle.tire_law_forces`
+    (one copy of the axle forces): plan §10.4 writes rung 4's forces on its own page with
+    `axle_slips`, and the change moves the racecar's last bits (1.6·10⁻¹³) in a review pass;
+    left for the maintainer, with the proposals below;
+  - a shallow `copy.copy` of a car keeps its bound tire path on the original: the library
+    copies with `deepcopy`, which rebinds; RULES 2.3's binding pattern is kept;
+  - `test_racecar_tires.py` repeating some of `test_tires.py` on the racecar's numbers: the
+    brief moved those tests there by name;
+  - proposals that change a public name or behaviour, in the pull request: the `phi_f`,
+    `phi_r` grip labels beside the `phi_rear`, `phi_front` angles; `(kappa, alpha)` as the
+    slips' return order; one key for the rear wheel's viscous drag (`bw_rear`, `bw_drive`);
+    retiring `axle_slips`; `rear_wheel_ground_torque` taking `Fx_r` (the tire forces are
+    computed twice per `f`, and it reads `params.get("bw_rear", 0.0)`); the reverse-mode
+    gradient of `LinearSaturation` at zero slip (NaN, as on the starting commit).
 
 ## 7. Ledger
 

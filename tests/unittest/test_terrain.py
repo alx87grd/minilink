@@ -96,6 +96,7 @@ def test_the_block_in_a_diagram_returns_the_fields_at_its_input_points():
     diagram.add_subsystem(TerrainBlock(bumps, n_points=4), "terrain")
     diagram.connect("wheels", "y", "terrain", "u")
 
+    assert diagram.params["terrain"]["terrain"] is bumps.params  # One home
     run = diagram.compute_trajectory(
         tf=0.1, record=["terrain:height", "terrain:gradient", "terrain:friction"]
     )
