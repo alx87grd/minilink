@@ -212,7 +212,12 @@ class SquashedGaussianHead:
 
         # The log-std network on the features, its last layer near zero
         self.mlp = MLP(
-            n_features, self.m, hidden, activation, seed=seed, output_gain=0.01
+            n_features,
+            self.m,
+            hidden=hidden,
+            activation=activation,
+            seed=seed,
+            output_gain=0.01,
         )
 
     def init(self):

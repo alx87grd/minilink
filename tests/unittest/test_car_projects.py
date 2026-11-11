@@ -289,13 +289,9 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.params["a"], profile.a)
         self.assertAlmostEqual(sys.params["b"], profile.b)
         self.assertFalse(hasattr(sys, "tire_model_f"))
-        self.assertAlmostEqual(sys.state.upper_bound[6], profile.limits.w_rear_max)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.limits.w_rear_dot_max
-        )
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[1], profile.limits.delta_dot_max
-        )
+        self.assertAlmostEqual(sys.state.upper[6], profile.limits.w_rear_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.w_rear_dot_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_dot_max)
 
     def test_apply_car_profile_servo_plant(self):
         from examples.projects.car_trajopt.vehicles.car_profile import (
@@ -308,10 +304,8 @@ class TestCarProfile(unittest.TestCase):
         profile = racecar_profile()
         self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
         self.assertAlmostEqual(sys.params["torque_tau"], 0.05)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.limits.tau_rear_max
-        )
-        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.tau_rear_max)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
 
     def test_apply_car_profile_engine_plant(self):
         from examples.projects.car_trajopt.vehicles.car_profile import (
@@ -329,15 +323,11 @@ class TestCarProfile(unittest.TestCase):
         self.assertAlmostEqual(sys.params["tau_fric"], profile.tau_fric)
         self.assertNotIn("engine_power_peak", sys.params)
         self.assertNotIn("transmission_ratio", sys.params)
-        self.assertAlmostEqual(
-            sys.inputs["u"].upper_bound[0], profile.engine_power_peak
-        )
-        self.assertAlmostEqual(
-            sys.inputs["u"].lower_bound[0], -profile.engine_power_peak
-        )
-        self.assertAlmostEqual(sys.inputs["u"].upper_bound[1], profile.limits.delta_max)
-        self.assertAlmostEqual(sys.state.upper_bound[8], profile.engine_power_peak)
-        self.assertAlmostEqual(sys.state.lower_bound[8], -profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].lower[0], -profile.engine_power_peak)
+        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
+        self.assertAlmostEqual(sys.state.upper[8], profile.engine_power_peak)
+        self.assertAlmostEqual(sys.state.lower[8], -profile.engine_power_peak)
 
 
 # The pathtracking project's vehicle: the rolling resistance, the tires, the inputs

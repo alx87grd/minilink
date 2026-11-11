@@ -23,8 +23,8 @@ def discretize(
     A continuous system becomes ``x_{k+1} = Φ(x_k, u_k, t_k)``, the input held
     over each period ``[t_k, t_k + dt]``: ``solver`` is ``"rk4"`` or
     ``"euler"``, taking ``substeps`` steps per period, or ``"exact"`` for a
-    linear model, the matrix exponential
-    ``x_{k+1} = e^{A dt} x_k + ∫₀^{dt} e^{A s} ds B u_k``. A static block is
+    linear model, the matrix exponential, about the model's nominal point (a
+    linearization's operating point, its drift kept). A static block is
     read at the sampling instants, a tick law keeps its count. The view reads
     the source's live ``params`` (``step(x, u, k, params)`` overrides them),
     and the sample period is ``dt`` alone: the source's ``params`` may not carry

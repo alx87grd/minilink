@@ -404,8 +404,8 @@ def add_input_port_like(diagram, port_id: str, port) -> None:
         nominal_value=port.nominal_value,
         labels=port.labels,
         units=port.units,
-        lower_bound=port.lower_bound,
-        upper_bound=port.upper_bound,
+        lower=port.lower,
+        upper=port.upper,
     )
 
 
@@ -424,8 +424,8 @@ def connect_new_output_port_like(
         nominal_value=output_port.nominal_value,
         labels=output_port.labels,
         units=output_port.units,
-        lower_bound=output_port.lower_bound,
-        upper_bound=output_port.upper_bound,
+        lower=output_port.lower,
+        upper=output_port.upper,
     )
 
 

@@ -56,7 +56,7 @@ concrete formatting, ordered by the cost of being wrong:
   `interpolation`) are fixed at `__init__` (for example by binding a port's compute function
   to `ctl` vs. `ctl_with_gravity`), never stored in `params`.
   A `params` argument, on an equation or on a tool's verb, is `None` or the complete tree
-  (every key, every block); nothing merges, and a one-off tree is a copy of the tool's own,
+  (every key, every subsystem); nothing merges, and a one-off tree is a copy of the tool's own,
   edited. Live mutation of one number stays `sys.params["m"] = 4`.
   The same holds for every core math object: a cost, a set, a distribution, a field
   hold a `params` dict (`{}` when they have none), read when the call passes `None`, their
@@ -74,7 +74,7 @@ concrete formatting, ordered by the cost of being wrong:
   `Evaluation`). An object stores no other run state, with one exception: an object whose
   convenience verbs need a default (plot, animate, `controller`) keeps the last result it
   returned, once, as the same object, never a copy. That is `sys.traj` on a `System`,
-  `last_solution` on a `Planner` (value iteration's `result` reads through it); a new one is
+  `last_solution` on a `Planner` (the grid planners' `tables` read through it); a new one is
   named `last_<what the run returns>`. Only those verbs read
   it, as a default; library code never does. A tool takes the result it needs, or uses the one
   its run returned (`tests/unittest/test_last_answer.py` lists every reader). An engine that
@@ -108,6 +108,14 @@ concrete formatting, ordered by the cost of being wrong:
   `renderer=` is the drawing library, on every drawing verb (`plot_renderer=` on `game` and the
   realtime simulator).
   `integrator=` is not used: it names the 1/s block. The flag names of 4.7 follow the same rule.
+  Four words, one meaning each (the maintainer's ruling 17b): `cost` is the cost object
+  (`problem.cost`, `cost=`, the parameter tree's `"cost"` key); `J` is a scalar, one run's cost
+  or a program's at `z` (`J*` at the optimum: a record's `.J`, a solve's `status["J"]`, the
+  running signal `"J"` and its rate `"dJ"`); `objective` is the criterion minimized over draws;
+  `cost_to_go` is the function `J(x, t)` (a `Field`; `J*` or `J_π` by its source, not its
+  name; `ValueTables.J` is the DP table). A quantity that is neither keeps a name of its own
+  (`raw_cost`, `path_cost`, `cost_to_come`, `mean_episode_cost`). Recorded exception:
+  `Manipulator.J(q)` is the Jacobian, the robotics textbook's letter.
   The whole vocabulary, one word per idea and one idea per word
   (`tests/unittest/test_vocabulary.py` refuses the retired words on the public surface):
 
@@ -120,8 +128,9 @@ concrete formatting, ordered by the cost of being wrong:
   | A tool's step or period | `dt` | |
   | A clocked block's own period | `sample_period` | |
   | Number of time steps, the transitions (a transcription's intervals: `N + 1` knots) | `n_steps` | `N` as a count (the equations keep `N`; `N` the reference gain stays) |
+  | The RL planner's control periods of each rollout per collection, the data of one update | `n_steps_per_update` | `n_steps` (a horizon's transitions) |
   | Number of time samples on a horizon, endpoints included (`Simulator`, `compute_trajectory`, the frequency and step responses, the LQR gain schedule) | `n_samples` | `n_steps`, `n`, `n_pts` |
-  | Number of sampled rollouts | `n_rollouts` | `n_samples` (time samples only) |
+  | Number of sampled rollouts (MPPI, a certificate's `verify`, the RL planner's parallel rollouts) | `n_rollouts` | `n_samples` (time samples only), `n_envs` |
   | Iterations, an exact count (a fixed scan); every count is `n_<thing>` | `n_iterations` | `iterations` as the keyword |
   | Iterations, a cap | `max_iterations` | |
   | A training budget, episodes / plant steps (the RL planners' `solve`, their records) | `n_episodes` / `n_timesteps` | `episodes`, `timesteps` |
@@ -132,22 +141,36 @@ concrete formatting, ordered by the cost of being wrong:
   | A per-call draw | `key` | |
   | A seed stored at construction (`0` by default where a run draws; `None` is a random block's mean, never fresh entropy) | `seed` | `rng` (internal only) |
   | The verb's algorithm (value iteration's `method="loop"`, RRT's `nearest_method`) | `method` | `algorithm`, `backend="loop"`, `nearest_backend` |
+  | A bound on an object (a port, the state, a set, `Saturation`, the program; `add_input_port(lower=, upper=)`, `port.lower`, `state.upper`); a limit a law applies to a named signal carries that signal's name (`u_min`, `u_max`, `delta_max`, `e_int_min`) | `lower`, `upper` | `lower_bound`, `upper_bound` |
+  | The optimizer's algorithm, and the implementation it runs (one table keyed `(method, backend)`, `backend=` the array module) | `method="slsqp"`, `"trust-constr"` (SciPy's spellings), `"l-bfgs"`, `"gd"`, `"adam"`, `"ipopt"` | `"scipy_slsqp"`, `"scipy_trust_constr"`, a library in the method's name |
   | The drawing library of a plot or an animation | `renderer` (`plot_renderer` on `game`) | `backend`, `plot_backend` |
   | The method's numbers, as keywords (`Optimizer`, trajectory optimization, the RL planner) | `**method_numbers` | `**algorithm_kwargs`, `**method_kwargs` |
   | A planner's record | `solution.record` | `solution.solver` |
+  | The block the RL planner trains, given and read back (the actor of actor-critic; the handed-out copy is `solution.controller`) | `actor=`, `planner.actor` | `policy=` |
+  | Train, and train more: every planner's one verb (the RL planner's `solve(n_timesteps=)` and the tabular learner's `solve(n_episodes=)` continue their training); the learned law's action | `solve`; `solution.controller`, `planner.actor.action(x)` | `learn`, `predict` (Stable-Baselines3's words, on the bridge's `SB3Controller` only) |
+  | A grid planner's tables, `J` and `pi` by node: the latest solution's; a tabular learner's table as it stands | `ValueTables`, `solution.record.tables`, `planner.tables`; `planner.greedy_tables` | `DynamicProgrammingResult`, `planner.result` |
   | A solution's planning family (`"value iteration"`, `"riccati"`, ...) | `solution.family` | `solution.method` |
   | A record's counts: tree nodes, iterations | `n_nodes`, `n_iterations` | `nodes`, `tree_nodes`, `iterations` |
+  | A solve's wall time, on every planner's record (`None` where the solve has no wall clock) | `solve_time_s` | `train_time_s` for a solve's time (the neural learner's `train_time_s` counts every training of the planner) |
+  | A record's cost, named by its quantity: the objective at the solution (the `Optimizer`, trajectory optimization and an iterate, MPPI, a compiled solve's `status`); a search's path cost-to-come, a tree node's, RRT*'s best; a learner's mean episode cost at the end of training (each `history` entry's own cost is `"J"`); a scored run's cost before the failure charge, beside its score `J` (`Evaluation`) | `J`; `path_cost`, `node.cost_to_come`, `best_path_cost`; `mean_episode_cost`; `raw_cost` | `cost` for any scalar (the cost is the object), `episode_cost`, `best_goal_cost` |
+  | A run's running cost signals (`traj.with_cost`, `plot_cost`, a step problem's `rollout`): the discounted rate, its integral with the terminal cost at the last sample | `"dJ"`, `"J"` | `"cost_rate"`, `"cost"` |
   | A trajectory-optimization iterate's constraint residuals (as on its record) | `max_equality_violation`, `min_inequality_margin` | `max_eq`, `min_ineq` |
-  | A block's channel count (sources, white noise, routing, saturation, delay, the PID family) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
+  | A block's channel count (sources, white noise, routing, saturation, delay, the PID family, the impedance laws) | `dim` | `p`, `dof` (`dof` stays a manipulator's joints) |
+  | The fixed-step time integration of `solver=` (the simulator, as `discretize` and the evaluators) | `"rk4"`, `"euler"` | `"rk4_fixedsteps"`, `"euler_fixedsteps"` |
+  | An author's reads: the input ports' values in `u`, by name; their nominal values, stacked; a recorded signal of a run | `sys.ports(u, "r", "y")`; `sys.u_nominal`; `traj.signal(name)` | `get_port_values_from_u`, `get_u_from_input_ports`, `get_signal` |
+  | A system placed in a diagram (`add_subsystem`, `diagram.subsystems`, the printout's `subsystems:`, `get_subsystem_input_port`); "block" is kept for the standard components of `minilink.blocks` | `subsystem` | `block` for a diagram's member, `subsys` |
   | A run's trajectories kept by `evaluate` | `trajectories=True` | `record=True` (a record is a planner's account) |
-  | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
+  | A port a keyword names (a source's output, a run's prescribed input); the run a plot draws | `port=`; `traj=` | `input_port_id=`; `rollout=` |
+  | How samples are read between their times (the step model's rollout, the noise sources, `TrajectorySource`) | `hold="zoh"`, `hold="linear"` | `interpolation=`, `"previous"`, `"foh"` |
+  | A drawing in 3-D; a file to write; a plot's two state axes; a plot's box | `is_3d`; `file_name`; `x_axis`, `y_axis`; `bounds` | `show_3d`; `filename`, `save_path`, a path in `save=`; `axes=(i, j)`, `axis_x`, `axis_y`; `limits` |
   | Playback rate of an animation (simulated seconds per wall second) | `speed` | `time_factor_video` |
   | An episode's length (`Sys2Gym`) | `episode_length` | `tf` as a length |
-  | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native law's numbers |
+  | An external solver's own knobs (SciPy, Ipopt) | `options=` (a dict) | `optimizer_options`, an options dataclass, a native method's numbers (`max_iterations=`, `tol=`, `learning_rate=` are keywords) |
   | A planner's numbers (varied per solve, traced) | `planner.params` (`params["method"]`), `solve(params=)` | `planner.settings` |
-  | Print text / draw a figure | `verbose` (default `False`) / `show` | |
+  | Print text / draw a figure (and where: `plot_diagram(show="inline" \| "window" \| "pdf")`) | `verbose` (default `False`) / `show` | `show_inline`, `show_pdf` |
   | Finite-difference step / convergence tolerance / a radius | `eps` / `tol` / `radius` | `eps` as a radius |
   | Cost-to-go and control-law plots, and their sweeps animated | `plot_cost_to_go`, `plot_control_law`; `animate_cost_to_go`, `animate_control_law` | `plot_cost2go`, `plot_policy`, `animate_policy` |
+| A plant's signals: the state's order (a style guideline, not a rule enforced on a user's plant), a rate's label, a unit, a default label | positions, then their rates (`[q; dq]`, all the positions first on a plant of several bodies); `d<position>` (`dtheta`, `dy`) unless the textbook names the rate (`omega`, `yaw_rate`, `vx`); a bare unit (`"Nm"`, `"rad/s"`: the plot adds the brackets); counted from 1 (`q1…`, `dq1…`, `u1…`, `p1…`) | rates first; `"[Nm]"`, `"rad/sec"`; `"Torque 0"`, `"Angle 0"` |
 
   **A naming pattern, not a hard rule: the controller is the block,
   the policy the function.** Use it where it fits:
@@ -241,7 +264,7 @@ concrete formatting, ordered by the cost of being wrong:
   names drive the operators. Contract: DESIGN §4, 'Control laws'.
 - **4.10 Early structural validation:** Diagram connection utilities (`@`, `>>`, `DiagramSystem.connect`)
   validate port existence and dimensional compatibility at wiring time, failing with explicit
-  error messages naming the mismatched ports and blocks; a connected input is rewired only
+  error messages naming the mismatched ports and subsystems; a connected input is rewired only
   through `disconnect`, and an output seen at the compile probe to move with an undeclared
   input is refused. This rule
   covers wiring, not `f`/`h` return-shape checks at ODE time.
@@ -296,7 +319,7 @@ concrete formatting, ordered by the cost of being wrong:
      block 4 (`J11`, `J12`, …), and the matrix is assembled here, row by row (5.5).
   6. **Return** (output). `return` of a name. Never an equation or an array on the
      `return` line; a result object built from named results may be
-     (`return DynamicProgrammingResult(grid=grid, J=J, …)`).
+     (`return ValueTables(grid=grid, J=J, …)`).
 
   A delegation, a constant, a dict literal or a frame composition stays the one line it is:
   the blocks are for equations (`tf` returns its frames as one dict literal). A numeric

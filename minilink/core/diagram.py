@@ -55,15 +55,17 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # Wiring tables and the stacked-state layout
         self.init_wiring()
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a continuous or static subsystem under a unique id.
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a continuous or static subsystem under a unique id, and return the id.
 
-        A :class:`StepSystem` has no ``f`` to stack, so it is refused here
-        rather than left out of the state derivative.
+        ``sys_id=None`` takes the operators' default (the block's class name,
+        numbered on a repeat). A :class:`StepSystem` has no ``f`` to stack, so it
+        is refused here rather than left out of the state derivative.
         """
+        sys_id = self.new_subsystem_id(sys, sys_id)
         require_flow_subsystem(sys, sys_id)
 
-        super().add_subsystem(sys, sys_id)
+        return super().add_subsystem(sys, sys_id)
 
     def f(self, x, u, t=0, params=None):
         """
@@ -99,7 +101,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
 
         return dx
 
-    def compile(self, backend="numpy", verbose=False, *, flatten=False):
+    def compile(self, *, backend="numpy", verbose=False, flatten=False):
         """
         Compile the diagram into a stateless evaluator for fast simulation.
 
@@ -193,7 +195,9 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
             inner = self.subsystems[sys_id]
             inner_params = None if params is None else params[sys_id]
             return inner.port_samples(
-                block_run(self, outer, traj, params), f"{rest}:{port_id}", inner_params
+                subsystem_run(self, outer, traj, params),
+                f"{rest}:{port_id}",
+                inner_params,
             )
 
         sys_id, port_id = signal_port_of(self, name)
@@ -202,7 +206,7 @@ class DiagramSystem(WiredDiagramMixin, DynamicSystem):
         # An output port's value; else the block's whole input, or one input port
         if port_id in block.outputs:
             values = [
-                self.compute_subsys_output_port(
+                self.compute_subsystem_output_port(
                     traj.x[:, i], traj.u[:, i], t, sys_id, port_id, params=params
                 )
                 for i, t in enumerate(traj.t)
@@ -237,7 +241,7 @@ def require_flow_subsystem(sys, sys_id):
         )
 
 
-def block_run(diagram, path, traj, params=None) -> Trajectory:
+def subsystem_run(diagram, path, traj, params=None) -> Trajectory:
     """
     The run of one block of ``diagram`` as the block saw it, reconstructed from the diagram's run.
 
@@ -263,30 +267,32 @@ def block_run(diagram, path, traj, params=None) -> Trajectory:
     run = Trajectory(t=traj.t, x=x, u=u)
     inner_params = None if params is None else params[sys_id]
 
-    return run if not rest else block_run(subsystem, rest, run, inner_params)
+    return run if not rest else subsystem_run(subsystem, rest, run, inner_params)
 
 
-def block_roles(diagram, recorded=(), offset=0, prefix=""):
+def subsystem_layouts(diagram, recorded=(), offset=0, prefix=""):
     """
-    Every block's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
+    Every subsystem's layout in a diagram's run, by id: its state slice, and its recorded input signal or ``None``.
 
-    A block inside a nested diagram is keyed by its path (``"inner/plant"``),
+    A subsystem inside a nested diagram is keyed by its path (``"inner/plant"``),
     its slice offset into the outer state; ``recorded`` names the signals the
-    run kept, the block's input among them as ``"plant:u"``.
+    run kept, the subsystem's input among them as ``"plant:u"``.
     """
-    roles = {}
-    for sys_id, block in diagram.subsystems.items():
+    layouts = {}
+    for sys_id, subsystem in diagram.subsystems.items():
         start, end = diagram.state_index[sys_id]
         path = f"{prefix}{sys_id}"
         u_name = f"{path}:u"
-        roles[path] = {
+        layouts[path] = {
             "x": (offset + start, offset + end),
             "u": u_name if u_name in recorded else None,
         }
-        if hasattr(block, "state_index"):
-            roles.update(block_roles(block, recorded, offset + start, f"{path}/"))
+        if hasattr(subsystem, "state_index"):
+            layouts.update(
+                subsystem_layouts(subsystem, recorded, offset + start, f"{path}/")
+            )
 
-    return roles
+    return layouts
 
 
 if __name__ == "__main__":

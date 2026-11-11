@@ -27,10 +27,10 @@ class OneLinkManipulator(Manipulator):
         super().__init__(dof=1, actuators=1, task_dim=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -158,9 +158,9 @@ class OneLinkManipulator(Manipulator):
         params = self.params if params is None else params
 
         lengths = np.array([params["l1"]])
-        upper_bound = self.inputs["u"].upper_bound
+        upper = self.inputs["u"].upper
 
-        return planar_torque_geometry(lengths, u, upper_bound)
+        return planar_torque_geometry(lengths, u, upper)
 
 
 class TwoLinkManipulator(Manipulator):
@@ -170,10 +170,10 @@ class TwoLinkManipulator(Manipulator):
         super().__init__(dof=2, actuators=2, task_dim=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -366,9 +366,9 @@ class TwoLinkManipulator(Manipulator):
         params = self.params if params is None else params
 
         lengths = self.lengths(params)
-        upper_bound = self.inputs["u"].upper_bound
+        upper = self.inputs["u"].upper
 
-        return planar_torque_geometry(lengths, u, upper_bound)
+        return planar_torque_geometry(lengths, u, upper)
 
 
 class ThreeLinkManipulator(Manipulator):
@@ -378,10 +378,10 @@ class ThreeLinkManipulator(Manipulator):
         super().__init__(dof=3, actuators=3, task_dim=3)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {
@@ -680,10 +680,10 @@ class FiveLinkManipulator(Manipulator):
         super().__init__(dof=5, actuators=5, task_dim=2)
 
         # The plant's own range: angles and rates within ±2π, torques within ±5
-        self.state.lower_bound = np.full(self.n, -2 * np.pi)
-        self.state.upper_bound = np.full(self.n, 2 * np.pi)
-        self.inputs["u"].lower_bound = np.full(self.inputs["u"].dim, -5.0)
-        self.inputs["u"].upper_bound = np.full(self.inputs["u"].dim, 5.0)
+        self.state.lower = np.full(self.n, -2 * np.pi)
+        self.state.upper = np.full(self.n, 2 * np.pi)
+        self.inputs["u"].lower = np.full(self.inputs["u"].dim, -5.0)
+        self.inputs["u"].upper = np.full(self.inputs["u"].dim, 5.0)
 
         # Parameters
         self.params = {"l": np.array([0.5, 0.5, 0.5, 0.5, 0.5])}
@@ -773,9 +773,9 @@ class FiveLinkManipulator(Manipulator):
         params = self.params if params is None else params
 
         lengths = params["l"]
-        upper_bound = self.inputs["u"].upper_bound
+        upper = self.inputs["u"].upper
 
-        return planar_torque_geometry(lengths, u, upper_bound)
+        return planar_torque_geometry(lengths, u, upper)
 
 
 class KinematicManipulator(DynamicSystem):
@@ -807,14 +807,14 @@ class KinematicManipulator(DynamicSystem):
         self.outputs["y"].units = list(self.state.units)
 
         # Ports: the effector position
-        p_labels = [f"p{i}" for i in range(self.task_dim)]
+        p_labels = [f"p{i + 1}" for i in range(self.task_dim)]
         self.add_output_port(
             "p",
             dim=self.task_dim,
             function=self.h_p,
             dependencies=(),
             labels=p_labels,
-            units=["[m]"] * self.task_dim,
+            units=["m"] * self.task_dim,
         )
 
         # Graphics: the camera frames the arm's full reach
@@ -981,7 +981,7 @@ def planar_frames(points, angles, effector=None):
     return frames
 
 
-def planar_torque_geometry(lengths, u, upper_bound):
+def planar_torque_geometry(lengths, u, upper):
     """Per-frame joint torque arcs (honest, keyed to the ``link{i}`` frames).
 
     Sweep sign matches :class:`~minilink.dynamics.catalog.pendulum.double_pendulum.DoublePendulum`
@@ -992,7 +992,7 @@ def planar_torque_geometry(lengths, u, upper_bound):
     dynamic = {}
     for i in range(len(lengths)):
         # A third of a turn at the torque limit (5 when unbounded, never below 1)
-        limit = float(abs(upper_bound[i])) if np.isfinite(upper_bound[i]) else 5.0
+        limit = float(abs(upper[i])) if np.isfinite(upper[i]) else 5.0
         limit = max(limit, 1.0)
         sweep = -u[i] * (2.0 * np.pi / 3.0) / limit
         arc = TorqueArrow(

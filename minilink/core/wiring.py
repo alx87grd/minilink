@@ -43,9 +43,6 @@ class WiredDiagramMixin:
         The diagram sets its subsystem registry and wiring table first, before
         ``System.__init__``, whose params setter reads them.
         """
-        # Wiring memory: a quiet connect
-        self.connection_verbose = False
-
         # The stacked state of the (still empty) subsystems
         self.n, self.state_index, self.state = state_layout(self.subsystems)
 
@@ -137,21 +134,40 @@ class WiredDiagramMixin:
 
     # Building the diagram
 
-    def add_subsystem(self, sys, sys_id):
-        """Add a subsystem under a unique id, with all its inputs unconnected.
+    def add_subsystem(self, sys, sys_id=None):
+        """Add a subsystem under a unique id, with all its inputs unconnected, and return the id.
 
         The ids ``plant``, ``controller`` and ``observer`` name the roles every
         tool reads (:func:`minilink.core.roles.roles`); one of each per level.
+        ``sys_id=None`` takes the operators' default: the block's ``id``, else
+        its class name, numbered on a repeat (``Pendulum``, ``Pendulum2``).
         """
+        sys_id = self.new_subsystem_id(sys, sys_id)
         require_plain_id(sys_id)
         check_reserved_id(sys_id, self.subsystems)
-        require_new_block(sys, sys_id, self.subsystems)
+        require_new_subsystem(sys, sys_id, self.subsystems)
 
         self.subsystems[sys_id] = sys
         self.connections[sys_id] = {port_id: None for port_id in sys.inputs}
 
         # The stacked state, with the new block
         self.n, self.state_index, self.state = state_layout(self.subsystems)
+
+        return sys_id
+
+    def new_subsystem_id(self, sys, sys_id=None) -> str:
+        """``sys_id`` as given, else the operators' default id of ``sys`` not yet taken here."""
+        if sys_id is not None:
+            return sys_id
+
+        # A real cycle: the assembly imports the diagrams built on this mixin
+        from minilink.core.assembly import default_subsystem_id, unique_id
+
+        # A role (plant, controller, observer) once per level, as the operators place it
+        base = default_subsystem_id(sys)
+        check_reserved_id(base, self.subsystems)
+
+        return unique_id(base, self.subsystems)
 
     def connect(self, source_sys_id, source_port_id, target_sys_id, target_port_id):
         """
@@ -175,12 +191,6 @@ class WiredDiagramMixin:
             source_port_id,
         )
 
-        if self.connection_verbose:
-            print(
-                f"Connected {source_sys_id}:{source_port_id} "
-                f"to {target_sys_id}:{target_port_id}"
-            )
-
     def disconnect(self, target_sys_id, target_port_id):
         """Open a subsystem input and return the ``(sys_id, port_id)`` it read, ``None`` if it was open."""
         require_subsystem_target(target_sys_id)
@@ -201,8 +211,8 @@ class WiredDiagramMixin:
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         """
         Expose a subsystem output port as a new diagram boundary output.
@@ -227,8 +237,8 @@ class WiredDiagramMixin:
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
         # Wired from the subsystem port it exposes
@@ -275,8 +285,8 @@ class WiredDiagramMixin:
                     nominal_value=port.nominal_value,
                     labels=port.labels,
                     units=port.units,
-                    lower_bound=port.lower_bound,
-                    upper_bound=port.upper_bound,
+                    lower=port.lower,
+                    upper=port.upper,
                 )
             else:
                 self.add_output_port(
@@ -290,7 +300,7 @@ class WiredDiagramMixin:
 
         return self
 
-    def autowire(self, *, strict: bool = False, validate: bool = True) -> DiagramSystem:
+    def autowire(self, *, strict: bool = False) -> DiagramSystem:
         """
         Connect unconnected inputs by name: each takes the one output with its name and size.
 
@@ -300,7 +310,7 @@ class WiredDiagramMixin:
         # A real cycle: the operators import DiagramSystem, built on this mixin
         from minilink.core.operators import autowire
 
-        return autowire(self, strict=strict, validate=validate)
+        return autowire(self, strict=strict)
 
     # Naming a block and its signals
 
@@ -376,9 +386,9 @@ class WiredDiagramMixin:
         pieces = []
         for port_id, port in subsystem.inputs.items():
             if dependencies != "all" and port_id not in dependencies:
-                port_u = port.get_default_value()
+                port_u = port.nominal_value
             else:
-                port_u = self.get_subsys_input_port(
+                port_u = self.get_subsystem_input_port(
                     x, u, t, sys_id, port_id, params=params
                 )
             pieces.append(port_u)
@@ -408,7 +418,7 @@ class WiredDiagramMixin:
 
         return params[sys_id]
 
-    def compute_subsys_output_port(self, x, u, t, sys_id, port_id, params=None):
+    def compute_subsystem_output_port(self, x, u, t, sys_id, port_id, params=None):
         """Evaluate one subsystem output port, recursing through its sources."""
         port = self.subsystems[sys_id].outputs[port_id]
         local_x = self.get_local_state(x, sys_id)
@@ -564,8 +574,8 @@ class WiredDiagramMixin:
             nominal_value=first.nominal_value,
             labels=first.labels,
             units=first.units,
-            lower_bound=first.lower_bound,
-            upper_bound=first.upper_bound,
+            lower=first.lower,
+            upper=first.upper,
         )
 
         # It feeds every open input of that name
@@ -589,21 +599,21 @@ class WiredDiagramMixin:
         if not outputs and name != "x":
             raise ValueError(
                 f"{name!r} is neither an open input nor an output of a block in "
-                f"{self.name!r}; blocks: {', '.join(self.subsystems) or '(none)'}"
+                f"{self.name!r}; subsystems: {', '.join(self.subsystems) or '(none)'}"
             )
 
-    def get_subsys_input_port(self, x, u, t, sys_id, port_id, params=None):
+    def get_subsystem_input_port(self, x, u, t, sys_id, port_id, params=None):
         """Value of one subsystem input port: connected source or nominal fallback."""
         source = self.connections[sys_id][port_id]
 
         if source is None:
-            return self.subsystems[sys_id].inputs[port_id].get_default_value()
+            return self.subsystems[sys_id].inputs[port_id].nominal_value
 
         source_sys_id, source_port_id = source
 
         if source_sys_id == "input":
-            return self.get_port_values_from_u(u)[source_port_id]
-        return self.compute_subsys_output_port(
+            return self.ports(u)[source_port_id]
+        return self.compute_subsystem_output_port(
             x, u, t, source_sys_id, source_port_id, params=params
         )
 
@@ -630,8 +640,8 @@ class DiagramOutputPort(OutputPort):
         nominal_value=None,
         labels=None,
         units=None,
-        lower_bound=None,
-        upper_bound=None,
+        lower=None,
+        upper=None,
     ):
         # The diagram and the subsystem port it exposes; set before
         # OutputPort.__init__, whose dependencies go through the property below
@@ -649,8 +659,8 @@ class DiagramOutputPort(OutputPort):
             nominal_value=nominal_value,
             labels=labels,
             units=units,
-            lower_bound=lower_bound,
-            upper_bound=upper_bound,
+            lower=lower,
+            upper=upper,
         )
 
     @property
@@ -667,7 +677,7 @@ class DiagramOutputPort(OutputPort):
     def source_output(self, x, u, t=0, params=None):
         """The exposed subsystem port, evaluated through the diagram."""
         source_sys_id, source_port_id = self.source
-        return self.diagram.compute_subsys_output_port(
+        return self.diagram.compute_subsystem_output_port(
             x, u, t, source_sys_id, source_port_id, params=params
         )
 
@@ -842,8 +852,8 @@ def state_layout(subsystems):
         substates = [sub.state for sub in subsystems.values()]
         state.labels = labels
         state.units = [unit for s in substates for unit in s.units]
-        state.upper_bound = np.concatenate([s.upper_bound for s in substates])
-        state.lower_bound = np.concatenate([s.lower_bound for s in substates])
+        state.upper = np.concatenate([s.upper for s in substates])
+        state.lower = np.concatenate([s.lower for s in substates])
         state.nominal_value = np.concatenate([s.nominal_value for s in substates])
 
     return n, state_index, state
@@ -878,7 +888,7 @@ def require_plain_id(sys_id):
         )
 
 
-def require_new_block(sys, sys_id, subsystems):
+def require_new_subsystem(sys, sys_id, subsystems):
     """Refuse a block the diagram already holds: its numbers would have two paths in the diagram's tree."""
     held = [existing_id for existing_id, block in subsystems.items() if block is sys]
     if held:

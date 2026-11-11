@@ -17,22 +17,14 @@ from minilink.core.system import System
 DEFAULT_INPUTS = {"x0": "y"}
 
 # The status keys every face's solve reports; a planner's own account comes after them
-STANDARD_STATUS = ("success", "iterations", "cost")
+STANDARD_STATUS = ("success", "n_iterations", "J")
 
 ###############################################################################
 # Public API
 ###############################################################################
 
 
-def ModelPredictiveController(
-    planner,
-    *,
-    inputs=None,
-    delay=False,
-    warm_start=True,
-    backend=None,
-    verbose=False,
-):
+class ModelPredictiveController(SampledDiagramSystem):
     """
     Model predictive control on a planner's compiled face: re-plan from the measured state at each tick, apply the plan.
 
@@ -57,7 +49,7 @@ def ModelPredictiveController(
       solved at tick ``k − 1``, as on a real computer; ``False`` (the default)
       applies the plan at once, the solve taking no time (the textbook MPC).
 
-    A solve that returns no usable plan (a non-finite cost or plan) keeps the
+    A solve that returns no usable plan (a non-finite ``J`` or plan) keeps the
     last one. ``P_k`` is the planner's tree (the solve block's ``params``, so
     the loop's ``controller.solve.cost.R`` tunes the plan) with each leaf
     named in ``inputs`` read from its input port (default ``{"x0": "y"}``:
@@ -80,35 +72,36 @@ def ModelPredictiveController(
     backend : str, optional
         The face's backend (default the planner's).
     verbose : bool
-        Print one line per solve: the tick's time, success, iterations, cost
+        Print one line per solve: the tick's time, success, iterations, ``J``
         and the solve's wall time (default off; host runs only, a traced run
         prints nothing).
+
+    Every block is pure and the loop computes each signal once per tick, so a
+    tick solves once; ``mpc % dt`` puts its blocks on the clock (a step
+    diagram's ``%``).
 
     Ports: inputs per ``inputs``; outputs ``u`` (the command), ``z`` (the plan
     solved at this tick, for dual rate and logging) and, when the plan carries
     states, ``x_ref`` and ``u_ref`` (the applied plan's state and input now).
     """
-    pv = planner.compile(backend)
-    require_point_start(planner.problem)
-    bindings = bindings_of(inputs)
 
-    return PredictiveController(
-        pv, bindings, delay=delay, warm_start=warm_start, verbose=verbose
-    )
-
-
-class PredictiveController(SampledDiagramSystem):
-    """
-    The MPC box: the planner's solve, the command and the plan's memory, with a unit delay before the command when ``delay``.
-
-    Every block is pure and the loop computes each signal once per tick, so a
-    tick solves once. Built by :func:`ModelPredictiveController`; ``mpc % dt``
-    puts its blocks on the clock (a step diagram's ``%``).
-    """
-
-    def __init__(self, pv, bindings, *, delay=False, warm_start=True, verbose=False):
+    def __init__(
+        self,
+        planner,
+        *,
+        inputs=None,
+        delay=False,
+        warm_start=True,
+        backend=None,
+        verbose=False,
+    ):
         super().__init__()
         self.name = "ModelPredictiveController"
+
+        # The planner's compiled face, from a point start; the leaves bound to ports
+        pv = planner.compile(backend)
+        require_point_start(planner.problem)
+        bindings = bindings_of(inputs)
 
         # The face, the bindings and the switches, shared by the blocks
         self.pv = pv
@@ -206,9 +199,9 @@ class PlanSolver(System):
         started = time.perf_counter()
         z_new, status = pv.solve(P, z0=z_guess)
         report_solve(self, t, status, started)
-        cost = status["cost"]
-        finite_cost = True if cost is None else xp.isfinite(cost)
-        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        J = status["J"]
+        finite_J = True if J is None else xp.isfinite(J)
+        usable = xp.all(xp.isfinite(z_new)) & finite_J
         z_star = xp.where(usable, z_new, z_prev)
 
         return z_star
@@ -354,31 +347,31 @@ def warm_guess(pv, z, x, params, z_default):
 
 def report_solve(block, t, status, started):
     """
-    One line for a verbose block's solve: its tick's time, success, iterations, cost and wall time (host runs only).
+    One line for a verbose block's solve: its tick's time, success, iteration count, ``J`` and wall time (host runs only).
 
     The planner's own account follows, any other number its status carries
-    (MPPI: ``S_min``, ``S_weighted``, ``effective_samples`` of ``K``, ``exit_rate``).
+    (MPPI: ``S_min``, ``S_weighted``, ``effective_rollouts`` of ``K``, ``exit_rate``).
     """
     values = [t, *(value for value in status.values() if value is not None)]
     if not block.verbose or not all(is_concrete(value) for value in values):
         return
     elapsed = time.perf_counter() - started
-    cost = status["cost"]
-    cost_text = "n/a" if cost is None else f"{float(cost):.6g}"
+    J = status["J"]
+    J_text = "n/a" if J is None else f"{float(J):.6g}"
 
-    # The planner's account beyond the four the face promises, the effective samples
+    # The planner's account beyond the four the face promises, the effective rollouts
     # out of the K drawn
     samples = getattr(block.pv, "K", None)
     extras = []
     for name, value in status.items():
         if name in STANDARD_STATUS or value is None:
             continue
-        of_K = f"/{samples}" if name == "effective_samples" and samples else ""
+        of_K = f"/{samples}" if name == "effective_rollouts" and samples else ""
         extras.append(f"{name}={float(value):.4g}{of_K}")
 
     print(
         f"MPC @ t={float(t):.2f}s  success={bool(status['success'])}  "
-        f"iterations={status['iterations']}  J={cost_text}  solve={elapsed:.3f}s"
+        f"n_iterations={status['n_iterations']}  J={J_text}  solve={elapsed:.3f}s"
         + "".join(f"  {extra}" for extra in extras)
     )
 

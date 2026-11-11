@@ -12,7 +12,11 @@ from minilink.core.roles import command_port
 from minilink.planning.evaluation import Evaluation
 from minilink.planning.evaluator import evaluate
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.results import PlanningSolution, episode_ticks_of
+from minilink.planning.results import (
+    PlanningSolution,
+    episode_ticks_of,
+    require_cost_to_go,
+)
 from minilink.planning.step_model import is_continuous, step_model_of
 
 ###############################################################################
@@ -120,7 +124,7 @@ class Planner(ABC):
     def cost_to_go(self, x, t=None) -> float:
         """The latest solution's cost-to-go field read at ``x`` (at ``t`` when given), a ``float``."""
         solution = require_solution(self)
-        J = require_cost_to_go(self, solution)
+        J = require_cost_to_go(solution, type(self).__name__)
         x = np.asarray(x, dtype=float)
 
         # J(x), or J(x, t) on a field that reads the time
@@ -145,13 +149,73 @@ class Planner(ABC):
         """The running cost along the latest solution's plan, else its controller's run on the planner's ``dt`` (:meth:`PlanningSolution.plot_cost`)."""
         return require_solution(self).plot_cost(**{"dt": self.dt, **kwargs})
 
-    def plot_control_law(self, **kwargs):
-        """The latest solution's law over the problem's box (:meth:`PlanningSolution.plot_control_law`)."""
-        return require_solution(self).plot_control_law(**kwargs)
+    def plot_control_law(
+        self,
+        *,
+        x_axis=None,
+        y_axis=None,
+        u_axis=0,
+        anchor=None,
+        bounds=None,
+        grid_shape=(101, 101),
+        t=0.0,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """The latest solution's law (:meth:`PlanningSolution.plot_control_law`, the same keywords): a ``PlotResult``."""
+        return require_solution(self).plot_control_law(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            u_axis=u_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
-    def plot_cost_to_go(self, **kwargs):
-        """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`)."""
-        return require_solution(self).plot_cost_to_go(**kwargs)
+    def plot_cost_to_go(
+        self,
+        *,
+        x_axis=0,
+        y_axis=1,
+        anchor=None,
+        bounds=None,
+        grid_shape=(51, 51),
+        t=0.0,
+        jmax=None,
+        is_3d=False,
+        trajectory=None,
+        title=None,
+        ax=None,
+        renderer="matplotlib",
+        show=True,
+    ):
+        """The latest solution's cost-to-go field (:meth:`PlanningSolution.plot_cost_to_go`, the same keywords): a ``PlotResult``."""
+        return require_solution(self).plot_cost_to_go(
+            x_axis=x_axis,
+            y_axis=y_axis,
+            anchor=anchor,
+            bounds=bounds,
+            grid_shape=grid_shape,
+            t=t,
+            jmax=jmax,
+            is_3d=is_3d,
+            trajectory=trajectory,
+            title=title,
+            ax=ax,
+            renderer=renderer,
+            show=show,
+        )
 
     ###########################################################################
     # Internal machinery
@@ -176,20 +240,7 @@ def require_solution(planner) -> PlanningSolution:
     return planner.last_solution
 
 
-def require_cost_to_go(planner, solution):
-    """Refuse a solution whose method gives no cost-to-go field; return its ``cost_to_go``."""
-    if solution.cost_to_go is None:
-        raise ValueError(
-            f"{type(planner).__name__}'s solution carries no cost-to-go field "
-            "(its cost_to_go is None)"
-        )
-
-    return solution.cost_to_go
-
-
-def open_loop_controller_of(
-    trajectory, sys, *, interpolation="linear"
-) -> TrajectorySource:
+def open_loop_controller_of(trajectory, sys, *, hold="linear") -> TrajectorySource:
     """
     The trajectory's input as a source block ``u = pi(t)`` for the plant ``sys``: ``controller >> sys``.
 
@@ -202,13 +253,20 @@ def open_loop_controller_of(
 
     # The command port's values, when the plant has a u port or a single input
     if "u" in sys.inputs or len(sys.inputs) == 1:
-        u = sys.get_port_values_from_u(u, command_port(sys))
+        u = sys.ports(u, command_port(sys))
 
-    return TrajectorySource(trajectory.t, u, interpolation=interpolation)
+    return TrajectorySource(trajectory.t, u, hold=hold)
 
 
 def planner_evidence(
-    planner, controller, *, dt=None, n_trials=50, tf=None, backend="numpy", problem=None
+    planner,
+    controller,
+    *,
+    dt=None,
+    n_trials=50,
+    episode_length=None,
+    backend="numpy",
+    problem=None,
 ) -> Evaluation | None:
     """
     The evidence a planner's ``solve(evaluate=True)`` records: its controller, as it is, scored on the real plant.
@@ -220,8 +278,8 @@ def planner_evidence(
     planner's own step (ruled 2026-11-08: the grid's for value iteration and
     tabular learning, the environment's for deep learning, the LQR's, an
     open-loop plan's own grid), the law continuous, ``dt`` only how finely its
-    loop is integrated; a clocked one on its own clock; ``tf`` is the run of an
-    infinite horizon. On a step problem, the model's rollouts
+    loop is integrated; a clocked one on its own clock; ``episode_length`` is the
+    run of an infinite horizon. On a step problem, the model's rollouts
     (:func:`step_evaluation`).
     """
     problem = planner.problem if problem is None else problem
@@ -235,7 +293,9 @@ def planner_evidence(
 
     # A step problem is scored on its model
     if not is_continuous(problem):
-        return step_evaluation(problem, controller, trials, episode_length=tf)
+        return step_evaluation(
+            problem, controller, trials, episode_length=episode_length
+        )
 
     return evaluate(
         problem,
@@ -244,7 +304,7 @@ def planner_evidence(
         n_trials=trials,
         key=0,
         backend=backend,
-        episode_length=tf,
+        episode_length=episode_length,
     )
 
 
@@ -274,12 +334,12 @@ def step_evaluation(
     for i in range(n):
         params = trial_of(draws, drawn, i)
 
-        # The model's run: x_0 … x_N, u_0 … u_{N−1}, cost = Σ γᵏ c_k + γᴺ h, the
+        # The model's run: x_0 … x_N, u_0 … u_{N−1}, raw_cost = Σ γᵏ c_k + γᴺ h, the
         # running cost's last value
         traj = model.rollout(controller, params=params, n_steps=N)
         xs = traj.x.T
         us = traj.u[:, :N].T
-        cost = traj.signals["cost"][0, -1]
+        raw_cost = traj.signals["J"][0, -1]
         t = [model.time_of(k, params) for k in range(N + 1)]
 
         # The judge's facts: finite, the least margin to X and U, the margin to Xf
@@ -295,20 +355,28 @@ def step_evaluation(
             reachability_margin = float(np.min(problem.Xf.margin(xs[-1], t[-1])))
         reached = reachability_margin >= 0.0
 
-        # J = cost, or with the failure charged cost + failure_cost · (failed or not
-        # reached), and the cost bound + failure_cost for a run not finite
-        cost = float(cost) if finite else np.inf
-        J = cost
+        # J = raw_cost, or with the failure charged raw_cost + failure_cost · (failed or
+        # not reached), and the cost bound + failure_cost for a run not finite
+        raw_cost = float(raw_cost) if finite else np.inf
+        J = raw_cost
         if problem.penalize_failure:
             charged = failure_cost if failed or not reached else 0.0
-            J = (cost if finite else bound) + charged
+            J = (raw_cost if finite else bound) + charged
 
         rows.append(
-            (cost, J, feasibility_margin, failed, reachability_margin, reached, xs[0])
+            (
+                raw_cost,
+                J,
+                feasibility_margin,
+                failed,
+                reachability_margin,
+                reached,
+                xs[0],
+            )
         )
 
     return Evaluation(
-        cost=np.array([row[0] for row in rows]),
+        raw_cost=np.array([row[0] for row in rows]),
         J=np.array([row[1] for row in rows]),
         feasibility_margin=np.array([row[2] for row in rows]),
         failed=np.array([row[3] for row in rows]),
@@ -387,6 +455,11 @@ def require_known_numbers(planner, method):
             f"{type(planner).__name__} has no number(s) {unknown} under "
             f'params["method"]; its numbers are {list(planner.number_names)}'
         )
+
+
+def host_copy(tree):
+    """A copy of a planner's complete tree for its solution, every leaf on the host (:func:`host_tree`)."""
+    return host_tree(deepcopy(tree))
 
 
 def host_tree(tree):

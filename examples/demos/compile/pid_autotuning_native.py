@@ -61,7 +61,7 @@ program = pe.program(wrt, params=start)
 descent = Optimizer(
     program,
     method="gd",
-    options={"maxiter": n_learn_steps},
+    max_iterations=n_learn_steps,
     learning_rate=lr,
 ).solve(
     callback=pe.live_plot(

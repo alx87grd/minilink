@@ -135,7 +135,14 @@ class NeuralPolicy(System):
         # Parameters: the policy network, sized on the features of the plant's x0
         z0 = self.observe(np.asarray(sys.x0, dtype=float))
         n_features = int(np.asarray(z0).shape[0])
-        self.mlp = MLP(n_features, m, hidden, activation, seed=seed, output_gain=0.01)
+        self.mlp = MLP(
+            n_features,
+            m,
+            hidden=hidden,
+            activation=activation,
+            seed=seed,
+            output_gain=0.01,
+        )
         self.params = {"mlp": self.mlp.params}
 
         # Ports: the plant state in, the bounded command out
@@ -144,8 +151,8 @@ class NeuralPolicy(System):
             dim=n,
             labels=list(sys.state.labels),
             units=list(sys.state.units),
-            lower_bound=x_lb,
-            upper_bound=x_ub,
+            lower=x_lb,
+            upper=x_ub,
         )
         self.add_output_port(
             "u",
@@ -154,8 +161,8 @@ class NeuralPolicy(System):
             dependencies=("x",),
             labels=list(port.labels),
             units=list(port.units),
-            lower_bound=u_lb,
-            upper_bound=u_ub,
+            lower=u_lb,
+            upper=u_ub,
         )
 
     def observe(self, x):
@@ -189,8 +196,8 @@ class NeuralPolicy(System):
 
         return a
 
-    def action(self, x, params=None):
-        """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh."""
+    def action(self, x, t=0.0, params=None):
+        """Plant input ``u = u_mid + u_half * squash(a)`` with ``squash`` clip or tanh; a time-invariant law, ``t`` unread."""
         xp = array_module(x)
 
         squash = self.squash
@@ -208,11 +215,11 @@ class NeuralPolicy(System):
 
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""
-        return self.action(u, params)
+        return self.action(u, t, params)
 
     def setpoint_position(self, x, params=None):
         """Cartesian point for the commanded set-point, or ``None``."""
-        r = self.action(x, params)
+        r = self.action(x, params=params)
         plant = setpoint_plant_of(self)
 
         # A joint reference, mapped through the arm's forward kinematics

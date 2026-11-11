@@ -341,8 +341,8 @@ def test_a_verb_refuses_a_partial_tree_and_takes_its_tools_tree_edited():
     from minilink import DynamicProgrammingPlanner
 
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-np.pi, -6.0])
-    plant.state.upper_bound = np.array([np.pi, 6.0])
+    plant.state.lower = np.array([-np.pi, -6.0])
+    plant.state.upper = np.array([np.pi, 6.0])
     problem = regulation_problem(plant).replace(X=plant.state.box, U=plant.input_box)
     planner = DynamicProgrammingPlanner(
         problem, max_iterations=5, x_grid=(5, 5), u_grid=(3,), dt=0.1
@@ -392,9 +392,7 @@ def test_a_held_simulator_sweeps_a_parameter_with_one_compile():
     )
     plant = Pendulum()
     plant.x0 = np.array([0.5, 0.0])
-    sim = Simulator(
-        plant, tf=1.0, n_samples=101, solver="rk4_fixedsteps", backend="jax"
-    )
+    sim = Simulator(plant, tf=1.0, n_samples=101, solver="rk4", backend="jax")
 
     finals = [
         sim.solve(params=edited(sim.params, {"m": m})).x[0, -1] for m in (0.5, 1.0)
@@ -486,9 +484,7 @@ def test_a_tools_params_is_a_copy_and_passed_back_runs_there(backend):
     assert not np.allclose(np.asarray(ev.f(x, u, 0.0, p)), before)
 
     plant.x0 = np.array([0.5, 0.0])  # tilted: the mass shows in the swing
-    sim = Simulator(
-        plant, tf=0.5, n_samples=51, solver="rk4_fixedsteps", backend=backend
-    )
+    sim = Simulator(plant, tf=0.5, n_samples=51, solver="rk4", backend=backend)
     q = sim.params
     q["m"] = 3.0
     assert sim.params["m"] == 1.0

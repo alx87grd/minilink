@@ -154,6 +154,16 @@ class Uniform(Distribution):
         self.support = self.box
 
     @property
+    def lower(self) -> np.ndarray:
+        """The lower bound ``(dim,)``, its box's."""
+        return self.box.lower
+
+    @property
+    def upper(self) -> np.ndarray:
+        """The upper bound ``(dim,)``, its box's."""
+        return self.box.upper
+
+    @property
     def mean(self) -> np.ndarray:
         """The box's center, ``(a + b) / 2``."""
         return 0.5 * (self.box.lower + self.box.upper)

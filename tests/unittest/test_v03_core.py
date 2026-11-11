@@ -223,7 +223,7 @@ def multi_rate_loop():
     return closed_loop(
         P(10.0, ports="reference") % 0.1,
         discretize(Integrator(), 0.01, substeps=5),
-        reference=Step(np.array([1.0]), np.array([0.0]), step_time=1.0),
+        reference=Step(np.array([0.0]), np.array([1.0]), step_time=1.0),
         filter=LowPass(alpha=0.6) % 0.01,
     )
 
@@ -288,9 +288,7 @@ def test_script_11_loop_a_bare_reference_reads_seconds():
     draws = [ev.signals(ticks.x[:, k], np.zeros(0), k)[0] for k in range(40)]
     t = dt * np.arange(40)
     np.testing.assert_array_equal(draws, [noise.h(None, None, tk)[0] for tk in t])
-    traj = continuous.compute_trajectory(
-        tf=0.4, dt=dt, solver="euler_fixedsteps", verbose=False
-    )
+    traj = continuous.compute_trajectory(tf=0.4, dt=dt, solver="euler", verbose=False)
     np.testing.assert_allclose(ticks.x[0], traj.x[0], rtol=1e-12, atol=1e-15)
 
 
@@ -411,22 +409,22 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
     late, early = plan(100.0, 0.0), plan(0.0, 200.0)
     np.testing.assert_allclose(late.trajectory.t, 100.0 + early.trajectory.t)
     np.testing.assert_allclose(late.trajectory.u, early.trajectory.u, atol=1e-6)
-    assert late.record.cost == pytest.approx(early.record.cost, rel=1e-6)
+    assert late.record.J == pytest.approx(early.record.J, rel=1e-6)
 
 
-def bicycle_planner(mu=1.0, target_y=0.0, *, method="scipy_slsqp", backend="jax"):
+def bicycle_planner(mu=1.0, target_y=0.0, *, method="slsqp", backend="jax"):
     """The rate bicycle's lane-keeping MPC (the e4 parity scenario), its friction and its lane given."""
     from minilink import BicycleDynRate
     from minilink.planning import TrajectoryOptimizationPlanner
 
     sys = BicycleDynRate(named_ports=True)
     sys.params["mu"] = mu
-    sys.state.lower_bound[6], sys.state.upper_bound[6] = 0.0, 40.0
-    sys.state.lower_bound[7], sys.state.upper_bound[7] = -0.5, 0.5
-    sys.inputs["w_rear_dot"].lower_bound[0] = -60.0
-    sys.inputs["w_rear_dot"].upper_bound[0] = 60.0
-    sys.inputs["delta_dot"].lower_bound[0] = -1.5
-    sys.inputs["delta_dot"].upper_bound[0] = 1.5
+    sys.state.lower[6], sys.state.upper[6] = 0.0, 40.0
+    sys.state.lower[7], sys.state.upper[7] = -0.5, 0.5
+    sys.inputs["w_rear_dot"].lower[0] = -60.0
+    sys.inputs["w_rear_dot"].upper[0] = 60.0
+    sys.inputs["delta_dot"].lower[0] = -1.5
+    sys.inputs["delta_dot"].upper[0] = 1.5
     r_r = float(sys.params["r_r"])
     speed = 6.0
     target = np.array([0.0, target_y, 0.0, speed, 0.0, 0.0, speed / r_r, 0.0])
@@ -479,7 +477,7 @@ def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
 
         # The offline route at the same tree answers the same plan
         offline = planner.solve(params=edited(planner.params, values))
-        assert offline.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
+        assert offline.record.J == pytest.approx(plan.record.J, rel=1e-6)
         np.testing.assert_allclose(offline.trajectory.x, plan.trajectory.x, atol=1e-3)
 
     # The friction and the target change the plan, and the user's plant keeps its mu
@@ -492,7 +490,7 @@ def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
         pv.solve(edited(pv.params, {"plant": {"nu": 1.0}}))
 
 
-def pendulum_planner(m=1.0, *, method="scipy_slsqp"):
+def pendulum_planner(m=1.0, *, method="slsqp"):
     """The pendulum brought back from 0.5 rad on 11 collocation knots, its mass given."""
     from minilink.planning import TrajectoryOptimizationPlanner
 
@@ -533,7 +531,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     reference = pendulum_planner(1.3).solve()
     assert plan.success
     np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)
-    assert plan.record.cost == pytest.approx(reference.record.cost, rel=1e-6)
+    assert plan.record.J == pytest.approx(reference.record.J, rel=1e-6)
 
 
 # Script 6
@@ -550,7 +548,7 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     vi.solve()
 
     # J(x) = the moves to the goal, the problem's c summed: the Chebyshev distance
-    J = vi.result.J.reshape(7, 7)
+    J = vi.tables.J.reshape(7, 7)
     cells = np.arange(7.0)
     np.testing.assert_array_equal(
         J, np.maximum.outer(np.abs(cells - 5.0), np.abs(cells - 3.0))
@@ -561,7 +559,7 @@ def test_script_06_join_a_grid_world_solves_by_value_iteration_on_transition():
     walk = problem.rollout(
         lambda x, k: np.asarray(law.outputs["u"].compute(None, x, k)), n_steps=8
     )
-    assert walk.signals["cost"][0, -1] == J[0, 0] == 5.0
+    assert walk.signals["J"][0, -1] == J[0, 0] == 5.0
 
 
 def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_one_j():
@@ -591,7 +589,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
 
     # The step tool's sum on the discretization value iteration backs up: Σ γᵏ c_k + γᴺ h
     step_problem = problem.discretize(dt, solver="rk4")
-    J_step = step_problem.rollout(policy).signals["cost"][0, -1]
+    J_step = step_problem.rollout(policy).signals["J"][0, -1]
 
     # The judge, the lookup law sampled at dt on the continuous plant
     J_judge = problem.compile(law % dt, backend="numpy").evaluate().objective
@@ -601,7 +599,7 @@ def test_script_06_join_value_iteration_the_judge_and_the_rl_environment_give_on
     env = RolloutEnvironment(problem, dt=dt, backend="numpy", reward="stage")
     x, t, J_env = problem.x0, 0.0, 0.0
     for k in range(env.n_steps_per_episode):
-        x, t, reward, terminated, _ = env.step(x, t, policy(x, t), None)
+        x, t, reward, terminated, _ = env.step(x, policy(x, t), t, None)
         J_env += step_problem.gamma**k * -float(reward)
     assert bool(terminated)
 
@@ -631,7 +629,6 @@ def native_mpc_problem():
     """The pendulum regulated from 0.5 rad over 2 s, and a native fixed-iteration planner on it (single shooting, Adam)."""
     from minilink.planning import TrajectoryOptimizationPlanner
     from minilink.planning.trajectory_optimization.shooting import (
-        ShootingOptions,
         ShootingTranscription,
     )
 
@@ -645,7 +642,7 @@ def native_mpc_problem():
     )
     planner = TrajectoryOptimizationPlanner(
         problem,
-        transcription=ShootingTranscription(ShootingOptions(n_steps=11)),
+        transcription=ShootingTranscription(n_steps=11),
         backend="jax",
         method="adam",
         n_iterations=30,
@@ -714,7 +711,7 @@ def test_script_05_join_the_dual_rate_form_gives_the_plan_one_slow_period_late()
     late.x0 = mpc.pv.initial()
     computer = (mpc % 0.05) >> (late % 0.05) >> (PlanFollower(planner) % 0.01)
     pe = problem.compile(computer, backend="jax")
-    u = np.asarray(pe.trajectory().get_signal("plant:u"))[0]
+    u = np.asarray(pe.trajectory().signal("plant:u"))[0]
 
     # The first slow period applies the guess (zero); the plan solved at t = 0 from
     # x(0) arrives at t = 0.05 and is read at the fast ticks
@@ -814,6 +811,6 @@ def test_a_held_loops_run_scores_on_the_step_problems_own_sum():
     # The law held over each period on the step problem's own step: the run carries the
     # running cost, so its score is J = Σ γᵏ c_k + γᴺ h
     held = problem.compile(law % 0.1, substeps=1, backend="numpy").trajectory()
-    J_step = problem.discretize(0.1).rollout(policy).signals["cost"][0, -1]
-    J = float(np.squeeze(evaluate_trajectory(problem, held).cost))
+    J_step = problem.discretize(0.1).rollout(policy).signals["J"][0, -1]
+    J = float(np.squeeze(evaluate_trajectory(problem, held).raw_cost))
     np.testing.assert_allclose(J, J_step, rtol=1e-12)

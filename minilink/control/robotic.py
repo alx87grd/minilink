@@ -68,7 +68,7 @@ class JointImpedance(System):
             "y",
             dim=2 * n,
             nominal_value=np.zeros(2 * n),
-            labels=[f"q{i}" for i in range(n)] + [f"dq{i}" for i in range(n)],
+            labels=[f"q{i + 1}" for i in range(n)] + [f"dq{i + 1}" for i in range(n)],
         )
         self.add_output_port(
             "u",
@@ -175,8 +175,8 @@ class TaskImpedance(System):
             "y",
             dim=2 * self.dof,
             nominal_value=np.zeros(2 * self.dof),
-            labels=[f"q{i}" for i in range(self.dof)]
-            + [f"dq{i}" for i in range(self.dof)],
+            labels=[f"q{i + 1}" for i in range(self.dof)]
+            + [f"dq{i + 1}" for i in range(self.dof)],
         )
         self.add_output_port(
             "u",

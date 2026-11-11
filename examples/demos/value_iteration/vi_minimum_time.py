@@ -13,10 +13,10 @@ INF = 10.0
 X0 = np.array([1.2, 0.0])
 
 plant = DoubleIntegrator()
-plant.state.lower_bound[:] = [-2.0, -2.0]
-plant.state.upper_bound[:] = [2.0, 2.0]
-plant.inputs["u"].lower_bound = np.array([-1.0])
-plant.inputs["u"].upper_bound = np.array([1.0])
+plant.state.lower[:] = [-2.0, -2.0]
+plant.state.upper[:] = [2.0, 2.0]
+plant.inputs["u"].lower = np.array([-1.0])
+plant.inputs["u"].upper = np.array([1.0])
 
 cost = TimeCost.from_system(plant, radius=1e-3)
 problem = PlanningProblem(plant, cost=cost, U=plant.input_box)

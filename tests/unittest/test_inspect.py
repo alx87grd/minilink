@@ -123,7 +123,7 @@ class TestInspectPrint(unittest.TestCase):
         self.assertIn("Optimizer, method='l-bfgs'", text)
         self.assertIn("program:", text)
 
-        result = OptimizationResult(z=[0.0, 0.0], success=True, cost=0.0)
+        result = OptimizationResult(z=[0.0, 0.0], success=True, J=0.0)
         result_text = str(result)
         self.assertIn("OptimizationResult, success=yes", result_text)
         self.assertIn("J*:", result_text)

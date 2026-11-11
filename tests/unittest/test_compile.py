@@ -42,7 +42,7 @@ class _JAXFriendlyPController(System):
             params = self.params
         Kp = params["Kp"]
         xp = array_module(u)
-        r, y_ = self.get_port_values_from_u(u, "r", "y")
+        r, y_ = self.ports(u, "r", "y")
         return xp.array([Kp * (r[0] - y_[0])])
 
 
@@ -69,7 +69,6 @@ class _JAXFriendlyIntegrator(DynamicSystem):
 def _build_small_closed_loop_jax():
     """Same wiring as :func:`_build_small_closed_loop` with JAX-traceable blocks."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     plant = _JAXFriendlyIntegrator()
     ctl.params["Kp"] = 2.5
@@ -91,7 +90,6 @@ def _build_closed_loop_with_external_output_jax():
 def _build_small_closed_loop():
     """Step → P → Integrator → feedback to controller."""
     diag = DiagramSystem()
-    diag.connection_verbose = False
     ctl = P(2.5, ports="reference")
     plant = Integrator()
     diag.add_subsystem(ctl, "controller")
@@ -124,7 +122,6 @@ def _build_feedthrough_loop():
             return u * 2
 
     diag = DiagramSystem()
-    diag.connection_verbose = False
     diag.add_subsystem(FeedthroughSystem("A"), "A")
     diag.add_subsystem(FeedthroughSystem("B"), "B")
     diag.add_subsystem(FeedthroughSystem("C"), "C")
@@ -270,7 +267,6 @@ class TestDiagramEvaluatorNumPy(unittest.TestCase):
     def test_f_zero_state(self):
         """Diagram with no dynamic subsystems should return empty dx."""
         diag = DiagramSystem()
-        diag.connection_verbose = False
 
         class Gain(System):
             def __init__(self):
@@ -402,7 +398,6 @@ class _JAXFriendlyStepIntegrator(StepSystem):
 def _build_step_loop_jax():
     """r → P → step integrator → feedback to the controller, its command a boundary output."""
     diag = StepDiagramSystem()
-    diag.connection_verbose = False
     ctl = _JAXFriendlyPController()
     ctl.params["Kp"] = 2.5
     diag.add_subsystem(ctl, "controller")
@@ -941,7 +936,7 @@ from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.optimization.mathematical_program import MathematicalProgram
 
 
-def test_mathematical_program_is_pure_description_without_z0():
+def test_a_mathematical_program_without_a_start_has_none():
 
     def J(z: np.ndarray):
         return z @ z
@@ -949,8 +944,10 @@ def test_mathematical_program_is_pure_description_without_z0():
     program = MathematicalProgram(n_z=2, J=J, metadata={"source": "test"})
     assert program.backend == "numpy"
     assert program.n_z == 2
-    assert not hasattr(program, "z0")
+    assert program.z0 is None
     assert program.metadata == {"source": "test"}
+    with pytest.raises(ValueError, match=r"z0 must have shape \(2,\)"):
+        MathematicalProgram(n_z=2, J=J, z0=np.zeros(3))
 
 
 def test_mathematical_program_validates_bounds_dimension():
@@ -1194,7 +1191,7 @@ class TestRolloutBatch(unittest.TestCase):
         self.x0s = self.rng.standard_normal((4, 2))
         self.dt = 0.02
         self.n_steps = 15
-        self.u_nominal = np.tile(self.sys.get_u_from_input_ports(), (self.n_steps, 1))
+        self.u_nominal = np.tile(self.sys.u_nominal, (self.n_steps, 1))
 
     def test_family_of_initial_states_under_the_nominal_input(self):
         xs = np.asarray(
@@ -1263,7 +1260,7 @@ def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
     """``rollout`` is ``step`` repeated at ``t_k = t₀ + k dt``, and RK4 is the four-stage formula."""
     if backend == "jax":
         pytest.importorskip("jax")
-    ev = step_model_plants()[index].compile(backend)
+    ev = step_model_plants()[index].compile(backend=backend)
     x0 = np.linspace(0.1, 0.3, ev.n)
     us = held_inputs_of(ev)
     dt = 0.05
@@ -1287,12 +1284,12 @@ def test_rk4_rollout_is_the_textbook_scheme_step_by_step(backend, index):
 def test_the_two_backends_agree_on_every_knob():
     pytest.importorskip("jax")
     for plant in step_model_plants():
-        ev_np, ev_jax = plant.compile("numpy"), plant.compile("jax")
+        ev_np, ev_jax = plant.compile(backend="numpy"), plant.compile(backend="jax")
         x0 = np.linspace(0.1, 0.3, ev_np.n)
         us = held_inputs_of(ev_np)
         for solver in ("rk4", "euler"):
             for substeps in (1, 3):
-                for hold in ("zoh", "foh"):
+                for hold in ("zoh", "linear"):
                     seq = us if hold == "zoh" else np.vstack([us, us[-1:]])
                     a = ev_np.rollout(
                         x0, seq, 0.0, 0.05, solver=solver, substeps=substeps, hold=hold
@@ -1306,7 +1303,7 @@ def test_the_two_backends_agree_on_every_knob():
 def test_substeps_converge_to_the_fine_step():
     from minilink import Pendulum
 
-    ev = Pendulum().compile("numpy")
+    ev = Pendulum().compile(backend="numpy")
     x0, u = np.array([1.0, 0.0]), np.array([0.2])
     fine = ev.step(x0, u, 0.0, dt=0.4, substeps=40)
     errors = [
@@ -1320,7 +1317,7 @@ def test_params_reach_the_step_and_none_reads_the_compiled_ones():
     from minilink import Pendulum
 
     plant = Pendulum()
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     x0, u = np.array([0.5, 0.0]), np.array([0.0])
     heavy = {**plant.params, "m": 2.0 * plant.params["m"]}
     np.testing.assert_array_equal(
@@ -1336,7 +1333,7 @@ def test_a_rollout_without_inputs_holds_the_nominal_input():
 
     plant = Pendulum()
     plant.inputs["u"].nominal_value = np.array([0.7])
-    ev = plant.compile("numpy")
+    ev = plant.compile(backend="numpy")
     us = np.full((5, 1), 0.7)
     np.testing.assert_array_equal(
         ev.rollout(np.ones(2), None, 0.0, 0.1, n_steps=5),
@@ -1349,7 +1346,7 @@ def test_the_compiled_forms_are_built_once():
     pytest.importorskip("jax")
     from minilink import Pendulum
 
-    ev = Pendulum().compile("jax")
+    ev = Pendulum().compile(backend="jax")
     first = ev.rollout
     ev.rollout(np.ones(2), np.zeros((3, 1)), 0.0, 0.1)
     assert ev.rollout is first and ev.step is ev.step
@@ -1358,7 +1355,7 @@ def test_the_compiled_forms_are_built_once():
 def test_the_step_refuses_an_unknown_solver():
     from minilink import Pendulum
 
-    ev = Pendulum().compile("numpy")
+    ev = Pendulum().compile(backend="numpy")
     with pytest.raises(ValueError, match="solver"):
         ev.step(np.ones(2), np.zeros(1), 0.0, dt=0.1, solver="scipy")
 
@@ -1497,10 +1494,10 @@ def test_every_jax_evaluator_applies_the_float64_policy():
     jax = pytest.importorskip("jax")
     from minilink import Pendulum
 
-    Pendulum().compile("jax")
+    Pendulum().compile(backend="jax")
     jax.config.update("jax_enable_x64", False)
     try:
-        ev = Pendulum().compile("jax")
+        ev = Pendulum().compile(backend="jax")
         dx = ev.f(np.ones(2), np.zeros(1))
     finally:
         jax.config.update("jax_enable_x64", True)
@@ -1632,6 +1629,6 @@ def test_verbose_compile_reads_its_steps_in_order_on_every_path(capsys):
             "[compile] Building execution plan (6 ports, 1 states)",
         ]
         if backend == "jax":
-            expected.append("[compile] Checking JAX compatibility of 4 blocks")
+            expected.append("[compile] Checking JAX compatibility of 4 subsystems")
         assert steps[:-1] == expected
         assert lines[-1].startswith("[compile] Done.")

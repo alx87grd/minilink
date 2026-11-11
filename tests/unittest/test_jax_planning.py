@@ -17,18 +17,15 @@ from minilink.optimization.evaluators.compiler import compile_program_evaluator
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.problems import PlanningProblem
 from minilink.planning.trajectory_optimization.direct_collocation import (
-    DirectCollocationOptions,
     DirectCollocationTranscription,
 )
 from minilink.planning.trajectory_optimization.multiple_shooting import (
-    MultipleShootingOptions,
     MultipleShootingTranscription,
 )
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
 from minilink.planning.trajectory_optimization.shooting import (
-    ShootingOptions,
     ShootingTranscription,
 )
 
@@ -36,10 +33,10 @@ from minilink.planning.trajectory_optimization.shooting import (
 class JaxSingleIntegrator(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=1, input_dim=1, output_dim=1, y_dependencies=())
-        self.state.lower_bound = np.array([-10.0])
-        self.state.upper_bound = np.array([10.0])
-        self.inputs["u"].lower_bound = np.array([-10.0])
-        self.inputs["u"].upper_bound = np.array([10.0])
+        self.state.lower = np.array([-10.0])
+        self.state.upper = np.array([10.0])
+        self.inputs["u"].lower = np.array([-10.0])
+        self.inputs["u"].upper = np.array([10.0])
 
     def f(self, x, u, t=0, params=None):
         return jnp.array([u[0]])
@@ -83,9 +80,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=DirectCollocationTranscription(
-                DirectCollocationOptions(n_steps=5)
-            ),
+            transcription=DirectCollocationTranscription(n_steps=5),
             backend="jax",
             options={"maxiter": 100, "ftol": 1e-09},
         )
@@ -108,7 +103,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=ShootingTranscription(ShootingOptions(n_steps=5)),
+            transcription=ShootingTranscription(n_steps=5),
             backend="jax",
             options={"maxiter": 100, "ftol": 1e-09},
         )
@@ -133,9 +128,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
         problem = self.make_single_integrator_problem()
         planner = TrajectoryOptimizationPlanner(
             problem,
-            transcription=MultipleShootingTranscription(
-                MultipleShootingOptions(n_steps=5)
-            ),
+            transcription=MultipleShootingTranscription(n_steps=5),
             backend="jax",
             options={"maxiter": 100, "ftol": 1e-09},
         )
@@ -165,7 +158,7 @@ class TestJaxDirectCollocation(unittest.TestCase):
             cost=base.cost,
             U=base.sys.input_box,
         )
-        tr = DirectCollocationTranscription(DirectCollocationOptions(n_steps=5))
+        tr = DirectCollocationTranscription(n_steps=5)
         guess = default_initial_trajectory(problem, tr.initial_guess_time_grid(problem))
         program = tr.transcribe(problem, backend="jax")
         z0 = tr.pack_initial_guess(problem, guess)
@@ -178,7 +171,9 @@ class TestJaxDirectCollocation(unittest.TestCase):
     def test_jax_evaluator_forced_rk4_rollout_smoke(self):
         sys = JaxSingleIntegrator()
         evaluator = sys.compile(backend="jax", verbose=False)
-        x = evaluator.rollout(np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="foh")
+        x = evaluator.rollout(
+            np.array([0.0]), np.ones((5, 1)), 0.0, 0.25, hold="linear"
+        )
         np.testing.assert_allclose(np.asarray(x).reshape(-1), np.linspace(0.0, 1.0, 5))
 
 

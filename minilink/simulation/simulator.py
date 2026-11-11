@@ -5,7 +5,6 @@ import time
 import numpy as np
 
 from minilink.core.backends import (
-    BACKEND_AUTO,
     BACKEND_JAX,
     BACKEND_NUMPY,
 )
@@ -20,10 +19,10 @@ from minilink.simulation.sim_reporting import (
     print_simulation_report,
 )
 from minilink.simulation.solver_warnings import emit_discontinuous_solver_warnings
-from minilink.simulation.solvers.euler import EulerSolverBackend
 from minilink.simulation.solvers.euler_fixed import EulerFixedStepSolverBackend
 from minilink.simulation.solvers.rk4_fixed import RK4SolverBackend
 from minilink.simulation.solvers.scipy_ivp import SciPySolverBackend
+from minilink.simulation.solvers.solver import fixed_steps_of
 from minilink.simulation.time_grid import build_time_grid
 
 # User-facing solver labels: (solver backend key, options)
@@ -74,8 +73,7 @@ _USER_SOLVER_MODES: dict[str, tuple[str, dict]] = {
         },
     ),
     "euler": ("euler", {}),
-    "euler_fixedsteps": ("euler_fixed", {}),
-    "rk4_fixedsteps": ("rk4", {}),
+    "rk4": ("rk4", {}),
 }
 
 # Long *explicit* uniform rollouts can use fixed-step RK4 (JIT) instead of
@@ -89,12 +87,6 @@ RK4_AUTO_MIN_TIME_POINTS = 10_000
 FIXED_STEP_SOLVERS = tuple(
     label for label, (backend, _) in _USER_SOLVER_MODES.items() if backend != "scipy"
 )
-
-# Pass ``backend=COMPILE_BACKEND_AUTO`` to try JAX first, then NumPy.
-# Re-exported from :mod:`minilink.core.backends` so legacy callers
-# importing it from the simulator keep working.
-COMPILE_BACKEND_AUTO = BACKEND_AUTO
-
 
 ###############################################################################
 # Public API
@@ -123,20 +115,19 @@ class Simulator:
     n_samples : int, optional
         Number of time samples (including endpoints) when ``dt`` is not set.
     dt : float, optional
-        Step size when ``n_samples`` is not set. The grid ends at ``tf`` when
-        ``dt`` divides ``tf - t0``; otherwise its last sample is the first
-        step past ``tf``.
+        Step size when ``n_samples`` is not set. The grid ends at ``tf``: when
+        ``dt`` does not divide ``tf - t0``, its last step is shorter.
     solver : str, optional
-        Solver mode; if ``None``, chosen by :meth:`select_solver`. Use
-        ``"euler"`` for variable ``dt`` per output knot, or
-        ``"euler_fixedsteps"`` for uniform grids via compiled Euler rollouts
-        (same pattern as ``"rk4_fixedsteps"``).
+        Solver mode; if ``None``, chosen by :meth:`select_solver`. ``"rk4"`` and
+        ``"euler"`` step at the grid's fixed ``dt`` (compiled rollouts, a
+        uniform grid whose last step may be shorter); ``"scipy"`` and its presets (``"scipy_stiff"``,
+        ``"scipy_max"``, ``"scipy_ultra"``, ``"scipy_lsoda"``) are adaptive.
     verbose : bool
         Print setup information (default quiet).
     backend : str
         Name passed as ``backend`` to :meth:`~minilink.core.system.System.compile`.
-        Typical values are ``numpy`` (default) or ``jax``. Use :data:`COMPILE_BACKEND_AUTO`
-        (the string ``auto``) to try JAX if importable, then fall back to NumPy.
+        Typical values are ``numpy`` (default) or ``jax``. Use ``"auto"``
+        (:data:`~minilink.core.backends.BACKEND_AUTO`) to try JAX if importable, then fall back to NumPy.
     solver_warnings : str
         ``"warn"`` (default), ``"error"``, or ``"ignore"`` for discontinuous-loop
         :class:`UserWarning` messages from :mod:`minilink.simulation.solver_warnings`.
@@ -222,7 +213,7 @@ class Simulator:
     def __str__(self):
         return simulator_text(self)
 
-    def solve(self, *, u=None, input_port_id=None, params=None, record=()):
+    def solve(self, *, u=None, port=None, params=None, record=()):
         """
         Run the simulation over ``self.t``: the nominal input, or ``u`` prescribed.
 
@@ -230,7 +221,7 @@ class Simulator:
         evaluator; else a sampled matrix ``(m, n_samples)``, a function ``u(t)``, a
         constant vector, or a scalar for a one-input system. A sampled input is
         held over each sample period and a function of time is read where the
-        solver evaluates ``f``, on every solver; ``input_port_id`` prescribes one
+        solver evaluates ``f``, on every solver; ``port`` prescribes one
         port and keeps the others at their nominal values. ``params=None`` runs
         on the numbers taken when the simulator was built (the compiled form); a
         tree, the system's complete tree at other numbers (``p = sim.params``, a
@@ -279,7 +270,7 @@ class Simulator:
             sys = self.sys
 
             def u_of_t(t):
-                return coerce_forced_input(sys, np.array([t]), u, input_port_id)[:, 0]
+                return coerce_forced_input(sys, np.array([t]), u, port)[:, 0]
 
             x_traj = self.solver_backend.integrate_input(
                 self.evaluator,
@@ -289,14 +280,10 @@ class Simulator:
                 args=self.solver_backend_options,
                 params=params,
             )
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
         else:
             # A sampled input, each sample held over its period
-            u_traj = coerce_forced_input(
-                self.sys, self.t, u, input_port_id=input_port_id
-            )
+            u_traj = coerce_forced_input(self.sys, self.t, u, port=port)
             x_traj = self.solver_backend.integrate_forced(
                 self.evaluator,
                 self.t,
@@ -361,11 +348,11 @@ class Simulator:
         - If the user has specified a solver, return it.
         - If the system has discontinuous behavior, return ``"euler"``.
         - If a block holds a signal over a sample period (``solver_info
-          ["sample_period"]``, a noise source), return ``"rk4_fixedsteps"``:
+          ["sample_period"]``, a noise source), return ``"rk4"``:
           the automatic grid then steps at a divisor of that period.
         - If the time grid was given explicitly, ``backend`` is
-          ``"jax"``, the grid is uniform, and it has at least
-          :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4_fixedsteps"``
+          ``"jax"``, the grid is uniform (its last step may be shorter), and it has at least
+          :data:`RK4_AUTO_MIN_TIME_POINTS` points, return ``"rk4"``
           (fast JIT rollout). The automatic grid never triggers this rule.
         - Otherwise, return ``"scipy"``.
         """
@@ -374,14 +361,14 @@ class Simulator:
         if sys.solver_info.get("discontinuous_behavior", False):
             return "euler"
         if sys.solver_info.get("sample_period") is not None:
-            return "rk4_fixedsteps"
+            return "rk4"
         if (
             not self.auto_time_grid
             and self.backend == BACKEND_JAX
             and self.n_samples >= RK4_AUTO_MIN_TIME_POINTS
-            and time_grid_is_uniform(self.t)
+            and fixed_steps_of(self.t) is not None
         ):
-            return "rk4_fixedsteps"
+            return "rk4"
         return "scipy"
 
     ###########################################################################
@@ -389,7 +376,7 @@ class Simulator:
     ###########################################################################
 
     def resolve_and_build_evaluator(self, sys, backend):
-        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on :data:`COMPILE_BACKEND_AUTO`."""
+        """``(backend, evaluator)``: ``sys`` compiled with ``backend``, or JAX then NumPy on ``"auto"``."""
         return build_on_auto(
             lambda backend: self.build_evaluator(sys, backend), backend
         )
@@ -413,8 +400,6 @@ class Simulator:
         if solver_backend_key == "scipy":
             return SciPySolverBackend()
         if solver_backend_key == "euler":
-            return EulerSolverBackend()
-        if solver_backend_key == "euler_fixed":
             return EulerFixedStepSolverBackend()
         if solver_backend_key == "rk4":
             return RK4SolverBackend()
@@ -515,14 +500,6 @@ def require_dynamic_system(sys) -> None:
             f"Cannot simulate {type(sys).__name__} with n={sys.n}; "
             "use DynamicSystem for state evolution."
         )
-
-
-def time_grid_is_uniform(times: np.ndarray) -> bool:
-    """True if ``times`` are evenly spaced (required for :class:`RK4SolverBackend`)."""
-    if times.size < 2:
-        return True
-    d = np.diff(times)
-    return bool(np.allclose(d, d[0], atol=0.0))
 
 
 def print_setup_panel(sim: Simulator, notes: list[str]) -> None:

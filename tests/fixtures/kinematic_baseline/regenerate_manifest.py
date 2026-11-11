@@ -44,7 +44,7 @@ def _load_plant(spec):
 def sample_states(sys):
     n, m = sys.n, sys.m
     x0 = np.asarray(sys.x0, dtype=float).reshape(-1).copy()
-    u0 = np.asarray(sys.get_u_from_input_ports(), dtype=float).reshape(-1).copy()
+    u0 = np.asarray(sys.u_nominal, dtype=float).reshape(-1).copy()
     i_n = np.arange(n, dtype=float)
     i_m = np.arange(m, dtype=float)
 

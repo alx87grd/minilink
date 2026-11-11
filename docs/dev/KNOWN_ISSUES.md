@@ -54,28 +54,27 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ## Planning
 
-### A tree-search plan replayed by its own controller drifts from the plan
-- **Symptom:** `RRTPlanner(problem, seed=0).solve(evaluate=True)` on the pendulum swing-up
-  (`Xf = BallSet([π, 0], 0.3)`): the record says "goal reached", the evaluation "goal missed".
-  The plan ends at `[3.31, −0.15]`; the handed-out controller, a `TrajectorySource` holding
-  each edge's input, replayed on the plan's own `dt = 0.05`, misses the ball, and still at
-  `dt = 0.01`; at `dt = 0.002` it reaches it. The same samples given as a held input,
-  `plant.compute_trajectory(u=plan.u, dt=0.05, solver="rk4_fixedsteps")`, reproduce the plan
-  exactly. The source is read at each RK4 stage like any block, so the last stage of a step
-  reads the next edge's input (first order at each switch, large for a bang-bang plan).
-- **Workaround:** score the plan itself, `evaluate_trajectory(problem, solution.trajectory)`,
-  or the controller on a finer step, `evaluate(problem, solution.controller, dt=0.002)`.
-- **Fix:** **[ask]** how a held open-loop plan is replayed, in
-  [api-stabilization.md](../plans/api-stabilization.md), section 4.
+### A tree search that never leaves its root cannot be scored
+- **Symptom:** `RRTStarPlanner(problem, seed=0, max_iterations=300).solve(evaluate=True)` on
+  the pendulum swing-up (`Xf = BallSet([π, 0], 0.3)`, horizon 10 s) raises "Port dimension
+  mismatch: controller:y has dim 0, plant:u has dim 1": no extension improved on the root, so
+  the best-effort path is the root alone, and `Tree.extract_trajectory` builds its input with
+  no channel (`u` of shape `(0, 1)`), which the controller's `TrajectorySource` carries (found
+  2026-11-11).
+- **Workaround:** more iterations (`max_iterations=`), or `solve()` without `evaluate` and a
+  check of `solution.record.success` first.
+- **Fix:** TODO, D3's hardening rows: the root-only path holds the plant's nominal input.
 
 ## Messages and small surprises
 
 ### A linear model's matrices are methods
 - **Symptom:** `plant.linearize().A` is a bound method; the matrix is `plant.linearize().A()`.
-  A student who writes `np.linalg.eigvals(lin.A)` gets "0-dimensional array given".
+  A student who writes `np.linalg.eigvals(lin.A)` gets NumPy's "0-dimensional array given";
+  the library's own verbs (`lqr_gain(lin.A, …)`, `controllability_matrix`, the linear
+  analysis on arrays) refuse it with the call to write, `sys.A()`.
 - **Workaround:** call it: `lin.A()`, `lin.B()`.
-- **Fix:** **[ask]** a public-API choice, not a defect by itself (the matrices are functions
-  of `params`): keep the call, or read `A` as an attribute at the block's own `params`.
+- **Fix:** none: the matrices stay methods `A(t, params)` on every linear model (the
+  maintainer's ruling 11 of 2026-11-10), and NumPy's own message cannot name the call.
 
 ## Tooling
 

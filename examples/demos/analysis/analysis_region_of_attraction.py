@@ -10,10 +10,10 @@ Q = np.diag([1.0, 0.01])  # try diag([1000, 10]): faster poles, a smaller certif
 X_UP = np.array([np.pi, 0.0])  # upright
 
 plant = Pendulum()
-plant.inputs["u"].lower_bound = np.array([-TORQUE])
-plant.inputs["u"].upper_bound = np.array([TORQUE])
-plant.state.lower_bound = np.array([-4 * np.pi, -20.0])
-plant.state.upper_bound = -plant.state.lower_bound
+plant.inputs["u"].lower = np.array([-TORQUE])
+plant.inputs["u"].upper = np.array([TORQUE])
+plant.state.lower = np.array([-4 * np.pi, -20.0])
+plant.state.upper = -plant.state.lower
 
 # The actuator limit is a block of its own, so the certificate sees the
 # saturation the real loop has, not the linear law the designer wrote.

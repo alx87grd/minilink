@@ -10,20 +10,22 @@ from minilink.graphical.animation.primitives import Sphere
 # Chenciner–Montgomery figure-eight initial condition (equal masses, G = 1).
 _FIGURE_EIGHT_X0 = np.array(
     [
+        # r1, r2, r3
         0.97000436,
         -0.24308753,
-        0.0,
-        0.4662036850,
-        0.4323657300,
         0.0,
         -0.97000436,
         0.24308753,
         0.0,
+        0.0,
+        0.0,
+        0.0,
+        # v1, v2, v3
         0.4662036850,
         0.4323657300,
         0.0,
-        0.0,
-        0.0,
+        0.4662036850,
+        0.4323657300,
         0.0,
         -0.93240737,
         -0.86473146,
@@ -37,14 +39,14 @@ _FIGURE_EIGHT_X0 = np.array(
 ###############################################################################
 
 
-class ThreeBodyProblem(DynamicSystem):
+class ThreeBody(DynamicSystem):
     """Mutual Newtonian gravitation for three point masses in 3-D.
 
     State layout (18):
 
-        x = [r1, v1, r2, v2, r3, v3]
+        x = [r1, r2, r3, v1, v2, v3]
 
-    with ``r_i, v_i in R^3``. Each mass follows::
+    with ``r_i, v_i in R^3``: the positions, then their rates. Each mass follows::
 
         v_i_dot = sum_{j != i} G m_j (r_j - r_i) / |r_j - r_i|^3
 
@@ -71,23 +73,23 @@ class ThreeBodyProblem(DynamicSystem):
             "r1x",
             "r1y",
             "r1z",
-            "v1x",
-            "v1y",
-            "v1z",
             "r2x",
             "r2y",
             "r2z",
-            "v2x",
-            "v2y",
-            "v2z",
             "r3x",
             "r3y",
             "r3z",
+            "v1x",
+            "v1y",
+            "v1z",
+            "v2x",
+            "v2y",
+            "v2z",
             "v3x",
             "v3y",
             "v3z",
         ]
-        self.state.units = (["m"] * 3 + ["m/s"] * 3) * 3
+        self.state.units = ["m"] * 9 + ["m/s"] * 9
         self.outputs["y"].labels = list(self.state.labels)
         self.outputs["y"].units = list(self.state.units)
 
@@ -128,8 +130,8 @@ class ThreeBodyProblem(DynamicSystem):
                 acc = acc + G * masses[j] * dr / (dist_sq * xp.sqrt(dist_sq))
             a.append(acc)
 
-        # ẋ = [v₁, v̇₁, v₂, v̇₂, v₃, v̇₃]
-        dx = xp.concatenate([v[0], a[0], v[1], a[1], v[2], a[2]])
+        # ẋ = [v₁, v₂, v₃, v̇₁, v̇₂, v̇₃]
+        dx = xp.concatenate([v[0], v[1], v[2], a[0], a[1], a[2]])
 
         return dx
 
@@ -206,11 +208,11 @@ class ThreeBodyProblem(DynamicSystem):
 
     def positions(self, x):
         """Return ``(r1, r2, r3)`` each shape ``(3,)`` from a state vector."""
-        return x[0:3], x[6:9], x[12:15]
+        return x[0:3], x[3:6], x[6:9]
 
     def velocities(self, x):
         """Return ``(v1, v2, v3)`` each shape ``(3,)`` from a state vector."""
-        return x[3:6], x[9:12], x[15:18]
+        return x[9:12], x[12:15], x[15:18]
 
 
 ###############################################################################
@@ -236,6 +238,6 @@ def initial_state_of(preset, n):
 
 
 if __name__ == "__main__":
-    sys = ThreeBodyProblem()
+    sys = ThreeBody()
     sys.compute_trajectory(tf=6.3, n_samples=630, show=False, verbose=False)
     sys.animate(show=False)

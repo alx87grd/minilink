@@ -463,7 +463,7 @@ class TestManipulatorPorts(unittest.TestCase):
 
 class TestRoboticWrappers(unittest.TestCase):
     def test_joint_impedance_closed_loop(self):
-        diagram = closed_loop(Impedance(dof=2), TwoLinkManipulator())
+        diagram = closed_loop(Impedance(dim=2), TwoLinkManipulator())
         self.assertNotIn("mux", diagram.subsystems)
         self.assertEqual(diagram.connections["controller"]["y"], ("plant", "y"))
 
@@ -661,8 +661,8 @@ class TestRoboticWrappers(unittest.TestCase):
 
         arm = TwoLinkManipulator()
         inner = JointImpedance(arm) @ arm
-        inner.inputs["r"].lower_bound = -np.ones(2)
-        inner.inputs["r"].upper_bound = np.ones(2)
+        inner.inputs["r"].lower = -np.ones(2)
+        inner.inputs["r"].upper = np.ones(2)
         x = inner.x0
         ctl = NeuralPolicy(inner, hidden=(4,), seed=0)
         self.assertEqual(ctl.tf(None, x), {})

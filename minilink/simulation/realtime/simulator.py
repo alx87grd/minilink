@@ -227,7 +227,7 @@ class RealtimeSimulator:
 
         x = np.asarray(sys.x0 if x0 is None else x0, dtype=float).reshape(evaluator.n)
         t = float(t0)
-        u = np.asarray(sys.get_u_from_input_ports(), dtype=float)
+        u = np.asarray(sys.u_nominal, dtype=float)
 
         t_warm = time.perf_counter()
         if self._auto_sim_dt:

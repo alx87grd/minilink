@@ -7,7 +7,7 @@
   "host_hint": "Linux-6.12.94+-x86_64-with-glibc2.39",
   "metrics": [
     {
-      "id": "optimizer.rosenbrock.scipy_slsqp.solve_s",
+      "id": "optimizer.rosenbrock.slsqp.solve_s",
       "gate": "speed",
       "direction": "lower_better",
       "value": 0.0016845880018081516,
@@ -15,7 +15,7 @@
       "notes": "Rosenbrock (n=5); Optimizer.solve wall time"
     },
     {
-      "id": "optimizer.rosenbrock.scipy_slsqp.success",
+      "id": "optimizer.rosenbrock.slsqp.success",
       "gate": "accuracy",
       "direction": "lower_better",
       "value": 0.0,
@@ -29,7 +29,7 @@
       "direction": "lower_better",
       "value": 0.032736430497607216,
       "unit": "s",
-      "notes": "catalog Pendulum swing-up, compile_backend=numpy, n_steps=16, scipy_slsqp"
+      "notes": "catalog Pendulum swing-up, compile_backend=numpy, n_steps=16, slsqp"
     },
     {
       "id": "trajopt.pendulum.numpy_slsqp.solve_s",
@@ -49,7 +49,7 @@
       "notes": "0 means optimizer reported success"
     },
     {
-      "id": "optimizer.circle_eq.scipy_slsqp.solve_s",
+      "id": "optimizer.circle_eq.slsqp.solve_s",
       "gate": "speed",
       "direction": "lower_better",
       "value": 0.0002529834964661859,
@@ -57,7 +57,7 @@
       "notes": "Equality circle; Optimizer.solve wall time"
     },
     {
-      "id": "optimizer.circle_eq.scipy_slsqp.success",
+      "id": "optimizer.circle_eq.slsqp.success",
       "gate": "accuracy",
       "direction": "lower_better",
       "value": 0.0,

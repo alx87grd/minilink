@@ -482,13 +482,13 @@ class DrivetrainBicycle(DynamicBicycle):
         delta_max = self.params["delta_max"]
 
         if self.named_ports:
-            self.inputs["P_cmd"].lower_bound = np.array([-P_max])
-            self.inputs["P_cmd"].upper_bound = np.array([P_max])
-            self.inputs["delta_cmd"].lower_bound = np.array([-delta_max])
-            self.inputs["delta_cmd"].upper_bound = np.array([delta_max])
+            self.inputs["P_cmd"].lower = np.array([-P_max])
+            self.inputs["P_cmd"].upper = np.array([P_max])
+            self.inputs["delta_cmd"].lower = np.array([-delta_max])
+            self.inputs["delta_cmd"].upper = np.array([delta_max])
         else:
-            self.inputs["u"].lower_bound = np.array([-P_max, -delta_max])
-            self.inputs["u"].upper_bound = np.array([P_max, delta_max])
+            self.inputs["u"].lower = np.array([-P_max, -delta_max])
+            self.inputs["u"].upper = np.array([P_max, delta_max])
 
 
 ###############################################################################

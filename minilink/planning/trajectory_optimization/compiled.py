@@ -12,11 +12,17 @@ from minilink.core.params import checked
 from minilink.core.trajectory import Trajectory
 from minilink.optimization.mathematical_program import OptimizationResult
 from minilink.planning.initial_guess import default_initial_trajectory
-from minilink.planning.planner import host_tree, open_loop_controller_of, problem_with
+from minilink.planning.planner import (
+    host_copy,
+    host_tree,
+    open_loop_controller_of,
+    problem_with,
+)
 from minilink.planning.results import PlanningSolution
 from minilink.planning.trajectory_optimization.direct_collocation import (
     DirectCollocationTranscription,
 )
+from minilink.planning.trajectory_optimization.planner import planner_parts
 
 ###############################################################################
 # Public API
@@ -50,7 +56,7 @@ class CompiledTrajectoryPlanner:
         self.problem = problem
         self.transcription = transcription
         self.backend = backend
-        self.offsets = np.asarray(transcription.options.offsets(problem))
+        self.offsets = np.asarray(transcription.offsets(problem))
         self.n = int(problem.sys.n)
         self.m = int(problem.sys.m)
 
@@ -147,7 +153,7 @@ class CompiledTrajectoryPlanner:
 
         ``params`` is ``None`` (the defaults) or :attr:`params` edited, checked once; the
         solution records its origin ``params["t0"]``. ``status`` is
-        ``{"success", "iterations", "cost"}``. A NumPy program has no
+        ``{"success", "n_iterations", "J"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
@@ -171,8 +177,8 @@ class CompiledTrajectoryPlanner:
         z = xp.concatenate([result.z, t0])
         status = {
             "success": result.success,
-            "iterations": result.stats.get("nit"),
-            "cost": result.cost,
+            "n_iterations": result.n_iterations,
+            "J": result.J,
         }
 
         return z, status
@@ -275,15 +281,15 @@ class CompiledTrajectoryPlanner:
         status = {} if status is None else status
         problem = self.problem_at(params)
         z_dec = np.asarray(z[:-1], dtype=float)
-        cost = status.get("cost")
+        J = status.get("J")
 
         result = OptimizationResult(
             z=z_dec,
             success=bool(status.get("success", True)),
-            cost=None if cost is None else float(cost),
+            J=None if J is None else float(J),
             stats={}
-            if status.get("iterations") is None
-            else {"nit": status["iterations"]},
+            if status.get("n_iterations") is None
+            else {"nit": status["n_iterations"]},
         )
         trajectory = self.transcription.reconstruct_result(
             result, problem=problem, backend=self.backend
@@ -305,10 +311,10 @@ class CompiledTrajectoryPlanner:
         )
 
         record = TrajectoryOptimizationRecord(
-            cost=result.cost,
-            solver_success=result.success,
+            J=result.J,
+            optimizer_success=result.success,
             message="",
-            n_iterations=status.get("iterations"),
+            n_iterations=status.get("n_iterations"),
             solve_time_s=None,
             feasibility_tol=tol,
             max_equality_violation=float(max_eq),
@@ -321,7 +327,11 @@ class CompiledTrajectoryPlanner:
         controller = open_loop_controller_of(trajectory, self.planner.problem.sys)
 
         return PlanningSolution(
-            problem=problem, controller=controller, record=record, trajectory=trajectory
+            problem=problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            params=host_copy(self.merged(params)),
         )
 
     def pack(self, guess, params=None):
@@ -369,14 +379,6 @@ class CompiledTrajectoryPlanner:
 ###############################################################################
 # Internal machinery
 ###############################################################################
-
-
-def planner_parts(params):
-    """``(problem, method)``: a planner's tree split into the problem's leaves and the method's numbers (the planner's :func:`~minilink.planning.trajectory_optimization.planner.planner_parts`)."""
-    # Lazy import: the planner module imports this one
-    from minilink.planning.trajectory_optimization import planner
-
-    return planner.planner_parts(params)
 
 
 def has_values(tree) -> bool:

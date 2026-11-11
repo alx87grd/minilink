@@ -188,8 +188,8 @@ def gif_cartpole() -> None:
     from minilink.graphical.catalog import camera_matrix
 
     plant = CartPole()
-    plant.inputs["u"].lower_bound[0] = -10.0
-    plant.inputs["u"].upper_bound[0] = 10.0
+    plant.inputs["u"].lower[0] = -10.0
+    plant.inputs["u"].upper[0] = 10.0
     x_goal = np.array([0.0, np.pi, 0.0, 0.0])
     problem = PlanningProblem(
         sys=plant,
@@ -206,7 +206,7 @@ def gif_cartpole() -> None:
         n_steps=40,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
     )
     traj = planner.solve().trajectory.resample(n_samples=240)
     camera = camera_matrix(
@@ -269,6 +269,7 @@ def ur5_impedance() -> None:
 def racecar_mpc() -> None:
     from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
     from minilink.catalog import UdeSRacecarDyn
+    from minilink.control import ModelPredictiveController
     from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
     from minilink.planning import (
         ReferenceTrack,
@@ -283,7 +284,6 @@ def racecar_mpc() -> None:
         quadratic_hinge,
     )
     from minilink.planning.trajectory_optimization.mpc import (
-        ModelPredictiveController,
         mpc_animation_overlays,
         plant_run,
     )
@@ -311,12 +311,12 @@ def racecar_mpc() -> None:
 
     design = UdeSRacecarDyn(named_ports=False)
     design.params["mu"] = PLANNER_MU
-    design.state.lower_bound[6] = 0.0
-    design.state.upper_bound[6] = 3.0 * V_TARGET / design.params["r_r"]
-    design.state.lower_bound[7] = -design.params["delta_max"]
-    design.state.upper_bound[7] = design.params["delta_max"]
-    design.state.lower_bound[8] = -design.params["P_max"]
-    design.state.upper_bound[8] = design.params["P_max"]
+    design.state.lower[6] = 0.0
+    design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
+    design.state.lower[7] = -design.params["delta_max"]
+    design.state.upper[7] = design.params["delta_max"]
+    design.state.lower[8] = -design.params["P_max"]
+    design.state.upper[8] = design.params["P_max"]
 
     centre = mount(point_probe(), on=design)
     body = mount(
@@ -377,7 +377,7 @@ def racecar_mpc() -> None:
         n_steps=MPC_STEPS,
         transcription="direct_collocation",
         backend="jax",
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 60, "ftol": 1.0},
     )
     mpc = ModelPredictiveController(planner, delay=True)
@@ -427,10 +427,10 @@ def gif_rocket() -> None:
     plant = Rocket()
     plant.params["inertia"] = 1000.0
     weight = plant.params["mass"] * plant.params["gravity"]
-    plant.inputs["u"].lower_bound = np.array([0.0, -GIMBAL])
-    plant.inputs["u"].upper_bound = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
-    plant.state.lower_bound = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
-    plant.state.upper_bound = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
+    plant.inputs["u"].lower = np.array([0.0, -GIMBAL])
+    plant.inputs["u"].upper = np.array([THRUST_TO_WEIGHT * weight, GIMBAL])
+    plant.state.lower = np.array([-100.0, 0.0, -1.0, -50.0, -50.0, -5.0])
+    plant.state.upper = np.array([100.0, 200.0, 1.0, 50.0, 50.0, 5.0])
 
     class LandingCost(CostFunction):
         Q = 0.1 * np.diag([1.0, 1.0, 10.0, 0.1, 0.1, 1.0])
@@ -460,8 +460,8 @@ def gif_rocket() -> None:
         features=lambda x: (x - X_LANDED) * FEATURE_SCALE,
         hidden=(64, 64),
         method="ppo",
-        n_envs=64,
-        n_steps=32,
+        n_rollouts=64,
+        n_steps_per_update=32,
         batch_size=256,
         learning_rate=1e-3,
         gamma=0.995,

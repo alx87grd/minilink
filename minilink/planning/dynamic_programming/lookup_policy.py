@@ -28,7 +28,7 @@ class LookupPolicy(System):
     each axis's levels by position.
 
     A finite horizon's law is a schedule: ``pi`` stacks the stages' tables
-    ``(N, nodes_n)`` on the stage times ``t`` ``(N + 1,)``, and the law holds
+    ``(N, n_nodes)`` on the stage times ``t`` ``(N + 1,)``, and the law holds
     stage ``i`` for ``t_i ≤ t < t_{i+1}`` (a tick a hair short of ``t_i``, by
     float rounding, counts in stage ``i``). Outside ``[t_0, t_N)`` it applies
     stage 0, the full-horizon law: past the horizon, the stationary law
@@ -39,7 +39,7 @@ class LookupPolicy(System):
     ----------
     grid : StateSpaceGrid
         Grid the policy is defined on.
-    pi : array of int, shape (nodes_n,) or (N, nodes_n)
+    pi : array of int, shape (n_nodes,) or (N, n_nodes)
         Greedy policy as action ids by node id, or one per stage.
     t : array, shape (N + 1,), optional
         The stage times of a stacked ``pi``.
@@ -83,17 +83,17 @@ class LookupPolicy(System):
         # Ports: their bounds mirror the grid's domain (plot sweeps and color limits)
         X = grid.X
         U = grid.U
-        self.add_input_port("x", dim=n, lower_bound=X.lower, upper_bound=X.upper)
+        self.add_input_port("x", dim=n, lower=X.lower, upper=X.upper)
         self.add_output_port(
             "u",
             dim=m,
             function=self.ctl,
             dependencies=("x",),
-            lower_bound=U.box.lower,
-            upper_bound=U.box.upper,
+            lower=U.box.lower,
+            upper=U.box.upper,
         )
 
-    def action(self, x, params=None, *, t=0.0) -> np.ndarray:
+    def action(self, x, t=0.0, params=None) -> np.ndarray:
         """Return the interpolated command ``u`` at a single state ``x`` (on a schedule, the stage of ``t``)."""
         params = self.params if params is None else params
         xp = array_module(x, params["u_table"])
@@ -122,7 +122,7 @@ class LookupPolicy(System):
 
     def ctl(self, x, u, t=0, params=None):
         """State feedback; the ``x`` input port carries the plant state in ``u``."""
-        return self.action(u, params, t=t)
+        return self.action(u, t, params)
 
 
 ###############################################################################
@@ -162,7 +162,7 @@ def require_stages(pi, t):
     t = np.asarray(t, dtype=float).reshape(-1)
     if pi.ndim != 2 or t.size != pi.shape[0] + 1 or np.any(np.diff(t) <= 0.0):
         raise ValueError(
-            f"a schedule takes pi (N, nodes_n) and increasing stage times t (N + 1,), "
+            f"a schedule takes pi (N, n_nodes) and increasing stage times t (N + 1,), "
             f"got pi {pi.shape} and t {t.shape}"
         )
 

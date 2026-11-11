@@ -29,7 +29,10 @@ PLANT_PACKAGE = "minilink.dynamics"
 RETIRED = {
     "gamma": ("radius_constant", ("RRTStarPlanner",)),
     "settings": ("params", None),
-    "final_time": ("the problem's t0 + horizon", ("DynamicProgrammingPlanner",)),
+    "final_time": (
+        "tf, the problem's t0 + horizon",
+        ("DynamicProgrammingPlanner",),
+    ),
     "x_start": ("x0", None),
     "t_start": ("t0", None),
     "iterations": (
@@ -42,11 +45,22 @@ RETIRED = {
             "TrajectoryOptimizationRecord",
             "ValueIterationRecord",
             "TreeSearchRecord",
-            "DynamicProgrammingResult",
+            "ValueTables",
         ),
     ),
     "optimizer_options": ("options", None),
-    "tf": ("horizon, or episode_length", ("PlanningProblem", "Sys2Gym")),
+    "tf": (
+        "horizon, or episode_length",
+        (
+            "PlanningProblem",
+            "Sys2Gym",
+            "RolloutEnvironment",
+            "lqr_finite_horizon",
+            "lqr_gain_schedule",
+            "ProblemEvaluator",
+            "LyapunovCertificate",
+        ),
+    ),
     "require_finite_tf": ("require_finite_horizon(problem)", None),
     "xbar": ("x_bar", None),
     "ubar": ("u_bar", None),
@@ -67,8 +81,17 @@ RETIRED = {
     "start_point": ("x0", ("PlanningProblem",)),
     "t2x": ("at", ("Trajectory",)),
     "t2u": ("at(t, 'u')", ("Trajectory",)),
-    "sample": ("at", ("Trajectory",)),
-    "n": ("state_dim", ("System", "DynamicSystem", "StepSystem")),
+    "sample": ("at", ("Trajectory", "ReferencePath", "PolylinePath")),
+    "n": (
+        "state_dim on a system; n_rollouts (verify) or n_samples (the plots) on a certificate",
+        (
+            "System",
+            "DynamicSystem",
+            "StepSystem",
+            "LyapunovCertificate",
+            "plot_region_of_attraction",
+        ),
+    ),
     "episodes": ("n_episodes", None),
     "timesteps": ("n_timesteps", None),
     "with_signal": ("with_signals", ("Trajectory",)),
@@ -163,15 +186,626 @@ RETIRED = {
     ),
     "plot_backend": ("plot_renderer", None),
     "p": ("dim", ("Source", "WhiteNoise")),
-    "dof": ("dim (dof stays a manipulator's joints)", ("P", "PI", "PD", "PID")),
+    "dof": (
+        "dim (dof stays a manipulator's joints)",
+        ("P", "PI", "PD", "PID", "Impedance", "IntegralImpedance"),
+    ),
     "filename": ("file_name", None),
     "limits": ("bounds", ("LyapunovCertificate", "plot_region_of_attraction")),
-    "show_signal": ("plot_signal", None),
+    "show_signal": ("compute_trajectory, then plot_trajectory", None),
+    "plot_signal": ("compute_trajectory, then plot_trajectory", None),
+    "max_nodes": ("max_iterations (a cap on the iterations)", None),
+    "connection_verbose": ("print(diagram), which lists the connections", None),
     "time": ("t", ("step_info",)),
     "system": ("sys", ("discretize",)),
     "time_factor_video": ("speed", None),
     "samples": ("n_samples", ("region_of_attraction",)),
+    "get_subsys_input_port": ("get_subsystem_input_port", None),
+    "compute_subsys_output_port": ("compute_subsystem_output_port", None),
+    "get_port_values_from_u": ("ports", None),
+    "get_signal": ("signal", None),
+    "nodes_n": ("n_nodes", None),
+    "actions_n": ("n_actions", None),
+    "effective_samples": ("effective_rollouts", None),
+    "save_path": ("file_name", None),
+    "plot_policy_field": ("plot_control_law_field", None),
+    "plot_value": ("plot_cost_to_go", ("StateSpaceGrid",)),
+    "eta": ("learning_rate", ("TabularLearningPlanner",)),
+    "train_time": ("train_time_s", None),
+    "solver_success": ("optimizer_success", None),
+    "input_port_id": ("port", None),
+    "interpolation": ("hold", ("TrajectorySource",)),
+    "lower_bound": ("lower", None),
+    "upper_bound": ("upper", None),
+    "options": (
+        "n_steps",
+        (
+            "DirectCollocationTranscription",
+            "ShootingTranscription",
+            "MultipleShootingTranscription",
+        ),
+    ),
 }
+
+
+# A retired name the facade scan does not reach (a class of a deep module, a member of one), at
+# its full path: what replaced it. Each sweep adds its own
+RETIRED_NAMES = {
+    "minilink.planning.problems.PlanningProblem.has_goal": "problem.Xf is not None",
+    "minilink.planning.problems.PlanningProblem.has_cost": "problem.cost is not None",
+    "minilink.simulation.simulator.COMPILE_BACKEND_AUTO": (
+        'backend="auto" (minilink.core.backends.BACKEND_AUTO)'
+    ),
+    "minilink.core.signals.InputPort.get_default_value": "port.nominal_value",
+    "minilink.core.system.System.get_u_from_input_ports": (
+        "sys.u_nominal (each input port's nominal_value, concatenated)"
+    ),
+    "minilink.core.signals.VectorSignal.set_nominal_value": (
+        "signal.nominal_value = value"
+    ),
+    "minilink.core.signals.nominal_of": (
+        "signal.nominal_value = value (a checked property, ruling Q8)"
+    ),
+    "minilink.planning.comparison.GivenPolicy": "GivenController",
+    "minilink.core.discrete.sampled_system.SampledSystem.counts": "is_tick_law",
+    "minilink.core.discrete.sampled_system.SampledSystem.resolves": "is_integrated",
+    "minilink.core.sets.is_bounded": "has_finite_face",
+    "minilink.planning.trajectory_optimization.path_integral.problem_leaves": (
+        "episode_leaves (problem_leaves reads a problem: planning.evaluation's)"
+    ),
+    "minilink.planning.step_problems.coerce_horizon": (
+        "coerce_n_steps (coerce_horizon is the continuous problem's)"
+    ),
+    "minilink.planning.trajectory_optimization.transcription.FixedGridOptions": (
+        "FixedGridTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.direct_collocation.DirectCollocationOptions": (
+        "DirectCollocationTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.shooting.ShootingOptions": (
+        "ShootingTranscription(n_steps=)"
+    ),
+    "minilink.planning.trajectory_optimization.multiple_shooting.MultipleShootingOptions": (
+        "MultipleShootingTranscription(n_steps=)"
+    ),
+    "minilink.planning.dynamic_programming.plotting.plot_policy_field": (
+        "plot_control_law_field"
+    ),
+    "minilink.planning.dynamic_programming.discretizer.StateSpaceGrid.plot_value": (
+        "plot_cost_to_go"
+    ),
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationRecord.solver_success": (
+        "optimizer_success"
+    ),
+    "minilink.planning.trajectory_optimization.mpc.predictive.PredictiveController": (
+        "ModelPredictiveController, the class (ruling 15)"
+    ),
+    # One name per thing in the planners' records (the maintainer's ruling 17 of 2026-11-10)
+    "minilink.planning.dynamic_programming.dp.DynamicProgrammingResult": (
+        "ValueTables, read as solution.record.tables"
+    ),
+    "minilink.planning.dynamic_programming.dp.DynamicProgrammingPlanner.result": (
+        "planner.tables, the latest solution's"
+    ),
+    "minilink.planning.search.rrt.TreeSearchRecord.cost": "path_cost",
+    "minilink.planning.evaluation.Evaluation.cost": (
+        "raw_cost (J is the raw cost plus the failure cost of a failed or missed run)"
+    ),
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.cost": (
+        "mean_episode_cost"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningRecord.cost": (
+        "mean_episode_cost"
+    ),
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.result": (
+        "planner.tables, the latest solution's; planner.greedy_tables, the table as it stands"
+    ),
+    # The RL planner speaks minilink's words (the maintainer's ruling 18 of 2026-11-10)
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.learn": (
+        "solve(n_timesteps=), which continues the training"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.predict": (
+        "solution.controller or planner.actor.action(x); predict is SB3's, through SB3Controller"
+    ),
+    # The design verbs (the maintainer's ruling 19 of 2026-11-11)
+    "minilink.control.design.trajectory_lqr": "lqr_trajectory",
+    "minilink.control.trajectory_lqr": "lqr_trajectory",
+    "minilink.trajectory_lqr": "lqr_trajectory",
+    # Class names (the maintainer's ruling 20b of 2026-11-11)
+    "minilink.dynamics.catalog.equations.oscillators.VanderPol": "VanDerPol",
+    "minilink.catalog.VanderPol": "VanDerPol",
+    "minilink.VanderPol": "VanDerPol",
+    "minilink.dynamics.catalog.astro.three_body.ThreeBodyProblem": "ThreeBody",
+    "minilink.catalog.ThreeBodyProblem": "ThreeBody",
+    "minilink.ThreeBodyProblem": "ThreeBody",
+    "minilink.analysis.structural.StructuralResult": "StructuralProperties",
+    "minilink.analysis.StructuralResult": "StructuralProperties",
+    # The smaller ones (the maintainer's ruling 22 of 2026-11-11)
+    "minilink.blocks.sources.Source.plot_signal": (
+        "source.compute_trajectory(tf=...), then source.plot_trajectory()"
+    ),
+    # A path is read at an arc length, not drawn from (the maintainer's ruling 22 of 2026-11-11)
+    "minilink.core.geometry.paths.ReferencePath.sample": "at",
+    "minilink.core.geometry.paths.PolylinePath.sample": "at",
+    # One verb on both learners (the maintainer's ruling of 2026-11-11)
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningPlanner.learn": (
+        "solve(n_episodes=), which continues the learning from the table as it stands"
+    ),
+    # Four words, one meaning each (the maintainer's ruling 17b of 2026-11-10): cost the
+    # object, J a scalar, objective the criterion over draws, cost_to_go the function
+    "minilink.optimization.mathematical_program.OptimizationResult.cost": "J",
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationRecord.cost": (
+        "J"
+    ),
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationIteration.cost": (
+        "J"
+    ),
+    "minilink.planning.trajectory_optimization.path_integral.MPPIRecord.cost": "J",
+    "minilink.planning.search.tree.Node.cost": "cost_to_come",
+    "minilink.learning.reinforcement_learning.tabular.TabularLearningRecord.episode_cost": (
+        "mean_episode_cost"
+    ),
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningRecord.episode_cost": (
+        "mean_episode_cost"
+    ),
+    "minilink.planning.search.rrt_star.RRTStarSnapshot.best_cost": "best_cost_to_come",
+    "minilink.planning.search.live_plot.TreeSearchIteration.best_cost": (
+        "best_cost_to_come"
+    ),
+    "minilink.planning.trajectory_optimization.path_integral.CompiledMPPIPlanner.path_cost": (
+        "rollout_cost"
+    ),
+}
+
+
+def owner_of(path):
+    """The module or class a dotted path's last name would sit on: the longest importable module, then attributes."""
+    parts = path.split(".")[:-1]
+    for split in range(len(parts), 0, -1):
+        try:
+            owner = importlib.import_module(".".join(parts[:split]))
+        except ImportError:
+            continue
+        for name in parts[split:]:
+            owner = getattr(owner, name)
+        return owner
+    raise ImportError(path)
+
+
+# A port and the box it builds say the same word (the ruling 5 of 2026-11-10): a bound on an
+# object is lower / upper; a limit a law applies to a named signal keeps that signal's name
+BOUND_WORDS = {"lower_bound": "lower", "upper_bound": "upper"}
+
+# A retired keyword of a function the facade scan does not reach, at the function's full path:
+# the keyword and what replaced it
+RETIRED_KEYWORDS = {
+    "minilink.planning.trajectory_optimization.mpc.viz.plot_sampled_futures": {
+        "axes": "x_axis, y_axis"
+    },
+    "minilink.planning.dynamic_programming.plotting.plot_control_law": {
+        "axis": "u_axis"
+    },
+    "minilink.planning.dynamic_programming.plotting.animate_cost_to_go": {
+        "save_path": "file_name"
+    },
+    "minilink.planning.dynamic_programming.plotting.animate_control_law": {
+        "save_path": "file_name"
+    },
+    "minilink.planning.search.plotting.animate_search": {"save": "file_name"},
+    "minilink.planning.search.plotting.animate_convergence": {"save": "file_name"},
+    "minilink.planning.evaluation.score_run": {"tf": "horizon"},
+    "minilink.planning.planner.planner_evidence": {"tf": "episode_length"},
+    "minilink.planning.evaluator.steps_of": {"tf": "horizon"},
+    "minilink.analysis.lyapunov.LyapunovCertificate.verify": {"tf": "horizon"},
+    "minilink.core.facades.plotting.SystemPlotting.plot_diagram": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
+    "minilink.graphical.diagrams.dot.plot_diagram": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
+    "minilink.graphical.diagrams.dot.render_diagram_graph": {
+        "show_inline": 'show="inline"',
+        "show_pdf": 'show="pdf"',
+    },
+    "minilink.core.closed_loop.feedback": {"validate": "the loop check always runs"},
+    "minilink.core.closed_loop.closed_loop": {"validate": "the loop check always runs"},
+    "minilink.core.operators.autowire": {"validate": "the loop check always runs"},
+    "minilink.core.wiring.WiredDiagramMixin.autowire": {
+        "validate": "the loop check always runs"
+    },
+    "minilink.core.facades.plotting.StepPlotting.plot_rollout": {"rollout": "traj"},
+    "minilink.core.facades.simulation.SystemSimulation.compute_trajectory": {
+        "input_port_id": "port"
+    },
+    "minilink.core.facades.simulation.DynamicSimulation.compute_trajectory": {
+        "input_port_id": "port"
+    },
+    "minilink.simulation.simulator.Simulator.solve": {"input_port_id": "port"},
+    "minilink.simulation.static_simulator.StaticSimulator.solve": {
+        "input_port_id": "port"
+    },
+    "minilink.blocks.sources.TrajectorySource.__init__": {"interpolation": "hold"},
+    "minilink.dynamics.abstraction.state_space.LTISystem.__init__": {
+        "x_bar": "linearize(sys, x_bar), a LinearizedSystem",
+        "u_bar": "linearize(sys, x_bar, u_bar), a LinearizedSystem",
+        "y_bar": "a LinearizedSystem's params['y_bar']",
+    },
+    "minilink.dynamics.abstraction.state_space.DiscreteLTISystem.__init__": {
+        "x_bar": "linearize(step_sys, x_bar), a LinearizedStepSystem",
+        "u_bar": "linearize(step_sys, x_bar, u_bar), a LinearizedStepSystem",
+        "y_bar": "a LinearizedStepSystem's params['y_bar']",
+        # A tick law (the maintainer's ruling Q1 of 2026-11-11): seconds come from a clock
+        "period": "model % dt, the clock the analysis reads",
+    },
+    "minilink.dynamics.abstraction.state_space.LinearizedStepSystem.__init__": {
+        "period": "model % dt, the clock the analysis reads",
+    },
+    # A set is its margin (the maintainer's ruling 22 of 2026-11-11): membership is derived
+    "minilink.core.sets.CallableSet.__init__": {
+        "margin_fn": "margin",
+        "contains_fn": "margin (membership is margin >= 0)",
+    },
+    "minilink.blocks.sources.TrajectorySource.from_trajectory": {
+        "interpolation": "hold"
+    },
+    "minilink.core.system.System.add_input_port": BOUND_WORDS,
+    "minilink.core.system.System.add_output_port": BOUND_WORDS,
+    "minilink.core.signals.VectorSignal.__init__": BOUND_WORDS,
+    "minilink.core.signals.OutputPort.__init__": BOUND_WORDS,
+    "minilink.core.wiring.WiredDiagramMixin.connect_new_output_port": BOUND_WORDS,
+    "minilink.core.wiring.DiagramOutputPort.__init__": BOUND_WORDS,
+    # The RL planner speaks minilink's words (the maintainer's ruling 18 of 2026-11-10)
+    "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.__init__": {
+        "n_envs": "n_rollouts",
+        "n_steps": "n_steps_per_update (n_steps is a horizon's transitions)",
+        "policy": "actor (read back as planner.actor)",
+    },
+}
+
+
+@pytest.mark.parametrize("path", sorted(RETIRED_KEYWORDS))
+def test_no_retired_keyword_at_its_path(path):
+    function = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    taken = set(inspect.signature(function).parameters)
+    hits = {
+        word: replaced
+        for word, replaced in RETIRED_KEYWORDS[path].items()
+        if word in taken
+    }
+    assert not hits, f"{path}: retired keywords {hits}"
+
+
+# The model's order, (x, u, t; p) or the subset read (CONSTITUTION, one signature): a method's
+# leading parameters, at its full path
+ONE_SIGNATURE = {
+    "minilink.planning.environment.RolloutEnvironment.step": ("x", "u", "t", "key"),
+    "minilink.planning.dynamic_programming.lookup_policy.LookupPolicy.action": (
+        "x",
+        "t",
+        "params",
+    ),
+    "minilink.control.neural.NeuralPolicy.action": ("x", "t", "params"),
+}
+
+
+@pytest.mark.parametrize("path", sorted(ONE_SIGNATURE))
+def test_a_method_takes_the_model_order(path):
+    method = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    leading = tuple(inspect.signature(method).parameters)[
+        1 : 1 + len(ONE_SIGNATURE[path])
+    ]
+    assert leading == ONE_SIGNATURE[path], f"{path} takes {leading}"
+
+
+# Keyword-only where every sibling already is (the API settlement, PR #139): the leading
+# parameters a caller may pass by position, at the function's full path; every other one is
+# keyword-only
+LEADING_POSITIONALS = {
+    "minilink.planning.problems.PlanningProblem.__init__": ("sys",),
+    "minilink.core.facades.simulation.SystemSimulation.compile": (),
+    "minilink.core.diagram.DiagramSystem.compile": (),
+    "minilink.core.discrete.step_diagram.StepDiagramSystem.compile": (),
+    "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.compile": (),
+    "minilink.core.compile.compiler.compile": ("system",),
+    "minilink.core.facades.animation.SystemAnimation.animate": ("traj",),
+    "minilink.core.facades.animation.SystemAnimation.render": ("x", "u", "t"),
+    "minilink.blocks.neural.MLP.__init__": ("input_dim", "output_dim"),
+    "minilink.interfaces.gymnasium.Sys2Gym.__init__": ("sys", "cost"),
+    "minilink.core.discrete.sampled_system.NativeSampledSystem.__init__": (
+        "state_dim",
+    ),
+    "minilink.planning.evaluator.evaluate": ("problem", "controller", "dt"),
+    "minilink.planning.problems.PlanningProblem.compile": ("controller", "dt"),
+    # The impedance laws take the PID family's signature: the gains first, dim a keyword
+    # (the maintainer's ruling 9 of 2026-11-10)
+    "minilink.control.impedance.Impedance.__init__": ("Kp", "Kd"),
+    "minilink.control.impedance.IntegralImpedance.__init__": ("Kp", "Ki", "Kd"),
+    "minilink.control.siso.PID.__init__": ("Kp", "Ki", "Kd", "tau"),
+    # The design verbs (the maintainer's ruling 19 of 2026-11-11): the observer runs a linear
+    # model, StateObserver(LTISystem(A, B, C, D), L) the matrix form
+    "minilink.estimation.observer.StateObserver.__init__": ("model", "L"),
+    # The step reads its final level first: Step() is the unit step at t = 1 s
+    # (the maintainer's ruling 13 of 2026-11-10)
+    "minilink.blocks.sources.Step.__init__": (
+        "final_value",
+        "initial_value",
+        "step_time",
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(LEADING_POSITIONALS))
+def test_only_the_leading_parameters_are_positional(path):
+    function = getattr(owner_of(path), path.rsplit(".", 1)[-1])
+    positional = tuple(
+        name
+        for name, parameter in inspect.signature(function).parameters.items()
+        if name != "self"
+        and parameter.kind
+        in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD)
+    )
+    assert positional == LEADING_POSITIONALS[path], f"{path} takes {positional}"
+
+
+@pytest.mark.parametrize("path", sorted(RETIRED_NAMES))
+def test_no_retired_name_at_its_path(path):
+    name = path.rsplit(".", 1)[-1]
+    owner = owner_of(path)
+    fields = (
+        {f.name for f in dataclasses.fields(owner)}
+        if dataclasses.is_dataclass(owner)
+        else set()
+    )
+    assert not hasattr(owner, name) and name not in fields, (
+        f"{path} is retired, write {RETIRED_NAMES[path]!r}"
+    )
+
+
+def test_a_search_keeps_its_counts_on_its_record_only():
+    """RRT's goal flag and extension count are the record's (RULES 2.4), not the planner's."""
+    from minilink.planning.search.extenders import KinodynamicExtender
+    from minilink.planning.search.rrt import RRTPlanner
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+    from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
+
+    problem, _ = make_holonomic_obstacle_problem()
+    extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
+    for planner_class in (RRTPlanner, RRTStarPlanner):
+        planner = planner_class(problem, extender=extender, max_iterations=5)
+        record = planner.solve().record
+        assert record.n_iterations >= 0 and not record.reached_goal
+        for retired in ("reached_goal", "iterations"):
+            assert not hasattr(planner, retired), f"{planner_class.__name__}.{retired}"
+    # RRT*'s record copies (the maintainer's ruling Q7 of 2026-11-11): the record's alone
+    for retired in ("converged", "best_path_cost", "history"):
+        assert not hasattr(planner, retired), f"RRTStarPlanner.{retired}"
+
+
+def rl_planner(**method_numbers):
+    """A small RL planner on a bounded pendulum, built without training."""
+    pytest.importorskip("jax")
+    import numpy as np
+
+    from minilink import Pendulum, PlanningProblem, QuadraticCost
+    from minilink.learning import ReinforcementLearningPlanner
+
+    plant = Pendulum()
+    plant.inputs["u"].lower = np.array([-4.0])
+    plant.inputs["u"].upper = np.array([4.0])
+    problem = PlanningProblem(
+        plant,
+        x0=[0.1, 0.0],
+        cost=QuadraticCost.from_system(plant),
+        U=plant.input_box,
+        horizon=np.inf,
+    )
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")  # the default discount's notice
+        return ReinforcementLearningPlanner(
+            problem,
+            dt=0.1,
+            hidden=(4,),
+            n_rollouts=2,
+            n_steps_per_update=8,
+            **method_numbers,
+        )
+
+
+def test_the_rl_planner_reads_back_its_sizes_in_its_own_words():
+    """Ruling 18: the parallel rollouts and each one's periods per update, never n_envs or n_steps."""
+    planner = rl_planner()
+    assert (planner.n_rollouts, planner.n_steps_per_update) == (2, 8)
+    for retired in ("n_envs", "n_steps"):
+        assert not hasattr(planner, retired), f"ReinforcementLearningPlanner.{retired}"
+
+
+def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        STANDARD_STATUS,
+    )
+
+    assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
+
+
+def test_the_running_cost_signals_are_dJ_and_J():
+    """Ruling 17b: a run's cost signals are dJ (the rate) and J (the running J), never cost_rate / cost."""
+    import numpy as np
+
+    from minilink import Pendulum, QuadraticCost
+    from minilink.core.trajectory import Trajectory
+    from minilink.graphical.signals.time_signals import _COST_SIGNAL_LABELS
+    from minilink.planning import PlanningProblem
+
+    plant = Pendulum()
+    cost = QuadraticCost.from_system(plant)
+    t = np.linspace(0.0, 1.0, 3)
+    traj = Trajectory(t=t, x=np.zeros((2, 3)), u=np.zeros((1, 3))).with_cost(cost)
+    step = PlanningProblem(plant, cost=cost, horizon=0.2).discretize(0.1)
+    walk = step.rollout(lambda x, t: np.zeros(1))
+    for signals in (traj.signals, walk.signals):
+        assert "J" in signals and "cost" not in signals and "cost_rate" not in signals
+    assert "dJ" in traj.signals
+    assert _COST_SIGNAL_LABELS == {"dJ": "dJ/dt", "J": "J"}
+
+
+def test_rrt_star_names_its_best_path_cost():
+    """Ruling 17b: RRT*'s best goal node's cost is the record's path_cost, never best_goal_cost."""
+    from minilink.planning.search.extenders import KinodynamicExtender
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+    from tests.unittest.planning_helpers import make_holonomic_obstacle_problem
+
+    problem, _ = make_holonomic_obstacle_problem()
+    extender = KinodynamicExtender(controls=[[1.0, 0.0]], horizon=0.5, n_steps=2)
+    planner = RRTStarPlanner(problem, extender=extender, max_iterations=5)
+    record = planner.solve().record
+    assert hasattr(record, "path_cost") and not hasattr(planner, "best_goal_cost")
+    assert all(hasattr(node, "cost_to_come") for node in planner.tree.nodes)
+
+
+def test_a_diagram_connects_quietly_and_a_program_holds_its_start():
+    """Ruling 22: no connection_verbose switch; the program's start is program.z0, not metadata."""
+    import numpy as np
+
+    from minilink.core.diagram import DiagramSystem
+    from minilink.optimization import MathematicalProgram
+
+    assert not hasattr(DiagramSystem(), "connection_verbose")
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, z0=[2.0])
+    assert program.z0.tolist() == [2.0] and "z0" not in program.metadata
+    assert MathematicalProgram(n_z=1, J=lambda z: z @ z).z0 is None
+    assert np.asarray(program.z0).shape == (1,)
+
+
+def test_the_learners_history_says_J():
+    """A learner's per-episode (tabular) and per-iteration (RL) history writes its cost as J."""
+    import numpy as np
+
+    from minilink import PlanningProblem, QuadraticCost
+    from minilink.dynamics.catalog.equations import DoubleIntegrator
+    from minilink.learning.reinforcement_learning import TabularLearningPlanner
+
+    plant = DoubleIntegrator()
+    plant.state.lower, plant.state.upper = np.array([-1.0, -1.0]), np.array([1.0, 1.0])
+    plant.inputs["u"].lower, plant.inputs["u"].upper = np.array([-1.0]), np.array([1.0])
+    problem = PlanningProblem(
+        plant,
+        cost=QuadraticCost.from_system(plant),
+        horizon=np.inf,
+        X=plant.state.box,
+        U=plant.input_box,
+    )
+    learner = TabularLearningPlanner(problem, x_grid=(5, 5), u_grid=(3,), dt=0.2)
+    record = learner.solve(n_episodes=2).record
+    for entry in record.history:
+        assert "J" in entry and "cost" not in entry
+
+    planner = rl_planner(batch_size=16)
+    for entry in planner.solve(n_timesteps=16).record.history:
+        assert "J" in entry and "cost" not in entry
+
+
+def test_a_solve_status_reports_its_scalar_as_J():
+    """Ruling 17b: a solve's scalar is J, never cost (the cost is the object)."""
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        STANDARD_STATUS,
+    )
+
+    assert "J" in STANDARD_STATUS and "cost" not in STANDARD_STATUS
+
+
+# One hold vocabulary on the three tools that read samples between their times: the
+# step model's rollout, the noise sources and the replay of a trajectory say "zoh" / "linear"
+RETIRED_HOLDS = {"foh": "linear", "previous": "zoh"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_HOLDS))
+def test_no_retired_hold(retired):
+    from minilink import Pendulum
+    from minilink.blocks import TrajectorySource
+
+    evaluator = Pendulum().compile(backend="numpy")
+    for refused in (
+        lambda: evaluator.rollout([0.0, 0.0], [[0.0], [0.0]], 0.0, 0.1, hold=retired),
+        lambda: TrajectorySource([0.0, 1.0], [0.0, 1.0], hold=retired),
+    ):
+        with pytest.raises(ValueError, match=RETIRED_HOLDS[retired]):
+            refused()
+
+
+# The optimizer's native numbers are keywords (the API settlement, PR #139): options= is the
+# external solver's dict, refused on gd and adam; the native method's statistics say method
+@pytest.mark.parametrize("retired", ["maxiter", "gtol"])
+def test_a_native_method_refuses_options(retired):
+    from minilink.optimization import MathematicalProgram, Optimizer
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, grad_J=lambda z: 2 * z)
+    with pytest.raises(ValueError, match="max_iterations="):
+        Optimizer(program, z0=[1.0], method="gd", options={retired: 5})
+    result = Optimizer(program, z0=[1.0], method="gd", max_iterations=3).solve()
+    assert result.n_iterations == result.stats["nit"] == 3
+    assert result.stats["method"] == "gd" and "algorithm" not in result.stats
+
+
+# A retired value of a keyword: the value that replaced it. The simulator's solver names are the
+# step model's words on every tool (the ruling of 2026-11-10)
+RETIRED_SOLVERS = {"rk4_fixedsteps": "rk4", "euler_fixedsteps": "euler"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_SOLVERS))
+def test_no_retired_solver_name(retired):
+    from minilink import Pendulum
+    from minilink.simulation.simulator import Simulator
+
+    with pytest.raises(
+        ValueError, match=f"Unknown solver.*'{RETIRED_SOLVERS[retired]}'"
+    ):
+        Simulator(Pendulum(), tf=0.1, n_samples=3, solver=retired)
+
+
+# The optimizer's method names the algorithm (the ruling 12 of 2026-11-10): SciPy's spellings,
+# the library left to backend= and the (method, backend) table
+RETIRED_METHODS = {"scipy_slsqp": "slsqp", "scipy_trust_constr": "trust-constr"}
+
+
+@pytest.mark.parametrize("retired", sorted(RETIRED_METHODS))
+def test_no_retired_optimizer_method(retired):
+    from minilink.optimization import MathematicalProgram, Optimizer
+    from minilink.optimization.optimizer import METHODS
+
+    program = MathematicalProgram(n_z=1, J=lambda z: z @ z, grad_J=lambda z: 2 * z)
+    with pytest.raises(
+        ValueError, match=f"Unknown optimizer method.*{RETIRED_METHODS[retired]}"
+    ):
+        Optimizer(program, z0=[1.0], method=retired)
+    assert {method for method, _ in METHODS} >= set(RETIRED_METHODS.values())
+    assert not any(retired == method for method, _ in METHODS)
+
+
+def test_a_missing_method_backend_pair_is_refused_with_the_valid_list():
+    from minilink.optimization.optimizer import preset_of
+
+    with pytest.raises(ValueError, match="the methods on 'torch' are"):
+        preset_of("slsqp", "torch")
+
+
+def test_a_port_and_the_state_carry_lower_and_upper():
+    from minilink import Pendulum
+
+    plant = Pendulum()
+    plant.add_input_port("w", lower=[-1.0], upper=[2.0])
+    for signal in (
+        plant.state,
+        plant.inputs["u"],
+        plant.inputs["w"],
+        plant.outputs["y"],
+    ):
+        assert signal.box.lower.tolist() == signal.lower.tolist()
+        assert signal.box.upper.tolist() == signal.upper.tolist()
+        for retired in BOUND_WORDS:
+            assert not hasattr(signal, retired), f"{signal.id}.{retired} is retired"
+    assert plant.inputs["w"].lower.tolist() == [-1.0]
 
 
 def public_objects():
@@ -236,6 +870,11 @@ def retired_on(qualname, owners):
 # (RULES 5.25): the refusals and readers a planner reads a problem and its latest solution through
 MODULE_HELPERS = {
     "PlanningProblem": {
+        "coerce_horizon",
+        "coerce_state",
+        "require_type",
+        "check_state_shape",
+        "require_member",
         "require_cost",
         "require_goal",
         "require_finite_horizon",
@@ -245,6 +884,12 @@ MODULE_HELPERS = {
         "part_trees",
     },
     "StepPlanningProblem": {"require_cost"},
+    "Optimizer": {
+        "start_vector",
+        "decision_vector",
+        "print_solve_preamble",
+        "print_solve_report",
+    },
     "Planner": {
         "require_solution",
         "require_cost",
@@ -256,12 +901,14 @@ MODULE_HELPERS = {
 
 
 def test_the_helpers_are_module_functions_not_methods():
+    from minilink.optimization.optimizer import Optimizer
     from minilink.planning.planner import Planner
     from minilink.planning.problems import PlanningProblem
     from minilink.planning.step_problems import StepPlanningProblem
 
     owners = {
-        cls.__name__: cls for cls in (PlanningProblem, StepPlanningProblem, Planner)
+        cls.__name__: cls
+        for cls in (PlanningProblem, StepPlanningProblem, Planner, Optimizer)
     }
     hits = sorted(
         f"{owner}.{name}"
@@ -270,6 +917,62 @@ def test_the_helpers_are_module_functions_not_methods():
         if hasattr(owners[owner], name)
     )
     assert not hits, f"module functions, not methods: {hits}"
+
+
+# A drawing shortcut writes its keywords out (the API settlement, PR #139; DESIGN section 4: every
+# editor shows them), the same keywords as the function it hands them to
+SHORTCUTS = {
+    "minilink.core.facades.plotting.SystemPlotting.plot_input_output_map": (
+        "minilink.graphical.port_map.plot_input_output_map"
+    ),
+    "minilink.core.facades.plotting.SystemPlotting.plot_control_law": (
+        "minilink.graphical.port_map.plot_control_law"
+    ),
+    "minilink.core.discrete.sampled_diagram.SampledDiagramSystem.animate": (
+        "minilink.core.facades.animation.SystemAnimation.animate"
+    ),
+}
+
+
+@pytest.mark.parametrize("path", sorted(SHORTCUTS))
+def test_a_drawing_shortcut_writes_its_keywords_out(path):
+    def keywords(dotted):
+        function = getattr(owner_of(dotted), dotted.rsplit(".", 1)[-1])
+        parameters = inspect.signature(function).parameters.values()
+        assert all(p.kind is not p.VAR_KEYWORD for p in parameters), dotted
+        return {p.name: p.default for p in parameters if p.kind is p.KEYWORD_ONLY}
+
+    assert keywords(path) == keywords(SHORTCUTS[path])
+
+
+# One helper per name (the API settlement, PR #139): a helper is defined once, every other module
+# imports it; two bodies under one name were two ideas, now two names
+ONE_HELPER = {
+    "steps_of": (
+        "minilink.planning.evaluator",
+        "minilink.planning.trajectory_optimization.path_integral",
+        "minilink.planning.step_model",
+    ),
+    "planner_parts": (
+        "minilink.planning.trajectory_optimization.planner",
+        "minilink.planning.trajectory_optimization.compiled",
+    ),
+    "require_cost_to_go": (
+        "minilink.planning.results",
+        "minilink.planning.planner",
+        "minilink.planning.comparison",
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(ONE_HELPER))
+def test_a_helper_name_has_one_body(name):
+    home, *users = ONE_HELPER[name]
+    defined = getattr(importlib.import_module(home), name)
+    for user in users:
+        module = importlib.import_module(user)
+        if hasattr(module, name):
+            assert getattr(module, name) is defined, f"{user}.{name} is another body"
 
 
 # The workflow a planner's verb takes (DESIGN §6, the four kinds of argument): what is shown,

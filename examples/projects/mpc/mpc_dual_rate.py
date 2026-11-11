@@ -18,14 +18,11 @@ Run from repo root::
 import numpy as np
 
 from minilink import BicycleDynRate
+from minilink.control import ModelPredictiveController, PlanFollower
 from minilink.core.backends import configure_jax
 from minilink.core.costs import QuadraticCost
 from minilink.planning.problems import PlanningProblem
-from minilink.planning.trajectory_optimization.mpc import (
-    ModelPredictiveController,
-    PlanFollower,
-    mpc_animation_overlays,
-)
+from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 from minilink.planning.trajectory_optimization.planner import (
     TrajectoryOptimizationPlanner,
 )
@@ -64,7 +61,7 @@ planner = TrajectoryOptimizationPlanner(
     n_steps=20,
     transcription="direct_collocation",
     backend="jax",
-    method="scipy_slsqp",
+    method="slsqp",
     options={"maxiter": 50, "ftol": 1.0},
 )
 

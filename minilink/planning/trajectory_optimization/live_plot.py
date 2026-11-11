@@ -76,7 +76,7 @@ class LiveTrajectoryPlotCallback:
     @staticmethod
     def iteration_title(iteration) -> str:
         """The figure title of one iterate: its index, cost and constraint residuals."""
-        title = f"iteration {iteration.iteration}  cost {iteration.cost:.6g}"
+        title = f"iteration {iteration.iteration}  J = {iteration.J:.6g}"
         if iteration.max_equality_violation is not None:
             title += f"  eq {iteration.max_equality_violation:.2e}"
         if iteration.min_inequality_margin is not None:

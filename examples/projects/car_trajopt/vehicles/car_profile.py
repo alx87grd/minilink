@@ -754,16 +754,16 @@ _APPLY_BY_CLASS: dict[str, Any] = {
 
 def set_state_bounds(state: Any, i: int, lower: float, upper: float) -> None:
     """Bound one state component: ``lower ≤ x_i ≤ upper``."""
-    state.lower_bound[i] = lower
-    state.upper_bound[i] = upper
+    state.lower[i] = lower
+    state.upper[i] = upper
 
 
 def set_port_bounds(
     port: Any, lower: float | np.ndarray, upper: float | np.ndarray
 ) -> None:
     """Bound an input port: ``lower ≤ u ≤ upper``, as float arrays."""
-    port.lower_bound = np.asarray(lower, dtype=float)
-    port.upper_bound = np.asarray(upper, dtype=float)
+    port.lower = np.asarray(lower, dtype=float)
+    port.upper = np.asarray(upper, dtype=float)
 
 
 # The limits of a profile

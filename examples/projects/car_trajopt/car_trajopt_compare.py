@@ -132,8 +132,8 @@ def _obs_terminal_x() -> float:
 
 def _obs_build_holonomic():
     sys = Holonomic()
-    sys.inputs["u"].lower_bound = np.array([0.0, -OBS_V_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_V_MAX, OBS_V_MAX])
+    sys.inputs["u"].lower = np.array([0.0, -OBS_V_MAX])
+    sys.inputs["u"].upper = np.array([OBS_V_MAX, OBS_V_MAX])
     x0 = np.array([0.0, OBS_Y_START])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL])
     u_bar = np.array([OBS_U_TARGET, 0.0])
@@ -145,12 +145,12 @@ def _obs_build_holonomic():
 
 def _obs_build_holonomic_dyn():
     sys = HolonomicAccel()
-    sys.state.lower_bound[2] = 0.0
-    sys.state.upper_bound[2] = OBS_V_MAX
-    sys.state.lower_bound[3] = -OBS_V_MAX
-    sys.state.upper_bound[3] = OBS_V_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_SPEED_DOT_MAX, -OBS_SPEED_DOT_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_SPEED_DOT_MAX, OBS_SPEED_DOT_MAX])
+    sys.state.lower[2] = 0.0
+    sys.state.upper[2] = OBS_V_MAX
+    sys.state.lower[3] = -OBS_V_MAX
+    sys.state.upper[3] = OBS_V_MAX
+    sys.inputs["u"].lower = np.array([-OBS_SPEED_DOT_MAX, -OBS_SPEED_DOT_MAX])
+    sys.inputs["u"].upper = np.array([OBS_SPEED_DOT_MAX, OBS_SPEED_DOT_MAX])
     x0 = np.array([0.0, OBS_Y_START, OBS_U_0, 0.0])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL, OBS_U_TARGET, 0.0])
     u_bar = np.array([0.0, 0.0])
@@ -162,8 +162,8 @@ def _obs_build_holonomic_dyn():
 
 def _obs_build_kinematic():
     sys = BicycleKin()
-    sys.inputs["u"].lower_bound = np.array([0.0, -OBS_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_V_MAX, OBS_DELTA_MAX])
+    sys.inputs["u"].lower = np.array([0.0, -OBS_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([OBS_V_MAX, OBS_DELTA_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0])
     x_ref = np.array([_obs_terminal_x(), OBS_Y_GOAL, OBS_HEADING_TARGET])
     u_bar = np.array([OBS_U_TARGET, 0.0])
@@ -175,12 +175,12 @@ def _obs_build_kinematic():
 
 def _obs_build_bicycle_acc():
     sys = BicycleAcc()
-    sys.state.lower_bound[3] = 0.0
-    sys.state.upper_bound[3] = OBS_V_MAX
-    sys.state.lower_bound[4] = -OBS_DELTA_MAX
-    sys.state.upper_bound[4] = OBS_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_SPEED_DOT_MAX, -OBS_STEERING_DOT_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_SPEED_DOT_MAX, OBS_STEERING_DOT_MAX])
+    sys.state.lower[3] = 0.0
+    sys.state.upper[3] = OBS_V_MAX
+    sys.state.lower[4] = -OBS_DELTA_MAX
+    sys.state.upper[4] = OBS_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-OBS_SPEED_DOT_MAX, -OBS_STEERING_DOT_MAX])
+    sys.inputs["u"].upper = np.array([OBS_SPEED_DOT_MAX, OBS_STEERING_DOT_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0])
     x_ref = np.array(
         [_obs_terminal_x(), OBS_Y_GOAL, OBS_HEADING_TARGET, OBS_U_TARGET, 0.0]
@@ -196,8 +196,8 @@ def _obs_build_dynamic():
     sys = DynamicBicycle(named_ports=False)
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
-    sys.inputs["u"].lower_bound = np.array([0.0, -OBS_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([w_rear_max, OBS_DELTA_MAX])
+    sys.inputs["u"].lower = np.array([0.0, -OBS_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([w_rear_max, OBS_DELTA_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0])
     x_ref = np.array(
         [
@@ -220,12 +220,12 @@ def _obs_build_dynamic_rate():
     sys = BicycleDynRate()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = w_rear_max
-    sys.state.lower_bound[7] = -OBS_DELTA_MAX
-    sys.state.upper_bound[7] = OBS_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_W_REAR_DOT_MAX, -OBS_DELTA_DOT_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_W_REAR_DOT_MAX, OBS_DELTA_DOT_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = w_rear_max
+    sys.state.lower[7] = -OBS_DELTA_MAX
+    sys.state.upper[7] = OBS_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-OBS_W_REAR_DOT_MAX, -OBS_DELTA_DOT_MAX])
+    sys.inputs["u"].upper = np.array([OBS_W_REAR_DOT_MAX, OBS_DELTA_DOT_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
     x_ref = np.array(
         [
@@ -250,12 +250,12 @@ def _obs_build_dynamic_taurate():
     sys = BicycleDynTauRate()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = w_rear_max
-    sys.state.lower_bound[7] = -OBS_DELTA_MAX
-    sys.state.upper_bound[7] = OBS_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_DOT_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_DOT_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = w_rear_max
+    sys.state.lower[7] = -OBS_DELTA_MAX
+    sys.state.upper[7] = OBS_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_DOT_MAX])
+    sys.inputs["u"].upper = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_DOT_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0])
     x_ref = np.array(
         [
@@ -280,12 +280,12 @@ def _obs_build_dynamic_servo():
     sys = BicycleDynServo()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = w_rear_max
-    sys.state.lower_bound[7] = -OBS_DELTA_MAX
-    sys.state.upper_bound[7] = OBS_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = w_rear_max
+    sys.state.lower[7] = -OBS_DELTA_MAX
+    sys.state.upper[7] = OBS_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-OBS_TAU_REAR_MAX, -OBS_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([OBS_TAU_REAR_MAX, OBS_DELTA_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0])
     x_ref = np.array(
         [
@@ -311,14 +311,14 @@ def _obs_build_dynamic_engine():
     sys = BicycleDynEngine()
     r_r = sys.params["r_r"]
     w_rear_max = 1.2 * OBS_U_TARGET / r_r
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = w_rear_max
-    sys.state.lower_bound[7] = -OBS_DELTA_MAX
-    sys.state.upper_bound[7] = OBS_DELTA_MAX
-    sys.state.lower_bound[8] = -OBS_P_CMD_MAX
-    sys.state.upper_bound[8] = OBS_P_CMD_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -OBS_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, OBS_DELTA_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = w_rear_max
+    sys.state.lower[7] = -OBS_DELTA_MAX
+    sys.state.upper[7] = OBS_DELTA_MAX
+    sys.state.lower[8] = -OBS_P_CMD_MAX
+    sys.state.upper[8] = OBS_P_CMD_MAX
+    sys.inputs["u"].lower = np.array([-OBS_P_CMD_MAX, -OBS_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([OBS_P_CMD_MAX, OBS_DELTA_MAX])
     x0 = np.array([0.0, OBS_Y_START, 0.0, OBS_U_0, 0.0, 0.0, OBS_U_0 / r_r, 0.0, 0.0])
     x_ref = np.array(
         [
@@ -395,7 +395,7 @@ def _corner_track() -> ReferenceTrack:
 
 
 def _pose_on_track(track: ReferenceTrack, s: float) -> tuple[np.ndarray, float]:
-    xy = np.asarray(track.path.sample(s), dtype=float)
+    xy = np.asarray(track.path.at(s), dtype=float)
     tangent = track.path.tangent(s)
     theta = float(np.arctan2(tangent[1], tangent[0]))
     if abs(np.cos(2.0 * theta)) > 1.0 - 1e-9:
@@ -415,8 +415,8 @@ def _corner_build_holonomic(track: ReferenceTrack):
     xy0, _ = _pose_on_track(track, CORNER_S0)
     xyf, _ = _pose_on_track(track, track.path.total_length - 0.5)
     sys = Holonomic()
-    sys.inputs["u"].lower_bound = np.array([-CORNER_V_MAX, -CORNER_V_MAX])
-    sys.inputs["u"].upper_bound = np.array([CORNER_V_MAX, CORNER_V_MAX])
+    sys.inputs["u"].lower = np.array([-CORNER_V_MAX, -CORNER_V_MAX])
+    sys.inputs["u"].upper = np.array([CORNER_V_MAX, CORNER_V_MAX])
     x0 = np.array([xy0[0], xy0[1]])
     x_ref = np.array([xyf[0], xyf[1]])
     u_bar = np.array([CORNER_U_TARGET, 0.0])
@@ -430,12 +430,12 @@ def _corner_build_holonomic_dyn(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     xyf, thf = _pose_on_track(track, track.path.total_length - 0.5)
     sys = HolonomicAccel()
-    sys.state.lower_bound[2] = -CORNER_V_MAX
-    sys.state.upper_bound[2] = CORNER_V_MAX
-    sys.state.lower_bound[3] = -CORNER_V_MAX
-    sys.state.upper_bound[3] = CORNER_V_MAX
-    sys.inputs["u"].lower_bound = np.array([-3.0, -3.0])
-    sys.inputs["u"].upper_bound = np.array([3.0, 3.0])
+    sys.state.lower[2] = -CORNER_V_MAX
+    sys.state.upper[2] = CORNER_V_MAX
+    sys.state.lower[3] = -CORNER_V_MAX
+    sys.state.upper[3] = CORNER_V_MAX
+    sys.inputs["u"].lower = np.array([-3.0, -3.0])
+    sys.inputs["u"].upper = np.array([3.0, 3.0])
     x0 = np.array([xy0[0], xy0[1], CORNER_U_0 * np.cos(th0), CORNER_U_0 * np.sin(th0)])
     x_ref = np.array(
         [
@@ -455,8 +455,8 @@ def _corner_build_holonomic_dyn(track: ReferenceTrack):
 def _corner_build_kinematic(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleKin()
-    sys.inputs["u"].lower_bound = np.array([0.0, -CORNER_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([CORNER_V_MAX, CORNER_DELTA_MAX])
+    sys.inputs["u"].lower = np.array([0.0, -CORNER_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([CORNER_V_MAX, CORNER_DELTA_MAX])
     x0 = np.array([xy0[0], xy0[1], th0])
     x_ref = np.zeros(3)
     u_bar = np.array([CORNER_U_TARGET, 0.0])
@@ -470,12 +470,12 @@ def _corner_build_kinematic(track: ReferenceTrack):
 def _corner_build_bicycle_acc(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleAcc()
-    sys.state.lower_bound[3] = 0.0
-    sys.state.upper_bound[3] = CORNER_V_MAX
-    sys.state.lower_bound[4] = -CORNER_DELTA_MAX
-    sys.state.upper_bound[4] = CORNER_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-3.0, -2.5])
-    sys.inputs["u"].upper_bound = np.array([3.0, 2.5])
+    sys.state.lower[3] = 0.0
+    sys.state.upper[3] = CORNER_V_MAX
+    sys.state.lower[4] = -CORNER_DELTA_MAX
+    sys.state.upper[4] = CORNER_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-3.0, -2.5])
+    sys.inputs["u"].upper = np.array([3.0, 2.5])
     x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0])
     x_ref = np.array([0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0])
     u_bar = np.zeros(2)
@@ -490,8 +490,8 @@ def _corner_build_dynamic(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = DynamicBicycle(named_ports=False)
     r_r = sys.params["r_r"]
-    sys.inputs["u"].lower_bound = np.array([0.0, -CORNER_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([90.0, CORNER_DELTA_MAX])
+    sys.inputs["u"].lower = np.array([0.0, -CORNER_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([90.0, CORNER_DELTA_MAX])
     x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0])
     x_ref = np.array([0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0])
     u_bar = np.array([CORNER_U_TARGET / r_r, 0.0])
@@ -506,12 +506,12 @@ def _corner_build_dynamic_rate(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleDynRate()
     r_r = sys.params["r_r"]
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = 90.0
-    sys.state.lower_bound[7] = -CORNER_DELTA_MAX
-    sys.state.upper_bound[7] = CORNER_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-80.0, -2.0])
-    sys.inputs["u"].upper_bound = np.array([80.0, 2.0])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = 90.0
+    sys.state.lower[7] = -CORNER_DELTA_MAX
+    sys.state.upper[7] = CORNER_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-80.0, -2.0])
+    sys.inputs["u"].upper = np.array([80.0, 2.0])
     x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0])
     x_ref = np.array(
         [0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0, CORNER_U_TARGET / r_r, 0.0]
@@ -528,12 +528,12 @@ def _corner_build_dynamic_taurate(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleDynTauRate()
     r_r = sys.params["r_r"]
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = 90.0
-    sys.state.lower_bound[7] = -CORNER_DELTA_MAX
-    sys.state.upper_bound[7] = CORNER_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-5000.0, -2.0])
-    sys.inputs["u"].upper_bound = np.array([5000.0, 2.0])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = 90.0
+    sys.state.lower[7] = -CORNER_DELTA_MAX
+    sys.state.upper[7] = CORNER_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-5000.0, -2.0])
+    sys.inputs["u"].upper = np.array([5000.0, 2.0])
     x0 = np.array([xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0])
     x_ref = np.array(
         [0.0, 0.0, 0.0, CORNER_U_TARGET, 0.0, 0.0, CORNER_U_TARGET / r_r, 0.0]
@@ -550,12 +550,12 @@ def _corner_build_dynamic_servo(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleDynServo()
     r_r = sys.params["r_r"]
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = 90.0
-    sys.state.lower_bound[7] = -CORNER_DELTA_MAX
-    sys.state.upper_bound[7] = CORNER_DELTA_MAX
-    sys.inputs["u"].lower_bound = np.array([-5000.0, -CORNER_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([5000.0, CORNER_DELTA_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = 90.0
+    sys.state.lower[7] = -CORNER_DELTA_MAX
+    sys.state.upper[7] = CORNER_DELTA_MAX
+    sys.inputs["u"].lower = np.array([-5000.0, -CORNER_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([5000.0, CORNER_DELTA_MAX])
     x0 = np.array(
         [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0, 0.0]
     )
@@ -574,14 +574,14 @@ def _corner_build_dynamic_engine(track: ReferenceTrack):
     xy0, th0 = _pose_on_track(track, CORNER_S0)
     sys = BicycleDynEngine()
     r_r = sys.params["r_r"]
-    sys.state.lower_bound[6] = 0.0
-    sys.state.upper_bound[6] = 90.0
-    sys.state.lower_bound[7] = -CORNER_DELTA_MAX
-    sys.state.upper_bound[7] = CORNER_DELTA_MAX
-    sys.state.lower_bound[8] = -OBS_P_CMD_MAX
-    sys.state.upper_bound[8] = OBS_P_CMD_MAX
-    sys.inputs["u"].lower_bound = np.array([-OBS_P_CMD_MAX, -CORNER_DELTA_MAX])
-    sys.inputs["u"].upper_bound = np.array([OBS_P_CMD_MAX, CORNER_DELTA_MAX])
+    sys.state.lower[6] = 0.0
+    sys.state.upper[6] = 90.0
+    sys.state.lower[7] = -CORNER_DELTA_MAX
+    sys.state.upper[7] = CORNER_DELTA_MAX
+    sys.state.lower[8] = -OBS_P_CMD_MAX
+    sys.state.upper[8] = OBS_P_CMD_MAX
+    sys.inputs["u"].lower = np.array([-OBS_P_CMD_MAX, -CORNER_DELTA_MAX])
+    sys.inputs["u"].upper = np.array([OBS_P_CMD_MAX, CORNER_DELTA_MAX])
     x0 = np.array(
         [xy0[0], xy0[1], th0, CORNER_U_0, 0.0, 0.0, CORNER_U_0 / r_r, 0.0, 0.0]
     )
@@ -660,7 +660,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         sys=sys,
         traj=traj,
         success=bool(result.success),
-        cost=None if result.cost is None else float(result.cost),
+        cost=None if result.J is None else float(result.J),
         solve_s=None if result.solve_time_s is None else float(result.solve_time_s),
         total_s=total_s,
     )
@@ -691,7 +691,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         n_steps=CORNER_N_STEPS,
         transcription="direct_collocation",
         backend=backend,
-        method="scipy_slsqp",
+        method="slsqp",
         options={"maxiter": 150, "ftol": 0.1},
     )
     t0 = time.perf_counter()
@@ -704,7 +704,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         sys=sys,
         traj=traj,
         success=bool(result.success),
-        cost=None if result.cost is None else float(result.cost),
+        cost=None if result.J is None else float(result.J),
         solve_s=None if result.solve_time_s is None else float(result.solve_time_s),
         total_s=total_s,
     )

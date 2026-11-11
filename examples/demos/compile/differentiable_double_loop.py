@@ -15,8 +15,8 @@ X0 = np.array([1.0, 0.0])  # the start, rad and rad/s
 plant = Pendulum()
 net = MLP(input_dim=2, output_dim=1, hidden=(4,), output_gain=0.1).rename_ports(u="x")
 inner = closed_loop(net, plant, reference=False, disturbance=True)
-inner.inputs["d"].lower_bound = np.array([-2.0])
-inner.inputs["d"].upper_bound = np.array([2.0])
+inner.inputs["d"].lower = np.array([-2.0])
+inner.inputs["d"].upper = np.array([2.0])
 inner.plot_diagram()
 
 # The outer loop: an MPC that plans d on the inner loop, solved by 5 Adam steps a tick

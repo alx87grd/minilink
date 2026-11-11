@@ -36,6 +36,7 @@ class MLP(System):
         self,
         input_dim: int,
         output_dim: int,
+        *,
         hidden=(64, 64),
         activation: str = "tanh",
         seed: int = 0,

@@ -12,8 +12,8 @@ from minilink.dynamics.catalog.pendulum.pendulum import Pendulum
 DOUBLE_PENDULUM_CHECKPOINTS = (0.0, 1.0, 2.5, 5.0, 7.5, 10.0)
 SHOWCASE_PENDULUM_CHECKPOINTS = (0.0, 2.5, 5.0, 7.5, 10.0)
 
-DOUBLE_PENDULUM_CANDIDATE = SimulationBenchmarkVariant("rk4_fixedsteps", "numpy")
-SHOWCASE_PENDULUM_CANDIDATE = SimulationBenchmarkVariant("rk4_fixedsteps", "numpy")
+DOUBLE_PENDULUM_CANDIDATE = SimulationBenchmarkVariant("rk4", "numpy")
+SHOWCASE_PENDULUM_CANDIDATE = SimulationBenchmarkVariant("rk4", "numpy")
 
 
 def build_double_pendulum():

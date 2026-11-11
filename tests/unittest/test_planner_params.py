@@ -24,8 +24,8 @@ X_UP = np.array([np.pi, 0.0])
 
 def bounded_pendulum():
     plant = Pendulum()
-    plant.state.lower_bound = np.array([-np.pi, -6.0])
-    plant.state.upper_bound = np.array([np.pi, 6.0])
+    plant.state.lower = np.array([-np.pi, -6.0])
+    plant.state.upper = np.array([np.pi, 6.0])
     return plant
 
 
@@ -67,15 +67,18 @@ PLANNERS = {
     ),
     "tabular": (
         lambda **k: TabularLearningPlanner(regulation(), **GRID, **k),
-        {"eta": 0.5},
+        {"learning_rate": 0.5},
     ),
     "LQR": (
         lambda **k: LQRPlanner(reach().replace(Xf=None), **k),
         {"x_bar": X_UP},
     ),
-    "RRT": (lambda **k: RRTPlanner(reach(), max_nodes=60, **k), {"goal_bias": 0.3}),
+    "RRT": (
+        lambda **k: RRTPlanner(reach(), max_iterations=60, **k),
+        {"goal_bias": 0.3},
+    ),
     "RRT*": (
-        lambda **k: RRTStarPlanner(reach(), max_nodes=40, **k),
+        lambda **k: RRTStarPlanner(reach(), max_iterations=40, **k),
         {"radius_constant": 2.0},
     ),
 }
@@ -221,3 +224,84 @@ def test_the_grids_table_options_survive_a_discount_and_a_tree():
     rebuilt = built.call_args.args[0]
     assert rebuilt.grid.precompute is False and rebuilt.grid.precomputed is False
     assert rebuilt.gamma == 0.8
+
+
+def test_every_planner_takes_verbose_off_by_default():
+    """``verbose=False`` on every planner's solve (LQR, RRT, RRT* and MPPI included)."""
+    import inspect
+
+    from minilink import ReinforcementLearningPlanner, TrajectoryOptimizationPlanner
+    from minilink.planning import MPPIPlanner
+
+    planners = (
+        DynamicProgrammingPlanner,
+        LQRPlanner,
+        RRTPlanner,
+        RRTStarPlanner,
+        TabularLearningPlanner,
+        TrajectoryOptimizationPlanner,
+        MPPIPlanner,
+        ReinforcementLearningPlanner,
+    )
+    for planner in planners:
+        parameter = inspect.signature(planner.solve).parameters["verbose"]
+        assert parameter.default is False, planner.__name__
+        assert parameter.kind is inspect.Parameter.KEYWORD_ONLY, planner.__name__
+
+
+@pytest.mark.parametrize("name", ["LQR", "RRT", "RRT*"])
+def test_a_verbose_solve_prints_its_record_once(name, capsys):
+    build, numbers = PLANNERS[name]
+    planner = build()
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"
+    planner.solve(params=edited(planner.params, {"method": numbers}), verbose=True)
+    assert (
+        capsys.readouterr().out.count("\n")
+        == str(planner.last_solution.record).count("\n") + 1
+    )
+    planner.solve()
+    assert capsys.readouterr().out == ""
+
+
+def test_solve_steps_takes_a_tree_as_solve_does():
+    build, numbers = PLANNERS["value iteration"]
+    planner = build()
+    at_tree = planner.solve_steps(5, params=edited(planner.params, {"method": numbers}))
+    built_there = build(**numbers).solve_steps(5)
+    np.testing.assert_allclose(fingerprint(at_tree), fingerprint(built_there))
+    assert at_tree is planner.last_solution
+
+
+def test_the_learning_curve_and_a_sources_signal_take_show():
+    import matplotlib
+
+    matplotlib.use("Agg")
+    from minilink import Step
+
+    build, _ = PLANNERS["tabular"]
+    planner = build()
+    solve_of(planner)
+    # An interactive backend: the planning views leave Agg silent
+    with (
+        mock.patch("matplotlib.pyplot.show") as shown,
+        mock.patch("matplotlib.pyplot.get_backend", return_value="TkAgg"),
+    ):
+        ax = planner.plot_learning_curve(show=False)
+        source = Step()
+        source.compute_trajectory(tf=2.0)
+        source.plot_trajectory(show=False)
+        assert not shown.called
+        planner.plot_learning_curve()
+        assert shown.call_count == 1
+    assert ax.get_xlabel() == "episode"
+
+
+@pytest.mark.jax
+def test_an_mppi_solve_prints_its_record_when_verbose(capsys):
+    from minilink.planning import MPPIPlanner
+
+    problem = reach().replace(Xf=None, horizon=0.5)
+    planner = MPPIPlanner(problem, dt=0.1, n_rollouts=8, n_iterations=1)
+    solution = planner.solve(verbose=True)
+    assert capsys.readouterr().out == f"{solution.record}\n"

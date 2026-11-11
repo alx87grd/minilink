@@ -23,9 +23,7 @@ class StaticEvaluator(Evaluator):
             raise TypeError("StaticEvaluator requires a static System (n=0)")
         if system.n != 0:
             raise TypeError(f"static evaluator requires n=0, got n={system.n}")
-        super().__init__(
-            0, system.m, system.p, backend, system.get_u_from_input_ports()
-        )
+        super().__init__(0, system.m, system.p, backend, system.u_nominal)
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params

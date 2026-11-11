@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 
@@ -42,18 +43,10 @@ class RRTStarPlanner(RRTPlanner):
 
     Its :meth:`solve` takes RRT's workflow, plus ``record_history`` and
     ``history_stride``: an :class:`RRTStarSnapshot` every ``history_stride``
-    extensions, for the animation.
-
-    Attributes
-    ----------
-    converged : bool
-        ``True`` when post-goal optimization stopped on the patience criterion.
-    iterations : int
-        Number of successful tree extensions performed.
-    best_goal_cost : float or None
-        Best cost-to-come among nodes in the goal region.
-    history : list of RRTStarSnapshot
-        Recorded frames of a ``solve(record_history=True)``.
+    extensions, for the animation. The search's account is the solution's
+    record: ``converged`` (post-goal optimization stopped on the patience
+    criterion), ``path_cost`` (the best cost-to-come in the goal region) and
+    ``history`` (the snapshots of a ``solve(record_history=True)``).
     """
 
     number_names = RRTPlanner.number_names + ("radius_constant", "rewire_eta")
@@ -64,7 +57,7 @@ class RRTStarPlanner(RRTPlanner):
         extender=None,
         *,
         metric=euclidean,
-        max_nodes: int = 5000,
+        max_iterations: int = 5000,
         goal_bias: float = 0.1,
         seed: int = 0,
         edge_resolution: float | None = None,
@@ -82,7 +75,7 @@ class RRTStarPlanner(RRTPlanner):
             problem,
             extender,
             metric=metric,
-            max_nodes=max_nodes,
+            max_iterations=max_iterations,
             goal_bias=goal_bias,
             seed=seed,
             edge_resolution=edge_resolution,
@@ -101,36 +94,32 @@ class RRTStarPlanner(RRTPlanner):
         self.cost_tol = float(cost_tol)
         self.convergence_patience = int(convergence_patience)
 
-        # The search's convergence, refreshed by every solve
-        self.converged: bool = False
-        self.iterations: int = 0
-        self.best_goal_cost: float | None = None
-        self.history: list[RRTStarSnapshot] = []
-
     def solve(
         self,
         *,
         params=None,
         evaluate=False,
         n_trials=50,
+        verbose=False,
         callback: Callable | list[Callable] | None = None,
         record_history: bool = False,
         history_stride: int = 1,
     ) -> PlanningSolution:
         """
-        Grow an RRT* until goal convergence, patience, or ``max_nodes`` (the solution as :meth:`RRTPlanner.solve`'s).
+        Grow an RRT* until goal convergence, patience, or ``max_iterations`` (the solution as :meth:`RRTPlanner.solve`'s).
 
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
         The workflow is :meth:`RRTPlanner.solve`'s, plus ``record_history``: an
-        :class:`RRTStarSnapshot` in :attr:`history` on the first and every
-        ``history_stride``-th extension, and on the last.
+        :class:`RRTStarSnapshot` in the record's ``history`` on the first and
+        every ``history_stride``-th extension, and on the last.
         """
         # At another tree: the planner there, its solution kept here
         if params is not None:
             solution = planner_at(self, params).solve(
                 evaluate=evaluate,
                 n_trials=n_trials,
+                verbose=verbose,
                 record_history=record_history,
                 history_stride=history_stride,
                 callback=callback,
@@ -139,6 +128,7 @@ class RRTStarPlanner(RRTPlanner):
 
         metric = self.metric
         self.require_nearest_method()
+        started = time.perf_counter()
 
         rng = np.random.default_rng(self.seed)
         goal_region = self.goal_region()
@@ -152,63 +142,63 @@ class RRTStarPlanner(RRTPlanner):
 
         # The tree, rooted at the start
         self.tree = Tree(
-            Node(x=x0, parent=None, edge=None, cost=0.0),
+            Node(x=x0, parent=None, edge=None, cost_to_come=0.0),
             nearest_method=self.nearest_method,
         )
-        self.reached_goal = False
         self.solution_node = None
-        self.converged = False
-        self.iterations = 0
-        self.best_goal_cost = None
-        self.history = []
         report = self.build_search_report(callback)
 
+        # The extensions so far, whether one reached the goal, the best path's
+        # cost, the convergence and the snapshots: the record's account
+        n_iterations = 0
+        reached_goal = False
         best_goal_node = None
+        best_path_cost = None
+        converged = False
+        history = []
         stale_extensions = 0
 
-        for _ in range(self.max_nodes):
+        for _ in range(self.max_iterations):
             # Extend: steer toward a sample, attach through the cheapest near
             # parent, rewire the near nodes
             if not self.extend_once(rng):
                 continue
-            self.iterations += 1
+            n_iterations += 1
 
             # The cheapest node in the goal region, and whether it improved
             best_goal_node, improved = self.refresh_best_goal(
                 goal_region, best_goal_node, cost_tol
             )
             if best_goal_node is not None:
-                self.reached_goal = True
+                reached_goal = True
                 self.solution_node = best_goal_node
-                self.best_goal_cost = float(best_goal_node.cost)
+                best_path_cost = float(best_goal_node.cost_to_come)
 
             # The step's callback, and its snapshot when the history is recorded
-            phase = (
-                "optimize" if self.reached_goal and optimize_after_goal else "explore"
-            )
-            self.record_search_step(
-                report, best_goal_node, phase, record_history, history_stride
-            )
+            phase = "optimize" if reached_goal and optimize_after_goal else "explore"
+            report(phase, n_iterations, reached_goal)
+            if record_history and (
+                n_iterations == 1 or n_iterations % history_stride == 0
+            ):
+                history.append(self.snapshot_of(best_goal_node, n_iterations))
 
             # Stop at the first goal hit, or once the goal cost has gone patience
             # extensions without improving by cost_tol
-            if self.reached_goal and not optimize_after_goal:
+            if reached_goal and not optimize_after_goal:
                 break
 
-            if self.reached_goal and optimize_after_goal:
+            if reached_goal and optimize_after_goal:
                 if improved:
                     stale_extensions = 0
                 else:
                     stale_extensions += 1
                 if stale_extensions >= patience:
-                    self.converged = True
+                    converged = True
                     break
 
         # The last extension's snapshot, when the stride skipped it
-        if record_history and (
-            not self.history or self.history[-1].iteration != self.iterations
-        ):
-            self.record_snapshot(best_goal_node)
+        if record_history and (not history or history[-1].iteration != n_iterations):
+            history.append(self.snapshot_of(best_goal_node, n_iterations))
 
         # No goal node: the node closest to the goal, when best effort is allowed
         if self.solution_node is None:
@@ -216,12 +206,21 @@ class RRTStarPlanner(RRTPlanner):
             closest = self.tree.nearest(goal_point, metric)
             self.solution_node = closest
             if not self.return_best_effort:
-                raise RuntimeError("RRT* failed to reach goal within max_nodes")
+                raise RuntimeError("RRT* failed to reach goal within max_iterations")
 
         return self.finish_trajectory(
             self.tree.extract_trajectory(self.solution_node, self.problem.t0),
             evaluate,
             n_trials,
+            self.search_record(
+                reached_goal,
+                n_iterations,
+                time.perf_counter() - started,
+                best_path_cost=best_path_cost,
+                converged=converged,
+                history=history,
+            ),
+            verbose=verbose,
         )
 
     def build_kwargs(self) -> dict:
@@ -236,22 +235,29 @@ class RRTStarPlanner(RRTPlanner):
 
         return kwargs
 
-    def search_record(self):
-        """The RRT* record: the best goal cost, and whether patience declared convergence."""
-        record = super().search_record()
-        cost = (
-            record.cost if self.best_goal_cost is None else float(self.best_goal_cost)
-        )
+    def search_record(
+        self,
+        reached_goal,
+        n_iterations,
+        solve_time_s=None,
+        *,
+        best_path_cost=None,
+        converged=False,
+        history=(),
+    ):
+        """The RRT* record: the best goal cost, whether patience declared convergence, the snapshots."""
+        record = super().search_record(reached_goal, n_iterations, solve_time_s)
+        path_cost = record.path_cost if best_path_cost is None else best_path_cost
 
         return replace(
             record,
-            cost=cost,
-            converged=bool(self.converged),
-            history=list(self.history),
+            path_cost=path_cost,
+            converged=bool(converged),
+            history=list(history),
         )
 
     def animate_convergence(self, **kwargs):
-        """Animate recorded RRT* history (a ``solve(record_history=True)``)."""
+        """Animate the latest solution's recorded history (a ``solve(record_history=True)``)."""
         # Lazy import: the graphics load on first use, not with the core
         from minilink.planning.search.plotting import animate_convergence
 
@@ -279,7 +285,9 @@ class RRTStarPlanner(RRTPlanner):
         near_nodes = tree.near(x_new, radius, metric)
 
         # The new state joins the tree through its cheapest near parent
-        best_parent, best_edge, best_cost = self.choose_parent(near_nodes, x_new, rng)
+        best_parent, best_edge, best_cost_to_come = self.choose_parent(
+            near_nodes, x_new, rng
+        )
         if best_edge is None:
             return False
 
@@ -288,7 +296,7 @@ class RRTStarPlanner(RRTPlanner):
                 x=x_new,
                 parent=best_parent,
                 edge=best_edge,
-                cost=best_cost,
+                cost_to_come=best_cost_to_come,
             )
         )
 
@@ -348,19 +356,19 @@ class RRTStarPlanner(RRTPlanner):
         """The near node, edge and cost-to-come that reach ``x_new`` cheapest."""
         best_parent = None
         best_edge = None
-        best_cost = np.inf
+        best_cost_to_come = np.inf
 
         for node in near_nodes:
             edge = self.try_extend(node, x_new, rng)
             if edge is None:
                 continue
-            cost = node.cost + edge.cost
-            if cost < best_cost:
-                best_cost = cost
+            cost = node.cost_to_come + edge.cost
+            if cost < best_cost_to_come:
+                best_cost_to_come = cost
                 best_parent = node
                 best_edge = edge
 
-        return best_parent, best_edge, best_cost
+        return best_parent, best_edge, best_cost_to_come
 
     def rewire_near(self, new_node, near_nodes, rng):
         """Reparent each near node through ``new_node`` when that lowers its cost-to-come."""
@@ -372,43 +380,40 @@ class RRTStarPlanner(RRTPlanner):
             edge = self.try_extend(new_node, candidate.x, rng)
             if edge is None:
                 continue
-            new_cost = new_node.cost + edge.cost
-            if new_cost < candidate.cost:
+            new_cost = new_node.cost_to_come + edge.cost
+            if new_cost < candidate.cost_to_come:
                 tree.rewire(candidate, new_node, edge)
                 tree.propagate_cost(candidate)
 
     def refresh_best_goal(self, goal_region, best_goal_node, cost_tol):
         """The cheapest node in the goal region, and whether it beats the previous best by ``cost_tol``."""
         improved = False
-        previous_cost = None if best_goal_node is None else float(best_goal_node.cost)
+        previous_cost = (
+            None if best_goal_node is None else float(best_goal_node.cost_to_come)
+        )
 
         for node in self.tree.nodes:
             if not goal_region.contains(node.x):
                 continue
-            if best_goal_node is None or node.cost < best_goal_node.cost:
+            if (
+                best_goal_node is None
+                or node.cost_to_come < best_goal_node.cost_to_come
+            ):
                 best_goal_node = node
 
         if best_goal_node is None:
             return None, False
 
-        if previous_cost is None or best_goal_node.cost < previous_cost - cost_tol:
+        if (
+            previous_cost is None
+            or best_goal_node.cost_to_come < previous_cost - cost_tol
+        ):
             improved = True
 
         return best_goal_node, improved
 
-    def record_search_step(
-        self, report, best_goal_node, phase, record_history, history_stride
-    ):
-        """Hand the step to the solve's ``report``, then snapshot it on the first and every ``history_stride``-th extension."""
-        report(phase)
-
-        if record_history and (
-            self.iterations == 1 or self.iterations % history_stride == 0
-        ):
-            self.record_snapshot(best_goal_node)
-
-    def record_snapshot(self, best_goal_node):
-        """Append the tree and the best goal path of this extension to the history."""
+    def snapshot_of(self, best_goal_node, n_iterations):
+        """The tree and the best goal path of extension ``n_iterations``: one :class:`RRTStarSnapshot` of the history."""
         tree_edges = [
             np.asarray(node.edge.states, dtype=float)
             for node in self.tree.nodes
@@ -418,16 +423,16 @@ class RRTStarPlanner(RRTPlanner):
         if best_goal_node is not None:
             path_states = self.path_states(best_goal_node)
 
-        self.history.append(
-            RRTStarSnapshot(
-                iteration=self.iterations,
-                best_cost=(
-                    None if best_goal_node is None else float(best_goal_node.cost)
-                ),
-                reached_goal=best_goal_node is not None,
-                tree_edges=tree_edges,
-                path_states=path_states,
-            )
+        best_cost_to_come = None
+        if best_goal_node is not None:
+            best_cost_to_come = float(best_goal_node.cost_to_come)
+
+        return RRTStarSnapshot(
+            iteration=n_iterations,
+            best_cost_to_come=best_cost_to_come,
+            reached_goal=best_goal_node is not None,
+            tree_edges=tree_edges,
+            path_states=path_states,
         )
 
 
@@ -440,7 +445,7 @@ class RRTStarSnapshot:
     ----------
     iteration : int
         Extension index when the snapshot was taken.
-    best_cost : float or None
+    best_cost_to_come : float or None
         Best goal cost-to-come at this frame (``None`` before any goal node).
     reached_goal : bool
         Whether a goal-region node exists at this frame.
@@ -451,7 +456,7 @@ class RRTStarSnapshot:
     """
 
     iteration: int
-    best_cost: float | None
+    best_cost_to_come: float | None
     reached_goal: bool
     tree_edges: list
     path_states: np.ndarray | None = None

@@ -15,7 +15,10 @@ class LowPassFilter(TransferFunction):
 
     First order is ``H(s) = ω_c / (s + ω_c)`` with ``ω_c = 2π·cutoff_hz``;
     higher ``order`` uses the analog Butterworth realization. A filter is
-    ``u -> y`` and not a plant: it exposes no state ``x``.
+    ``u -> y`` and not a plant: it exposes no state ``x``. The cutoff is in
+    hertz, as a filter's datasheet and a sensor's bandwidth state it; a
+    :class:`~minilink.blocks.sources.Sine` takes ``omega`` in rad/s, the
+    number in its equation.
     """
 
     def __init__(self, cutoff_hz=1.0, order=1):

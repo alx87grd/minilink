@@ -35,7 +35,7 @@ class PController(System):
         self.add_output_port("u", dim=1, function=self.ctl, dependencies=("r", "y"))
 
     def ctl(self, x, u, t=0, params=None):
-        r, y = self.get_port_values_from_u(u, "r", "y")
+        r, y = self.ports(u, "r", "y")
 
         u_cmd = 10.0 * (r[0] - y[0])
         return [u_cmd]

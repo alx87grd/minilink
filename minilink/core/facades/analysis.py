@@ -37,9 +37,9 @@ class SystemAnalysis:
         return jacobian(self, of, wrt, x_bar, u_bar, t, params, method=method, eps=eps)
 
 
-class DynamicAnalysis:
+class LinearAnalysis:
     """
-    Analysis shortcuts for :class:`~minilink.core.system.DynamicSystem`: each forwards to its :mod:`minilink.analysis` function.
+    The linear-model shortcuts, in ``s`` on a :class:`~minilink.core.system.DynamicSystem` and in ``z`` on a :class:`~minilink.core.discrete.step_system.StepSystem` (``t`` its tick).
     """
 
     def linearize(
@@ -54,10 +54,11 @@ class DynamicAnalysis:
         method="auto",
         eps=1e-6,
     ):
-        """Linearize about ``(x_bar, u_bar)`` and return an ``LTISystem``.
+        """Linearize about ``(x_bar, u_bar)`` and return a ``LinearizedSystem`` (a ``LinearizedStepSystem`` on a step system).
 
         ``lin = plant.linearize(x_bar)`` gives ``lin.A()``, ``lin.B()``,
-        ``lin.C()``, ``lin.D()``. See :func:`minilink.analysis.linearization.linearize`.
+        ``lin.C()``, ``lin.D()``, the point ``lin.x_bar``, and the pure
+        deviation model ``lin.deviation_model()``. See :func:`minilink.analysis.linearization.linearize`.
         """
         # A real cycle through minilink.core.system
         from minilink.analysis.linearization import linearize
@@ -99,6 +100,12 @@ class DynamicAnalysis:
             minimal=minimal,
         )
 
+
+class DynamicAnalysis(LinearAnalysis):
+    """
+    Analysis shortcuts for :class:`~minilink.core.system.DynamicSystem`: each forwards to its :mod:`minilink.analysis` function.
+    """
+
     def discretize(self, dt, *, solver="rk4", substeps=1):
         """Return this system on a clock of period ``dt``, its input held: a ``SampledSystem``.
 
@@ -123,9 +130,9 @@ class DynamicAnalysis:
         return find_equilibrium(self, x_guess, u_bar, t, params, tol=tol)
 
 
-class StepAnalysis:
+class StepAnalysis(LinearAnalysis):
     """
-    Analysis shortcuts for :class:`~minilink.core.discrete.step_system.StepSystem`: the Jacobian of ``step`` at a tick ``k``.
+    Analysis shortcuts for :class:`~minilink.core.discrete.step_system.StepSystem`: the Jacobian of ``step`` at a tick ``k``, and the linear model in ``z``.
     """
 
     def jacobian(

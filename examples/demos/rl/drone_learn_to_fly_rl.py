@@ -23,13 +23,13 @@ class NormalizedDrone2D(Drone2D):
         super().__init__()
         self.params["mass"] = 1.0
         self.params["inertia"] = 0.1
-        self.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-        self.inputs["u"].upper_bound = np.array([+1.0, +1.0])
+        self.inputs["u"].lower = np.array([-1.0, -1.0])
+        self.inputs["u"].upper = np.array([+1.0, +1.0])
         self.inputs["u"].units = ["%", "%"]
         self.weight = self.params["gravity"] * self.params["mass"]
         self.thrust2weight = 1.2
-        self.state.upper_bound = np.array([10, 10, 2 * np.pi, 10, 10, 10])
-        self.state.lower_bound = -self.state.upper_bound
+        self.state.upper = np.array([10, 10, 2 * np.pi, 10, 10, 10])
+        self.state.lower = -self.state.upper
 
     def thrust(self, u):
         """Normalized input to thruster forces: u = 0 hovers, +-1 is max / min."""
@@ -67,7 +67,12 @@ problem = PlanningProblem(
 )
 
 planner = ReinforcementLearningPlanner(
-    problem, dt=DT, normalize=False, n_envs=1, n_steps=2048, batch_size=64
+    problem,
+    dt=DT,
+    normalize=False,
+    n_rollouts=1,
+    n_steps_per_update=2048,
+    batch_size=64,
 )
 solution = planner.solve(n_timesteps=TRAINING_TIMESTEPS)
 print(solution.record)

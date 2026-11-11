@@ -19,7 +19,7 @@ HERE = Path(__file__).resolve().parent
 
 TF = 0.5
 DT = 0.001
-SOLVER = "rk4_fixedsteps"
+SOLVER = "rk4"
 GRAVITY = 0.0
 Q0 = np.array([0.0, -np.pi / 2 + 0.2, 0.0, -np.pi / 2, 0.0, 0.0])
 DQ0 = np.array([0.2, -0.1, 0.15, -0.05, 0.08, -0.03])

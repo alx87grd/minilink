@@ -7,7 +7,7 @@ import numpy as np
 from minilink.core.backends import ensure_jax_x64
 from minilink.planning.dynamic_programming.discretizer import PAIR_CHUNK_SIZE
 from minilink.planning.dynamic_programming.dp import (
-    DynamicProgrammingResult,
+    ValueTables,
     stage_schedule,
 )
 from minilink.planning.dynamic_programming.progress import (
@@ -22,7 +22,7 @@ from minilink.planning.dynamic_programming.progress import (
 
 def value_iteration(
     planner, max_sweeps, stop_on_tol=True, keep_stages=False
-) -> DynamicProgrammingResult:
+) -> ValueTables:
     """
     The planner's value iteration, run on device.
 
@@ -33,7 +33,7 @@ def value_iteration(
     stage stacked). A reported or recorded solve runs the planner's own loop
     instead, one jitted step at a time (:func:`device_step`).
 
-    Warning: a solve builds the device tables once, at ``final_time``, and reuses
+    Warning: a solve builds the device tables once, at ``tf``, and reuses
     them for every sweep, so the dynamics ``f``, the running cost ``g`` and a
     callable ``out_of_bound_cost`` must not depend on time. Use the ``"numpy"`` backend on
     a grid with ``precompute=False`` for a time-varying problem.
@@ -42,7 +42,7 @@ def value_iteration(
 
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner)
-    J0 = jax.numpy.asarray(terminal_cost(planner, planner.final_time))
+    J0 = jax.numpy.asarray(terminal_cost(planner, planner.tf))
 
     # A finite horizon: its N sweeps in one compiled scan, every stage kept
     if keep_stages:
@@ -55,7 +55,7 @@ def value_iteration(
     J, pi, k, delta = run(J0, G, coords, in_bounds, gamma, tol)
     jax.block_until_ready(J)
 
-    return DynamicProgrammingResult(
+    return ValueTables(
         grid=planner.grid,
         J=np.array(J),
         pi=np.array(pi, dtype=int),
@@ -78,8 +78,8 @@ def device_step(planner, verbose=False):
 
     # Device tables and the cost-to-go at the final time, built for this solve
     G, coords, in_bounds = device_tables(planner, verbose)
-    J0 = jnp.asarray(terminal_cost(planner, planner.final_time, verbose))
-    pi0 = jnp.zeros(planner.grid.nodes_n, dtype=jnp.int32)
+    J0 = jnp.asarray(terminal_cost(planner, planner.tf, verbose))
+    pi0 = jnp.zeros(planner.grid.n_nodes, dtype=jnp.int32)
 
     gamma = float(planner.gamma)
     step = jitted_step(planner)
@@ -98,7 +98,7 @@ def terminal_cost(planner, t, verbose=False) -> np.ndarray:
 
     grid = planner.grid
     model = grid.model
-    N = grid.nodes_n
+    N = grid.n_nodes
 
     states = jnp.asarray(grid.states)
 
@@ -135,8 +135,8 @@ def running_cost_table(planner, t, verbose=False) -> np.ndarray:
     grid = planner.grid
     model = grid.model
     params = model.params
-    N = grid.nodes_n
-    A = grid.actions_n
+    N = grid.n_nodes
+    A = grid.n_actions
     failure_cost = planner.out_of_bound_cost
 
     states = jnp.asarray(grid.states)
@@ -208,7 +208,7 @@ def device_tables(planner, verbose=False):
     jnp = ensure_jax_x64().numpy
 
     grid = planner.grid
-    tf = planner.final_time
+    tf = planner.tf
     interpolation = planner.interpolation
     n = grid.n
 
@@ -237,11 +237,11 @@ def require_device_interpolation(interpolation):
         raise ValueError("JAX backend supports 'linear' or 'nearest' interpolation")
 
 
-def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingResult:
+def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> ValueTables:
     """A finite horizon's ``N`` backward sweeps in one compiled scan, the stages stacked forward in time."""
     jax = ensure_jax_x64()
 
-    tf = planner.final_time
+    tf = planner.tf
     dt = planner.grid.dt
     gamma = float(planner.gamma)
 
@@ -259,7 +259,7 @@ def finite_sweeps(planner, J0, G, coords, in_bounds, N) -> DynamicProgrammingRes
     # The stages forward in time: J_0 … J_N (J_N = h) and π_0 … π_{N−1}
     schedule = stage_schedule(tf, dt, [np.array(J0), *J_swept], list(pi_swept))
 
-    return DynamicProgrammingResult(
+    return ValueTables(
         grid=planner.grid,
         J=np.array(J_swept[-1]),
         pi=np.array(pi_swept[-1], dtype=int),
@@ -306,7 +306,7 @@ def compiled_loop(planner, stop_on_tol, max_sweeps):
     jax = ensure_jax_x64()
     jnp = jax.numpy
 
-    N = planner.grid.nodes_n
+    N = planner.grid.n_nodes
     step = jitted_step(planner)
 
     def run(J0, G, coords, in_bounds, gamma, tol):
@@ -350,8 +350,8 @@ def jitted_step(planner):
     map_coordinates = jax.scipy.ndimage.map_coordinates
 
     shape = tuple(int(s) for s in planner.grid.x_grid_shape)
-    N = planner.grid.nodes_n
-    A = planner.grid.actions_n
+    N = planner.grid.n_nodes
+    A = planner.grid.n_actions
     order = 0 if planner.interpolation == "nearest" else 1
 
     def step(J_next, G, coords, in_bounds, gamma):

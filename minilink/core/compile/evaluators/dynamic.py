@@ -25,9 +25,7 @@ class DynamicEvaluator(ContinuousEvaluator):
     def __init__(self, system: DynamicSystem, backend="numpy", verbose=False):
         if not isinstance(system, DynamicSystem):
             raise TypeError("DynamicEvaluator requires a DynamicSystem")
-        super().__init__(
-            system.n, system.m, system.p, backend, system.get_u_from_input_ports()
-        )
+        super().__init__(system.n, system.m, system.p, backend, system.u_nominal)
         self._system = system
         self._frozen_params = copy.deepcopy(system.params)
         self.params_reader = lambda: system.params

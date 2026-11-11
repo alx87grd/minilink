@@ -291,7 +291,7 @@ class TestOptionalIpopt(unittest.TestCase):
                 self.assertTrue(
                     "cyipopt" in constants,
                     f"{path.relative_to(REPO)} picks 'ipopt' without probing "
-                    "importlib.util.find_spec('cyipopt'); fall back to 'scipy_slsqp'",
+                    "importlib.util.find_spec('cyipopt'); fall back to 'slsqp'",
                 )
 
 

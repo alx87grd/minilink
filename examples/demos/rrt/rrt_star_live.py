@@ -30,10 +30,10 @@ REPLAY_HISTORY = False
 HISTORY_STRIDE = 30
 
 sys = HolonomicMobileRobot()  # dx = u
-sys.state.lower_bound = np.array([-6.0, -6.0])
-sys.state.upper_bound = np.array([6.0, 6.0])
-sys.inputs["u"].lower_bound = np.array([-1.0, -1.0])
-sys.inputs["u"].upper_bound = np.array([1.0, 1.0])
+sys.state.lower = np.array([-6.0, -6.0])
+sys.state.upper = np.array([6.0, 6.0])
+sys.inputs["u"].lower = np.array([-1.0, -1.0])
+sys.inputs["u"].upper = np.array([1.0, 1.0])
 
 scene = Scene(
     obstacles=(
@@ -88,7 +88,7 @@ planner = RRTStarPlanner(
     extender=extender,
     seed=SEED,
     goal_bias=0.08,
-    max_nodes=MAX_NODES,
+    max_iterations=MAX_NODES,
     optimize_after_goal=True,
     cost_tol=COST_TOL,
     convergence_patience=CONVERGENCE_PATIENCE,
@@ -96,7 +96,7 @@ planner = RRTStarPlanner(
 
 print("RRT* post-goal convergence demo")
 print(
-    f"  max_nodes={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
+    f"  max_iterations={MAX_NODES}  patience={CONVERGENCE_PATIENCE}  "
     f"cost_tol={COST_TOL}  live_plot={LIVE_PLOT}"
 )
 if LIVE_PLOT:
@@ -106,35 +106,36 @@ if LIVE_PLOT:
     )
 
 t0 = time.perf_counter()
-traj = planner.solve(
+solution = planner.solve(
     record_history=REPLAY_HISTORY,
     history_stride=HISTORY_STRIDE,
     callback=live_plot,
-).trajectory
+)
 elapsed = time.perf_counter() - t0
+traj, record = solution.trajectory, solution.record
 
 goal_error = float(np.linalg.norm(traj.x[:, -1] - x_goal))
 stop_reason = (
     "converged"
-    if planner.converged
-    else ("max_nodes" if planner.iterations >= MAX_NODES else "first_goal")
+    if record.converged
+    else ("max_iterations" if record.n_iterations >= MAX_NODES else "first_goal")
 )
 
-print(f"  reached_goal={planner.reached_goal}  converged={planner.converged}")
-print(f"  extensions={planner.iterations}  tree nodes={len(planner.tree.nodes)}")
-print(f"  best path cost={planner.best_goal_cost:.3f}  goal error={goal_error:.3f} m")
+print(f"  reached_goal={record.reached_goal}  converged={record.converged}")
+print(f"  extensions={record.n_iterations}  tree nodes={len(planner.tree.nodes)}")
+print(f"  best path cost={record.path_cost:.3f}  goal error={goal_error:.3f} m")
 print(f"  elapsed={elapsed:.2f} s  stop reason: {stop_reason}")
 
-if REPLAY_HISTORY and planner.history:
-    first_goal = next((frame for frame in planner.history if frame.reached_goal), None)
+if REPLAY_HISTORY and record.history:
+    first_goal = next((frame for frame in record.history if frame.reached_goal), None)
     if first_goal is not None:
         print(
             f"  first goal at extension {first_goal.iteration}, "
-            f"cost={first_goal.best_cost:.3f}"
+            f"cost={first_goal.best_cost_to_come:.3f}"
         )
-        final_cost = planner.history[-1].best_cost
+        final_cost = record.history[-1].best_cost_to_come
         print(
-            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost - final_cost:.3f})"
+            f"  final cost={final_cost:.3f} (Δ={first_goal.best_cost_to_come - final_cost:.3f})"
         )
 
 if LIVE_PLOT:

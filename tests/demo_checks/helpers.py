@@ -18,7 +18,7 @@ def check_dynamics_f(system) -> None:
     x = np.asarray(system.x0, dtype=float)
     if x.shape != (system.n,):
         x = np.zeros(system.n)
-    u = system.get_u_from_input_ports()
+    u = system.u_nominal
     dx = np.asarray(system.f(x, u, 0.0), dtype=float)
     if dx.shape != (system.n,):
         raise ValueError(
@@ -33,7 +33,7 @@ def check_geometry_frame(system, x=None, u=None, t=0.0) -> None:
     x = np.asarray(system.x0 if x is None else x, dtype=float)
     if x.shape != (system.n,):
         x = np.zeros(system.n)
-    u = system.get_u_from_input_ports() if u is None else np.asarray(u, dtype=float)
+    u = system.u_nominal if u is None else np.asarray(u, dtype=float)
     animator = Animator(system)
     kinematic = system.get_kinematic_geometry()
     frame = animator.resolve_frame(x, u, t, kinematic=kinematic)

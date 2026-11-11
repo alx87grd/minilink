@@ -123,8 +123,8 @@ class PlanningProblem:
         Continuous planning horizon length in seconds, measured from
         ``t0``. ``None`` means unset (RRT / some DP tasks). ``+inf`` means
         infinite-horizon. Finite trajopt / MPC grids require a finite
-        ``horizon`` — demos should always set it explicitly. Knot count ``N``
-        lives on transcription options.
+        ``horizon`` — demos should always set it explicitly. The interval count
+        ``N`` lives on the transcription (``n_steps=``).
     t0 : float, optional
         The start time of the horizon, ``[t0, t0 + horizon]``: a run
         starts at ``t0``, its costs, sets and references read absolute
@@ -197,6 +197,7 @@ class PlanningProblem:
     def __init__(
         self,
         sys: System,
+        *,
         x0=None,
         cost: CostFunction | None = None,
         X: Set | None = None,
@@ -238,13 +239,13 @@ class PlanningProblem:
         n = int(self.sys.n)
 
         # The horizon and the discount rate, and the failure's switch and cost
-        horizon = self.coerce_horizon(self.horizon)
+        horizon = coerce_horizon(self.horizon)
         self.discount_rate = coerce_rate(self.discount_rate)
         self.penalize_failure = coerce_switch(self.penalize_failure)
         self.failure_cost = coerce_failure_cost(self.failure_cost)
 
         # The evaluation start: the point given, else the law's mean, else X0's
-        x0 = self.coerce_state(
+        x0 = coerce_state(
             default_x0_of(self),
             label="x0",
             required=True,
@@ -260,15 +261,15 @@ class PlanningProblem:
         Xf = self.Xf
 
         # The sets' types
-        self.require_type("X", X, Set)
-        self.require_type("U", U, InputSet)
-        self.require_type("X0", X0, Set)
+        require_type("X", X, Set)
+        require_type("U", U, InputSet)
+        require_type("X0", X0, Set)
         if Xf is not None:
-            self.require_type("Xf", Xf, Set)
+            require_type("Xf", Xf, Set)
 
         # The start: a state of size n inside X0
-        self.check_state_shape("x0", x0, n)
-        self.require_member(
+        check_state_shape("x0", x0, n)
+        require_member(
             X0,
             x0,
             set_label="X0",
@@ -369,11 +370,11 @@ class PlanningProblem:
 
     @x0.setter
     def x0(self, value):
-        start = self.coerce_state(value, label="x0", required=True)
-        self.check_state_shape("x0", start, int(self.sys.n))
+        start = coerce_state(value, label="x0", required=True)
+        check_state_shape("x0", start, int(self.sys.n))
         if isinstance(self.X0, SingletonSet):
             self.X0 = SingletonSet(start)
-        self.require_member(self.X0, start, set_label="X0", point_label="x0")
+        require_member(self.X0, start, set_label="X0", point_label="x0")
 
         self.held_params["x0"] = start
 
@@ -522,16 +523,6 @@ class PlanningProblem:
                 fields["X0"] = None
 
         return type(self)(**fields)
-
-    @property
-    def has_goal(self) -> bool:
-        """Return ``True`` when a terminal goal or boundary set is available."""
-        return self.Xf is not None
-
-    @property
-    def has_cost(self) -> bool:
-        """Return ``True`` when the problem has a cost function."""
-        return self.cost is not None
 
     @property
     def is_stochastic(self) -> bool:
@@ -693,71 +684,67 @@ class PlanningProblem:
     def _repr_pretty_(self, p, cycle):
         repr_pretty(self, p, cycle)
 
-    ###########################################################################
-    # Internal machinery
-    ###########################################################################
-
-    @staticmethod
-    def coerce_horizon(horizon: object) -> float | None:
-        """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
-        if horizon is None:
-            return None
-
-        value = float(horizon)
-        if np.isnan(value) or value <= 0.0:
-            raise ValueError(
-                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
-            )
-        if not (np.isfinite(value) or np.isposinf(value)):
-            raise ValueError(
-                "horizon must be positive, None (unset), or +inf (infinite-horizon)"
-            )
-
-        return value
-
-    @staticmethod
-    def coerce_state(
-        x: object,
-        *,
-        label: str,
-        required: bool,
-    ) -> np.ndarray | None:
-        """A flat float copy of the point, ``None`` when it is optional and missing."""
-        if x is None:
-            if required:
-                raise ValueError(f"{label} is required")
-            return None
-
-        return np.asarray(x, dtype=float).reshape(-1).copy()
-
-    @staticmethod
-    def require_type(label: str, value: object, expected_type: type) -> None:
-        """Refuse a value that is not an instance of ``expected_type``."""
-        if not isinstance(value, expected_type):
-            raise TypeError(f"{label} must be a {expected_type.__name__} instance")
-
-    @staticmethod
-    def check_state_shape(label: str, x: np.ndarray, n: int) -> None:
-        """Validate a representative point as a flat state of size ``n``."""
-        if x.shape != (n,):
-            raise ValueError(f"{label} must have shape ({n},)")
-
-    @staticmethod
-    def require_member(
-        set_: Set,
-        point: np.ndarray,
-        *,
-        set_label: str,
-        point_label: str,
-    ) -> None:
-        """Refuse a representative point outside its boundary set."""
-        if not set_.contains(point):
-            raise ValueError(f"{point_label} must belong to {set_label}")
-
 
 ###############################################################################
 # Internal machinery
 ###############################################################################
+
+
+def coerce_horizon(horizon: object) -> float | None:
+    """The horizon as a float: positive or ``+inf``, ``None`` when unset."""
+    if horizon is None:
+        return None
+
+    value = float(horizon)
+    if np.isnan(value) or value <= 0.0:
+        raise ValueError(
+            "horizon must be positive, None (unset), or +inf (infinite-horizon)"
+        )
+    if not (np.isfinite(value) or np.isposinf(value)):
+        raise ValueError(
+            "horizon must be positive, None (unset), or +inf (infinite-horizon)"
+        )
+
+    return value
+
+
+def coerce_state(
+    x: object,
+    *,
+    label: str,
+    required: bool,
+) -> np.ndarray | None:
+    """A flat float copy of the point, ``None`` when it is optional and missing."""
+    if x is None:
+        if required:
+            raise ValueError(f"{label} is required")
+        return None
+
+    return np.asarray(x, dtype=float).reshape(-1).copy()
+
+
+def require_type(label: str, value: object, expected_type: type) -> None:
+    """Refuse a value that is not an instance of ``expected_type``."""
+    if not isinstance(value, expected_type):
+        raise TypeError(f"{label} must be a {expected_type.__name__} instance")
+
+
+def check_state_shape(label: str, x: np.ndarray, n: int) -> None:
+    """Validate a representative point as a flat state of size ``n``."""
+    if x.shape != (n,):
+        raise ValueError(f"{label} must have shape ({n},)")
+
+
+def require_member(
+    set_: Set,
+    point: np.ndarray,
+    *,
+    set_label: str,
+    point_label: str,
+) -> None:
+    """Refuse a representative point outside its boundary set."""
+    if not set_.contains(point):
+        raise ValueError(f"{point_label} must belong to {set_label}")
 
 
 def default_x0_of(problem):
@@ -866,7 +853,8 @@ def require_samplable_start(set_, box):
     """Refuse a start set that cannot draw: no finite bounding box, or no ``sample`` of its own."""
     if type(set_).sample is Set.sample:
         raise ValueError(
-            f"x0 {type(set_).__name__} cannot draw a start (only a box samples): "
+            f"x0 {type(set_).__name__} cannot draw a start (a box, a ball, an ellipsoid "
+            "and a singleton sample): "
             "give a law (a Distribution), or a box"
         )
     if not is_finite_box(box):

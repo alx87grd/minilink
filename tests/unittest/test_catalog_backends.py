@@ -35,7 +35,7 @@ def _cases():
 def _random_points(sys, count=3, seed=0):
     rng = np.random.default_rng(seed)
     x0 = np.asarray(sys.x0, dtype=float)
-    u0 = np.asarray(sys.get_u_from_input_ports(), dtype=float)
+    u0 = np.asarray(sys.u_nominal, dtype=float)
     for _ in range(count):
         yield (
             x0 + 0.3 * rng.standard_normal(x0.shape),

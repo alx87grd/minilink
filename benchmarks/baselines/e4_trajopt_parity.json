@@ -21,7 +21,7 @@
       "direction": "lower_better",
       "value": 66.71988306676982,
       "unit": "cost",
-      "notes": "CartPole TOP.solve, scipy_slsqp, compile_backend=jax"
+      "notes": "CartPole TOP.solve, slsqp, compile_backend=jax"
     },
     {
       "id": "e4.cartpole_rebuild.solve_s",

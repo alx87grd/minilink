@@ -297,7 +297,7 @@ class ForceInputBicycle(DynamicSystem):
         max_steer = self.max_steer
 
         q, v = self.x2q(x)
-        f_rear, delta = self.get_port_values_from_u(u, "f_rear", "delta")
+        f_rear, delta = self.ports(u, "f_rear", "delta")
 
         # The applied inputs: the rear force, and the steer held inside its limits
         u_in = np.array([f_rear[0], delta[0]])
@@ -814,7 +814,7 @@ class EngineBicycle(RearDriveBicycle):
         max_steer = self.max_steer
 
         q, v = self.x2q(x)
-        throttle, delta_cmd = self.get_port_values_from_u(u, "throttle", "delta")
+        throttle, delta_cmd = self.ports(u, "throttle", "delta")
         throttle = throttle[0]
         delta_cmd = delta_cmd[0]
 

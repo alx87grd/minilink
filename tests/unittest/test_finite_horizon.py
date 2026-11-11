@@ -25,10 +25,10 @@ def finite(verbose=False, **kwargs):
 
 def double_integrator(horizon=1.0, S=np.eye(2)):
     sys = DoubleIntegrator()
-    sys.state.lower_bound = np.array([-2.0, -2.0])
-    sys.state.upper_bound = np.array([2.0, 2.0])
-    sys.inputs["u"].lower_bound = np.array([-4.0])
-    sys.inputs["u"].upper_bound = np.array([4.0])
+    sys.state.lower = np.array([-2.0, -2.0])
+    sys.state.upper = np.array([2.0, 2.0])
+    sys.inputs["u"].lower = np.array([-4.0])
+    sys.inputs["u"].upper = np.array([4.0])
     cost = QuadraticCost.from_system(sys, Q=np.eye(2), R=np.eye(1), S=S)
 
     return PlanningProblem(
@@ -69,7 +69,7 @@ def test_the_last_stage_is_the_terminal_cost_and_the_first_the_full_horizon_tabl
     solution = planner.solve()
     t, J, pi = solution.record.tables.schedule
 
-    np.testing.assert_array_equal(J[-1], planner.terminal_cost(planner.final_time))
+    np.testing.assert_array_equal(J[-1], planner.terminal_cost(planner.tf))
     np.testing.assert_array_equal(J[0], solution.record.tables.J)
     np.testing.assert_array_equal(pi[0], solution.record.tables.pi)
 
@@ -228,7 +228,7 @@ def test_the_staged_law_closes_a_jax_loop_as_on_numpy():
     plant.x0 = np.array([0.5, 0.0])
     loop = law @ plant
 
-    on_numpy = loop.compute_trajectory(tf=6.0, solver="rk4_fixedsteps")
-    on_jax = loop.compute_trajectory(tf=6.0, solver="rk4_fixedsteps", backend="jax")
+    on_numpy = loop.compute_trajectory(tf=6.0, solver="rk4")
+    on_jax = loop.compute_trajectory(tf=6.0, solver="rk4", backend="jax")
 
     np.testing.assert_allclose(np.asarray(on_jax.x), on_numpy.x, rtol=1e-9, atol=1e-12)

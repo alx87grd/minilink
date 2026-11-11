@@ -9,17 +9,19 @@ from minilink.core.exports import lazy_facade
 #
 # Every tool reads ``tool(sys, x_bar, u_bar, t, params, *, method="auto", eps)``; the
 # sensitivity functions take the loop's pieces instead,
-# ``sensitivity(plant=H, controller=C, filter=F)``. A ``System`` carries the common
+# ``sensitivity(plant, controller, x_bar, …, *, filter=F, of=, wrt=)``. A ``System`` carries the common
 # ones as methods: ``linearize``, ``find_equilibrium``, ``transfer_function``,
-# ``plot_bode``, ``plot_pzmap``, ``plot_root_locus``, ``plot_step_response`` and
-# ``animate_modal``. The band is linear analysis at an operating point: an
-# ``LTISystem`` is read as is, anything else is linearized first, the step response
+# ``plot_bode``, ``plot_pzmap``, ``plot_root_locus``, ``plot_nyquist``,
+# ``plot_step_response`` and ``animate_modal``. The band is linear analysis at an operating point: a
+# linear model is read as is, anything else is linearized first, the step response
 # included (its figure says "Linear" or "Linearized").
 #
 # Each exported name maps to its (module path, attribute).
 _EXPORTS: dict[str, tuple[str, str]] = {
     "LyapunovCertificate": ("minilink.analysis.lyapunov", "LyapunovCertificate"),
-    "StructuralResult": ("minilink.analysis.structural", "StructuralResult"),
+    "Margins": ("minilink.analysis.linear", "Margins"),
+    "StepInfo": ("minilink.analysis.time_response", "StepInfo"),
+    "StructuralProperties": ("minilink.analysis.structural", "StructuralProperties"),
     "VerificationReport": ("minilink.analysis.lyapunov", "VerificationReport"),
     "animate_modal": ("minilink.analysis.modal", "animate_modal"),
     "bode": ("minilink.analysis.frequency", "bode"),
@@ -46,6 +48,7 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "noise_sensitivity",
     ),
     "nyquist": ("minilink.analysis.frequency", "nyquist"),
+    "poles": ("minilink.analysis.modal", "poles"),
     "observability": ("minilink.analysis.structural", "observability"),
     "observability_matrix": (
         "minilink.analysis.structural",

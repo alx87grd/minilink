@@ -27,14 +27,15 @@ def build_time_grid(
     Build time samples on ``[t0, tf]`` and return ``(time_vector, dt, n_samples)``.
 
     If ``n_samples`` is set, uses a uniform grid of that many points. If
-    ``dt`` is set, samples ``t0 + k dt``; both together are refused. When ``dt`` divides ``tf - t0`` (to
-    a relative tolerance of 1e-9, which absorbs round-off such as
-    ``1.1 / 0.1``), the grid has ``round((tf - t0) / dt) + 1`` points and
-    ends at ``tf``. Otherwise it steps on until it covers ``tf``: the last
-    sample is the first step past ``tf``, up to one ``dt`` beyond it. If
-    neither, uses ``default_dt`` the same way when the caller supplies one
-    (fixed-step solvers) and otherwise the :data:`DEFAULT_N_SAMPLES` reporting
-    grid.
+    ``dt`` is set, samples ``t0 + k dt``; both together are refused. The grid
+    ends at ``tf``: when ``dt`` divides ``tf - t0`` (to a relative tolerance
+    of 1e-9, which absorbs round-off such as ``1.1 / 0.1``), it has
+    ``round((tf - t0) / dt) + 1`` points; otherwise its last step is shorter
+    than ``dt`` and lands on ``tf`` (``[0, 0.3, 0.6, 0.9, 1.0]`` for ``dt =
+    0.3`` on ``[0, 1]``). If neither, uses ``default_dt`` the same way when
+    the caller supplies one (fixed-step solvers) and otherwise the
+    :data:`DEFAULT_N_SAMPLES` reporting grid. The ``dt`` returned is the
+    grid's step, its first.
     """
     t0, tf = require_time_span(t0, tf)
 
@@ -115,16 +116,19 @@ def require_dt(dt, *, label="dt"):
 
 
 def dt_grid(t0, tf, dt):
-    """``t0, t0 + dt, …`` until ``tf`` is covered, ending at ``tf`` when ``dt`` divides the horizon."""
+    """``t0, t0 + dt, …``, ending at ``tf``: a ``dt`` that does not divide the run shortens the last step."""
     n_float = (tf - t0) / dt
     n = round(n_float)
-    time_vector = np.arange(t0, tf + dt, dt)
 
-    # dt divides the horizon: keep t₀ … t₀ + n dt and drop the sample round-off can
+    # dt divides the horizon: t₀ … t₀ + n dt, dropping the sample round-off can
     # add past t_f. Slicing arange keeps every kept sample bit-identical
     # (t0 + dt * arange rounds differently when t0 != 0).
     if n >= 1 and abs(n_float - n) <= _WHOLE_STEPS_RTOL * n:
-        time_vector = time_vector[: n + 1]
+        time_vector = np.arange(t0, tf + dt, dt)[: n + 1]
+
+    # It does not: the steps of dt short of t_f, then a shorter last one onto t_f
+    else:
+        time_vector = np.append(np.arange(t0, tf, dt), tf)
 
     return time_vector
 

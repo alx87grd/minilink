@@ -62,7 +62,12 @@ class ValueFunction:
     def network(self, seed):
         """The MLP from the features to one value, its weights drawn from ``seed``."""
         return MLP(
-            self.n_features, 1, self.hidden, self.activation, seed=seed, output_gain=1.0
+            self.n_features,
+            1,
+            hidden=self.hidden,
+            activation=self.activation,
+            seed=seed,
+            output_gain=1.0,
         )
 
 
@@ -100,8 +105,8 @@ class QFunction(ValueFunction):
         return MLP(
             self.n_features + self.m,
             1,
-            self.hidden,
-            self.activation,
+            hidden=self.hidden,
+            activation=self.activation,
             seed=seed,
             output_gain=1.0,
         )

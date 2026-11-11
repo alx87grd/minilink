@@ -27,9 +27,11 @@ SYSTEM_FACTORIES = {
     "Source": lambda: minilink.Source(2),
     "StateFeedback": lambda: minilink.StateFeedback(np.array([[1.0, 0.5]])),
     "StateObserver": lambda: minilink.StateObserver(
-        np.array([[0.0, 1.0], [-2.0, -0.5]]),
-        np.array([[0.0], [1.0]]),
-        np.array([[1.0, 0.0]]),
+        minilink.LTISystem(
+            np.array([[0.0, 1.0], [-2.0, -0.5]]),
+            np.array([[0.0], [1.0]]),
+            np.array([[1.0, 0.0]]),
+        ),
         np.array([[3.0], [2.0]]),
     ),
     "TimeVaryingFeedback": lambda: minilink.TimeVaryingFeedback(
@@ -65,6 +67,12 @@ SYSTEM_FACTORIES = {
     "LookupPolicy": lambda: lookup_policy(),
     "NeuralPolicy": lambda: minilink.NeuralPolicy(minilink.Pendulum(), hidden=(4,)),
     "SampledSystem": lambda: core.SampledSystem(minilink.Pendulum(), 0.1),
+    "LTISystem": lambda: minilink.LTISystem(
+        np.array([[0.0, 1.0], [-2.0, -0.5]]), np.array([[0.0], [1.0]])
+    ),
+    "LinearizedSystem": lambda: minilink.linearize(
+        minilink.Pendulum(), np.array([np.pi, 0.0])
+    ),
 }
 SYSTEM_EXCEPTIONS = {
     # The abstract shells and the diagrams: their params are their blocks' (walked as blocks)
@@ -312,3 +320,39 @@ def test_a_law_moves_with_its_numbers_and_its_mean_follows():
         np.testing.assert_array_equal(law.mean, mean)
         for key, value in spread.items():
             np.testing.assert_array_equal(law.params[key], value)
+
+
+# A set's margin takes its member first, then the arguments it depends on (CONSTITUTION §2,
+# one signature): a member of the wrong size is refused, never broadcast into other numbers
+@pytest.mark.parametrize("backend", ["numpy", "jax"])
+def test_a_set_refuses_a_member_of_the_wrong_size(backend):
+    from minilink.core.sets import BallSet, BoxSet, SingletonSet
+
+    if backend == "jax":
+        jax = pytest.importorskip("jax")
+        xp = jax.numpy
+    else:
+        xp = np
+    plant = minilink.Pendulum()
+    x, u = xp.zeros(2), xp.zeros(1)
+
+    # The member first: the input box's two margins, the state box's four
+    assert plant.input_box.margin(u, x).shape == (2,)
+    assert plant.state.box.margin(x).shape == (4,)
+
+    # The model's order on an input set, (x, u), was four numbers of nothing
+    with pytest.raises(ValueError, match="takes its member first, margin\\(u, x, t\\)"):
+        plant.input_box.margin(x, u)
+    with pytest.raises(ValueError, match="of size 2; got a vector of size 1"):
+        plant.state.box.margin(u)
+    with pytest.raises(ValueError, match="the ball holds vectors, of size 2"):
+        BallSet([0.0, 0.0], 1.0).margin(xp.zeros(3))
+    with pytest.raises(ValueError, match="the singleton holds a vector, of size 2"):
+        SingletonSet([0.0, 0.0]).margin(u)
+
+    # Under jit the sizes are static: the right member traces, the wrong one is refused
+    if backend == "jax":
+        box = BoxSet([-1.0, -1.0], [1.0, 1.0])
+        assert jax.jit(box.margin)(x).shape == (4,)
+        with pytest.raises(ValueError, match="takes its member first"):
+            jax.jit(box.margin)(u)

@@ -50,12 +50,12 @@ configure_jax(enable_x64=True)
 
 sys = BicycleAcc()
 keepout_radius = OBSTACLE_RADIUS + OBSTACLE_MARGIN
-sys.state.lower_bound[3] = 0.0
-sys.state.upper_bound[3] = V_MAX
-sys.state.lower_bound[4] = -DELTA_MAX
-sys.state.upper_bound[4] = DELTA_MAX
-sys.inputs["u"].lower_bound = np.array([-SPEED_DOT_MAX, -STEERING_DOT_MAX])
-sys.inputs["u"].upper_bound = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
+sys.state.lower[3] = 0.0
+sys.state.upper[3] = V_MAX
+sys.state.lower[4] = -DELTA_MAX
+sys.state.upper[4] = DELTA_MAX
+sys.inputs["u"].lower = np.array([-SPEED_DOT_MAX, -STEERING_DOT_MAX])
+sys.inputs["u"].upper = np.array([SPEED_DOT_MAX, STEERING_DOT_MAX])
 
 x0 = np.array([0.0, Y_START, 0.0, U_0, 0.0])
 x_ref = np.array([U_TARGET * TF, Y_GOAL, HEADING_TARGET, U_TARGET, 0.0])
