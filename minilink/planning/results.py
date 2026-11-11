@@ -72,10 +72,13 @@ class PlanningSolution:
         the solve was asked to evaluate (``solve(evaluate=True)``); ``None``
         otherwise, or when the problem declares no cost.
     params : dict, optional
-        The numbers the solve ran on: the problem's tree as it was when the
-        solution was made, a copy. ``None`` (the default) takes it from
-        ``problem`` at construction; the live problem may move afterwards, the
-        evidence keeps its numbers.
+        The numbers the solve ran on: the planner's complete tree as it was
+        when the solution was made, a copy (the problem's parts the planner
+        reads, ``"method"`` its numbers, ``"seed"``), so
+        ``planner.solve(params=solution.params)`` solves it again; the live
+        problem may move afterwards, the evidence keeps its numbers. ``None``
+        (the default, a solution no planner made) takes the problem's tree at
+        construction.
     """
 
     problem: PlanningProblem
@@ -87,7 +90,7 @@ class PlanningSolution:
     params: dict | None = None
 
     def __post_init__(self) -> None:
-        # The numbers solved on, a copy: the evidence keeps them when the problem moves
+        # A solution no planner made: the problem's numbers, a copy the evidence keeps
         if self.params is None:
             object.__setattr__(self, "params", copy.deepcopy(self.problem.params))
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -210,9 +211,8 @@ class TrajectoryOptimizationPlanner(Planner):
         per iterate in the record (one rollout each: leave it off for
         production solves).
         """
-        problem_params, method = planner_parts(
-            None if params is None else checked(params, self.params)
-        )
+        tree = self.params if params is None else checked(params, self.params)
+        problem_params, method = planner_parts(None if params is None else tree)
         problem = problem_with(self.problem, host_tree(problem_params))
 
         return self.solve_on(
@@ -221,6 +221,7 @@ class TrajectoryOptimizationPlanner(Planner):
             evaluate,
             n_trials,
             method,
+            tree=tree,
             verbose=verbose,
             callback=callback,
             live_plot=live_plot,
@@ -235,12 +236,13 @@ class TrajectoryOptimizationPlanner(Planner):
         n_trials,
         method=None,
         *,
+        tree=None,
         verbose=False,
         callback=None,
         live_plot=False,
         record_history=False,
     ) -> PlanningSolution:
-        """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store."""
+        """One offline solve of ``problem`` from ``guess``: transcribe, seed, solve, read back, check, store; ``tree`` the planner's complete tree it solves (the solution's ``params``)."""
         workflow_t0 = time.perf_counter()
         backend = self.backend
         seed = self.resolve_guess(problem, guess)
@@ -336,7 +338,7 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         solution = self.store_solution(
             self.trajectory_solution(
-                trajectory, record, evaluate, n_trials, problem=problem
+                trajectory, record, evaluate, n_trials, problem=problem, params=tree
             )
         )
 
@@ -519,10 +521,11 @@ class TrajectoryOptimizationPlanner(Planner):
         )
 
     def trajectory_solution(
-        self, trajectory, record, evaluate, n_trials, problem=None
+        self, trajectory, record, evaluate, n_trials, problem=None, params=None
     ) -> PlanningSolution:
-        """The schedule as a solution of the planner's problem (or ``problem``): its input replayed by a source block, scored over the draws when asked."""
+        """The schedule as a solution of the planner's problem (or ``problem``, solved at the tree ``params``): its input replayed by a source block, scored over the draws when asked."""
         problem = self.problem if problem is None else problem
+        params = self.params if params is None else params
         controller = open_loop_controller_of(trajectory, self.problem.sys)
 
         evaluation = None
@@ -538,6 +541,7 @@ class TrajectoryOptimizationPlanner(Planner):
             record=record,
             trajectory=trajectory,
             evaluation=evaluation,
+            params=host_tree(deepcopy(params)),
         )
 
     def print_solve_report(

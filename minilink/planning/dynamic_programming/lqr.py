@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 import warnings
+from copy import deepcopy
 from dataclasses import dataclass
 
 import numpy as np
@@ -251,6 +252,7 @@ class LQRPlanner(Planner):
             record=record,
             cost_to_go=cost_to_go,
             evaluation=evaluation,
+            params=deepcopy(self.params),
         )
         if verbose:
             print(record)

@@ -821,3 +821,112 @@ def test_the_planning_plots_overlay_a_run_and_refuse_what_they_cannot_draw():
     with pytest.raises(ValueError, match="anchor"):
         lqr.plot_control_law(anchor=[np.pi, 0.0], show=False)
     assert vi.plot_control_law(anchor=[np.pi, 0.0], show=False).figure is not None
+
+
+# --- the solution's params: the planner's complete tree, solved again ---
+
+
+def round_trip_planners():
+    """``(name, planner, solve keywords)`` for every planner, each small and seeded."""
+    from minilink import LQRPlanner
+    from minilink.planning import MPPIPlanner
+    from minilink.planning.search.rrt_star import RRTStarPlanner
+
+    grid = dict(x_grid=(11, 11), u_grid=(3,), dt=0.2)
+    infinite = move_problem().replace(horizon=np.inf, discount_rate=0.5)
+    obstacles, _ = make_holonomic_obstacle_problem()
+    compass = [
+        np.array([np.cos(a), np.sin(a)])
+        for a in np.linspace(0.0, 2.0 * np.pi, 8, endpoint=False)
+    ]
+
+    def extender():
+        return KinodynamicExtender(controls=compass, horizon=0.6, n_steps=6)
+
+    planners = [
+        ("value iteration", DynamicProgrammingPlanner(infinite, **grid), {}),
+        ("lqr", LQRPlanner(move_problem()), {}),
+        ("rrt", RRTPlanner(obstacles, extender(), max_iterations=400, seed=3), {}),
+        (
+            "rrt*",
+            RRTStarPlanner(obstacles, extender(), max_iterations=200, seed=3),
+            {},
+        ),
+        ("trajectory optimization", trajopt(move_problem(), collocation), {}),
+        (
+            "mppi",
+            MPPIPlanner(move_problem(), dt=0.1, n_rollouts=64, n_iterations=2),
+            {},
+        ),
+        (
+            "tabular learning",
+            TabularLearningPlanner(infinite, solver="euler", seed=2, **grid),
+            {"n_episodes": 20},
+        ),
+    ]
+
+    return planners
+
+
+def solved_numbers(solution):
+    """What a solve computes, as bytes: the controller's numbers, the plan and the record but its timings."""
+    import pickle
+    from dataclasses import fields, is_dataclass
+
+    record = solution.record
+    numbers = {
+        name: getattr(record, name)
+        for name in (f.name for f in fields(record))
+        if not name.endswith("time_s") and name not in ("optimization_result",)
+    }
+    if is_dataclass(numbers.get("tables")):
+        tables = numbers.pop("tables")
+        numbers["J"], numbers["pi"] = tables.J, tables.pi
+    controller = {
+        key: value
+        for key, value in (solution.controller.params or {}).items()
+        if not isinstance(value, dict)
+    }
+    plan = solution.trajectory
+    plan = None if plan is None else (plan.t, plan.x, plan.u)
+
+    return pickle.dumps((sorted(controller.items()), plan, sorted(numbers.items())))
+
+
+@pytest.mark.parametrize("index", range(7))
+def test_a_solution_is_solved_again_from_its_params(index):
+    """Ruling 24: solution.params is the planner's complete tree; solve(params=) reproduces it."""
+    name, planner, keywords = round_trip_planners()[index]
+    first = planner.solve(**keywords)
+
+    assert set(first.params) == set(planner.params), name
+    assert {"method", "seed"} <= set(first.params)
+    again = planner.solve(params=first.params, **keywords)
+
+    assert solved_numbers(again) == solved_numbers(first), name
+
+
+@pytest.mark.jax
+def test_a_learned_solution_is_learned_again_from_its_params():
+    pytest.importorskip("jax")
+    from minilink.learning.reinforcement_learning import ReinforcementLearningPlanner
+
+    problem = move_problem().replace(horizon=np.inf, discount_rate=0.5)
+    problem.sys.state.lower = np.array([-3.0, -3.0])
+    problem.sys.state.upper = np.array([3.0, 3.0])
+    problem = problem.replace(X=problem.sys.state.box)
+    planner = ReinforcementLearningPlanner(
+        problem,
+        dt=0.1,
+        hidden=(8,),
+        n_rollouts=2,
+        n_steps_per_update=16,
+        batch_size=16,
+        episode_length=2.0,
+    )
+    first = planner.solve(n_timesteps=64)
+    again = planner.solve(n_timesteps=64, params=first.params)
+
+    assert set(first.params) == set(planner.params)
+    for key, weights in first.controller.params["mlp"].items():
+        np.testing.assert_array_equal(again.controller.params["mlp"][key], weights)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable
 
@@ -445,6 +446,7 @@ class RRTPlanner(Planner):
             record=record,
             trajectory=trajectory,
             evaluation=evaluation,
+            params=deepcopy(self.params),
         )
         if verbose:
             print(record)

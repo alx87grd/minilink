@@ -488,6 +488,7 @@ class CompiledMPPIPlanner:
             controller=controller,
             record=record,
             trajectory=trajectory,
+            params=host_tree(copy.deepcopy(self.merged(params))),
         )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:

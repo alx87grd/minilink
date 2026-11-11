@@ -1322,7 +1322,10 @@ tabular learning, the failure cost past the grid, a `QuadraticField` for `LQRPla
 read `J(x)` or `J(x, t=t)`; the RL critic's `CriticField`, `J(x) = −V_w(x)` its
 weights its `params`, when the training discount equals the problem's); the
 `evaluation`, the score of `controller` as it is over the problem's draws with
-`solve(evaluate=True)`; and `params`, the numbers solved on, a copy. One rule: what is
+`solve(evaluate=True)`; and `params`, the numbers solved on, a copy of the planner's complete
+tree (the problem's parts it reads, `"method"`, `"seed"`), so
+`planner.solve(params=solution.params)` solves it again (a solution no planner made holds the
+problem's tree). One rule: what is
 handed out (`controller`) is exactly what is scored (`evaluation`) and drawn — no hidden
 `% dt`. Everything on the solution is the solver's own claim under its
 own model — `cost_to_go` is the method's estimate, never a measurement; a
@@ -1744,7 +1747,8 @@ rebuilt planner's `solve`. Value iteration rebuilds its grid with the grid's own
 (`StateSpaceGrid.rebuilt_on`: `precompute`, `precompute_backend` and the grid's build report),
 as `gamma=` does. The compiled face's `pv.solve(params, z0)` takes none: it stays pure,
 silent and free of plots. There is no settings record on a planner. One exception:
-the RL planner's `params` is a report, and its `solve` trains without `params=` (TODO §6).
+the RL planner's tree holds no problem leaves (`"method"` and `"seed"` only), its
+`solve(params=)` training a planner rebuilt there from its seed.
 
 **The compiled face**:
 `planner.compile(backend=None)` gives `pv`, the planner's solve as functions of `(params, z)`:

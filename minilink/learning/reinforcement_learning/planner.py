@@ -669,6 +669,7 @@ class ReinforcementLearningPlanner(Planner):
             record=record,
             cost_to_go=cost_to_go,
             evaluation=evaluation,
+            params=copy.deepcopy(self.params),
         )
 
     def training_record(self, solve_time_s=None) -> "ReinforcementLearningRecord":

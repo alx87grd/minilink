@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -868,6 +869,7 @@ class DynamicProgrammingPlanner(Planner):
             record=record,
             cost_to_go=cost_to_go,
             evaluation=evaluation,
+            params=deepcopy(self.params),
         )
 
         return self.store_solution(solution)

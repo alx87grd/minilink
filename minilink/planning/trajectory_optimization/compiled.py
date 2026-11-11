@@ -322,7 +322,11 @@ class CompiledTrajectoryPlanner:
         controller = open_loop_controller_of(trajectory, self.planner.problem.sys)
 
         return PlanningSolution(
-            problem=problem, controller=controller, record=record, trajectory=trajectory
+            problem=problem,
+            controller=controller,
+            record=record,
+            trajectory=trajectory,
+            params=host_tree(copy.deepcopy(self.merged(params))),
         )
 
     def pack(self, guess, params=None):

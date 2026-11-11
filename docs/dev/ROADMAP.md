@@ -514,6 +514,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     after it ends, and an infinite horizon runs the evaluator's default 10 s, as value
     iteration's and the LQR's evidence (RRT's ran its path's own length there); the record's
     "goal reached" stays the search's.
+  - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
+    the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
+    on every planner, so `planner.solve(params=solution.params)` solves it again (it held the
+    problem's tree, and the call was refused for its missing `method` and `seed`). The
+    problem's parts keep their paths (`solution.params["plant"]["m"]`).
 
 ## 3. Maturity (TRL)
 

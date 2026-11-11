@@ -928,9 +928,9 @@ One line each; open a plan doc only when a design needs a writeup.
   shaping filter `τ ż = −z + w`, its state started from `N(0, W / 2τ)` so it is stationary
   from `t = 0`, the twin test checking the variance `W / 2τ` (`W = 2 τ σ²`); with it
   `LowPassFilter(tau=)`, the filter parameterized by its time constant beside `cutoff_hz`.
-- A training run that rebinds its numbers: the RL planner's `params` is a report
-  today, with no `solve(params=)` (DESIGN §6); a run that trains on a moved plant or reward, if research needs
-  one.
+- A training run that rebinds its numbers: the RL planner's tree holds no problem leaves
+  today (`"method"` and `"seed"`; DESIGN §6), so `solve(params=)` retrains on the method's
+  numbers only; a run that trains on a moved plant or reward, if research needs one.
 - A 3-D still of any animation: `save_frame(t)` on the meshcat renderer writes the static
   HTML of one frame. The headless screenshot side exists: `docs/asset_export.py::html_to_gif`
   seeks an exported page frame by frame, so a still is one `seek` and one screenshot. With it,
