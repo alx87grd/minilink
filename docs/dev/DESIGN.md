@@ -1098,7 +1098,8 @@ SciPy solver adapts `f` for `solve_ivp` itself (`simulation/solvers/scipy_ivp.py
 ports (their functions included) and state metadata are the source's, its `sample_period`
 structural. One equation, two faces: the seconds face `update(x, u, t, params=None)`, the state
 one period after the sampling instant `t` (a continuous source integrated by `solver`, `"rk4"`
-or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of a linear model;
+or `"euler"` with `substeps` per period, or `"exact"`, the matrix exponential of a linear model
+about its nominal point, a linearization's drift `f(x̄, ū)` kept;
 a static source has `n = 0`), its output ports functions in seconds; the tick face
 `step(x, u, k)` and `h(x, u, k)`, `t_k = k·sample_period` (the origin 0; a consumer with an origin
 calls the seconds face). A tick source (a `StepSystem`) keeps its count and has no seconds

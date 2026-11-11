@@ -1397,6 +1397,18 @@ class TestDiscretize(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, "linear model"):
             discretize(Pendulum(), dt, solver="exact")
 
+    def test_exact_discretization_keeps_a_linearization_s_point_and_drift(self):
+        """The exact hold of ẋ = dx̄ + A (x − x̄) + B (u − ū) is the model's own flow, off the origin and off an equilibrium."""
+        from minilink.analysis import linearize
+
+        dt = 0.1
+        for x_bar in ([np.pi, 0.0], [np.pi / 2, 0.0]):
+            lin = linearize(Pendulum(), x_bar=x_bar)
+            x, u = np.asarray(x_bar) + np.array([0.1, 0.0]), np.array([0.2])
+            exact = discretize(lin, dt, solver="exact").step(x, u)
+            flow = discretize(lin, dt, solver="rk4", substeps=200).step(x, u)
+            np.testing.assert_allclose(exact, flow, atol=1e-10)
+
     def test_substeps_split_the_period(self):
         plant = Pendulum()
         x, u = np.array([1.0, 0.0]), np.array([0.0])

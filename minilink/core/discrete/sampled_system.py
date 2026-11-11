@@ -476,28 +476,40 @@ def require_own_output_map(law, output_dim):
 
 
 def exact_update(source, x, u, t, dt, params):
-    """``x(t + h) = A_d x + B_d u``, the exact hold of a linear model."""
+    """
+    The exact hold of a linear model over one period, about its nominal point ``(x̄, ū)``.
+
+    The point is the operating point of a linearization, whose drift
+    ``f(x̄, ū)`` the hold keeps, and the origin of an LTI model, where the drift
+    is zero.
+    """
     xp = array_module(x, u)
 
     n = source.n
     m = source.m
 
+    x_bar = xp.asarray(source.state.nominal_value)
+    u_bar = xp.asarray(source.u_nominal)
     A = xp.asarray(source.A(t, params))
     B = xp.asarray(source.B(t, params))
 
-    # [A_d B_d; 0 I] = exp([A B; 0 0] Δt)
+    # The drift at the point, zero at an equilibrium
+    dx_bar = xp.asarray(source.f(x_bar, u_bar, t, params))
+
+    # [A_d B_d Γ dx̄; 0 I 0; 0 0 1] = exp([A B dx̄; 0 0 0; 0 0 0] Δt)
     # fmt: off
     M = xp.block([
-        [A, B],
-        [xp.zeros((m, n)), xp.zeros((m, m))],
+        [A, B, dx_bar[:, None]],
+        [xp.zeros((m + 1, n)), xp.zeros((m + 1, m)), xp.zeros((m + 1, 1))],
     ])
     # fmt: on
     E = expm(M * dt)
     A_d = E[:n, :n]
-    B_d = E[:n, n:]
+    B_d = E[:n, n : n + m]
+    drift = E[:n, n + m]
 
-    # x_{k+1} = A_d x_k + B_d u_k
-    x_next = A_d @ x + B_d @ u
+    # x_{k+1} = x̄ + A_d (x_k − x̄) + B_d (u_k − ū) + Γ dx̄, Γ = ∫₀^Δt e^{Aτ} dτ
+    x_next = x_bar + A_d @ (x - x_bar) + B_d @ (u - u_bar) + drift
 
     return x_next
 
