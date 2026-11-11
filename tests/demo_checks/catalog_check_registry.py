@@ -64,6 +64,10 @@ from minilink.dynamics.catalog.pendulum.pendulum import (
     Pendulum,
     TwoIndependentPendulums,
 )
+from minilink.dynamics.catalog.vehicles.car_presets_3d import (
+    FormulaCar3D,
+    OffRoadCar3D,
+)
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
@@ -75,11 +79,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
-from minilink.dynamics.catalog.vehicles.suspension_car import (
-    FormulaCar3D,
-    OffRoadCar3D,
-    SuspensionCar3D,
-)
+from minilink.dynamics.catalog.vehicles.suspension_car import SuspensionCar3D
 from minilink.graphical.catalog.skins import car_skin_3d
 
 

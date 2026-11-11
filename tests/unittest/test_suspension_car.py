@@ -1,16 +1,15 @@
-"""Contract of the 3-D car: its attitude block, its corners, its reductions to rung 4."""
+"""Contract of the 3-D car: its attitude block, its corners, its reductions to the drivetrain bicycle."""
 
 import numpy as np
 import pytest
 
 from minilink.core.backends import configure_jax
-from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
-from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import (
-    DrivetrainBicycle as Rung4,
-)
-from minilink.dynamics.catalog.vehicles.suspension_car import (
+from minilink.dynamics.catalog.vehicles.car_presets_3d import (
     FormulaCar3D,
     OffRoadCar3D,
+)
+from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
+from minilink.dynamics.catalog.vehicles.suspension_car import (
     SpringDamper,
     SuspensionCar3D,
     attitude,
@@ -153,7 +152,7 @@ def test_the_spring_carries_its_static_load_at_ride_height():
 
 @pytest.mark.jax
 def test_the_first_nine_states_reduce_to_the_drivetrain_bicycle_on_a_narrow_track():
-    """A steady turn on a narrow track with stiff springs: rung 4's yaw rate."""
+    """A steady turn on a narrow track with stiff springs: the drivetrain bicycle's yaw rate."""
     pytest.importorskip("jax")
     car = SuspensionCar3D()
     car.params["track"] = 0.3
@@ -404,7 +403,10 @@ def test_a_tire_given_to_a_preset_replaces_its_slicks():
     "skin", [car_skin_3d, formula_car_skin_3d, offroad_car_skin_3d]
 )
 def test_a_3d_look_fits_the_3d_car_and_the_bicycle(skin):
-    for car in (SuspensionCar3D(wheel_angles=True), Rung4(wheel_angles=True)):
+    for car in (
+        SuspensionCar3D(wheel_angles=True),
+        DrivetrainBicycle(wheel_angles=True),
+    ):
         car.skin = skin
 
         look = car.skin(car)
@@ -469,3 +471,93 @@ def test_coasting_over_rolling_hills_the_car_follows_the_ground_and_loses_energy
     assert np.ptp(hills.height(x[0], x[1])) > 1.5
     assert np.max(np.abs(ride - car.params["h_cg"])) < 0.15
     assert np.max(energy - energy[0]) < 1.0
+
+
+# The ladder: the same car as the drivetrain bicycle, a model of its own
+
+
+def test_the_default_car_is_the_drivetrain_bicycle_number_for_number():
+    car = SuspensionCar3D()
+    bicycle = DrivetrainBicycle()
+
+    shared = [key for key in bicycle.params if key not in ("tire", "terrain")]
+
+    assert shared
+    for key in shared:
+        assert car.params[key] == bicycle.params[key], key
+    assert car.params["tire"]["rl"] == bicycle.params["tire"]["r"]
+
+
+def test_the_drive_and_the_servo_are_the_drivetrain_bicycle_s():
+    """Rolling straight on flat ground, ``[w_rear_dot, delta_dot, P_dot]`` agree."""
+    car = SuspensionCar3D()
+    bicycle = DrivetrainBicycle()
+    rng = np.random.default_rng(3)
+
+    for _ in range(10):
+        x = cruising(car, rng.uniform(2.0, 30.0))
+        x[6] *= rng.uniform(0.9, 1.2)  # The rear wheels slipping
+        x[7] = rng.uniform(-0.7, 0.7)  # Past the steering lock too
+        x[8] = rng.uniform(-1.0e5, 1.0e5)
+        u = np.array([rng.uniform(-2.0e5, 2.0e5), rng.uniform(-1.0, 1.0)])
+
+        rates_3d = car.f(x, u)[6:9]
+        rates_planar = bicycle.f(x[:9], u)[6:9]
+
+        # The rear load differs by the lift-off's smooth corner only
+        np.testing.assert_allclose(rates_3d, rates_planar, rtol=1e-3, atol=1e-6)
+
+
+def test_the_car_is_a_model_of_its_own_with_no_planar_method():
+    car = SuspensionCar3D()
+
+    assert not isinstance(car, DrivetrainBicycle)
+    for planar in ("compute_tire_physics", "generalized_d", "M", "C", "N"):
+        assert not hasattr(car, planar)
+
+
+# The terrain in time, and the numbers a preset or a user changes
+
+
+def test_a_ground_that_moves_with_time_is_read_at_the_time_of_the_call():
+    class Rising(Terrain):
+        """Flat ground rising at 0.1 m/s, drying at t = 1 s."""
+
+        def height(self, x, y, t=0.0, params=None):
+            return 0.1 * t + np.zeros_like(x * y)
+
+        def friction(self, x, y, t=0.0, params=None):
+            return np.where(t < 1.0, 0.2, 1.0) + np.zeros_like(x * y)
+
+    car = SuspensionCar3D(terrain=Rising())
+    x = cruising(car, 10.0, x4=2.0)
+    u = np.zeros(2)
+
+    # The ground 0.2 m higher squeezes the springs; the dry road grips the sideslip
+    assert car.loads(x, u, 2.0).sum() > 1.5 * car.loads(x, u, 0.0).sum()
+    assert abs(car.f(x, u, 0.5)[4]) < 0.5 * abs(car.f(x, u, 2.0)[4])
+    assert car.tf(x, u, 2.0)["wheel_fl"][2, 3] == pytest.approx(
+        car.tf(x, u, 0.0)["wheel_fl"][2, 3] + 0.2
+    )
+
+
+def test_the_rest_state_follows_the_ride_height():
+    car = SuspensionCar3D()
+    car.params["h_cg"] = 0.4
+
+    car.x0 = car.rest_state()
+
+    weight = car.params["mass"] * car.params["gravity"]
+    assert car.x0[9] == 0.4
+    assert car.loads(car.x0, np.zeros(2)).sum() == pytest.approx(weight, rel=1e-4)
+
+
+@pytest.mark.parametrize("preset", [FormulaCar3D, OffRoadCar3D])
+def test_a_preset_s_limits_and_rest_state_follow_its_numbers(preset):
+    car = preset()
+    p = car.params
+
+    np.testing.assert_array_equal(car.inputs["u"].upper, [p["P_max"], p["delta_max"]])
+    assert car.x0[9] == p["h_cg"]
+    # At rest within the smooth floor's residual, F_eps² / (4 Fz) per corner
+    np.testing.assert_allclose(car.f(car.x0, np.zeros(2)), 0.0, atol=1e-2)

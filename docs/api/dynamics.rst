@@ -55,6 +55,9 @@ Catalog
 .. automodule:: minilink.dynamics.catalog.vehicles.suspension_car
    :members:
 
+.. automodule:: minilink.dynamics.catalog.vehicles.car_presets_3d
+   :members:
+
 .. automodule:: minilink.dynamics.catalog.vehicles.propulsion
    :members:
 

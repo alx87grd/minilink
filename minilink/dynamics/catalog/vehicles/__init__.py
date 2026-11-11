@@ -2,6 +2,10 @@
 
 # The tire laws and slips (``tires``) and the parameter sets stay in their modules:
 # plants only in __all__.
+from minilink.dynamics.catalog.vehicles.car_presets_3d import (
+    FormulaCar3D,
+    OffRoadCar3D,
+)
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     BicycleDynRate,
@@ -21,11 +25,7 @@ from minilink.dynamics.catalog.vehicles.steering import (
     KinematicBicycle,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
-from minilink.dynamics.catalog.vehicles.suspension_car import (
-    FormulaCar3D,
-    OffRoadCar3D,
-    SuspensionCar3D,
-)
+from minilink.dynamics.catalog.vehicles.suspension_car import SuspensionCar3D
 
 __all__ = [
     "BicycleDynRate",
