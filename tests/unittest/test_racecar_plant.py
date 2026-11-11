@@ -4,7 +4,9 @@ import numpy as np
 import pytest
 
 from minilink import KinematicBicycle
-from minilink.catalog import UdeSRacecar, UdeSRacecarDyn
+from minilink.catalog import DrivetrainBicycle, UdeSRacecar, UdeSRacecarDyn
+from minilink.core.backends import configure_jax
+from minilink.core.system import automatic_step_of
 from minilink.dynamics.catalog.vehicles.racecar import stiff_tires
 
 
@@ -44,23 +46,27 @@ def test_ports_and_state_layout():
 
 
 @pytest.mark.jax
-def test_solver_hint_is_under_the_fastest_mode():
-    """The hint is shorter than the fastest time constant of the linearized plant.
+@pytest.mark.parametrize(
+    "make", [UdeSRacecarDyn, DrivetrainBicycle], ids=lambda m: m.__name__
+)
+def test_the_automatic_step_keeps_euler_stable_at_rest(make):
+    """The hint's step, ``Δt = 0.1 τ``, keeps ``|λ| Δt < 2`` on the plant's stiffest mode.
 
-    Measured on the Jacobian itself rather than on a restatement of the formula that
-    produced the hint, so that a mode the estimate forgets shows up here.
+    Measured on the Jacobian at rest, where the slip denominators sit on their floor
+    and the tire modes are stiffest, rather than on the formula that produced the
+    hint, so that a mode the estimate forgets shows up here.
     """
     jax = pytest.importorskip("jax")
+    configure_jax(enable_x64=True)
     jnp = jax.numpy
-    car = UdeSRacecarDyn(named_ports=False)
-    hint = car.solver_info["smallest_time_constant"]
+    car = make(named_ports=False)
+    dt = automatic_step_of(car.solver_info)
 
-    # at rest: the slip denominators sit on their floor, so the tire modes are stiffest
     A = np.asarray(jax.jacfwd(car.f)(jnp.zeros(car.n), jnp.zeros(2)))
-    fastest = 1.0 / np.abs(np.linalg.eigvals(A).real).max()
+    fastest_rate = np.abs(np.linalg.eigvals(A)).max()
 
-    assert 0.0 < hint <= fastest
-    assert hint < car.params["engine_tau"]
+    assert fastest_rate * dt < 2.0
+    assert 10.0 * dt <= min(car.params["engine_tau"], car.params["steering_tau"])
 
 
 @pytest.mark.slow

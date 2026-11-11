@@ -242,6 +242,16 @@ Each entry: the step, the choice, the options it was taken over, and why.
     comment true for both key sets; a copied comment in `LinearSaturation`; the empty
     wheel-angle block beside its twin; a test's `c_alpha_r` against `Fz_r`; a retired
     `length` key in a racecar test; `pyro-port-remaining.md` and ROADMAP's wording.
+- **VM-10, the maintainer's rulings on the default car's simulation speed** (after the
+  pull request opened; goal: faster than real time with SciPy, faster still compiled on
+  JAX). `DrivetrainBicycle`'s `v_min_epsilon` 0.1 → 0.5 m/s and `Jw_rear` 1.6 → 10 kg m²
+  (option B of three); its solver hint is no longer the halved estimate of its fastest
+  mode but `τ = 19 T`, `T` the stiffest standstill tire estimate, capped by the actuator
+  lags, so the automatic step `Δt = 0.1 τ` keeps Euler stable (`|λ| Δt < 2`) at about 1 ms
+  (option C of four: the maintainer's reason, "a solver hint, not a fundamental property of
+  the model; a serious simulation will not use the hint"). The racecar inherits the rule
+  (its automatic step 28 µs → 1.07 ms); its demos and the GRO501 notebook pass their own
+  steps, so none moved.
 - **VM-10, the reviewers' findings not applied:**
   - writing `DrivetrainBicycle.compute_tire_physics` through `DynamicBicycle.tire_law_forces`
     (one copy of the axle forces): plan §10.4 writes rung 4's forces on its own page with
@@ -306,6 +316,14 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   MPC solves stop at SLSQP `ftol = 0.3`, 60 iterations). Both runs finish the lap and exit
   cleanly; judged the same behaviour under plan §7's ruling. `realtime/game_car` needs a
   joystick and was not run.
+- **VM-10, the default car's speed** (cloud container, 10 s of driving, wall time after
+  compile): with ε 0.5 and `Jw_rear` 10, SciPy (adaptive, the hint unused) 0.06–0.34 s
+  (0.57–2.53 s before); the compiled JAX rollout at the automatic step 0.98 ms, 0.067 s, its
+  end within 10⁻⁴ m of a tight SciPy reference on the same horizon (at the old 0.9 µs step
+  it needed 11 million steps). `|λ|max Δt` at rest, from the Jacobian: 1.90 (default car),
+  1.91 (racecar); Euler and RK4 both settle from rest. The launch from rest ends at
+  30.7 m/s after 10 s (31.3 before, the heavier wheel); the top speed does not move. The
+  baseline, the ten car demos and the GRO501 notebook: byte-identical or passing.
 - **VM-10, the gates on the final tree:** ruff check and format; `pytest -n auto` (all but
   the bridge); the demo-check bridge on its own; the regression gates with the CI flags,
   against the stored baselines with no `--update`; the GRO501 notebook's smoke check;

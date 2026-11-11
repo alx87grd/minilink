@@ -71,7 +71,8 @@ class DrivetrainBicycle(DynamicBicycle):
     -----
     The default numbers are the full-size car of :class:`DynamicBicycle` (its mass,
     inertia, geometry and drag, its ``Ca`` and ``Ck`` over the static loads), with a
-    100 kW drive and a road-car steering servo.
+    100 kW drive, a road-car steering servo, a rear axle of 10 kg m^2 and a slip
+    floor of 0.5 m/s, so a fixed-step run takes about 1 ms steps (:meth:`fastest_mode`).
     """
 
     def __init__(self, named_ports=True, tire=None, wheel_angles=False):
@@ -97,7 +98,7 @@ class DrivetrainBicycle(DynamicBicycle):
             "P_max": 100000.0,  # [W]
             "tau_sat": 2500.0,  # [N m] torque the drivetrain holds at the rear axle
             "engine_tau": 0.2,  # [s]   lag from the command to the power
-            "Jw_rear": 1.6,  # [kg m^2] rear wheels plus the drivetrain
+            "Jw_rear": 10.0,  # [kg m^2] rear wheels plus the drivetrain in a middle gear
             "bw_drive": 0.1,  # [N m s] viscous drag of the drivetrain
             "bw_rear": 0.0,  # [N m s] the base class's own wheel drag: f() adds bw_drive
             "tau_fric": 10.0,  # [N m] dry friction of the drivetrain
@@ -106,6 +107,7 @@ class DrivetrainBicycle(DynamicBicycle):
             "steering_tau": 0.1,  # [s]
             "steer_rate_max": 1.0,  # [rad/s]
             # Smoothing scales: they keep the equations finite and differentiable at rest
+            "v_min_epsilon": 0.5,  # [m/s]   floor of the slip denominators
             "w_min_epsilon": 1.0,  # [rad/s] floor of the power-to-torque denominator
             "v_c": 0.1,  # [m/s]   creep speed of the rolling resistance
             "w_c": 1.0,  # [rad/s] creep rate of the drivetrain dry friction
@@ -194,14 +196,17 @@ class DrivetrainBicycle(DynamicBicycle):
         self.own_solver_info = dict(value)
 
     def fastest_mode(self) -> float:
-        """The solver hint: an estimate of the plant's fastest mode, in seconds.
+        """The solver hint, in seconds: ten times the largest step an explicit run takes stably.
 
+        A fixed-step run without a step of its own takes ``Δt = 0.1 τ`` from this hint.
         The tire modes are stiffest at rest, where the slip denominators sit on their
-        floor ``v_min_epsilon``. Three of them are estimated — the wheel against the
+        floor ``v_min_epsilon``: three are estimated, the wheel against the
         longitudinal stiffness, the yaw and the sideslip against the cornering
-        stiffnesses — and the smallest is halved, because each is written for one
-        degree of freedom while the real modes couple them (the longitudinal pair alone
-        is some 16 % faster than an uncoupled wheel would be).
+        stiffnesses. Those standstill modes come from the slip floor, not from the
+        car's behaviour, so the hint does not resolve them: it keeps Euler stable on
+        the stiffest, ``|λ| Δt < 2``, with a margin, and resolves the actuator lags.
+        It is a solver convenience, not a mode of the model; a run that needs
+        accuracy names its own step or uses an adaptive solver.
         """
         params = self.params
 
@@ -223,8 +228,10 @@ class DrivetrainBicycle(DynamicBicycle):
         T_yaw = inertia * v_eps / (C_alpha_f * a**2 + C_alpha_r * b**2)
         T_lat = mass * v_eps / (C_alpha_f + C_alpha_r)
 
-        # Half the smallest of the three estimates and the two actuator lags
-        T_min = 0.5 * min(T_long, T_yaw, T_lat, engine_tau, steering_tau)
+        # Euler stays stable on the stiffest mode for Δt < 2 T: Δt = 1.9 T, so τ = 19 T;
+        # the actuator lags are resolved, τ ≤ their time constants
+        T_stable = 19.0 * min(T_long, T_yaw, T_lat)
+        T_min = min(T_stable, engine_tau, steering_tau)
 
         return T_min
 

@@ -1152,7 +1152,9 @@ observer's `A − L C`, a PID's derivative filters; an all-zero spectrum, an int
 declares `∞` and bounds nothing); a catalog plant declares its own from its linearization at
 the nominal point by a closed formula, as a `fastest_mode()` read from `params` (the
 pendulum's `√((m l² + I)/(m g l))`, the cart-pole's unstable pole, the dynamic bicycle's tire
-modes at rest, the racecar's); a law with a time constant of its own declares it
+modes at rest); the drivetrain bicycle and the racecar on it declare instead ten times the
+largest step Euler takes stably on their tire modes at rest, a solver hint, not a mode of
+the model (their standstill modes come from the slip floor); a law with a time constant of its own declares it
 (`SlidingMode`'s `1/λ`). A custom plant that declares nothing keeps the 1 ms default; no
 plant is linearized automatically. A diagram's hint is the smallest over its stateful
 subsystems and any block that sets its own; a static block left at the default does not
