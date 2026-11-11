@@ -508,7 +508,7 @@ def _run_trajopt_variant(
         nit=solution.stats.get("nit"),
         nfev=solution.stats.get("nfev"),
         njev=solution.stats.get("njev"),
-        cost=solution.cost,
+        cost=solution.J,
         eq_inf=max_eq,
         min_ineq=min_ineq,
         bound_inf=max_bound,

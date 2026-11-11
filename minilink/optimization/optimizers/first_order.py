@@ -140,7 +140,7 @@ class FirstOrderOptimizer(OptimizerBackend):
         return OptimizationResult(
             z=z,
             success=bool(converged and np.isfinite(J)),
-            cost=float(J),
+            J=float(J),
             message=message,
             stats={"nit": k, "grad_norm": grad_norm, "method": self.algorithm},
         )

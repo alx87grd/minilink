@@ -472,7 +472,7 @@ class TestTheWarmStartedMPC(unittest.TestCase):
         z, _ = pv.solve(edited(pv.params, {"x0": np.array([0.5]), "t0": 0.0}))
 
         def failing(params=None, z0=None):
-            return z0 + 1.0, {"success": False, "n_iterations": 0, "cost": np.nan}
+            return z0 + 1.0, {"success": False, "n_iterations": 0, "J": np.nan}
 
         pv.solve = failing
         z_star = solve.compute_z(np.zeros(0), np.concatenate([[0.8], z]), 0.2)
@@ -660,7 +660,7 @@ class TestTheMPCsSeamFixes(unittest.TestCase):
         assert not np.array_equal(block.compute_z(np.zeros(0), u, 0.2), z)
 
         def diverged(params=None, z0=None):
-            return z0 * np.nan, {"success": False, "n_iterations": 1, "cost": np.nan}
+            return z0 * np.nan, {"success": False, "n_iterations": 1, "J": np.nan}
 
         pv.solve = diverged
         np.testing.assert_array_equal(block.compute_z(np.zeros(0), u, 0.2), z)

@@ -293,6 +293,16 @@ RETIRED_NAMES = {
     "minilink.learning.reinforcement_learning.planner.ReinforcementLearningPlanner.predict": (
         "solution.controller or planner.actor.action(x); predict is SB3's, through SB3Controller"
     ),
+    # Four words, one meaning each (the maintainer's ruling 17b of 2026-11-10): cost the
+    # object, J a scalar, objective the criterion over draws, cost_to_go the function
+    "minilink.optimization.mathematical_program.OptimizationResult.cost": "J",
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationRecord.cost": (
+        "J"
+    ),
+    "minilink.planning.trajectory_optimization.planner.TrajectoryOptimizationIteration.cost": (
+        "J"
+    ),
+    "minilink.planning.trajectory_optimization.path_integral.MPPIRecord.cost": "J",
 }
 
 
@@ -543,6 +553,15 @@ def test_a_compiled_planner_counts_its_iterations_as_n_iterations():
     )
 
     assert "n_iterations" in STANDARD_STATUS and "iterations" not in STANDARD_STATUS
+
+
+def test_a_solve_status_reports_its_scalar_as_J():
+    """Ruling 17b: a solve's scalar is J, never cost (the cost is the object)."""
+    from minilink.planning.trajectory_optimization.mpc.predictive import (
+        STANDARD_STATUS,
+    )
+
+    assert "J" in STANDARD_STATUS and "cost" not in STANDARD_STATUS
 
 
 # One hold vocabulary on the three tools that read samples between their times (AS-28): the

@@ -503,7 +503,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 iteration=0,
                 z=np.zeros(1),
                 trajectory=traj0,
-                cost=1.0,
+                J=1.0,
                 max_equality_violation=0.0,
                 min_inequality_margin=None,
             )
@@ -515,7 +515,7 @@ class TestPlanningArchitecture(unittest.TestCase):
                 iteration=1,
                 z=np.zeros(1),
                 trajectory=traj1,
-                cost=0.5,
+                J=0.5,
                 max_equality_violation=0.0,
                 min_inequality_margin=None,
             )
@@ -2458,7 +2458,7 @@ def test_the_compiled_face_reproduces_the_planners_solve(backend):
     face = pv.solution(z, status=status)
     np.testing.assert_array_equal(face.trajectory.x, solved.trajectory.x)
     np.testing.assert_array_equal(face.trajectory.u, solved.trajectory.u)
-    assert face.record.cost == solved.record.cost
+    assert face.record.J == solved.record.J
     assert pv.n_z == 3 * 12 + 1 and z[-1] == 0.0  # the 12 knots, then the origin
     assert set(pv.params) >= {"x0", "t0", "plant", "cost"}
 
@@ -2531,7 +2531,7 @@ def test_the_native_face_solves_a_family_of_starts_in_one_vmap():
     solve = jax.jit(lambda x: pv.solve(edited(pv.params, {"x0": x}))[0])
     np.testing.assert_allclose(solve(starts[1]), zs[1], rtol=1e-12)
     J0 = float(pv.optimizer.program_evaluator.objective(pv.initial()[:-1]))
-    assert float(status["cost"][0]) < J0
+    assert float(status["J"][0]) < J0
 
 
 def test_every_planner_has_one_tree_shape():

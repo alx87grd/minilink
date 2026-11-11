@@ -319,7 +319,7 @@ class TrajectoryOptimizationPlanner(Planner):
 
         # The solver's account of the solve, beside the feasibility check
         record = TrajectoryOptimizationRecord(
-            cost=optimization_result.cost,
+            J=optimization_result.J,
             optimizer_success=bool(optimization_result.success),
             message=str(optimization_result.message),
             n_iterations=optimization_result.n_iterations,
@@ -475,7 +475,7 @@ class TrajectoryOptimizationPlanner(Planner):
                 z_arr,
                 backend,
                 iteration_index,
-                cost=J,
+                J=J,
                 dynamics=dynamics,
             )
             if record_history:
@@ -494,15 +494,15 @@ class TrajectoryOptimizationPlanner(Planner):
         backend: str,
         iteration_index: int,
         *,
-        cost: float | None = None,
+        J: float | None = None,
         dynamics=None,
     ) -> TrajectoryOptimizationIteration:
-        """One iterate ``z`` as the planner reports it: its plan, its cost and its residuals."""
-        if cost is None:
-            cost = optimizer.program_evaluator.objective(z)
+        """One iterate ``z`` as the planner reports it: its plan, its ``J`` and its residuals."""
+        if J is None:
+            J = optimizer.program_evaluator.objective(z)
 
         trajectory = self.transcription.reconstruct_result(
-            OptimizationResult(z=z, success=False, cost=cost),
+            OptimizationResult(z=z, success=False, J=J),
             problem=problem,
             backend=backend,
             dynamics=dynamics,
@@ -513,7 +513,7 @@ class TrajectoryOptimizationPlanner(Planner):
             iteration=iteration_index,
             z=z.copy(),
             trajectory=trajectory,
-            cost=cost,
+            J=J,
             max_equality_violation=max_eq,
             min_inequality_margin=min_ineq,
         )
@@ -566,7 +566,7 @@ class TrajectoryOptimizationPlanner(Planner):
         )
         print("solver success:", result.success)
         print("message:", result.message)
-        print("J*:", result.cost)
+        print("J*:", result.J)
         print("stats:", result.stats)
         print("max_eq:", record.max_equality_violation)
         print("min_ineq:", record.min_inequality_margin)
@@ -600,7 +600,7 @@ class TrajectoryOptimizationRecord:
     plan is. The optimizer's own flag, ``optimizer_success``, and its message stay beside it.
     """
 
-    cost: float | None
+    J: float | None
     optimizer_success: bool
     message: str
     n_iterations: int | None
@@ -628,7 +628,7 @@ class TrajectoryOptimizationRecord:
     # Display
 
     def __str__(self) -> str:
-        cost = "n/a" if self.cost is None else f"{float(self.cost):.6g}"
+        J = "n/a" if self.J is None else f"{float(self.J):.6g}"
 
         if self.feasible is None:
             check = "online tick, no residual check"
@@ -647,17 +647,17 @@ class TrajectoryOptimizationRecord:
         if self.solve_time_s is not None:
             solver += f", {self.solve_time_s:.3g} s"
 
-        return f"J* = {cost}, {check}; {solver}"
+        return f"J* = {J}, {check}; {solver}"
 
 
 @dataclass(frozen=True)
 class TrajectoryOptimizationIteration:
-    """One optimizer iterate as the planner reports it: ``z``, its plan, its cost and its residuals."""
+    """One optimizer iterate as the planner reports it: ``z``, its plan, its ``J`` and its residuals."""
 
     iteration: int
     z: np.ndarray
     trajectory: Trajectory
-    cost: float
+    J: float
     max_equality_violation: float
     min_inequality_margin: float | None
 

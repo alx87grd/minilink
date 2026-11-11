@@ -148,7 +148,7 @@ class CompiledTrajectoryPlanner:
 
         ``params`` is ``None`` (the defaults) or :attr:`params` edited, checked once; the
         solution records its origin ``params["t0"]``. ``status`` is
-        ``{"success", "n_iterations", "cost"}``. A NumPy program has no
+        ``{"success", "n_iterations", "J"}``. A NumPy program has no
         parameters: the values rebuild it on a copy of the problem.
         """
         tree = self.merged(params)
@@ -173,7 +173,7 @@ class CompiledTrajectoryPlanner:
         status = {
             "success": result.success,
             "n_iterations": result.n_iterations,
-            "cost": result.cost,
+            "J": result.J,
         }
 
         return z, status
@@ -276,12 +276,12 @@ class CompiledTrajectoryPlanner:
         status = {} if status is None else status
         problem = self.problem_at(params)
         z_dec = np.asarray(z[:-1], dtype=float)
-        cost = status.get("cost")
+        J = status.get("J")
 
         result = OptimizationResult(
             z=z_dec,
             success=bool(status.get("success", True)),
-            cost=None if cost is None else float(cost),
+            J=None if J is None else float(J),
             stats={}
             if status.get("n_iterations") is None
             else {"nit": status["n_iterations"]},
@@ -306,7 +306,7 @@ class CompiledTrajectoryPlanner:
         )
 
         record = TrajectoryOptimizationRecord(
-            cost=result.cost,
+            J=result.J,
             optimizer_success=result.success,
             message="",
             n_iterations=status.get("n_iterations"),

@@ -475,7 +475,7 @@ def test_ipopt_unconstrained_quadratic():
     out = Optimizer(prog, z0=np.zeros(2), method="ipopt", options=_IPOPT_QUIET).solve()
     assert out.success
     assert np.allclose(out.z, [1.0, 2.0], atol=1e-06)
-    assert out.cost is not None and out.cost < 1e-10
+    assert out.J is not None and out.J < 1e-10
 
 
 @pytest.mark.ipopt
@@ -730,7 +730,7 @@ def test_an_optimizer_returns_the_optimum_its_cost_and_its_record():
     # z*, J(z*), the verdict and the solver's own record
     assert isinstance(result, OptimizationResult)
     np.testing.assert_allclose(result.z, [1.0, -2.0], atol=1e-6)
-    assert result.success and result.cost == pytest.approx(0.0, abs=1e-10)
+    assert result.success and result.J == pytest.approx(0.0, abs=1e-10)
     assert isinstance(result.message, str) and isinstance(result.stats, dict)
 
 

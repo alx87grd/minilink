@@ -409,7 +409,7 @@ def test_script_12_program_a_plan_from_100_tracks_as_from_0(backend, transcripti
     late, early = plan(100.0, 0.0), plan(0.0, 200.0)
     np.testing.assert_allclose(late.trajectory.t, 100.0 + early.trajectory.t)
     np.testing.assert_allclose(late.trajectory.u, early.trajectory.u, atol=1e-6)
-    assert late.record.cost == pytest.approx(early.record.cost, rel=1e-6)
+    assert late.record.J == pytest.approx(early.record.J, rel=1e-6)
 
 
 def bicycle_planner(mu=1.0, target_y=0.0, *, method="slsqp", backend="jax"):
@@ -477,7 +477,7 @@ def test_script_04_program_the_compiled_face_rebinds_like_the_rebuilds():
 
         # The offline route at the same tree answers the same plan
         offline = planner.solve(params=edited(planner.params, values))
-        assert offline.record.cost == pytest.approx(plan.record.cost, rel=1e-6)
+        assert offline.record.J == pytest.approx(plan.record.J, rel=1e-6)
         np.testing.assert_allclose(offline.trajectory.x, plan.trajectory.x, atol=1e-3)
 
     # The friction and the target change the plan, and the user's plant keeps its mu
@@ -531,7 +531,7 @@ def test_script_04_program_ipopt_solves_the_compiled_program():
     reference = pendulum_planner(1.3).solve()
     assert plan.success
     np.testing.assert_allclose(plan.trajectory.x, reference.trajectory.x, atol=1e-4)
-    assert plan.record.cost == pytest.approx(reference.record.cost, rel=1e-6)
+    assert plan.record.J == pytest.approx(reference.record.J, rel=1e-6)
 
 
 # Script 6

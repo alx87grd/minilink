@@ -117,7 +117,7 @@ def run_showcase_cartpole_trajopt(
             t: [float(v) for v in samples[t]] for t in SHOWCASE_TRAJOPT_CHECKPOINTS
         },
         x_tf=[float(v) for v in traj.x[:, -1].reshape(-1)],
-        cost=float(optimization_result.cost),
+        cost=float(optimization_result.J),
         eq_inf=eq_inf,
         success=bool(optimization_result.success),
         total_s=float(np.mean(total_times)),

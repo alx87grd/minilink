@@ -152,7 +152,7 @@ class OptimizationResult:
 
     z: np.ndarray
     success: bool
-    cost: float | None = None
+    J: float | None = None
     message: str = ""
     stats: dict[str, object] = field(default_factory=dict)
     raw_result: object | None = None
@@ -273,8 +273,8 @@ def optimization_result_text(result):
     headline = f"OptimizationResult, success={success}"
     body = []
 
-    if result.cost is not None:
-        body.append(body_line("J*", f"{float(result.cost):.6g}"))
+    if result.J is not None:
+        body.append(body_line("J*", f"{float(result.J):.6g}"))
     body.append(body_line("z*", preview_vector(result.z)))
     if result.message:
         message = result.message.strip()

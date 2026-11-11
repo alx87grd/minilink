@@ -192,7 +192,7 @@ class MPPIRecord:
     solves, which have no wall clock).
     """
 
-    cost: float
+    J: float
     S_min: float
     S_weighted: float
     effective_rollouts: float
@@ -203,7 +203,7 @@ class MPPIRecord:
 
     def __str__(self) -> str:
         return (
-            f"MPPI: cost {self.cost:.6g} (nominal plan), S_min {self.S_min:.6g}, "
+            f"MPPI: J = {self.J:.6g} (nominal plan), S_min {self.S_min:.6g}, "
             f"weighted {self.S_weighted:.6g}, effective rollouts "
             f"{self.effective_rollouts:.1f}, exit rate {self.exit_rate:.0%}, "
             f"{'stays in X' if self.success else 'leaves X'}"
@@ -283,7 +283,7 @@ class CompiledMPPIPlanner:
         """
         The solve as a function: ``(z, status)`` from the plan ``z0`` (``None``: :meth:`initial`) on ``params``.
 
-        ``status`` is ``{"success", "n_iterations", "cost"}`` plus the softmin's
+        ``status`` is ``{"success", "n_iterations", "J"}`` plus the softmin's
         account (``S_min``, ``S_weighted``, ``effective_rollouts``, ``exit_rate``).
         """
         P = self.merged(params)
@@ -302,14 +302,14 @@ class CompiledMPPIPlanner:
         # U after n_iterations passes of sample, roll out, weigh, update
         U, last = self.passes(P, z0)
 
-        # The plan's own rollout: its cost and whether it stays in X
-        cost, left, _ = path_cost(x0, t0, U, P)
+        # The plan's own rollout: its J and whether it stays in X
+        J, left, _ = path_cost(x0, t0, U, P)
         S = last["S"]
         w = last["w"]
         status = {
             "success": ~left,
             "n_iterations": self.n_iterations,
-            "cost": cost,
+            "J": J,
             "S_min": jnp.min(S),
             "S_weighted": w @ S,
             "effective_rollouts": 1.0 / jnp.sum(w**2),
@@ -469,7 +469,7 @@ class CompiledMPPIPlanner:
         trajectory = self.planned_trajectory(z, params)
 
         record = MPPIRecord(
-            cost=float(status.get("cost", np.nan)),
+            J=float(status.get("J", np.nan)),
             S_min=float(status.get("S_min", np.nan)),
             S_weighted=float(status.get("S_weighted", np.nan)),
             effective_rollouts=float(status.get("effective_rollouts", np.nan)),

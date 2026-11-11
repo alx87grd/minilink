@@ -99,7 +99,7 @@ def test_a_kept_trajectory_optimization_solution_keeps_its_own_account():
     for solution in (first, second):
         record = solution.record
         assert record.optimization_result is not None
-        assert record.cost == record.optimization_result.cost
+        assert record.J == record.optimization_result.J
         assert len(record.history) > 0
         assert record.step_time_s is not None
     assert first.record.history is not second.record.history

@@ -58,20 +58,20 @@ class IpoptOptimizer(OptimizerBackend):
             options=dict(self.options),
         )
 
-        # The counters and the status the solver reports, and the final cost
+        # The counters and the status the solver reports, and the final J
         stats = {}
         for name in ("nit", "nfev", "njev", "status"):
             if hasattr(raw_result, name):
                 stats[name] = getattr(raw_result, name)
 
-        cost = None
+        J = None
         if getattr(raw_result, "fun", None) is not None:
-            cost = float(raw_result.fun)
+            J = float(raw_result.fun)
 
         return OptimizationResult(
             z=np.asarray(raw_result.x, dtype=float),
             success=bool(raw_result.success),
-            cost=cost,
+            J=J,
             message=str(raw_result.message),
             stats=stats,
             raw_result=raw_result,

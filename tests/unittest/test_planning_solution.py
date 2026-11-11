@@ -158,10 +158,7 @@ def test_trajopt_evaluation_is_one_trial_deterministic_and_n_trials_stochastic()
     assert solution.evaluation.n_trials == 1 and not solution.evaluation.failed[0]
     assert str(solution.evaluation).startswith("J = ")
     # the replayed schedule scores the optimizer's cost up to the discretization gap
-    assert (
-        abs(solution.evaluation.mean - solution.record.cost)
-        < 0.05 * solution.record.cost
-    )
+    assert abs(solution.evaluation.mean - solution.record.J) < 0.05 * solution.record.J
 
     with pytest.warns(UserWarning):  # a deterministic planner on a stochastic problem
         planner = trajopt(move_problem(stochastic=True), shooting)

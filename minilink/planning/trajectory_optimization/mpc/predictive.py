@@ -17,7 +17,7 @@ from minilink.core.system import System
 DEFAULT_INPUTS = {"x0": "y"}
 
 # The status keys every face's solve reports; a planner's own account comes after them
-STANDARD_STATUS = ("success", "n_iterations", "cost")
+STANDARD_STATUS = ("success", "n_iterations", "J")
 
 ###############################################################################
 # Public API
@@ -49,7 +49,7 @@ class ModelPredictiveController(SampledDiagramSystem):
       solved at tick ``k − 1``, as on a real computer; ``False`` (the default)
       applies the plan at once, the solve taking no time (the textbook MPC).
 
-    A solve that returns no usable plan (a non-finite cost or plan) keeps the
+    A solve that returns no usable plan (a non-finite ``J`` or plan) keeps the
     last one. ``P_k`` is the planner's tree (the solve block's ``params``, so
     the loop's ``controller.solve.cost.R`` tunes the plan) with each leaf
     named in ``inputs`` read from its input port (default ``{"x0": "y"}``:
@@ -72,7 +72,7 @@ class ModelPredictiveController(SampledDiagramSystem):
     backend : str, optional
         The face's backend (default the planner's).
     verbose : bool
-        Print one line per solve: the tick's time, success, iterations, cost
+        Print one line per solve: the tick's time, success, iterations, ``J``
         and the solve's wall time (default off; host runs only, a traced run
         prints nothing).
 
@@ -199,9 +199,9 @@ class PlanSolver(System):
         started = time.perf_counter()
         z_new, status = pv.solve(P, z0=z_guess)
         report_solve(self, t, status, started)
-        cost = status["cost"]
-        finite_cost = True if cost is None else xp.isfinite(cost)
-        usable = xp.all(xp.isfinite(z_new)) & finite_cost
+        J = status["J"]
+        finite_J = True if J is None else xp.isfinite(J)
+        usable = xp.all(xp.isfinite(z_new)) & finite_J
         z_star = xp.where(usable, z_new, z_prev)
 
         return z_star
@@ -347,7 +347,7 @@ def warm_guess(pv, z, x, params, z_default):
 
 def report_solve(block, t, status, started):
     """
-    One line for a verbose block's solve: its tick's time, success, iteration count, cost and wall time (host runs only).
+    One line for a verbose block's solve: its tick's time, success, iteration count, ``J`` and wall time (host runs only).
 
     The planner's own account follows, any other number its status carries
     (MPPI: ``S_min``, ``S_weighted``, ``effective_rollouts`` of ``K``, ``exit_rate``).
@@ -356,8 +356,8 @@ def report_solve(block, t, status, started):
     if not block.verbose or not all(is_concrete(value) for value in values):
         return
     elapsed = time.perf_counter() - started
-    cost = status["cost"]
-    cost_text = "n/a" if cost is None else f"{float(cost):.6g}"
+    J = status["J"]
+    J_text = "n/a" if J is None else f"{float(J):.6g}"
 
     # The planner's account beyond the four the face promises, the effective rollouts
     # out of the K drawn
@@ -371,7 +371,7 @@ def report_solve(block, t, status, started):
 
     print(
         f"MPC @ t={float(t):.2f}s  success={bool(status['success'])}  "
-        f"n_iterations={status['n_iterations']}  J={cost_text}  solve={elapsed:.3f}s"
+        f"n_iterations={status['n_iterations']}  J={J_text}  solve={elapsed:.3f}s"
         + "".join(f"  {extra}" for extra in extras)
     )
 

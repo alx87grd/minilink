@@ -80,7 +80,7 @@ result = Optimizer(
 ).solve()
 print(result)
 
-assert result.cost < batch_loss(nn_params), "training did not reduce the loss"
+assert result.J < batch_loss(nn_params), "training did not reduce the loss"
 
 
 # Part 3: simulate with the learned controller

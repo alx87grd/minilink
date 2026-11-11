@@ -332,7 +332,7 @@ class Optimizer:
         return OptimizationResult(
             z=host_or_traced(z),
             success=True,
-            cost=host_or_traced(J, float),
+            J=host_or_traced(J, float),
             message=f"{K} steps taken",
             stats={"nit": K, "method": self.method},
         )

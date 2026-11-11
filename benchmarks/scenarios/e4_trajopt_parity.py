@@ -151,7 +151,7 @@ def run_pendulum_rebuild(*, n_runs: int = 1, tiny: bool = False) -> list[MetricR
         checkpoint_times=PENDULUM_CHECKPOINTS,
         checkpoint_x={t: [float(v) for v in samples[t]] for t in PENDULUM_CHECKPOINTS},
         x_tf=[float(v) for v in traj.x[:, -1].reshape(-1)],
-        cost=float(optimization_result.cost),
+        cost=float(optimization_result.J),
         eq_inf=0.0,
         success=bool(optimization_result.success),
         total_s=float(np.mean(total_times)),
@@ -252,7 +252,7 @@ def run_bicycle_parametric(
         plan = pv.solution(z, params=tree, status=status)
         total_times.append(time.perf_counter() - t0)
         traj = plan.trajectory
-        cost_val = float(plan.record.cost)
+        cost_val = float(plan.record.J)
         success = bool(status["success"])  # the solver's flag, as a tick reports it
 
     assert traj is not None

@@ -660,7 +660,7 @@ def _solve_obstacle_case(case: ModelCase, scene: Scene) -> SolveRun:
         sys=sys,
         traj=traj,
         success=bool(result.success),
-        cost=None if result.cost is None else float(result.cost),
+        cost=None if result.J is None else float(result.J),
         solve_s=None if result.solve_time_s is None else float(result.solve_time_s),
         total_s=total_s,
     )
@@ -704,7 +704,7 @@ def _solve_corner_case(case: ModelCase, track: ReferenceTrack) -> SolveRun:
         sys=sys,
         traj=traj,
         success=bool(result.success),
-        cost=None if result.cost is None else float(result.cost),
+        cost=None if result.J is None else float(result.J),
         solve_s=None if result.solve_time_s is None else float(result.solve_time_s),
         total_s=total_s,
     )

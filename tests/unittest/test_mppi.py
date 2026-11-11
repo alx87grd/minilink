@@ -79,7 +79,7 @@ def test_the_plan_lowers_the_cost_of_the_default_one():
         edited(pv.params, {"method": {"temperature": 1e9}}), z0
     )  # an unweighted average
     z, status = pv.solve(None, z0)
-    assert float(status["cost"]) < float(status_0["cost"])
+    assert float(status["J"]) < float(status_0["J"])
     assert z.shape == (pv.n_z,) and pv.n_z == 20 * 1 + 1
 
 
@@ -289,7 +289,7 @@ def test_a_gradient_through_mppis_temperature_is_finite():
         _, status = pv.solve_fn(
             {**pv.params, "method": {**pv.params["method"], "temperature": lam}}, z0
         )
-        return status["cost"]
+        return status["J"]
 
     assert np.isfinite(float(jax.grad(cost)(0.01)))
 
