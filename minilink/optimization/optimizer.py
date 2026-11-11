@@ -59,8 +59,8 @@ PRESETS: dict[str, tuple[str, dict]] = {
 }
 
 # The one method table, keyed (method, backend): the algorithm and the array module of the
-# program it runs on select the implementation. Each algorithm has one implementation today,
-# on either backend: SciPy and Ipopt solve on the host, the first-order loop runs on the
+# program it runs on select the implementation. An algorithm runs one implementation on
+# either backend: SciPy and Ipopt solve on the host, the first-order loop runs on the
 # program's own array module
 METHODS: dict[tuple[str, str], tuple[str, dict]] = {
     (method, backend): preset
