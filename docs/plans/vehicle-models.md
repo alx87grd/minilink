@@ -160,14 +160,20 @@ load. It never serves rung 4b.
   This is what makes the exact load transfer of §6 possible.
 - **`Fz` is an argument, never computed inside the law.** Its source is the normal-load law
   (§5.3).
-- **The slips during the refactor:** each law keeps the slip definition it has today, so
-  no number moves.
-  - `LinearSaturation` keeps `|vx| + ε`, today's `tire_slip`.
-  - The brush law keeps the racecar's `√(vx² + ε²)`, today's `axle_slips`.
-  - The magic formula, which has no numbers to keep, uses the smooth form.
+- **Who owns the slip** (the maintainer, 2026-11-11):
+  - **The car decides** which slip formula it uses, and calls it at one place: one method that
+    turns each wheel's contact velocity (wheel frame) into `(κ, α)`. It then hands the slips to
+    `tire.forces(kappa, alpha, Fz, params)`.
+  - **The formula itself is a function of the tire module**, imported by the car, never
+    rewritten in a plant. The tire law stays a pure map from slip to force.
+- **The slips during the refactor:** no number moves, so the tire module holds today's two
+  formulas, moved unchanged (same operations, same order, so the results stay
+  bit-identical):
+  - `|vx| + ε`, today's `tire_slip`, called by rungs 3 and 3b;
+  - `√(vx² + ε²)`, today's `axle_slips` written per wheel, called by rung 4 and by every
+    new car.
 
-  The slip formula therefore travels with the law, through the tire object (`tire.slips(...)`),
-  on the contact velocity in the wheel frame.
+  A tire swapped onto a car uses that car's slip formula.
 - **One slip function later.** It replaces the four regularizations and is decided with the
   later switch (§7). The candidate is the smooth form:
 
