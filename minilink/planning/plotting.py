@@ -207,6 +207,11 @@ def plot_control_law(
     return result
 
 
+###############################################################################
+# Internal machinery
+###############################################################################
+
+
 def controller_law_figure(solution, *, bounds=None, **kwargs):
     """The solution's controller drawn by its own ``plot_control_law``, ``bounds`` and the colour limits filled from the problem."""
     given = dict(kwargs)
@@ -303,11 +308,6 @@ def control_law_kwargs(solution, kwargs) -> dict:
         kwargs.setdefault("vmax", float(u_box.upper[u_axis]))
 
     return kwargs
-
-
-###############################################################################
-# Internal machinery
-###############################################################################
 
 
 def require_no_anchor(anchor):
