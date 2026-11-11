@@ -4,10 +4,9 @@ import re
 
 import numpy as np
 
-from minilink.analysis.linearization import design_point
 from minilink.core.discrete.step_system import StepSystem
 from minilink.core.system import DynamicSystem, fastest_time_constant
-from minilink.dynamics.abstraction.state_space import ConstantMatrices
+from minilink.dynamics.abstraction.state_space import ConstantMatrices, design_point
 
 ###############################################################################
 # Public API

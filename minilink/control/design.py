@@ -4,11 +4,7 @@ import numpy as np
 from scipy.signal import place_poles
 
 from minilink.analysis.derivatives import jacobian
-from minilink.analysis.linearization import (
-    design_model,
-    design_point,
-    require_continuous_model,
-)
+from minilink.analysis.linearization import design_model, require_continuous_model
 from minilink.analysis.riccati import (
     care,
     hamiltonian_matrix,
@@ -25,7 +21,7 @@ from minilink.control.state import (
     TrajectoryFeedback,
 )
 from minilink.core.diagram import DiagramSystem
-from minilink.dynamics.abstraction.state_space import require_arrays
+from minilink.dynamics.abstraction.state_space import design_point, require_arrays
 
 ###############################################################################
 # Public API

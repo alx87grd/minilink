@@ -462,6 +462,18 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
         )
 
 
+# The linear models a design reads as they are, and those of them taken about a point
+LINEARIZATIONS = (LinearizedSystem, LinearizedStepSystem)
+LINEAR_MODELS = (LTISystem, DiscreteLTISystem, *LINEARIZATIONS)
+
+
+def design_point(model):
+    """The point a design on ``model`` holds: ``(x̄, ū, ȳ)`` of a linearization, the origin of a linear model."""
+    if isinstance(model, LINEARIZATIONS):
+        return model.x_bar, model.u_bar, model.y_bar
+    return np.zeros(model.n), np.zeros(model.m), np.zeros(model.p)
+
+
 ###############################################################################
 # Internal machinery
 ###############################################################################

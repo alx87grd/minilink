@@ -14,16 +14,13 @@ from minilink.core.roles import command_port
 from minilink.core.signals import InputPort
 from minilink.core.system import System
 from minilink.dynamics.abstraction.state_space import (
+    LINEAR_MODELS,
+    LINEARIZATIONS,
     DiscreteLTISystem,
     LinearizedStepSystem,
     LinearizedSystem,
-    LTISystem,
 )
 from minilink.graphical.control import style
-
-# The linear models a design reads as they are, and those of them taken about a point
-LINEARIZATIONS = (LinearizedSystem, LinearizedStepSystem)
-LINEAR_MODELS = (LTISystem, DiscreteLTISystem, *LINEARIZATIONS)
 
 ###############################################################################
 # Public API
@@ -410,13 +407,6 @@ def discrete_period(sys):
 def period_of(sys):
     """The sample period ``Δ`` a step system runs at, in seconds, its clock's; ``None`` for a tick law."""
     return getattr(sys, "sample_period", None)
-
-
-def design_point(model):
-    """The point a design on ``model`` holds: ``(x̄, ū, ȳ)`` of a linearization, the origin of a linear model."""
-    if isinstance(model, LINEARIZATIONS):
-        return model.x_bar, model.u_bar, model.y_bar
-    return np.zeros(model.n), np.zeros(model.m), np.zeros(model.p)
 
 
 def input_selectors(sys, wrt):

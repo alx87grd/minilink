@@ -411,8 +411,7 @@ class TestFamilyPattern(unittest.TestCase):
         # the nominal state is the default point; a model from arrays sits at the origin
         plant.state.nominal_value = np.array(x_bar, dtype=float)
         np.testing.assert_allclose(plant.linearize().x_bar, x_bar)
-        from minilink.analysis.linearization import design_point
-        from minilink.dynamics.abstraction.state_space import LTISystem
+        from minilink.dynamics.abstraction.state_space import LTISystem, design_point
 
         origin = LTISystem(_Affine.A, _Affine.B, _Affine.C, _Affine.D)
         self.assertFalse(hasattr(origin, "x_bar"))
