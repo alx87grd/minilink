@@ -295,3 +295,19 @@ The numbers that moved, each with how it was measured (machine, median of N, war
   tire's stiffness at the slip floor), so a 5 s run from rest takes 8 s of wall time.
 - **VM-6:** none; byte-identical to VM-4's capture.
 - **VM-7:** none; byte-identical to VM-6's capture (nothing calls the terrain).
+- **VM-10, the review fixes:** none; byte-identical to VM-7's capture, and
+  `DrivetrainBicycle`'s numbers, solver hint and `f` (200 seeded points) the same bits.
+- **VM-10, the car demos** (cloud container; each run headless on the final tree and on
+  the starting commit, compared by the final state of every trajectory it leaves): nine of
+  the ten agree within 6·10⁻⁴ relative (seven within 10⁻⁹). `udes_racecar/mpc_racecar_dynamic`
+  ends 1.4 m away (`x` −4.91 against −3.57). The change enters at VM-2's arithmetic (not at
+  the key order of `params`, tested), and the demo amplifies round-off: on the starting
+  commit, `c_alpha_f` scaled by 1 + 10⁻¹³ moves its end by 0.5 m and `c_kappa` by 0.9 m (its
+  MPC solves stop at SLSQP `ftol = 0.3`, 60 iterations). Both runs finish the lap and exit
+  cleanly; judged the same behaviour under plan §7's ruling. `realtime/game_car` needs a
+  joystick and was not run.
+- **VM-10, the gates on the final tree:** ruff check and format; `pytest -n auto` (all but
+  the bridge); the demo-check bridge on its own; the regression gates with the CI flags,
+  against the stored baselines with no `--update`; the GRO501 notebook's smoke check;
+  nbstripout; the docs build with `-W`: all pass. The full local regression run (no
+  `--tiny`) was not run (AGENTS.md asks it of a big compile or `Simulator` review).
