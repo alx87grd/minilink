@@ -33,7 +33,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | --- | --- |
 | Users | the courses and his research; advanced specialized models in his private repository |
 | Ladder | 1 point → 2 kinematic bicycle → 3 dynamic bicycle → 3b dynamic bicycle with rate inputs → 4 powered car; 5 the longitudinal car as a side step of 3 and 4 (maximum braking and acceleration, no steering); 6 a 3-D car with suspension on a hard surface, at video-game fidelity; 4b quasi-static load transfer, designed for (§6) |
-| 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it |
+| 3b | kept public: the trajectory-optimization and MPC demos, the tutorial and the benchmarks use it; its own class (`BicycleDynRate` today), sharing rung 3's chassis through the parent class, so rung 3's `f` stays a clean course page |
 | UdeS Racecar | the flagship teaching platform; public at least as a preset. A proxy that behaves roughly like the real car, for testing ideas (today `UdeSRacecarDyn`), never an identified model of it: identifying the real car is the students' work in class |
 | Tire | a tire object carrying its force law and its default numbers; the defaults are copied into the car's `params` at construction; three laws, plus a transitional `LinearSaturation` law that keeps today's numbers until the demo clean-up, then retires (§5.1) |
 | Terrain | a height `z(x, y)`, its gradient and a friction `μ(x, y)`; given to the car at construction, like the tire; also exported as a static block for custom diagrams |
@@ -329,7 +329,7 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
 ## 8. What leaves, what stays
 
 - Inside minilink: today's look-only and parameter-only classes become presets and skins.
-  Their names are decided with question 4 of §9.
+  Their names are decided with question 3 of §9.
 - The two project folders stay as they are (read only). Their models inspired this design
   and are not migrated by it.
 - Their duplicates of catalog code (the point, the kinematic bicycle, the engine and servo
@@ -348,21 +348,18 @@ here.
    Rung 6 is two-track either way.
 2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-3. **The form of the rate-input bicycle (3b):** a class of its own (today), a construction
-   option on rung 3, or integrators wired in front of rung 3 (measured for MPC speed against
-   the class first).
-4. **Names:**
+3. **Names:**
    - the generic names of rungs 4 and 6;
    - the UdeS Racecar's public face: thin classes that set only the preset and the skin
      (an exception to the catalog clean-up's "no two supported plants differ by parameters
      alone"), a preset argument, or a parameter set plus a skin.
-5. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
+4. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
    `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
    parameter trees and compile first.
-6. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
-7. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
+5. **The magic formula's defaults:** re-fit `C` and `E` so the curve peaks.
+6. **The longitudinal car's tire:** keep its sigmoid `μ(s)`, or move it onto the tire
    module.
-8. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
+7. **The reference demo for the tire and slip switch** (§7): `mpc_car_minimal`, the trajectory-
    optimization comparison, or another the maintainer names.
-9. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
+8. **`QuarterCar`:** kept as the seed of the suspension corner, or replaced by the corner
    law and the terrain.
