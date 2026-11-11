@@ -546,6 +546,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     the planner's copies `planner.converged`, `planner.best_path_cost` and `planner.history`
     are gone; read `solution.record.converged`, `record.path_cost` and `record.history`
     (`animate_convergence` reads the latest solution's).
+  - *A port's nominal value is checked* (the maintainer's ruling Q8 of 2026-11-11):
+    `signal.nominal_value` is a property; an assignment (`plant.inputs["u"].nominal_value =
+    …`, `plant.state.nominal_value = …`) is checked against the signal's `dim`, as the
+    constructor's keyword was, and kept as its own flat float copy (it was stored as given,
+    any size); the module function `nominal_of` is gone.
   - *A solution holds the planner's tree* (the maintainer's ruling 24): `solution.params` is
     the planner's complete tree, a copy (the problem's parts it reads, `"method"`, `"seed"`),
     on every planner, so `planner.solve(params=solution.params)` solves it again (it held the

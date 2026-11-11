@@ -15,6 +15,19 @@ class TestCoreComponents(unittest.TestCase):
         with self.assertRaises(ValueError):
             VectorSignal("test", dim=2, nominal_value=[1.0, 2.0, 3.0])
 
+    def test_a_nominal_value_assigned_is_checked_and_copied(self):
+        # Ruling Q8: the property checks an assignment against dim, as the constructor
+        v = VectorSignal("u", dim=2)
+        given = np.array([[1, 2]])
+        v.nominal_value = given
+        given[0, 0] = 7
+        np.testing.assert_array_equal(v.nominal_value, [1.0, 2.0])
+        self.assertEqual(v.nominal_value.dtype, float)
+        with self.assertRaisesRegex(ValueError, "signal 'u' must have 2 entries"):
+            v.nominal_value = np.zeros(3)
+        v.nominal_value = None
+        np.testing.assert_array_equal(v.nominal_value, [0.0, 0.0])
+
     def test_vector_signal_rejects_negative_dimension(self):
         with self.assertRaises(ValueError):
             VectorSignal("test", dim=-1)

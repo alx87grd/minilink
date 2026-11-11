@@ -243,6 +243,9 @@ RETIRED_NAMES = {
     "minilink.core.signals.VectorSignal.set_nominal_value": (
         "signal.nominal_value = value"
     ),
+    "minilink.core.signals.nominal_of": (
+        "signal.nominal_value = value (a checked property, ruling Q8)"
+    ),
     "minilink.planning.comparison.GivenPolicy": "GivenController",
     "minilink.core.discrete.sampled_system.SampledSystem.counts": "is_tick_law",
     "minilink.core.discrete.sampled_system.SampledSystem.resolves": "is_integrated",

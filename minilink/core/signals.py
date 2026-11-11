@@ -31,7 +31,9 @@ class VectorSignal:
     lower : np.ndarray
         The lower numerical bound of each component.
     nominal_value : np.ndarray
-        The default or operating point value of the signal.
+        The default or operating point value of the signal, ``(dim,)``: an
+        assignment is checked against ``dim`` and kept as its own flat float
+        copy.
     """
 
     def __init__(
@@ -64,7 +66,7 @@ class VectorSignal:
         self.lower = -np.inf * np.ones(self.dim)
 
         # Nominal value: the given one, checked against dim, else zeros
-        self.nominal_value = nominal_of(nominal_value, self.dim)
+        self.nominal_value = nominal_value
 
         # The user's metadata over the defaults, each field checked against dim
         if labels is not None:
@@ -85,6 +87,21 @@ class VectorSignal:
         )
         if upper is not None:
             self.upper = upper
+
+    @property
+    def nominal_value(self) -> np.ndarray:
+        """The signal's default or operating-point value, ``(dim,)``."""
+        return self.own_nominal_value
+
+    @nominal_value.setter
+    def nominal_value(self, value):
+        # Zeros for none; else the value's own flat float copy, of dim entries
+        if value is None:
+            self.own_nominal_value = np.zeros(self.dim)
+            return
+        value = np.asarray(value, dtype=float).reshape(-1)
+        require_nominal_shape(value, self.dim, self.id)
+        self.own_nominal_value = value.copy()
 
     @property
     def box(self) -> BoxSet:
@@ -260,20 +277,13 @@ def length_or_none(value, *, field_name, signal_id):
         ) from exc
 
 
-def nominal_of(nominal_value, dim):
-    """A nominal value as its own flat float copy of ``dim`` entries (zeros when ``None``)."""
-    if nominal_value is None:
-        return np.zeros(dim)
-    value = np.asarray(nominal_value, dtype=float).reshape(-1)
-    require_nominal_shape(value, dim)
-
-    return value.copy()
-
-
-def require_nominal_shape(value, dim):
+def require_nominal_shape(value, dim, signal_id):
     """Refuse a nominal value that does not flatten to exactly ``dim`` entries."""
     if value.shape != (dim,):
-        raise ValueError(f"nominal_value must have shape ({dim},), got {value.shape}")
+        raise ValueError(
+            f"the nominal_value of signal '{signal_id}' must have {dim} entries, one "
+            f"per component of the signal, got shape {value.shape}"
+        )
 
 
 def as_optional_string_list(value, *, dim, field_name, signal_id):

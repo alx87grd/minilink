@@ -302,7 +302,8 @@ the named car profiles live with their scenarios in `examples/projects/car_trajo
   the nominal state x̄ and the input ports' `nominal_value` the nominal inputs ū, the
   operating point every analysis and design verb reads when `x_bar` / `u_bar` are
   omitted (`analysis.derivatives.operating_point`); `x0` is the start of a simulation
-  and nothing else. Both default to zeros; a diagram derives both from its blocks. Where
+  and nothing else. A signal's `nominal_value` is a property: an assignment is checked
+  against its `dim` and kept as its own flat float copy. Both default to zeros; a diagram derives both from its blocks. Where
   the point lives: on a system, the nominal value of its signals; in a block whose law
   reads it (`OutputReference`, `StateObserver`), its `params`; in a tool, the
   `x_bar` / `u_bar` arguments, defaulting to the nominal (the target of
