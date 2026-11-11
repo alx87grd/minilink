@@ -141,8 +141,8 @@ class DynamicBicycle(DynamicSystem):
         self.body_length_overhang = 0.26
         self.body_ground_clearance = 0.003
         self.ground_plane_size = 120.0
-        self._visual_wheel_width = 0.2
-        self._visual_tire_radius_ratio = 0.58
+        self.visual_wheel_width = 0.2
+        self.visual_tire_radius_ratio = 0.58
 
         # Graphics: the default 2-D skin (black centerline chassis) and a camera that
         # tracks the body frame. A numeric scale keeps auto-fit from taking over
@@ -351,11 +351,10 @@ class DynamicBicycle(DynamicSystem):
 
         # Resultant wrench: ΣF_x less the drag ½ ρ CdA vx |vx|, ΣF_y and the yaw
         # moment ΣM_z = a F_yf − b F_yr
-        Sum_Fx = Fx_f_b + Fx_r_b
+        F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
+        Sum_Fx = Fx_f_b + Fx_r_b - F_aero
         Sum_Fy = Fy_f_b + Fy_r_b
         Sum_Mz = a * Fy_f_b - b * Fy_r_b
-        F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
-        Sum_Fx = Sum_Fx - F_aero
 
         # The generalized damping is minus the resultant tire and drag wrench
         d = -xp.array([Sum_Fx, Sum_Fy, Sum_Mz])

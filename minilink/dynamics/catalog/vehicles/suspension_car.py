@@ -94,11 +94,8 @@ class SuspensionCar3D(DynamicSystem):
         self.named_ports = bool(named_ports)
         self.wheel_angles = bool(wheel_angles)
 
-        # Parameters: the full-size car of the drivetrain bicycle, number for number
-        # (the chassis, the rolling resistance, the drive, the steering and the
-        # smoothing scales), then the 3-D body: the track, the ride height of the
-        # centre of gravity and the roll and pitch inertias ("inertia" stays the
-        # yaw inertia)
+        # Parameters: the full-size car of the drivetrain bicycle, number for number,
+        # then the 3-D body ("inertia" stays the yaw inertia)
         self.params.update(
             {
                 # Chassis
@@ -111,21 +108,6 @@ class SuspensionCar3D(DynamicSystem):
                 "gravity": 9.81,  # [m/s^2]
                 "rho": 1.225,  # [kg/m^3] air density
                 "CdA": 0.3 * 2.2,  # [m^2] drag area
-            }
-        )
-
-        # The parts: the road, then a tire and a spring per wheel, each holding its
-        # own numbers
-        self.terrain = Terrain() if terrain is None else copy.deepcopy(terrain)
-        self.tire = wheel_parts(BrushTire() if tire is None else tire, self.wheels)
-        self.suspension = wheel_parts(
-            SpringDamper() if suspension is None else suspension, self.wheels
-        )
-        self.params["terrain"] = self.terrain.params
-        self.params["tire"] = {wheel: self.tire[wheel].params for wheel in self.wheels}
-        self.params.update(
-            {
-                # Rolling resistance
                 "C_rr": 0.015,  # [-] rolling resistance of a road tire
                 # Propulsion
                 "P_max": 100000.0,  # [W]
@@ -150,76 +132,24 @@ class SuspensionCar3D(DynamicSystem):
                 "Iyy": 2400.0,  # [kg m^2] pitch inertia
             }
         )
+        self.x0 = self.rest_state()
+
+        # Parts: the road, then a tire and a spring per wheel, each holding its own
+        # numbers at its key
+        self.terrain = Terrain() if terrain is None else copy.deepcopy(terrain)
+        self.tire = wheel_parts(BrushTire() if tire is None else tire, self.wheels)
+        self.suspension = wheel_parts(
+            SpringDamper() if suspension is None else suspension, self.wheels
+        )
+        self.params["terrain"] = self.terrain.params
+        self.params["tire"] = {wheel: self.tire[wheel].params for wheel in self.wheels}
         self.params["suspension"] = {
             wheel: self.suspension[wheel].params for wheel in self.wheels
         }
-        self.x0 = self.rest_state()
 
-        # Ports: the two commands within their limits, as two named ports or one
-        # stacked port
-        if self.named_ports:
-            self.add_input_port(
-                "P_cmd", nominal_value=0.0, labels=["P_cmd"], units=["W"]
-            )
-            self.add_input_port(
-                "delta_cmd", nominal_value=0.0, labels=["delta_cmd"], units=["rad"]
-            )
-        else:
-            self.add_input_port(
-                "u",
-                dim=2,
-                nominal_value=np.zeros(2),
-                labels=["P_cmd", "delta_cmd"],
-                units=["W", "rad"],
-            )
-        self.bound_commands()
-
-        # Ports: the sensors of a 3-D body
-        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
-        self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
-        self.add_output_port(
-            "slip",
-            dim=8,
-            function=self.slips,
-            labels=[f"kappa_{w}" for w in self.wheels]
-            + [f"alpha_{w}" for w in self.wheels],
-            units=["-"] * 4 + ["rad"] * 4,
-        )
-        self.add_output_port(
-            "grip",
-            dim=4,
-            function=self.grip,
-            labels=[f"grip_{w}" for w in self.wheels],
-            units=["-"] * 4,
-        )
-        self.add_output_port(
-            "imu",
-            dim=6,
-            function=self.imu,
-            labels=["a_x", "a_y", "a_z", "omega_x", "omega_y", "omega_z"],
-            units=["m/s^2"] * 3 + ["rad/s"] * 3,
-        )
-        self.add_output_port(
-            "power",
-            dim=2,
-            function=self.power,
-            labels=["P", "P_wheel"],
-            units=["W", "W"],
-        )
-        self.add_output_port(
-            "loads",
-            dim=4,
-            function=self.loads,
-            labels=[f"Fz_{w}" for w in self.wheels],
-            units=["N"] * 4,
-        )
-        self.add_output_port(
-            "rollover",
-            dim=2,
-            function=self.rollover,
-            labels=["Fz_min", "phi"],
-            units=["N", "rad"],
-        )
+        # Ports: the two commands within their limits, and the sensors of a 3-D body
+        self.add_command_ports()
+        self.add_sensor_ports()
 
         # Signal labels and units
         labels = ["x", "y", "psi", "vx", "vy", "yaw_rate", "w_rear", "delta", "P"]
@@ -314,7 +244,7 @@ class SuspensionCar3D(DynamicSystem):
         # The corners: each tire's force and where it acts
         corners = self.contact_forces(x, t, params)
         F_world = corners["F"].sum(axis=0)
-        tau_world = cross(corners["arm"], corners["F"]).sum(axis=0)
+        tau_world = xp.cross(corners["arm"], corners["F"]).sum(axis=0)
         Fx_rear = corners["Fx"][2] + corners["Fx"][3]
 
         # The resultant force in the heading frame, with the drag ½ ρ CdA vx |vx|
@@ -329,20 +259,21 @@ class SuspensionCar3D(DynamicSystem):
         dvy = Fy_H / mass - r * vx
         dvz = Fz / mass - gravity
 
-        # Rotation in the body frame: ω = E [p, q, r], and I ω̇ + ω × I ω = τ
+        # Rotation in the body frame, about its principal axes I = diag(Ixx, Iyy, Izz):
+        #   ω = E [p, q, r],  I ω̇ + ω × I ω = τ
         R = attitude(phi, theta, psi)
         E = euler_rate_map(phi, theta)
+        I_body = xp.array([Ixx, Iyy, Izz])
         omega = E @ xp.array([p, q, r])
-        I_omega = xp.array([Ixx * omega[0], Iyy * omega[1], Izz * omega[2]])
         tau_body = R.T @ tau_world
-        domega_num = tau_body - cross(omega, I_omega)
-        domega = xp.array(
-            [domega_num[0] / Ixx, domega_num[1] / Iyy, domega_num[2] / Izz]
-        )
+        domega = (tau_body - xp.cross(omega, I_body * omega)) / I_body
 
         # [ṗ, q̇, ṙ] = E⁻¹ (ω̇ − Ė [p, q, r])
         dE_rates = euler_rate_map_derivative(phi, theta, p, q, r)
         d_rates = xp.linalg.solve(E, domega - dE_rates)
+        dp = d_rates[0]
+        dq = d_rates[1]
+        dr = d_rates[2]
 
         # Kinematics: [ẋ, ẏ] = Rz(ψ) [vx, vy], ż = vz, [φ̇, θ̇, ψ̇] = [p, q, r]
         dX = c_psi * vx - s_psi * vy
@@ -373,13 +304,13 @@ class SuspensionCar3D(DynamicSystem):
             dphi = xp.zeros(0)
 
         # ẋ = [ẋ, ẏ, ψ̇, v̇x, v̇y, ṙ, ẇ_rear, δ̇, Ṗ, ż, φ̇, θ̇, v̇z, ṗ, q̇, φ̇_wheels]
-        dx = xp.concatenate(
-            [
-                xp.array([dX, dY, r, dvx, dvy, d_rates[2], w_rear_dot, delta_dot]),
-                xp.array([P_dot, dz, p, q, dvz, d_rates[0], d_rates[1]]),
-                dphi,
-            ]
-        )
+        # fmt: off
+        dx_car = xp.array([
+            dX, dY, r, dvx, dvy, dr, w_rear_dot, delta_dot, P_dot,
+            dz, p, q, dvz, dp, dq,
+        ])
+        # fmt: on
+        dx = xp.concatenate([dx_car, dphi])
 
         return dx
 
@@ -406,10 +337,10 @@ class SuspensionCar3D(DynamicSystem):
         X = x[0]
         Y = x[1]
         psi = x[2]
+        delta = x[7]
         z = x[9]
         phi = x[10]
         theta = x[11]
-        delta = x[7]
         R = attitude(phi, theta, psi)
         p_cg = xp.array([X, Y, z])
 
@@ -431,19 +362,20 @@ class SuspensionCar3D(DynamicSystem):
         norm = xp.sqrt(dz_dx**2 + dz_dy**2 + 1.0)
         n = xp.stack([-dz_dx / norm, -dz_dy / norm, 1.0 / norm], axis=1)
 
-        # The gap along the normal, d = n_z (P_att,z − z_ground), and the contact C = P_att − d n
+        # The gap along the normal, d = n_z (P_att,z − z_ground), and the contact
+        # C = P_att − d n
         d = n[:, 2] * (P_att[:, 2] - z_ground)
         C = P_att - d[:, None] * n
 
-        # The wheel frames: the body's x axis on the ground plane, turned by δ at the
-        # front; e_y = n × e_x
+        # The wheel frames: the body's x axis projected on the ground plane and
+        # normalized, turned by δ about n at the front; e_y = n × e_x
         x_body = R[:, 0]
-        e_flat = x_body - xp.sum(n * x_body, axis=1)[:, None] * n
-        e_flat = e_flat / xp.sqrt(xp.sum(e_flat**2, axis=1))[:, None]
+        x_flat = x_body - xp.sum(n * x_body, axis=1)[:, None] * n
+        e_flat = x_flat / xp.sqrt(xp.sum(x_flat**2, axis=1))[:, None]
         steer = xp.array([1.0, 1.0, 0.0, 0.0]) * delta
-        n_cross_e = cross(n, e_flat)
+        n_cross_e = xp.cross(n, e_flat)
         e_x = xp.cos(steer)[:, None] * e_flat + xp.sin(steer)[:, None] * n_cross_e
-        e_y = cross(n, e_x)
+        e_y = xp.cross(n, e_x)
 
         geometry = {
             "P_att": P_att,
@@ -470,6 +402,9 @@ class SuspensionCar3D(DynamicSystem):
         params = self.params if params is None else params
         xp = array_module(x)
 
+        wheels = self.wheels
+        tires = self.tire
+        springs = self.suspension
         terrain = self.terrain
         terrain_params = params["terrain"]
         mass = params["mass"]
@@ -484,75 +419,74 @@ class SuspensionCar3D(DynamicSystem):
 
         X = x[0]
         Y = x[1]
-        z = x[9]
         psi = x[2]
         vx = x[3]
         vy = x[4]
         r = x[5]
         w_rear = x[6]
+        z = x[9]
         phi = x[10]
         theta = x[11]
         vz = x[12]
         p = x[13]
         q = x[14]
+        c_psi = xp.cos(psi)
+        s_psi = xp.sin(psi)
+        p_cg = xp.array([X, Y, z])
         corners = self.corner_geometry(x, t, params)
         R = corners["R"]
+        P_att = corners["P_att"]
         n = corners["n"]
         d = corners["d"]
         C = corners["C"]
-        P_att = corners["P_att"]
-        p_cg = xp.array([X, Y, z])
+        e_x = corners["e_x"]
+        e_y = corners["e_y"]
         Fz0 = static_loads(mass, gravity, a, b)
 
         # The body's velocity in the world: v = Rz(ψ) [vx, vy, 0] + [0, 0, vz], and
         # its angular velocity ω_world = R E [p, q, r]
-        c_psi = xp.cos(psi)
-        s_psi = xp.sin(psi)
         v_cg = xp.array([c_psi * vx - s_psi * vy, s_psi * vx + c_psi * vy, vz])
         omega_world = R @ (euler_rate_map(phi, theta) @ xp.array([p, q, r]))
 
         # Each attachment's velocity v_att = v + ω × (P_att − p_cg), and the gap rate
         # ḋ = n · v_att
-        v_att = v_cg + cross(omega_world, P_att - p_cg)
+        v_att = v_cg + xp.cross(omega_world, P_att - p_cg)
         d_dot = xp.sum(n * v_att, axis=1)
-
-        e_x = corners["e_x"]
-        e_y = corners["e_y"]
 
         # Each contact's velocity v_C = v + ω × (C − p_cg), in its wheel frame
         arm = C - p_cg
-        v_C = v_cg + cross(omega_world, arm)
+        v_C = v_cg + xp.cross(omega_world, arm)
         vx_w = xp.sum(v_C * e_x, axis=1)
         vy_w = xp.sum(v_C * e_y, axis=1)
 
         # The road's grip under each contact
         friction = terrain.friction(C[:, 0], C[:, 1], t, terrain_params)
 
-        # Each wheel: its spring's load, its slips, its tire's forces
+        # The wheel rates: the front wheels roll free, ω = vx / r (so κ = 0), and the
+        # two rear ones turn together at w_rear
+        radius = (r_f, r_f, r_r, r_r)
+        rolls_free = (True, True, False, False)
+        w = (vx_w[0] / r_f, vx_w[1] / r_f, w_rear, w_rear)
+
+        # Each wheel: the load of its spring, then the slips and the force of its tire
         Fz = []
         Fx = []
         Fy = []
         kappa = []
         alpha = []
         grip = []
-        for i, wheel in enumerate(self.wheels):
-            spring = self.suspension[wheel]
-            tire = self.tire[wheel]
+        for i, wheel in enumerate(wheels):
+            spring = springs[wheel]
+            tire = tires[wheel]
             spring_params = params["suspension"][wheel]
             tire_params = params["tire"][wheel]
-            front = i < 2
-            r_wheel = r_f if front else r_r
 
-            # The front wheels roll free (κ = 0), the rear ones turn at w_rear
-            w_wheel = vx_w[i] / r_wheel if front else w_rear
             Fz_i = spring.load(d[i], d_dot[i], Fz0[wheel], h_cg, spring_params)
-            kappa_i, alpha_i = tire.slip(
-                vx_w[i], vy_w[i], w_wheel, r_wheel, tire_params
-            )
+            kappa_i, alpha_i = tire.slip(vx_w[i], vy_w[i], w[i], radius[i], tire_params)
             Fx_i, Fy_i = tire.forces(kappa_i, alpha_i, Fz_i, friction[i], tire_params)
 
-            # Rolling resistance of the free-rolling front wheels: −C_rr Fz sign(vx)
-            if front:
+            # Rolling resistance of a free-rolling wheel: −C_rr Fz sign(vx)
+            if rolls_free[i]:
                 Fx_i = Fx_i - C_rr * Fz_i * smooth_sign(vx_w[i], v_c)
             grip_i = tire.friction_use(Fx_i, Fy_i, Fz_i, friction[i], tire_params)
 
@@ -565,6 +499,9 @@ class SuspensionCar3D(DynamicSystem):
         Fz = xp.stack(Fz)
         Fx = xp.stack(Fx)
         Fy = xp.stack(Fy)
+        kappa = xp.stack(kappa)
+        alpha = xp.stack(alpha)
+        grip = xp.stack(grip)
 
         # The force at each contact: F = Fx e_x + Fy e_y + Fz n
         F = Fx[:, None] * e_x + Fy[:, None] * e_y + Fz[:, None] * n
@@ -575,12 +512,12 @@ class SuspensionCar3D(DynamicSystem):
             "Fz": Fz,
             "Fx": Fx,
             "Fy": Fy,
-            "kappa": xp.stack(kappa),
-            "alpha": xp.stack(alpha),
+            "kappa": kappa,
+            "alpha": alpha,
             "vx": vx_w,
             "vy": vy_w,
             "v_C": v_C,
-            "grip": xp.stack(grip),
+            "grip": grip,
             **corners,
         }
 
@@ -669,14 +606,17 @@ class SuspensionCar3D(DynamicSystem):
         q = x[14]
         corners = self.contact_forces(x, t, params)
         R = corners["R"]
+        F_contact = corners["F"].sum(axis=0)
 
-        # The specific force: the contact and aero forces over the mass, in the body
-        # frame (what an accelerometer reads; gravity is not a contact force)
+        # The drag ½ ρ CdA vx |vx|, against the heading, in the world
         F_aero = 0.5 * rho * CdA * vx * xp.abs(vx)
-        aero_world = -F_aero * xp.array([xp.cos(psi), xp.sin(psi), 0.0])
-        specific = R.T @ ((corners["F"].sum(axis=0) + aero_world) / mass)
+        F_aero_world = -F_aero * xp.array([xp.cos(psi), xp.sin(psi), 0.0])
+
+        # The specific force a = Rᵀ (ΣF_contact + F_aero) / m, what an accelerometer
+        # reads (gravity is not a contact force), and the body rates ω = E [p, q, r]
+        a_body = R.T @ ((F_contact + F_aero_world) / mass)
         omega = euler_rate_map(phi, theta) @ xp.array([p, q, r])
-        imu = xp.concatenate([specific, omega])
+        imu = xp.concatenate([a_body, omega])
 
         return imu
 
@@ -700,13 +640,13 @@ class SuspensionCar3D(DynamicSystem):
         C = np.asarray(corners["C"])
         e_x = np.asarray(corners["e_x"])
         e_y = np.asarray(corners["e_y"])
+        radius = (r_f, r_f, r_r, r_r)
         spin = [x[16], x[16], x[15], x[15]] if wheel_angles else [0.0] * 4
 
         frames = {"body": SE3(R, np.array([x[0], x[1], x[9]]))}
         for i, wheel in enumerate(wheels):
-            radius = r_f if i < 2 else r_r
             R_hub = np.column_stack([e_x[i], e_y[i], n[i]]) @ Ry(spin[i])
-            frames[f"wheel_{wheel}"] = SE3(R_hub, C[i] + radius * n[i])
+            frames[f"wheel_{wheel}"] = SE3(R_hub, C[i] + radius[i] * n[i])
 
         # The planar frame of every car rung: the front axle, steered, on the ground
         # between its two contacts
@@ -824,6 +764,73 @@ class SuspensionCar3D(DynamicSystem):
             "suspension": dict(self.suspension),
             "terrain": self.terrain,
         }
+
+    def add_command_ports(self):
+        """The two commands, as two named ports or one stacked port, within their limits."""
+        if self.named_ports:
+            self.add_input_port(
+                "P_cmd", nominal_value=0.0, labels=["P_cmd"], units=["W"]
+            )
+            self.add_input_port(
+                "delta_cmd", nominal_value=0.0, labels=["delta_cmd"], units=["rad"]
+            )
+        else:
+            self.add_input_port(
+                "u",
+                dim=2,
+                nominal_value=np.zeros(2),
+                labels=["P_cmd", "delta_cmd"],
+                units=["W", "rad"],
+            )
+        self.bound_commands()
+
+    def add_sensor_ports(self):
+        """The state and the sensors, each an output port."""
+        self.add_output_port("y", dim=self.n, function=self.h, dependencies=())
+        self.add_output_port("speed", function=self.speed, labels=["vx"], units=["m/s"])
+        self.add_output_port(
+            "slip",
+            dim=8,
+            function=self.slips,
+            labels=[f"kappa_{w}" for w in self.wheels]
+            + [f"alpha_{w}" for w in self.wheels],
+            units=["-"] * 4 + ["rad"] * 4,
+        )
+        self.add_output_port(
+            "grip",
+            dim=4,
+            function=self.grip,
+            labels=[f"grip_{w}" for w in self.wheels],
+            units=["-"] * 4,
+        )
+        self.add_output_port(
+            "imu",
+            dim=6,
+            function=self.imu,
+            labels=["a_x", "a_y", "a_z", "omega_x", "omega_y", "omega_z"],
+            units=["m/s^2"] * 3 + ["rad/s"] * 3,
+        )
+        self.add_output_port(
+            "power",
+            dim=2,
+            function=self.power,
+            labels=["P", "P_wheel"],
+            units=["W", "W"],
+        )
+        self.add_output_port(
+            "loads",
+            dim=4,
+            function=self.loads,
+            labels=[f"Fz_{w}" for w in self.wheels],
+            units=["N"] * 4,
+        )
+        self.add_output_port(
+            "rollover",
+            dim=2,
+            function=self.rollover,
+            labels=["Fz_min", "phi"],
+            units=["N", "rad"],
+        )
 
     def commands(self, x, u):
         """``[P_cmd, delta_cmd]`` from the port vector: the two named ports in order."""
@@ -946,16 +953,3 @@ def static_loads(mass, gravity, a, b):
     Fz0 = {"fl": Fz0_front, "fr": Fz0_front, "rl": Fz0_rear, "rr": Fz0_rear}
 
     return Fz0
-
-
-def cross(a, b):
-    """``a × b`` along the last axis, for 3-vectors or stacks of them."""
-    xp = array_module(a, b)
-
-    # (a × b) = (a₂ b₃ − a₃ b₂, a₃ b₁ − a₁ b₃, a₁ b₂ − a₂ b₁)
-    c1 = a[..., 1] * b[..., 2] - a[..., 2] * b[..., 1]
-    c2 = a[..., 2] * b[..., 0] - a[..., 0] * b[..., 2]
-    c3 = a[..., 0] * b[..., 1] - a[..., 1] * b[..., 0]
-    c = xp.stack([c1, c2, c3], axis=-1)
-
-    return c

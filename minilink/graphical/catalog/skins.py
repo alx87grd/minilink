@@ -85,8 +85,8 @@ def car_skin_3d(plant, color="#151922"):
     body_length_overhang = getattr(plant, "body_length_overhang", 0.26)
     body_ground_clearance = getattr(plant, "body_ground_clearance", 0.003)
     ground_size = getattr(plant, "ground_plane_size", 120.0)
-    tire_radius_ratio = getattr(plant, "_visual_tire_radius_ratio", 0.58)
-    wheel_width = getattr(plant, "_visual_wheel_width", 0.2)
+    tire_radius_ratio = getattr(plant, "visual_tire_radius_ratio", 0.58)
+    wheel_width = getattr(plant, "visual_wheel_width", 0.2)
 
     # The body spans the wheelbase plus an overhang; the drawn tire is a fraction
     # of the smaller tire radius, never under 4.5 cm
