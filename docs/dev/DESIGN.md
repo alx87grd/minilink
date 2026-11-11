@@ -1531,7 +1531,10 @@ real plant. The planner's `dt` is the integration step of its evidence, for ever
 iteration and tabular learning on their grid's `dt`, deep learning on its environment's,
 the LQR on its reporting grid `dt`, an open-loop plan on its own grid, the interpolation
 its planner states), so `sol.evaluation` equals `evaluate(problem, sol.controller, dt=)`
-on that step; a clocked
+on that step; every planner is scored over the problem's horizon, one judge (an open-loop
+plan shorter than it holds its last input after it ends; an infinite horizon over the
+evaluator's default run, 10 s with its warning, as value iteration's and the LQR's; the
+learners over their environment's episode); a clocked
 controller on its own clock, a step problem's law on its own `rollout` (each run the step problem's
 `J = Σ γᵏ c_k + γᴺ h` with the judge's margins and failure charge, an infinite horizon over
 an episode of 10 ticks of its time); the planner's own `J` stays in its record beside it,

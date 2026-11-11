@@ -123,7 +123,8 @@ class RRTPlanner(Planner):
 
         The solution's controller is the path's input held by a source block,
         ``controller >> plant``; ``evaluate=True`` replays it over the problem's
-        draws when the problem declares a cost.
+        draws and horizon (the path's last input held after it ends) when the
+        problem declares a cost; the record's "goal reached" is the search's.
         ``params`` (the complete tree of :attr:`params`, a copy edited) solves
         the planner rebuilt there (:func:`~minilink.planning.planner.planner_at`), this one unchanged.
 
@@ -431,17 +432,12 @@ class RRTPlanner(Planner):
         """The path as a solution: its input held by a source block, the search's ``record`` (printed when ``verbose``), scored when asked."""
         controller = open_loop_controller_of(trajectory, self.problem.sys, hold="zoh")
 
-        # Scored over the problem's draws, on the path's median time step
+        # Scored over the problem's draws and its horizon (the path's last input
+        # held after it ends), on the path's median time step
         evaluation = None
         if evaluate:
             dt = float(np.median(np.diff(trajectory.t)))
-            evaluation = planner_evidence(
-                self,
-                controller,
-                dt=dt,
-                n_trials=n_trials,
-                episode_length=float(trajectory.tf - trajectory.t0),
-            )
+            evaluation = planner_evidence(self, controller, dt=dt, n_trials=n_trials)
 
         solution = PlanningSolution(
             problem=self.problem,

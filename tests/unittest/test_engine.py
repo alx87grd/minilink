@@ -903,6 +903,27 @@ def test_a_held_plan_is_scored_as_planned():
     )
 
 
+def test_a_plan_is_scored_over_the_problems_horizon():
+    """Ruling 23b: one judge, the problem's horizon; the plan's last input held after it ends."""
+    problem, solution = swing_up_plan()
+    plan = solution.trajectory
+    dt = float(np.median(np.diff(plan.t)))
+    assert plan.tf < problem.horizon
+
+    evidence = swing_up_evidence(problem)
+    report = evaluate(problem, solution.controller, dt=dt, backend="numpy")
+
+    np.testing.assert_array_equal(evidence.J, report.J)
+    assert solution.record.success and not bool(evidence.reached[0])
+
+
+def swing_up_evidence(problem):
+    """The swing-up's RRT evidence, ``solve(evaluate=True)``."""
+    from minilink.planning.search.rrt import RRTPlanner
+
+    return RRTPlanner(problem, seed=0).solve(evaluate=True).evaluation
+
+
 @pytest.mark.jax
 def test_a_held_plan_scores_alike_on_jax():
     pytest.importorskip("jax")

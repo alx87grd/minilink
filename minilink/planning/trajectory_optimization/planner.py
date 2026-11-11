@@ -529,12 +529,7 @@ class TrajectoryOptimizationPlanner(Planner):
         if evaluate:
             dt = float(trajectory.t[1] - trajectory.t[0])
             evaluation = planner_evidence(
-                self,
-                controller,
-                dt=dt,
-                n_trials=n_trials,
-                episode_length=float(trajectory.tf - trajectory.t[0]),
-                problem=problem,
+                self, controller, dt=dt, n_trials=n_trials, problem=problem
             )
 
         return PlanningSolution(

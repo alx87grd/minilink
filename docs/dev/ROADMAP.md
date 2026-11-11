@@ -509,7 +509,11 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     sample held over each step, as `plant.compute_trajectory(u=plan.u, dt=…)` does, so
     `solve(evaluate=True)` and `evaluate(problem, solution.controller, dt=…)` on the plan's own
     `dt` reproduce the plan (the swing-up's RRT plan, which reached its goal while its replay
-    missed it at `dt = 0.05` and `0.01`); the block handed out is unchanged.
+    missed it at `dt = 0.05` and `0.01`); the block handed out is unchanged. Every planner is
+    scored over the problem's horizon (ruling 23b): a plan shorter than it holds its last input
+    after it ends, and an infinite horizon runs the evaluator's default 10 s, as value
+    iteration's and the LQR's evidence (RRT's ran its path's own length there); the record's
+    "goal reached" stays the search's.
 
 ## 3. Maturity (TRL)
 
