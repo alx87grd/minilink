@@ -123,6 +123,34 @@ class ConstantMatrices:
         return params["D"]
 
 
+class OperatingPoint:
+    """The operating point ``(x̄, ū, ȳ)`` of a model that stores it in its ``params``.
+
+    ``x_bar``, ``u_bar`` and ``y_bar`` read ``params``; :meth:`set_nominal_point`
+    makes the point the model's nominal state and input.
+    """
+
+    @property
+    def x_bar(self):
+        """The operating point's state ``x̄`` (``params["x_bar"]``)."""
+        return self.params["x_bar"]
+
+    @property
+    def u_bar(self):
+        """The operating point's input ``ū`` (``params["u_bar"]``)."""
+        return self.params["u_bar"]
+
+    @property
+    def y_bar(self):
+        """The system's output at the operating point, ``ȳ = h(x̄, ū)`` (``params["y_bar"]``)."""
+        return self.params["y_bar"]
+
+    def set_nominal_point(self):
+        """Make ``x̄`` the nominal state and ``ū`` the input's nominal value (each signal keeps its own copy)."""
+        self.state.nominal_value = self.params["x_bar"]
+        self.inputs["u"].nominal_value = self.params["u_bar"]
+
+
 class LTISystem(ConstantMatrices, StateSpaceSystem):
     """Linear time-invariant system with constant matrices::
 
@@ -189,7 +217,7 @@ class LTISystem(ConstantMatrices, StateSpaceSystem):
         return lti_latex()
 
 
-class LinearizedSystem(ConstantMatrices, StateSpaceSystem):
+class LinearizedSystem(OperatingPoint, ConstantMatrices, StateSpaceSystem):
     """The first-order model of a system about an operating point ``(x̄, ū)``, in the system's own coordinates::
 
         dx = f(x̄, ū) + A @ (x - x̄) + B @ (u - ū)
@@ -235,23 +263,7 @@ class LinearizedSystem(ConstantMatrices, StateSpaceSystem):
         }
 
         # The nominal point: x̄, and ū on the input
-        self.state.nominal_value = self.params["x_bar"].copy()
-        self.inputs["u"].nominal_value = self.params["u_bar"].copy()
-
-    @property
-    def x_bar(self):
-        """The operating point's state ``x̄`` (``params["x_bar"]``)."""
-        return self.params["x_bar"]
-
-    @property
-    def u_bar(self):
-        """The operating point's input ``ū`` (``params["u_bar"]``)."""
-        return self.params["u_bar"]
-
-    @property
-    def y_bar(self):
-        """The system's output at the operating point, ``ȳ = h(x̄, ū)`` (``params["y_bar"]``)."""
-        return self.params["y_bar"]
+        self.set_nominal_point()
 
     def f(self, x, u, t=0.0, params=None):
         params = self.params if params is None else params
@@ -356,7 +368,7 @@ class DiscreteLTISystem(ConstantMatrices, StepSystem):
         return f"{super().__str__()}\n  per tick\n{matrices_text(self)}"
 
 
-class LinearizedStepSystem(ConstantMatrices, StepSystem):
+class LinearizedStepSystem(OperatingPoint, ConstantMatrices, StepSystem):
     """The first-order model of a step or sampled system about an operating point ``(x̄, ū)``, in the system's own coordinates::
 
         x_{k+1} = F(x̄, ū) + A_d @ (x_k - x̄) + B_d @ (u_k - ū)
@@ -398,23 +410,7 @@ class LinearizedStepSystem(ConstantMatrices, StepSystem):
         }
 
         # The nominal point: x̄, and ū on the input
-        self.state.nominal_value = self.params["x_bar"].copy()
-        self.inputs["u"].nominal_value = self.params["u_bar"].copy()
-
-    @property
-    def x_bar(self):
-        """The operating point's state ``x̄`` (``params["x_bar"]``)."""
-        return self.params["x_bar"]
-
-    @property
-    def u_bar(self):
-        """The operating point's input ``ū`` (``params["u_bar"]``)."""
-        return self.params["u_bar"]
-
-    @property
-    def y_bar(self):
-        """The system's output at the operating point, ``ȳ = h(x̄, ū)`` (``params["y_bar"]``)."""
-        return self.params["y_bar"]
+        self.set_nominal_point()
 
     def step(self, x, u, k=0, params=None):
         params = self.params if params is None else params
