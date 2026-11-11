@@ -471,8 +471,8 @@ v0.9 they go to `CHANGELOG.md`, step V5):
     `h`. The step problem's `rollout` signal `"cost"` → `"J"`, its values unchanged.
   - *Cost-to-come.* RRT/RRT*'s `node.cost` → `node.cost_to_come`, a live step's and an RRT*
     snapshot's `best_cost` → `best_cost_to_come`, `planner.best_goal_cost` →
-    `planner.best_path_cost`; `Edge.cost`, the edge's own cost, keeps its name. MPPI's
-    internal `path_cost(...)` → `rollout_cost(...)`.
+    `planner.best_path_cost` (then read on the record, ruling Q7 below); `Edge.cost`, the
+    edge's own cost, keeps its name. MPPI's internal `path_cost(...)` → `rollout_cost(...)`.
   - *The learners' records.* `episode_cost` → `mean_episode_cost`, on the tabular and the
     neural learner. `Evaluation.raw_cost` and tabular learning's `greedy_tables` are kept.
   - *One verb on both learners* (the maintainer's ruling of 2026-11-11):

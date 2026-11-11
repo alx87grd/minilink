@@ -129,8 +129,8 @@ TODO's "API sweep's judgment calls" row is folded in here.
 | 19 | **Design verbs.** `trajectory_lqr` beside `lqr_*`; `lqr_finite_horizon(…, tf)` a length; `StateObserver(A, B, C, L, D)` re-taking what the linear model holds | 30; 24; 10 | **Ruled 2026-11-11: option 1** — `trajectory_lqr` → `lqr_trajectory`; `lqr_finite_horizon(..., tf)` → `horizon`; `StateObserver(model, L)` reading `A, B, C, D` and the operating point from a `LinearizedSystem` (or an `LTISystem`, point zero), the matrix form `StateObserver(LTISystem(A, B, C, D), L)`; no number moves. Landed on `api-settle`. |
 | 20 | **Class names.** `VanderPol`, `ThreeBodyProblem`, `HeadingController` (the one "Controller"), `TaskKinematic`, `OutputReference`, `StructuralResult`, `StepCost.c` (a third letter beside `g`, `h`) | 16; 11; 23; 21; 23; 9 | `VanDerPol`, `ThreeBody`; the rest checked against the course notes' words first **20a ruled 2026-11-10: keep `LookupPolicy`, `NeuralPolicy`, `GaussianPolicy`** — "the controller is the block, the policy the function" is a guideline, not a hard rule; the RL and DP domain's own word for the deployed law is allowed (RULES 2.7 records the exception). **20b ruled 2026-11-11:** `VanderPol` → `VanDerPol`, `ThreeBodyProblem` → `ThreeBody`, `StructuralResult` → `StructuralProperties`; `TaskKinematic`, `TaskKinematicNullspace`, `OutputReference` and `StepCost.c` kept. 20b landed on `api-settle`. |
 | 21 | **The root list.** Names with no example use (`LinearApproximator`, `QuadraticFeatures`, `RadialBasisFeatures`, `StaticSimulator`, the `*_gain` four, `BoxInputSet`); half pairs (`lqr_gain` without `lqr_gain_schedule`) | maintainer-owned | **Ruled 2026-11-11: option 1** — regenerated from what the rebuilt demos and the course notebooks import, at the end of v0.4 with K8-1, drafted for the maintainer's review; a name leaving the root stays on its band facade; nothing changes now |
-| 23 | **How a held open-loop plan is replayed.** RRT's and MPPI's controller is a `TrajectorySource` holding each sample; read at every RK4 stage, it takes the next sample at a step's last stage, so RRT's replay on its own `dt = 0.05` misses the goal its plan reaches (it reaches it at `dt = 0.002`), while the same samples as a held input (`compute_trajectory(u=…)`) reproduce the plan exactly | KNOWN_ISSUES | **23a ruled 2026-11-11:** the evidence of a held open-loop plan (RRT, MPPI) runs the simulator's held-input rule, the handed-out `TrajectorySource` unchanged; measured on `api-settle` (pendulum swing-up, seed 0): the plan ends `[3.31, −0.15]` in the goal, the held replay reproduces it, the controller over the plan's 4.8 s misses at `dt = 0.05` and `0.01` and reaches at `0.002`. **23b ruled 2026-11-11:** every planner is scored on the problem's horizon, one judge; an open-loop plan shorter than the horizon holds its last input after it; the stray `episode_length=` on the open-loop evidence (ignored on a finite horizon, so it ran 10 s anyway: `J = 391.5`, failed) removed; RRT's record keeps "goal reached" for its search |
-| 24 | **`solution.params`** is the problem's tree, so `planner.solve(params=solution.params)` is refused ("missing `method`, `seed`") | a core record's shape | **Ruled 2026-11-11: option 1** — the solution stores the planner's complete tree (the problem's parts, the method's numbers, the seed), so `planner.solve(params=solution.params)` reproduces the solution; decided directly by the maintainer |
+| 23 | **How a held open-loop plan is replayed.** RRT's and MPPI's controller is a `TrajectorySource` holding each sample; read at every RK4 stage, it takes the next sample at a step's last stage, so RRT's replay on its own `dt = 0.05` misses the goal its plan reaches (it reaches it at `dt = 0.002`), while the same samples as a held input (`compute_trajectory(u=…)`) reproduce the plan exactly | KNOWN_ISSUES | **23a ruled 2026-11-11:** the evidence of a held open-loop plan (RRT, MPPI) runs the simulator's held-input rule, the handed-out `TrajectorySource` unchanged; measured on `api-settle` (pendulum swing-up, seed 0): the plan ends `[3.31, −0.15]` in the goal, the held replay reproduces it, the controller over the plan's 4.8 s misses at `dt = 0.05` and `0.01` and reaches at `0.002`. **23b ruled 2026-11-11:** every planner is scored on the problem's horizon, one judge; an open-loop plan shorter than the horizon holds its last input after it; the stray `episode_length=` on the open-loop evidence (ignored on a finite horizon, so it ran 10 s anyway: `J = 391.5`, failed) removed; RRT's record keeps "goal reached" for its search. 23a and 23b landed on `api-settle` (see the decisions below) |
+| 24 | **`solution.params`** is the problem's tree, so `planner.solve(params=solution.params)` is refused ("missing `method`, `seed`") | a core record's shape | **Ruled 2026-11-11: option 1** — the solution stores the planner's complete tree (the problem's parts, the method's numbers, the seed), so `planner.solve(params=solution.params)` reproduces the solution; decided directly by the maintainer. Landed on `api-settle` |
 | 22 | **Smaller ones:** `CallableSet(contains_fn=)` a set without a margin; `EllipsoidSet(field, …)` not buildable from `(center, P, level)`; `path.sample(s)` using the draw word (`path.at(s)`); a `dt` that does not divide the run overshoots `tf` (`[0, 0.3, 0.6, 0.9, 1.2]` for `tf = 1`); `LowPassFilter(cutoff_hz=)` beside `Sine(omega=)`; `Source.plot_signal`; `connection_verbose`; the program's start in `metadata["z0"]`; RRT's `max_nodes` (a cap on iterations) | small | **Ruled 2026-11-11: all nine as proposed** — a `CallableSet` requires `margin=` (`contains` derived); `EllipsoidSet.from_matrix(center, P, level)`; `path.sample(s)` → `path.at(s)`; a `dt` that does not divide the run shortens its last step to land on `tf` (numbers move on such grids only); `LowPassFilter(cutoff_hz=)` and `Sine(omega=)` kept, the docstrings say why; `Source.plot_signal` and `connection_verbose` removed; `program.z0` an attribute (was `metadata["z0"]`); RRT's `max_nodes` → `max_iterations`. Landed on `api-settle`. |
 
 ## 5. Planned work to pull forward
@@ -729,16 +729,108 @@ then after each commit: byte-identical.
   comments before their lines, binds first, no `self.` in the math; the textbook-style test
   caught one quoted annotation (`from_matrix`), fixed in its own commit.
 
+The run of rulings 23, 24 and Q1, Q2, Q4 to Q8 on the branch `api-settle` (2026-11-11), one
+commit per ruling (23 in two). A new seeded baseline (ruling 19's, plus the pendulum swing-up's
+RRT plan and its evidence on three steps, RRT*'s and MPPI's evidence, the same plan as a linear
+source, a trajectory optimization's evidence, a tick law's step, print and Bode on and off a
+clock, `ThreeBody` read back through the permutation, the ports' nominal values, the problem
+part of an LQR solution's `params`), run twice and compared, then after each commit:
+byte-identical but for the numbers a ruling moves (23a's evidence, the transfer function Q4
+refuses, `ThreeBody`'s raw order, equal once permuted back).
+
+- **Ruling 23a, the design.** The problem evaluator recognises a held plan, a
+  `TrajectorySource` with `hold="zoh"` closed open loop on a fixed-step solver
+  (`is_held_plan`, `ProblemEvaluator.held_plan`): the loop keeps the source beside the plant
+  (its parameters stay the tree's `controller` leaves, its output recorded), but the plant's
+  command is the loop's input `"plan"`, and the run feeds it, row by row, the plan's sample read
+  at the middle of each step (`u_k = π(t_k + dt/2)`, the last at `t_N`), held over the step as
+  the step model holds any input sequence: the simulator's held-input rule, without touching the
+  block or the diagram algebra. Measured on the swing-up (seed 0): the evidence over the plan's
+  4.8 s on its own `dt` reproduces the plan's states to `4e-13` and reaches the goal, on NumPy
+  and JAX alike, and at `dt = 0.01` too (it missed at `0.05` and `0.01` before);
+  `plant.compute_trajectory(u=plan.u, dt=…)` differs from the plan by `7e-4` (its own grid).
+- **Ruling 23a, judgment calls.** The middle of the step, not its start, so a `t_k` rounded
+  below a plan sample never reads the sample before (MPPI's compiled `command` adds `1e-9` for
+  the same reason); on the plan's grid the two are the same sample. An adaptive solver keeps the
+  source wired: it reads the zero-order hold in continuous time, which is the held input already.
+  A linear source (trajectory optimization's) is not a held plan and is read at every stage, as
+  collocation assumes; a `NoiseSource`, also `"zoh"`, is a disturbance, not a plan, and is left
+  as it is.
+- **Ruling 23, the numbers that moved** (the evidence only; no record, plan or regression
+  baseline): the swing-up's RRT evidence over its 10 s horizon `J = 391.49` (failed, goal
+  missed) → `439.71` (failed, goal missed: the plan reaches the ball at 4.8 s, then its last
+  input, held, carries the pendulum out of the state box); its replay over the plan's 4.8 s at
+  `dt = 0.05` `J = 140.71`, missed → `142.17`, reached; MPPI's evidence on the double integrator
+  of the baseline `J = 1.60796` → `1.60591`. The regression gates did not move (no scenario
+  scores an RRT or MPPI plan), so nothing was re-pinned.
+- **Ruling 23b.** On a finite horizon the evaluator ignored `episode_length`, so removing it from
+  RRT's and trajectory optimization's evidence moved nothing (byte-identical); trajectory
+  optimization and MPPI refuse an infinite horizon. On an infinite horizon RRT's evidence ran
+  the path's own length; it now runs the evaluator's default 10 s with its warning, as value
+  iteration's and the LQR's evidence do, one judge (the swing-up with no horizon: `J = 142.17`,
+  reached, over 4.8 s → `439.71`, failed). The learners keep their environment's episode, the
+  run they trained on. **A question:** whether the open-loop evidence on an infinite horizon
+  should stop where the plan stops instead (it then judges a plan by a run it chose).
+- **Ruling 24.** Every planner hands its solution a copy of its own complete tree: value
+  iteration, the LQR, RRT and RRT*, the tabular and the neural learners `deepcopy(planner.params)`;
+  trajectory optimization the tree it solved (`checked(params, planner.params)`, or its own),
+  through `solve_on(tree=)` and `trajectory_solution(params=)`; the compiled faces (trajectory
+  optimization's, MPPI's) `host_tree` of the merged tree. A solution no planner made (the
+  comparison's given controller) keeps the problem's tree. No caller migrated: the problem's
+  parts keep their paths in the planner's tree (`solution.params["plant"]`). A test solves every
+  planner twice, the second from `solution.params`, and compares the pickled controller
+  numbers, plan and record (timings out), byte for byte. **A question:** the RL planner's tree
+  holds no problem leaves (`"method"`, `"seed"`), so its `solution.params` does not record the
+  plant and cost it trained on (TODO's row "A training run that rebinds its numbers" reworded).
+- **Q1.** `period` and `period_text` gone; `period_of` reads a clock's `sample_period` only. The
+  analysis of `lin % 0.1` gives the period's numbers byte for byte (Bode, margins, pole-zero
+  map, step response, root locus, Nyquist, the transfer function before Q4). One fix it needed:
+  a clocked linear model's step response was titled "Linearized" (the analysis linearizes the
+  clocked system), so the figure reads the clock's source (`is_linear_model`) and says "Linear"
+  as the model's. The `TestInZ` plots and the loop-grammar tests clock their model.
+- **Q2.** The certificate's `rollout(horizon)` and `rollout_on(…, horizon)`, and the evaluator's
+  `automatic_dt_of(loop, horizon)`, name their length the same way (internal).
+- **Q4, what was refused.** `transfer_function` on any step system (a tick law, a block on a
+  clock, a sampled loop, their linearizations), through `discrete_period(sys)`; the step
+  systems' facade `step_sys.transfer_function()` keeps its method and refuses with the same
+  sentence. `StateObserver(model, L)` on a step model (`DiscreteLTISystem`,
+  `LinearizedStepSystem`); `luenberger` on a step or sampled system, before it builds the gain
+  (`kalman` and so `lqg` refused one since AS-1). Kept: `place` on a discrete model and
+  `luenberger_gain(A, C, poles)`, their poles read in `z`; the Riccati refusal's sentence now
+  names `luenberger_gain`, not `luenberger`. **A question:** whether `transfer_function` leaves
+  the step systems' facade (`LinearAnalysis` is shared by the two families) instead of refusing.
+- **Q5.** Byte-identical through the permutation (the RK4 step is component-wise): `x0`, `f`,
+  the labels, the bounds and a 0.5 s run. The demo's `x0[0]` is still `r1x`; no notebook uses the
+  plant. The catalog's bounds are the default infinite box, so only their order moved.
+- **Q6.** `y_dependencies=()` came with `output_dim=` (StepSystem's signature and default), so a
+  law whose `y` reads `u` can say so; the refusal reads "y would read itself".
+- **Q7.** The search's account lives in the solve's locals and goes to `search_record(…,
+  best_path_cost=, converged=, history=)`; the snapshot helper returns its frame
+  (`snapshot_of`); `animate_convergence` reads `require_solution(planner).record.history`, so
+  only the shortcuts read `last_solution` still.
+- **Q8.** The setter keeps the constructor's rule (`None` is zeros, a flat float copy); its
+  sentence keeps the word `nominal_value`, which a test reads. None of the 30 assignments
+  assigned a wrong size: the library's and the tests' run in the suite, the notebooks' in the
+  sweep, and the five demos outside CI (the sliding-mode setpoint, the UR5 setpoint, the racecars'
+  `u` and `P_cmd`, the one-link arm's tip) were checked by hand. One behaviour changed: an
+  assignment no longer aliases the array given (no caller relied on it; the baseline is
+  byte-identical).
+- **A defect found, not fixed:** a tree search whose best effort is its root alone hands out an
+  input with no channel, and `solve(evaluate=True)` raises; KNOWN_ISSUES and a TODO row (D3).
+- **The textbook check.** The diffs that touch math (the held plan's read, `ThreeBody`'s `f`,
+  the certificate's horizon) read next to `dp.py`: the read and its comment one beat, the
+  arrays bound to a name before the return (its own commit, byte-identical).
+
 ## Rulings of 2026-11-11 outside the numbered rows
 
 - **The tabular learner's `learn`** folds into `solve(n_episodes=)`, continuing from the current table, as the RL planner's did (ruling 18): one verb on both learners. Landed on `api-settle`.
 - **The learners' per-episode `history` key** `"cost"` → `"J"` (ruling 17b's four-word rule). Landed on `api-settle`.
-- **Q1, the discrete models' `period`** (AS-24's leftover): `DiscreteLTISystem` and `LinearizedStepSystem` lose `period` and are pure tick laws, `x⁺ = A_d x + B_d u`; seconds come only from a clock (CONSTITUTION invariant 1): `model % Δ`, whose `sample_period` the analysis already reads; `linearize` of a sampled loop returns the tick-law model; the printout says "per tick". The maintainer: Bode is for continuous time; the existing discrete support stays only because it is free (per tick on a tick law, rad/s on `model % Δ`); no new discrete-frequency work.
-- **Q2:** `ProblemEvaluator.tf` → `pe.horizon`; `LyapunovCertificate.verify(tf=)` → `horizon=`.
+- **Q1, the discrete models' `period`** (AS-24's leftover): `DiscreteLTISystem` and `LinearizedStepSystem` lose `period` and are pure tick laws, `x⁺ = A_d x + B_d u`; seconds come only from a clock (CONSTITUTION invariant 1): `model % Δ`, whose `sample_period` the analysis already reads; `linearize` of a sampled loop returns the tick-law model; the printout says "per tick". The maintainer: Bode is for continuous time; the existing discrete support stays only because it is free (per tick on a tick law, rad/s on `model % Δ`); no new discrete-frequency work. Landed on `api-settle`.
+- **Q2:** `ProblemEvaluator.tf` → `pe.horizon`; `LyapunovCertificate.verify(tf=)` → `horizon=`. Landed on `api-settle`.
 - **Q3:** no `sys.poles()` shortcut; `poles(sys)` is the verb; `TransferFunction.poles` and `StateObserver.poles` keep their names.
-- **Q4:** `transfer_function` refuses a step or sampled system ("a transfer function is continuous; design on the continuous plant, then `% dt`"); the KNOWN_ISSUES entry leaves with the fix.
-- **Q5:** `ThreeBody`'s state ordered globally (all positions, then all rates). "Positions then rates" (ruling 7) is a style guideline, not a rule enforced in general: RULES words it so, and no test enforces it on a user's plant.
-- **Q6:** `NativeSampledSystem` takes `output_dim=` like its siblings, with a domain sentence refusing an `h` that would read its own output port.
-- **Q7:** RRT*'s planner copies of its record (`converged`, its best path cost, `history`) removed; callers read `solution.record` (RULES 2.4, as AS-30 did for RRT).
-- **Q8:** a port's `nominal_value` is a checked property (assignment checked against `dim`, one domain sentence); the module function `nominal_of` goes.
+- **Q4:** `transfer_function` refuses a step or sampled system ("a transfer function is continuous; design on the continuous plant, then `% dt`"); the KNOWN_ISSUES entry leaves with the fix. Landed on `api-settle`.
+- **Q5:** `ThreeBody`'s state ordered globally (all positions, then all rates). "Positions then rates" (ruling 7) is a style guideline, not a rule enforced in general: RULES words it so, and no test enforces it on a user's plant. Landed on `api-settle`.
+- **Q6:** `NativeSampledSystem` takes `output_dim=` like its siblings, with a domain sentence refusing an `h` that would read its own output port. Landed on `api-settle`.
+- **Q7:** RRT*'s planner copies of its record (`converged`, its best path cost, `history`) removed; callers read `solution.record` (RULES 2.4, as AS-30 did for RRT). Landed on `api-settle`.
+- **Q8:** a port's `nominal_value` is a checked property (assignment checked against `dim`, one domain sentence); the module function `nominal_of` goes. Landed on `api-settle`.
 - **Q9:** `PlotResult` keeps `.figure` (matplotlib's word); ruling 16's `.fig` was a slip of the text.
