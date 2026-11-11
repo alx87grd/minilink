@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections.abc import Callable
-from copy import deepcopy
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -33,6 +32,7 @@ from minilink.optimization.optimizer import (
 from minilink.planning.initial_guess import default_initial_trajectory
 from minilink.planning.planner import (
     Planner,
+    host_copy,
     host_tree,
     open_loop_controller_of,
     planner_evidence,
@@ -541,7 +541,7 @@ class TrajectoryOptimizationPlanner(Planner):
             record=record,
             trajectory=trajectory,
             evaluation=evaluation,
-            params=host_tree(deepcopy(params)),
+            params=host_copy(params),
         )
 
     def print_solve_report(

@@ -16,6 +16,7 @@ from minilink.planning.environment import RolloutEnvironment
 from minilink.planning.evaluator import steps_of
 from minilink.planning.planner import (
     Planner,
+    host_copy,
     host_tree,
     open_loop_controller_of,
     planner_evidence,
@@ -493,7 +494,7 @@ class CompiledMPPIPlanner:
             controller=controller,
             record=record,
             trajectory=trajectory,
-            params=host_tree(copy.deepcopy(self.merged(params))),
+            params=host_copy(self.merged(params)),
         )
 
     def planned_trajectory(self, z, params=None) -> Trajectory:

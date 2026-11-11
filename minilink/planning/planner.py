@@ -464,6 +464,11 @@ def require_known_numbers(planner, method):
         )
 
 
+def host_copy(tree):
+    """A copy of a planner's complete tree for its solution, every leaf on the host (:func:`host_tree`)."""
+    return host_tree(deepcopy(tree))
+
+
 def host_tree(tree):
     """A tree with every leaf a NumPy value (``None`` kept, an empty subtree kept empty), or ``None`` for none."""
     if not tree:
