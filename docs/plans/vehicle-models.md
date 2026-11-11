@@ -43,6 +43,7 @@ Who uses it: the maintainer's courses and his research. Self-driving is the main
 | Suspension | the design supports quasi-static load transfer (4b), spring-dampers (level i) and wheel hop (level ii); the first build is level (i) only |
 | Load transfer | an exact continuous model: no lag on the acceleration |
 | Slip | today's slip definitions kept during the refactor, so no demo number moves; the smooth formula is tried later, together with the switch from `LinearSaturation` to the brush law, measured before and after (§5.1, §7). Supersedes the same day's answer to switch the slip during phase 1 |
+| Names | rung 4's generic class is `DrivetrainBicycle` ("powered" is too vague): the UdeS Racecar's `UdeSRacecarDyn` sits on it |
 | Phases | 1 the foundations; 2 the 3-D car; 3 a good skin and generic parameter preset for the 3-D car, and the UdeS Racecar preset brought to it with its real skin and parameters (§7) |
 | Project folders | `car_trajopt/` and `pathtracking/` are read only, as inspiration; this plan does not change them |
 
@@ -97,7 +98,7 @@ The brush and Pacejka laws agree to about 4°. At its defaults Pacejka has no pe
 | 2 | kinematic bicycle | `x, y, psi` | `v, δ` | the no-slip constraint, the wheelbase |
 | 3 | dynamic bicycle | `+ vx, vy, r` | `w_rear, δ` | mass, yaw inertia, tires |
 | 3b | dynamic bicycle, rate inputs | `+ w_rear, δ` | `ẇ_rear, δ̇` | actuators as states: limits become bounds, rates become costs (the MPC plant) |
-| 4 | powered car | `+ P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering |
+| 4 | `DrivetrainBicycle` | `+ P` | `P_cmd, δ_cmd` | wheel spin, power-limited drive, servo steering |
 | 4b | powered car with load transfer (designed for, §6) | none added | as rung 4 | the loads shift with the accelerations |
 | 5 | longitudinal car (side step) | `x, v, ω, φ` | wheel torque | slip ratio, maximum braking and acceleration |
 | 6 | 3-D car | rung 4's nine, then `z, φ, θ, vz, p, q`, then the corner states (§6) | as rung 4 | heave, roll, pitch, suspension, load transfer, terrain |
@@ -348,7 +349,7 @@ here.
    Rung 6 is two-track either way.
 2. **Wheel hop (level ii):** a construction option on rung 6 (its states appended at the
    end), or a rung 7.
-3. **The generic names of rungs 4 and 6** (the UdeS Racecar's thin classes sit on them).
+3. **The generic name of rung 6** (rung 4 is `DrivetrainBicycle`, §2): `Car3D` or `SuspensionCar3D`.
 4. **Parameter names for axles and corners:** flat suffixes (`c_alpha_f`, later
    `c_alpha_fl`), or nested per corner. No leaf plant nests its `params` today; check the
    parameter trees and compile first.
