@@ -91,7 +91,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "HolonomicMobileRobot",
     ),
     "KinematicBicycle": ("minilink.dynamics.catalog.vehicles", "KinematicBicycle"),
-    "KinematicCar": ("minilink.dynamics.catalog.vehicles", "KinematicCar"),
     "UdeSRacecar": ("minilink.dynamics.catalog.vehicles", "UdeSRacecar"),
     "UdeSRacecarDyn": ("minilink.dynamics.catalog.vehicles", "UdeSRacecarDyn"),
     "LongitudinalTorqueCar": (

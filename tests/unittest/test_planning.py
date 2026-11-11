@@ -1487,7 +1487,6 @@ from minilink.core.geometry import Sphere
 from minilink.core.kinematics import apply, translation
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
-    KinematicCar,
 )
 from minilink.planning.spatial.collision import (
     CollisionBody,
@@ -1539,7 +1538,7 @@ def _holonomic_point():
 
 
 def _kinematic_car_body(length=1.6, width=0.5):
-    return mount(car_outline(length, width), on=KinematicCar())
+    return mount(car_outline(length, width), on=KinematicBicycle())
 
 
 def test_bind_disc_body_pose():

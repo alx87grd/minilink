@@ -5,6 +5,7 @@ from functools import partial
 
 import numpy as np
 
+from minilink.core.kinematics import SE2, translation
 from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.steering import KinematicBicycle
 from minilink.dynamics.catalog.vehicles.tires import BrushTire
@@ -72,13 +73,14 @@ class UdeSRacecar(KinematicBicycle):
         self.wheel_len = 2.0 * r
         self.wheel_width = 0.045
         self.wheel_radius = r
+        self.track = 0.20
         self.camera_follow_frame = "body"
         self.camera_scale = 2.0 * (a + b)
 
     def tf(self, x, u, t=0, params=None):
         params = self.params if params is None else params
 
-        return link_frames(x[0], x[1], x[2], u[1], params)
+        return link_frames(x[0], x[1], x[2], u[1], params, self.track)
 
 
 class UdeSRacecarDyn(DrivetrainBicycle):
@@ -126,9 +128,9 @@ class UdeSRacecarDyn(DrivetrainBicycle):
         params = self.params if params is None else params
 
         if self.wheel_angles:
-            return link_frames(x[0], x[1], x[2], x[7], params, x[9], x[10])
+            return link_frames(x[0], x[1], x[2], x[7], params, self.track, x[9], x[10])
 
-        return link_frames(x[0], x[1], x[2], x[7], params)
+        return link_frames(x[0], x[1], x[2], x[7], params, self.track)
 
     def get_dynamic_geometry(self, x, u, t=0, params=None):
         """The axle arrows of the 2-D look; none on the car whose wheels turn."""
@@ -159,8 +161,8 @@ def stiff_tires(params):
 ###############################################################################
 
 
-def link_frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
-    """Link poses for either racecar plant."""
+def link_frames(X, Y, psi, delta, params, track, phi_rear=0.0, phi_front=None):
+    """Link poses for either racecar plant, and the front wheels every car look reads."""
     # Lazy import: the graphics load on first use, not with the core
     from minilink.graphical.catalog.racecar_skin import racecar_frames
 
@@ -169,8 +171,10 @@ def link_frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
     r_r = params["r_r"]
 
     wheelbase = a + b
+    T_body = SE2(X, Y, psi)
+    R_steer = SE2(0.0, 0.0, delta)
 
-    return racecar_frames(
+    frames = racecar_frames(
         X,
         Y,
         psi,
@@ -181,6 +185,10 @@ def link_frames(X, Y, psi, delta, params, phi_rear=0.0, phi_front=None):
         wheelbase=wheelbase,
         wheel_radius=r_r,
     )
+    frames["wheel_fl"] = T_body @ translation(a, 0.5 * track, r_r) @ R_steer
+    frames["wheel_fr"] = T_body @ translation(a, -0.5 * track, r_r) @ R_steer
+
+    return frames
 
 
 if __name__ == "__main__":

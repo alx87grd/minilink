@@ -79,7 +79,7 @@ TRACED_TF = (
     "InvertedPendulum",
     "TwoIndependentPendulums",
     "MountainCar",
-    "KinematicCar",
+    "KinematicBicycle",
     "Plane2D",
     "Boat2DWithCurrent",
 )

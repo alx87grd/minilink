@@ -91,7 +91,7 @@ class DubinsSteering(SteeringFunction):
     ``speed``. The inputs are ``(speed, steering)`` with ``steering`` in
     ``{+max_steering, 0, -max_steering}`` — exactly the bicycle controls that
     trace each circular arc, so the segment is feasible for the matching
-    ``KinematicBicycle``/``KinematicCar``.
+    ``KinematicBicycle``.
     """
 
     def __init__(

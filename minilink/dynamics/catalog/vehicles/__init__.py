@@ -20,7 +20,6 @@ from minilink.dynamics.catalog.vehicles.racecar import (
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicBicycle,
-    KinematicCar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
 
@@ -31,7 +30,6 @@ __all__ = [
     "DynamicBicycleCar3D",
     "HolonomicMobileRobot",
     "KinematicBicycle",
-    "KinematicCar",
     "LongitudinalTorqueCar",
     "LongitudinalSlipCar",
     "MountainCar",

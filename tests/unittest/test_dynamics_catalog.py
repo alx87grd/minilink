@@ -106,10 +106,11 @@ class TestCatalogSmoke(unittest.TestCase):
                     plant_class(output_mass=output_mass)
 
     def test_the_3d_car_skin_dresses_a_plant_without_wheel_radii(self):
-        from minilink.dynamics.catalog.vehicles.steering import KinematicCar
         from minilink.graphical.catalog.skins import car_skin_3d
 
-        car = KinematicCar()
+        car = KinematicBicycle()  # The full-size kinematic car
+        car.params["a"] = 2.0
+        car.params["b"] = 3.0
         self.assertNotIn("r_f", car.params)
         geometry = car_skin_3d(car)
         wheel_rl = geometry["body"][1]
@@ -653,7 +654,6 @@ from minilink.dynamics.catalog.pendulum.cartpole import (
 from minilink.dynamics.catalog.mass_spring_damper.linear import FloatingTwoMass
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
-from minilink.dynamics.catalog.vehicles.steering import KinematicCar
 
 
 def stored(cls, **attributes):
@@ -736,7 +736,7 @@ PARAMS_CASES = [
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "r_f", 0.4),
     (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
     # The kinematic car: its steered front wheels
-    (stored(KinematicCar), "tf", "a", 3.0),
+    (stored(KinematicBicycle), "tf", "a", 3.0),
     # The longitudinal cars: the traction arrow
     (
         stored(LongitudinalSlipCar),
@@ -969,7 +969,6 @@ from minilink.dynamics.catalog.vehicles.racecar import UdeSRacecar, UdeSRacecarD
     "make",
     [
         KinematicBicycle,
-        KinematicCar,
         UdeSRacecar,
         DynamicBicycle,
         BicycleDynRate,
@@ -1021,3 +1020,31 @@ def test_the_road_friction_scales_every_tire_in_one_line():
 
     assert not np.allclose(dry, wet)
     np.testing.assert_allclose(wet, the_same_by_the_tires, rtol=1e-12)
+
+
+# Every car rung publishes one frame set, so any car look draws any rung
+
+from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
+
+CAR_FRAMES = {"body", "axle_front", "wheel_fl", "wheel_fr"}
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        KinematicBicycle,
+        UdeSRacecar,
+        DynamicBicycle,
+        BicycleDynRate,
+        DrivetrainBicycle,
+        UdeSRacecarDyn,
+    ],
+    ids=lambda m: m.__name__,
+)
+def test_every_car_rung_publishes_the_car_frames_and_wears_any_car_look(make):
+    car = make()
+    frames = car.tf(np.zeros(car.n), np.zeros(car.m))
+
+    assert CAR_FRAMES <= set(frames)
+    for look in (car_skin_2d, car_skin_3d):
+        assert set(look(car)) - {"world"} <= set(frames)

@@ -74,9 +74,19 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicBicycle,
-    KinematicCar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
+from minilink.graphical.catalog.skins import car_skin_3d
+
+
+def full_size_car_3d():
+    """The full-size kinematic car: the bicycle at a = 2, b = 3 in the four-wheel look."""
+    car = KinematicBicycle()
+    car.params["a"] = 2.0
+    car.params["b"] = 3.0
+    car.skin = car_skin_3d
+    return car
+
 
 PlantFactory = Callable[[], Any]
 
@@ -125,7 +135,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
     CatalogCheckEntry("CartPole", CartPole),
     CatalogCheckEntry("NoisyCartPole", NoisyCartPole),
     CatalogCheckEntry("KinematicBicycle", KinematicBicycle),
-    CatalogCheckEntry("KinematicCar", KinematicCar),
+    CatalogCheckEntry("KinematicBicycle with car_skin_3d", full_size_car_3d),
     CatalogCheckEntry("HolonomicMobileRobot", HolonomicMobileRobot),
     CatalogCheckEntry("BicycleDynRate", BicycleDynRate),
     CatalogCheckEntry(
