@@ -1,4 +1,4 @@
-"""Dynamic bicycle: a planar rigid body on linear tires, and its wheel-rate / steer-rate rung."""
+"""Dynamic bicycle: a planar rigid body on its tires, and its wheel-rate / steer-rate rung."""
 
 import copy
 from functools import partial
@@ -12,7 +12,7 @@ from minilink.core.signals import VectorSignal
 from minilink.core.system import DynamicSystem, fastest_time_constant
 from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
 from minilink.graphical.animation.primitives import Arrow
-from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
+from minilink.graphical.catalog.skins import car_skin_2d
 
 ###############################################################################
 # Public API
@@ -580,60 +580,6 @@ class DynamicBicycle(DynamicSystem):
         F_r_loc = np.array([Fx_r, Fy_r])
 
         return v_r_loc, v_f_loc, F_r_loc, F_f_loc
-
-
-class DynamicBicycleCar3D(DynamicBicycle):
-    """
-    Same dynamics as :class:`DynamicBicycle`; overrides only kinematic graphics.
-
-    Body box, four wheel :class:`~minilink.graphical.animation.primitives.Rod` primitives,
-    and duplicated velocity/force arrows at each side (bicycle model vectors on L/R).
-    """
-
-    def __init__(self):
-        super().__init__()
-
-        # Graphics: the 3-D skin over the base plant's 3-D look; the dynamic arrows
-        # stay a per-class override, since four corner arrows are not skin-driven
-        self.skin = car_skin_3d
-
-    def get_dynamic_geometry(self, x, u, t=0, params=None):
-        """3-D look: velocity and force arrows duplicated at all four wheels.
-
-        Dynamic geometry is not a skin concern, so the four-wheel arrow set is a
-        manual override here rather than something driven by ``car_skin_3d``. The
-        arrows share the ``body`` frame (``T_wb``); each bakes its wheel
-        corner as its ``base`` and lifts to the hub height via ``local_transform``.
-        """
-        params = self.params if params is None else params
-
-        a = params["a"]
-        b = params["b"]
-        r_f = params["r_f"]
-        r_r = params["r_r"]
-        tr = self.track
-
-        v_r_loc, v_f_loc, F_r_loc, F_f_loc = self.contact_fields(x, u, params)
-
-        def _arrow(vec, scale, color, bx, by, bz):
-            arr = Arrow(
-                base=(bx, by), vector=vec, scale=scale, color=color, linewidth=2
-            )
-            arr.local_transform = translation(0.0, 0.0, bz)
-            return arr
-
-        return {
-            "body": [
-                _arrow(v_r_loc, 0.2, "blue", -b, 0.5 * tr, r_r),
-                _arrow(v_r_loc, 0.2, "blue", -b, -0.5 * tr, r_r),
-                _arrow(v_f_loc, 0.2, "blue", a, 0.5 * tr, r_f),
-                _arrow(v_f_loc, 0.2, "blue", a, -0.5 * tr, r_f),
-                _arrow(F_r_loc, 0.001, "red", -b, 0.5 * tr, r_r),
-                _arrow(F_r_loc, 0.001, "red", -b, -0.5 * tr, r_r),
-                _arrow(F_f_loc, 0.001, "red", a, 0.5 * tr, r_f),
-                _arrow(F_f_loc, 0.001, "red", a, -0.5 * tr, r_f),
-            ]
-        }
 
 
 class BicycleDynRate(DynamicBicycle):

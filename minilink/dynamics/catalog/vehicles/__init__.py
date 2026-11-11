@@ -6,7 +6,6 @@ from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicy
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     BicycleDynRate,
     DynamicBicycle,
-    DynamicBicycleCar3D,
 )
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
@@ -27,7 +26,6 @@ __all__ = [
     "BicycleDynRate",
     "DrivetrainBicycle",
     "DynamicBicycle",
-    "DynamicBicycleCar3D",
     "HolonomicMobileRobot",
     "KinematicBicycle",
     "LongitudinalTorqueCar",

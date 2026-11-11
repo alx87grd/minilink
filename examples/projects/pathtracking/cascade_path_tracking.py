@@ -1,7 +1,7 @@
 """Cascade path tracking: pure pursuit, heading / yaw-rate loops, and velocity PID.
 
 Tracks a sinusoidal lane ``y(x) = A sin(2 pi x / lambda)`` with
-:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycleCar3D`.
+:class:`~minilink.dynamics.catalog.vehicles.dynamic_bicycle.DynamicBicycle` in its 3-D look.
 Diagram: PathPlanner → ``path`` → Tracking + ``y`` ``→ theta_ref``; planner ``u_ref``
 → velocity PID ``→ w_rear``; heading / yaw-rate loops ``→ delta``. Run from repo root::
 
@@ -19,12 +19,13 @@ import numpy as np
 from minilink.core.diagram import DiagramSystem
 from minilink.core.kinematics import SE2
 from minilink.core.system import DynamicSystem, System
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
+from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycle
 from minilink.graphical.animation.primitives import (
     Arrow,
     CustomLine,
     TorqueArrow,
 )
+from minilink.graphical.catalog.skins import car_skin_3d
 
 # Path and motion setpoints (shared by pursuit law and XY plot)
 A = 2.0
@@ -395,7 +396,8 @@ def plot_xy_vs_path(px, py, t, a_amp: float, wavelength: float):
     plt.show()
 
 
-vehicle = DynamicBicycleCar3D()
+vehicle = DynamicBicycle()
+vehicle.skin = car_skin_3d
 vehicle.x0 = np.array([-10.0, 0.4, 0.05, 0.0, 0.0, 0.0], dtype=float)
 
 planner = PathPlanner(U_REF, path_a=A, path_lambda=LAMBDA)

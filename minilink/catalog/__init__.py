@@ -82,10 +82,6 @@ _EXPORTS: dict[str, tuple[str, str]] = {
         "DrivetrainBicycle",
     ),
     "DynamicBicycle": ("minilink.dynamics.catalog.vehicles", "DynamicBicycle"),
-    "DynamicBicycleCar3D": (
-        "minilink.dynamics.catalog.vehicles",
-        "DynamicBicycleCar3D",
-    ),
     "HolonomicMobileRobot": (
         "minilink.dynamics.catalog.vehicles",
         "HolonomicMobileRobot",

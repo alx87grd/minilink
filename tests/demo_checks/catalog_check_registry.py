@@ -16,7 +16,6 @@ from minilink.catalog import (
     DoublePendulum,
     DrivetrainBicycle,
     DynamicBicycle,
-    DynamicBicycleCar3D,
     NoisyPendulum,
     Plane3D,
     UdeSRacecar,
@@ -77,6 +76,13 @@ from minilink.dynamics.catalog.vehicles.steering import (
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
 from minilink.graphical.catalog.skins import car_skin_3d
+
+
+def dynamic_bicycle_3d():
+    """The dynamic bicycle in the four-wheel 3-D look."""
+    car = DynamicBicycle()
+    car.skin = car_skin_3d
+    return car
 
 
 def full_size_car_3d():
@@ -165,7 +171,7 @@ CATALOG_CHECK_ENTRIES: tuple[CatalogCheckEntry, ...] = (
         "UdeSRacecarDyn(wheel_angles=True)",
         lambda: UdeSRacecarDyn(wheel_angles=True),
     ),
-    CatalogCheckEntry("DynamicBicycleCar3D", DynamicBicycleCar3D),
+    CatalogCheckEntry("DynamicBicycle with car_skin_3d", dynamic_bicycle_3d),
     CatalogCheckEntry("Boat2D", Boat2D),
     CatalogCheckEntry("Boat2DWithCurrent", Boat2DWithCurrent),
     CatalogCheckEntry(
@@ -185,9 +191,6 @@ _PENDULUM = "minilink.dynamics.catalog.pendulum"
 KINEMATIC_RENDER_PLANTS: tuple[KinematicRenderPlant, ...] = (
     KinematicRenderPlant(
         "dynamic_bicycle", f"{_VEHICLES}.dynamic_bicycle", "DynamicBicycle"
-    ),
-    KinematicRenderPlant(
-        "dynamic_bicycle_car3d", f"{_VEHICLES}.dynamic_bicycle", "DynamicBicycleCar3D"
     ),
     KinematicRenderPlant(
         "kinematic_bicycle", f"{_VEHICLES}.steering", "KinematicBicycle"
