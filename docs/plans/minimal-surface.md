@@ -307,7 +307,48 @@ pick:
 - **One controller on the kinematic, the dynamic and the 3-D car:** after the ruling on the
   3-D car's rear axle (QUESTIONS.md).
 
-### 4.8 The rule that keeps the set small
+### 4.8 What the kept surface runs of the library (measured 2026-11-12)
+
+A first input for the core cut. Every notebook and script of the surface as proposed was
+run under line coverage of `minilink/`: the showcase, the 16 tutorials, the 9 proposed
+demos and the 25 course and topic notebooks, 51 runs on one cloud machine. The library has
+32 741 executable statements.
+
+| Package | Statements | Run by the showcase, basics, advanced and demos | + core notebooks | + course notebooks |
+| --- | ---: | ---: | ---: | ---: |
+| `planning` | 7 386 | 62 % | 65 % | 72 % |
+| `core` | 6 762 | 72 % | 77 % | 79 % |
+| `graphical` | 5 060 | 48 % | 48 % | 54 % |
+| `dynamics` | 4 989 | 44 % | 45 % | 45 % |
+| `analysis` | 1 481 | 49 % | 51 % | 66 % |
+| `control` | 1 360 | 47 % | 47 % | 53 % |
+| `simulation` | 1 333 | 32 % | 35 % | 35 % |
+| `experimental` | 1 326 | 0 % | 0 % | 0 % |
+| `learning` | 1 113 | 57 % | 57 % | 57 % |
+| `optimization` | 1 105 | 73 % | 79 % | 79 % |
+| the rest | 826 | | | |
+| **all** | **32 741** | **54 %** | **57 %** | **61 %** |
+
+- **Never imported by anything kept:** 29 files, 3 258 statements: `experimental/` whole
+  (1 326); `analysis/lyapunov.py` (321) and `modal.py`; `control/geometric.py`,
+  `modelbased.py` and `stochastic.py` (454 together); `dp_jax.py` and `approximation.py`
+  of dynamic programming (306); the boat and the three bodies with the boat's skin; the
+  Plotly backends of the signal and control plots; `multiple_shooting.py`; the static
+  simulator.
+- **Imported and mostly not run:** catalog plants nothing kept uses (the plane, the arms
+  other than the UR5, the double pendulum, the longitudinal cars, the mountain car, the
+  linear mass-spring-dampers: about 1 300 statements); the tabular learners and SAC
+  (240); `core/inspect.py` (106 of 154 not run).
+- **Kept alive by the course notebooks alone:** the Gymnasium interface, the sensitivity
+  functions and the time responses, parts of the fields, the costs and the step problems.
+- **What the measure cannot say:** the MeshCat and pygame renderers, the realtime simulator
+  and most of the 3-D car read as unused because the runs replaced MeshCat by matplotlib
+  and skipped the games; four course notebooks did not run (Stable-Baselines3, PyTorch and
+  Gymnasium's extras are not installed); a statement not run is not a statement to remove
+  (refusals, the other backend, an option nobody passed here). The Ipopt optimizer reads as
+  unused for the same reason.
+
+### 4.9 The rule that keeps the set small
 
 - A new demo tells a story none of the others tells.
 - A new plant goes in the catalog, with its own hello-world.
