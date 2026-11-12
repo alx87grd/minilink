@@ -32,6 +32,7 @@ examples/demos/trajopt/trajopt_holonomic_corridor.py minilink.planning.spatial.t
 examples/demos/realtime/game_cartpole.py minilink.simulation.realtime
 examples/demos/realtime/game_ur5_setpoint.py minilink.simulation.realtime
 examples/tutorial/showcase_jax.ipynb minilink.experimental.c_export
+examples/tutorial/showcase_minilink.ipynb minilink.core.backends
 examples/tutorial/showcase_minilink.ipynb minilink.core.kinematics
 examples/tutorial/showcase_minilink.ipynb minilink.graphical.animation.primitives
 examples/teaching/courses/udes_gro501/racecar_toward_mpc.ipynb minilink.graphical.catalog.racecar_skin

@@ -168,7 +168,55 @@ Open in the list, each the maintainer's:
 without a copy. Before a tool's walk-through leaves the demos, its tutorial section is
 checked to exist; the tutorials are reduced after the demos, not with them.
 
-### 4.5 The rule that keeps the set small
+### 4.5 The tutorials beside the demos (reviewed 2026-11-12)
+
+The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled the same day:
+
+| Layer | Notebooks | Code lines | What it is | Ruling |
+| --- | --- | --- | --- | --- |
+| `basics/` | 3 | 228 | story-led: a model, a loop, analysis, a plan | kept |
+| `advanced/` | 5 | 470 | one topic each | kept |
+| `core/` | 8 | 799 | the core objects listed method by method, written for the maintainer's API review | **kept until that review is done,** then they go: a stand-in for the documentation of the core classes, not teaching material |
+| showcases | 3 | 670 | landing pages | **one showcase** |
+
+- **The one showcase** is `showcase_minilink.ipynb`, rewritten from scratch on 2026-11-12:
+  one pendulum, its `f` written by hand in the first cell, then handed to every tool (a loop,
+  a clock, `linearize` and `lqr`, three planners on one problem, an MPC, a law trained by
+  reinforcement learning then scored and linearized, a gradient through the loop, a batch of
+  rollouts), and the same lines on the UR5. 49 cells, 253 code lines, under a minute in the
+  notebook checker. A draft for the maintainer's review.
+- **`showcase_jax` and `showcase_from_rl_to_bode` are still in the tree:** they leave once
+  the maintainer has read the new one and the snapshot tag exists. The first is covered by
+  `advanced/05_differentiable`. The second holds a story nothing else tells (the UR5, an
+  impedance loop, a learned set-point law, the Bode plot of the learned loop) and takes
+  about 8 minutes: a candidate for a demo script, which is where a long 3-D run belongs.
+- **The tutorials change the demo list of §4.3.** Three of the thirteen are tutorial
+  sections already: demo 1 is `advanced/02_optimal_control` (four planners, one comparison),
+  demo 3 the last section of `advanced/05_differentiable`, demo 10 is covered between
+  `advanced/03` and `advanced/05`. The split proposed: the tutorials carry what fits in a
+  notebook, the demos only what a notebook shows badly (long runs, 3-D scenes, real-time
+  games, the racecar on its circuit, the rocket), about nine scripts. Not yet ruled.
+- **Taught in the tutorials and used nowhere else** (a word match over the 94 demos, the
+  course and topic notebooks and the projects, 2026-11-12; to redo after the demo rebuild):
+  47 of the 218 library names the tutorials use, nearly all from `core/`. Fifteen are
+  internals of the problem shown as user tools (`goal_point`, `horizon_kind`, `cost_bound`,
+  `drawn_paths`, `realize`, ...). The candidates to leave the library, used by almost
+  nothing inside it either: the evaluation's `feasibility_rate`, `reachability_rate`,
+  `success_rate`, `rollout_cost`, `terminal_cost`, `cvar`; `Particles`, `MarginField`,
+  `SampledCost`, `Batched`, `angle_features`, `as_step_system`, the function
+  `value_iteration`. With one or two users in the repository: `region_of_attraction`
+  (one demo, a 910-line module), `TransferFunction`, `Lead`, `step_response`,
+  `find_equilibrium`, `discretize`, `QuadraticField`, `JointImpedance`, `IntegralImpedance`,
+  `LowPassFilter`.
+- **Found while writing the showcase:**
+  - `array_module`, the one line a hand-written `f` needs to run on both backends, has no
+    public import: the showcase and five demos reach `minilink.core.backends` through the
+    import allowlist;
+  - the comparison table of `advanced/02_optimal_control` reports value iteration as not
+    converged (3000 sweeps, the change still 20) and three of its four answers as missing
+    the goal on the judged run, on the catalog pendulum as on a hand-written one.
+
+### 4.6 The rule that keeps the set small
 
 - A new demo tells a story none of the others tells.
 - A new plant goes in the catalog, with its own hello-world.
