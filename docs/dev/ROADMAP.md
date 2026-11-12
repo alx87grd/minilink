@@ -891,6 +891,43 @@ review's defects (2026-11-10) and phase 4b, the API settled before the demo rebu
   (plans as policies, its third change; TODO §1.8): additive, so before the tag if ready, else
   a 0.4.x or v0.5 with the RL and RRT faces.
 
+**The consolidation: its order and its targets** (the maintainer, 2026-11-12). Phase 5 is a
+consolidation, not a redraft at equal size: the code converged over v0.3 and v0.4 while what
+surrounds it grew (a test per rule, a doc section per ruling, a plan doc per run). Its success
+is measured in lines removed. The numbers below are orientation for whoever does the work,
+not a budget and not enforced by a check; measured on `dev-vehicle`, tracked files only.
+
+| Part | Today (2026-11-12) | Target after the consolidation |
+| --- | --- | --- |
+| Library (`minilink/`) | 82 060 lines, 281 files | 55 000 to 60 000 lines |
+| Tests | 42 539 lines, 101 files | 12 000 to 15 000 lines |
+| Benchmarks | 5 886 lines | 1 000 to 2 000 lines (the regression gate) |
+| Demos | 94 scripts | 12 to 15 scripts |
+| Projects and `minilink/experimental/` | 10 351 lines | none here (the private repository) |
+| Tutorial notebooks | 19 | 6 to 8 |
+| Course and topic notebooks | 25 | none here (a courses repository, pinned to a release; moved between terms) |
+| Governance and plan docs | 9 151 lines, 23 files | 1 500 to 2 000 lines |
+
+- **Three repositories:** `minilink` (the library, the minimal examples, a compact
+  architecture page); a public courses repository for the course notebooks, pinned to a
+  release, with a nightly run against `minilink`'s main that warns and never blocks; the
+  maintainer's private repository for the scratch work, the former demos, the projects and the
+  research models.
+- **The order:** the snapshot tag; the list of examples, each naming the core tools it
+  shows (the maintainer's); the new examples built, the rest moved out; the core cut, one
+  decision at a time, by what no example and no course notebook uses, with the tests still
+  in place; the tests rebuilt around the examples and each module's mathematical contracts;
+  the docs collapsed; the release.
+- **The tests are the net of the core cut:** they are rebuilt after it, not before. The ones
+  that check words and conventions rather than numbers (10 files, 3 009 lines) can go first.
+- **"Reads like a textbook" is the bar of the core math objects** (the plants' equations,
+  the control laws, the planners' algorithms), not of the whole library: the machinery and
+  the drawing code (a skin's geometry) are judged on robustness, and their size is not a
+  concern.
+- **A rule is held by a test only when breaking it gives a wrong number or a broken
+  example;** the others live in RULES and in review. A pass that adds more scaffolding than
+  it removes is not a consolidation.
+
 **The v0.3 core's leftovers.** One number per workstream, the same as TODO §1.N; each is small:
 
 | § | Workstream | Left (TODO §1.N) |
