@@ -461,7 +461,21 @@ The maintainer's order (2026-11-11). Suspension level (i) is the only one built 
     body with the corner's penalty law, so a car that rolls over lands and keeps tumbling.
     This is the edge of "not a contact engine" (CONSTITUTION §1.4), which is why it stays
     unscheduled;
-  - the review of rebuilding `QuarterCar` on the corner law and the terrain (§2).
+  - the review of rebuilding `QuarterCar` on the corner law and the terrain (§2);
+  - **the contact along the body's suspension axis,** for a more realistic off-road
+    simulation (§10.7's validity note). Three candidates, to prototype and measure on the
+    off-road preset's rollover threshold before one is picked:
+    1. *today:* `C = P_att − d n`, the load along `n`; defined at every attitude, no solve;
+    2. *the geometry only:* the contact where the body's z axis through the attachment meets
+       the tangent plane, `C = P_att − s ẑ_b` with `s = d / (n · ẑ_b)`, the load still the
+       spring force along `n`. It fixes the sideways shift, keeps `f` a plain ODE, and needs
+       a smooth floor on `n · ẑ_b`, which vanishes with the car on its side;
+    3. *the strut as a strut:* the spring carries only the force along `ẑ_b`, so
+       `F_spring = Fz (n · ẑ_b) + F_tire · ẑ_b`: the load depends on the tire force, a
+       closed-form solve inside `f` while the tire laws are linear in the load.
+
+    With it: the terrain read under the contact, not under the attachment, and a wheel of
+    finite radius meeting a bump before its centre does.
 
 ## 8. What leaves, what stays
 
@@ -713,8 +727,17 @@ C_i = P_i − d_i n_i                     contact point
 - Because the forces act at the ground and the centre of gravity sits above it, braking
   pitches the car and a turn rolls it: the load transfer of §6, with no extra term.
 - **The simplifications,** stated in the class docstring: the spring acts along the terrain
-  normal, not along the body's z axis; the terrain is read under the attachment point; `Δ̇`
+  normal, not along the body's z axis; the terrain is read under the attachment point; `ḋ`
   neglects the terrain's curvature. All three vanish on flat ground at small roll.
+- **A simple first model, good on mostly flat terrain only** (the maintainer, 2026-11-12).
+  The contact `C = P_att − d n` stays under the attachment along the terrain's normal. A
+  strut fixed to the body carries its contact sideways as the car rolls, by about
+  `h_cg tan φ` toward the inside of the lean: 2 cm on the default car in a steady turn
+  (φ = 0.04 rad), 17 cm on the off-road preset at φ = 0.25 rad, a fifth of its 0.8 m
+  half-track (geometry, not a simulation). The outer contact is then drawn too far out, so
+  the rollover margin on steep relief is likely overestimated; by how much is not measured.
+  To check before the off-road car is used for realistic rollover work: the list of §7,
+  "the contact along the body's suspension axis".
 - **Past 90° of roll** the same law holds the attachment points off the ground, so the car
   rests on its side or roof and never falls through. Nothing more is specified (§2).
 

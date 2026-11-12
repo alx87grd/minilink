@@ -112,7 +112,10 @@ class OffRoadCar3D(SuspensionCar3D):
     a 2.4 m wheelbase, the centre of gravity 0.65 m high (a car that can roll over),
     130 kW, tires of grip 0.9 and a soft, long-travel suspension (a heave mode near
     1.3 Hz). A plausible cartoon, not a model of any real vehicle; a ``tire`` or
-    ``suspension`` given replaces the preset's, its own numbers included.
+    ``suspension`` given replaces the preset's, its own numbers included. The 3-D
+    car's contacts are simplified for mostly flat ground (:class:`SuspensionCar3D`,
+    "Validity"): on steep relief or at a large roll its rollover margin is
+    indicative only.
     """
 
     def __init__(

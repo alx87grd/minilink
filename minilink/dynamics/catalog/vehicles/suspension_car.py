@@ -64,6 +64,14 @@ class SuspensionCar3D(DynamicSystem):
     axis; the terrain is read under the attachment point; the gap rate neglects the
     terrain's curvature and the ground's own velocity where the terrain moves with
     time; the wheels are massless. All vanish on still, flat ground at small roll.
+
+    Validity: mostly flat ground and small roll and pitch. Each contact stays under
+    its attachment along the terrain's normal, where a strut fixed to the body
+    carries it sideways by about ``h_cg tan(phi)`` as the car rolls, toward the
+    inside of the lean. On a tall car at a large roll that is a sizeable part of
+    the half-track, so the load transfer and the rollover margin on steep relief
+    are indicative only.
+
     The roll-pitch-yaw attitude is singular at a pitch of ``+-90`` deg, an
     end-over-end flip. Past 90 deg of roll the same springs hold the attachments
     off the ground: only the tires touch it.
