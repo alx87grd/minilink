@@ -81,28 +81,15 @@ from minilink import DynamicSystem
 class MassSpringDamper(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=1)
-        self.params = {"m": 1.0, "k": 4.0, "b": 0.3}
 
     def f(self, x, u, t=0, params=None):
-        params = self.params if params is None else params
-
-        m = params["m"]
-        k = params["k"]
-        b = params["b"]
-
-        p = x[0]
-        v = x[1]
-
-        # m p̈ + b ṗ + k p = u
+        m, k, b = 1.0, 4.0, 0.3
+        p, v = x
         a = (u[0] - b * v - k * p) / m
-        dx = np.array([v, a])
-
-        return dx
+        return np.array([v, a])
 
     def h(self, x, u, t=0, params=None):
-        y = x[0:1]  # the sensor measures the position only
-
-        return y
+        return np.array([x[0]])  # sensor measures position only
 
 
 plant = MassSpringDamper()

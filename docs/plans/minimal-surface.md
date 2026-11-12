@@ -179,12 +179,16 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
 | `core/` | 8 | 799 | the core objects listed method by method, written for the maintainer's API review | **kept until that review is done,** then they go: a stand-in for the documentation of the core classes, not teaching material |
 | showcases | 3 | 670 | landing pages | **one showcase** |
 
-- **The one showcase** is `showcase_minilink.ipynb`, rewritten from scratch on 2026-11-12:
-  one pendulum, its `f` written by hand in the first cell, then handed to every tool (a loop,
-  a clock, `linearize` and `lqr`, three planners on one problem, an MPC, a law trained by
-  reinforcement learning then scored and linearized, a gradient through the loop, a batch of
-  rollouts), and the same lines on the UR5. 49 cells, 253 code lines, under a minute in the
-  notebook checker. A draft for the maintainer's review.
+- **The one showcase** is `showcase_minilink.ipynb`. A first rewrite (2026-11-12) opened on
+  a 40-line hand-written pendulum class; the maintainer refused it the same day: a showcase
+  shows how little it takes to start, and writing a class cleanly is a tutorial's job. The
+  second rewrite mirrors the README, section for section, with code that runs: ten lines on
+  the catalog pendulum; diagrams as code, the loop then on a clock; a short model of one's
+  own; one `f` differentiated (Jacobians, LQR, a batch of rollouts); one problem for three
+  planners and an MPC; the one optimization boundary (a program, two optimizers); a law
+  learned by reinforcement and scored; the same lines on the UR5. 40 cells, 218 code
+  lines, about a minute. The pendulum family's 2-D look was redrawn for it (a dark rod, a
+  blue bob, a hub on a grey mount).
 - **`showcase_jax` and `showcase_from_rl_to_bode` are deleted** (the maintainer,
   2026-11-12). The first is covered by `advanced/05_differentiable`; what it showed that no
   tutorial does (identification by gradient, the C export) is to be covered in the API

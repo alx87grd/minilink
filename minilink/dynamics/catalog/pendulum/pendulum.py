@@ -133,7 +133,7 @@ class Pendulum(MechanicalSystem):
     def get_kinematic_geometry(self):
         length = self.params["l"]
 
-        return {"link": link_geometry(length)}
+        return {"world": pivot_mount(length), "link": link_geometry(length)}
 
     def tf(self, x, u, t=0, params=None):
         return {"link": SE2(0.0, 0.0, x[0])}
@@ -354,14 +354,22 @@ class TwoIndependentPendulums(MechanicalSystem):
 
 
 def link_geometry(length):
-    """A hanging link: the pivot, the rod along −y, and the bob at its end."""
-    radius = 0.08 * length
-    pivot = Circle(radius=radius, center=[0.0, 0.0], color="blue", fill=True)
-    rod = Rod(length=length, radius=0.03 * length, color="blue", linewidth=2)
-    bob = Circle(radius=radius, center=[0.0, -length], color="blue", fill=True)
-    link = [pivot, rod, bob]
+    """A hanging link: a dark rod along −y, a blue bob at its end, a hub at the pivot."""
+    rod = Rod(length=length, radius=0.02 * length, color="#374151", linewidth=4)
+    bob = Circle(
+        radius=0.10 * length, center=[0.0, -length], color="#2563eb", fill=True
+    )
+    hub = Circle(radius=0.035 * length, center=[0.0, 0.0], color="#111827", fill=True)
+    link = [rod, bob, hub]
 
     return link
+
+
+def pivot_mount(length):
+    """The fixed mount behind the pivot: a grey plate, in the world frame."""
+    plate = Circle(radius=0.07 * length, center=[0.0, 0.0], color="#9ca3af", fill=True)
+
+    return [plate]
 
 
 def torque_arc(sweep, radius):
@@ -370,8 +378,8 @@ def torque_arc(sweep, radius):
         sweep=sweep,
         radius=radius,
         head_ratio=0.4,
-        color="red",
-        linewidth=2,
+        color="#dc2626",
+        linewidth=2.5,
     )
     arc.local_transform = SE2(0.0, 0.0, -np.pi / 2.0)
 
