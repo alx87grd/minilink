@@ -10,7 +10,7 @@ A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO 
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
 2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: four small names the API
-settlement (PR #139) left, four questions on the car ladder, one on the architecture, and one on the vision.
+settlement (PR #139) left, four questions on the car ladder, two on the architecture, and one on the vision.
 
 ## The API
 
@@ -164,6 +164,71 @@ settlement (PR #139) left, four questions on the car ladder, one on the architec
 - **Recommendation:** option 1, decided and done during the consolidation's core cut, when
   it is known which of the 13 files stay.
 - **Blocks:** nothing; it moves no public import.
+- **Answer:**
+
+### What the check of the core notebooks found in the API
+- **Context:** to make the core notebooks exact (2026-11-12), every public signature of the
+  core objects was resolved against the code. The list below is what looked inconsistent in
+  the library itself, not in the notebooks; nothing was changed. It is input for the
+  maintainer's API review, each item his to keep, change or drop. Three defects found the
+  same way are in KNOWN_ISSUES ("The compiled evaluators").
+- **Two names for one idea:**
+  1. a diagram's member is `subsystem` (`subsystem_id`), `block` (`diagram.of`), `role`
+     (`Trajectory.of`) and `of=` (`compute_cost`); `sys_id` on a diagram, a bare `id` on
+     `add_input_port` and `add_output_port`;
+  2. `OutputPort(function=...)` is read back as `port.compute`;
+  3. `GridField` has `n` and `dim`; the other fields `dim` only;
+  4. the program evaluator has `J` and `objective`, `h` and `equality_residual`, `g` and
+     `inequality_margin`, but one name only for `grad_J`, `jac_h`, `jac_g`;
+  5. `method=` is the optimizer's algorithm on trajectory optimization, the Jacobian's on
+     `LQRPlanner`, the backward step (`"table"`, `"loop"`) on value iteration, the learning
+     algorithm on the RL planners; its default is `"slsqp"` on one and `"auto"` on `Optimizer`;
+  6. the default time is `t=0` on `System.f`, `h`, `tf` and `t=0.0` on the catalog plants, the
+     sets, the costs and the fields.
+- **Positional against keyword-only:**
+  7. `pe.evaluate(params, key, n_trials, *, trajectories)` against
+     `evaluate(problem, controller, dt, *, ..., n_trials, key)`; `pe.program(wrt, bounds, key,
+     n_trials, *, params)`; `pe.trajectory(key=None)` against `pe.evaluate(key=0)`;
+  8. `solve` is keyword-only on `Optimizer` and `Planner`, positional on the compiled
+     trajectory planner, which returns `(z, status)` and not a result object;
+  9. `backend` defaults to `"numpy"` on `System.compile`, `None` on a planner's `compile`
+     (positional), `"auto"` on `problem.compile`;
+  10. `Field.as_set(*, lower, upper)` is keyword-only with a sentinel; `FieldSet(field,
+      lower=0.0, upper=None)` is positional with another default;
+  11. `plot_diagram(file_name, show, *, expand)`: `show` is positional there and keyword-only
+      on every other plot;
+  12. `StepPlanningProblem.transition(x, u, k, params)` has no default for `k`, and
+      `terminal(x, t, params)` takes `t` where its sibling takes `k`;
+  13. `SingletonSet.residual(z, params)` has no `t`; `margin(z, t, params)` has.
+- **Siblings whose surfaces differ:**
+  14. the step `compute_trajectory` has no `port`, `n_samples` or `solver_warnings`, and
+      another keyword order;
+  15. `Planner.plot_trajectory`, `animate` and `plot_cost` take `**kwargs` where
+      `plot_control_law` and `plot_cost_to_go` spell every keyword; `Comparison`'s plots have
+      no `renderer`, `ax` or `title`;
+  16. `StepPlanningProblem` has no `compile`, `nominal`, `goal_point`, `discount_factor` or
+      `drawn_paths`, and a `disturbances` property that always returns `{}`;
+  17. three draw verbs on the problem with three defaults: `realize(key=None, n=1)`,
+      `sample_x0(key, n=None)`, `sample_params(key)`;
+  18. the problem's parameter tree has an `"X0"` key only when the start is not the singleton
+      at `x0`, so its keys depend on how the start was given;
+  19. `Uniform.lower` and `upper` are read-only where `Gaussian.mean` and `BoxSet.lower` can
+      be set; the base `Set` has no `dim`, so `MarginField(CallableSet(...)).dim` raises.
+- **Public members that read as internal:** the wiring mixin's `init_wiring`,
+  `new_subsystem_id`, `get_local_state`, `get_local_input`, `subsystem_params`,
+  `compute_subsystem_output_port` and `check_algebraic_loops`; `SampledSystem`'s
+  `source_params`, `write_source_params` and `update_with_cost` (it has no internal banner);
+  `PlanningProblem.parts_view`, `Planner.build_kwargs` and `rebuilt_on`,
+  `Optimizer.solve_count`, `SampledCost.laws_at`; `System.compute_state`,
+  `get_input_port_slice` and `get_all_input_labels_and_units`.
+- **Exports:** `ModelPredictiveController` is exported by `minilink.control` and defined under
+  `planning/`; `MPPIPlanner` is the one planner not at the root; `array_module`, which a
+  hand-written `f` needs to run on both backends, is exported by no facade.
+- **Options:** take them one family at a time in the API review, with the core notebooks open
+  beside the code; or rule a few now.
+- **Recommendation:** the naming items 1, 5 and 7 to 9 first: they are what a reader of the
+  core notebooks meets on every page.
+- **Blocks:** nothing.
 - **Answer:**
 
 ## The vision

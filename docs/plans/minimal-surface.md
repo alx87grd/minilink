@@ -217,7 +217,43 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
     converged (3000 sweeps, the change still 20) and three of its four answers as missing
     the goal on the judged run, on the catalog pendulum as on a hand-written one.
 
-### 4.6 The rule that keeps the set small
+### 4.6 The tutorials made ready and the demos drafted (2026-11-12)
+
+On the maintainer's go, in one run:
+
+- **Each layer for its reader.** `basics/` is for engineering students who design an LQR on
+  a pendulum and a cart-pole and simulate it: the cart-pole balance and its animation join
+  the pendulum's. `advanced/` is for research students, whose plants are larger: the MPC
+  notebook gains a car (the dynamic bicycle brought back onto its lane), the
+  reinforcement-learning one a planar drone learning to hover and a pointer to the UR5 demo.
+  `core/` is the maintainer's reading documentation of the core objects.
+- **`advanced/02_optimal_control` said the opposite of its table:** value iteration "ends in
+  the goal with the lowest cost" beside a table reporting it not converged, off the goal and
+  the most expensive. With a cost for leaving the state box it converges (1136 sweeps) and
+  is the cheapest answer, in the goal.
+- **The core notebooks are exact:** every quoted signature resolved against the code by a
+  script, which found 46 mismatches and 8 names that did not exist, none now. What the same
+  check found in the library is in QUESTIONS.md ("What the check of the core notebooks found
+  in the API") and KNOWN_ISSUES ("The compiled evaluators").
+- **The proposed demos are drafted** in `examples/demos_proposed_minimal/`: ten scripts
+  beside the existing ones, its README the list. Eight rewrite or copy an existing script,
+  `cartpole_lqg.py` merges two, `ur5_rl_to_bode.py` is the former showcase. Each ran to
+  its end with its animations skipped.
+
+Seen while drafting, and left as they are:
+
+- `racecar_mpc.py` reproduces `udes_racecar/mpc_racecar_dynamic.py` to the digit, and
+  that demo does not do what its comments said: in its 5 s the car covers 21.7 m of the
+  36.6 m circuit, not "a little more than one lap", and its centre strays 0.81 m from the
+  line, beyond the 0.6 m lane.
+- `rocket_landing_rl.py` trains as `rl/rocket_landing_rl.py` does, 4 million steps in about
+  two minutes, and scores as it does: over 100 drawn starts, 54 % of the runs stay within
+  the limits and the mean cost is 7.9 × 10⁴. The landing is not learned at this budget.
+- `Comparison.plot_trajectory` scores an infinite-horizon answer on a default 10 s, with a
+  warning, whatever the horizon of the problem it was compared on (`advanced/02`).
+- Three demos wait on the MeshCat viewer when run with no browser (KNOWN_ISSUES).
+
+### 4.7 The rule that keeps the set small
 
 - A new demo tells a story none of the others tells.
 - A new plant goes in the catalog, with its own hello-world.
