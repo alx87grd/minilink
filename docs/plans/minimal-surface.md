@@ -277,7 +277,36 @@ Seen while drafting, and left as they are:
 - `Comparison.plot_trajectory` scores an infinite-horizon answer on a default 10 s, with a
   warning, whatever the horizon of the problem it was compared on (`advanced/02`).
 
-### 4.7 The rule that keeps the set small
+### 4.7 Demos to add later (noted 2026-11-12, none drafted)
+
+The seven of §4.6 are the shortlist. Candidates for two or three more, the maintainer's to
+pick:
+
+- **Two MPCs on the car, each on the model that suits it** (the maintainer's idea):
+  - *MPPI on the kinematic bicycle, with the inner PI on the speed.* Sampling needs many
+    cheap rollouts and no gradient, which a three-state model gives; it handles a cost that
+    is not smooth (cones, lane edges) without the shaping a gradient method needs. It
+    would replace the collocation planner of `racecar_mpc.py` in the same cascade.
+  - *SQP on the dynamic model for fast cornering.* Near the limit of grip the plan must
+    know the tires, and a gradient method on the dynamic model with exact derivatives is
+    the tool: few iterations, a warm start, constraints held. Its starting point is
+    `udes_racecar/mpc_racecar_dynamic.py`, which today neither completes its lap nor stays
+    in its lane (§4.6), with fewer spatial fields.
+
+  The pair tells one story: the planner follows the model, sampling where the model is
+  cheap and the cost rough, gradients where the model is rich and the cost smooth. To
+  check when drafting: that the MPPI lap is as clean as the collocation one, and that the
+  dynamic lap is fast enough to show what the kinematic plan cannot do.
+- **Identification of a car from a driving log, by gradient through the simulator:** the
+  differentiable path has no demo on anything larger than a pendulum's gains; the numbers
+  to find are the tire parts' (`params["tire"]`).
+- **A rocket landing that works:** the README's front row shows one, and
+  `rl/rocket_landing_rl.py` does not learn it (§4.6); by a larger training budget, or by
+  trajectory optimization with feedback.
+- **One controller on the kinematic, the dynamic and the 3-D car:** after the ruling on the
+  3-D car's rear axle (QUESTIONS.md).
+
+### 4.8 The rule that keeps the set small
 
 - A new demo tells a story none of the others tells.
 - A new plant goes in the catalog, with its own hello-world.
