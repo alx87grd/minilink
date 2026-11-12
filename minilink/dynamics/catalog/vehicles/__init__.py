@@ -1,11 +1,15 @@
-"""Vehicle dynamics: the teaching ladder from the holonomic point to the UdeS racecar, plus propulsion and suspension."""
+"""Vehicle dynamics: the teaching ladder from the holonomic point to the 3-D car on its suspension, plus propulsion and the quarter car."""
 
-# Tire math (``tire_slip`` / ``linear_tire_forces`` in dynamic_bicycle, the brush pair
-# in tires) and parameter sets stay in their modules — plants only in __all__.
+# The tire laws and slips (``tires``) and the parameter sets stay in their modules:
+# plants only in __all__.
+from minilink.dynamics.catalog.vehicles.car_presets_3d import (
+    FormulaCar3D,
+    OffRoadCar3D,
+)
+from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import (
     BicycleDynRate,
     DynamicBicycle,
-    DynamicBicycleCar3D,
 )
 from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
@@ -15,27 +19,27 @@ from minilink.dynamics.catalog.vehicles.propulsion import (
 from minilink.dynamics.catalog.vehicles.racecar import (
     UdeSRacecar,
     UdeSRacecarDyn,
-    UdeSRacecarDyn3D,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
     KinematicBicycle,
-    KinematicCar,
 )
 from minilink.dynamics.catalog.vehicles.suspension import QuarterCar
+from minilink.dynamics.catalog.vehicles.suspension_car import SuspensionCar3D
 
 __all__ = [
     "BicycleDynRate",
+    "DrivetrainBicycle",
     "DynamicBicycle",
-    "DynamicBicycleCar3D",
     "HolonomicMobileRobot",
     "KinematicBicycle",
-    "KinematicCar",
     "LongitudinalTorqueCar",
     "LongitudinalSlipCar",
     "MountainCar",
     "QuarterCar",
+    "SuspensionCar3D",
+    "FormulaCar3D",
+    "OffRoadCar3D",
     "UdeSRacecar",
     "UdeSRacecarDyn",
-    "UdeSRacecarDyn3D",
 ]

@@ -60,66 +60,6 @@
     "t": 1.4
   },
   {
-    "plant": "dynamic_bicycle_car3d",
-    "sample": "rest",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "DynamicBicycleCar3D",
-    "requires": [],
-    "x": [
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0,
-      0.0
-    ],
-    "u": [
-      0.0,
-      0.0
-    ],
-    "t": 0.0
-  },
-  {
-    "plant": "dynamic_bicycle_car3d",
-    "sample": "pose_a",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "DynamicBicycleCar3D",
-    "requires": [],
-    "x": [
-      0.38213459565024244,
-      0.14494310179066947,
-      -0.20193844183994303,
-      -0.3959969986401782,
-      -0.2903729216800561,
-      0.034999593375778563
-    ],
-    "u": [
-      0.2450166444603104,
-      0.15540249206766613
-    ],
-    "t": 0.7
-  },
-  {
-    "plant": "dynamic_bicycle_car3d",
-    "sample": "pose_b",
-    "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "DynamicBicycleCar3D",
-    "requires": [],
-    "x": [
-      0.7129658880491484,
-      0.7933318483619749,
-      0.5965641697413763,
-      0.19139946337118596,
-      -0.2806265821516959,
-      -0.6546216888515283
-    ],
-    "u": [
-      0.3916634548137417,
-      0.49272486499423007
-    ],
-    "t": 1.4
-  },
-  {
     "plant": "kinematic_bicycle",
     "sample": "rest",
     "module": "minilink.dynamics.catalog.vehicles.steering",

@@ -280,7 +280,8 @@ a method passed where its matrix goes is refused with the call to write; `Manipu
 task ports `p`, `pdot`; `forward_kinematics`, `J`, `inverse_kinematics`) is the base of the
 serial arms, read straight by the robotic laws (`ctl @ plant` on `y = [q; dq]`). Mixed
 inputs are named ports with concrete allocation hooks, never inheritance branches. The
-vehicle ladder (four teaching rungs, dual-backend) is in the catalog; its research rungs and
+vehicle ladder (from the point to the 3-D car on its suspension, dual-backend) is in the
+catalog; its research rungs and
 the named car profiles live with their scenarios in `examples/projects/car_trajopt/`.
 
 ## 4. Core Object Contracts
@@ -535,6 +536,14 @@ law on both backends (`params=None` its defaults, the same values twice, the JAX
 NumPy ones, a finite gradient through a float leaf); `tests/unittest/test_params_model.py`
 pins the seven rules. The leaves are numbers and numeric arrays, an integer leaf (a seed)
 never in `wrt`; every function is deterministic given its parameters, the seed among them.
+A car is assembled from parts the same way: each wheel's tire owns its numbers (`mu`, the
+stiffnesses, its slip floor, its shape), and the car holds each tire's dict at
+`params["tire"][wheel]` (`car.params["tire"]["f"] is car.tire["f"].params`), beside its own
+numbers, and its terrain's dict at `"terrain"`, whose friction factor (1 on the reference
+surface) multiplies every tire's `mu`; the car declares them with `param_parts()`, so a
+whole-tree assignment is routed to the parts. The 3-D car also holds each corner's
+spring-damper at `params["suspension"][wheel]`; a `TerrainBlock` holds its terrain's dict
+at `"terrain"`.
 - **One keyword per kind of choice.** `backend=` is the array module (`"numpy"`,
   `"jax"`, or `"auto"` where a tool can fall back) on every tool and facade that compiles;
   `solver=` is the time integration; `method=` is the verb's own numerical method (the
@@ -1192,7 +1201,9 @@ observer's `A − L C`, a PID's derivative filters; an all-zero spectrum, an int
 declares `∞` and bounds nothing); a catalog plant declares its own from its linearization at
 the nominal point by a closed formula, as a `fastest_mode()` read from `params` (the
 pendulum's `√((m l² + I)/(m g l))`, the cart-pole's unstable pole, the dynamic bicycle's tire
-modes at rest, the racecar's); a law with a time constant of its own declares it
+modes at rest); the drivetrain bicycle and the racecar on it declare instead ten times the
+largest step Euler takes stably on their tire modes at rest, a solver hint, not a mode of
+the model (their standstill modes come from the slip floor); a law with a time constant of its own declares it
 (`SlidingMode`'s `1/λ`). A custom plant that declares nothing keeps the 1 ms default; no
 plant is linearized automatically. A diagram's hint is the smallest over its stateful
 subsystems and any subsystem that sets its own; a static subsystem left at the default does not

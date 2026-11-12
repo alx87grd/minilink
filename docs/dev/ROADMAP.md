@@ -582,7 +582,7 @@ Step ids (`S29`, `P4`, `T2`, …) are the rows of
 | Core + diagrams | teaching | 7 | Public API and diagram API stable; compile-vs-reference parity tested; wrong-shape `f` / `h` fails at `compile()`, and so does an `h`-computed output that moves with an input it does not declare (a port function is not probed, KNOWN_ISSUES); `connect` refuses a rewire (`disconnect` first; the v0.3 run, step 7); the modules by job (the operators, the closed loop, the roles, the port graph; the discrete-time pieces in `core/discrete/`, the `System` shortcuts in `core/facades/`); three owners of a start (the block, the problem, the evaluator's tree), a block's state size fixed once built; `System(state_dim, *, input_dim=, output_dim=)` on every system kind, a static one feeding its input through; `h` the `"y"` port on every block and evaluator. | Automation by convention, the rest (P10: plots and animation by role). |
 | Compile (`core/compile/`) | teaching (frozen subset) | 4 | Integrated; the frozen evaluator subset is named in DESIGN §5; one evaluator class per system kind on either backend, one body per method compiled on JAX; the step model (`ev.step` / `ev.rollout`, `solver=`, `substeps=`, `hold=`) under every sampled tool, `discretize` on it (S75). Speed lives in batches (1000 rollouts × 1000 RK4 steps in 0.12–0.16 s on a cloud CPU); `rollout_batch` takes a `params` family; float64 on JAX by default. Step evaluators that trace and batch, one signal pass per tick, the sampled plan; the step problem answers its own equations (`transition`, `terminal`, `run`), on the internal `StepModel` (`planning/step_model.py`). One automatic-backend rule (`build_on_auto`, falling back on a missing JAX or a `NotTraceableError` only); the batch claim gated in CI, a parameter family's price measured (about 4–6× the plain batch on a one-joint plant, none where `H(q)` varies) and accepted, the catalog's readability first. | Diffrax (S27, v0.9). |
 | Simulation | teaching | 7 | Mature; fixed 10 001-point default grid; `verbose` names unified; one automatic step from the blocks' physics (the linear blocks' eigenvalues, the catalog's `fastest_mode()`), a held block read at each RK4 stage like any block (first order at its switches); `scipy_stiff` at `scipy`'s tolerances with the Jacobian on both backends. | Two points of one owner per rule waiting for the maintainer's go (S65); the rest of the catalog declaring its `τ` (TODO §2). |
-| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); four-rung vehicle ladder; UdeS racecar (kinematic, dynamic, 3-D); every plant states its own bounds, the mechanical bases invent none. | The catalog clean-up (K8, v0.4, after the demo rebuild); one mechanical family (S32; postponed until the maintainer reviews the mechanical hierarchy, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.5. |
+| Dynamics (abstraction + catalog) | teaching | 7 | Plants QA'd; `MechanicalSystem` / `Manipulator`; UR5 ABA/RNEA; **every catalog plant compiles on both backends** (contract test); the vehicle ladder (point, kinematic bicycle, dynamic bicycle and its rate rung, `DrivetrainBicycle`, the 3-D `SuspensionCar3D` with its formula and off-road presets and looks), on a tire module of four laws (linear, brush, magic formula, the transitional saturated linear one) held per wheel as parts, a terrain module (flat, slope, bumps) under the 3-D car, the heading `psi` and one frame set on every car; UdeS racecar a preset on the kinematic and drivetrain bicycles (`wheel_angles=True` for the 3-D look); every plant states its own bounds, the mechanical bases invent none. | The catalog clean-up (K8, v0.4, after the demo rebuild; its car part, K8-0, in review with the 3-D car, [vehicle-models-run.md](../plans/vehicle-models-run.md) §6); phase 3 of the same plan (the demos moved to the brush tire, the UdeS Racecar on the 3-D car); one mechanical family (S32; postponed until the maintainer reviews the mechanical hierarchy, TODO §2); catalog hygiene (S64) and the general serial chain (C6), v0.5. |
 | Control | teaching | 6 | Linear, LQR (infinite horizon, finite horizon, along a trajectory), pole placement, reference scaling (`N`), `P` / `PI` / `PD` / `PID` and the rate-measured `Impedance` / `IntegralImpedance` as one family (what is measured decides the derivative; limits with infinite defaults, anti-windup once a limit is declared; the shared pieces three pure functions; the joint and task impedance laws on the same error rule), model-based SMC and computed torque, robotic impedance and kinematic laws, neural policy block; the geometric path-tracking laws `PurePursuit`, `Stanley` and `LineOfSight` on a `core/geometry` path, with the heading loop `HeadingController` (forward driving; unit-tested and JAX-traced, three racecar demos and their comparison, not yet in a course); a controller is a plain `System`; MPC's teaching name `ModelPredictiveController` on `minilink.control` (G3). | The robotic PID wrappers (C2, v0.5); the path-tracking laws on a `Track` (A3). |
 | Analysis | teaching | 6 | Jacobians, linearize, structural, equilibria, modal; one-channel Bode with grid-free margins, pole-zero, root locus, Nyquist, the linear step response on matplotlib and plotly; the sensitivity functions `S` / `T` / `PS` / `CS`. Every verb takes any `System`, the linear model as is, the rest linearized at the operating point; a step or sampled system in `z`, the root locus and the step response included, and the four linear plots (`plot_bode`, `plot_pzmap`, `plot_root_locus`, `plot_step_response`) on continuous, step and sampled systems alike. | Nichols and overlays later; Bode, poles and margins traceable for sensitivity to params (idea to review, S73). |
 | Blocks | teaching | 5 | Routing, nonlinear, filters, sources (with `Sine`; `NoiseSource`, sampled noise of any law, `WhiteNoise` its subclass), TF, `MLP`, `UnitDelay`. | `Ramp` / `Chirp` / `Delay` / `Switch` (C3, v0.5). |
@@ -890,6 +890,43 @@ review's defects (2026-11-10) and phase 4b, the API settled before the demo rebu
 - **Phase 7, the compiled faces of LQR and value iteration and the MPC reading the state**
   (plans as policies, its third change; TODO §1.8): additive, so before the tag if ready, else
   a 0.4.x or v0.5 with the RL and RRT faces.
+
+**The consolidation: its order and its targets** (the maintainer, 2026-11-12). Phase 5 is a
+consolidation, not a redraft at equal size: the code converged over v0.3 and v0.4 while what
+surrounds it grew (a test per rule, a doc section per ruling, a plan doc per run). Its success
+is measured in lines removed. The numbers below are orientation for whoever does the work,
+not a budget and not enforced by a check; measured on `dev-vehicle`, tracked files only.
+
+| Part | Today (2026-11-12) | Target after the consolidation |
+| --- | --- | --- |
+| Library (`minilink/`) | 82 060 lines, 281 files | 55 000 to 60 000 lines |
+| Tests | 42 539 lines, 101 files | 12 000 to 15 000 lines |
+| Benchmarks | 5 886 lines | 1 000 to 2 000 lines (the regression gate) |
+| Demos | 94 scripts | 12 to 15 scripts |
+| Projects and `minilink/experimental/` | 10 351 lines | none here (the private repository) |
+| Tutorial notebooks | 19 | 6 to 8 |
+| Course and topic notebooks | 25 | none here (a courses repository, pinned to a release; moved between terms) |
+| Governance and plan docs | 9 151 lines, 23 files | 1 500 to 2 000 lines |
+
+- **Three repositories:** `minilink` (the library, the minimal examples, a compact
+  architecture page); a public courses repository for the course notebooks, pinned to a
+  release, with a nightly run against `minilink`'s main that warns and never blocks; the
+  maintainer's private repository for the scratch work, the former demos, the projects and the
+  research models.
+- **The order:** the snapshot tag; the list of examples, each naming the core tools it
+  shows (the maintainer's); the new examples built, the rest moved out; the core cut, one
+  decision at a time, by what no example and no course notebook uses, with the tests still
+  in place; the tests rebuilt around the examples and each module's mathematical contracts;
+  the docs collapsed; the release.
+- **The tests are the net of the core cut:** they are rebuilt after it, not before. The ones
+  that check words and conventions rather than numbers (10 files, 3 009 lines) can go first.
+- **"Reads like a textbook" is the bar of the core math objects** (the plants' equations,
+  the control laws, the planners' algorithms), not of the whole library: the machinery and
+  the drawing code (a skin's geometry) are judged on robustness, and their size is not a
+  concern.
+- **A rule is held by a test only when breaking it gives a wrong number or a broken
+  example;** the others live in RULES and in review. A pass that adds more scaffolding than
+  it removes is not a consolidation.
 
 **The v0.3 core's leftovers.** One number per workstream, the same as TODO §1.N; each is small:
 

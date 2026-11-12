@@ -1,8 +1,10 @@
 """Drive the 1/10 racecar with a gamepad — windowless joystick + MeshCat + Plotly."""
 
-from minilink import UdeSRacecarDyn3D
+from minilink import UdeSRacecarDyn
+from minilink.graphical.catalog import racecar_skin_3d
 
-sys = UdeSRacecarDyn3D()
+sys = UdeSRacecarDyn(wheel_angles=True)
+sys.skin = racecar_skin_3d
 
 sys.game(
     renderer="meshcat",

@@ -4,6 +4,7 @@ Broad catalog plant checks (instantiate, ``f`` finite, geometry) live in the
 demo-check layer: ``tests/demo_checks/run_catalog_checks.py``.
 """
 
+import copy
 import unittest
 import numpy as np
 from minilink.dynamics.catalog.aerial.drone import (
@@ -42,11 +43,6 @@ from minilink.dynamics.catalog.vehicles.mountain_car import MountainCar
 from minilink.dynamics.catalog.vehicles.propulsion import (
     LongitudinalTorqueCar,
     LongitudinalSlipCar,
-)
-from examples.projects.car_trajopt.vehicles.extras import (
-    ConstantSpeedKinematicCar,
-    DynamicHolonomicMobileRobot,
-    HolonomicMobileRobot3D,
 )
 from minilink.dynamics.catalog.vehicles.steering import (
     HolonomicMobileRobot,
@@ -110,10 +106,11 @@ class TestCatalogSmoke(unittest.TestCase):
                     plant_class(output_mass=output_mass)
 
     def test_the_3d_car_skin_dresses_a_plant_without_wheel_radii(self):
-        from minilink.dynamics.catalog.vehicles.steering import KinematicCar
         from minilink.graphical.catalog.skins import car_skin_3d
 
-        car = KinematicCar()
+        car = KinematicBicycle()  # The full-size kinematic car
+        car.params["a"] = 2.0
+        car.params["b"] = 3.0
         self.assertNotIn("r_f", car.params)
         geometry = car_skin_3d(car)
         wheel_rl = geometry["body"][1]
@@ -127,12 +124,6 @@ class TestCatalogSmoke(unittest.TestCase):
         np.testing.assert_allclose(
             HolonomicMobileRobot().f(np.array([1.0, 2.0]), np.array([3.0, 4.0])),
             [3.0, 4.0],
-        )
-        np.testing.assert_allclose(
-            DynamicHolonomicMobileRobot().f(
-                np.array([1.0, 2.0, 3.0, 4.0]), np.array([5.0, 6.0])
-            ),
-            [3.0, 4.0, 5.0, 6.0],
         )
         car = LongitudinalSlipCar()
         self.assertGreater(car.acceleration(speed=0.0, slip=0.1), 0.0)
@@ -217,8 +208,6 @@ class TestCatalogSmoke(unittest.TestCase):
             (QuarterCar(), 1),
             (MountainCar(), 1),
             (HolonomicMobileRobot(), 1),
-            (DynamicHolonomicMobileRobot(), 1),
-            (HolonomicMobileRobot3D(), 1),
             (LongitudinalTorqueCar(), 1),
             (CartPole(), 1),
             (KinematicManipulator(2, 2), 1),
@@ -610,10 +599,6 @@ class TestMechanicalJointPortLabels(unittest.TestCase):
 import pytest
 
 from minilink.core.backends import configure_jax
-from examples.projects.car_trajopt.vehicles.ladder import (
-    BicycleDynEngine,
-    BicycleDynServo,
-)
 from minilink.dynamics.catalog.vehicles.dynamic_bicycle import BicycleDynRate
 
 
@@ -659,248 +644,6 @@ class TestBicycleDynRate(unittest.TestCase):
         self.assertFalse(np.allclose(dx_nom, dx_heavy))
 
 
-@pytest.mark.jax
-class TestBicycleDynServo(unittest.TestCase):
-    def setUp(self):
-        configure_jax(enable_x64=True)
-        self.named = BicycleDynServo(named_ports=True)
-        self.uy = BicycleDynServo()
-
-    def test_standard_ports(self):
-        self.assertIn("u", self.uy.inputs)
-        self.assertEqual(self.uy.inputs["u"].dim, 2)
-        self.assertEqual(self.uy.n, 9)
-        self.assertIn("y", self.uy.outputs)
-        self.assertEqual(self.uy.outputs["y"].dim, self.uy.n)
-
-    def test_f_matches_named_servo_inputs(self):
-        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 4.0, 0.1, 0.0])
-        u = np.array([200.0, 0.05])
-        dx_named = np.asarray(self.named.f(x, u))
-        dx_uy = np.asarray(self.uy.f(x, u))
-        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
-
-    def test_f_matches_named_servo_inputs_with_large_steer_command(self):
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 33.0, 0.0, 0.0])
-        u = np.array([0.0, 1.0])
-        dx_named = np.asarray(self.named.f(x, u))
-        dx_uy = np.asarray(self.uy.f(x, u))
-        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
-
-    def test_zero_torque_cruise_actuators_near_equilibrium(self):
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0, 0.0])
-        u = np.array([0.0, 0.0])
-        dx = np.asarray(self.named.f(x, u))
-        np.testing.assert_allclose(dx[6:8], np.zeros(2), atol=0.5)
-
-    def test_params_override_Ca(self):
-        sys = BicycleDynServo()
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.5, 0.0, 10.0 / 0.3, 0.05, 0.0])
-        u = np.array([0.0, 0.0])
-        params = {**sys.params, "Ca": 0.5 * sys.params["Ca"]}
-        dx_nom = np.asarray(sys.f(x, u))
-        dx_soft = np.asarray(sys.f(x, u, params=params))
-        self.assertFalse(np.allclose(dx_nom, dx_soft))
-
-
-@pytest.mark.jax
-class TestBicycleDynEngine(unittest.TestCase):
-    def setUp(self):
-        configure_jax(enable_x64=True)
-        self.named = BicycleDynEngine(named_ports=True)
-        self.uy = BicycleDynEngine()
-
-    def test_standard_ports(self):
-        self.assertIn("u", self.uy.inputs)
-        self.assertEqual(self.uy.inputs["u"].dim, 2)
-        self.assertEqual(self.uy.n, 9)
-        self.assertEqual(self.uy.inputs["u"].labels, ["P_cmd", "delta_cmd"])
-        self.assertIn("y", self.uy.outputs)
-        self.assertEqual(self.uy.outputs["y"].dim, self.uy.n)
-        self.assertNotIn("torque_tau", self.uy.params)
-        self.assertNotIn("transmission_ratio", self.uy.params)
-        self.assertNotIn("engine_power_peak", self.uy.params)
-
-    def test_f_matches_named_engine_inputs(self):
-        x = np.array([1.0, 2.0, 0.1, 3.0, 0.2, 0.05, 10.0, 0.1, 5000.0])
-        u = np.array([8000.0, 0.05])
-        dx_named = np.asarray(self.named.f(x, u))
-        dx_uy = np.asarray(self.uy.f(x, u))
-        np.testing.assert_allclose(dx_named, dx_uy, rtol=1e-09, atol=1e-09)
-
-    def test_unsaturated_torque_is_power_over_omega(self):
-        sys = BicycleDynEngine()
-        w = 50.0
-        P = 5000.0
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, w, 0.0, P])
-        u = np.array([P, 0.0])
-        # Mid-speed unsaturated: τ ≈ P/ω ≪ tau_sat
-        self.assertLess(abs(P / w), sys.params["tau_sat"])
-        dx = np.asarray(sys.f(x, u))
-        # P_dot ≈ 0 when P_cmd = P
-        np.testing.assert_allclose(dx[8], 0.0, atol=1e-09)
-
-    def test_stall_torque_saturates_near_zero_omega(self):
-        sys = BicycleDynEngine()
-        tau_sat = sys.params["tau_sat"]
-        P = 1e6
-        x = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, P])
-        u = np.array([P, 0.0])
-        dx = np.asarray(sys.f(x, u))
-        # ω=0, P>0 → τ = +τ_sat; brake≈0 → ω̇ = τ_sat / Jw
-        np.testing.assert_allclose(dx[6], tau_sat / sys.params["Jw_rear"], rtol=1e-06)
-
-    def test_params_override_engine_brake(self):
-        sys = BicycleDynEngine()
-        x = np.array([0.0, 0.0, 0.0, 10.0, 0.0, 0.0, 10.0 / 0.3, 0.0, 0.0])
-        u = np.array([0.0, 0.0])
-        params = {**sys.params, "bw_engine": 10.0 * sys.params["bw_engine"]}
-        dx_nom = np.asarray(sys.f(x, u))
-        dx_heavy = np.asarray(sys.f(x, u, params=params))
-        self.assertFalse(np.allclose(dx_nom[6], dx_heavy[6]))
-
-
-class TestCarProfile(unittest.TestCase):
-    def test_registered_profiles(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            CAR_PROFILES,
-            get_car_profile,
-            list_car_profiles,
-        )
-
-        self.assertEqual(list_car_profiles(), ("passenger_car", "racecar", "udes_1_5"))
-        for name in list_car_profiles():
-            self.assertIs(get_car_profile(name), CAR_PROFILES[name])
-
-    def test_racecar_matches_demo_vehicle_geometry(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import racecar_profile
-
-        profile = racecar_profile()
-        self.assertEqual(profile.mass, 700.0)
-        self.assertEqual(profile.a, 1.2)
-        self.assertEqual(profile.b, 1.0)
-        self.assertEqual(profile.r_r, 0.34)
-        self.assertEqual(profile.engine_power_peak, 100000.0)
-        self.assertEqual(profile.v_nom, 10.0)
-        self.assertLess(profile.v_nom, profile.limits.vx_max)
-        self.assertAlmostEqual(profile.limits.delta_max, np.pi / 4.0, places=2)
-        self.assertEqual(profile.limits.delta_dot_max, 3.0)
-        self.assertEqual(profile.limits.w_rear_dot_max, 41.0)
-        self.assertEqual(profile.limits.tau_rear_max, 3400.0)
-        self.assertEqual(profile.limits.tau_rear_min, -3400.0)
-
-    def test_propulsion_limits_from_power_at_nominal(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            get_car_profile,
-            list_car_profiles,
-        )
-
-        for name in list_car_profiles():
-            profile = get_car_profile(name)
-            tau = profile.propulsion_torque_nominal()
-            wdot = profile.propulsion_wheel_accel_nominal()
-            if abs(tau) >= 100.0:
-                expected_tau = round(tau, -1)
-            else:
-                expected_tau = round(tau, 1)
-            self.assertEqual(profile.limits.tau_rear_max, expected_tau)
-            self.assertEqual(profile.limits.tau_rear_min, -expected_tau)
-            self.assertEqual(profile.limits.w_rear_dot_max, round(wdot))
-            self.assertAlmostEqual(
-                profile.limits.v_dot_max,
-                round(profile.propulsion_longitudinal_accel_nominal(), 1),
-            )
-            self.assertEqual(profile.limits.a_long_max, profile.limits.v_dot_max)
-            self.assertEqual(profile.limits.delta_dot_max, profile.steer_rate_max)
-            self.assertLessEqual(profile.v_nom, profile.limits.vx_max)
-
-    def test_actuator_limits_exceed_traction_reference(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            get_car_profile,
-            list_car_profiles,
-        )
-
-        for name in list_car_profiles():
-            profile = get_car_profile(name)
-            if profile.propulsion_torque_nominal() > profile.traction_torque_max():
-                self.assertGreater(
-                    profile.limits.tau_rear_max,
-                    profile.traction_torque_max(),
-                    msg=name,
-                )
-                self.assertGreater(
-                    profile.limits.w_rear_dot_max,
-                    round(profile.traction_wheel_accel_reference()),
-                    msg=name,
-                )
-                self.assertGreater(profile.actuator_traction_headroom(), 1.0, msg=name)
-
-    def test_udes_matches_kinematic_racecar_geometry(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import udes_1_5_profile
-        from minilink.catalog import UdeSRacecar
-
-        udes = UdeSRacecar()
-        profile = udes_1_5_profile()
-        self.assertAlmostEqual(profile.a, udes.params["a"])
-        self.assertAlmostEqual(profile.b, udes.params["b"])
-        self.assertAlmostEqual(profile.length, udes.params["length"])
-
-    def test_apply_car_profile_rate_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            apply_car_profile,
-            passenger_car_profile,
-        )
-
-        sys = BicycleDynRate()
-        apply_car_profile(sys, passenger_car_profile())
-        profile = passenger_car_profile()
-        self.assertAlmostEqual(sys.params["mass"], profile.mass)
-        self.assertAlmostEqual(sys.params["a"] + sys.params["b"], profile.a + profile.b)
-        self.assertAlmostEqual(sys.params["Ca"], profile.Ca)
-        self.assertAlmostEqual(sys.params["a"], profile.a)
-        self.assertAlmostEqual(sys.params["b"], profile.b)
-        self.assertFalse(hasattr(sys, "tire_model_f"))
-        self.assertAlmostEqual(sys.state.upper[6], profile.limits.w_rear_max)
-        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.w_rear_dot_max)
-        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_dot_max)
-
-    def test_apply_car_profile_servo_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            apply_car_profile,
-            racecar_profile,
-        )
-
-        sys = BicycleDynServo()
-        apply_car_profile(sys, racecar_profile())
-        profile = racecar_profile()
-        self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
-        self.assertAlmostEqual(sys.params["torque_tau"], 0.05)
-        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.limits.tau_rear_max)
-        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
-
-    def test_apply_car_profile_engine_plant(self):
-        from examples.projects.car_trajopt.vehicles.car_profile import (
-            apply_car_profile,
-            racecar_profile,
-        )
-
-        sys = BicycleDynEngine()
-        apply_car_profile(sys, racecar_profile())
-        profile = racecar_profile()
-        self.assertAlmostEqual(sys.params["engine_tau"], profile.engine_tau)
-        self.assertAlmostEqual(sys.params["steering_tau"], profile.steering_tau)
-        self.assertAlmostEqual(sys.params["tau_sat"], profile.tau_sat)
-        self.assertAlmostEqual(sys.params["bw_engine"], profile.bw_engine)
-        self.assertAlmostEqual(sys.params["tau_fric"], profile.tau_fric)
-        self.assertNotIn("engine_power_peak", sys.params)
-        self.assertNotIn("transmission_ratio", sys.params)
-        self.assertAlmostEqual(sys.inputs["u"].upper[0], profile.engine_power_peak)
-        self.assertAlmostEqual(sys.inputs["u"].lower[0], -profile.engine_power_peak)
-        self.assertAlmostEqual(sys.inputs["u"].upper[1], profile.limits.delta_max)
-        self.assertAlmostEqual(sys.state.upper[8], profile.engine_power_peak)
-        self.assertAlmostEqual(sys.state.lower[8], -profile.engine_power_peak)
-
-
 # The params family: a method reads the params it is given
 
 from minilink.dynamics.catalog.manipulators.arms import ThreeLinkManipulator
@@ -910,8 +653,6 @@ from minilink.dynamics.catalog.pendulum.cartpole import (
 )
 from minilink.dynamics.catalog.mass_spring_damper.linear import FloatingTwoMass
 from minilink.dynamics.catalog.pendulum.pendulum import InvertedPendulum
-from minilink.dynamics.catalog.vehicles.dynamic_bicycle import DynamicBicycleCar3D
-from minilink.dynamics.catalog.vehicles.steering import KinematicCar
 
 
 def stored(cls, **attributes):
@@ -991,10 +732,8 @@ PARAMS_CASES = [
     # The dynamic bicycles: contact velocity and tire force arrows
     (stored(DynamicBicycle), "get_dynamic_geometry", "a", 1.3),
     (stored(DynamicBicycle), "get_dynamic_geometry", "Ca", 80000.0),
-    (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "r_f", 0.4),
-    (stored(DynamicBicycleCar3D), "get_dynamic_geometry", "Ca", 80000.0),
     # The kinematic car: its steered front wheels
-    (stored(KinematicCar), "tf", "length", 6.0),
+    (stored(KinematicBicycle), "tf", "a", 3.0),
     # The longitudinal cars: the traction arrow
     (
         stored(LongitudinalSlipCar),
@@ -1047,8 +786,6 @@ PARAMS_CASES = [
     # The planar drones: the thrust arrows at the thrusters
     (stored(Drone2D), "get_dynamic_geometry", "thruster_offset", 0.7),
     (stored(Drone2DWithSideThruster), "get_dynamic_geometry", "thruster_offset", 0.7),
-    # The constant-speed car of the car_trajopt project: its front axle
-    (stored(ConstantSpeedKinematicCar), "tf", "a", 2.5),
 ]
 
 
@@ -1079,14 +816,6 @@ def case_id(value):
     return getattr(value, "__name__", None)
 
 
-def test_the_constant_speed_car_drives_the_bicycle_at_the_speed_given():
-    car = ConstantSpeedKinematicCar()
-    u = np.array([0.2])
-    np.testing.assert_array_equal(car.bicycle_input(u), [2.0, 0.2])
-    fast = {**car.params, "speed": 5.0}
-    np.testing.assert_array_equal(car.bicycle_input(u, fast), [5.0, 0.2])
-
-
 @pytest.mark.parametrize("make, method, key, value", PARAMS_CASES, ids=case_id)
 def test_a_method_reads_the_params_it_is_given(make, method, key, value):
     plant = make()
@@ -1102,149 +831,282 @@ def test_a_method_reads_the_params_it_is_given(make, method, key, value):
         np.testing.assert_equal(given, default)
 
 
-# The pathtracking project's vehicle: the rolling resistance, the tires, the inputs
+# The dynamic bicycles on a law of the tire module
 
-from examples.projects.pathtracking.common.vehicle import (
-    LinearTire,
-    Pacejka,
-    RearDriveBicycle,
-    create_vehicle,
+from minilink.dynamics.catalog.vehicles.tires import BrushTire, MagicFormulaTire
+
+TIRE_LAWS = [BrushTire, MagicFormulaTire]
+
+
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+@pytest.mark.parametrize(
+    "make", [DynamicBicycle, BicycleDynRate], ids=lambda m: m.__name__
 )
+def test_a_dynamic_bicycle_holds_a_copy_of_the_tire_on_each_wheel(make, law):
+    template = law(c_alpha=6.0)
+    car = make(tire=template)
+
+    assert {"Ca", "Ck", "mu", "v_min_epsilon"}.isdisjoint(car.params)
+    for wheel in ("f", "r"):
+        assert car.params["tire"][wheel] is car.tire[wheel].params  # One home
+        assert car.tire[wheel] is not template  # A copy: the template is not held
+        assert car.params["tire"][wheel] == template.params  # The tire's numbers win
+    assert car.params["tire"]["f"] is not car.params["tire"]["r"]
+
+    # A whole-tree assignment is routed to the tires, which stay held
+    held = car.params["tire"]["r"]
+    tree = copy.deepcopy(car.params)
+    tree["tire"]["r"]["mu"] = 0.4
+    car.params = tree
+    assert car.params["tire"]["r"] is held and held["mu"] == 0.4
+    assert car.params["tire"]["f"]["mu"] == template.params["mu"]
 
 
-class TestPathtrackingVehicle(unittest.TestCase):
-    def test_the_front_rolling_resistance_opposes_the_front_wheel_spin(self):
-        vehicle = create_vehicle()
-        vehicle.rolling_friction_constant = 0.015
-        v = np.array(
-            [0.0, 0.0, 0.0, 2.0, -2.0]
-        )  # The rear spins forward, the front back
-        u_in = np.array([0.0, 0.0])
-        Fx_front, _, _, _ = vehicle.compute_tire_physics(v, u_in)
-        Fz_f = vehicle.mass * vehicle.gravity * vehicle.b / vehicle.L
-        d = vehicle.generalized_d(np.zeros(3), v, u_in)
-        tau_front = vehicle.r_f * Fx_front + vehicle.bw_front * v[4] - 0.015 * Fz_f
-        self.assertAlmostEqual(d[4], tau_front, places=9)
+def test_a_tire_per_wheel_by_name():
+    front, rear = BrushTire(c_alpha=4.0), MagicFormulaTire(c_alpha=5.0)
+    car = DrivetrainBicycle(tire={"f": front, "r": rear})
 
-    def test_the_lateral_weight_is_one_without_longitudinal_slip(self):
-        # G_yκ(κ = 0) = 1 whatever the curvature E (Pacejka 2006, §4.3.2)
-        tire = Pacejka()
-        tire.r_Ey1 = 0.5  # E = r_Ey1 + r_Ey2 d_fz = −0.5
-        for alpha in (0.0, 0.1, -0.2):
-            self.assertEqual(tire.Gyk(0.0, alpha), 1.0)
-        self.assertLess(tire.Gyk(0.3, 0.1), 1.0)
-
-    def test_the_rear_drive_bicycle_leaves_the_callers_input_alone(self):
-        vehicle = RearDriveBicycle()
-        vehicle.tire_model_f = LinearTire()
-        vehicle.tire_model_r = LinearTire()
-        x = np.zeros(8)
-        x[3] = 5.0
-        x[6] = 5.0 / vehicle.r_r
-        x[7] = 5.0 / vehicle.r_f
-        u = np.array([10.0, 2.0])  # A steer command past the limit
-        dx = vehicle.f(x, u)
-        np.testing.assert_array_equal(u, [10.0, 2.0])
-        clipped = np.array([10.0, vehicle.max_steer])
-        np.testing.assert_array_equal(dx, vehicle.f(x, clipped))
-
-    def test_the_friction_circle_caps_each_contact_of_an_array(self):
-        # One contact inside the circle, one beyond it: each as its own scalar call
-        alpha = np.array([0.01, 0.5])
-        kappa = np.array([0.005, 0.9])
-        Fz = np.array([3000.0, 3000.0])
-        for tire in (LinearTire(), Pacejka(combined_slip_mode="c")):
-            with self.subTest(tire=type(tire).__name__):
-                Fx, Fy = tire.slip2forces(alpha, kappa, Fz)
-                for i in range(2):
-                    Fx_i, Fy_i = tire.slip2forces(alpha[i], kappa[i], Fz[i])
-                    self.assertEqual((Fx[i], Fy[i]), (Fx_i, Fy_i))
-                self.assertLessEqual(
-                    np.hypot(Fx[1], Fy[1]), tire.mu * Fz[1] * (1 + 1e-12)
-                )
+    assert car.params["tire"]["f"]["c_alpha"] == 4.0
+    assert car.params["tire"]["r"]["C"] == rear.params["C"]
+    with pytest.raises(ValueError, match="wheels"):
+        DrivetrainBicycle(tire={"f": front})
 
 
-# The pathtracking project's path helpers: the point ahead along the path, both copies
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+def test_a_dynamic_bicycle_on_a_tire_law_simulates(law):
+    car = DynamicBicycle(tire=law())
+    x0 = np.array([0.0, 0.0, 0.0, 5.0, 0.0, 0.0])
 
-PATH_MODULES = (
-    "examples.projects.pathtracking.bicycle_los.los",
-    "examples.projects.pathtracking.bicycle_los_v2.path_tracking",
-)
+    traj = car.compute_trajectory(tf=3.0, u=np.array([18.0, 0.1]), x0=x0)
 
-
-@pytest.mark.parametrize("module", PATH_MODULES)
-def test_the_point_ahead_starts_on_the_next_segment_after_a_degenerate_one(module):
-    import importlib
-
-    ahead = importlib.import_module(module).point_ahead_along_path
-    for path in (
-        [(0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
-        [(0.0, 0.0), (0.0, 0.0), (0.0, 0.0), (4.0, 0.0), (4.0, 3.0)],
-    ):
-        ax, ay, i, lam, heading = ahead(path, 0, 0.7, 1.0, closed=False)
-        assert (ax, ay, heading) == (1.0, 0.0, 0.0)
-        assert i == len(path) - 3
-
-
-@pytest.mark.parametrize("module", PATH_MODULES)
-def test_an_open_path_stops_at_its_end_with_its_last_heading(module):
-    import importlib
-
-    ahead = importlib.import_module(module).point_ahead_along_path
-    square = [(0.0, 0.0), (4.0, 0.0), (4.0, 3.0), (0.0, 3.0)]
-    reached = ahead(square, 1, 0.2, 9.0, closed=False)
-    assert reached == (0.0, 3.0, 2, 1.0, np.pi)
-    assert [type(value) for value in reached] == [float, float, int, float, float]
-    clamped = ahead(square, 3, 0.5, 1.0, closed=False)  # No closing segment
-    assert clamped[:3] == (1.0, 3.0, 2)
-    with pytest.raises(ValueError, match="non-negative"):
-        ahead(square, 1, 0.2, -1.0, closed=False)
-    wrapped = ahead(square, 0, 0.5, -1.0, closed=True)  # A loop wraps a negative ds
-    assert [type(value) for value in wrapped] == [float, float, int, float, float]
-
-
-def test_a_closed_rounded_rectangle_does_not_repeat_its_first_waypoint():
-    from examples.projects.pathtracking.common.path_generator import (
-        rounded_rectangle_path,
-    )
-
-    closed = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=True)
-    open_loop = rounded_rectangle_path(40.0, 20.0, 7.0, nseg=2, narc=4, closed=False)
-    # The closing segment returns to the first waypoint: no zero-length segment
-    assert np.hypot(*(closed[-1] - closed[0])) > 0.1
-    # The open path runs the whole loop, back onto its first waypoint
-    np.testing.assert_array_equal(open_loop[-1], open_loop[0])
-    np.testing.assert_array_equal(open_loop[:-1], closed)
-
-
-# The pathtracking project's signal blocks: one xp body each, so they trace under jit
+    assert np.all(np.isfinite(traj.x))
+    assert traj.x[5, -1] > 0.0  # A left steer turns the car left
 
 
 @pytest.mark.jax
-def test_the_pathtracking_signal_blocks_trace_under_jit():
+@pytest.mark.parametrize("law", TIRE_LAWS, ids=lambda law: law.__name__)
+def test_a_rate_bicycle_on_a_tire_law_traces_under_jax(law):
     jax = pytest.importorskip("jax")
     configure_jax(enable_x64=True)
-    from examples.projects.pathtracking.common.allocation import Allocation
-    from examples.projects.pathtracking.mpc_v1.nominal_refs import NominalRefs
-    from examples.projects.pathtracking.mpc_v1.plant_to_mpc import PlantToMpcState
+    jnp = jax.numpy
+    car = BicycleDynRate(tire=law())
+    x = jnp.array([0.0, 0.0, 0.1, 4.0, 0.2, 0.1, 14.0, 0.05])
+    u = jnp.array([1.0, 0.1])
 
-    rng = np.random.default_rng(0)
-    allocation = Allocation(0.34, 40000.0, transmission_ratio=2.0)
-    nominal = NominalRefs()
-    to_mpc = PlantToMpcState()
-    cases = [
-        (allocation.h_throttle, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
-        (
-            allocation.h_throttle,
-            np.concatenate([[-50.0, 0.1], 40.0 + rng.normal(size=10)]),
-        ),
-        (allocation.h_delta, np.concatenate([[3000.0, 0.1], rng.normal(size=10)])),
-        (nominal.h_heading_ref, rng.normal(size=8)),
-        (nominal.h_vx_ref, rng.normal(size=8)),
-        (nominal.h_delta_ff, rng.normal(size=8)),
-        (to_mpc.h_y_mpc, rng.normal(size=10)),
-    ]
-    for h, u in cases:
-        expected = h(None, u)
-        traced = jax.jit(lambda u, h=h: h(None, u))(u)
-        np.testing.assert_array_equal(np.asarray(traced), expected)
+    dx = jax.jit(car.f)(x, u)
+    dmu = jax.grad(lambda mu: car.f(x, u, 0.0, {**car.params, "mu": mu})[4])(1.0)
+
+    np.testing.assert_allclose(
+        np.asarray(dx), np.asarray(car.f(np.asarray(x), np.asarray(u))), rtol=1e-12
+    )
+    assert np.isfinite(float(dmu))
+
+
+# The drivetrain bicycle: the full-size car launches, reaches its top speed, turns
+
+from minilink.dynamics.catalog.vehicles.drivetrain_bicycle import DrivetrainBicycle
+
+
+def test_the_drivetrain_bicycle_launches_from_rest():
+    car = DrivetrainBicycle(named_ports=False)
+
+    traj = car.compute_trajectory(tf=1.0, u=np.array([car.params["P_max"], 0.0]))
+
+    assert np.all(np.isfinite(traj.x))
+    assert traj.x[3, -1] > 3.0  # Faster than 3 m/s after one second
+    assert np.all(np.diff(traj.x[3]) >= -1e-9)
+
+
+def test_the_drivetrain_bicycle_tops_out_where_its_power_meets_the_drag():
+    from scipy.optimize import brentq
+
+    car = DrivetrainBicycle(named_ports=False)
+    p = car.params
+    u = np.array([p["P_max"], 0.0])
+
+    def cruise(v):
+        """The car's acceleration at speed ``v``, the wheel rate in balance."""
+
+        def wheel_acceleration(w):
+            return car.f(np.array([0, 0, 0, v, 0, 0, w, 0, p["P_max"]]), u)[6]
+
+        w = brentq(wheel_acceleration, v / p["r_r"], 1.2 * v / p["r_r"])
+        return car.f(np.array([0, 0, 0, v, 0, 0, w, 0, p["P_max"]]), u)[3]
+
+    v_top = brentq(cruise, 20.0, 90.0)
+
+    # P_max = ½ ρ CdA v³ + C_rr Fz_f v + the drivetrain's drag, at the rolling rate
+    drag = 0.5 * p["rho"] * p["CdA"]
+    Fz_f = p["mass"] * p["gravity"] * p["b"] / (p["a"] + p["b"])
+
+    def balance(v):
+        w = v / p["r_r"]
+        losses = (p["bw_drive"] * w + p["tau_fric"]) * w
+        return drag * v**3 + p["C_rr"] * Fz_f * v + losses - p["P_max"]
+
+    assert v_top == pytest.approx(brentq(balance, 10.0, 100.0), rel=0.02)
+
+
+def test_the_drivetrain_bicycle_turns_the_way_it_steers():
+    car = DrivetrainBicycle(named_ports=False)
+    r_r = car.params["r_r"]
+
+    for delta in (0.05, -0.05):
+        x = np.array([0.0, 0.0, 0.0, 15.0, 0.0, 0.0, 15.0 / r_r, delta, 0.0])
+        yaw_acceleration = car.f(x, np.array([0.0, delta]))[5]
+        assert np.sign(yaw_acceleration) == np.sign(delta)
+
+
+# The car ladder's heading is psi, and the wheelbase is a + b
+
+from minilink.dynamics.catalog.vehicles.racecar import UdeSRacecar, UdeSRacecarDyn
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        KinematicBicycle,
+        UdeSRacecar,
+        DynamicBicycle,
+        BicycleDynRate,
+        DrivetrainBicycle,
+        UdeSRacecarDyn,
+    ],
+    ids=lambda m: m.__name__,
+)
+def test_every_car_names_its_heading_psi_and_owns_its_wheelbase_once(make):
+    car = make()
+
+    assert car.state.labels[2] == "psi"
+    assert "length" not in car.params
+    assert {"a", "b"} <= set(car.params)
+
+
+def test_the_saturated_linear_tire_given_runs_on_its_own_numbers():
+    from minilink.dynamics.catalog.vehicles.tires import LinearSaturation
+
+    v = np.array([10.0, 0.5, 0.2])
+    u = np.array([35.3, 0.05])
+    default = DynamicBicycle()
+    given = DynamicBicycle(tire=LinearSaturation())  # Its defaults are rung 3's numbers
+
+    assert given.params["tire"]["f"] == {
+        "mu": 1.0,
+        "Ca": 60000.0,
+        "Ck": 100000.0,
+        "v_eps": 0.1,
+    }
+    np.testing.assert_allclose(
+        given.compute_tire_physics(v, u), default.compute_tire_physics(v, u), rtol=1e-12
+    )
+    assert given.fastest_mode() == pytest.approx(default.fastest_mode(), rel=1e-12)
+
+
+def test_the_terrain_friction_scales_every_tire_in_one_line():
+    car = DrivetrainBicycle(named_ports=False)
+    x = np.array([0.0, 0.0, 0.0, 10.0, 1.0, 0.3, 10.0 / 0.3, 0.1, 0.0])
+    u = np.zeros(2)
+    dry = np.asarray(car.f(x, u))
+
+    car.params["terrain"]["friction"] = 0.4
+    wet = np.asarray(car.f(x, u))
+    car.params["terrain"]["friction"] = 1.0
+    for wheel in ("f", "r"):
+        car.params["tire"][wheel]["mu"] *= 0.4
+    the_same_by_the_tires = np.asarray(car.f(x, u))
+
+    assert not np.allclose(dry, wet)
+    np.testing.assert_allclose(wet, the_same_by_the_tires, rtol=1e-12)
+
+
+# Every car rung publishes one frame set, so any car look draws any rung
+
+from minilink.graphical.catalog.skins import car_skin_2d, car_skin_3d
+
+CAR_FRAMES = {"body", "axle_front", "wheel_fl", "wheel_fr"}
+
+
+@pytest.mark.parametrize(
+    "make",
+    [
+        KinematicBicycle,
+        UdeSRacecar,
+        DynamicBicycle,
+        BicycleDynRate,
+        DrivetrainBicycle,
+        UdeSRacecarDyn,
+    ],
+    ids=lambda m: m.__name__,
+)
+def test_every_car_rung_publishes_the_car_frames_and_wears_any_car_look(make):
+    car = make()
+    frames = car.tf(np.zeros(car.n), np.zeros(car.m))
+
+    assert CAR_FRAMES <= set(frames)
+    for look in (car_skin_2d, car_skin_3d):
+        assert set(look(car)) - {"world"} <= set(frames)
+
+
+def test_a_friction_map_lowers_the_grip_of_the_axle_on_it_only():
+    from minilink.dynamics.catalog.vehicles.terrain import Terrain
+
+    class IceAhead(Terrain):
+        """Ice where x > 0."""
+
+        def friction(self, x, y, t=0.0, params=None):
+            return np.where(x > 0.0, 0.1, 1.0)
+
+    car = DrivetrainBicycle(named_ports=False, terrain=IceAhead())
+    v = np.array([10.0, 1.0, 0.0])
+    u_in = np.array([10.0 / 0.3, 0.0])
+
+    # The car straddles the edge: the front axle on the ice, the rear on asphalt
+    _, Fy_f, _, Fy_r = car.compute_tire_physics(v, u_in, q=np.array([0.0, 0.0, 0.0]))
+    _, Fy_f_dry, _, Fy_r_dry = car.compute_tire_physics(
+        v, u_in, q=np.array([-5.0, 0.0, 0.0])
+    )
+
+    assert abs(Fy_f) < 0.2 * abs(Fy_f_dry)
+    assert Fy_r == Fy_r_dry
+
+
+@pytest.mark.parametrize(
+    "plant",
+    [DynamicBicycle, BicycleDynRate, DrivetrainBicycle, UdeSRacecarDyn],
+    ids=lambda plant: plant.__name__,
+)
+def test_a_road_that_dries_with_time_is_read_at_the_time_of_the_call(plant):
+    from minilink.dynamics.catalog.vehicles.terrain import Terrain
+    from minilink.dynamics.catalog.vehicles.tires import BrushTire
+
+    class Drying(Terrain):
+        """Wet until t = 1 s, dry after."""
+
+        def friction(self, x, y, t=0.0, params=None):
+            return np.where(t < 1.0, 0.2, 1.0)
+
+    car = plant(tire=BrushTire(), terrain=Drying())
+    x = np.zeros(car.n)
+    x[3:6] = [10.0, 2.0, 0.0]
+    x[6:] = 0.0
+    u = np.zeros(car.m)
+
+    dvy_wet = car.f(x, u, 0.0)[4]
+    dvy_dry = car.f(x, u, 2.0)[4]
+
+    assert abs(dvy_wet) < 0.5 * abs(dvy_dry)
+
+    # The rear wheel, stopped under a rolling car, is spun up harder by the dry road,
+    # and the used grip is read on the road of that time
+    if plant in (DrivetrainBicycle, UdeSRacecarDyn):
+        assert abs(car.f(x, u, 0.0)[6]) < 0.5 * abs(car.f(x, u, 2.0)[6])
+        np.testing.assert_allclose(car.grip(x, u, 0.0), car.grip(x, u, 2.0), rtol=0.2)
+        assert np.all(car.grip(x, u, 2.0) > 0.9)
+
+
+def test_the_racecar_s_command_limits_are_its_own_numbers():
+    car = UdeSRacecarDyn()
+    p = car.params
+
+    np.testing.assert_array_equal(car.inputs["u"].upper, [p["P_max"], p["delta_max"]])
+    np.testing.assert_array_equal(car.inputs["u"].lower, [-p["P_max"], -p["delta_max"]])

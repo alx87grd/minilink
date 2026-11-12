@@ -64,7 +64,7 @@ scene = Scene(obstacles=[Sphere(c, CONE_RADIUS + CONE_MARGIN) for c in cones])
 # The model the plan runs on: the same car with grip to spare. Nothing else changes, so
 # what the plan gets wrong at the limit is the plant's own behaviour, not other physics.
 design = UdeSRacecarDyn(named_ports=False)
-design.params["mu"] = PLANNER_MU
+design.params["terrain"]["friction"] = PLANNER_MU
 design.state.lower[6] = 0.0
 design.state.upper[6] = 3.0 * V_TARGET / design.params["r_r"]
 design.state.lower[7] = -design.params["delta_max"]
@@ -143,7 +143,7 @@ planner = TrajectoryOptimizationPlanner(
 mpc = ModelPredictiveController(planner, delay=False, verbose=True)
 
 car = UdeSRacecarDyn(named_ports=False)
-car.params["mu"] = PLANT_MU
+car.params["terrain"]["friction"] = PLANT_MU
 car.x0 = x0.copy()  # the whole circuit, not the car
 car.camera_scale = 2.0
 

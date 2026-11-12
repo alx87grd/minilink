@@ -32,6 +32,7 @@ the maintainer would and logged in the run's record.
 | Step, in plain words | Id | Release | What the ask is |
 | --- | --- | --- | --- |
 | Your demo rebuild, then the tests' clean slate | MS-D1 | v0.4 (end) | your new minimal demo set; decided with it: the test layers, the tabular Q-learning demo, the MPC-tuning demo, the cart-pole RL demo's budget, the supported plants, GMC714's pins (§1.12) |
+| The car models' review: the 3-D car, its presets and looks | K8-0 | v0.4 | the decisions the run took on its own, listed in [vehicle-models-run.md](vehicle-models-run.md) §6 ("Run 1 continued") and the pull request: the presets' names and numbers, the suspension part, the locked axle, no downforce, the read-only projects' one-keyword edits |
 | The mechanical hierarchy and the car models' base | S32 | v0.4 end or later | your review: which class is the child of which, the cars' base, the mass matrix's one name, `C(q, v)` or `C(q, dq)`, `actuators=` a count |
 | The root list regenerated from the rebuilt demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
@@ -308,10 +309,15 @@ touches fewer files. Nothing leaves without the maintainer's ruling (RULES 7.1).
 feature (K4) became the maintainer's demo rebuild (§1.12).
 
 - [ ] **The catalog clean-up** (K8): two import layers and support by
-  test. Steps, one commit each: **K8-0** the car family to three models (`KinematicBicycle`,
+  test. Steps, one commit each: **K8-0** the car family to three models (widened by [vehicle-models.md](vehicle-models.md), its steps and their "done when" in [vehicle-models-run.md](vehicle-models-run.md); `KinematicBicycle`,
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
-  notebooks and demos migrated); **K8-1** the root prelude trimmed to the course set (the
+  notebooks and demos migrated; in review on `dev-vehicle`: the tire and terrain
+  modules, `DrivetrainBicycle` with `UdeSRacecarDyn` its preset, `UdeSRacecarDyn3D` as
+  `UdeSRacecarDyn(wheel_angles=True)`, `psi`, the wheelbase owned by `a` and `b`, the tires as
+  per-wheel parts, one frame set (`KinematicCar` and `DynamicBicycleCar3D` retired), one
+  stacked `u`, `SuspensionCar3D` with `FormulaCar3D` and `OffRoadCar3D` and their looks;
+  **[ask]** the run's own decisions, the brief's §6 and the pull request); **K8-1** the root prelude trimmed to the course set (the
   course plants, 16, no cap; all 50 catalog plants today; ledger line in ROADMAP §2);
   **K8-2** `minilink.catalog` the one flat index of every supported plant, each passing the
   both-backends contract test, with a docs entry; **K8-3** the unsupported plants moved to `minilink/experimental/catalog/` with their skins
@@ -322,7 +328,7 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   (`camera.py`, `ProblemEnv` / `to_gymnasium`; the pygame renderer stays, the real-time
   default); **K8-6** the README's catalog line by domain and the API
   site's plant page. Done when the root prelude lists exactly the course plants, `minilink.catalog`
-  lists only tested plants, no two supported plants differ by parameters alone, and
+  lists only tested plants, no two supported plants differ by parameters alone (except the UdeS Racecar's thin preset classes, ruled 2026-11-11: vehicle-models.md), and
   `test_teaching_surface.py` pins both lists.
 - [ ] **The kinematic car family declares its time constant** (v0.4, with K8-0): `KinematicBicycle` and `UdeSRacecar` get default input bounds and declare `τ = L / (v_max tan δ_max)`, so their loops leave the 1 ms default (1000 substeps a 0.1 s MPC period today). Done when the car family's automatic step reads its declared `τ` and the moved numbers sit in a ledger.
 - [ ] **The experimental tier, untested** (K9). Landed: the prototype

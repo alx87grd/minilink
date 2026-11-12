@@ -60,7 +60,7 @@
     "id": "bicycle_cascade_vehicle",
     "requires": [],
     "module": "minilink.dynamics.catalog.vehicles.dynamic_bicycle",
-    "class": "DynamicBicycleCar3D",
+    "class": "DynamicBicycle",
     "params": {},
     "x": [
       -10.0,

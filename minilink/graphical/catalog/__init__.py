@@ -7,6 +7,7 @@ from minilink.core.exports import lazy_facade
 _SHAPES = "minilink.graphical.catalog.shapes"
 _SKINS = "minilink.graphical.catalog.skins"
 _RACECAR = "minilink.graphical.catalog.racecar_skin"
+_CARS_3D = "minilink.graphical.catalog.car_skins_3d"
 _CAMERA = "minilink.graphical.animation.camera"
 _DRAWABLES = "minilink.graphical.animation.drawables"
 
@@ -47,6 +48,8 @@ _EXPORTS: dict[str, tuple[str, str]] = {
     # Skins
     "car_skin_2d": (_SKINS, "car_skin_2d"),
     "car_skin_3d": (_SKINS, "car_skin_3d"),
+    "formula_car_skin_3d": (_CARS_3D, "formula_car_skin_3d"),
+    "offroad_car_skin_3d": (_CARS_3D, "offroad_car_skin_3d"),
     "plane_skin_3d": (_SKINS, "plane_skin_3d"),
     "racecar_skin_2d": (_RACECAR, "racecar_skin_2d"),
     "racecar_skin_3d": (_RACECAR, "racecar_skin_3d"),

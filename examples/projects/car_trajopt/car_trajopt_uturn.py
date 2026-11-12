@@ -18,7 +18,7 @@ Y_GOAL = 15.0
 W_REAR_MAX = 30.0
 DELTA_MAX = 0.8
 
-sys = DynamicBicycle()
+sys = DynamicBicycle(named_ports=True)
 sys.inputs["w_rear"].lower[0] = W_REAR_MAX
 sys.inputs["w_rear"].upper[0] = W_REAR_MAX
 sys.inputs["delta"].lower[0] = -DELTA_MAX

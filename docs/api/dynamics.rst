@@ -46,13 +46,25 @@ Catalog
 .. automodule:: minilink.dynamics.catalog.vehicles.dynamic_bicycle
    :members:
 
+.. automodule:: minilink.dynamics.catalog.vehicles.drivetrain_bicycle
+   :members:
+
 .. automodule:: minilink.dynamics.catalog.vehicles.racecar
+   :members:
+
+.. automodule:: minilink.dynamics.catalog.vehicles.suspension_car
+   :members:
+
+.. automodule:: minilink.dynamics.catalog.vehicles.car_presets_3d
    :members:
 
 .. automodule:: minilink.dynamics.catalog.vehicles.propulsion
    :members:
 
 .. automodule:: minilink.dynamics.catalog.vehicles.tires
+   :members:
+
+.. automodule:: minilink.dynamics.catalog.vehicles.terrain
    :members:
 
 .. automodule:: minilink.dynamics.catalog.vehicles.suspension
