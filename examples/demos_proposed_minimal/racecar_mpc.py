@@ -116,7 +116,7 @@ traj = closed_loop.compute_trajectory(tf=TF, dt=0.01)
 lap = traj.of("plant")
 bounds = ((-4.5, 4.5), (-3.5, 3.5))
 
-fig, ax = track.plot(bounds=bounds, show=False)
+fig, ax = track.plot(bounds=bounds, waypoint_color="none", show=False)
 scene.plot(bounds=bounds, ax=ax, show=False)
 ax.plot(lap.x[0], lap.x[1], label="the car")
 ax.legend()

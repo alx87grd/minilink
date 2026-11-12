@@ -282,21 +282,22 @@ Seen while drafting, and left as they are:
 The seven of §4.6 are the shortlist. Candidates for two or three more, the maintainer's to
 pick:
 
-- **Two MPCs on the car, each on the model that suits it** (the maintainer's idea):
-  - *MPPI on the kinematic bicycle, with the inner PI on the speed.* Sampling needs many
-    cheap rollouts and no gradient, which a three-state model gives; it handles a cost that
-    is not smooth (cones, lane edges) without the shaping a gradient method needs. It
-    would replace the collocation planner of `racecar_mpc.py` in the same cascade.
-  - *SQP on the dynamic model for fast cornering.* Near the limit of grip the plan must
-    know the tires, and a gradient method on the dynamic model with exact derivatives is
-    the tool: few iterations, a warm start, constraints held. Its starting point is
-    `udes_racecar/mpc_racecar_dynamic.py`, which today neither completes its lap nor stays
-    in its lane (§4.6), with fewer spatial fields.
+- **Two MPCs on the car, each on the model that suits it** (the maintainer's idea),
+  prototyped the same day in `examples/demos_proposed_minimal/`, both on the 18 m circuit
+  of `racecar_mpc.py`:
+  - `racecar_mppi.py`: the cascade of `racecar_mpc.py` with its planner replaced by MPPI
+    on the kinematic bicycle (2048 sequences per tick, 1 s ahead). It laps in 6.4 s, the
+    car's centre within 0.43 m of the line (0.50 m with the collocation planner), and
+    runs in 27 s.
+  - `racecar_fast_lap.py`: SQP on the dynamic model, asked for 5.5 m/s. The plan brakes
+    to 3.0 m/s into the corners and reaches 4.75 m/s on the straights: a lap in 4.8 s
+    against 6.4 s for the kinematic plan, the centre within 0.58 m of the line of a 0.6 m
+    lane (the plan is given a lane of 0.4 m as its margin).
 
   The pair tells one story: the planner follows the model, sampling where the model is
-  cheap and the cost rough, gradients where the model is rich and the cost smooth. To
-  check when drafting: that the MPPI lap is as clean as the collocation one, and that the
-  dynamic lap is fast enough to show what the kinematic plan cannot do.
+  cheap and the cost rough, gradients where the model is rich and the cost smooth. Open:
+  whether `racecar_mppi.py` replaces `racecar_mpc.py` (same cascade, and it tracks the
+  line better) or stands beside it.
 - **Identification of a car from a driving log, by gradient through the simulator:** the
   differentiable path has no demo on anything larger than a pendulum's gains; the numbers
   to find are the tire parts' (`params["tire"]`).
