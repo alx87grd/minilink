@@ -1,10 +1,10 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
 **Status:** phases 1, 2 and 2b built by run 1 of [vehicle-models-run.md](vehicle-models-run.md),
-in review on `dev-vehicle`. The maintainer was interviewed on 2026-11-11; the answers
+merged into `dev` by PR #141 on 2026-11-12. The maintainer was interviewed on 2026-11-11; the answers
 are recorded in §2. A second review the same day added the rulings at the end of §2's table. An
 independent review of the built branch followed (§11): its fixes that keep names and behaviour
-are applied, and its three design questions wait in [QUESTIONS.md](../dev/QUESTIONS.md).  
+are applied, and its design questions wait in [QUESTIONS.md](../dev/QUESTIONS.md).  
 **Lane:** teaching catalog (`minilink/dynamics/catalog/vehicles/`). The specialized models go
 to the maintainer's private repository, not to minilink.  
 **Rung:** the car part of v0.4's catalog clean-up (the car cut, K8-0 in [TODO.md](TODO.md)),
@@ -804,5 +804,18 @@ Known and left as they are:
   realtime game steps about seven times coarser than the hint: a parked car's rear wheel
   chatters there (up to 0.5 m/s of wheel-surface speed with Euler), and stays finite;
 - `x0` and the command limits are set at construction and by `set_numbers`: after a direct
-  edit of `params["h_cg"]`, `car.x0 = car.rest_state()` brings the car back to rest.
+  edit of `params["h_cg"]`, `car.x0 = car.rest_state()` brings the car back to rest;
+- the 3-D car's speed, measured 2026-11-12 on one cloud machine (CPU, double precision,
+  medians of 5 to 7):
+  - the Python loop over the four wheels costs nothing under JAX: it is unrolled at trace
+    time, and against a version with the four wheels as one vector call (the same `f`, to
+    the bit, on NumPy) a call takes 52 to 56 µs against 50 to 54 µs, a batch of 10 000
+    states 6.9 to 7.1 ms against 6.6 to 7.0 ms, the compile 0.3 to 0.45 s against 0.3 s;
+  - one compiled call takes about 52 µs, against about 6 µs for the drivetrain bicycle. The
+    cause is not found: the attitude, the 3×3 solve and the cross products are 4 to 6 µs
+    each, taken alone;
+  - on NumPy a call takes about 265 µs (80 µs for the drivetrain bicycle), and the
+    simulation tests take 23 to 48 s each with the adaptive solver, which is why they run on
+    JAX. A vector path for the four wheels, when they share one tire law, would likely help
+    there; not measured.
 

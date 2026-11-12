@@ -312,7 +312,7 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   test. Steps, one commit each: **K8-0** the car family to three models (widened by [vehicle-models.md](vehicle-models.md), its steps and their "done when" in [vehicle-models-run.md](vehicle-models-run.md); `KinematicBicycle`,
   `DynamicBicycle`, `UdeSRacecarDyn` on the root; `KinematicCar` and `DynamicBicycleCar3D` merged as
   skins, `UdeSRacecar` a parameter preset, `UdeSRacecarDyn3D` a `wheel_angles=True` option, the
-  notebooks and demos migrated; in review on `dev-vehicle`: the tire and terrain
+  notebooks and demos migrated; merged into `dev` by PR #141 (2026-11-12): the tire and terrain
   modules, `DrivetrainBicycle` with `UdeSRacecarDyn` its preset, `UdeSRacecarDyn3D` as
   `UdeSRacecarDyn(wheel_angles=True)`, `psi`, the wheelbase owned by `a` and `b`, the tires as
   per-wheel parts, one frame set (`KinematicCar` and `DynamicBicycleCar3D` retired), one

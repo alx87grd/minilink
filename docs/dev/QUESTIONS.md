@@ -10,7 +10,7 @@ A ruling the maintainer takes updates the doc it changes (DESIGN, ROADMAP, TODO 
 doc it shapes) in the same change; the commit message carries its why. It then leaves this
 file. The core's architecture is of record: the v0.3 rulings and the v0.4 rulings of
 2026-11-04 to 2026-11-11 live in DESIGN and RULES. Open here: four small names the API
-settlement (PR #139) left, three questions on the car ladder, and one question on the vision.
+settlement (PR #139) left, four questions on the car ladder, one on the architecture, and one on the vision.
 
 ## The API
 
@@ -44,8 +44,7 @@ settlement (PR #139) left, three questions on the car ladder, and one question o
 - **Answer:**
 
 ### The 3-D car's rear axle: locked, or an open differential?
-- **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder, in review on
-  `dev-vehicle`) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
+- **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
   2026-11-11). Measured on the built car against the drivetrain bicycle with the same numbers,
   steady yaw rate at a steer of 0.01 rad, 5 and 15 m/s: 65 % of the bicycle's on the default
   car, 79 % on the off-road preset, 88 % on the formula preset. The two rear tires slip against
@@ -110,6 +109,61 @@ settlement (PR #139) left, three questions on the car ladder, and one question o
 - **Recommendation:** constructor numbers on the terrains and the parts on `minilink.catalog`
   (one way to build a car, one import line); the block waits.
 - **Blocks:** nothing; each is one commit.
+- **Answer:**
+
+### Three small points the car ladder's review left
+- **Context:** the independent review of the car ladder (PR #141) raised three points that
+  change a public signature or name, so each waits for you. They are small and independent.
+  1. *Where `t` sits on the bicycles' hooks.* To read a road that changes with time, the
+     review added the time of the call as an optional last argument:
+     `compute_tire_physics(v, u, params, q, t)`, `contact_friction(q, params, t)`,
+     `generalized_d(q, v, u, params, t)`, `rear_wheel_ground_torque(v, w, delta, params, q, t)`.
+     On the 3-D car it sits before `params`, as on `f`: `contact_forces(x, t, params)`. The
+     trailing form keeps the project folders' positional calls working; those rungs
+     (`BicycleDynTauRate`, `BicycleDynServo`, `BicycleDynEngine`) therefore still read the
+     road at `t = 0`.
+  2. *The numbers and the command limits written twice.* The 3-D car is a model of its own,
+     so the 23 default numbers it shares with the drivetrain bicycle, `bound_commands`,
+     `commands`, `power` and the command ports are written on both classes, source-identical,
+     held together by a test.
+  3. *Two new method names:* `set_numbers(numbers)` (a preset's numbers over the car's own,
+     the command limits and the rest state following) on `DrivetrainBicycle` and
+     `SuspensionCar3D`, and `rest_state()` on the 3-D car.
+- **Options,** per point:
+  1. `t` before `params` everywhere (CONSTITUTION, 'One signature'), with the project folders'
+     calls changed in the same commit; or the trailing form kept and stated.
+  2. One `DRIVETRAIN_PARAMS` constant read by both cars, as `PUBLIC_RACECAR_PARAMS` is, and
+     `bound_commands` as one module helper; or each model's numbers kept on its own page.
+  3. The names kept; or others of your choosing.
+- **Recommendation:** `t` before `params` everywhere once the project folders move to the
+  private repository (the consolidation); the shared constant for the numbers, since a
+  number has one home, the equations staying on each page; the two names kept.
+- **Blocks:** nothing.
+- **Answer:**
+
+## The architecture
+
+### Does the planning framework get a package of its own?
+- **Context:** `minilink.planning` is the largest package (19 093 lines, the core is 17 005).
+  A third of it is not a planner: the 13 files at its top level (6 585 lines) are the
+  framework every planner shares: the problem (`problems.py`, `step_problems.py`,
+  `step_model.py`), the evaluation (`evaluator.py`, `evaluation.py`, `comparison.py`), the
+  solution record (`results.py`), the planner base class and its helpers. The algorithms sit
+  beside it in four subpackages (`trajectory_optimization`, `dynamic_programming`, `search`,
+  `spatial`). CONSTITUTION §1 names `PlanningProblem` and `PlanningSolution` as a foundation
+  beside `System`, and the RL planner in `minilink.learning` builds on them. The package
+  layout was ruled by pillar on 2026-10-24.
+- **Options:**
+  1. *A subpackage inside `planning`* for the framework, beside the four algorithm ones,
+     the facade unchanged (`from minilink.planning import PlanningProblem` still works). No
+     user import moves; the folder shows what the structure already is.
+  2. *Into `core`.* The problem and the solution are core objects by the constitution. Costs:
+     the evaluator runs simulations and compares planners, tool-level code that would grow
+     the core.
+  3. *As it is:* the framework at the package's top level.
+- **Recommendation:** option 1, decided and done during the consolidation's core cut, when
+  it is known which of the 13 files stay.
+- **Blocks:** nothing; it moves no public import.
 - **Answer:**
 
 ## The vision

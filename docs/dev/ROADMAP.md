@@ -833,11 +833,13 @@ release, ROADMAP's former v0.4 features become v0.5. The rows are TODO §1 and �
 of TODO's "Next, in order": what changes a public name or a behaviour first, the surface
 redrafted once on the settled names, the numbers re-pinned once, additive work last.
 
-**Where it stands (2026-11-11).** The first four phases of that order are on `dev`, merged by
+**Where it stands (2026-11-12).** The first four phases of that order are on `dev`, merged by
 PRs #135 and #136 on 2026-11-08, then the API naming sweep (PR #138, 2026-11-08), the
 maintainer's PID autotuning demos with the evaluator's live plot (2026-11-09), the API
 review's defects (2026-11-10) and phase 4b, the API settled before the demo rebuild (PR #139,
-2026-11-11). Their contracts are DESIGN's; every name they changed is in
+2026-11-11), and the car ladder with its independent review (PR #141, 2026-11-12: the tire
+parts, the terrain, the 3-D car on its suspension; docs/plans/vehicle-models.md). Their
+contracts are DESIGN's; every name they changed is in
 §2's breaking changes. Every feature branch is merged: `dev` holds all the work.
 - *Before them, on `dev` after the tag:* the tutorials in three layers (basics, core,
   advanced); the vocabulary of RULES 2.7 and one last answer per object (RULES 2.4), held by
@@ -895,7 +897,8 @@ review's defects (2026-11-10) and phase 4b, the API settled before the demo rebu
 consolidation, not a redraft at equal size: the code converged over v0.3 and v0.4 while what
 surrounds it grew (a test per rule, a doc section per ruling, a plan doc per run). Its success
 is measured in lines removed. The numbers below are orientation for whoever does the work,
-not a budget and not enforced by a check; measured on `dev-vehicle`, tracked files only.
+not a budget and not enforced by a check; measured on `dev` as PR #141 left it, tracked
+files only.
 
 | Part | Today (2026-11-12) | Target after the consolidation |
 | --- | --- | --- |
