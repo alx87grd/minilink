@@ -102,11 +102,9 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ## Tooling
 
-### Three demos hang when run headless
-- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py`, `los_racecar.py` and
-  `examples/demos/rl/ur5_rl_to_bode.py` (at its first animation, still waiting after 11 minutes
-  on 2026-11-12; under 2 minutes with its two animations skipped)
-  compute their run, print the meshcat viewer's URL and then wait: with no browser open on the
-  viewer, the script never ends (the two racecar ones still running after 110 s on a cloud machine, 2026-11-08).
+### Two racecar demos hang when run headless
+- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py` and `los_racecar.py`
+  compute their lap, print the meshcat viewer's URL and then wait: with no browser open on the
+  viewer, the script never ends (both still running after 110 s on a cloud machine, 2026-11-08).
 - **Workaround:** run them interactively, with a browser open on the URL they print.
 - **Fix:** the maintainer's end-of-v0.4 demo rebuild (TODO §1.12, the demo set).

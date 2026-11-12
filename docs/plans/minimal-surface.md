@@ -192,9 +192,9 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
 - **`showcase_jax` and `showcase_from_rl_to_bode` are deleted** (the maintainer,
   2026-11-12). The first is covered by `advanced/05_differentiable`; what it showed that no
   tutorial does (identification by gradient, the C export) is to be covered in the API
-  walk-through or not at all. The second is a demo script,
-  `examples/demos/rl/ur5_rl_to_bode.py`: the UR5, an impedance loop, a learned set-point
-  law, the Bode plot of the learned loop and its region of attraction, a long 3-D run.
+  walk-through or not at all. The second was first kept as a demo script, then deleted too
+  (the maintainer, 2026-11-12): it was a quick test that a Bode plot can be drawn through a
+  neural law, tools plugged together to see whether they connect, not a story worth showing.
 - **The tutorials change the demo list of §4.3.** Three of the thirteen are tutorial
   sections already: demo 1 is `advanced/02_optimal_control` (four planners, one comparison),
   demo 3 the last section of `advanced/05_differentiable`, demo 10 is covered between
@@ -239,23 +239,43 @@ On the maintainer's go, in one run:
   script, which found 46 mismatches and 8 names that did not exist, none now. What the same
   check found in the library is in QUESTIONS.md ("What the check of the core notebooks found
   in the API") and KNOWN_ISSUES ("The compiled evaluators").
-- **The proposed demos are drafted** in `examples/demos_proposed_minimal/`: ten scripts
-  beside the existing ones, its README the list. Eight rewrite or copy an existing script,
-  `cartpole_lqg.py` merges two, `ur5_rl_to_bode.py` is the former showcase. Each ran to
-  its end with its animations skipped.
+- **The proposed demos are drafted** in `examples/demos_proposed_minimal/`, its README the
+  list. The first draft was ten scripts, most of them existing demos copied and tidied;
+  the maintainer refused it the same day: a copy keeps a script's accidents (every option
+  of an API it was written to exercise, a figure too many, a diagram never shown), and a
+  quick test is not a story. The second draft is seven scripts, each redesigned as one
+  story that shows its diagram where the wiring is the point and ends on one plot and one
+  animation:
+  - `cartpole_swingup.py` and `cartpole_lqg.py`, kept, each cut to its story's figures;
+  - `racecar_mpc.py`, rewritten: a plan made on the kinematic bicycle drives the dynamic
+    racecar through an inner speed loop (a PI on the speed, the steering to the servo), the
+    cascade drawn. It replaces the dynamic-model MPC with its three spatial fields, which
+    is research material, and the comparison of path-tracking laws, which is too;
+  - `ur5_impedance.py`, the UR5 in 3-D, in place of the two-link arm;
+  - `drone_learns_to_fly.py` in place of the rocket landing, which does not learn its task
+    (below); at 600 000 steps, 40 s, the drone ends within 0.15 m of its hover and every
+    scored run stays within the limits;
+  - `rrt_star_obstacles.py`, kept;
+  - `offroad_car_game.py`: the 3-D car as the game demo, in place of its open-loop run and
+    of the cart-pole game (matplotlib and pygame together are not yet reliable enough for
+    a kept demo).
+
+  Each ran to its end, with its animation on matplotlib in place of MeshCat and the game
+  replaced by a short simulated run.
 
 Seen while drafting, and left as they are:
 
-- `racecar_mpc.py` reproduces `udes_racecar/mpc_racecar_dynamic.py` to the digit, and
-  that demo does not do what its comments said: in its 5 s the car covers 21.7 m of the
-  36.6 m circuit, not "a little more than one lap", and its centre strays 0.81 m from the
-  line, beyond the 0.6 m lane.
-- `rocket_landing_rl.py` trains as `rl/rocket_landing_rl.py` does, 4 million steps in about
-  two minutes, and scores as it does: over 100 drawn starts, 54 % of the runs stay within
-  the limits and the mean cost is 7.9 × 10⁴. The landing is not learned at this budget.
+- `udes_racecar/mpc_racecar_dynamic.py` does not do what its comments say: in its 5 s the
+  car covers 21.7 m of the 36.6 m circuit, not "a little more than one lap", and its centre
+  strays 0.81 m from the line, beyond the 0.6 m lane.
+- `rl/rocket_landing_rl.py` trains 4 million steps in about two minutes and does not learn
+  the landing: over 100 drawn starts, 54 % of the runs stay within the limits and the mean
+  cost is 7.9 × 10⁴ (this container, JAX 0.12).
+- In `racecar_mpc.py` the car laps on the outer half of its lane, not on the line: the cost
+  only keeps it inside the lane. A pull toward the line (the track's distance field) made
+  the plan stall, and a narrower lane too; neither is in the draft.
 - `Comparison.plot_trajectory` scores an infinite-horizon answer on a default 10 s, with a
   warning, whatever the horizon of the problem it was compared on (`advanced/02`).
-- Three demos wait on the MeshCat viewer when run with no browser (KNOWN_ISSUES).
 
 ### 4.7 The rule that keeps the set small
 

@@ -1,132 +1,125 @@
-"""Racecar MPC: a lap of a closed circuit, past two cones, on a floor slipperier than the plan believes."""
+"""Racecar MPC: a plan made on the kinematic model drives the dynamic car through an inner speed loop."""
 
+import matplotlib.pyplot as plt
 import numpy as np
 
-from minilink import PlanningProblem, QuadraticCost, TrajectoryOptimizationPlanner
-from minilink.catalog import UdeSRacecarDyn
+from minilink import (
+    PI,
+    DiagramSystem,
+    PlanningProblem,
+    QuadraticCost,
+    TrajectoryOptimizationPlanner,
+    UdeSRacecar,
+    UdeSRacecarDyn,
+)
+from minilink.blocks import Demux, Gain
 from minilink.control import ModelPredictiveController
-from minilink.graphical.catalog.racecar_skin import racecar_skin_3d
+from minilink.graphical.catalog import racecar_skin_3d
 from minilink.planning import (
     ReferenceTrack,
     Scene,
     Sphere,
-    car_outline,
     circuit_waypoints,
     from_waypoints,
     mount,
     point_probe,
-    quadratic_excess,
     quadratic_hinge,
 )
-from minilink.planning.trajectory_optimization.mpc import mpc_animation_overlays
 
-V_TARGET = 6.0  # [m/s] asked for everywhere; the corners are what take it back
-TF = 5.0  # [s] the far straight and its cones; a full lap takes about 8.5 s
-MU = 0.6  # [-] the floor's grip; the plan believes in 0.7
+V_CRUISE = 3.0  # [m/s] the speed the plan asks for
+TF = 8.0  # [s] a little more than one lap
 
-# The circuit: a rounded rectangle 36.6 m round, a lane 0.6 m either side of its line
+# The circuit: a rounded rectangle 18 m round, a lane 0.6 m either side of its line,
+# and one cone on the far straight
 
-width = 8.0  # [m]
-
-path = circuit_waypoints(length=12.0, width=width, radius=2.0)
+path = circuit_waypoints(length=6.0, width=4.0, radius=1.0)
 track = ReferenceTrack(from_waypoints(path), half_width=0.6)
+scene = Scene(obstacles=[Sphere((0.0, 2.0), 0.15)])
 
-# Two cones on the far straight, each leaning 0.13 m over the line, one each way: the
-# car has to pick a side, then cross between them. Each is drawn 0.10 m wide with a
-# keep-out of 0.15 m around it
+# The model the plan runs on: the kinematic bicycle, ẋ = v cos ψ, ẏ = v sin ψ,
+# ψ̇ = v tan δ / L. Its two inputs are a speed and a steering angle
 
-cones = [(2.0, 0.5 * width - 0.13), (-2.0, 0.5 * width + 0.13)]
+model = UdeSRacecar()
+model.inputs["u"].lower = np.array([0.0, -0.52])
+model.inputs["u"].upper = np.array([5.0, 0.52])
 
-scene = Scene(obstacles=[Sphere(cone, 0.25) for cone in cones])
-
-# The model the plan runs on: the 1/10 racecar with a little grip to spare, its wheel
-# rate, steering and power kept within what the car has
-
-p_cruise = 15.0  # [W] about what holds V_TARGET on a straight
-
-model = UdeSRacecarDyn()
-model.params["terrain"]["friction"] = 0.7
-r_r = model.params["r_r"]
-delta_max = model.params["delta_max"]
-P_max = model.params["P_max"]
-model.state.lower[6:9] = [0.0, -delta_max, -P_max]
-model.state.upper[6:9] = [3.0 * V_TARGET / r_r, delta_max, P_max]
-
-# The cost: hold the speed, with little steering; keep the car's centre on the line,
-# its footprint inside the lane and 0.30 m clear of the cones. The quadratic part says
-# nothing of where the car is on the map: the three fields do
+# The cost: cruise at V_CRUISE with little steering, stay in the lane, keep 0.2 m
+# clear of the cone
 
 centre = mount(point_probe(), on=model)
-body = mount(car_outline(length=0.34, width=0.20, margin=0.02), on=model)
-
-x_cruise = np.zeros(model.n)
-x_cruise[3] = V_TARGET
-x_cruise[6] = V_TARGET / r_r
-x_cruise[8] = p_cruise
 
 cost = (
     QuadraticCost.from_system(
         model,
-        Q=np.diag([0.0, 0.0, 0.0, 4.0, 1.0, 0.0, 0.0, 2.0, 0.0]),
-        R=np.diag([0.0005, 60.0]),
-        S=np.diag([0.0, 0.0, 0.0, 8.0, 2.0, 0.0, 0.0, 2.0, 0.0]),
-        x_bar=x_cruise,
-        u_bar=np.array([p_cruise, 0.0]),
+        Q=np.zeros((3, 3)),
+        R=np.diag([2.0, 1.0]),
+        u_bar=np.array([V_CRUISE, 0.0]),
     )
-    + track.distance_field(centre).as_cost(
-        weight=60.0, shaping=quadratic_excess(threshold=0.05)
-    )
-    + track.corridor_field(body).as_cost(
-        weight=200.0, shaping=quadratic_hinge(threshold=0.0)
-    )
-    + scene.clearance_field(body).as_cost(
-        weight=400.0, shaping=quadratic_hinge(threshold=0.30)
+    + track.corridor_field(centre).as_cost(weight=20.0, shaping=quadratic_hinge())
+    + scene.clearance_field(centre).as_cost(
+        weight=40.0, shaping=quadratic_hinge(threshold=0.2)
     )
 )
 
-# The start: halfway along the near straight at V_TARGET, 0.15 m beside the line and a
-# hair off its axis (the distance to a line has no derivative on the line itself)
+# The start: on the near straight, 0.1 m beside the line
 
-first = int(np.argmin(np.abs(path[:, 0]) + np.abs(path[:, 1] + 0.5 * width)))
-step = path[(first + 1) % path.shape[0]] - path[first]
-heading = np.arctan2(step[1], step[0]) + 1.0e-4
-start = path[first] + 0.15 * np.array([-np.sin(heading), np.cos(heading)])
+heading = np.arctan2(path[1, 1] - path[0, 1], path[1, 0] - path[0, 0])
+x0 = np.array(
+    [path[0, 0] - 0.1 * np.sin(heading), path[0, 1] + 0.1 * np.cos(heading), heading]
+)
 
-x0 = x_cruise.copy()
-x0[0:3] = [start[0], start[1], heading]
-
-# The law: a plan 1.2 s ahead on 12 intervals, solved again every 0.1 s from the
-# measured state, each solve starting from the last plan
+# The outer loop: a plan 1 s ahead, solved again every 0.1 s from the measured pose
 
 planner = TrajectoryOptimizationPlanner(
-    PlanningProblem(
-        model, x0=x0, cost=cost, X=model.state.box, U=model.input_box, horizon=1.2
-    ),
-    n_steps=12,
-    transcription="direct_collocation",
+    PlanningProblem(model, x0=x0, cost=cost, U=model.input_box, horizon=1.0),
+    n_steps=8,
     backend="jax",
     method="slsqp",
-    options={"maxiter": 60, "ftol": 0.3},
+    options={"maxiter": 40, "ftol": 0.01},
 )
 mpc = ModelPredictiveController(planner, delay=False)
 
-# The loop: the law on its clock, closed on the car on the real floor
+# The car the plan drives: the dynamic racecar, with its tires, its drivetrain and its
+# steering servo. Its inputs are a drive power and a steering command, not a speed
 
-car = UdeSRacecarDyn()
-car.params["terrain"]["friction"] = MU
-car.x0 = x0.copy()
+car = UdeSRacecarDyn(named_ports=True)
+car.x0[0:3] = x0
 car.skin = racecar_skin_3d
-car.camera_scale = 2.0
 
-closed_loop = (mpc % 0.1) @ car
-traj = closed_loop.compute_trajectory(tf=TF, dt=0.002)
+# The inner loop: a PI on the speed turns the plan's speed into a drive power; the
+# plan's steering angle goes to the servo; the car's pose goes back to the plan
 
-closed_loop.plot_trajectory()
-closed_loop.animate(
-    traj.resample(n_samples=250),
-    overlays=mpc_animation_overlays(
-        traj, mpc, loop=closed_loop, scene=scene, track=track
-    ),
-    renderer="meshcat",
-    native=False,
-)
+speed_loop = PI(Kp=40.0, Ki=40.0, ports="reference", u_min=-80.0, u_max=80.0)
+
+inner_loop = DiagramSystem()
+inner_loop.add_subsystem(car, "car")
+inner_loop.add_subsystem(speed_loop, "speed_loop")
+inner_loop.add_subsystem(Demux([1, 1]), "commands")
+inner_loop.add_subsystem(Gain(np.eye(9)[:3]), "pose")
+inner_loop.add_input_port("u", dim=2, nominal_value=np.array([V_CRUISE, 0.0]))
+inner_loop.connect("input", "u", "commands", "u")
+inner_loop.connect("commands", "u[0]", "speed_loop", "r")
+inner_loop.connect("car", "speed", "speed_loop", "y")
+inner_loop.connect("speed_loop", "u", "car", "P_cmd")
+inner_loop.connect("commands", "u[1]", "car", "delta_cmd")
+inner_loop.connect("car", "y", "pose", "u")
+inner_loop.connect_new_output_port("pose", "y", "y")
+inner_loop.plot_diagram()
+
+# The whole loop: the plan on its 10 Hz clock, closed on the inner loop
+
+closed_loop = (mpc % 0.1) @ inner_loop
+traj = closed_loop.compute_trajectory(tf=TF, dt=0.01)
+
+# The lap: the car's path in its lane and round the cone, then the car itself
+
+lap = traj.of("plant")
+bounds = ((-4.5, 4.5), (-3.5, 3.5))
+
+fig, ax = track.plot(bounds=bounds, show=False)
+scene.plot(bounds=bounds, ax=ax, show=False)
+ax.plot(lap.x[0], lap.x[1], label="the car")
+ax.legend()
+plt.show()
+
+inner_loop.animate(lap, renderer="meshcat")

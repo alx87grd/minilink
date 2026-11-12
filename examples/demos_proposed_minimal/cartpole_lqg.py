@@ -41,7 +41,6 @@ R = np.array([[0.1]])
 
 gain = lqr(plant, Q, R, x_bar=x_up)
 observer = kalman(plant, Q_n, R_n, x_bar=x_up)
-print(observer)
 
 # One run: the loop by role, a noise source on each of the plant's two noise ports
 

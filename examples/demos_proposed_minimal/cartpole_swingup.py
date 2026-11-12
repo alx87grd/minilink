@@ -60,9 +60,9 @@ replay.animate()
 controller = lqr_trajectory(
     plant, plan, Q=np.diag([1.0, 10.0, 1.0, 1.0]), R=np.diag([1.0])
 )
-controller.plot_gain_schedule()
-
 closed_loop = controller @ plant
+closed_loop.plot_diagram()
+
 closed_loop.compute_trajectory(tf=2 * TF)
 closed_loop.plot_trajectory()
 closed_loop.animate()
