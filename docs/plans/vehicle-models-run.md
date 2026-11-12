@@ -1,6 +1,6 @@
 # Vehicle models: the run
 
-**Status:** run 1 in review on `vehicle-models-phase1` (VM-5 and VM-8 wait on the maintainer, §6); run 2 not started.  
+**Status:** run 1 in review on `dev-vehicle` (VM-5 and VM-8 wait on the maintainer, §6); run 2 not started.  
 **What it is:** the brief of the automatic runs (AGENTS.md, "Automatic runs") that build
 [vehicle-models.md](vehicle-models.md): the steps in order, one commit each, what proves
 each one, and when to stop and ask. The design is in that plan (its §10 says how the pieces
@@ -13,7 +13,7 @@ Steps are numbered `VM-1`, `VM-2`, … (this doc's own prefix).
 
 ## 1. Rules of the run
 
-- **Branch:** `vehicle-models-phase1` (run 2: `vehicle-models-phase2`), cut from `dev` once
+- **Branch:** `dev-vehicle` (run 1 was built on `vehicle-models-phase1`; run 2: `vehicle-models-phase2`), cut from `dev` once
   the plan is merged there, otherwise from `vehicle-models-plan`. One commit per step, one
   pull request into `dev` at the end, never merged by the agent.
 - **Read first:** AGENTS.md, CONSTITUTION, RULES, the plan, then the tests of the car family

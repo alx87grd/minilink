@@ -45,7 +45,7 @@ settlement (PR #139) left, three questions on the car ladder, and one question o
 
 ### The 3-D car's rear axle: locked, or an open differential?
 - **Context:** the 3-D car (`SuspensionCar3D`, the last rung of the car ladder, in review on
-  `vehicle-models-phase1`) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
+  `dev-vehicle`) drives both rear wheels at one rate `w_rear`, a locked axle (ruled
   2026-11-11). Measured on the built car against the drivetrain bicycle with the same numbers,
   steady yaw rate at a steer of 0.01 rad, 5 and 15 m/s: 65 % of the bicycle's on the default
   car, 79 % on the off-road preset, 88 % on the formula preset. The two rear tires slip against

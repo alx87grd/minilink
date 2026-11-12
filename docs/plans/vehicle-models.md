@@ -1,7 +1,7 @@
 # Vehicle models: a car ladder, a tire module, a terrain, a 3-D car
 
 **Status:** phases 1, 2 and 2b built by run 1 of [vehicle-models-run.md](vehicle-models-run.md),
-in review on `vehicle-models-phase1`. The maintainer was interviewed on 2026-11-11; the answers
+in review on `dev-vehicle`. The maintainer was interviewed on 2026-11-11; the answers
 are recorded in §2. A second review the same day added the rulings at the end of §2's table. An
 independent review of the built branch followed (§11): its fixes that keep names and behaviour
 are applied, and its three design questions wait in [QUESTIONS.md](../dev/QUESTIONS.md).  
@@ -775,7 +775,7 @@ Public names are the maintainer's. The run uses these and lists them in its pull
 
 ## 11. The independent review of the built branch
 
-A second-opinion review of `vehicle-models-phase1` (two independent reviewers, one reproducing
+A second-opinion review of the branch as run 1 left it (two independent reviewers, one reproducing
 the physics, one judging the architecture) found the equations right: momentum balances to
 10⁻¹⁰ on 200 random states on flat ground, a slope and bumps; the loads at rest sum to the
 weight; the load transfer matches theory; the planar rungs are bit-identical to `dev`.
