@@ -4,8 +4,8 @@
 shape (MS-D3), the short-term test restructure (the `slow` marker and `--runslow`), the
 notebooks (MS-D5) and the benchmarks reduced to the regression gate (MS-D6). Left: the
 maintainer's demo rebuild, then the tests' clean slate (MS-D1), the last steps of v0.4. This
-doc keeps what those two need: the constraint, the test layers and their open options, and a
-starting list for the demo set. Its decision ids carry the `MS-` prefix
+doc keeps what those two need: the constraint, the test layers and their open options, and
+the draft of the demo set (§4). Its decision ids carry the `MS-` prefix
 (docs/plans/README.md). The row and its "done when": [TODO.md](TODO.md) §1.12.
 
 ## 1. The goal and the rulings
@@ -17,8 +17,8 @@ knows every demo and every test layer, and a CI that answers in minutes.
   (landed); at the end of v0.4 the maintainer deletes all demos and rebuilds a minimalist set
   himself; once the new demos are what he wants, the test infrastructure is rebuilt from
   scratch around the new library.
-- **MS-D4, the demo set (2026-11-07):** the maintainer's, decided in that rebuild (§4 is a
-  starting list).
+- **MS-D4, the demo set (2026-11-07):** the maintainer's, decided in that rebuild (§4 is the
+  draft he reviews).
 - **MS-D5, notebooks (2026-11-07):** the course notebooks keep their paths, their content the
   maintainer's; the five unique topic pages stay until the repository-structure decision (K5,
   v0.9).
@@ -76,33 +76,102 @@ contract, math, the open layers, or deletion. The obvious ones: **repo rules**
 (MS-D2c), the pyro-port cases inside `test_mechanical_robotics` and `test_dynamics_catalog`.
 The slowest cases (`pytest --durations=40`) are flagged in the sort.
 
-## 4. A starting list for the demo set (MS-D4)
+## 4. The demo set (MS-D4): a draft for the maintainer's review
 
-One demo per core feature, 19 rows, each an existing script (a clean slate or a curated set
-are both open; the maintainer decides in the rebuild):
+**Status:** a draft of 2026-11-12, written on the maintainer's go after he read the proposal;
+the list is his, and each row is open until he rules it. It replaces the 19-row starting list
+of 2026-10-31 (one demo per feature), which kept the shape this section argues against.
 
-| Feature | Demo |
-| --- | --- |
-| A system and its simulation | `core/diagram_closed_loop.py` (a plant, a law, `@`) |
-| Composition | `core/diagram_nested_loop.py` (cascade) |
-| Analysis | `analysis/analysis_linearize.py`, `analysis/analysis_frequency.py` |
-| Classical control | `control/classical_family.py` |
-| State feedback and estimation | `control/lqg_cartpole.py` |
-| Robotics | `robotic/task_impedance_two_link.py` |
-| Sampled loop | `compile/multi_rate_computer.py` |
-| Noise and Monte Carlo | `compile/lqg_monte_carlo.py` |
-| Value iteration | `value_iteration/vi_pendulum_lqr.py` |
-| Trajectory optimization | `trajopt/trajopt_cartpole_collocation_jax.py` |
-| RRT | `rrt/rrt_pendulum_swingup.py` |
-| MPC | `mpc/mpc_car_minimal.py` |
-| MPPI | `mpc/mppi_pendulum.py` |
-| Reinforcement learning | `rl/pendulum_swing_up_rl.py` |
-| Gradients through a loop | `compile/digital_pid_tuning.py` |
-| The core in one script | `compile/differentiable_double_loop.py` |
-| Optimization | `optimization/optim_basic.py` |
-| Animation | `graphical/animation_renderers.py` |
-| Real-time | `realtime/game_cartpole.py` |
+### 4.1 The problem: a demo per plant and per tool
 
-Decided with the set (TODO §1.12): a tabular Q-learning demo beside value iteration, the MPC
-hyperparameter-tuning demo, the cart-pole RL demo's budget; and, drawn from it, the supported
-plants (K8-3) and GMC714's pinned names (G3).
+The catalog holds many plants and the library many tools, so the demo folder tends to hold a
+script per pair. Pyro did, twice over: a folder by system (the pendulum with value iteration,
+with RRT, with MPC) and a folder by tool. Minilink's design removes the reason: any tool takes
+any `System`, and one `PlanningProblem` goes to every planner under one judge, so a script
+whose content is "tool X on plant Y" shows nothing a reader could not write in three lines.
+
+The 94 scripts of `examples/demos/` as counted on 2026-11-12:
+
+- 31 use the pendulum, each with another tool: one row of the table, in 31 files;
+- six racecar scripts and six value-iteration scripts are variants of one another;
+- 29 walk one tool (10 analysis, 7 wiring, 6 step systems, 4 plotting, 2 optimizer), as the
+  19 tutorial notebooks already do, in the same order;
+- seven say in their title that they port a Pyro script.
+
+### 4.2 One home per need
+
+| A reader's need | Its one home | Not |
+| --- | --- | --- |
+| How do I use tool X? | the tutorial notebooks, on the pendulum | a demo per tool |
+| What does plant Y look like? | the plant's own module, run directly (RULES 5.18) | a demo per plant |
+| What can minilink do? | the demos below, each a story | a demo per pair |
+
+A row of the table is one script: one problem handed to every planner and compared in one
+table. A demo is neither filed by system nor by tool: the set is small enough for one flat
+folder, each script named by its plant and its task.
+
+### 4.3 The thirteen
+
+| # | Demo | The story | From |
+| --- | --- | --- | --- |
+| | **The library's thesis** | | |
+| 1 | Pendulum, every planner | one swing-up problem; value iteration, LQR, trajectory optimization, MPPI and RRT; one comparison table | **new**; replaces `vi_pendulum_lqr`, `vi_pendulum_swingup`, `mppi_pendulum`, `rrt_pendulum_swingup`, `evaluate_controller` |
+| 2 | Cart-pole LQG | a Kalman filter and LQR with noise on the ports, scored by Monte Carlo | merges `control/lqg_cartpole` and `compile/lqg_monte_carlo` |
+| 3 | The differentiable double loop | a neural inner loop, an MPC around it, a gradient through both | `compile/differentiable_double_loop` |
+| | **Flagship platforms** | | |
+| 4 | Cart-pole swing-up | a planned trajectory, then LQR along it | `control/trajectory_lqr_cartpole` |
+| 5 | Racecar MPC | model predictive control round a circuit | one of `mpc/mpc_car_minimal`, `udes_racecar/mpc_racecar_dynamic`, `mpc_racecar_kinematic` |
+| 6 | Racecar path tracking | pure pursuit, Stanley and line of sight on one car and circuit | `udes_racecar/path_tracking_racecar_compare` |
+| 7 | Two-link arm | task impedance at the end effector | `robotic/task_impedance_two_link` |
+| 8 | Rocket landing | reinforcement learning on a stochastic problem | `rl/rocket_landing_rl` |
+| 9 | Off-road car | the 3-D car over rolling hills, open loop | `dynamics/offroad_car_3d` |
+| | **The rest of the surface** | | |
+| 10 | Digital PID tuned by gradient | a law on its clock, the loop differentiated | `compile/digital_pid_tuning` |
+| 11 | RRT* among obstacles | a scene, a tree rewiring live | `rrt/rrt_star_live` |
+| 12 | Cart-pole game | the arrow keys, in real time, no hardware | `realtime/game_cartpole` |
+| 13 | The README's examples | runnable, in the README's order | `core/readme_examples` |
+
+Open in the list, each the maintainer's:
+
+- **Demo 1's size.** Five planners in one script is the best showing of "one problem, one
+  judge" and the hardest script to keep short. The bar proposed: about 80 lines and a
+  minute's run. Reinforcement learning stays out of it (training takes minutes) and keeps
+  demo 8; past the bar the script splits in two.
+- **Demo 5's model:** the kinematic racecar (shortest) or the dynamic one (the flagship).
+- **Demo 8's plant:** the rocket, or the drone or the cart-pole (its budget was an open row).
+- **Demo 9 runs outside the 3-D car's stated validity** (hills of 0.8 m; vehicle-models.md
+  §10.7): a flat course with the formula preset is the alternative.
+- **The folder and the file names:** student-facing, not proposed here.
+- The rows the 2026-10-31 list attached (a tabular Q-learning demo beside value iteration,
+  the MPC hyperparameter-tuning demo) are not in the thirteen; they return only as a story.
+
+### 4.4 Where the other scripts go
+
+| Today | Scripts | Goes to |
+| --- | --- | --- |
+| `analysis/` | 10 | the tutorials (analysis and control); none kept |
+| `core/`, `blocks/` | 8 | the tutorials (systems); `readme_examples` kept (13) |
+| `hybrid/` | 6 | the tutorial on discrete and sampled systems; none kept |
+| `graphical/`, `optimization/` | 6 | the tutorials; none kept |
+| `compile/` | 14 | 3 and 10 kept; `lqg_monte_carlo` into 2; the rest to the differentiable tutorial or the private repository |
+| `control/` | 9 | 4 kept; `lqg_cartpole` into 2; the rest to the tutorials, the two Pyro ports out |
+| `value_iteration/` | 6 | into 1; the 4-D cases to the private repository |
+| `mpc/`, `udes_racecar/` | 11 | 5 and 6 kept; `mppi_pendulum` into 1; the rest out |
+| `trajopt/`, `rrt/` | 5 | 11 kept; `rrt_pendulum_swingup` into 1; the corridor scripts out |
+| `rl/` | 4 | 8 kept; the rest out |
+| `robotic/` | 6 | 7 kept; the five others out (four Pyro ports, the custom one-link arm to the tutorials) |
+| `dynamics/` | 4 | 9 kept; Lorenz and the three bodies run from their own modules |
+| `realtime/` | 4 | 12 kept; the gamepad games to the private repository or kept as extras |
+| `evaluation/` | 1 | into 1 |
+
+"Out" is the maintainer's private repository, after the snapshot tag: nothing is deleted
+without a copy. Before a tool's walk-through leaves the demos, its tutorial section is
+checked to exist; the tutorials are reduced after the demos, not with them.
+
+### 4.5 The rule that keeps the set small
+
+- A new demo tells a story none of the others tells.
+- A new plant goes in the catalog, with its own hello-world.
+- A new tool gets a tutorial section, and a line in demo 1 when it is a planner.
+
+Decided with the set (TODO §1.12): the supported plants (K8-3) and GMC714's pinned names (G3).
