@@ -52,7 +52,7 @@ DESIGN §3 is the package map.
 
 | Folder | Content |
 | --- | --- |
-| `tutorial/` | three layers, `basics/` (3), `core/` (8), `advanced/` (5), + 3 showcases |
+| `tutorial/` | three layers, `basics/` (3), `core/` (8), `advanced/` (5), + 1 showcase |
 | `teaching/topics/<domain>/` | 5 notebooks in three domains (two duplicates of GRO860 notebooks deleted in v0.4) |
 | `teaching/courses/udes_gro860/`, `udes_gro501/` | 14 + 6 notebooks, cited by the course documents |
 | `demos/<chapter>/` | scripts in 17 chapters: the package names plus `rrt`, `hybrid`, `mpc`, `realtime`, `robotic`, `udes_racecar` |

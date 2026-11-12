@@ -6,19 +6,6 @@
     ],
     "timeout": 420
   },
-  "examples/tutorial/showcase_jax.ipynb": {
-    "requires": [
-      "jax"
-    ],
-    "timeout": 300
-  },
-  "examples/tutorial/showcase_from_rl_to_bode.ipynb": {
-    "requires": [
-      "jax",
-      "meshcat"
-    ],
-    "timeout": 300
-  },
   "examples/tutorial/basics/01_minilink.ipynb": {
     "requires": [
       "plotly"

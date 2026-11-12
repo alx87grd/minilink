@@ -12,7 +12,7 @@ Start in Colab:
 ```
 examples/
   # --- Teaching Lane (Pedagogical contract: curated, canonical, CI-checked) ---
-  tutorial/                    # basics/ (students), core/ (the foundation), advanced/ (tools) + showcases
+  tutorial/                    # basics/ (students), core/ (the foundation), advanced/ (tools) + the showcase
   teaching/
     topics/<domain>/           # Textbook pages — refactorable (classical_control, optimal_control, …)
     courses/<id>/              # Live course pins (udes_gro860, udes_gro501, later udes_gmc714) — frozen paths
@@ -29,7 +29,7 @@ untested by default (ROADMAP §2).
 
 | Folder | Lane | When to use |
 | --- | --- | --- |
-| [`tutorial/`](tutorial/) | teaching, smoked | Learn **minilink** — numbered API notebooks + showcases |
+| [`tutorial/`](tutorial/) | teaching, smoked | Learn **minilink** — numbered API notebooks + the showcase |
 | [`teaching/topics/`](teaching/topics/) | teaching, smoked unless long | Learn a **subject** — course-agnostic textbook page |
 | [`teaching/courses/<id>/`](teaching/courses/) | teaching, smoked unless long | Homework cited by a live course — do not rename without the notes |
 | [`demos/<chapter>/`](demos/) | teaching, nightly sweep | Canonical single-file demo (incl. pedagogical compares) |
@@ -39,7 +39,7 @@ untested by default (ROADMAP §2).
 
 **Notebook names**
 
-- Tutorial: `NN_<topic>.ipynb` and `showcase_<topic>.ipynb`.
+- Tutorial: `NN_<topic>.ipynb` and `showcase_minilink.ipynb`.
 - Topics and courses: `<plant>_<method>[_vs_<method>…][_sb3].ipynb` (snake_case).
   Plant first when there is one (`pendulum_`, `cartpole_`, `drone_`).
   Name the **method** (`value_iteration`, `lqr`, `ppo`). Add the **task**
@@ -50,7 +50,7 @@ untested by default (ROADMAP §2).
 - The folder carries the audience (`topics/` vs `courses/`) and the domain; do not repeat them in the filename.
 
 **Notebook links** (one map, this file): a tutorial chapter carries at most one same-folder
-**Next** link to its numbered successor; the showcases are self-contained; a teaching
+**Next** link to its numbered successor; the showcase is self-contained; a teaching
 notebook links no other notebook, demo or library source (its Colab badge, the `git clone`
 cell and external library docs stay); demos and projects link no notebook. `teaching/topics/`
 is the textbook; `teaching/courses/<id>/` is a live homework pin.
@@ -83,8 +83,6 @@ folders on GitHub, then open a notebook badge.
 | Notebook | Colab |
 | --- | --- |
 | [showcase_minilink](tutorial/showcase_minilink.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) |
-| [showcase_jax](tutorial/showcase_jax.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb) |
-| [showcase_from_rl_to_bode](tutorial/showcase_from_rl_to_bode.ipynb) | [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) |
 
 #### Basics — students: model, connect, simulate first; each notebook one step deeper
 

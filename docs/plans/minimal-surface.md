@@ -185,11 +185,12 @@ The 19 tutorial notebooks, as read on 2026-11-12, and what the maintainer ruled 
   reinforcement learning then scored and linearized, a gradient through the loop, a batch of
   rollouts), and the same lines on the UR5. 49 cells, 253 code lines, under a minute in the
   notebook checker. A draft for the maintainer's review.
-- **`showcase_jax` and `showcase_from_rl_to_bode` are still in the tree:** they leave once
-  the maintainer has read the new one and the snapshot tag exists. The first is covered by
-  `advanced/05_differentiable`. The second holds a story nothing else tells (the UR5, an
-  impedance loop, a learned set-point law, the Bode plot of the learned loop) and takes
-  about 8 minutes: a candidate for a demo script, which is where a long 3-D run belongs.
+- **`showcase_jax` and `showcase_from_rl_to_bode` are deleted** (the maintainer,
+  2026-11-12). The first is covered by `advanced/05_differentiable`; what it showed that no
+  tutorial does (identification by gradient, the C export) is to be covered in the API
+  walk-through or not at all. The second is a demo script,
+  `examples/demos/rl/ur5_rl_to_bode.py`: the UR5, an impedance loop, a learned set-point
+  law, the Bode plot of the learned loop and its region of attraction, a long 3-D run.
 - **The tutorials change the demo list of §4.3.** Three of the thirteen are tutorial
   sections already: demo 1 is `advanced/02_optimal_control` (four planners, one comparison),
   demo 3 the last section of `advanced/05_differentiable`, demo 10 is covered between

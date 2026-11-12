@@ -37,7 +37,7 @@ the maintainer would and logged in the run's record.
 | The root list regenerated from the rebuilt demos | — | v0.4 (end, with K8-1) | your review of the drafted list (§1.13) |
 | One owner per rule, its two public items | S65 | v0.4 | one set of Monte Carlo defaults for `evaluate` and the planners' evidence; one empty-cache rule for the `compute_*` facades |
 | Where the course material lives; the examples tree | K5 | v0.9 | repository-structure.md's options |
-| The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff; `showcase_jax` waits |
+| The demo sweep to the flatness rule | D1.3 | standing (wave D) | your review of each diff |
 | The planning demos on the solution verbs | D1.4 | standing (wave D) | `solution.plot_*` and `compare(...)` in place of hand-rolled comparisons |
 | Two dead modules | D2 | standing (wave D) | remove `planning/spatial/overlays.py` (with A3) and `experimental/symbolic/mechanics/utils.py` |
 | LQG as a planner | LQGPlanner | v0.5 | `LQGPlanner(problem)` beside `LQRPlanner` |
@@ -51,7 +51,7 @@ the maintainer would and logged in the run's record.
 | Catalog hygiene | S64 | v0.5 | the per-plant clean-ups |
 | Traceable linear analysis | S73 | v0.5 (any time) | `poles`, `frequency_response`, `margins` through the array module, and the sensitivity peaks |
 | The move of the course material | K6 | v0.9 | only if K5 says so |
-| The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook; `showcase_jax`'s `c_export` import |
+| The pinned Colab cell | V6 | v0.9 | a pinned release in every notebook |
 | A lighter git history | V11 | v0.9 | a force-push without notebook outputs (176 MB clone to under 25 MB) |
 | The convergence leftovers | TODO §6 | before V3 | the racecar 3-D skin moved; `Sys2Gym` / `SB3Controller` to the experimental tier; `planning/search/` cut; three facade verbs |
 | The README's two headline examples | — | v0.4 (with the demo rebuild) | the planner comparison's numbers so each planner reaches the goal, and bounds on the co-design example (KNOWN_ISSUES, "The README's examples") |
@@ -337,8 +337,8 @@ feature (K4) became the maintainer's demo rebuild (§1.12).
   gate, run by the nightly job (`pytest tests/experimental`), `c_export`'s flagship smoke kept in
   the JAX regression job (K9-2); the status line on every `minilink/experimental/` module
   docstring (K9-3); `manipulator_eom.ipynb` deleted (it imported the symbolic
-  tier); `showcase_jax.ipynb` keeps its quick C-export demo, the one documented exception beside the
-  flagship smoke (both on `minilink.experimental.c_export`). Left: the unsupported plants' test rows
+  tier); the C-export demo left with `showcase_jax.ipynb` (deleted 2026-11-12), so the flagship
+  smoke is the one exception left on `minilink.experimental.c_export`. Left: the unsupported plants' test rows
   leave with K8-3. Done when CI's gate imports nothing under the tier but those two exceptions,
   and `pip wheel` ships nothing under it.
 - [ ] **The rest of the catalog declares its time constant** (the automatic step's first scope landed:
@@ -489,8 +489,8 @@ maintainer's rebuild keeps (§1.12); the notebooks' are unchanged.
   Also: teaching code stops rebinding `sys` (scan: examples#7); one owner for the
   teaching-facade list the two teaching tests share (scan: tests-ci#7).
 - [ ] **The sweep** (D1.3), one file per step, maintainer reviews each diff **[ask per file]**:
-  the showcases (`showcase_jax.ipynb` first;
-  `showcase_jax` rewritten, awaiting review), then the non-clean demos, then the teaching
+  the showcase (one since 2026-11-12, rewritten from scratch, awaiting review), then the
+  non-clean demos, then the teaching
   notebooks. Done when
   the D1.2 allowlist is empty and the notebook checks pass.
   Also: the placeholder sections of tutorials 01, 02, 03, 05, 08 and 09 filled (scan:
@@ -790,8 +790,7 @@ terms; the v1.0 rows after two cohorts.
   alternative, one `full` extra beside it (one install story). What remains: the Colab setup cell
   clones a pinned release (`git clone --depth 1 -b vX.Y`, the notebooks' relative
   imports of the examples tree keep working) instead of `git clone main`;
-  `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows. `showcase_jax.ipynb`
-  imports `minilink.experimental.c_export`, which the wheel does not ship: settle it here.
+  `COLAB_CLONE` in `tests/unittest/test_repo_contract.py` follows.
   The "pin the course notebooks on `0.2.0` now" option of
   [repository-structure.md](repository-structure.md) §4 waits here (course
   sync is secondary to the order of the waves; the course notebooks keep tracking `main` and

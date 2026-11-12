@@ -78,16 +78,11 @@ Found by running the README's snippets as written (2026-11-09, a 4-core cloud ma
 
 ## Tooling
 
-### Two racecar demos hang when run headless
-- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py` and `los_racecar.py`
-  compute their lap, print the meshcat viewer's URL and then wait: with no browser open on the
-  viewer, the script never ends (both still running after 110 s on a cloud machine, 2026-11-08).
+### Three demos hang when run headless
+- **Symptom:** `examples/demos/udes_racecar/pure_pursuit_racecar.py`, `los_racecar.py` and
+  `examples/demos/rl/ur5_rl_to_bode.py` (at its first animation, still waiting after 11 minutes
+  on 2026-11-12; under 2 minutes with its two animations skipped)
+  compute their run, print the meshcat viewer's URL and then wait: with no browser open on the
+  viewer, the script never ends (the two racecar ones still running after 110 s on a cloud machine, 2026-11-08).
 - **Workaround:** run them interactively, with a browser open on the URL they print.
 - **Fix:** the maintainer's end-of-v0.4 demo rebuild (TODO §1.12, the demo set).
-
-### The RL-to-Bode showcase notebook runs close to the notebook checker's time limit
-- **Symptom:** `showcase_from_rl_to_bode` takes about 8 minutes on a cloud machine (465 s
-  alone, the same before and after the 2026-10-24 restructure); run beside the test suite it
-  hits the checker's 300 s limit.
-- **Workaround:** run the notebook checks alone, or with `--timeout 1000`.
-- **Fix:** none planned; raise its timeout in the notebook checker if CI starts to time out.

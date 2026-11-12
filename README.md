@@ -81,15 +81,28 @@ from minilink import DynamicSystem
 class MassSpringDamper(DynamicSystem):
     def __init__(self):
         super().__init__(state_dim=2, input_dim=1, output_dim=1)
+        self.params = {"m": 1.0, "k": 4.0, "b": 0.3}
 
     def f(self, x, u, t=0, params=None):
-        m, k, b = 1.0, 4.0, 0.3
-        p, v = x
+        params = self.params if params is None else params
+
+        m = params["m"]
+        k = params["k"]
+        b = params["b"]
+
+        p = x[0]
+        v = x[1]
+
+        # m p̈ + b ṗ + k p = u
         a = (u[0] - b * v - k * p) / m
-        return np.array([v, a])
+        dx = np.array([v, a])
+
+        return dx
 
     def h(self, x, u, t=0, params=None):
-        return np.array([x[0]])  # sensor measures position only
+        y = x[0:1]  # the sensor measures the position only
+
+        return y
 
 
 plant = MassSpringDamper()
@@ -300,9 +313,8 @@ import sys; sys.path.insert(0, "/content/minilink")
 ## Learn More & Tutorials
 
 - [Interactive Pitch Deck](https://alx87grd.github.io/minilink/presentation.html) — self-contained 14-slide executive, academic, and industrial presentation deck.
-- [Showcase Notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) — the complete tool ladder demonstrated on real plants.
-- [JAX Showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_jax.ipynb) — write $f$ once, get exact derivatives and batched GPU rollouts.
-- [From RL to Bode Showcase](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_from_rl_to_bode.ipynb) — 6-axis robot, impedance loop, neural policy, and frequency response.
+- [Showcase Notebook](https://github.com/alx87grd/minilink/blob/main/examples/tutorial/showcase_minilink.ipynb) — one pendulum, its equation written once, handed to every tool: a loop, a clock, LQR, three planners, MPC, reinforcement learning, gradients; about a minute to run.
+- [From RL to Bode](https://github.com/alx87grd/minilink/blob/main/examples/demos/rl/ur5_rl_to_bode.py) — a demo script: a 6-axis robot, an impedance loop, a neural policy, and the frequency response of the learned loop.
 - [Tutorials](https://github.com/alx87grd/minilink/tree/main/examples/tutorial) — three layers: `basics/` (model, connect, simulate; start with `01_minilink`), `core/` (the foundation objects and the problem pipeline), `advanced/` (discrete and hybrid loops, optimal control, MPC, RL, differentiable loops).
 - [Teaching Notebooks](https://github.com/alx87grd/minilink/tree/main/examples/teaching) — swing-up control, dynamic programming, and PPO.
 

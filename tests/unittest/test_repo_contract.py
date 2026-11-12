@@ -35,11 +35,7 @@ PROSE_FILES = (
     "README.md",
     "docs/index.rst",
 )
-PROSE_NOTEBOOKS = (
-    "examples/tutorial/showcase_minilink.ipynb",
-    "examples/tutorial/showcase_jax.ipynb",
-    "examples/tutorial/showcase_from_rl_to_bode.ipynb",
-)
+PROSE_NOTEBOOKS = ("examples/tutorial/showcase_minilink.ipynb",)
 
 # 7.6 — documents whose internal links must resolve.
 LINKED_DOCS = (

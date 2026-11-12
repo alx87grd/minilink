@@ -210,7 +210,7 @@ concrete formatting, ordered by the cost of being wrong:
   merely lists the files in that folder. The existing maps (root `README.md`,
   `examples/README.md`, `tests/README.md`) stay the maps; leaf demo folders do not get
   a second copy. Do not add new markdown guides unless the maintainer asks.
-- **3.7 Intro surfaces stay canonical.** README.md, the three showcase notebooks, and
+- **3.7 Intro surfaces stay canonical.** README.md, the showcase notebook, and
   `examples/tutorial/` present the main core tools: `System`, diagrams, simulate,
   compile, analysis, planning trajopt, the sampled step path (`StepSystem`,
   `StepDiagramSystem`, `SampledSystem`, `SampledDiagramSystem`), and MPC as its exemplar.
@@ -587,7 +587,7 @@ concrete formatting, ordered by the cost of being wrong:
   wall-clock cap is not the rule (trajopt and RL cells may take longer).
 - **6.8 Demo-gate maturity.** Does it meet the teaching surface's entry rule before it enters?
   Contract: ROADMAP §2.
-- **6.9 Public-facing prose is foundational, not a bake-off.** README, the three showcases,
+- **6.9 Public-facing prose is foundational, not a bake-off.** README, the showcase,
   and the docs landing page stay positive about minilink and never name
   other tools. Framing: minilink bridges capabilities that usually live in separate tools.
   No superlatives; speed claims follow DESIGN §5 (batches, never a per-call ratio). The main
